@@ -266,57 +266,59 @@
       }
     }
     
-    async function login(supabase, isAdmin) {
+   async function login(supabase, isAdmin) {
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
 
-  if (!email || !password) {
-    showError('Введите email и пароль');
-    return;
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    showError('Неверный формат email');
-    return;
-  }
+  console.log('🔍 Отладочная информация:');
+  console.log('Email:', email);
+  console.log('Password:', password);
+  console.log('Supabase URL:', window.SUPABASE_URL);
 
   try {
     document.getElementById('loginBtn').disabled = true;
     document.getElementById('adminLoginBtn').disabled = true;
     showWarning('🔐 Проверяем данные...');
     
-    // ИСПРАВЛЕННЫЙ ЗАПРОС - проверяем только в вашей кастомной таблице
+    // ТЕСТОВЫЙ ЗАПРОС - сначала проверим просто наличие пользователя
+    console.log('🔄 Выполняем запрос к Supabase...');
+    
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('email', email)
       .eq('password_hash', password)
       .single();
-    
-    if (userError || !user) {
+
+    console.log('📊 Результат запроса:');
+    console.log('Data:', user);
+    console.log('Error:', userError);
+    console.log('Error details:', userError?.details);
+    console.log('Error message:', userError?.message);
+    console.log('Error hint:', userError?.hint);
+
+    if (userError) {
+      console.error('❌ Ошибка Supabase:', userError);
+      showError('❌ Ошибка базы данных: ' + userError.message);
+      document.getElementById('loginBtn').disabled = false;
+      document.getElementById('adminLoginBtn').disabled = false;
+      return;
+    }
+
+    if (!user) {
+      console.log('❌ Пользователь не найден');
       showError('❌ Неверный email или пароль');
       document.getElementById('loginBtn').disabled = false;
       document.getElementById('adminLoginBtn').disabled = false;
       return;
     }
 
-    // Сохраняем пользователя в localStorage
-    localStorage.setItem('currentUser', JSON.stringify(user));
-
-    if (isAdmin) {
-      if (user.is_admin) {
-        window.location.href = "/admin.html";
-      } else {
-        showError('❌ У вас нет прав администратора');
-        document.getElementById('loginBtn').disabled = false;
-        document.getElementById('adminLoginBtn').disabled = false;
-      }
-    } else {
-      window.location.href = "/profile.html";
-    }
+    console.log('✅ Пользователь найден:', user);
+    
+    // Остальной код...
+    
   } catch (error) {
-    console.error('Unexpected login error:', error);
+    console.error('💥 Неожиданная ошибка:', error);
     showError('❌ Неожиданная ошибка: ' + error.message);
     document.getElementById('loginBtn').disabled = false;
     document.getElementById('adminLoginBtn').disabled = false;
