@@ -267,61 +267,61 @@
     }
     
     async function login(supabase, isAdmin) {
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
 
-      if (!email || !password) {
-        showError('Введите email и пароль');
-        return;
-      }
+  if (!email || !password) {
+    showError('Введите email и пароль');
+    return;
+  }
 
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        showError('Неверный формат email');
-        return;
-      }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    showError('Неверный формат email');
+    return;
+  }
 
-      try {
-        document.getElementById('loginBtn').disabled = true;
-        document.getElementById('adminLoginBtn').disabled = true;
-        showWarning('🔐 Проверяем данные...');
-        
-        // Используем кастомную аутентификацию через нашу таблицу users
-        const { data: user, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', email)
-          .eq('password_hash', password) // В реальной системе нужно использовать хеширование!
-          .single();
-        
-        if (userError || !user) {
-          showError('❌ Неверный email или пароль');
-          document.getElementById('loginBtn').disabled = false;
-          document.getElementById('adminLoginBtn').disabled = false;
-          return;
-        }
+  try {
+    document.getElementById('loginBtn').disabled = true;
+    document.getElementById('adminLoginBtn').disabled = true;
+    showWarning('🔐 Проверяем данные...');
+    
+    // ИСПРАВЛЕННЫЙ ЗАПРОС - проверяем только в вашей кастомной таблице
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .eq('password_hash', password)
+      .single();
+    
+    if (userError || !user) {
+      showError('❌ Неверный email или пароль');
+      document.getElementById('loginBtn').disabled = false;
+      document.getElementById('adminLoginBtn').disabled = false;
+      return;
+    }
 
-        // Сохраняем пользователя в localStorage для последующих проверок
-        localStorage.setItem('currentUser', JSON.stringify(user));
+    // Сохраняем пользователя в localStorage
+    localStorage.setItem('currentUser', JSON.stringify(user));
 
-        if (isAdmin) {
-          if (user.is_admin) {
-            window.location.href = "/admin.html";
-          } else {
-            showError('❌ У вас нет прав администратора');
-            document.getElementById('loginBtn').disabled = false;
-            document.getElementById('adminLoginBtn').disabled = false;
-          }
-        } else {
-          window.location.href = "/profile.html";
-        }
-      } catch (error) {
-        console.error('Unexpected login error:', error);
-        showError('❌ Неожиданная ошибка: ' + error.message);
+    if (isAdmin) {
+      if (user.is_admin) {
+        window.location.href = "/admin.html";
+      } else {
+        showError('❌ У вас нет прав администратора');
         document.getElementById('loginBtn').disabled = false;
         document.getElementById('adminLoginBtn').disabled = false;
       }
+    } else {
+      window.location.href = "/profile.html";
     }
+  } catch (error) {
+    console.error('Unexpected login error:', error);
+    showError('❌ Неожиданная ошибка: ' + error.message);
+    document.getElementById('loginBtn').disabled = false;
+    document.getElementById('adminLoginBtn').disabled = false;
+  }
+}
     
     if (window.SUPABASE_URL) {
       initApp();
