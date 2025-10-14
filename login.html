@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Вход — Edu Platform</title>
+  <title>Вход — Edu Keys</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
   <style>
@@ -11,7 +11,7 @@
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      background: linear-gradient(135deg, #fdd835, #f48fb1);
       font-family: 'Poppins', 'Comic Sans MS', cursive, sans-serif;
       margin: 0;
       padding: 20px;
@@ -79,10 +79,22 @@
     .btn.admin:hover {
       box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
     }
+    .btn.help {
+      background: linear-gradient(135deg, #2196F3, #21CBF3);
+      margin-top: 15px;
+    }
     .link {
       margin-top: 20px;
       font-size: 14px;
       color: #666;
+    }
+    .link a {
+      color: var(--accent2);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .link a:hover {
+      text-decoration: underline;
     }
     .error, .success, .warning {
       padding: 12px;
@@ -120,6 +132,111 @@
       animation: spin 1s linear infinite;
       margin: 0 auto 10px;
     }
+    .existing-account-help {
+      background: #e8f5e8;
+      border: 1px solid #c8e6c9;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    /* Стили для модального окна помощи */
+    .help-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      padding: 20px;
+    }
+    .help-modal-content {
+      background: white;
+      border-radius: 16px;
+      max-width: 800px;
+      width: 100%;
+      max-height: 90vh;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .help-modal-header {
+      padding: 20px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .help-modal-tabs {
+      display: flex;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .help-tab {
+      flex: 1;
+      padding: 15px;
+      border: none;
+      background: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .help-tab.active {
+      background: white;
+      color: var(--accent2);
+      border-bottom: 3px solid var(--accent2);
+    }
+    .help-tab-content {
+      display: none;
+      padding: 0;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    .help-tab-content.active {
+      display: block;
+    }
+    .help-image {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .help-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+      padding: 5px;
+    }
+    .help-close:hover {
+      color: #333;
+    }
+    .image-loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    /* Индикатор предзагрузки */
+    .preload-status {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      z-index: 9999;
+      display: none;
+    }
+
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -149,15 +266,66 @@
         padding: 14px 20px;
         font-size: 16px;
       }
+      
+      .help-modal-content {
+        margin: 10px;
+        max-height: 85vh;
+      }
+      
+      .help-modal-tabs {
+        flex-direction: column;
+      }
+      
+      .help-tab {
+        padding: 12px;
+      }
+
+      .preload-status {
+        bottom: 10px;
+        right: 10px;
+        font-size: 10px;
+      }
     }
   </style>
   
   <script src="/load-config.js"></script>
 </head>
 <body>
+  <!-- Индикатор предзагрузки -->
+  <div class="preload-status" id="preloadStatus">
+    <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
+    Предзагружаем помощь...
+  </div>
+
+  <!-- Модальное окно помощи -->
+  <div class="help-modal" id="helpModal">
+    <div class="help-modal-content">
+      <div class="help-modal-header">
+        <h3 style="margin: 0; color: #333;">📚 Помощь по платформе</h3>
+        <button class="help-close" id="closeHelpModal">✕</button>
+      </div>
+      <div class="help-modal-tabs">
+        <button class="help-tab active" data-tab="registration">📝 Регистрация</button>
+        <button class="help-tab" data-tab="rules">📋 Правила</button>
+      </div>
+      <div class="help-tab-content active" id="registrationContent">
+        <div class="image-loading">
+          <div class="spinner"></div>
+          <p>Загружаем инструкцию по регистрации...</p>
+        </div>
+      </div>
+      <div class="help-tab-content" id="rulesContent">
+        <div class="image-loading">
+          <div class="spinner"></div>
+          <p>Загружаем правила платформы...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="login-container">
     <div class="login-card">
-      <h2>Вход в образовательную платформу</h2>
+      <h2>Вход в Edu Keys</h2>
       
       <div id="loading" class="loading">
         <div class="spinner"></div>
@@ -171,7 +339,7 @@
       <div id="loginForm" style="display: none;">
         <div class="form-group">
           <label for="email">Email:</label>
-          <input type="email" id="email" placeholder="example@school.edu" autocomplete="email">
+          <input type="email" id="email" placeholder="example@gmail.com" autocomplete="email">
         </div>
 
         <div class="form-group">
@@ -183,13 +351,211 @@
         <button class="btn admin" id="adminLoginBtn">Войти как администратор</button>
 
         <div class="link">
-          <p>Обратитесь к администратору для получения доступа</p>
+          <p>Нет аккаунта? <a href="/register.html">Зарегистрироваться</a></p>
+          <p><a href="/reset.html">Забыли пароль?</a></p>
+          <button class="btn help" id="helpBtn">❓ Помощь по платформе</button>
         </div>
       </div>
     </div>
   </div>
 
   <script type="module">
+    // ===== УЛУЧШЕННАЯ СИСТЕМА ПОМОЩИ С ПРЕДЗАГРУЗКОЙ И ОБХОДОМ КЭША =====
+    function initHelpSystem(supabase) {
+      const helpModal = document.getElementById('helpModal');
+      const helpBtn = document.getElementById('helpBtn');
+      const closeHelpBtn = document.getElementById('closeHelpModal');
+      const helpTabs = document.querySelectorAll('.help-tab');
+      const tabContents = document.querySelectorAll('.help-tab-content');
+      const preloadStatus = document.getElementById('preloadStatus');
+      
+      // Объект для хранения предзагруженных изображений
+      const preloadedImages = {
+        registration: null,
+        rules: null
+      };
+
+      // Статусы загрузки
+      let imagesLoaded = {
+        registration: false,
+        rules: false
+      };
+
+      // Функция для получения публичного URL изображения из Storage С ПАРАМЕТРОМ ВЕРСИИ
+      function getHelpImageUrl(imageName) {
+        // Добавляем параметр версии чтобы избежать кэширования
+        const version = new Date().getTime(); // timestamp в миллисекундах
+        return `${window.SUPABASE_URL}/storage/v1/object/public/help-images/${imageName}?v=${version}`;
+      }
+
+      // Функция предзагрузки изображений
+      async function preloadHelpImages() {
+        preloadStatus.style.display = 'block';
+        console.log('🔄 Начинаем предзагрузку изображений помощи...');
+
+        const imagesToPreload = [
+          { name: 'registration', url: 'registration-help.png' },
+          { name: 'rules', url: 'rules-help.png' }
+        ];
+
+        const preloadPromises = imagesToPreload.map(({ name, url }) => {
+          return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              preloadedImages[name] = img;
+              imagesLoaded[name] = true;
+              console.log(`✅ Предзагружено: ${name}`);
+              updatePreloadStatus();
+              resolve(name);
+            };
+            img.onerror = () => {
+              console.warn(`❌ Не удалось предзагрузить: ${name}`);
+              // Пробуем загрузить без кэша
+              loadWithoutCache(name, url).then(resolve);
+            };
+            // ДОБАВЛЯЕМ ПАРАМЕТР ВЕРСИИ ДЛЯ ОБХОДА КЭША
+            img.src = getHelpImageUrl(url);
+          });
+        });
+
+        await Promise.allSettled(preloadPromises);
+        
+        // Скрываем индикатор через 2 секунды
+        setTimeout(() => {
+          preloadStatus.style.display = 'none';
+        }, 2000);
+      }
+
+      // Дополнительная функция для загрузки без кэша
+      async function loadWithoutCache(tabName, imageName) {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            preloadedImages[tabName] = img;
+            imagesLoaded[tabName] = true;
+            console.log(`✅ Загружено без кэша: ${tabName}`);
+            updatePreloadStatus();
+            resolve(tabName);
+          };
+          img.onerror = () => {
+            console.warn(`❌ Окончательно не удалось загрузить: ${tabName}`);
+            updatePreloadStatus();
+            resolve(tabName);
+          };
+          // Используем другой параметр для обхода кэша
+          const timestamp = new Date().getTime();
+          img.src = `${window.SUPABASE_URL}/storage/v1/object/public/help-images/${imageName}?timestamp=${timestamp}&nocache=${Math.random()}`;
+        });
+      }
+
+      // Обновление статуса предзагрузки
+      function updatePreloadStatus() {
+        const loadedCount = Object.values(imagesLoaded).filter(Boolean).length;
+        const totalCount = Object.keys(imagesLoaded).length;
+        preloadStatus.innerHTML = `
+          <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
+          Помощь: ${loadedCount}/${totalCount}
+        `;
+      }
+
+      // Функция загрузки изображения помощи (использует предзагруженные)
+      function loadHelpImage(tabName) {
+        const contentDiv = document.getElementById(`${tabName}Content`);
+        
+        // Если изображение уже предзагружено, используем его
+        if (imagesLoaded[tabName] && preloadedImages[tabName]) {
+          contentDiv.innerHTML = '';
+          const img = preloadedImages[tabName].cloneNode();
+          img.className = 'help-image';
+          img.alt = tabName === 'registration' ? 'Инструкция по регистрации' : 'Правила платформы';
+          contentDiv.appendChild(img);
+          return;
+        }
+
+        // Fallback: загружаем обычным способом с обходом кэша
+        const imageName = tabName === 'registration' ? 'registration-help.png' : 'rules-help.png';
+        
+        const img = document.createElement('img');
+        img.className = 'help-image';
+        img.alt = tabName === 'registration' ? 'Инструкция по регистрации' : 'Правила платформы';
+        
+        // ДОБАВЛЯЕМ ПАРАМЕТР ДЛЯ ОБХОДА КЭША
+        img.src = getHelpImageUrl(imageName);
+        
+        img.onload = () => {
+          contentDiv.innerHTML = '';
+          contentDiv.appendChild(img);
+        };
+        
+        img.onerror = () => {
+          showImageError(contentDiv, tabName);
+        };
+      }
+
+      // Функция показа ошибки загрузки изображения
+      function showImageError(contentDiv, tabName) {
+        const title = tabName === 'registration' ? '📝 Инструкция по регистрации' : '📋 Правила платформы';
+        const message = tabName === 'registration' 
+          ? 'Изображение инструкции временно недоступно. Обратитесь к администратору.'
+          : 'Изображение правил временно недоступно. Обратитесь к администратору.';
+        
+        contentDiv.innerHTML = `
+          <div style="padding: 40px; text-align: center;">
+            <h3>${title}</h3>
+            <p>${message}</p>
+            <p class="small-muted">Если проблема повторяется, свяжитесь с администратором: @skebobingg</p>
+          </div>
+        `;
+      }
+
+      // Открытие модального окна
+      helpBtn.addEventListener('click', async () => {
+        helpModal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        
+        // Показываем предзагруженные изображения
+        loadHelpImage('registration');
+        loadHelpImage('rules');
+      });
+      
+      // Закрытие модального окна
+      closeHelpBtn.addEventListener('click', () => {
+        helpModal.style.display = 'none';
+        document.body.style.overflow = '';
+      });
+      
+      // Закрытие по клику на фон
+      helpModal.addEventListener('click', (e) => {
+        if (e.target === helpModal) {
+          helpModal.style.display = 'none';
+          document.body.style.overflow = '';
+        }
+      });
+      
+      // Закрытие по Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && helpModal.style.display === 'flex') {
+          helpModal.style.display = 'none';
+          document.body.style.overflow = '';
+        }
+      });
+      
+      // Переключение вкладок
+      helpTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          helpTabs.forEach(t => t.classList.remove('active'));
+          tabContents.forEach(c => c.classList.remove('active'));
+          
+          tab.classList.add('active');
+          const tabName = tab.getAttribute('data-tab');
+          document.getElementById(`${tabName}Content`).classList.add('active');
+        });
+      });
+
+      // Запускаем предзагрузку при инициализации
+      preloadHelpImages();
+    }
+
     function showError(message) {
       const errorEl = document.getElementById('errorMessage');
       errorEl.textContent = message;
@@ -217,7 +583,57 @@
       document.getElementById('loading').style.display = 'none';
     }
 
-    async function initApp() {
+    async function handleEmailConfirmation(supabase) {
+      if (window.location.hash) {
+        try {
+          showWarning('🔐 Обрабатываем подтверждение email...');
+          
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          const type = hashParams.get('type');
+          
+          console.log('Hash params:', { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
+
+          if (type === 'signup' && accessToken) {
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+
+            if (error) {
+              throw new Error(`Ошибка установки сессии: ${error.message}`);
+            }
+
+            if (data.user) {
+              if (data.user.email_confirmed_at) {
+                showSuccess('✅ Email успешно подтвержден! Сейчас вы будете перенаправлены...');
+                
+                await supabase.auth.signOut();
+                
+                window.history.replaceState(null, null, window.location.pathname + '?message=confirmed');
+                
+                setTimeout(() => {
+                  window.location.href = '/login.html?message=confirmed';
+                }, 3000);
+                return true;
+              } else {
+                throw new Error('Email не был подтвержден');
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Email confirmation error:', error);
+          showError(`❌ Ошибка подтверждения email: ${error.message}`);
+          
+          window.history.replaceState(null, null, window.location.pathname);
+          return false;
+        }
+      }
+      return false;
+    }
+    
+    function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации системы');
         return;
@@ -226,17 +642,39 @@
       document.getElementById('loginForm').style.display = 'block';
       document.getElementById('loading').style.display = 'none';
       
+      const urlParams = new URLSearchParams(window.location.search);
+      const message = urlParams.get('message');
+      
+      if (message === 'confirmed') {
+        showSuccess('✅ Email успешно подтвержден! Теперь вы можете войти в систему.');
+        
+        const helpDiv = document.createElement('div');
+        helpDiv.className = 'existing-account-help';
+        helpDiv.innerHTML = '<strong>🎉 Отлично! Ваш аккаунт активирован.</strong><br>Теперь вы можете войти в систему используя ваш email и пароль.';
+        document.getElementById('loginForm').insertBefore(helpDiv, document.getElementById('loginForm').firstChild);
+      } else if (message === 'check_email') {
+        showWarning('📧 Проверьте вашу почту для подтверждения регистрации.');
+      } else if (message === 'email_exists') {
+        showError('❌ Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.');
+      }
+      
       import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm')
         .then(({ createClient }) => {
           const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
           
-          // Проверяем, есть ли уже авторизованный пользователь в localStorage
-          const userStr = localStorage.getItem('currentUser');
-          if (userStr) {
-            console.log('👤 Пользователь уже авторизован');
-            const user = JSON.parse(userStr);
-            checkUserRoleAndRedirect(user);
-          }
+          // Инициализируем систему помощи с предзагрузкой
+          initHelpSystem(supabase);
+          
+          handleEmailConfirmation(supabase).then(handled => {
+            if (!handled) {
+              supabase.auth.getUser().then(({ data: { user } }) => {
+                if (user) {
+                  console.log('👤 Пользователь уже авторизован');
+                  checkUserRoleAndRedirect(user);
+                }
+              });
+            }
+          });
           
           document.getElementById('loginBtn').addEventListener('click', () => login(supabase, false));
           document.getElementById('adminLoginBtn').addEventListener('click', () => login(supabase, true));
@@ -259,71 +697,109 @@
     }
 
     async function checkUserRoleAndRedirect(user) {
-      if (user.is_admin) {
+      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+      const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single();
+        
+      if (profile && profile.is_admin) {
         window.location.href = "/admin.html";
       } else {
         window.location.href = "/profile.html";
       }
     }
     
-   async function login(supabase, isAdmin) {
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
+    async function login(supabase, isAdmin) {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
 
-  console.log('🔍 Отладочная информация:');
-  console.log('Email:', email);
-  console.log('Password:', password);
-  console.log('Supabase URL:', window.SUPABASE_URL);
+      if (!email || !password) {
+        showError('Введите email и пароль');
+        return;
+      }
 
-  try {
-    document.getElementById('loginBtn').disabled = true;
-    document.getElementById('adminLoginBtn').disabled = true;
-    showWarning('🔐 Проверяем данные...');
-    
-    // ТЕСТОВЫЙ ЗАПРОС - сначала проверим просто наличие пользователя
-    console.log('🔄 Выполняем запрос к Supabase...');
-    
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .eq('password_hash', password)
-      .single();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showError('Неверный формат email');
+        return;
+      }
 
-    console.log('📊 Результат запроса:');
-    console.log('Data:', user);
-    console.log('Error:', userError);
-    console.log('Error details:', userError?.details);
-    console.log('Error message:', userError?.message);
-    console.log('Error hint:', userError?.hint);
+      try {
+        document.getElementById('loginBtn').disabled = true;
+        document.getElementById('adminLoginBtn').disabled = true;
+        showWarning('🔐 Проверяем данные...');
+        
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        
+        if (error) {
+          console.error('Login error details:', error);
+          
+          if (error.message?.includes('Invalid login credentials') || error.code === 'invalid_credentials') {
+            showError('❌ Неверный email или пароль. Если вы забыли пароль, воспользуйтесь восстановлением.');
+          } else if (error.message?.includes('Email not confirmed') || error.code === 'email_not_confirmed') {
+            showError('❌ Email не подтвержден. Проверьте вашу почту и подтвердите регистрацию.');
+            
+            const resend = confirm('Отправить письмо с подтверждением повторно?');
+            if (resend) {
+              const { error: resendError } = await supabase.auth.resend({
+                type: 'signup',
+                email: email
+              });
+              
+              if (!resendError) {
+                showSuccess('📧 Письмо с подтверждением отправлено повторно. Проверьте вашу почту.');
+              }
+            }
+          } else if (error.message?.includes('rate limit') || error.code === 'rate_limit_exceeded') {
+            showError('⚠️ Слишком много попыток. Попробуйте через несколько минут.');
+          } else if (error.message?.includes('User not found')) {
+            showError('❌ Пользователь с таким email не найден. Проверьте email или зарегистрируйтесь.');
+          } else {
+            showError('❌ Ошибка входа: ' + (error.message || 'Неизвестная ошибка'));
+          }
+          
+          document.getElementById('loginBtn').disabled = false;
+          document.getElementById('adminLoginBtn').disabled = false;
+          return;
+        }
 
-    if (userError) {
-      console.error('❌ Ошибка Supabase:', userError);
-      showError('❌ Ошибка базы данных: ' + userError.message);
-      document.getElementById('loginBtn').disabled = false;
-      document.getElementById('adminLoginBtn').disabled = false;
-      return;
+        if (data.user && !data.user.email_confirmed_at) {
+          showError('❌ Email не подтвержден. Проверьте вашу почту для завершения регистрации.');
+          await supabase.auth.signOut();
+          document.getElementById('loginBtn').disabled = false;
+          document.getElementById('adminLoginBtn').disabled = false;
+          return;
+        }
+
+        if (isAdmin) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', data.user.id)
+            .single();
+            
+          if (profile && profile.is_admin) {
+            window.location.href = "/admin.html";
+          } else {
+            showError('❌ У вас нет прав администратора');
+            await supabase.auth.signOut();
+            document.getElementById('loginBtn').disabled = false;
+            document.getElementById('adminLoginBtn').disabled = false;
+          }
+        } else {
+          window.location.href = "/profile.html";
+        }
+      } catch (error) {
+        console.error('Unexpected login error:', error);
+        showError('❌ Неожиданная ошибка: ' + error.message);
+        document.getElementById('loginBtn').disabled = false;
+        document.getElementById('adminLoginBtn').disabled = false;
+      }
     }
-
-    if (!user) {
-      console.log('❌ Пользователь не найден');
-      showError('❌ Неверный email или пароль');
-      document.getElementById('loginBtn').disabled = false;
-      document.getElementById('adminLoginBtn').disabled = false;
-      return;
-    }
-
-    console.log('✅ Пользователь найден:', user);
-    
-    // Остальной код...
-    
-  } catch (error) {
-    console.error('💥 Неожиданная ошибка:', error);
-    showError('❌ Неожиданная ошибка: ' + error.message);
-    document.getElementById('loginBtn').disabled = false;
-    document.getElementById('adminLoginBtn').disabled = false;
-  }
-}
     
     if (window.SUPABASE_URL) {
       initApp();
