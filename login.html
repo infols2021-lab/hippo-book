@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Вход — Edu Platform</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      font-family: 'Poppins', 'Comic Sans MS', cursive, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    .login-container {
+      width: 100%;
+      max-width: 400px;
+    }
+    .login-card {
+      background: #fff;
+      padding: 25px;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .login-card h2 {
+      margin: 0 0 20px 0;
+      color: #333;
+      font-size: 1.5rem;
+    }
+    .form-group {
+      margin-bottom: 15px;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: #333;
+    }
+    .login-card input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #f0f0f0;
+      border-radius: 12px;
+      box-sizing: border-box;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    .login-card input:focus {
+      border-color: var(--accent2);
+      outline: none;
+    }
+    .btn {
+      background: var(--accent2);
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 10px;
+      width: 100%;
+      font-size: 16px;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(78, 205, 196, 0.3);
+    }
+    .btn.admin {
+      background: var(--accent);
+      margin-top: 8px;
+    }
+    .btn.admin:hover {
+      box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
+    }
+    .link {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+    .error, .success, .warning {
+      padding: 12px;
+      border-radius: 8px;
+      margin: 15px 0;
+      display: none;
+      font-size: 14px;
+    }
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #ffcdd2;
+    }
+    .success {
+      background: #e8f5e8;
+      color: #2e7d32;
+      border: 1px solid #c8e6c9;
+    }
+    .warning {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    .loading {
+      display: none;
+      margin: 15px 0;
+      text-align: center;
+    }
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid var(--accent2);
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Мобильные стили */
+    @media (max-width: 480px) {
+      body {
+        padding: 15px;
+      }
+      .login-container {
+        max-width: 100%;
+      }
+      .login-card {
+        padding: 20px;
+        border-radius: 16px;
+      }
+      .login-card h2 {
+        font-size: 1.3rem;
+        margin-bottom: 15px;
+      }
+      .login-card input {
+        padding: 14px 16px;
+        font-size: 16px;
+      }
+      .btn {
+        padding: 14px 20px;
+        font-size: 16px;
+      }
+    }
+  </style>
+  
+  <script src="/load-config.js"></script>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <h2>Вход в образовательную платформу</h2>
+      
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Загружаем конфигурацию...</p>
+      </div>
+      
+      <div id="errorMessage" class="error"></div>
+      <div id="successMessage" class="success"></div>
+      <div id="warningMessage" class="warning"></div>
+      
+      <div id="loginForm" style="display: none;">
+        <div class="form-group">
+          <label for="email">Email:</label>
+          <input type="email" id="email" placeholder="example@school.edu" autocomplete="email">
+        </div>
+
+        <div class="form-group">
+          <label for="password">Пароль:</label>
+          <input type="password" id="password" placeholder="Введите ваш пароль" autocomplete="current-password">
+        </div>
+
+        <button class="btn" id="loginBtn">Войти как ученик</button>
+        <button class="btn admin" id="adminLoginBtn">Войти как администратор</button>
+
+        <div class="link">
+          <p>Обратитесь к администратору для получения доступа</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    function showError(message) {
+      const errorEl = document.getElementById('errorMessage');
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
+      document.getElementById('successMessage').style.display = 'none';
+      document.getElementById('warningMessage').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+    function showSuccess(message) {
+      const successEl = document.getElementById('successMessage');
+      successEl.textContent = message;
+      successEl.style.display = 'block';
+      document.getElementById('errorMessage').style.display = 'none';
+      document.getElementById('warningMessage').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
+    }
+
+    function showWarning(message) {
+      const warningEl = document.getElementById('warningMessage');
+      warningEl.textContent = message;
+      warningEl.style.display = 'block';
+      document.getElementById('errorMessage').style.display = 'none';
+      document.getElementById('successMessage').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
+    }
+
+    async function initApp() {
+      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+        showError('❌ Ошибка конфигурации системы');
+        return;
+      }
+      
+      document.getElementById('loginForm').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+      
+      import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm')
+        .then(({ createClient }) => {
+          const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+          
+          // Проверяем, есть ли уже авторизованный пользователь
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) {
+              console.log('👤 Пользователь уже авторизован');
+              checkUserRoleAndRedirect(user);
+            }
+          });
+          
+          document.getElementById('loginBtn').addEventListener('click', () => login(supabase, false));
+          document.getElementById('adminLoginBtn').addEventListener('click', () => login(supabase, true));
+
+          document.getElementById('password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+              login(supabase, false);
+            }
+          });
+
+          document.getElementById('email').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+              document.getElementById('password').focus();
+            }
+          });
+        })
+        .catch(error => {
+          showError('❌ Ошибка загрузки системы: ' + error.message);
+        });
+    }
+
+    async function checkUserRoleAndRedirect(user) {
+      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+      const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+      
+      const { data: userData } = await supabase
+        .from('users')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single();
+        
+      if (userData && userData.is_admin) {
+        window.location.href = "/admin.html";
+      } else {
+        window.location.href = "/profile.html";
+      }
+    }
+    
+    async function login(supabase, isAdmin) {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!email || !password) {
+        showError('Введите email и пароль');
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showError('Неверный формат email');
+        return;
+      }
+
+      try {
+        document.getElementById('loginBtn').disabled = true;
+        document.getElementById('adminLoginBtn').disabled = true;
+        showWarning('🔐 Проверяем данные...');
+        
+        // Используем кастомную аутентификацию через нашу таблицу users
+        const { data: user, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .eq('password_hash', password) // В реальной системе нужно использовать хеширование!
+          .single();
+        
+        if (userError || !user) {
+          showError('❌ Неверный email или пароль');
+          document.getElementById('loginBtn').disabled = false;
+          document.getElementById('adminLoginBtn').disabled = false;
+          return;
+        }
+
+        // Создаем сессию через Supabase Auth (упрощенная версия)
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: 'default_password' // В реальной системе нужно использовать правильную аутентификацию
+        });
+
+        if (authError) {
+          console.warn('Auth error:', authError);
+          // Продолжаем без полной аутентификации Supabase
+        }
+
+        if (isAdmin) {
+          if (user.is_admin) {
+            window.location.href = "/admin.html";
+          } else {
+            showError('❌ У вас нет прав администратора');
+            document.getElementById('loginBtn').disabled = false;
+            document.getElementById('adminLoginBtn').disabled = false;
+          }
+        } else {
+          window.location.href = "/profile.html";
+        }
+      } catch (error) {
+        console.error('Unexpected login error:', error);
+        showError('❌ Неожиданная ошибка: ' + error.message);
+        document.getElementById('loginBtn').disabled = false;
+        document.getElementById('adminLoginBtn').disabled = false;
+      }
+    }
+    
+    if (window.SUPABASE_URL) {
+      initApp();
+    } else {
+      const timeout = setTimeout(() => {
+        showError('❌ Таймаут загрузки конфигурации');
+      }, 1000);
+      
+      window.addEventListener('configLoaded', () => {
+        clearTimeout(timeout);
+        initApp();
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Восстановление пароля — Edu Keys</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #81c784, #64b5f6);
+      font-family: 'Poppins', 'Comic Sans MS', cursive, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    .reset-container {
+      width: 100%;
+      max-width: 400px;
+      position: relative;
+    }
+    .reset-card {
+      background: #fff;
+      padding: 25px;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .reset-card h2 {
+      margin: 0 0 20px 0;
+      color: #333;
+      font-size: 1.5rem;
+    }
+    .reset-card input {
+      width: 100%;
+      padding: 12px 15px;
+      margin: 8px 0;
+      border: 2px solid #f0f0f0;
+      border-radius: 12px;
+      box-sizing: border-box;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    .reset-card input:focus {
+      border-color: var(--accent2);
+      outline: none;
+    }
+    .btn {
+      background: #29b6f6;
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 10px;
+      width: 100%;
+      font-size: 16px;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(41, 182, 246, 0.3);
+    }
+    .btn:disabled {
+      background: #b0bec5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .link {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+    .link a {
+      color: var(--accent2);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .link a:hover {
+      text-decoration: underline;
+    }
+    .error, .success {
+      padding: 12px;
+      border-radius: 8px;
+      margin: 15px 0;
+      display: none;
+      font-size: 14px;
+    }
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #ffcdd2;
+    }
+    .success {
+      background: #e8f5e8;
+      color: #2e7d32;
+      border: 1px solid #c8e6c9;
+    }
+    .loading {
+      display: none;
+      margin: 15px 0;
+      text-align: center;
+    }
+    .reload-icon {
+      display: none;
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--accent);
+      transition: transform 0.3s;
+      background: none;
+      border: none;
+      padding: 5px;
+    }
+    .reload-icon:hover {
+      transform: rotate(180deg) scale(1.2);
+    }
+
+    /* Мобильные стили */
+    @media (max-width: 480px) {
+      body {
+        padding: 15px;
+      }
+      .reset-container {
+        max-width: 100%;
+      }
+      .reset-card {
+        padding: 20px;
+        border-radius: 16px;
+      }
+      .reset-card h2 {
+        font-size: 1.3rem;
+        margin-bottom: 15px;
+      }
+      .reset-card input {
+        padding: 14px 16px;
+        font-size: 16px;
+      }
+      .btn {
+        padding: 14px 20px;
+        font-size: 16px;
+      }
+      .reload-icon {
+        top: 10px;
+        right: 10px;
+      }
+    }
+
+    /* Планшеты */
+    @media (min-width: 481px) and (max-width: 768px) {
+      .reset-container {
+        max-width: 450px;
+      }
+    }
+  </style>
+  
+  <script src="/load-config.js"></script>
+</head>
+<body>
+  <div class="reset-container">
+    <button class="reload-icon" id="reloadBtn">🔄</button>
+    
+    <div class="reset-card">
+      <h2>Сброс пароля</h2>
+      
+      <div id="loading" class="loading">
+        <p>Загружаем конфигурацию...</p>
+      </div>
+      
+      <div id="errorMessage" class="error"></div>
+      <div id="successMessage" class="success"></div>
+      
+      <div id="resetForm" style="display: none;">
+        <input type="email" id="email" placeholder="Email" required>
+        <button class="btn" id="resetBtn">Отправить письмо</button>
+        <div class="link">
+          <p><a href="/login.html">← Вернуться к входу</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    function showError(message) {
+      const errorEl = document.getElementById('errorMessage');
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
+      document.getElementById('successMessage').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+    function showSuccess(message) {
+      const successEl = document.getElementById('successMessage');
+      successEl.textContent = message;
+      successEl.style.display = 'block';
+      document.getElementById('errorMessage').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+    function resetForm() {
+      document.getElementById('email').value = "";
+      document.getElementById('errorMessage').style.display = 'none';
+      document.getElementById('successMessage').style.display = 'none';
+      document.getElementById('resetBtn').disabled = false;
+      document.getElementById('resetBtn').textContent = 'Отправить письмо';
+      document.getElementById('reloadBtn').style.display = 'none';
+    }
+    
+    function initApp() {
+      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+        showError('❌ Ошибка конфигурации');
+        return;
+      }
+      
+      document.getElementById('resetForm').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+      
+      import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm')
+        .then(({ createClient }) => {
+          const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+          
+          document.getElementById('reloadBtn').addEventListener('click', resetForm);
+          
+          document.getElementById('resetBtn').addEventListener('click', async () => {
+            const email = document.getElementById('email').value.trim();
+            
+            if (!email) {
+              showError('Введите email');
+              return;
+            }
+
+            const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+            if (!emailPattern.test(email)) {
+              showError('Неверный формат email');
+              document.getElementById('reloadBtn').style.display = 'block';
+              return;
+            }
+
+            try {
+              document.getElementById('resetBtn').disabled = true;
+              document.getElementById('resetBtn').textContent = 'Отправляем...';
+              
+              const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + '/update-password.html'
+              });
+
+              if (error) throw error;
+
+              showSuccess('📧 Письмо отправлено! Проверьте вашу почту для сброса пароля.');
+              document.getElementById('reloadBtn').style.display = 'block';
+
+              setTimeout(() => {
+                document.getElementById('resetBtn').disabled = false;
+                document.getElementById('resetBtn').textContent = 'Отправить письмо';
+              }, 30000);
+            } catch (error) {
+              showError('Ошибка отправки: ' + error.message);
+              document.getElementById('resetBtn').disabled = false;
+              document.getElementById('resetBtn').textContent = 'Отправить письмо';
+              document.getElementById('reloadBtn').style.display = 'block';
+            }
+          });
+
+          // Поддержка Enter для формы
+          document.getElementById('email').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+              document.getElementById('resetBtn').click();
+            }
+          });
+        })
+        .catch(error => {
+          showError('❌ Ошибка загрузки Supabase: ' + error.message);
+        });
+    }
+    
+    if (window.SUPABASE_URL) {
+      initApp();
+    } else {
+      const timeout = setTimeout(() => {
+        showError('❌ Таймаут загрузки конфигурации');
+      }, 1000);
+      
+      window.addEventListener('configLoaded', () => {
+        clearTimeout(timeout);
+        initApp();
+      });
+    }
+  </script>
+</body>
+</html>
