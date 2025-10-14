@@ -4,8 +4,8 @@ module.exports = (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     
     const config = {
-        SUPABASE_URL: process.env.SUPABASE_URL || 'https://dtjhlanmwjpdcdxgzzyo.supabase.co',
-        SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0amhsYW5td2pwZGNkeGd6enlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDUwOTIsImV4cCI6MjA3MjM4MTA5Mn0.jS4DXQSOBawRFtnzjsmF5AzzltDYAG0AXrwrY1B0UpY'
+        SUPABASE_URL: process.env.SUPABASE_URL || 'https://zjvedphdbpuzqzvznqex.supabase.co',
+        SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqdmVkcGhkYnB1enF6dnpucWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNDMxMDgsImV4cCI6MjA3NTkxOTEwOH0.rfIdcmTx9q-UZyQp0QKjBdGQGbDpMuy0R3_3P_DOV7I'
     };
     
     const jsCode = `
