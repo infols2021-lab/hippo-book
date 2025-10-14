@@ -230,13 +230,13 @@
         .then(({ createClient }) => {
           const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
           
-          // Проверяем, есть ли уже авторизованный пользователь
-          supabase.auth.getUser().then(({ data: { user } }) => {
-            if (user) {
-              console.log('👤 Пользователь уже авторизован');
-              checkUserRoleAndRedirect(user);
-            }
-          });
+          // Проверяем, есть ли уже авторизованный пользователь в localStorage
+          const userStr = localStorage.getItem('currentUser');
+          if (userStr) {
+            console.log('👤 Пользователь уже авторизован');
+            const user = JSON.parse(userStr);
+            checkUserRoleAndRedirect(user);
+          }
           
           document.getElementById('loginBtn').addEventListener('click', () => login(supabase, false));
           document.getElementById('adminLoginBtn').addEventListener('click', () => login(supabase, true));
@@ -259,16 +259,7 @@
     }
 
     async function checkUserRoleAndRedirect(user) {
-      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-      const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-      
-      const { data: userData } = await supabase
-        .from('users')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single();
-        
-      if (userData && userData.is_admin) {
+      if (user.is_admin) {
         window.location.href = "/admin.html";
       } else {
         window.location.href = "/profile.html";
@@ -310,16 +301,8 @@
           return;
         }
 
-        // Создаем сессию через Supabase Auth (упрощенная версия)
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email: user.email,
-          password: 'default_password' // В реальной системе нужно использовать правильную аутентификацию
-        });
-
-        if (authError) {
-          console.warn('Auth error:', authError);
-          // Продолжаем без полной аутентификации Supabase
-        }
+        // Сохраняем пользователя в localStorage для последующих проверок
+        localStorage.setItem('currentUser', JSON.stringify(user));
 
         if (isAdmin) {
           if (user.is_admin) {

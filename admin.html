@@ -807,21 +807,18 @@
       document.getElementById('modal').style.display = 'flex';
     }
 
-    // Функция проверки прав администратора
+    // Функция проверки прав администратора (ОБНОВЛЕННАЯ)
     async function checkAdmin(supabase) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        // Проверяем пользователя в localStorage
+        const userStr = localStorage.getItem('currentUser');
+        if (!userStr) {
             window.location.href = '/login.html';
             return false;
         }
         
-        const { data: userData } = await supabase
-            .from('users')
-            .select('is_admin')
-            .eq('id', user.id)
-            .single();
-            
-        if (!userData || !userData.is_admin) {
+        const user = JSON.parse(userStr);
+        
+        if (!user.is_admin) {
             showModal('Доступ запрещен', 'Требуются права администратора.');
             setTimeout(() => {
                 window.location.href = '/profile.html';
@@ -829,7 +826,7 @@
             return false;
         }
         
-        return { user, userData };
+        return user;
     }
 
     // Функция для экранирования HTML
@@ -855,11 +852,10 @@
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
         const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
         
-        // ПРОВЕРЯЕМ АДМИНА ПЕРВЫМ ДЕЛОМ
-        const adminCheck = await checkAdmin(supabase);
-        if (!adminCheck) return false;
+        // ПРОВЕРЯЕМ АДМИНА ПЕРВЫМ ДЕЛОМ (ОБНОВЛЕННАЯ ПРОВЕРКА)
+        const adminUser = await checkAdmin(supabase);
+        if (!adminUser) return false;
         
-        const currentUser = adminCheck.user;
         let editingUserId = null;
         let editingTextbookId = null;
         let editingCrosswordId = null;
@@ -874,10 +870,10 @@
           document.getElementById('modal').style.display = 'none';
         });
 
-        // Выход из системы
+        // Выход из системы (ОБНОВЛЕННЫЙ)
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           if (confirm('Вы уверены, что хотите выйти?')) {
-            await supabase.auth.signOut();
+            localStorage.removeItem('currentUser');
             window.location.href = '/login.html';
           }
         });
@@ -1103,7 +1099,7 @@
           }
 
           try {
-            // В реальной системе здесь должно быть хеширование пароля!
+            // Создаем пользователя в кастомной таблице
             const { data, error } = await supabase
               .from('users')
               .insert([{
@@ -2183,7 +2179,7 @@
                 file_name: file.name,
                 file_size: file.size,
                 mime_type: file.type,
-                created_by: currentUser.id,
+                created_by: adminUser.id,
                 is_active: false
               }]);
 

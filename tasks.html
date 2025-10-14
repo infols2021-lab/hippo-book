@@ -2,46 +2,134 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <title>Задания — Edu Keys</title>
+  <title>Задания — Edu Platform</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
   <style>
-    .attempt-info {
+    .tasks-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .tasks-tab {
+      padding: 12px 20px;
+      background: var(--card);
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.2s;
+      border: 2px solid transparent;
+    }
+    .tasks-tab.active {
+      background: var(--accent2);
+      color: white;
+      border-color: var(--accent2);
+    }
+    .tasks-section {
+      display: none;
+    }
+    .tasks-section.active {
+      display: block;
+    }
+
+    /* Элементы учебников и кроссвордов */
+    .textbook-item, .crossword-item {
+      background: white;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+    }
+    .textbook-item:hover, .crossword-item:hover {
+      border-color: var(--accent2);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    }
+    .textbook-header, .crossword-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .tasks-list {
+      margin-top: 15px;
+    }
+    .task-card {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 10px;
+      transition: all 0.3s ease;
+    }
+    .task-card:hover {
+      background: #e9ecef;
+      transform: translateY(-2px);
+    }
+    .task-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .task-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .task-stats {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .stat-badge {
+      background: var(--bg1);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    /* Информационные блоки */
+    .info-card {
       background: #e7f3ff;
       border: 1px solid #b3d9ff;
       border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 16px;
+      padding: 15px;
+      margin-bottom: 20px;
     }
-    .warning-note {
+    .warning-card {
       background: #fff3cd;
       border: 1px solid #ffeaa7;
       border-radius: 8px;
-      padding: 10px;
-      margin-top: 10px;
-      font-size: 14px;
+      padding: 15px;
+      margin-bottom: 20px;
     }
-    .start-warning {
-      background: #ffeaa7;
-      border: 2px solid #fdcb6e;
-      border-radius: 8px;
-      padding: 10px;
-      margin-top: 5px;
-      font-size: 13px;
+
+    /* Индикаторы прогресса */
+    .progress-indicator {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-left: 8px;
     }
-    .demo-note {
-      background: #e8f5e9;
-      border: 2px solid #4caf50;
-      border-radius: 8px;
-      padding: 10px;
-      margin-top: 5px;
-      font-size: 13px;
+    .progress-completed {
+      background: #d4edda;
+      color: #155724;
     }
-    .month-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .progress-available {
+      background: #d1ecf1;
+      color: #0c5460;
     }
+    .progress-locked {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
     .loading { 
       text-align: center; 
       padding: 40px; 
@@ -69,6 +157,55 @@
       text-align: center; 
       display: none; 
     }
+
+    /* Мобильная адаптация */
+    @media (max-width: 768px) {
+      .tasks-tabs {
+        flex-direction: column;
+        gap: 5px;
+      }
+      
+      .tasks-tab {
+        text-align: center;
+        padding: 15px;
+      }
+      
+      .textbook-header, .crossword-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      
+      .task-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      
+      .task-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+      
+      .task-stats {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .textbook-item, .crossword-item {
+        padding: 15px;
+      }
+      
+      .task-card {
+        padding: 12px;
+      }
+      
+      .stat-badge {
+        font-size: 11px;
+        padding: 3px 6px;
+      }
+    }
   </style>
   
   <script src="/load-config.js"></script>
@@ -76,7 +213,7 @@
 <body>
   <div id="loading" class="loading">
     <div class="spinner"></div>
-    <p>🔄 Загружаем конфигурацию...</p>
+    <p>🔄 Загружаем задания...</p>
   </div>
   
   <div id="errorMessage" class="error"></div>
@@ -84,22 +221,61 @@
   <div id="mainContent" style="display: none;">
     <div class="container">
       <div class="header">
-        <div class="logo"><div class="mark">EK</div><div><h3>Задания</h3><div class="small-muted">Выбирай и проходи</div></div></div>
+        <div class="logo">
+          <div class="mark">EP</div>
+          <div>
+            <h3>Задания</h3>
+            <div class="small-muted">Выбирай и проходи</div>
+          </div>
+        </div>
         <div class="nav">
-          <button class="btn" onclick="location.href='/profile.html'">Профиль</button>
-          <button class="btn secondary" id="logoutBtn">Выйти</button>
+          <button class="btn" onclick="location.href='/profile.html'">👤 Профиль</button>
+          <button class="btn secondary" id="logoutBtn">🚪 Выйти</button>
         </div>
       </div>
 
-      <div class="attempt-info">
-        <strong>💡 Важная информация:</strong> Попытка списывается автоматически при переходе к заданию. 
-        Будьте внимательны! Если возникли проблемы, напишите администратору в Telegram: @skebobingg
-        <br><br>
-        <strong>📚 Демо-задания:</strong> Это обучающие задания с готовыми ответами. Попытки за них не списываются.
+      <div class="info-card">
+        <strong>💡 Информация о заданиях:</strong>
+        <p style="margin: 8px 0 0 0; font-size: 14px;">
+          • <strong>Учебники</strong> - теоретические задания и тесты для изучения материала<br>
+          • <strong>Кроссворды</strong> - интерактивные задания для закрепления знаний<br>
+          • Прогресс автоматически сохраняется при завершении заданий
+        </p>
+      </div>
+
+      <div class="warning-card">
+        <strong>⚠️ Внимание!</strong>
+        <p style="margin: 8px 0 0 0; font-size: 14px;">
+          Задание считается выполненным только после нажатия кнопки "Завершить задание". 
+          У вас неограниченное количество попыток для каждого задания.
+        </p>
       </div>
 
       <div class="card">
-        <div id="monthsRoot"></div>
+        <div class="tasks-tabs">
+          <div class="tasks-tab active" data-tab="textbooks">📚 Учебники</div>
+          <div class="tasks-tab" data-tab="crosswords">🧩 Кроссворды</div>
+        </div>
+
+        <!-- Секция учебников -->
+        <div class="tasks-section active" id="textbooks-section">
+          <div id="textbooksList">
+            <div class="loading" style="padding: 40px;">
+              <div class="spinner"></div>
+              <p>Загружаем учебники...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Секция кроссвордов -->
+        <div class="tasks-section" id="crosswords-section">
+          <div id="crosswordsList">
+            <div class="loading" style="padding: 40px;">
+              <div class="spinner"></div>
+              <p>Загружаем кроссворды...</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -129,153 +305,305 @@
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
         const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
         
-        const months = ["Сентябрь","Октябрь","Ноябрь","Декабрь","Январь","Февраль","Март"];
+        // Проверяем авторизацию через localStorage
+        const userStr = localStorage.getItem('currentUser');
+        if (!userStr) {
+          location.href = '/login.html';
+          return;
+        }
+        
+        const user = JSON.parse(userStr);
 
-        // Получаем текущий учебный месяц (1-7)
-        function getStudyIndex() {
-          const now = new Date();
-          const month = now.getMonth() + 1;
+        // Функция для переключения вкладок
+        function initTasksTabs() {
+          const tabs = document.querySelectorAll('.tasks-tab');
           
-          if (month >= 9) {
-            return month - 8;
-          } else {
-            return month + 4;
-          }
+          tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+              const tabName = tab.getAttribute('data-tab');
+              
+              // Убираем активный класс у всех вкладок
+              tabs.forEach(t => t.classList.remove('active'));
+              document.querySelectorAll('.tasks-section').forEach(s => s.classList.remove('active'));
+              
+              // Активируем выбранную вкладку
+              tab.classList.add('active');
+              document.getElementById(`${tabName}-section`).classList.add('active');
+              
+              // Загружаем данные для активной вкладки
+              if (tabName === 'textbooks') {
+                loadTextbooks();
+              } else if (tabName === 'crosswords') {
+                loadCrosswords();
+              }
+            });
+          });
         }
 
-        async function loadTasks() {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) { 
-            location.href = '/login.html'; 
-            return; 
-          }
-
-          const { data: tasks } = await supabase.from('tasks').select('*').order('month_index');
-          const { data: attempts } = await supabase.from('attempts').select('*').eq('user_id', user.id);
-          const { data: keys } = await supabase.from('keys').select('*').eq('user_id', user.id);
-
-          const root = document.getElementById('monthsRoot');
-          root.innerHTML = '';
-
-          const currentMonthIndex = getStudyIndex();
-
-          for (let mi = 1; mi <= 7; mi++) {
-            const monthTasks = (tasks || []).filter(t => t.month_index === mi);
-            if (monthTasks.length === 0) continue;
-
-            // Определяем статус месяца
-            const hasKeyForMonth = (keys || []).some(k => k.month_index === mi);
-            const hasAnyAttemptForMonth = (attempts || []).some(a => {
-              const task = monthTasks.find(t => t.id === a.task_id);
-              return task !== undefined;
-            });
+        // Функция для загрузки учебников и заданий
+        async function loadTextbooks() {
+          const container = document.getElementById('textbooksList');
+          
+          try {
+            container.innerHTML = '<div class="loading" style="padding: 40px;"><div class="spinner"></div><p>Загружаем учебники...</p></div>';
             
-            let monthStatus = '';
-            let monthStatusIcon = '';
+            // Получаем все учебники с их заданиями
+            const { data: textbooks, error: textbooksError } = await supabase
+              .from('textbooks')
+              .select(`
+                *,
+                tasks (
+                  id,
+                  title,
+                  type,
+                  time_limit,
+                  passing_score,
+                  order_index,
+                  is_active
+                )
+              `)
+              .eq('is_active', true)
+              .order('order_index', { ascending: true });
             
-            if (hasKeyForMonth) {
-              monthStatus = '🗝️ Получен ключ';
-              monthStatusIcon = '🗝️';
-            } else if (hasAnyAttemptForMonth) {
-              monthStatus = '❌ Попытка использована';
-              monthStatusIcon = '❌';
-            } else if (mi <= currentMonthIndex) {
-              monthStatus = '✅ Доступно';
-              monthStatusIcon = '✅';
-            } else {
-              monthStatus = '🔒 Заблокировано';
-              monthStatusIcon = '🔒';
+            if (textbooksError) throw textbooksError;
+            
+            if (!textbooks || textbooks.length === 0) {
+              container.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">📚 Учебники пока не добавлены</p>';
+              return;
             }
-
-            const box = document.createElement('div');
-            box.className = 'month-row';
-            const title = document.createElement('div');
-            title.className = 'month-title';
             
-            title.innerHTML = `
-              <div><b>${months[mi-1]}</b></div>
-              <div class="month-status">
-                <span class="small-muted">${monthStatus}</span>
-              </div>
-            `;
-            box.appendChild(title);
-
-            const grid = document.createElement('div');
-            grid.className = 'tasks-grid';
+            let html = '';
             
-            monthTasks.forEach(t => {
-              const card = document.createElement('div');
-              card.className = 'task-card';
+            // Для каждого учебника отображаем его задания
+            for (const textbook of textbooks) {
+              const activeTasks = textbook.tasks?.filter(task => task.is_active) || [];
               
-              // Проверяем, выполнял ли пользователь это задание
-              const attempt = (attempts || []).find(a => a.task_id === t.id);
-              const hasKeyForMonth = (keys || []).some(k => k.month_index === t.month_index);
-              const isDemo = t.is_demo || t.type === 'demo';
+              if (activeTasks.length === 0) continue;
               
-              card.innerHTML = `
-                <h4>${t.title} ${isDemo ? '📚' : ''}</h4>
-                <p>${isDemo ? 'Демо-задание • ' : ''}Тип: ${isDemo ? '📚 Демо' : '📝 Тест'} • Проходной балл: ${t.passing_score}% • Лимит времени: ${t.time_limit || 60} мин</p>
+              html += `
+                <div class="textbook-item">
+                  <div class="textbook-header">
+                    <div>
+                      <h3 style="margin: 0; color: #333;">${textbook.title}</h3>
+                      <p class="small-muted" style="margin: 5px 0 0 0;">${textbook.description || 'Без описания'}</p>
+                      <p class="small-muted">Заданий: ${activeTasks.length}</p>
+                    </div>
+                  </div>
+                  <div class="tasks-list">
               `;
               
-              const meta = document.createElement('div');
-              meta.className = 'meta';
+              // Сортируем задания по order_index
+              activeTasks.sort((a, b) => a.order_index - b.order_index);
               
-              const btn = document.createElement('button');
-              btn.className = 'btn small';
-              
-              if (hasKeyForMonth && !isDemo) {
-                // Если ключ за месяц уже получен (только для обычных заданий)
-                btn.textContent = '🗝️ Ключ получен';
-                btn.disabled = true;
-                btn.classList.add('ghost');
-              } else if (attempt && !isDemo) {
-                // Если была попытка (любая) - доступ закрыт (только для обычных заданий)
-                btn.textContent = '❌ Попытка использована';
-                btn.disabled = true;
-                btn.classList.add('ghost');
-                card.innerHTML += `<div class="warning-note">Для сброса попытки напишите админу в Telegram: @skebobingg</div>`;
-              } else if (mi <= currentMonthIndex || isDemo) {
-                // Если месяц доступен и не было попыток, или это демо-задание
-                if (isDemo) {
-                  btn.textContent = '📚 Изучить демо';
-                  btn.onclick = () => {
-                    location.href = `/task.html?id=${t.id}`;
-                  };
-                  card.innerHTML += `<div class="demo-note">📚 Демо-задание: попытки не списываются, баллы не начисляются</div>`;
-                } else {
-                  btn.textContent = '🚀 Начать задание';
-                  btn.onclick = () => {
-                    if (confirm('⚠️ ВНИМАНИЕ!\n\nПри переходе к заданию попытка будет списана автоматически.\n\nВы уверены, что готовы начать?')) {
-                      location.href = `/task.html?id=${t.id}`;
-                    }
-                  };
-                  card.innerHTML += `<div class="start-warning">⚠️ Попытка спишется при переходе</div>`;
-                }
-              } else {
-                // Если месяц еще не доступен
-                btn.textContent = '🔒 Недоступно';
-                btn.disabled = true;
-                btn.classList.add('ghost');
+              // Для каждого задания проверяем прогресс пользователя
+              for (const task of activeTasks) {
+                // Проверяем, выполнено ли задание
+                const { data: progress, error: progressError } = await supabase
+                  .from('user_progress')
+                  .select('is_completed, score')
+                  .eq('user_id', user.id)
+                  .eq('task_id', task.id)
+                  .single();
+                
+                const isCompleted = progress?.is_completed || false;
+                const score = progress?.score || 0;
+                
+                const taskTypeIcon = task.type === 'test' ? '📝' : 
+                                   task.type === 'fill' ? '✍️' : '🧩';
+                
+                const progressIndicator = isCompleted ? 
+                  `<span class="progress-indicator progress-completed">✅ Выполнено (${score}%)</span>` :
+                  `<span class="progress-indicator progress-available">📝 Доступно</span>`;
+                
+                html += `
+                  <div class="task-card">
+                    <div class="task-header">
+                      <div>
+                        <strong>${taskTypeIcon} ${task.title}</strong>
+                        ${progressIndicator}
+                      </div>
+                      <div class="task-actions">
+                        <button class="btn btn-small start-task-btn" 
+                                data-task-id="${task.id}" 
+                                data-task-title="${task.title}">
+                          ${isCompleted ? '🔄 Повторить' : '🚀 Начать'}
+                        </button>
+                      </div>
+                    </div>
+                    <div class="task-stats">
+                      <span class="stat-badge">⏱️ ${task.time_limit || 60} мин</span>
+                      <span class="stat-badge">🎯 ${task.passing_score || 80}% для зачета</span>
+                      <span class="stat-badge">${taskTypeIcon} ${task.type === 'test' ? 'Тест' : task.type === 'fill' ? 'Пропуски' : 'Кроссворд'}</span>
+                    </div>
+                  </div>
+                `;
               }
               
-              meta.appendChild(btn);
-              card.appendChild(meta);
-              grid.appendChild(card);
+              html += `
+                  </div>
+                </div>
+              `;
+            }
+            
+            container.innerHTML = html;
+            
+            // Назначаем обработчики для кнопок начала заданий
+            document.querySelectorAll('.start-task-btn').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                const taskId = btn.getAttribute('data-task-id');
+                const taskTitle = btn.getAttribute('data-task-title');
+                
+                if (confirm(`Начать задание "${taskTitle}"?\n\nУ вас неограниченное количество попыток. Задание будет считаться выполненным после нажатия кнопки "Завершить задание".`)) {
+                  window.location.href = `/task.html?id=${taskId}`;
+                }
+              });
             });
             
-            box.appendChild(grid);
-            root.appendChild(box);
+          } catch (error) {
+            console.error('Ошибка загрузки учебников:', error);
+            container.innerHTML = '<p style="text-align: center; padding: 20px; color: #e74c3c;">❌ Ошибка загрузки учебников</p>';
           }
         }
 
+        // Функция для загрузки кроссвордов и заданий
+        async function loadCrosswords() {
+          const container = document.getElementById('crosswordsList');
+          
+          try {
+            container.innerHTML = '<div class="loading" style="padding: 40px;"><div class="spinner"></div><p>Загружаем кроссворды...</p></div>';
+            
+            // Получаем все кроссворды с их заданиями
+            const { data: crosswords, error: crosswordsError } = await supabase
+              .from('crosswords')
+              .select(`
+                *,
+                tasks (
+                  id,
+                  title,
+                  type,
+                  time_limit,
+                  passing_score,
+                  order_index,
+                  is_active
+                )
+              `)
+              .eq('is_active', true)
+              .order('order_index', { ascending: true });
+            
+            if (crosswordsError) throw crosswordsError;
+            
+            if (!crosswords || crosswords.length === 0) {
+              container.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">🧩 Кроссворды пока не добавлены</p>';
+              return;
+            }
+            
+            let html = '';
+            
+            // Для каждого кроссворда отображаем его задания
+            for (const crossword of crosswords) {
+              const activeTasks = crossword.tasks?.filter(task => task.is_active) || [];
+              
+              if (activeTasks.length === 0) continue;
+              
+              html += `
+                <div class="crossword-item">
+                  <div class="crossword-header">
+                    <div>
+                      <h3 style="margin: 0; color: #333;">${crossword.title}</h3>
+                      <p class="small-muted" style="margin: 5px 0 0 0;">${crossword.description || 'Без описания'}</p>
+                      <p class="small-muted">Заданий: ${activeTasks.length}</p>
+                    </div>
+                  </div>
+                  <div class="tasks-list">
+              `;
+              
+              // Сортируем задания по order_index
+              activeTasks.sort((a, b) => a.order_index - b.order_index);
+              
+              // Для каждого задания проверяем прогресс пользователя
+              for (const task of activeTasks) {
+                // Проверяем, выполнено ли задание
+                const { data: progress, error: progressError } = await supabase
+                  .from('user_progress')
+                  .select('is_completed, score')
+                  .eq('user_id', user.id)
+                  .eq('task_id', task.id)
+                  .single();
+                
+                const isCompleted = progress?.is_completed || false;
+                const score = progress?.score || 0;
+                
+                const taskTypeIcon = task.type === 'test' ? '📝' : 
+                                   task.type === 'fill' ? '✍️' : '🧩';
+                
+                const progressIndicator = isCompleted ? 
+                  `<span class="progress-indicator progress-completed">✅ Выполнено (${score}%)</span>` :
+                  `<span class="progress-indicator progress-available">📝 Доступно</span>`;
+                
+                html += `
+                  <div class="task-card">
+                    <div class="task-header">
+                      <div>
+                        <strong>${taskTypeIcon} ${task.title}</strong>
+                        ${progressIndicator}
+                      </div>
+                      <div class="task-actions">
+                        <button class="btn btn-small start-task-btn" 
+                                data-task-id="${task.id}" 
+                                data-task-title="${task.title}">
+                          ${isCompleted ? '🔄 Повторить' : '🚀 Начать'}
+                        </button>
+                      </div>
+                    </div>
+                    <div class="task-stats">
+                      <span class="stat-badge">⏱️ ${task.time_limit || 60} мин</span>
+                      <span class="stat-badge">🎯 ${task.passing_score || 80}% для зачета</span>
+                      <span class="stat-badge">${taskTypeIcon} ${task.type === 'test' ? 'Тест' : task.type === 'fill' ? 'Пропуски' : 'Кроссворд'}</span>
+                    </div>
+                  </div>
+                `;
+              }
+              
+              html += `
+                  </div>
+                </div>
+              `;
+            }
+            
+            container.innerHTML = html;
+            
+            // Назначаем обработчики для кнопок начала заданий
+            document.querySelectorAll('.start-task-btn').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                const taskId = btn.getAttribute('data-task-id');
+                const taskTitle = btn.getAttribute('data-task-title');
+                
+                if (confirm(`Начать задание "${taskTitle}"?\n\nУ вас неограниченное количество попыток. Задание будет считаться выполненным после нажатия кнопки "Завершить задание".`)) {
+                  window.location.href = `/task.html?id=${taskId}`;
+                }
+              });
+            });
+            
+          } catch (error) {
+            console.error('Ошибка загрузки кроссвордов:', error);
+            container.innerHTML = '<p style="text-align: center; padding: 20px; color: #e74c3c;">❌ Ошибка загрузки кроссвордов</p>';
+          }
+        }
+
+        // Выход из системы
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           if (confirm('Вы уверены, что хотите выйти?')) {
-            await supabase.auth.signOut();
+            localStorage.removeItem('currentUser');
             location.href = '/login.html';
           }
         });
 
-        await loadTasks();
+        // Инициализируем вкладки
+        initTasksTabs();
+        
+        // Загружаем учебники (активная вкладка по умолчанию)
+        await loadTextbooks();
+        
         showContent();
         return true;
         
@@ -285,23 +613,17 @@
       }
     }
     
-    const configTimeout = setTimeout(() => {
-      if (!window.SUPABASE_URL) {
-        showError('❌ Таймаут загрузки конфигурации. Используем резервные значения...');
-        window.SUPABASE_URL = 'https://dtjhlanmwjpdcdxgzzyo.supabase.co';
-        window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0amhsYW5td2pwZGNkeGd6enlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MDUwOTIsImV4cCI6MjA3MjM4MTA5Mn0.jS4DXQSOBawRFtnzjsmF5AzzltDYAG0AXrwrY1B0UpY';
-        initApp();
-      }
-    }, 5000);
-    
-    window.addEventListener('configLoaded', () => {
-      clearTimeout(configTimeout);
-      initApp();
-    });
-    
     if (window.SUPABASE_URL) {
-      clearTimeout(configTimeout);
       initApp();
+    } else {
+      const timeout = setTimeout(() => {
+        showError('❌ Таймаут загрузки конфигурации');
+      }, 1000);
+      
+      window.addEventListener('configLoaded', () => {
+        clearTimeout(timeout);
+        initApp();
+      });
     }
   </script>
 </body>
