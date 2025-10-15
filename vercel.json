@@ -40,10 +40,6 @@
       "dest": "/$1"
     },
     {
-      "src": "/auth/confirm",
-      "dest": "/login.html"
-    },
-    {
       "src": "/",
       "dest": "/login.html"
     }
