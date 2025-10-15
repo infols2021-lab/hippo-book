@@ -41,14 +41,10 @@
     },
     {
       "src": "/auth/confirm",
-      "dest": "/auth-confirm.html"
-    },
-    {
-      "src": "/",
       "dest": "/login.html"
     },
     {
-      "src": "/(.*)",
+      "src": "/",
       "dest": "/login.html"
     }
   ],
