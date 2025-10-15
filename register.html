@@ -153,14 +153,6 @@
       width: 20px;
       text-align: center;
     }
-    .rate-limit {
-      background: #fff3cd;
-      border: 1px solid #ffeaa7;
-      border-radius: 8px;
-      padding: 10px;
-      margin: 10px 0;
-      font-size: 13px;
-    }
     .info-box {
       background: #e3f2fd;
       border: 1px solid #bbdefb;
@@ -232,10 +224,6 @@
           ✅ <strong>Подтверждение email обязательно!</strong> Без подтверждения вход в систему невозможен.
         </div>
 
-        <div class="rate-limit">
-          ⚠️ <strong>Защита от спама:</strong> Максимум 3 регистрации в час с одного устройства
-        </div>
-
         <div class="form-group">
           <label for="fullname">Полное имя:</label>
           <input type="text" id="fullname" placeholder="Иванов Иван Иванович" required>
@@ -300,13 +288,6 @@
       'spam4.me', 'fakeinbox.com', 'tmpmail.net', 'trashmail.com'
     ];
 
-    // Система ограничения регистраций
-    const REGISTRATION_LIMIT = {
-      maxAttempts: 3,
-      timeWindow: 60 * 60 * 1000, // 1 час
-      key: 'edu-keys-registration-limits'
-    };
-
     function showError(message) {
       const errorEl = document.getElementById('errorMessage');
       errorEl.textContent = message;
@@ -362,35 +343,6 @@
       }
       
       return { valid: true };
-    }
-
-    // Система ограничения регистраций
-    function checkRateLimit() {
-      try {
-        const now = Date.now();
-        const limits = JSON.parse(localStorage.getItem(REGISTRATION_LIMIT.key) || '{"attempts":[],"lastReset":0}');
-        
-        // Сбрасываем старые попытки
-        const recentAttempts = limits.attempts.filter(time => now - time < REGISTRATION_LIMIT.timeWindow);
-        
-        if (recentAttempts.length >= REGISTRATION_LIMIT.maxAttempts) {
-          const nextAttempt = Math.min(...recentAttempts) + REGISTRATION_LIMIT.timeWindow;
-          const minutesLeft = Math.ceil((nextAttempt - now) / (60 * 1000));
-          return { allowed: false, message: `Превышен лимит регистраций. Попробуйте через ${minutesLeft} минут.` };
-        }
-        
-        // Сохраняем текущую попытку
-        recentAttempts.push(now);
-        localStorage.setItem(REGISTRATION_LIMIT.key, JSON.stringify({
-          attempts: recentAttempts,
-          lastReset: now
-        }));
-        
-        return { allowed: true };
-      } catch (e) {
-        console.warn('Rate limit check failed:', e);
-        return { allowed: true }; // В случае ошибки разрешаем регистрацию
-      }
     }
 
     // Функция обновления визуальной валидации
@@ -485,13 +437,6 @@
               return;
             }
 
-            // Проверка ограничения регистраций
-            const rateLimit = checkRateLimit();
-            if (!rateLimit.allowed) {
-              showError(rateLimit.message);
-              return;
-            }
-
             try {
               document.getElementById('registerBtn').disabled = true;
               document.getElementById('registerBtn').textContent = 'Создаем аккаунт...';
@@ -524,7 +469,7 @@
                     error.status === 400) {
                   showError('❌ Пользователь с таким email уже зарегистрирован. Используйте другой email или войдите в существующий аккаунт.');
                 } else if (error.message?.includes('rate limit') || error.code === 'rate_limit_exceeded') {
-                  showError('❌ Слишком много попыток регистрации. Попробуйте через час.');
+                  showError('❌ Слишком много попыток регистрации. Попробуйте позже.');
                 } else if (error.message?.includes('email sending is disabled')) {
                   showError('❌ Временно недоступна отправка email. Попробуйте позже или свяжитесь с администратором.');
                 } else if (error.message?.includes('Invalid email')) {
