@@ -583,6 +583,49 @@
       document.getElementById('loading').style.display = 'none';
     }
 
+    // Функция для создания профиля вручную при необходимости
+    async function ensureProfileExists(supabase, user) {
+      try {
+        // Проверяем, существует ли профиль
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+
+        if (error || !profile) {
+          console.log('Profile not found, creating manually...');
+          
+          // Создаем профиль вручную
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name || '',
+                created_at: new Date().toISOString(),
+                completed_assignments_count: 0,
+                is_admin: false
+              }
+            ]);
+
+          if (insertError) {
+            console.error('Failed to create profile manually:', insertError);
+            return false;
+          }
+          
+          console.log('Profile created manually during login');
+          return true;
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Error ensuring profile exists:', error);
+        return false;
+      }
+    }
+
     async function handleEmailConfirmation(supabase) {
       if (window.location.hash) {
         try {
@@ -606,13 +649,19 @@
             }
 
             if (data.user) {
+              // УБЕЖДАЕМСЯ, ЧТО ПРОФИЛЬ СУЩЕСТВУЕТ
+              await ensureProfileExists(supabase, data.user);
+              
               if (data.user.email_confirmed_at) {
                 showSuccess('✅ Email успешно подтвержден! Сейчас вы будете перенаправлены...');
                 
+                // Выходим и заходим заново для чистоты сессии
                 await supabase.auth.signOut();
                 
+                // Очищаем URL от hash параметров
                 window.history.replaceState(null, null, window.location.pathname + '?message=confirmed');
                 
+                // Перенаправляем на страницу входа с сообщением об успехе
                 setTimeout(() => {
                   window.location.href = '/login.html?message=confirmed';
                 }, 3000);
@@ -626,6 +675,7 @@
           console.error('Email confirmation error:', error);
           showError(`❌ Ошибка подтверждения email: ${error.message}`);
           
+          // Очищаем URL в случае ошибки
           window.history.replaceState(null, null, window.location.pathname);
           return false;
         }
@@ -656,6 +706,8 @@
         showWarning('📧 Проверьте вашу почту для подтверждения регистрации.');
       } else if (message === 'email_exists') {
         showError('❌ Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.');
+      } else if (message === 'password_reset') {
+        showSuccess('✅ Пароль успешно изменен! Теперь вы можете войти с новым паролем.');
       }
       
       import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm')
@@ -665,12 +717,14 @@
           // Инициализируем систему помощи с предзагрузкой
           initHelpSystem(supabase);
           
+          // Обрабатываем подтверждение email если есть hash параметры
           handleEmailConfirmation(supabase).then(handled => {
             if (!handled) {
+              // Проверяем, не авторизован ли пользователь уже
               supabase.auth.getUser().then(({ data: { user } }) => {
                 if (user) {
                   console.log('👤 Пользователь уже авторизован');
-                  checkUserRoleAndRedirect(user);
+                  checkUserRoleAndRedirect(user, supabase);
                 }
               });
             }
@@ -696,19 +750,32 @@
         });
     }
 
-    async function checkUserRoleAndRedirect(user) {
-      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-      const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-      
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single();
+    async function checkUserRoleAndRedirect(user, supabase) {
+      try {
+        // УБЕЖДАЕМСЯ, ЧТО ПРОФИЛЬ СУЩЕСТВУЕТ
+        await ensureProfileExists(supabase, user);
         
-      if (profile && profile.is_admin) {
-        window.location.href = "/admin.html";
-      } else {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching profile:', error);
+          // Продолжаем с обычным пользователем в случае ошибки
+          window.location.href = "/profile.html";
+          return;
+        }
+        
+        if (profile && profile.is_admin) {
+          window.location.href = "/admin.html";
+        } else {
+          window.location.href = "/profile.html";
+        }
+      } catch (error) {
+        console.error('Error in checkUserRoleAndRedirect:', error);
+        // В случае ошибки перенаправляем на профиль
         window.location.href = "/profile.html";
       }
     }
@@ -775,13 +842,25 @@
           return;
         }
 
+        // УБЕЖДАЕМСЯ, ЧТО ПРОФИЛЬ СУЩЕСТВУЕТ ПОСЛЕ УСПЕШНОГО ВХОДА
+        await ensureProfileExists(supabase, data.user);
+
         if (isAdmin) {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('is_admin')
             .eq('id', data.user.id)
             .single();
             
+          if (profileError) {
+            console.error('Error fetching admin profile:', profileError);
+            showError('❌ Ошибка проверки прав доступа');
+            await supabase.auth.signOut();
+            document.getElementById('loginBtn').disabled = false;
+            document.getElementById('adminLoginBtn').disabled = false;
+            return;
+          }
+          
           if (profile && profile.is_admin) {
             window.location.href = "/admin.html";
           } else {
