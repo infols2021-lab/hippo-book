@@ -619,29 +619,80 @@
       document.getElementById('modal').style.display = 'flex';
     }
 
-    // Функция проверки прав администратора
+    // УЛУЧШЕННАЯ Функция проверки прав администратора
     async function checkAdmin(supabase) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            window.location.href = '/login.html';
-            return false;
-        }
-        
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('is_admin')
-            .eq('id', user.id)
-            .single();
+        try {
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
             
-        if (!profile || !profile.is_admin) {
-            showModal('Доступ запрещен', 'Требуются права администратора.');
+            if (authError) {
+                console.error('Auth error:', authError);
+                throw new Error('Ошибка аутентификации');
+            }
+            
+            if (!user) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            
+            // Проверяем профиль пользователя
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('is_admin, full_name, email')
+                .eq('id', user.id)
+                .single();
+                
+            if (profileError) {
+                console.error('Profile error:', profileError);
+                
+                // Если профиль не найден, создаем его
+                if (profileError.code === 'PGRST116') {
+                    console.log('Профиль не найден, создаем...');
+                    const { error: createError } = await supabase
+                        .from('profiles')
+                        .insert([
+                            {
+                                id: user.id,
+                                email: user.email,
+                                full_name: user.user_metadata?.full_name || '',
+                                is_admin: false, // По умолчанию не админ
+                                created_at: new Date().toISOString()
+                            }
+                        ]);
+                    
+                    if (createError) {
+                        console.error('Create profile error:', createError);
+                        throw new Error('Не удалось создать профиль');
+                    }
+                    
+                    showModal('Доступ запрещен', 'Профиль создан, но у вас нет прав администратора. Обратитесь к существующему администратору.');
+                    setTimeout(() => {
+                        window.location.href = '/profile.html';
+                    }, 3000);
+                    return false;
+                }
+                
+                throw new Error('Ошибка при проверке профиля: ' + profileError.message);
+            }
+            
+            if (!profile || !profile.is_admin) {
+                showModal('Доступ запрещен', 'Требуются права администратора. Обратитесь к администратору системы.');
+                setTimeout(() => {
+                    window.location.href = '/profile.html';
+                }, 3000);
+                return false;
+            }
+            
+            console.log('✅ Админ доступ подтвержден:', profile.email);
+            return { user, profile };
+            
+        } catch (error) {
+            console.error('Admin check error:', error);
+            showModal('Ошибка доступа', 'Не удалось проверить права доступа: ' + error.message);
             setTimeout(() => {
-                window.location.href = '/profile.html';
-            }, 2000);
+                window.location.href = '/login.html';
+            }, 3000);
             return false;
         }
-        
-        return { user, profile };
     }
 
     // Генератор уникальных ID для вопросов
@@ -748,7 +799,7 @@
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
         const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
         
-        // ПРОВЕРЯЕМ АДМИНА ПЕРВЫМ ДЕЛОМ
+        // ПРОВЕРЯЕМ АДМИНА ПЕРВЫМ ДЕЛОМ - УЛУЧШЕННАЯ ВЕРСИЯ
         const adminCheck = await checkAdmin(supabase);
         if (!adminCheck) return false;
         
