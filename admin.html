@@ -649,6 +649,95 @@
       return 'q_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
+    // Функция для инициализации загрузки изображений
+    function initImageUpload(uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId) {
+      const uploadArea = document.getElementById(uploadAreaId);
+      const fileInput = document.getElementById(fileInputId);
+      const progress = document.getElementById(progressId);
+      const progressBar = document.getElementById(progressBarId);
+      const preview = document.getElementById(previewId);
+      const urlInput = document.getElementById(urlInputId);
+
+      // Обработчик клика по области загрузки
+      uploadArea.addEventListener('click', () => {
+        fileInput.click();
+      });
+
+      // Обработчик выбора файла
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+          handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput);
+        }
+      });
+
+      // Обработчики drag and drop
+      uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+      });
+
+      uploadArea.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+      });
+
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+          handleFileUpload(e.dataTransfer.files[0], uploadArea, progress, progressBar, preview, urlInput);
+        }
+      });
+    }
+
+    // Функция загрузки файла
+    async function handleFileUpload(file, uploadArea, progress, progressBar, preview, urlInput) {
+      // Проверка типа файла
+      if (!file.type.startsWith('image/')) {
+        showModal('Ошибка', 'Пожалуйста, выберите файл изображения.');
+        return;
+      }
+
+      // Проверка размера файла (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showModal('Ошибка', 'Размер файла не должен превышать 5MB.');
+        return;
+      }
+
+      try {
+        // Показываем прогресс
+        progress.style.display = 'block';
+        progressBar.style.width = '0%';
+
+        // Создаем URL для предпросмотра
+        const objectUrl = URL.createObjectURL(file);
+        preview.src = objectUrl;
+        preview.style.display = 'block';
+
+        // Симулируем прогресс загрузки (в реальном приложении здесь будет настоящая загрузка)
+        let progressValue = 0;
+        const progressInterval = setInterval(() => {
+          progressValue += 5;
+          progressBar.style.width = progressValue + '%';
+          
+          if (progressValue >= 100) {
+            clearInterval(progressInterval);
+            setTimeout(() => {
+              progress.style.display = 'none';
+              // Сохраняем URL для использования в форме
+              urlInput.value = objectUrl;
+              showModal('Успех', 'Изображение успешно загружено!');
+            }, 500);
+          }
+        }, 50);
+
+      } catch (error) {
+        console.error('Ошибка загрузки изображения:', error);
+        showModal('Ошибка', 'Не удалось загрузить изображение: ' + error.message);
+        progress.style.display = 'none';
+      }
+    }
+
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
@@ -672,6 +761,25 @@
         let editingCrosswordId = null;
         let editingAssignmentId = null;
         let selectedMaterialId = null;
+
+        // ===== ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ ЗАГРУЗКИ ИЗОБРАЖЕНИЙ =====
+        initImageUpload(
+          'textbookUploadArea', 
+          'textbookCoverInput', 
+          'textbookCoverProgress', 
+          'textbookCoverProgressBar', 
+          'textbookCoverPreview', 
+          'textbookCoverUrl'
+        );
+
+        initImageUpload(
+          'crosswordUploadArea', 
+          'crosswordCoverInput', 
+          'crosswordCoverProgress', 
+          'crosswordCoverProgressBar', 
+          'crosswordCoverPreview', 
+          'crosswordCoverUrl'
+        );
 
         // ===== ОБРАБОТЧИКИ СОБЫТИЙ =====
         
@@ -757,31 +865,6 @@
         document.getElementById('crosswordAccessSelect').addEventListener('change', updateAccessButton);
         document.getElementById('grantAccessBtn').addEventListener('click', grantAccess);
 
-        // ===== ФУНКЦИИ ДЛЯ РАБОТЫ С ИЗОБРАЖЕНИЯМИ =====
-        
-        async function uploadImage(file, path) {
-          try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-            const filePath = `${path}/${fileName}`;
-            
-            const { data, error } = await supabase.storage
-              .from('materials')
-              .upload(filePath, file);
-            
-            if (error) throw error;
-            
-            const { data: { publicUrl } } = supabase.storage
-              .from('materials')
-              .getPublicUrl(filePath);
-            
-            return publicUrl;
-          } catch (error) {
-            console.error('Ошибка загрузки изображения:', error);
-            throw new Error('Не удалось загрузить изображение: ' + error.message);
-          }
-        }
-        
         // ===== ФУНКЦИИ ДЛЯ СТАТИСТИКИ =====
         
         async function loadStats() {
@@ -803,10 +886,10 @@
               .select('id');
 
             if (!textbooksError && !crosswordsError && !assignmentsError && !usersError) {
-              document.getElementById('totalTextbooks').textContent = textbooks.length;
-              document.getElementById('totalCrosswords').textContent = crosswords.length;
-              document.getElementById('totalAssignments').textContent = assignments.length;
-              document.getElementById('totalUsers').textContent = users.length;
+              document.getElementById('totalTextbooks').textContent = textbooks?.length || 0;
+              document.getElementById('totalCrosswords').textContent = crosswords?.length || 0;
+              document.getElementById('totalAssignments').textContent = assignments?.length || 0;
+              document.getElementById('totalUsers').textContent = users?.length || 0;
             }
           } catch (error) {
             console.error('Ошибка загрузки статистики:', error);
@@ -870,11 +953,7 @@
             
             if (error) {
               console.error('Supabase error:', error);
-              // Проверяем, является ли ошибка RLS ошибкой
-              if (error.code === '42501' || error.message.includes('row-level security')) {
-                throw new Error('Ошибка прав доступа. Убедитесь, что RLS политики настроены правильно для администраторов.');
-              }
-              throw error;
+              throw new Error('Ошибка сохранения учебника: ' + error.message);
             }
             
             showModal('Успех', editingTextbookId ? 'Учебник успешно обновлен' : 'Учебник успешно создан');
@@ -1065,11 +1144,7 @@
             
             if (error) {
               console.error('Supabase error:', error);
-              // Проверяем, является ли ошибка RLS ошибкой
-              if (error.code === '42501' || error.message.includes('row-level security')) {
-                throw new Error('Ошибка прав доступа. Убедитесь, что RLS политики настроены правильно для администраторов.');
-              }
-              throw error;
+              throw new Error('Ошибка сохранения кроссворда: ' + error.message);
             }
             
             showModal('Успех', editingCrosswordId ? 'Кроссворд успешно обновлен' : 'Кроссворд успешно создан');
@@ -1322,7 +1397,7 @@
                 <div class="sentence-builder">
                   <div class="sentence-preview" id="sentencePreview${questionId}">Введите предложение ниже</div>
                   <textarea class="sentence-input" id="sentenceInput${questionId}" placeholder="Введите предложение, используя ___ для пропусков. Например: Я ___ яблоко." rows="2"></textarea>
-                  <button class="btn btn-small add-gap-btn" onclick="updateSentencePreview('${questionId}')">Обновить предпросмотр</button>
+                  <button type="button" class="btn btn-small add-gap-btn" onclick="window.updateSentencePreview('${questionId}')">Обновить предпросмотр</button>
                 </div>
               </div>
               <div class="form-group">
@@ -1349,12 +1424,13 @@
           if (currentQuestionType === 'sentence') {
             const sentenceInput = document.getElementById(`sentenceInput${questionId}`);
             sentenceInput.addEventListener('input', () => {
-              updateSentencePreview(questionId);
+              window.updateSentencePreview(questionId);
             });
           }
         }
         
-        function updateSentencePreview(questionId) {
+        // Функция для обновления предпросмотра предложения (добавляем в глобальную область видимости)
+        window.updateSentencePreview = function(questionId) {
           const sentenceInput = document.getElementById(`sentenceInput${questionId}`);
           const preview = document.getElementById(`sentencePreview${questionId}`);
           
@@ -1372,7 +1448,7 @@
           } else {
             preview.textContent = 'Введите предложение ниже';
           }
-        }
+        };
         
         async function saveAssignment() {
           const title = document.getElementById('assignmentTitle').value.trim();
@@ -1396,13 +1472,14 @@
             return;
           }
           
+          // Собираем данные вопросов
           for (let i = 0; i < questionElements.length; i++) {
             const item = questionElements[i];
             const questionType = item.getAttribute('data-type') || 'test';
-            const question = item.querySelector('.question-text').value;
+            const questionText = item.querySelector('.question-text').value;
             
-            if (!question) {
-              showModal('Ошибка', 'Заполните текст вопроса');
+            if (!questionText) {
+              showModal('Ошибка', `Заполните текст вопроса ${i + 1}`);
               return;
             }
             
@@ -1413,13 +1490,13 @@
               const options = optionsText.split('\n').filter(opt => opt.trim() !== '');
               
               if (correct < 0 || correct >= options.length) {
-                showModal('Ошибка', 'Номер правильного ответа должен соответствовать одному из вариантов');
+                showModal('Ошибка', `Номер правильного ответа в вопросе ${i + 1} должен соответствовать одному из вариантов`);
                 return;
               }
               
               questions.push({
                 type: 'test',
-                q: question,
+                q: questionText,
                 options: options,
                 correct: correct
               });
@@ -1428,13 +1505,13 @@
               const answers = answersText.split('\n').filter(ans => ans.trim() !== '');
               
               if (answers.length === 0) {
-                showModal('Ошибка', 'Введите хотя бы один правильный ответ');
+                showModal('Ошибка', `Введите хотя бы один правильный ответ в вопросе ${i + 1}`);
                 return;
               }
               
               questions.push({
                 type: 'fill',
-                q: question,
+                q: questionText,
                 answers: answers
               });
             } else if (questionType === 'sentence') {
@@ -1443,12 +1520,12 @@
               const answers = answersText.split('\n').filter(ans => ans.trim() !== '');
               
               if (!sentence) {
-                showModal('Ошибка', 'Введите предложение с пропусками');
+                showModal('Ошибка', `Введите предложение с пропусками в вопросе ${i + 1}`);
                 return;
               }
               
               if (answers.length === 0) {
-                showModal('Ошибка', 'Введите правильные ответы для пропусков');
+                showModal('Ошибка', `Введите правильные ответы для пропусков в вопросе ${i + 1}`);
                 return;
               }
               
@@ -1456,13 +1533,13 @@
               const gapCount = (sentence.match(/___/g) || []).length;
               
               if (gapCount !== answers.length) {
-                showModal('Ошибка', `Количество пропусков в предложении (${gapCount}) не совпадает с количеством ответов (${answers.length})`);
+                showModal('Ошибка', `Количество пропусков в предложении (${gapCount}) не совпадает с количеством ответов (${answers.length}) в вопросе ${i + 1}`);
                 return;
               }
               
               questions.push({
                 type: 'sentence',
-                q: question,
+                q: questionText,
                 sentence: sentence,
                 answers: answers
               });
@@ -1503,11 +1580,7 @@
             
             if (error) {
               console.error('Supabase error:', error);
-              // Проверяем, является ли ошибка RLS ошибкой
-              if (error.code === '42501' || error.message.includes('row-level security')) {
-                throw new Error('Ошибка прав доступа. Убедитесь, что RLS политики настроены правильно для администраторов.');
-              }
-              throw error;
+              throw new Error('Ошибка сохранения задания: ' + error.message);
             }
             
             showModal('Успех', editingAssignmentId ? 'Задание успешно обновлено' : 'Задание успешно создано');
@@ -1690,7 +1763,7 @@
                     <div class="sentence-builder">
                       <div class="sentence-preview" id="sentencePreview${questionId}">${question.sentence.replace(/___/g, '<span style="border-bottom: 2px dashed #666; padding: 0 10px; margin: 0 2px;">[?]</span>')}</div>
                       <textarea class="sentence-input" id="sentenceInput${questionId}" placeholder="Введите предложение, используя ___ для пропусков. Например: Я ___ яблоко." rows="2">${question.sentence}</textarea>
-                      <button class="btn btn-small add-gap-btn" onclick="updateSentencePreview('${questionId}')">Обновить предпросмотр</button>
+                      <button type="button" class="btn btn-small add-gap-btn" onclick="window.updateSentencePreview('${questionId}')">Обновить предпросмотр</button>
                     </div>
                   </div>
                   <div class="form-group">
@@ -1748,91 +1821,115 @@
         async function loadUsers() {
           const searchTerm = document.getElementById('userSearch').value.trim();
           
-          let query = supabase
-            .from('profiles')
-            .select(`
-              *,
-              user_progress(count),
-              user_progress_completed:user_progress!inner(count)
-            `)
-            .neq('id', currentUser.id)
-            .order('created_at', { ascending: false });
+          try {
+            let query = supabase
+              .from('profiles')
+              .select('*')
+              .order('created_at', { ascending: false });
           
-          if (searchTerm) {
-            query = query.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
-          }
-          
-          const { data, error } = await query;
-          
-          if (error) {
-            console.error('Ошибка загрузки пользователей:', error);
-            showModal('Ошибка', 'Ошибка загрузки пользователей: ' + error.message);
-            return;
-          }
-          
-          const tbody = document.querySelector('#usersTable tbody');
-          tbody.innerHTML = '';
-          
-          if (data.length === 0) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td colspan="5" style="text-align:center;padding:20px;">Пользователи не найдены</td>`;
-            tbody.appendChild(tr);
-            return;
-          }
-          
-          data.forEach(user => {
-            const totalAssignments = user.user_progress?.[0]?.count || 0;
-            const completedAssignments = user.user_progress_completed?.[0]?.count || 0;
+            if (searchTerm) {
+              query = query.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+            }
             
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td>
-                <div><strong>${user.full_name || 'Не указано'}</strong></div>
-                <div class="user-stats">
-                  <span class="stat-badge">👤 ID: ${user.id.substring(0, 8)}...</span>
-                </div>
-              </td>
-              <td>${user.email || 'Не указано'}</td>
-              <td>
-                <div class="user-stats">
-                  <span class="stat-badge">📊 ${completedAssignments}/${totalAssignments} выполнено</span>
-                </div>
-              </td>
-              <td>${user.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
-              <td>
-                <div class="user-actions">
-                  <button class="btn btn-small ${user.is_admin ? 'secondary' : ''}" data-user-id="${user.id}" data-make-admin="${!user.is_admin}">
-                    ${user.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}
-                  </button>
-                </div>
-              </td>
-            `;
-            tbody.appendChild(tr);
-          });
+            const { data, error } = await query;
+            
+            if (error) {
+              console.error('Ошибка загрузки пользователей:', error);
+              showModal('Ошибка', 'Ошибка загрузки пользователей: ' + error.message);
+              return;
+            }
+            
+            const tbody = document.querySelector('#usersTable tbody');
+            tbody.innerHTML = '';
+            
+            if (!data || data.length === 0) {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `<td colspan="5" style="text-align:center;padding:20px;">Пользователи не найдены</td>`;
+              tbody.appendChild(tr);
+              return;
+            }
+            
+            // Загружаем прогресс пользователей
+            const { data: userProgress } = await supabase
+              .from('user_progress')
+              .select('user_id, is_completed');
+              
+            const progressByUser = {};
+            if (userProgress) {
+              userProgress.forEach(progress => {
+                if (!progressByUser[progress.user_id]) {
+                  progressByUser[progress.user_id] = { total: 0, completed: 0 };
+                }
+                progressByUser[progress.user_id].total++;
+                if (progress.is_completed) {
+                  progressByUser[progress.user_id].completed++;
+                }
+              });
+            }
+            
+            data.forEach(user => {
+              const userProgress = progressByUser[user.id] || { total: 0, completed: 0 };
+              const progressText = userProgress.total > 0 
+                ? `${userProgress.completed}/${userProgress.total} выполнено (${Math.round((userProgress.completed / userProgress.total) * 100)}%)`
+                : 'Нет прогресса';
+              
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td>
+                  <div><strong>${user.full_name || 'Не указано'}</strong></div>
+                  <div class="user-stats">
+                    <span class="stat-badge">👤 ID: ${user.id.substring(0, 8)}...</span>
+                  </div>
+                </td>
+                <td>${user.email || 'Не указано'}</td>
+                <td>
+                  <div class="user-stats">
+                    <span class="stat-badge">📊 ${progressText}</span>
+                  </div>
+                </td>
+                <td>${user.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
+                <td>
+                  <div class="user-actions">
+                    <button class="btn btn-small ${user.is_admin ? 'secondary' : ''}" data-user-id="${user.id}" data-make-admin="${!user.is_admin}">
+                      ${user.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}
+                    </button>
+                  </div>
+                </td>
+              `;
+              tbody.appendChild(tr);
+            });
 
-          document.querySelectorAll('[data-user-id]').forEach(btn => {
-            if (btn.textContent.includes('админ')) {
+            document.querySelectorAll('[data-user-id]').forEach(btn => {
               btn.addEventListener('click', () => {
                 const userId = btn.getAttribute('data-user-id');
                 const makeAdmin = btn.getAttribute('data-make-admin') === 'true';
                 toggleAdmin(userId, makeAdmin);
               });
-            }
-          });
+            });
+          } catch (error) {
+            console.error('Ошибка загрузки пользователей:', error);
+            showModal('Ошибка', 'Ошибка загрузки пользователей: ' + error.message);
+          }
         }
         
         async function toggleAdmin(userId, makeAdmin) {
           if (!confirm(`Вы уверены, что хотите ${makeAdmin ? 'назначить' : 'снять'} права администратора?`)) return;
           
-          const { error } = await supabase
-            .from('profiles')
-            .update({ is_admin: makeAdmin })
-            .eq('id', userId);
-            
-          if (error) {
+          try {
+            const { error } = await supabase
+              .from('profiles')
+              .update({ is_admin: makeAdmin })
+              .eq('id', userId);
+              
+            if (error) {
+              showModal('Ошибка', 'Ошибка при изменении прав: ' + error.message);
+            } else {
+              showModal('Успех', `Права администратора ${makeAdmin ? 'выданы' : 'отозваны'} успешно`);
+              loadUsers();
+            }
+          } catch (error) {
+            console.error('Ошибка изменения прав:', error);
             showModal('Ошибка', 'Ошибка при изменении прав: ' + error.message);
-          } else {
-            loadUsers();
           }
         }
 
@@ -1843,7 +1940,6 @@
             const { data: users, error } = await supabase
               .from('profiles')
               .select('id, full_name, email')
-              .neq('id', currentUser.id)
               .order('full_name');
               
             if (error) throw error;
@@ -1851,12 +1947,14 @@
             const select = document.getElementById('userSelect');
             select.innerHTML = '<option value="">-- Выберите пользователя --</option>';
             
-            users.forEach(user => {
-              const option = document.createElement('option');
-              option.value = user.id;
-              option.textContent = `${user.full_name || 'Без имени'} (${user.email})`;
-              select.appendChild(option);
-            });
+            if (users && users.length > 0) {
+              users.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.id;
+                option.textContent = `${user.full_name || 'Без имени'} (${user.email})`;
+                select.appendChild(option);
+              });
+            }
             
           } catch (error) {
             console.error('Ошибка загрузки пользователей:', error);
@@ -1869,7 +1967,6 @@
               .from('crosswords')
               .select('id, title')
               .eq('is_active', true)
-              .eq('is_available', false) // Только те, что не доступны по умолчанию
               .order('title');
               
             if (error) throw error;
@@ -1877,12 +1974,14 @@
             const select = document.getElementById('crosswordAccessSelect');
             select.innerHTML = '<option value="">-- Выберите кроссворд --</option>';
             
-            crosswords.forEach(crossword => {
-              const option = document.createElement('option');
-              option.value = crossword.id;
-              option.textContent = crossword.title;
-              select.appendChild(option);
-            });
+            if (crosswords && crosswords.length > 0) {
+              crosswords.forEach(crossword => {
+                const option = document.createElement('option');
+                option.value = crossword.id;
+                option.textContent = crossword.title;
+                select.appendChild(option);
+              });
+            }
             
           } catch (error) {
             console.error('Ошибка загрузки кроссвордов:', error);
@@ -1900,6 +1999,20 @@
           const crosswordId = document.getElementById('crosswordAccessSelect').value;
           
           try {
+            // Проверяем, не выдан ли уже доступ
+            const { data: existingAccess, error: checkError } = await supabase
+              .from('crossword_access')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('crossword_id', crosswordId);
+              
+            if (checkError) throw checkError;
+            
+            if (existingAccess && existingAccess.length > 0) {
+              showModal('Ошибка', 'Доступ уже выдан этому пользователю');
+              return;
+            }
+            
             const { error } = await supabase
               .from('crossword_access')
               .insert([{
@@ -1949,7 +2062,7 @@
             accessList.forEach(access => {
               const tr = document.createElement('tr');
               tr.innerHTML = `
-                <td>${access.profiles?.full_name || 'Без имени'} (${access.profiles?.email})</td>
+                <td>${access.profiles?.full_name || 'Без имени'} (${access.profiles?.email || 'нет email'})</td>
                 <td>${access.crosswords?.title || 'Неизвестно'}</td>
                 <td>${new Date(access.granted_at).toLocaleDateString('ru-RU')} (${access.granted_by_profiles?.full_name || 'Админ'})</td>
                 <td>
