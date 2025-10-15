@@ -34,7 +34,6 @@
     .upload-progress { width:100%; height:4px; background:#f0f0f0; border-radius:2px; margin:10px 0; display:none; }
     .upload-progress-bar { height:100%; background:var(--accent2); border-radius:2px; width:0%; transition:width 0.3s; }
     
-    /* Новые стили для админ-панели */
     .material-form { display: none; margin-top: 20px; }
     .material-form.active { display: block; }
     .assignment-form { display: none; margin-top: 20px; }
@@ -94,7 +93,6 @@
       margin-top: 5px;
     }
     
-    /* Стили для заполнения предложений */
     .sentence-builder {
       background: #f8f9fa;
       border-radius: 8px;
@@ -160,7 +158,6 @@
       padding: 40px; 
     }
 
-    /* Статистика */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -190,7 +187,6 @@
       font-weight: 600;
     }
 
-    /* Адаптивность для админ-панели */
     @media (max-width: 1024px) {
       .admin-container {
         width: 98%;
@@ -858,23 +854,30 @@
               textbookData.cover_image_url = coverUrl;
             }
             
+            let result;
             if (editingTextbookId) {
-              const { error } = await supabase
+              result = await supabase
                 .from('textbooks')
                 .update(textbookData)
                 .eq('id', editingTextbookId);
-                
-              if (error) throw error;
-              showModal('Успех', 'Учебник успешно обновлен');
             } else {
-              const { error } = await supabase
+              result = await supabase
                 .from('textbooks')
                 .insert([textbookData]);
-                
-              if (error) throw error;
-              showModal('Успех', 'Учебник успешно создан');
             }
             
+            const { error } = result;
+            
+            if (error) {
+              console.error('Supabase error:', error);
+              // Проверяем, является ли ошибка RLS ошибкой
+              if (error.code === '42501' || error.message.includes('row-level security')) {
+                throw new Error('Ошибка прав доступа. Убедитесь, что RLS политики настроены правильно для администраторов.');
+              }
+              throw error;
+            }
+            
+            showModal('Успех', editingTextbookId ? 'Учебник успешно обновлен' : 'Учебник успешно создан');
             hideTextbookForm();
             loadTextbooks();
             loadStats();
@@ -1046,23 +1049,30 @@
               crosswordData.cover_image_url = coverUrl;
             }
             
+            let result;
             if (editingCrosswordId) {
-              const { error } = await supabase
+              result = await supabase
                 .from('crosswords')
                 .update(crosswordData)
                 .eq('id', editingCrosswordId);
-                
-              if (error) throw error;
-              showModal('Успех', 'Кроссворд успешно обновлен');
             } else {
-              const { error } = await supabase
+              result = await supabase
                 .from('crosswords')
                 .insert([crosswordData]);
-                
-              if (error) throw error;
-              showModal('Успех', 'Кроссворд успешно создан');
             }
             
+            const { error } = result;
+            
+            if (error) {
+              console.error('Supabase error:', error);
+              // Проверяем, является ли ошибка RLS ошибкой
+              if (error.code === '42501' || error.message.includes('row-level security')) {
+                throw new Error('Ошибка прав доступа. Убедитесь, что RLS политики настроены правильно для администраторов.');
+              }
+              throw error;
+            }
+            
+            showModal('Успех', editingCrosswordId ? 'Кроссворд успешно обновлен' : 'Кроссворд успешно создан');
             hideCrosswordForm();
             loadCrosswords();
             loadStats();
@@ -1477,23 +1487,30 @@
               assignmentData.crossword_id = materialId;
             }
             
+            let result;
             if (editingAssignmentId) {
-              const { error } = await supabase
+              result = await supabase
                 .from('assignments')
                 .update(assignmentData)
                 .eq('id', editingAssignmentId);
-                
-              if (error) throw error;
-              showModal('Успех', 'Задание успешно обновлено');
             } else {
-              const { error } = await supabase
+              result = await supabase
                 .from('assignments')
                 .insert([assignmentData]);
-                
-              if (error) throw error;
-              showModal('Успех', 'Задание успешно создано');
             }
             
+            const { error } = result;
+            
+            if (error) {
+              console.error('Supabase error:', error);
+              // Проверяем, является ли ошибка RLS ошибкой
+              if (error.code === '42501' || error.message.includes('row-level security')) {
+                throw new Error('Ошибка прав доступа. Убедитесь, что RLS политики настроены правильно для администраторов.');
+              }
+              throw error;
+            }
+            
+            showModal('Успех', editingAssignmentId ? 'Задание успешно обновлено' : 'Задание успешно создано');
             hideAssignmentForm();
             loadAssignments();
             loadStats();
@@ -1735,7 +1752,7 @@
             .from('profiles')
             .select(`
               *,
-              user_progress!inner(count),
+              user_progress(count),
               user_progress_completed:user_progress!inner(count)
             `)
             .neq('id', currentUser.id)
