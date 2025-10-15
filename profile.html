@@ -2,11 +2,11 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <title>Профиль — Edu Platform</title>
+  <title>Профиль — Edu Keys</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
   <style>
-    /* СИСТЕМА ФОНА */
+    /* СИСТЕМА ФОНА - ЧИСТЫЙ БЕЗ ПРОЗРАЧНОСТИ */
     body {
       margin: 0;
       padding: 0;
@@ -27,89 +27,7 @@
       z-index: 2;
     }
 
-    /* Вкладки прогресса */
-    .progress-tabs {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
-    .progress-tab {
-      padding: 12px 20px;
-      background: var(--card);
-      border-radius: 12px;
-      cursor: pointer;
-      font-weight: 700;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      transition: all 0.2s;
-      border: 2px solid transparent;
-    }
-    .progress-tab.active {
-      background: var(--accent2);
-      color: white;
-      border-color: var(--accent2);
-    }
-    .progress-section {
-      display: none;
-    }
-    .progress-section.active {
-      display: block;
-    }
-
-    /* Элементы прогресса */
-    .progress-item {
-      background: white;
-      border: 2px solid #e0e0e0;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 15px;
-      transition: all 0.3s ease;
-    }
-    .progress-item:hover {
-      border-color: var(--accent2);
-      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
-    }
-    .progress-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-    .progress-stats {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .progress-badge {
-      background: var(--bg1);
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 14px;
-      font-weight: 600;
-    }
-    .progress-bar-container {
-      width: 100%;
-      height: 8px;
-      background: #f0f0f0;
-      border-radius: 4px;
-      overflow: hidden;
-      margin-top: 10px;
-    }
-    .progress-bar {
-      height: 100%;
-      background: linear-gradient(135deg, var(--accent2), #6dd3c0);
-      border-radius: 4px;
-      transition: width 0.5s ease;
-    }
-    .progress-percentage {
-      font-size: 14px;
-      color: var(--muted);
-      margin-top: 5px;
-      text-align: right;
-    }
-
-    /* Аватар без ключей */
+    /* Осенние улучшения для профиля */
     .profile-avatar {
       border: 4px solid #ffa726;
       box-shadow: 
@@ -117,6 +35,7 @@
         inset 0 0 20px rgba(255, 193, 7, 0.1);
       transition: all 0.5s ease;
     }
+
     .profile-avatar:hover {
       transform: scale(1.02);
       box-shadow: 
@@ -124,7 +43,29 @@
         inset 0 0 30px rgba(255, 193, 7, 0.2);
     }
 
-    /* Анимации */
+    .month-row {
+      padding: 12px;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+      background: #ffffff;
+    }
+
+    .month-row:hover {
+      background: #fff8f0;
+      border-color: #ffcc80;
+      transform: translateX(5px);
+    }
+
+    .month-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+    }
+
+    /* Анимация появления */
     @keyframes fadeInUp {
       from {
         opacity: 0;
@@ -135,11 +76,39 @@
         transform: translateY(0);
       }
     }
+
     #mainContent {
       animation: fadeInUp 0.8s ease-out;
     }
 
-    /* Индикаторы загрузки */
+    /* Индикатор загрузки фона */
+    .background-loading {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      z-index: 1000;
+      display: none;
+    }
+
+    /* Индикатор предзагрузки помощи */
+    .preload-status {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      z-index: 9999;
+      display: none;
+    }
+
     .loading { 
       text-align: center; 
       padding: 40px; 
@@ -171,38 +140,137 @@
       display: none; 
     }
 
-    /* Мобильная адаптация */
+    /* Стили для модального окна помощи */
+    .help-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      padding: 20px;
+    }
+    .help-modal-content {
+      background: white;
+      border-radius: 16px;
+      max-width: 800px;
+      width: 100%;
+      max-height: 90vh;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .help-modal-header {
+      padding: 20px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .help-modal-tabs {
+      display: flex;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .help-tab {
+      flex: 1;
+      padding: 15px;
+      border: none;
+      background: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .help-tab.active {
+      background: white;
+      color: var(--accent2);
+      border-bottom: 3px solid var(--accent2);
+    }
+    .help-tab-content {
+      display: none;
+      padding: 0;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    .help-tab-content.active {
+      display: block;
+    }
+    .help-image {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .help-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+      padding: 5px;
+    }
+    .help-close:hover {
+      color: #333;
+    }
+    .image-loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    /* Мобильная оптимизация */
     @media (max-width: 768px) {
+      body {
+        background-attachment: scroll;
+      }
+      
       .container {
         width: 100%;
         margin: 0;
         padding: 10px;
       }
       
-      .progress-tabs {
-        flex-direction: column;
-        gap: 5px;
-      }
-      
-      .progress-tab {
-        text-align: center;
-        padding: 15px;
-      }
-      
-      .progress-header {
-        flex-direction: column;
-        gap: 10px;
-        align-items: flex-start;
-      }
-      
-      .progress-stats {
-        width: 100%;
-        justify-content: space-between;
-      }
-      
       .profile-avatar {
         width: 180px;
         height: 180px;
+      }
+      
+      .key-circle {
+        width: 28px;
+        height: 28px;
+      }
+      
+      .background-loading {
+        top: 10px;
+        right: 10px;
+        font-size: 10px;
+        padding: 6px 10px;
+      }
+
+      .preload-status {
+        bottom: 10px;
+        right: 10px;
+        font-size: 10px;
+      }
+      
+      .card {
+        margin: 8px 0;
+      }
+
+      .help-modal-content {
+        margin: 10px;
+        max-height: 85vh;
+      }
+      
+      .help-modal-tabs {
+        flex-direction: column;
+      }
+      
+      .help-tab {
+        padding: 12px;
       }
     }
 
@@ -212,13 +280,15 @@
         height: 150px;
       }
       
-      .progress-badge {
-        font-size: 12px;
-        padding: 4px 8px;
+      .key-circle {
+        width: 24px;
+        height: 24px;
       }
       
-      .progress-item {
-        padding: 15px;
+      .month-title {
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
       }
     }
   </style>
@@ -226,10 +296,49 @@
   <script src="/load-config.js"></script>
 </head>
 <body id="profileBody">
+  <!-- Индикатор загрузки фона -->
+  <div class="background-loading" id="backgroundLoading">
+    <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
+    Загружаем фон...
+  </div>
+
+  <!-- Индикатор предзагрузки помощи -->
+  <div class="preload-status" id="preloadStatus">
+    <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
+    Предзагружаем помощь...
+  </div>
+
+  <!-- Модальное окно помощи -->
+  <div class="help-modal" id="helpModal">
+    <div class="help-modal-content">
+      <div class="help-modal-header">
+        <h3 style="margin: 0; color: #333;">📚 Помощь по платформе</h3>
+        <button class="help-close" id="closeHelpModal">✕</button>
+      </div>
+      <div class="help-modal-tabs">
+        <button class="help-tab active" data-tab="registration">📝 Регистрация</button>
+        <button class="help-tab" data-tab="rules">📋 Правила</button>
+      </div>
+      <div class="help-tab-content active" id="registrationContent">
+        <div class="image-loading">
+          <div class="spinner"></div>
+          <p>Загружаем инструкцию по регистрации...</p>
+        </div>
+      </div>
+      <div class="help-tab-content" id="rulesContent">
+        <div class="image-loading">
+          <div class="spinner"></div>
+          <p>Загружаем правила платформы...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Основной контент -->
   <div class="container">
     <div id="loading" class="loading">
       <div class="spinner"></div>
-      <p>🔄 Загружаем профиль...</p>
+      <p>🔄 Загружаем конфигурацию...</p>
     </div>
     
     <div id="errorMessage" class="error"></div>
@@ -237,20 +346,21 @@
     <div id="mainContent" style="display: none;">
       <div class="header">
         <div class="logo">
-          <div class="mark" style="background: linear-gradient(135deg, #ff9800, #f57c00);">EP</div>
+          <div class="mark" style="background: linear-gradient(135deg, #ff9800, #f57c00);">EK</div>
           <div>
-            <h3 style="background: linear-gradient(135deg, #ff9800, #e65100); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0;">Edu Platform</h3>
-            <div class="small-muted">📊 Ваш прогресс обучения</div>
+            <h3 style="background: linear-gradient(135deg, #ff9800, #e65100); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0;">Edu Keys</h3>
+            <div class="small-muted">🎨 Персонализированный профиль</div>
           </div>
         </div>
         <div class="nav">
           <button class="btn" onclick="location.href='/tasks.html'" style="background: linear-gradient(135deg, #ff9800, #f57c00);">📚 К заданиям</button>
+          <button class="btn" id="helpBtn" style="background: linear-gradient(135deg, #2196F3, #21CBF3);">❓ Помощь</button>
           <button class="btn secondary" id="logoutBtn" style="background: linear-gradient(135deg, #795548, #5d4037);">🚪 Выйти</button>
         </div>
       </div>
 
       <div class="grid-2">
-        <!-- Левая колонка: профиль -->
+        <!-- left: profile -->
         <div class="card profile-card">
           <div class="profile-avatar" role="img" aria-label="Профиль ученика">
             <svg viewBox="0 0 200 200" preserveAspectRatio="none" style="width:100%;height:100%;border-radius:12px">
@@ -271,57 +381,43 @@
                 <ellipse cx="70" cy="10" rx="30" ry="12" fill="#ffcc80"/>
               </g>
             </svg>
+
+            <!-- overlayed key circles -->
+            <div class="key-circles" id="keyCircles">
+              <div class="key-circle kpos1" data-index="1"></div>
+              <div class="key-circle kpos2" data-index="2"></div>
+              <div class="key-circle kpos3" data-index="3"></div>
+              <div class="key-circle kpos4" data-index="4"></div>
+              <div class="key-circle kpos5" data-index="5"></div>
+              <div class="key-circle kpos6" data-index="6"></div>
+              <div class="key-circle kpos7" data-index="7"></div>
+            </div>
           </div>
 
           <div class="profile-info">
             <h3 id="fullname" style="color: #5d4037; margin-bottom: 8px;">Ученик</h3>
             <div class="small-muted" id="emailText" style="color: #8d6e63;">—</div>
             <div style="margin-top:16px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-              <span class="badge" id="totalProgress" style="background: linear-gradient(135deg, #ffa726, #fb8c00); padding: 8px 16px;">📊 Общий прогресс: 0%</span>
-              <span class="badge" id="completedTasks" style="background: linear-gradient(135deg, #795548, #5d4037); padding: 8px 16px;">✅ Выполнено: 0 заданий</span>
+              <span class="badge" id="keysCount" style="background: linear-gradient(135deg, #ffa726, #fb8c00); padding: 8px 16px;">🗝️ Ключей: 0/7</span>
+              <span class="badge" id="attemptsCount" style="background: linear-gradient(135deg, #795548, #5d4037); padding: 8px 16px;">📊 Попыток: 0</span>
             </div>
           </div>
         </div>
 
-        <!-- Правая колонка: прогресс -->
+        <!-- right: progress / months -->
         <div>
           <div class="card">
-            <h3 style="color: #e65100; margin-bottom: 16px;">📊 Прогресс обучения</h3>
-            
-            <div class="progress-tabs">
-              <div class="progress-tab active" data-tab="textbooks">📚 Учебники</div>
-              <div class="progress-tab" data-tab="crosswords">🧩 Кроссворды</div>
-            </div>
-
-            <!-- Секция учебников -->
-            <div class="progress-section active" id="textbooks-section">
-              <div id="textbooksProgress">
-                <div class="loading" style="padding: 20px;">
-                  <div class="spinner" style="width: 24px; height: 24px;"></div>
-                  <p>Загружаем прогресс по учебникам...</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Секция кроссвордов -->
-            <div class="progress-section" id="crosswords-section">
-              <div id="crosswordsProgress">
-                <div class="loading" style="padding: 20px;">
-                  <div class="spinner" style="width: 24px; height: 24px;"></div>
-                  <p>Загружаем прогресс по кроссвордам...</p>
-                </div>
-              </div>
-            </div>
+            <h3 style="color: #e65100; margin-bottom: 16px;">📊 Прогресс по месяцам</h3>
+            <div id="monthsList" style="margin-top:12px"></div>
           </div>
 
           <div style="height:18px"></div>
 
           <div class="card">
             <h3 style="color: #e65100; margin-bottom: 16px;">ℹ️ Информация</h3>
-            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">🎯 Прогресс отображает количество выполненных заданий в каждом учебнике и кроссворде.</p>
-            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">📚 Учебники содержат теоретические задания и тесты.</p>
-            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">🧩 Кроссворды - это интерактивные задания для закрепления материала.</p>
-            <p class="small-muted" style="color: #5d4037; line-height: 1.5;"><strong>💡 Совет:</strong> Выполняйте задания последовательно для лучшего усвоения материала.</p>
+            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">🎯 Кружки на аватаре заполняются по мере получения ключей за каждый месяц. Нажми «К заданиям», чтобы начать.</p>
+            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">📅 Задания каждого месяца становятся доступны в соответствующем месяце учебного года (с сентября по март).</p>
+            <p class="small-muted" style="color: #5d4037; line-height: 1.5;"><strong>⚠️ Внимание:</strong> Каждая попытка списывается при начале задания. Будьте внимательны!</p>
           </div>
         </div>
       </div>
@@ -343,6 +439,267 @@
       document.getElementById('errorMessage').style.display = 'none';
     }
     
+    // ===== УЛУЧШЕННАЯ СИСТЕМА ПОМОЩИ С ПРЕДЗАГРУЗКОЙ И ОБХОДОМ КЭША =====
+    function initHelpSystem(supabase) {
+      const helpModal = document.getElementById('helpModal');
+      const helpBtn = document.getElementById('helpBtn');
+      const closeHelpBtn = document.getElementById('closeHelpModal');
+      const helpTabs = document.querySelectorAll('.help-tab');
+      const tabContents = document.querySelectorAll('.help-tab-content');
+      const preloadStatus = document.getElementById('preloadStatus');
+      
+      // Объект для хранения предзагруженных изображений
+      const preloadedImages = {
+        registration: null,
+        rules: null
+      };
+
+      // Статусы загрузки
+      let imagesLoaded = {
+        registration: false,
+        rules: false
+      };
+
+      // Функция для получения публичного URL изображения из Storage С ПАРАМЕТРОМ ВЕРСИИ
+      function getHelpImageUrl(imageName) {
+        // Добавляем параметр версии чтобы избежать кэширования
+        const version = new Date().getTime(); // timestamp в миллисекундах
+        return `${window.SUPABASE_URL}/storage/v1/object/public/help-images/${imageName}?v=${version}`;
+      }
+
+      // Функция предзагрузки изображений
+      async function preloadHelpImages() {
+        preloadStatus.style.display = 'block';
+        console.log('🔄 Начинаем предзагрузку изображений помощи...');
+
+        const imagesToPreload = [
+          { name: 'registration', url: 'registration-help.png' },
+          { name: 'rules', url: 'rules-help.png' }
+        ];
+
+        const preloadPromises = imagesToPreload.map(({ name, url }) => {
+          return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              preloadedImages[name] = img;
+              imagesLoaded[name] = true;
+              console.log(`✅ Предзагружено: ${name}`);
+              updatePreloadStatus();
+              resolve(name);
+            };
+            img.onerror = () => {
+              console.warn(`❌ Не удалось предзагрузить: ${name}`);
+              // Пробуем загрузить без кэша
+              loadWithoutCache(name, url).then(resolve);
+            };
+            // ДОБАВЛЯЕМ ПАРАМЕТР ВЕРСИИ ДЛЯ ОБХОДА КЭША
+            img.src = getHelpImageUrl(url);
+          });
+        });
+
+        await Promise.allSettled(preloadPromises);
+        
+        // Скрываем индикатор через 2 секунды
+        setTimeout(() => {
+          preloadStatus.style.display = 'none';
+        }, 2000);
+      }
+
+      // Дополнительная функция для загрузки без кэша
+      async function loadWithoutCache(tabName, imageName) {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            preloadedImages[tabName] = img;
+            imagesLoaded[tabName] = true;
+            console.log(`✅ Загружено без кэша: ${tabName}`);
+            updatePreloadStatus();
+            resolve(tabName);
+          };
+          img.onerror = () => {
+            console.warn(`❌ Окончательно не удалось загрузить: ${tabName}`);
+            updatePreloadStatus();
+            resolve(tabName);
+          };
+          // Используем другой параметр для обхода кэша
+          const timestamp = new Date().getTime();
+          img.src = `${window.SUPABASE_URL}/storage/v1/object/public/help-images/${imageName}?timestamp=${timestamp}&nocache=${Math.random()}`;
+        });
+      }
+
+      // Обновление статуса предзагрузки
+      function updatePreloadStatus() {
+        const loadedCount = Object.values(imagesLoaded).filter(Boolean).length;
+        const totalCount = Object.keys(imagesLoaded).length;
+        preloadStatus.innerHTML = `
+          <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
+          Помощь: ${loadedCount}/${totalCount}
+        `;
+      }
+
+      // Функция загрузки изображения помощи (использует предзагруженные)
+      function loadHelpImage(tabName) {
+        const contentDiv = document.getElementById(`${tabName}Content`);
+        
+        // Если изображение уже предзагружено, используем его
+        if (imagesLoaded[tabName] && preloadedImages[tabName]) {
+          contentDiv.innerHTML = '';
+          const img = preloadedImages[tabName].cloneNode();
+          img.className = 'help-image';
+          img.alt = tabName === 'registration' ? 'Инструкция по регистрации' : 'Правила платформы';
+          contentDiv.appendChild(img);
+          return;
+        }
+
+        // Fallback: загружаем обычным способом с обходом кэша
+        const imageName = tabName === 'registration' ? 'registration-help.png' : 'rules-help.png';
+        
+        const img = document.createElement('img');
+        img.className = 'help-image';
+        img.alt = tabName === 'registration' ? 'Инструкция по регистрации' : 'Правила платформы';
+        
+        // ДОБАВЛЯЕМ ПАРАМЕТР ДЛЯ ОБХОДА КЭША
+        img.src = getHelpImageUrl(imageName);
+        
+        img.onload = () => {
+          contentDiv.innerHTML = '';
+          contentDiv.appendChild(img);
+        };
+        
+        img.onerror = () => {
+          showImageError(contentDiv, tabName);
+        };
+      }
+
+      // Функция показа ошибки загрузки изображения
+      function showImageError(contentDiv, tabName) {
+        const title = tabName === 'registration' ? '📝 Инструкция по регистрации' : '📋 Правила платформы';
+        const message = tabName === 'registration' 
+          ? 'Изображение инструкции временно недоступно. Обратитесь к администратору.'
+          : 'Изображение правил временно недоступно. Обратитесь к администратору.';
+        
+        contentDiv.innerHTML = `
+          <div style="padding: 40px; text-align: center;">
+            <h3>${title}</h3>
+            <p>${message}</p>
+            <p class="small-muted">Если проблема повторяется, свяжитесь с администратором: @skebobingg</p>
+          </div>
+        `;
+      }
+
+      // Открытие модального окна
+      helpBtn.addEventListener('click', async () => {
+        helpModal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        
+        // Показываем предзагруженные изображения
+        loadHelpImage('registration');
+        loadHelpImage('rules');
+      });
+      
+      // Закрытие модального окна
+      closeHelpBtn.addEventListener('click', () => {
+        helpModal.style.display = 'none';
+        document.body.style.overflow = '';
+      });
+      
+      // Закрытие по клику на фон
+      helpModal.addEventListener('click', (e) => {
+        if (e.target === helpModal) {
+          helpModal.style.display = 'none';
+          document.body.style.overflow = '';
+        }
+      });
+      
+      // Закрытие по Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && helpModal.style.display === 'flex') {
+          helpModal.style.display = 'none';
+          document.body.style.overflow = '';
+        }
+      });
+      
+      // Переключение вкладок
+      helpTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          helpTabs.forEach(t => t.classList.remove('active'));
+          tabContents.forEach(c => c.classList.remove('active'));
+          
+          tab.classList.add('active');
+          const tabName = tab.getAttribute('data-tab');
+          document.getElementById(`${tabName}Content`).classList.add('active');
+        });
+      });
+
+      // Запускаем предзагрузку при инициализации
+      preloadHelpImages();
+    }
+    
+    // ===== ПРОСТАЯ СИСТЕМА ЗАГРУЗКИ ФОНА =====
+    async function loadProfileBackground(supabase) {
+      const backgroundLoading = document.getElementById('backgroundLoading');
+      const profileBody = document.getElementById('profileBody');
+      
+      try {
+        backgroundLoading.style.display = 'block';
+        console.log('🔄 Начинаем загрузку фона профиля...');
+        
+        const { data: background, error } = await supabase
+          .from('backgrounds')
+          .select('image_url, mime_type, file_name')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        console.log('📋 Результат запроса фона:', { background, error });
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            console.log('ℹ️ Активный фон не найден, используем стандартный фон');
+          } else {
+            console.error('❌ Ошибка загрузки фона:', error);
+          }
+          backgroundLoading.style.display = 'none';
+          return;
+        }
+
+        if (background && background.image_url) {
+          console.log('✅ Найден активный фон:', background.file_name);
+          
+          const img = new Image();
+          img.onload = function() {
+            console.log('🖼️ Фон успешно загружен в память');
+            profileBody.style.backgroundImage = `url('${background.image_url}')`;
+            
+            console.log('✅ Фон профиля установлен:', background.file_name);
+            backgroundLoading.style.display = 'none';
+          };
+          
+          img.onerror = function() {
+            console.error('❌ Ошибка загрузки изображения фона');
+            backgroundLoading.style.display = 'none';
+          };
+          
+          console.log('📥 Загружаем изображение по URL:', background.image_url);
+          img.src = background.image_url;
+          
+          setTimeout(() => {
+            if (backgroundLoading.style.display !== 'none') {
+              console.log('⏰ Таймаут загрузки фона');
+              backgroundLoading.style.display = 'none';
+            }
+          }, 10000);
+        } else {
+          console.log('ℹ️ Активный фон не найден');
+          backgroundLoading.style.display = 'none';
+        }
+      } catch (error) {
+        console.error('❌ Ошибка загрузки фона профиля:', error);
+        backgroundLoading.style.display = 'none';
+      }
+    }
+    
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
@@ -353,262 +710,114 @@
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
         const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
         
-        // Проверяем авторизацию через localStorage
-        const userStr = localStorage.getItem('currentUser');
-        if (!userStr) {
-          location.href = '/login.html';
-          return;
-        }
-        
-        const user = JSON.parse(userStr);
+        const months = ["Сентябрь","Октябрь","Ноябрь","Декабрь","Январь","Февраль","Март"];
 
-        // Функция для загрузки фона
-        async function loadProfileBackground() {
-          try {
-            const { data: background, error } = await supabase
-              .from('backgrounds')
-              .select('image_url')
-              .eq('is_active', true)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .single();
-
-            if (!error && background && background.image_url) {
-              document.getElementById('profileBody').style.backgroundImage = `url('${background.image_url}')`;
-            }
-          } catch (error) {
-            console.log('Фон не загружен:', error.message);
+        function getStudyIndex() {
+          const now = new Date();
+          const month = now.getMonth() + 1;
+          
+          if (month >= 9) {
+            return month - 8;
+          } else {
+            return month + 4;
           }
         }
 
-        // Функция для переключения вкладок
-        function initProgressTabs() {
-          const tabs = document.querySelectorAll('.progress-tab');
-          
-          tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-              const tabName = tab.getAttribute('data-tab');
-              
-              // Убираем активный класс у всех вкладок
-              tabs.forEach(t => t.classList.remove('active'));
-              document.querySelectorAll('.progress-section').forEach(s => s.classList.remove('active'));
-              
-              // Активируем выбранную вкладку
-              tab.classList.add('active');
-              document.getElementById(`${tabName}-section`).classList.add('active');
-              
-              // Загружаем данные для активной вкладки
-              if (tabName === 'textbooks') {
-                loadTextbooksProgress();
-              } else if (tabName === 'crosswords') {
-                loadCrosswordsProgress();
-              }
-            });
-          });
-        }
-
-        // Функция для загрузки прогресса по учебникам
-        async function loadTextbooksProgress() {
-          const container = document.getElementById('textbooksProgress');
-          
-          try {
-            container.innerHTML = '<div class="loading" style="padding: 20px;"><div class="spinner" style="width: 24px; height: 24px;"></div><p>Загружаем прогресс по учебникам...</p></div>';
-            
-            // Получаем все учебники
-            const { data: textbooks, error: textbooksError } = await supabase
-              .from('textbooks')
-              .select('*')
-              .eq('is_active', true)
-              .order('order_index', { ascending: true });
-            
-            if (textbooksError) throw textbooksError;
-            
-            if (!textbooks || textbooks.length === 0) {
-              container.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">📚 Учебники пока не добавлены</p>';
-              return;
-            }
-            
-            let html = '';
-            let totalCompleted = 0;
-            let totalTasks = 0;
-            
-            // Для каждого учебника получаем прогресс
-            for (const textbook of textbooks) {
-              // Получаем задания учебника
-              const { data: tasks, error: tasksError } = await supabase
-                .from('tasks')
-                .select('id')
-                .eq('textbook_id', textbook.id)
-                .eq('is_active', true);
-              
-              if (tasksError) throw tasksError;
-              
-              const totalTextbookTasks = tasks?.length || 0;
-              totalTasks += totalTextbookTasks;
-              
-              // Получаем выполненные задания
-              const { data: completedTasks, error: progressError } = await supabase
-                .from('user_progress')
-                .select('task_id')
-                .eq('user_id', user.id)
-                .eq('is_completed', true)
-                .in('task_id', tasks?.map(t => t.id) || []);
-              
-              if (progressError) throw progressError;
-              
-              const completedTextbookTasks = completedTasks?.length || 0;
-              totalCompleted += completedTextbookTasks;
-              
-              const percentage = totalTextbookTasks > 0 ? Math.round((completedTextbookTasks / totalTextbookTasks) * 100) : 0;
-              
-              html += `
-                <div class="progress-item">
-                  <div class="progress-header">
-                    <div>
-                      <h4 style="margin: 0; color: #333;">${textbook.title}</h4>
-                      <p class="small-muted" style="margin: 5px 0 0 0;">${textbook.description || 'Без описания'}</p>
-                    </div>
-                    <div class="progress-stats">
-                      <span class="progress-badge" style="background: ${percentage === 100 ? '#e8f5e8' : '#e3f2fd'}; color: ${percentage === 100 ? '#2e7d32' : '#1976d2'};">${completedTextbookTasks}/${totalTextbookTasks}</span>
-                      <span class="progress-badge" style="background: #fff3cd; color: #856404;">${percentage}%</span>
-                    </div>
-                  </div>
-                  <div class="progress-bar-container">
-                    <div class="progress-bar" style="width: ${percentage}%; background: ${percentage === 100 ? 'linear-gradient(135deg, #4caf50, #66bb6a)' : 'linear-gradient(135deg, var(--accent2), #6dd3c0)'};"></div>
-                  </div>
-                  <div class="progress-percentage">
-                    ${percentage === 100 ? '✅ Завершено' : `Выполнено ${percentage}%`}
-                  </div>
-                </div>
-              `;
-            }
-            
-            container.innerHTML = html;
-            
-            // Обновляем общую статистику
-            const totalPercentage = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
-            document.getElementById('totalProgress').textContent = `📊 Общий прогресс: ${totalPercentage}%`;
-            document.getElementById('completedTasks').textContent = `✅ Выполнено: ${totalCompleted} заданий`;
-            
-          } catch (error) {
-            console.error('Ошибка загрузки прогресса учебников:', error);
-            container.innerHTML = '<p style="text-align: center; padding: 20px; color: #e74c3c;">❌ Ошибка загрузки прогресса</p>';
+        async function loadProfile(){
+          const { data: { user } } = await supabase.auth.getUser();
+          if(!user) { 
+            location.href = '/login.html'; 
+            return; 
           }
-        }
 
-        // Функция для загрузки прогресса по кроссвордам
-        async function loadCrosswordsProgress() {
-          const container = document.getElementById('crosswordsProgress');
-          
-          try {
-            container.innerHTML = '<div class="loading" style="padding: 20px;"><div class="spinner" style="width: 24px; height: 24px;"></div><p>Загружаем прогресс по кроссвордам...</p></div>';
-            
-            // Получаем все кроссворды
-            const { data: crosswords, error: crosswordsError } = await supabase
-              .from('crosswords')
-              .select('*')
-              .eq('is_active', true)
-              .order('order_index', { ascending: true });
-            
-            if (crosswordsError) throw crosswordsError;
-            
-            if (!crosswords || crosswords.length === 0) {
-              container.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">🧩 Кроссворды пока не добавлены</p>';
-              return;
-            }
-            
-            let html = '';
-            let totalCompleted = 0;
-            let totalTasks = 0;
-            
-            // Для каждого кроссворда получаем прогресс
-            for (const crossword of crosswords) {
-              // Получаем задания кроссворда
-              const { data: tasks, error: tasksError } = await supabase
-                .from('tasks')
-                .select('id')
-                .eq('crossword_id', crossword.id)
-                .eq('is_active', true);
-              
-              if (tasksError) throw tasksError;
-              
-              const totalCrosswordTasks = tasks?.length || 0;
-              totalTasks += totalCrosswordTasks;
-              
-              // Получаем выполненные задания
-              const { data: completedTasks, error: progressError } = await supabase
-                .from('user_progress')
-                .select('task_id')
-                .eq('user_id', user.id)
-                .eq('is_completed', true)
-                .in('task_id', tasks?.map(t => t.id) || []);
-              
-              if (progressError) throw progressError;
-              
-              const completedCrosswordTasks = completedTasks?.length || 0;
-              totalCompleted += completedCrosswordTasks;
-              
-              const percentage = totalCrosswordTasks > 0 ? Math.round((completedCrosswordTasks / totalCrosswordTasks) * 100) : 0;
-              
-              html += `
-                <div class="progress-item">
-                  <div class="progress-header">
-                    <div>
-                      <h4 style="margin: 0; color: #333;">${crossword.title}</h4>
-                      <p class="small-muted" style="margin: 5px 0 0 0;">${crossword.description || 'Без описания'}</p>
-                    </div>
-                    <div class="progress-stats">
-                      <span class="progress-badge" style="background: ${percentage === 100 ? '#e8f5e8' : '#f3e5f5'}; color: ${percentage === 100 ? '#2e7d32' : '#7b1fa2'};">${completedCrosswordTasks}/${totalCrosswordTasks}</span>
-                      <span class="progress-badge" style="background: #fff3cd; color: #856404;">${percentage}%</span>
-                    </div>
-                  </div>
-                  <div class="progress-bar-container">
-                    <div class="progress-bar" style="width: ${percentage}%; background: ${percentage === 100 ? 'linear-gradient(135deg, #4caf50, #66bb6a)' : 'linear-gradient(135deg, #7b1fa2, #9c27b0)'};"></div>
-                  </div>
-                  <div class="progress-percentage">
-                    ${percentage === 100 ? '✅ Завершено' : `Выполнено ${percentage}%`}
-                  </div>
-                </div>
-              `;
-            }
-            
-            container.innerHTML = html;
-            
-          } catch (error) {
-            console.error('Ошибка загрузки прогресса кроссвордов:', error);
-            container.innerHTML = '<p style="text-align: center; padding: 20px; color: #e74c3c;">❌ Ошибка загрузки прогресса</p>';
-          }
-        }
-
-        // Основная функция загрузки профиля
-        async function loadProfile() {
-          document.getElementById('fullname').textContent = user.full_name || 'Ученик';
+          const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+          document.getElementById('fullname').textContent = profile?.full_name || 'Ученик';
           document.getElementById('emailText').textContent = user.email;
+          document.getElementById('attemptsCount').textContent = `📊 Попыток: ${profile?.attempts || 0}`;
 
-          // Загружаем фон профиля
-          await loadProfileBackground();
+          const { data: keys } = await supabase.from('keys').select('*').eq('user_id', user.id);
+          const got = keys?.length || 0;
+          document.getElementById('keysCount').textContent = `🗝️ Ключей: ${got}/7`;
+
+          document.querySelectorAll('.key-circle').forEach(el => {
+            const idx = parseInt(el.dataset.index, 10);
+            const found = keys?.some(k => k.month_index === idx);
+            if (found) { 
+              el.classList.add('filled'); 
+              el.style.background = 'linear-gradient(135deg, #ffb74d, #ff9800)';
+              el.style.boxShadow = '0 6px 20px rgba(255, 152, 0, 0.4), 0 0 20px rgba(255, 193, 7, 0.3)';
+            } else { 
+              el.classList.remove('filled');
+              el.style.background = 'linear-gradient(135deg, #8d6e63, #6d4c41)';
+              el.style.boxShadow = '0 4px 12px rgba(109, 76, 65, 0.3)';
+            }
+          });
+
+          const monthsContainer = document.getElementById('monthsList');
+          monthsContainer.innerHTML = '';
           
-          // Инициализируем вкладки
-          initProgressTabs();
+          const currentMonthIndex = getStudyIndex();
           
-          // Загружаем прогресс по учебникам (активная вкладка по умолчанию)
-          await loadTextbooksProgress();
+          const { data: attempts } = await supabase.from('attempts').select('*, tasks!inner(month_index)').eq('user_id', user.id);
+          
+          for (let i = 1; i <= 7; i++) {
+            const hasKey = keys?.some(k => k.month_index === i) || false;
+            const hasAttemptForMonth = attempts?.some(a => a.tasks.month_index === i) || false;
+            const isAvailable = i <= currentMonthIndex;
+            const isCompleted = hasKey;
+            
+            let status = '';
+            let emoji = '';
+            let statusColor = '';
+            
+            if (isCompleted) {
+              status = 'Задание выполнено';
+              emoji = '✅';
+              statusColor = '#4caf50';
+            } else if (hasAttemptForMonth) {
+              status = 'Попытка использована';
+              emoji = '❌';
+              statusColor = '#f44336';
+            } else if (isAvailable) {
+              status = 'Доступно для выполнения';
+              emoji = '📝';
+              statusColor = '#ff9800';
+            } else {
+              status = 'Заблокировано';
+              emoji = '🔒';
+              statusColor = '#9e9e9e';
+            }
+            
+            const li = document.createElement('div');
+            li.className = 'month-row';
+            li.innerHTML = `
+              <div class="month-title">
+                <div><b style="color: #5d4037;">${months[i-1]}</b></div>
+                <div><span class="small-muted" style="color: ${statusColor}; font-weight: 500;">${emoji} ${status}</span></div>
+              </div>
+            `;
+            monthsContainer.appendChild(li);
+          }
         }
 
-        // Выход из системы
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           if (confirm('Вы уверены, что хотите выйти?')) {
-            localStorage.removeItem('currentUser');
+            await supabase.auth.signOut();
             location.href = '/login.html';
           }
         });
 
+        // Инициализируем систему помощи с предзагрузкой
+        initHelpSystem(supabase);
+        
+        await loadProfileBackground(supabase);
+        
         await loadProfile();
         showContent();
         return true;
         
       } catch (error) {
-        showError('❌ Ошибка загрузки профиля: ' + error.message);
+        showError('❌ Ошибка инициализации: ' + error.message);
         return false;
       }
     }

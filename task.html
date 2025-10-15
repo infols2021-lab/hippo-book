@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <title>Задание — Edu Platform</title>
+  <title>Задание — Edu Keys</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
   <style>
@@ -18,6 +18,7 @@
     .fill-input { padding: 8px 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: 16px; width: 100%; max-width: 400px; margin-top: 10px; }
     .fill-input:focus { border-color: var(--accent2); outline: none; }
     .fill-label { display: block; margin-top: 15px; font-weight: 600; }
+    .attempt-warning { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 12px; margin-bottom: 16px; color: #856404; }
     
     /* Стили для демо-заданий */
     .demo-task-info {
@@ -312,14 +313,14 @@
     <div class="container">
       <div class="header">
         <div class="logo">
-          <div class="mark">EP</div>
+          <div class="mark">EK</div>
           <div>
             <h3 id="pageTitle">Задание</h3>
             <div class="small-muted" id="subTitle"></div>
           </div>
         </div>
         <div class="nav">
-          <button class="btn" onclick="location.href='/tasks.html'">📚 К заданиям</button>
+          <button class="btn" onclick="location.href='/tasks.html'">К заданиям</button>
         </div>
       </div>
 
@@ -348,9 +349,9 @@
         <div id="taskBody" class="task-content"></div>
         
         <div style="margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-          <button id="submitBtn" class="btn" style="display: none;">✅ Завершить задание</button>
-          <button id="showAnswersBtn" class="btn" style="display: none; background: #7b1fa2;">👁️ Показать ответы</button>
-          <button class="btn secondary" onclick="location.href='/tasks.html'">← Назад к заданиям</button>
+          <button id="submitBtn" class="btn" style="display: none;">Отправить ответ</button>
+          <button id="showAnswersBtn" class="btn" style="display: none; background: #7b1fa2;">Показать ответы</button>
+          <button class="btn secondary" onclick="location.href='/tasks.html'">Назад к заданиям</button>
         </div>
       </div>
     </div>
@@ -381,12 +382,6 @@
       document.getElementById('errorMessage').style.display = 'none';
     }
     
-    function showModal(title, text) {
-      document.getElementById('modalTitle').textContent = title;
-      document.getElementById('modalText').textContent = text;
-      document.getElementById('modal').style.display = 'flex';
-    }
-
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
@@ -397,17 +392,10 @@
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
         const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
         
-        // Проверяем авторизацию через localStorage
-        const userStr = localStorage.getItem('currentUser');
-        if (!userStr) {
-          location.href = '/login.html';
-          return;
-        }
-        const user = JSON.parse(userStr);
-
         const params = new URLSearchParams(window.location.search);
         const taskId = params.get('id');
         let task = null;
+        let user = null;
         let currentAttemptId = null;
         let attemptStarted = false;
         let startTime = null;
@@ -429,6 +417,12 @@
         const completedMessage = document.getElementById('completedMessage');
         const completedText = document.getElementById('completedText');
         const demoTaskInfo = document.getElementById('demoTaskInfo');
+
+        function showModal(title, text) {
+          document.getElementById('modalTitle').textContent = title;
+          document.getElementById('modalText').textContent = text;
+          document.getElementById('modal').style.display = 'flex';
+        }
 
         document.getElementById('modalOk').addEventListener('click', () => {
           document.getElementById('modal').style.display = 'none';
@@ -530,23 +524,31 @@
           }
 
           try {
-            const { data, error } = await supabase
-              .from('user_progress')
-              .update({ 
-                is_completed: true,
-                score: 0, // Авто-отправка с 0 баллов
-                completed_at: new Date().toISOString()
-              })
-              .eq('id', currentAttemptId);
+            const { data, error } = await supabase.rpc('finish_attempt', {
+              _user_id: user.id,
+              _task_id: taskId,
+              _attempt_id: currentAttemptId,
+              _answers: answers
+            });
 
-            if (error) throw error;
+            if (error) {
+              console.error('Auto-submit error:', error);
+              attemptWarning.innerHTML = '<strong>⏰ Время вышло, но не удалось отправить ответ автоматически. Сообщите администратору.</strong>';
+              return;
+            }
 
-            taskBody.style.display = 'none';
-            submitBtn.style.display = 'none';
-            completedMessage.style.display = 'block';
-            completedText.textContent = '⏰ Время вышло! Задание автоматически завершено.';
-            hideFixedTimer();
+            const result = Array.isArray(data) ? data[0] : data;
             
+            if (result.error) {
+              console.error('Auto-submit result error:', result.error);
+              attemptWarning.innerHTML = '<strong>⏰ Время вышло, но произошла ошибка при отправке. Сообщите администратору.</strong>';
+            } else {
+              taskBody.style.display = 'none';
+              submitBtn.style.display = 'none';
+              completedMessage.style.display = 'block';
+              completedText.textContent = result.message || '⏰ Время вышло! Задание автоматически отправлено.';
+              hideFixedTimer();
+            }
           } catch (e) {
             console.error('Auto-submission error:', e);
             attemptWarning.innerHTML = '<strong>⏰ Время вышло, но произошла ошибка при отправке. Сообщите администратору.</strong>';
@@ -569,23 +571,19 @@
               return true;
             }
 
-            // Создаем запись о прогрессе (неограниченные попытки)
-            const { data: progress, error } = await supabase
-              .from('user_progress')
-              .insert([{
-                user_id: user.id,
-                task_id: taskId,
-                is_completed: false,
-                score: 0,
-                attempts_count: 1,
-                last_attempt_at: new Date().toISOString()
-              }])
-              .select()
-              .single();
+            const { data, error } = await supabase.rpc('start_attempt', {
+              _user_id: user.id,
+              _task_id: taskId
+            });
 
             if (error) throw error;
 
-            currentAttemptId = progress.id;
+            if (data.error) {
+              showModal('Ошибка', data.error);
+              return false;
+            }
+
+            currentAttemptId = data.attempt_id;
             attemptStarted = true;
             startTime = new Date();
             
@@ -596,7 +594,7 @@
             taskBody.style.display = 'block';
             submitBtn.style.display = 'inline-block';
             attemptWarning.style.display = 'block';
-            attemptWarning.innerHTML = '<strong>💡 Подсказка:</strong> У вас неограниченное количество попыток. Задание считается выполненным после нажатия кнопки "Завершить задание".';
+            attemptWarning.innerHTML = '<strong>⚠️ Внимание!</strong> Вы начали выполнение задания. Попытка списана. Следите за временем!';
             
             // ПОКАЗЫВАЕМ ФИКСИРОВАННЫЙ ТАЙМЕР
             showFixedTimer();
@@ -605,23 +603,24 @@
             return true;
           } catch (error) {
             console.error('Ошибка начала попытки:', error);
-            showModal('Ошибка', 'Не удалось начать попытку. Попробуйте позже.');
+            if (error.message.includes('Попытка уже использована')) {
+              await showCompletedAttempt();
+            } else {
+              showModal('Ошибка', 'Не удалось начать попытку. Попробуйте позже.');
+            }
             return false;
           }
         }
 
         async function showCompletedAttempt() {
-          const { data: progress } = await supabase
-            .from('user_progress')
+          const { data: attempt } = await supabase
+            .from('attempts')
             .select('*')
             .eq('task_id', taskId)
             .eq('user_id', user.id)
-            .eq('is_completed', true)
-            .order('completed_at', { ascending: false })
-            .limit(1)
             .single();
 
-          if (progress) {
+          if (attempt) {
             taskLoadingElement.style.display = 'none';
             taskBody.style.display = 'none';
             submitBtn.style.display = 'none';
@@ -629,15 +628,24 @@
             completedMessage.style.display = 'block';
             hideFixedTimer();
             
-            if (progress.score >= task.passing_score) {
-              completedText.textContent = `✅ Вы успешно выполнили это задание! Ваш результат: ${progress.score}%`;
+            if (attempt.score === -1) {
+              completedText.textContent = 'Вы начали это задание, но не завершили его. Попытка считается использованной. Для повторной попытки обратитесь к администратору в Telegram: @skebobingg';
+            } else if (attempt.score >= task.passing_score) {
+              completedText.textContent = `✅ Вы успешно выполнили это задание! Ваш результат: ${attempt.score}%`;
             } else {
-              completedText.textContent = `❌ Вы уже выполняли это задание. Результат: ${progress.score}%. Вы можете повторить попытку.`;
+              completedText.textContent = `❌ Вы уже выполняли это задание. Результат: ${attempt.score}%. Для повторной попытки обратитесь к администратору в Telegram: @skebobingg`;
             }
           }
         }
 
         async function loadTask() {
+          const { data: { user: userData } } = await supabase.auth.getUser();
+          user = userData;
+          if (!user) {
+            location.href = '/login.html';
+            return;
+          }
+
           const { data: taskData } = await supabase.from('tasks').select('*').eq('id', taskId).single();
           if (!taskData) {
             showModal('Ошибка', 'Задание не найдено');
@@ -646,11 +654,24 @@
           
           task = taskData;
           timeLimit = task.time_limit || 60;
-          isDemoTask = task.is_demo || false;
+          isDemoTask = task.is_demo || task.type === 'demo';
           
           // Показываем информацию о демо-задании
           if (isDemoTask) {
             demoTaskInfo.style.display = 'block';
+          }
+
+          const { data: key } = await supabase
+            .from('keys')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('month_index', task.month_index)
+            .single();
+          
+          if (key && !isDemoTask) {
+            showCompletedAttempt();
+            completedText.textContent = '🎉 Вы уже получили ключ за этот месяц!';
+            return;
           }
 
           document.getElementById('pageTitle').textContent = task.title;
@@ -658,31 +679,31 @@
           const questionTypes = task.content?.questions?.map(q => q.type) || [];
           const hasMcq = questionTypes.includes('mcq');
           const hasFill = questionTypes.includes('fill');
+          const hasDemo = questionTypes.includes('demo');
           
           let typeText = '';
           if (isDemoTask) typeText = '📚 Демо-задание';
           else if (hasMcq && hasFill) typeText = '📝 Тест + ✍️ Письменный';
           else if (hasMcq) typeText = '📝 Тест';
           else if (hasFill) typeText = '✍️ Письменный';
+          else if (hasDemo) typeText = '📚 Демо';
           
           document.getElementById('subTitle').textContent = `${typeText} • Проходной балл: ${task.passing_score || 80}% • Лимит времени: ${timeLimit} мин`;
 
-          // Для демо-заданий не проверяем предыдущие попытки
+          // Для демо-заданий не проверяем попытки
           if (isDemoTask) {
             await startAttempt();
             return;
           }
 
-          // Проверяем, есть ли уже завершенная попытка
-          const { data: completedProgress } = await supabase
-            .from('user_progress')
+          const { data: attempt } = await supabase
+            .from('attempts')
             .select('*')
             .eq('task_id', taskId)
             .eq('user_id', user.id)
-            .eq('is_completed', true)
             .single();
 
-          if (completedProgress) {
+          if (attempt) {
             await showCompletedAttempt();
           } else {
             await startAttempt();
@@ -697,15 +718,16 @@
           // Добавляем информацию о типах вопросов
           const mcqCount = questions.filter(q => q.type === 'mcq').length;
           const fillCount = questions.filter(q => q.type === 'fill').length;
+          const demoCount = questions.filter(q => q.type === 'demo').length;
           
-          if ((mcqCount > 0 && fillCount > 0) || isDemoTask) {
+          if ((mcqCount > 0 && fillCount > 0) || demoCount > 0) {
             const typeInfo = document.createElement('div');
             typeInfo.className = 'task-type-info';
             
             let infoHTML = '<strong>ℹ️ Информация о задании:</strong><br>';
             if (mcqCount > 0) infoHTML += `• Тестовые вопросы (выбор ответа): ${mcqCount}<br>`;
             if (fillCount > 0) infoHTML += `• Письменные вопросы (ввод ответа): ${fillCount}<br>`;
-            if (isDemoTask) infoHTML += `• Демо-задание (обучение)<br>`;
+            if (demoCount > 0) infoHTML += `• Демо-вопросы (обучение): ${demoCount}<br>`;
             infoHTML += '<small>Отвечайте внимательно на все типы вопросов!</small>';
             
             typeInfo.innerHTML = infoHTML;
@@ -967,66 +989,49 @@
             submitBtn.disabled = true;
             submitBtn.textContent = 'Проверяем ответы...';
             
-            // Здесь должна быть логика проверки ответов и расчета баллов
-            // Пока просто завершаем задание с фиксированным баллом
-            const score = calculateScore(answers, questions);
-            
-            const { error } = await supabase
-              .from('user_progress')
-              .update({ 
-                is_completed: true,
-                score: score,
-                completed_at: new Date().toISOString()
-              })
-              .eq('id', currentAttemptId);
+            const { data, error } = await supabase.rpc('finish_attempt', {
+              _user_id: user.id,
+              _task_id: taskId,
+              _attempt_id: currentAttemptId,
+              _answers: answers
+            });
 
-            if (error) throw error;
+            if (error) {
+              console.error('RPC Error:', error);
+              showModal('Ошибка отправки', 'Не удалось отправить ответ: ' + error.message);
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Отправить ответ';
+              return;
+            }
 
             clearInterval(timerInterval);
             hideFixedTimer();
 
-            taskBody.style.display = 'none';
-            submitBtn.style.display = 'none';
-            completedMessage.style.display = 'block';
+            const result = Array.isArray(data) ? data[0] : data;
             
-            if (score >= task.passing_score) {
-              completedText.textContent = `🎉 Поздравляем! Вы успешно выполнили задание!\n\nВаш результат: ${score}%`;
-              showModal('🎉 Поздравляем!', `Вы успешно выполнили задание!\n\nВаш результат: ${score}%`);
+            if (result.error) {
+              showModal('Ошибка', result.error);
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Отправить ответ';
+            } else if (result.passed) {
+              taskBody.style.display = 'none';
+              submitBtn.style.display = 'none';
+              completedMessage.style.display = 'block';
+              completedText.textContent = result.message;
+              
+              showModal('🎉 Поздравляем!', result.message);
             } else {
-              completedText.textContent = `Задание завершено.\n\nВаш результат: ${score}%. Для успешного выполнения необходимо набрать ${task.passing_score}%.\n\nВы можете повторить попытку.`;
-              showModal('Задание завершено', `Ваш результат: ${score}%\n\nДля успешного выполнения необходимо набрать ${task.passing_score}%.\n\nВы можете повторить попытку.`);
+              taskBody.style.display = 'none';
+              submitBtn.style.display = 'none';
+              completedMessage.style.display = 'block';
+              completedText.textContent = result.message;
             }
           } catch (e) {
             console.error('Submission error:', e);
             showModal('Ошибка', 'Неизвестная ошибка. Попробуйте позже.');
             submitBtn.disabled = false;
-            submitBtn.textContent = '✅ Завершить задание';
+            submitBtn.textContent = 'Отправить ответ';
           }
-        }
-
-        // Функция для расчета баллов (заглушка - нужно реализовать реальную логику)
-        function calculateScore(answers, questions) {
-          let correctAnswers = 0;
-          let totalQuestions = questions.length;
-          
-          for (let i = 0; i < totalQuestions; i++) {
-            const question = questions[i];
-            const userAnswer = answers[i];
-            
-            if (question.type === 'mcq') {
-              if (userAnswer === question.correct) {
-                correctAnswers++;
-              }
-            } else if (question.type === 'fill') {
-              // Простая проверка для демо - в реальной системе нужна более сложная логика
-              const correctAnswer = Array.isArray(question.answers) ? question.answers[0] : question.answer;
-              if (userAnswer.toString().toLowerCase() === correctAnswer.toString().toLowerCase()) {
-                correctAnswers++;
-              }
-            }
-          }
-          
-          return Math.round((correctAnswers / totalQuestions) * 100);
         }
 
         // Защита от потери данных при перезагрузке
