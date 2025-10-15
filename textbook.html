@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Учебник — Edu Keys</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .textbook-container {
+      width: 95%;
+      max-width: 1000px;
+      margin: 20px auto;
+    }
+    
+    .textbook-header {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      padding: 30px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    
+    .textbook-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    
+    .textbook-description {
+      font-size: 1.1rem;
+      opacity: 0.9;
+      margin-bottom: 20px;
+    }
+    
+    .progress-stats {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+    
+    .stat-item {
+      text-align: center;
+    }
+    
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 700;
+    }
+    
+    .stat-label {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+    
+    .assignments-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    
+    .assignment-item {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border-left: 4px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .assignment-item:hover {
+      transform: translateX(5px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .assignment-item.completed {
+      border-left-color: var(--accent2);
+      background: #f8fffe;
+    }
+    
+    .assignment-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .assignment-icon.test {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+    
+    .assignment-icon.fill {
+      background: #f3e5f5;
+      color: #7b1fa2;
+    }
+    
+    .assignment-icon.sentence {
+      background: #e8f5e8;
+      color: #2e7d32;
+    }
+    
+    .assignment-content {
+      flex: 1;
+    }
+    
+    .assignment-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #333;
+    }
+    
+    .assignment-type {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .assignment-status {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .status-completed {
+      background: #e8f5e8;
+      color: #2e7d32;
+    }
+    
+    .status-pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+    
+    .back-button {
+      margin-bottom: 20px;
+    }
+
+    .loading { 
+      text-align: center; 
+      padding: 40px; 
+      display: none;
+    }
+    .spinner { 
+      border: 4px solid #f3f3f3; 
+      border-top: 4px solid var(--accent2); 
+      border-radius: 50%; 
+      width: 40px; 
+      height: 40px; 
+      animation: spin 2s linear infinite; 
+      margin: 0 auto 20px; 
+    }
+    @keyframes spin { 
+      0% { transform: rotate(0deg); } 
+      100% { transform: rotate(360deg); } 
+    }
+    .error { 
+      background: #ffebee; 
+      color: #c62828; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin: 20px; 
+      text-align: center; 
+      display: none; 
+    }
+
+    @media (max-width: 768px) {
+      .textbook-header {
+        padding: 20px;
+      }
+      
+      .textbook-title {
+        font-size: 1.5rem;
+      }
+      
+      .progress-stats {
+        gap: 15px;
+      }
+      
+      .stat-number {
+        font-size: 1.5rem;
+      }
+      
+      .assignment-item {
+        padding: 15px;
+      }
+    }
+  </style>
+  
+  <script src="/load-config.js"></script>
+</head>
+<body>
+  <div class="textbook-container">
+    <div class="back-button">
+      <button class="btn secondary" onclick="location.href='/materials.html'">← Назад к материалам</button>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Загружаем учебник...</p>
+    </div>
+    
+    <div id="errorMessage" class="error"></div>
+
+    <div id="textbookContent" style="display: none;">
+      <div class="textbook-header" id="textbookHeader">
+        <div class="textbook-title" id="textbookTitle">Название учебника</div>
+        <div class="textbook-description" id="textbookDescription">Описание учебника</div>
+        <div class="progress-stats">
+          <div class="stat-item">
+            <div class="stat-number" id="completedCount">0</div>
+            <div class="stat-label">Выполнено</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" id="totalCount">0</div>
+            <div class="stat-label">Всего заданий</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" id="progressPercent">0%</div>
+            <div class="stat-label">Прогресс</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Задания учебника</h3>
+        <p class="small-muted">Выполняйте задания в любом порядке. Прогресс сохраняется автоматически.</p>
+        
+        <div class="assignments-list" id="assignmentsList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    document.getElementById('loading').style.display = 'block';
+    
+    function showError(message) {
+      document.getElementById('errorMessage').textContent = message;
+      document.getElementById('errorMessage').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+    function showContent() {
+      document.getElementById('textbookContent').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('errorMessage').style.display = 'none';
+    }
+    
+    async function initApp() {
+      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
+        return false;
+      }
+      
+      try {
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+        const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          window.location.href = '/login.html';
+          return;
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const textbookId = urlParams.get('id');
+
+        if (!textbookId) {
+          showError('❌ Учебник не указан');
+          return;
+        }
+
+        let textbook = null;
+        let assignments = [];
+        let userProgress = [];
+
+        async function loadTextbook() {
+          try {
+            // Загружаем учебник
+            const { data: textbookData, error: textbookError } = await supabase
+              .from('textbooks')
+              .select('*')
+              .eq('id', textbookId)
+              .single();
+
+            if (textbookError) throw textbookError;
+            textbook = textbookData;
+
+            // Загружаем задания учебника
+            const { data: assignmentsData, error: assignmentsError } = await supabase
+              .from('assignments')
+              .select('*')
+              .eq('textbook_id', textbookId)
+              .order('order_index');
+
+            if (assignmentsError) throw assignmentsError;
+            assignments = assignmentsData || [];
+
+            // Загружаем прогресс пользователя
+            const { data: progressData, error: progressError } = await supabase
+              .from('user_progress')
+              .select('*')
+              .eq('user_id', user.id)
+              .in('assignment_id', assignments.map(a => a.id));
+
+            if (progressError) throw progressError;
+            userProgress = progressData || [];
+
+            renderTextbook();
+            renderAssignments();
+            showContent();
+
+          } catch (error) {
+            console.error('Ошибка загрузки учебника:', error);
+            showError('❌ Ошибка загрузки учебника: ' + error.message);
+          }
+        }
+
+        function renderTextbook() {
+          document.getElementById('textbookTitle').textContent = textbook.title;
+          document.getElementById('textbookDescription').textContent = textbook.description || 'Учебные материалы и задания';
+
+          const completedCount = userProgress.filter(up => up.is_completed).length;
+          const totalCount = assignments.length;
+          const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+          document.getElementById('completedCount').textContent = completedCount;
+          document.getElementById('totalCount').textContent = totalCount;
+          document.getElementById('progressPercent').textContent = progressPercent + '%';
+        }
+
+        function renderAssignments() {
+          const list = document.getElementById('assignmentsList');
+          list.innerHTML = '';
+
+          if (assignments.length === 0) {
+            list.innerHTML = `
+              <div style="text-align: center; padding: 40px; color: #666;">
+                <p>📝 Задания пока не добавлены</p>
+                <p class="small-muted">Скоро здесь появятся задания для выполнения</p>
+              </div>
+            `;
+            return;
+          }
+
+          assignments.forEach(assignment => {
+            const progress = userProgress.find(up => up.assignment_id === assignment.id);
+            const isCompleted = progress ? progress.is_completed : false;
+            
+            const assignmentData = assignment.content || {};
+            const assignmentType = assignmentData.type || 'test';
+            
+            let typeIcon = '📝';
+            let typeLabel = 'Тест';
+            let typeClass = 'test';
+            
+            if (assignmentType === 'fill') {
+              typeIcon = '✍️';
+              typeLabel = 'Ввод ответа';
+              typeClass = 'fill';
+            } else if (assignmentType === 'sentence') {
+              typeIcon = '📝';
+              typeLabel = 'Заполнение предложения';
+              typeClass = 'sentence';
+            }
+
+            const item = document.createElement('div');
+            item.className = `assignment-item ${isCompleted ? 'completed' : ''}`;
+            item.onclick = () => {
+              window.location.href = `/assignment.html?id=${assignment.id}&source=textbook&sourceId=${textbookId}`;
+            };
+
+            item.innerHTML = `
+              <div class="assignment-icon ${typeClass}">${typeIcon}</div>
+              <div class="assignment-content">
+                <div class="assignment-title">${assignment.title}</div>
+                <div class="assignment-type">${typeLabel}</div>
+              </div>
+              <div class="assignment-status ${isCompleted ? 'status-completed' : 'status-pending'}">
+                ${isCompleted ? '✅ Выполнено' : '⏳ Ожидает'}
+              </div>
+            `;
+
+            list.appendChild(item);
+          });
+        }
+
+        await loadTextbook();
+        return true;
+        
+      } catch (error) {
+        showError('❌ Ошибка инициализации: ' + error.message);
+        return false;
+      }
+    }
+    
+    if (window.SUPABASE_URL) {
+      initApp();
+    } else {
+      window.addEventListener('configLoaded', initApp);
+    }
+  </script>
+</body>
+</html>

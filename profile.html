@@ -27,42 +27,145 @@
       z-index: 2;
     }
 
-    /* Осенние улучшения для профиля */
+    /* Обновленный дизайн профиля */
     .profile-avatar {
-      border: 4px solid #ffa726;
-      box-shadow: 
-        0 12px 32px rgba(255, 152, 0, 0.2),
-        inset 0 0 20px rgba(255, 193, 7, 0.1);
-      transition: all 0.5s ease;
+      width: 220px;height: 220px;border-radius: 20px;
+      background:linear-gradient(135deg,#fff,#fff8e6);
+      position:relative; display:flex;align-items:center;justify-content:center;
+      box-shadow:0 10px 24px rgba(0,0,0,0.08);
+      border:6px solid #fff6d8;
+    }
+    
+    /* SVG decorative image container */
+    .profile-avatar svg { width:100%; height:100%; border-radius:14px; }
+
+    /* Progress circles (заменяем ключи) */
+    .progress-circles { position:absolute; inset:12px; pointer-events:none; }
+    .progress-circle {
+      width:34px;height:34px;border-radius:50%;background:#111;opacity:0.9;
+      position:absolute; transform:translate(-50%,-50%);
+      box-shadow:0 4px 10px rgba(0,0,0,0.3);
+    }
+    .progress-circle.filled {
+      background:linear-gradient(135deg,#ffd166,#ff6b6b);
+      box-shadow:0 8px 18px rgba(255,107,107,0.28), 0 2px 6px rgba(0,0,0,0.12);
     }
 
-    .profile-avatar:hover {
-      transform: scale(1.02);
-      box-shadow: 
-        0 16px 40px rgba(255, 152, 0, 0.3),
-        inset 0 0 30px rgba(255, 193, 7, 0.2);
-    }
+    /* positions (7 spots) - placed in friendly arc */
+    .pos1{ left:20%; top:28% }
+    .pos2{ left:40%; top:16% }
+    .pos3{ left:60%; top:14% }
+    .pos4{ left:80%; top:26% }
+    .pos5{ left:74%; top:54% }
+    .pos6{ left:50%; top:66% }
+    .pos7{ left:26%; top:58% }
 
-    .month-row {
-      padding: 12px;
+    /* Profile info */
+    .profile-info { width:100%; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:999px; background:var(--accent2); color:#fff; font-weight:700; }
+
+    /* Новые стили для статистики */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+    
+    .stat-card {
+      background: white;
+      padding: 20px;
       border-radius: 12px;
-      margin-bottom: 8px;
-      transition: all 0.3s ease;
-      border: 1px solid transparent;
-      background: #ffffff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-align: center;
+      border-left: 4px solid var(--accent2);
     }
-
-    .month-row:hover {
-      background: #fff8f0;
-      border-color: #ffcc80;
-      transform: translateX(5px);
+    
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--accent2);
+      margin-bottom: 5px;
     }
-
-    .month-title {
+    
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+      font-weight: 600;
+    }
+    
+    .materials-progress {
+      margin-top: 20px;
+    }
+    
+    .progress-item {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       display: flex;
-      justify-content: space-between;
+      justify-content: between;
       align-items: center;
-      padding: 8px 0;
+    }
+    
+    .progress-item-info {
+      flex: 1;
+    }
+    
+    .progress-item-title {
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #333;
+    }
+    
+    .progress-item-stats {
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .progress-bar-mini {
+      width: 100px;
+      height: 8px;
+      background: #f0f0f0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-left: 15px;
+    }
+    
+    .progress-fill-mini {
+      height: 100%;
+      background: var(--accent2);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
+    .loading { 
+      text-align: center; 
+      padding: 40px; 
+      display: none;
+    }
+    .spinner { 
+      border: 4px solid #f3f3f3; 
+      border-top: 4px solid var(--accent2); 
+      border-radius: 50%; 
+      width: 40px; 
+      height: 40px; 
+      animation: spin 2s linear infinite; 
+      margin: 0 auto 20px; 
+    }
+    @keyframes spin { 
+      0% { transform: rotate(0deg); } 
+      100% { transform: rotate(360deg); } 
+    }
+    .error { 
+      background: #ffebee; 
+      color: #c62828; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin: 20px; 
+      text-align: center; 
+      display: none; 
     }
 
     /* Анимация появления */
@@ -95,132 +198,6 @@
       display: none;
     }
 
-    /* Индикатор предзагрузки помощи */
-    .preload-status {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: rgba(0,0,0,0.8);
-      color: white;
-      padding: 8px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      z-index: 9999;
-      display: none;
-    }
-
-    .loading { 
-      text-align: center; 
-      padding: 40px; 
-      display: none;
-      background: white;
-      border-radius: 16px;
-      margin: 20px;
-    }
-    .spinner { 
-      border: 4px solid #f3f3f3; 
-      border-top: 4px solid var(--accent2); 
-      border-radius: 50%; 
-      width: 40px; 
-      height: 40px; 
-      animation: spin 2s linear infinite; 
-      margin: 0 auto 20px; 
-    }
-    @keyframes spin { 
-      0% { transform: rotate(0deg); } 
-      100% { transform: rotate(360deg); } 
-    }
-    .error { 
-      background: #ffebee; 
-      color: #c62828; 
-      padding: 20px; 
-      border-radius: 8px; 
-      margin: 20px; 
-      text-align: center; 
-      display: none; 
-    }
-
-    /* Стили для модального окна помощи */
-    .help-modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 10000;
-      padding: 20px;
-    }
-    .help-modal-content {
-      background: white;
-      border-radius: 16px;
-      max-width: 800px;
-      width: 100%;
-      max-height: 90vh;
-      overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    .help-modal-header {
-      padding: 20px;
-      border-bottom: 1px solid #f0f0f0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .help-modal-tabs {
-      display: flex;
-      background: #f8f9fa;
-      border-bottom: 1px solid #e9ecef;
-    }
-    .help-tab {
-      flex: 1;
-      padding: 15px;
-      border: none;
-      background: none;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-    .help-tab.active {
-      background: white;
-      color: var(--accent2);
-      border-bottom: 3px solid var(--accent2);
-    }
-    .help-tab-content {
-      display: none;
-      padding: 0;
-      max-height: 60vh;
-      overflow-y: auto;
-    }
-    .help-tab-content.active {
-      display: block;
-    }
-    .help-image {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-    .help-close {
-      background: none;
-      border: none;
-      font-size: 24px;
-      cursor: pointer;
-      color: #666;
-      padding: 5px;
-    }
-    .help-close:hover {
-      color: #333;
-    }
-    .image-loading {
-      text-align: center;
-      padding: 40px;
-      color: #666;
-    }
-
     /* Мобильная оптимизация */
     @media (max-width: 768px) {
       body {
@@ -238,7 +215,7 @@
         height: 180px;
       }
       
-      .key-circle {
+      .progress-circle {
         width: 28px;
         height: 28px;
       }
@@ -249,28 +226,21 @@
         font-size: 10px;
         padding: 6px 10px;
       }
-
-      .preload-status {
-        bottom: 10px;
-        right: 10px;
-        font-size: 10px;
+      
+      .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
       }
       
-      .card {
-        margin: 8px 0;
-      }
-
-      .help-modal-content {
-        margin: 10px;
-        max-height: 85vh;
-      }
-      
-      .help-modal-tabs {
+      .progress-item {
         flex-direction: column;
+        align-items: flex-start;
       }
       
-      .help-tab {
-        padding: 12px;
+      .progress-bar-mini {
+        width: 100%;
+        margin-left: 0;
+        margin-top: 10px;
       }
     }
 
@@ -280,15 +250,13 @@
         height: 150px;
       }
       
-      .key-circle {
+      .progress-circle {
         width: 24px;
         height: 24px;
       }
       
-      .month-title {
-        flex-direction: column;
-        gap: 8px;
-        text-align: center;
+      .stat-number {
+        font-size: 2rem;
       }
     }
   </style>
@@ -300,38 +268,6 @@
   <div class="background-loading" id="backgroundLoading">
     <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
     Загружаем фон...
-  </div>
-
-  <!-- Индикатор предзагрузки помощи -->
-  <div class="preload-status" id="preloadStatus">
-    <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
-    Предзагружаем помощь...
-  </div>
-
-  <!-- Модальное окно помощи -->
-  <div class="help-modal" id="helpModal">
-    <div class="help-modal-content">
-      <div class="help-modal-header">
-        <h3 style="margin: 0; color: #333;">📚 Помощь по платформе</h3>
-        <button class="help-close" id="closeHelpModal">✕</button>
-      </div>
-      <div class="help-modal-tabs">
-        <button class="help-tab active" data-tab="registration">📝 Регистрация</button>
-        <button class="help-tab" data-tab="rules">📋 Правила</button>
-      </div>
-      <div class="help-tab-content active" id="registrationContent">
-        <div class="image-loading">
-          <div class="spinner"></div>
-          <p>Загружаем инструкцию по регистрации...</p>
-        </div>
-      </div>
-      <div class="help-tab-content" id="rulesContent">
-        <div class="image-loading">
-          <div class="spinner"></div>
-          <p>Загружаем правила платформы...</p>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- Основной контент -->
@@ -353,8 +289,7 @@
           </div>
         </div>
         <div class="nav">
-          <button class="btn" onclick="location.href='/tasks.html'" style="background: linear-gradient(135deg, #ff9800, #f57c00);">📚 К заданиям</button>
-          <button class="btn" id="helpBtn" style="background: linear-gradient(135deg, #2196F3, #21CBF3);">❓ Помощь</button>
+          <button class="btn" onclick="location.href='/materials.html'" style="background: linear-gradient(135deg, #ff9800, #f57c00);">📚 Материалы</button>
           <button class="btn secondary" id="logoutBtn" style="background: linear-gradient(135deg, #795548, #5d4037);">🚪 Выйти</button>
         </div>
       </div>
@@ -382,15 +317,15 @@
               </g>
             </svg>
 
-            <!-- overlayed key circles -->
-            <div class="key-circles" id="keyCircles">
-              <div class="key-circle kpos1" data-index="1"></div>
-              <div class="key-circle kpos2" data-index="2"></div>
-              <div class="key-circle kpos3" data-index="3"></div>
-              <div class="key-circle kpos4" data-index="4"></div>
-              <div class="key-circle kpos5" data-index="5"></div>
-              <div class="key-circle kpos6" data-index="6"></div>
-              <div class="key-circle kpos7" data-index="7"></div>
+            <!-- overlayed progress circles -->
+            <div class="progress-circles" id="progressCircles">
+              <div class="progress-circle pos1" data-index="1"></div>
+              <div class="progress-circle pos2" data-index="2"></div>
+              <div class="progress-circle pos3" data-index="3"></div>
+              <div class="progress-circle pos4" data-index="4"></div>
+              <div class="progress-circle pos5" data-index="5"></div>
+              <div class="progress-circle pos6" data-index="6"></div>
+              <div class="progress-circle pos7" data-index="7"></div>
             </div>
           </div>
 
@@ -398,26 +333,49 @@
             <h3 id="fullname" style="color: #5d4037; margin-bottom: 8px;">Ученик</h3>
             <div class="small-muted" id="emailText" style="color: #8d6e63;">—</div>
             <div style="margin-top:16px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-              <span class="badge" id="keysCount" style="background: linear-gradient(135deg, #ffa726, #fb8c00); padding: 8px 16px;">🗝️ Ключей: 0/7</span>
-              <span class="badge" id="attemptsCount" style="background: linear-gradient(135deg, #795548, #5d4037); padding: 8px 16px;">📊 Попыток: 0</span>
+              <span class="badge" id="totalAssignmentsCount" style="background: linear-gradient(135deg, #ffa726, #fb8c00); padding: 8px 16px;">📊 Всего заданий: 0</span>
+              <span class="badge" id="completedAssignmentsCount" style="background: linear-gradient(135deg, #795548, #5d4037); padding: 8px 16px;">✅ Выполнено: 0</span>
             </div>
           </div>
         </div>
 
-        <!-- right: progress / months -->
+        <!-- right: progress / statistics -->
         <div>
           <div class="card">
-            <h3 style="color: #e65100; margin-bottom: 16px;">📊 Прогресс по месяцам</h3>
-            <div id="monthsList" style="margin-top:12px"></div>
+            <h3 style="color: #e65100; margin-bottom: 16px;">📊 Общая статистика</h3>
+            
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-number" id="textbooksCompleted">0</div>
+                <div class="stat-label">Учебников пройдено</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number" id="crosswordsCompleted">0</div>
+                <div class="stat-label">Кроссвордов пройдено</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number" id="successRate">0%</div>
+                <div class="stat-label">Успеваемость</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:18px"></div>
+
+          <div class="card">
+            <h3 style="color: #e65100; margin-bottom: 16px;">📚 Прогресс по материалам</h3>
+            <div class="materials-progress" id="materialsProgress">
+              <!-- Прогресс по учебникам и кроссвордам будет добавлен динамически -->
+            </div>
           </div>
 
           <div style="height:18px"></div>
 
           <div class="card">
             <h3 style="color: #e65100; margin-bottom: 16px;">ℹ️ Информация</h3>
-            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">🎯 Кружки на аватаре заполняются по мере получения ключей за каждый месяц. Нажми «К заданиям», чтобы начать.</p>
-            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">📅 Задания каждого месяца становятся доступны в соответствующем месяце учебного года (с сентября по март).</p>
-            <p class="small-muted" style="color: #5d4037; line-height: 1.5;"><strong>⚠️ Внимание:</strong> Каждая попытка списывается при начале задания. Будьте внимательны!</p>
+            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">🎯 Кружки на аватаре заполняются по мере выполнения заданий. Каждый кружок представляет собой завершенный учебник или кроссворд.</p>
+            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">📚 Выполняйте задания в учебниках и кроссвордах для улучшения вашего прогресса.</p>
+            <p class="small-muted" style="color: #5d4037; line-height: 1.5;"><strong>💡 Совет:</strong> Регулярно занимайтесь для достижения лучших результатов!</p>
           </div>
         </div>
       </div>
@@ -437,202 +395,6 @@
       document.getElementById('mainContent').style.display = 'block';
       document.getElementById('loading').style.display = 'none';
       document.getElementById('errorMessage').style.display = 'none';
-    }
-    
-    // ===== УЛУЧШЕННАЯ СИСТЕМА ПОМОЩИ С ПРЕДЗАГРУЗКОЙ И ОБХОДОМ КЭША =====
-    function initHelpSystem(supabase) {
-      const helpModal = document.getElementById('helpModal');
-      const helpBtn = document.getElementById('helpBtn');
-      const closeHelpBtn = document.getElementById('closeHelpModal');
-      const helpTabs = document.querySelectorAll('.help-tab');
-      const tabContents = document.querySelectorAll('.help-tab-content');
-      const preloadStatus = document.getElementById('preloadStatus');
-      
-      // Объект для хранения предзагруженных изображений
-      const preloadedImages = {
-        registration: null,
-        rules: null
-      };
-
-      // Статусы загрузки
-      let imagesLoaded = {
-        registration: false,
-        rules: false
-      };
-
-      // Функция для получения публичного URL изображения из Storage С ПАРАМЕТРОМ ВЕРСИИ
-      function getHelpImageUrl(imageName) {
-        // Добавляем параметр версии чтобы избежать кэширования
-        const version = new Date().getTime(); // timestamp в миллисекундах
-        return `${window.SUPABASE_URL}/storage/v1/object/public/help-images/${imageName}?v=${version}`;
-      }
-
-      // Функция предзагрузки изображений
-      async function preloadHelpImages() {
-        preloadStatus.style.display = 'block';
-        console.log('🔄 Начинаем предзагрузку изображений помощи...');
-
-        const imagesToPreload = [
-          { name: 'registration', url: 'registration-help.png' },
-          { name: 'rules', url: 'rules-help.png' }
-        ];
-
-        const preloadPromises = imagesToPreload.map(({ name, url }) => {
-          return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-              preloadedImages[name] = img;
-              imagesLoaded[name] = true;
-              console.log(`✅ Предзагружено: ${name}`);
-              updatePreloadStatus();
-              resolve(name);
-            };
-            img.onerror = () => {
-              console.warn(`❌ Не удалось предзагрузить: ${name}`);
-              // Пробуем загрузить без кэша
-              loadWithoutCache(name, url).then(resolve);
-            };
-            // ДОБАВЛЯЕМ ПАРАМЕТР ВЕРСИИ ДЛЯ ОБХОДА КЭША
-            img.src = getHelpImageUrl(url);
-          });
-        });
-
-        await Promise.allSettled(preloadPromises);
-        
-        // Скрываем индикатор через 2 секунды
-        setTimeout(() => {
-          preloadStatus.style.display = 'none';
-        }, 2000);
-      }
-
-      // Дополнительная функция для загрузки без кэша
-      async function loadWithoutCache(tabName, imageName) {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            preloadedImages[tabName] = img;
-            imagesLoaded[tabName] = true;
-            console.log(`✅ Загружено без кэша: ${tabName}`);
-            updatePreloadStatus();
-            resolve(tabName);
-          };
-          img.onerror = () => {
-            console.warn(`❌ Окончательно не удалось загрузить: ${tabName}`);
-            updatePreloadStatus();
-            resolve(tabName);
-          };
-          // Используем другой параметр для обхода кэша
-          const timestamp = new Date().getTime();
-          img.src = `${window.SUPABASE_URL}/storage/v1/object/public/help-images/${imageName}?timestamp=${timestamp}&nocache=${Math.random()}`;
-        });
-      }
-
-      // Обновление статуса предзагрузки
-      function updatePreloadStatus() {
-        const loadedCount = Object.values(imagesLoaded).filter(Boolean).length;
-        const totalCount = Object.keys(imagesLoaded).length;
-        preloadStatus.innerHTML = `
-          <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
-          Помощь: ${loadedCount}/${totalCount}
-        `;
-      }
-
-      // Функция загрузки изображения помощи (использует предзагруженные)
-      function loadHelpImage(tabName) {
-        const contentDiv = document.getElementById(`${tabName}Content`);
-        
-        // Если изображение уже предзагружено, используем его
-        if (imagesLoaded[tabName] && preloadedImages[tabName]) {
-          contentDiv.innerHTML = '';
-          const img = preloadedImages[tabName].cloneNode();
-          img.className = 'help-image';
-          img.alt = tabName === 'registration' ? 'Инструкция по регистрации' : 'Правила платформы';
-          contentDiv.appendChild(img);
-          return;
-        }
-
-        // Fallback: загружаем обычным способом с обходом кэша
-        const imageName = tabName === 'registration' ? 'registration-help.png' : 'rules-help.png';
-        
-        const img = document.createElement('img');
-        img.className = 'help-image';
-        img.alt = tabName === 'registration' ? 'Инструкция по регистрации' : 'Правила платформы';
-        
-        // ДОБАВЛЯЕМ ПАРАМЕТР ДЛЯ ОБХОДА КЭША
-        img.src = getHelpImageUrl(imageName);
-        
-        img.onload = () => {
-          contentDiv.innerHTML = '';
-          contentDiv.appendChild(img);
-        };
-        
-        img.onerror = () => {
-          showImageError(contentDiv, tabName);
-        };
-      }
-
-      // Функция показа ошибки загрузки изображения
-      function showImageError(contentDiv, tabName) {
-        const title = tabName === 'registration' ? '📝 Инструкция по регистрации' : '📋 Правила платформы';
-        const message = tabName === 'registration' 
-          ? 'Изображение инструкции временно недоступно. Обратитесь к администратору.'
-          : 'Изображение правил временно недоступно. Обратитесь к администратору.';
-        
-        contentDiv.innerHTML = `
-          <div style="padding: 40px; text-align: center;">
-            <h3>${title}</h3>
-            <p>${message}</p>
-            <p class="small-muted">Если проблема повторяется, свяжитесь с администратором: @skebobingg</p>
-          </div>
-        `;
-      }
-
-      // Открытие модального окна
-      helpBtn.addEventListener('click', async () => {
-        helpModal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-        
-        // Показываем предзагруженные изображения
-        loadHelpImage('registration');
-        loadHelpImage('rules');
-      });
-      
-      // Закрытие модального окна
-      closeHelpBtn.addEventListener('click', () => {
-        helpModal.style.display = 'none';
-        document.body.style.overflow = '';
-      });
-      
-      // Закрытие по клику на фон
-      helpModal.addEventListener('click', (e) => {
-        if (e.target === helpModal) {
-          helpModal.style.display = 'none';
-          document.body.style.overflow = '';
-        }
-      });
-      
-      // Закрытие по Escape
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && helpModal.style.display === 'flex') {
-          helpModal.style.display = 'none';
-          document.body.style.overflow = '';
-        }
-      });
-      
-      // Переключение вкладок
-      helpTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          helpTabs.forEach(t => t.classList.remove('active'));
-          tabContents.forEach(c => c.classList.remove('active'));
-          
-          tab.classList.add('active');
-          const tabName = tab.getAttribute('data-tab');
-          document.getElementById(`${tabName}Content`).classList.add('active');
-        });
-      });
-
-      // Запускаем предзагрузку при инициализации
-      preloadHelpImages();
     }
     
     // ===== ПРОСТАЯ СИСТЕМА ЗАГРУЗКИ ФОНА =====
@@ -710,96 +472,219 @@
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
         const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
         
-        const months = ["Сентябрь","Октябрь","Ноябрь","Декабрь","Январь","Февраль","Март"];
-
-        function getStudyIndex() {
-          const now = new Date();
-          const month = now.getMonth() + 1;
-          
-          if (month >= 9) {
-            return month - 8;
-          } else {
-            return month + 4;
-          }
+        const { data: { user } } = await supabase.auth.getUser();
+        if(!user) { 
+          location.href = '/login.html'; 
+          return; 
         }
+
+        let profile = null;
+        let textbooks = [];
+        let crosswords = [];
+        let assignments = [];
+        let userProgress = [];
+        let crosswordAccess = [];
 
         async function loadProfile(){
-          const { data: { user } } = await supabase.auth.getUser();
-          if(!user) { 
-            location.href = '/login.html'; 
-            return; 
-          }
-
-          const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-          document.getElementById('fullname').textContent = profile?.full_name || 'Ученик';
-          document.getElementById('emailText').textContent = user.email;
-          document.getElementById('attemptsCount').textContent = `📊 Попыток: ${profile?.attempts || 0}`;
-
-          const { data: keys } = await supabase.from('keys').select('*').eq('user_id', user.id);
-          const got = keys?.length || 0;
-          document.getElementById('keysCount').textContent = `🗝️ Ключей: ${got}/7`;
-
-          document.querySelectorAll('.key-circle').forEach(el => {
-            const idx = parseInt(el.dataset.index, 10);
-            const found = keys?.some(k => k.month_index === idx);
-            if (found) { 
-              el.classList.add('filled'); 
-              el.style.background = 'linear-gradient(135deg, #ffb74d, #ff9800)';
-              el.style.boxShadow = '0 6px 20px rgba(255, 152, 0, 0.4), 0 0 20px rgba(255, 193, 7, 0.3)';
-            } else { 
-              el.classList.remove('filled');
-              el.style.background = 'linear-gradient(135deg, #8d6e63, #6d4c41)';
-              el.style.boxShadow = '0 4px 12px rgba(109, 76, 65, 0.3)';
-            }
-          });
-
-          const monthsContainer = document.getElementById('monthsList');
-          monthsContainer.innerHTML = '';
-          
-          const currentMonthIndex = getStudyIndex();
-          
-          const { data: attempts } = await supabase.from('attempts').select('*, tasks!inner(month_index)').eq('user_id', user.id);
-          
-          for (let i = 1; i <= 7; i++) {
-            const hasKey = keys?.some(k => k.month_index === i) || false;
-            const hasAttemptForMonth = attempts?.some(a => a.tasks.month_index === i) || false;
-            const isAvailable = i <= currentMonthIndex;
-            const isCompleted = hasKey;
+          try {
+            // Загружаем профиль
+            const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            profile = profileData;
             
-            let status = '';
-            let emoji = '';
-            let statusColor = '';
+            document.getElementById('fullname').textContent = profile?.full_name || 'Ученик';
+            document.getElementById('emailText').textContent = user.email;
             
-            if (isCompleted) {
-              status = 'Задание выполнено';
-              emoji = '✅';
-              statusColor = '#4caf50';
-            } else if (hasAttemptForMonth) {
-              status = 'Попытка использована';
-              emoji = '❌';
-              statusColor = '#f44336';
-            } else if (isAvailable) {
-              status = 'Доступно для выполнения';
-              emoji = '📝';
-              statusColor = '#ff9800';
-            } else {
-              status = 'Заблокировано';
-              emoji = '🔒';
-              statusColor = '#9e9e9e';
-            }
-            
-            const li = document.createElement('div');
-            li.className = 'month-row';
-            li.innerHTML = `
-              <div class="month-title">
-                <div><b style="color: #5d4037;">${months[i-1]}</b></div>
-                <div><span class="small-muted" style="color: ${statusColor}; font-weight: 500;">${emoji} ${status}</span></div>
-              </div>
-            `;
-            monthsContainer.appendChild(li);
+            // Загружаем учебники
+            const { data: textbooksData } = await supabase
+              .from('textbooks')
+              .select('*')
+              .eq('is_active', true)
+              .order('order_index');
+            textbooks = textbooksData || [];
+
+            // Загружаем кроссворды
+            const { data: crosswordsData } = await supabase
+              .from('crosswords')
+              .select('*')
+              .eq('is_active', true)
+              .order('order_index');
+            crosswords = crosswordsData || [];
+
+            // Загружаем все задания
+            const { data: assignmentsData } = await supabase
+              .from('assignments')
+              .select('*');
+            assignments = assignmentsData || [];
+
+            // Загружаем прогресс пользователя
+            const { data: progressData } = await supabase
+              .from('user_progress')
+              .select('*')
+              .eq('user_id', user.id);
+            userProgress = progressData || [];
+
+            // Загружаем доступ к кроссвордам
+            const { data: accessData } = await supabase
+              .from('crossword_access')
+              .select('*')
+              .eq('user_id', user.id);
+            crosswordAccess = accessData || [];
+
+            // Обновляем статистику
+            updateStatistics();
+            updateProgressCircles();
+            renderMaterialsProgress();
+
+          } catch (error) {
+            console.error('Ошибка загрузки профиля:', error);
+            showError('❌ Ошибка загрузки профиля: ' + error.message);
           }
         }
 
+        function updateStatistics() {
+          // Общее количество выполненных заданий
+          const completedAssignments = userProgress.filter(up => up.is_completed).length;
+          const totalAssignments = assignments.length;
+          
+          document.getElementById('totalAssignmentsCount').textContent = `📊 Всего заданий: ${totalAssignments}`;
+          document.getElementById('completedAssignmentsCount').textContent = `✅ Выполнено: ${completedAssignments}`;
+
+          // Прогресс по учебникам
+          const textbookProgress = textbooks.map(textbook => {
+            const textbookAssignments = assignments.filter(a => a.textbook_id === textbook.id);
+            const completedTextbookAssignments = userProgress.filter(up => 
+              up.is_completed && textbookAssignments.some(a => a.id === up.assignment_id)
+            ).length;
+            
+            return {
+              textbook,
+              completed: completedTextbookAssignments,
+              total: textbookAssignments.length,
+              progress: textbookAssignments.length > 0 ? (completedTextbookAssignments / textbookAssignments.length) * 100 : 0
+            };
+          });
+
+          // Прогресс по кроссвордам
+          const accessibleCrosswords = crosswords.filter(crossword => 
+            crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id)
+          );
+          
+          const crosswordProgress = accessibleCrosswords.map(crossword => {
+            const crosswordAssignments = assignments.filter(a => a.crossword_id === crossword.id);
+            const completedCrosswordAssignments = userProgress.filter(up => 
+              up.is_completed && crosswordAssignments.some(a => a.id === up.assignment_id)
+            ).length;
+            
+            return {
+              crossword,
+              completed: completedCrosswordAssignments,
+              total: crosswordAssignments.length,
+              progress: crosswordAssignments.length > 0 ? (completedCrosswordAssignments / crosswordAssignments.length) * 100 : 0
+            };
+          });
+
+          // Статистика
+          const completedTextbooks = textbookProgress.filter(tp => tp.progress === 100).length;
+          const completedCrosswords = crosswordProgress.filter(cp => cp.progress === 100).length;
+          const successRate = totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
+
+          document.getElementById('textbooksCompleted').textContent = completedTextbooks;
+          document.getElementById('crosswordsCompleted').textContent = completedCrosswords;
+          document.getElementById('successRate').textContent = successRate + '%';
+        }
+
+        function updateProgressCircles() {
+          // Обновляем кружки прогресса на аватаре
+          const totalCompleted = userProgress.filter(up => up.is_completed).length;
+          const completionPercentage = assignments.length > 0 ? (totalCompleted / assignments.length) * 100 : 0;
+          
+          // Заполняем кружки в зависимости от процента выполнения
+          const circles = document.querySelectorAll('.progress-circle');
+          const circlesToFill = Math.min(7, Math.floor((completionPercentage / 100) * 7));
+          
+          circles.forEach((circle, index) => {
+            if (index < circlesToFill) {
+              circle.classList.add('filled');
+              circle.style.background = 'linear-gradient(135deg, #ffb74d, #ff9800)';
+              circle.style.boxShadow = '0 6px 20px rgba(255, 152, 0, 0.4), 0 0 20px rgba(255, 193, 7, 0.3)';
+            } else {
+              circle.classList.remove('filled');
+              circle.style.background = 'linear-gradient(135deg, #8d6e63, #6d4c41)';
+              circle.style.boxShadow = '0 4px 12px rgba(109, 76, 65, 0.3)';
+            }
+          });
+        }
+
+        function renderMaterialsProgress() {
+          const container = document.getElementById('materialsProgress');
+          container.innerHTML = '';
+
+          // Прогресс по учебникам
+          textbooks.forEach(textbook => {
+            const textbookAssignments = assignments.filter(a => a.textbook_id === textbook.id);
+            const completedTextbookAssignments = userProgress.filter(up => 
+              up.is_completed && textbookAssignments.some(a => a.id === up.assignment_id)
+            ).length;
+            
+            const progress = textbookAssignments.length > 0 ? 
+              (completedTextbookAssignments / textbookAssignments.length) * 100 : 0;
+
+            const progressItem = document.createElement('div');
+            progressItem.className = 'progress-item';
+            progressItem.innerHTML = `
+              <div class="progress-item-info">
+                <div class="progress-item-title">📚 ${textbook.title}</div>
+                <div class="progress-item-stats">${completedTextbookAssignments}/${textbookAssignments.length} заданий</div>
+              </div>
+              <div class="progress-bar-mini">
+                <div class="progress-fill-mini" style="width: ${progress}%"></div>
+              </div>
+            `;
+            
+            container.appendChild(progressItem);
+          });
+
+          // Прогресс по доступным кроссвордам
+          const accessibleCrosswords = crosswords.filter(crossword => 
+            crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id)
+          );
+          
+          accessibleCrosswords.forEach(crossword => {
+            const crosswordAssignments = assignments.filter(a => a.crossword_id === crossword.id);
+            const completedCrosswordAssignments = userProgress.filter(up => 
+              up.is_completed && crosswordAssignments.some(a => a.id === up.assignment_id)
+            ).length;
+            
+            const progress = crosswordAssignments.length > 0 ? 
+              (completedCrosswordAssignments / crosswordAssignments.length) * 100 : 0;
+
+            const progressItem = document.createElement('div');
+            progressItem.className = 'progress-item';
+            progressItem.innerHTML = `
+              <div class="progress-item-info">
+                <div class="progress-item-title">🧩 ${crossword.title}</div>
+                <div class="progress-item-stats">${completedCrosswordAssignments}/${crosswordAssignments.length} слов</div>
+              </div>
+              <div class="progress-bar-mini">
+                <div class="progress-fill-mini" style="width: ${progress}%"></div>
+              </div>
+            `;
+            
+            container.appendChild(progressItem);
+          });
+
+          // Если нет материалов
+          if (textbooks.length === 0 && accessibleCrosswords.length === 0) {
+            container.innerHTML = `
+              <div style="text-align: center; padding: 20px; color: #666;">
+                <p>📚 Материалы пока не добавлены</p>
+                <p class="small-muted">Скоро здесь появятся учебники и кроссворды</p>
+              </div>
+            `;
+          }
+        }
+
+        // Выход из системы
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           if (confirm('Вы уверены, что хотите выйти?')) {
             await supabase.auth.signOut();
@@ -807,11 +692,10 @@
           }
         });
 
-        // Инициализируем систему помощи с предзагрузкой
-        initHelpSystem(supabase);
-        
+        // Загружаем фон профиля
         await loadProfileBackground(supabase);
         
+        // Загружаем данные профиля
         await loadProfile();
         showContent();
         return true;

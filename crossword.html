@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Кроссворд — Edu Keys</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .crossword-container {
+      width: 95%;
+      max-width: 1000px;
+      margin: 20px auto;
+    }
+    
+    .crossword-header {
+      background: linear-gradient(135deg, #ff6b6b, #ffa726);
+      color: white;
+      padding: 30px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    
+    .crossword-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    
+    .crossword-description {
+      font-size: 1.1rem;
+      opacity: 0.9;
+      margin-bottom: 20px;
+    }
+    
+    .progress-stats {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+    
+    .stat-item {
+      text-align: center;
+    }
+    
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 700;
+    }
+    
+    .stat-label {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+    
+    .assignments-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    
+    .assignment-item {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border-left: 4px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .assignment-item:hover {
+      transform: translateX(5px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .assignment-item.completed {
+      border-left-color: var(--accent);
+      background: #fff5f5;
+    }
+    
+    .assignment-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+      background: #ffeaa7;
+      color: #e17055;
+    }
+    
+    .assignment-content {
+      flex: 1;
+    }
+    
+    .assignment-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #333;
+    }
+    
+    .assignment-type {
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .assignment-status {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .status-completed {
+      background: #e8f5e8;
+      color: #2e7d32;
+    }
+    
+    .status-pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+    
+    .back-button {
+      margin-bottom: 20px;
+    }
+
+    .locked-message {
+      background: #fff3cd;
+      border: 2px solid #ffeaa7;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .loading { 
+      text-align: center; 
+      padding: 40px; 
+      display: none;
+    }
+    .spinner { 
+      border: 4px solid #f3f3f3; 
+      border-top: 4px solid var(--accent); 
+      border-radius: 50%; 
+      width: 40px; 
+      height: 40px; 
+      animation: spin 2s linear infinite; 
+      margin: 0 auto 20px; 
+    }
+    @keyframes spin { 
+      0% { transform: rotate(0deg); } 
+      100% { transform: rotate(360deg); } 
+    }
+    .error { 
+      background: #ffebee; 
+      color: #c62828; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin: 20px; 
+      text-align: center; 
+      display: none; 
+    }
+
+    @media (max-width: 768px) {
+      .crossword-header {
+        padding: 20px;
+      }
+      
+      .crossword-title {
+        font-size: 1.5rem;
+      }
+      
+      .progress-stats {
+        gap: 15px;
+      }
+      
+      .stat-number {
+        font-size: 1.5rem;
+      }
+      
+      .assignment-item {
+        padding: 15px;
+      }
+    }
+  </style>
+  
+  <script src="/load-config.js"></script>
+</head>
+<body>
+  <div class="crossword-container">
+    <div class="back-button">
+      <button class="btn secondary" onclick="location.href='/materials.html'">← Назад к материалам</button>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Загружаем кроссворд...</p>
+    </div>
+    
+    <div id="errorMessage" class="error"></div>
+
+    <div id="crosswordContent" style="display: none;">
+      <div id="lockedMessage" class="locked-message" style="display: none;">
+        <h3>🔒 Кроссворд недоступен</h3>
+        <p>Для доступа к этому кроссворду обратитесь к администратору.</p>
+      </div>
+
+      <div class="crossword-header" id="crosswordHeader" style="display: none;">
+        <div class="crossword-title" id="crosswordTitle">Название кроссворда</div>
+        <div class="crossword-description" id="crosswordDescription">Описание кроссворда</div>
+        <div class="progress-stats">
+          <div class="stat-item">
+            <div class="stat-number" id="completedCount">0</div>
+            <div class="stat-label">Разгадано</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" id="totalCount">0</div>
+            <div class="stat-label">Всего слов</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" id="progressPercent">0%</div>
+            <div class="stat-label">Прогресс</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="assignmentsCard" style="display: none;">
+        <h3>Слова кроссворда</h3>
+        <p class="small-muted">Разгадывайте слова в любом порядке. Прогресс сохраняется автоматически.</p>
+        
+        <div class="assignments-list" id="assignmentsList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    document.getElementById('loading').style.display = 'block';
+    
+    function showError(message) {
+      document.getElementById('errorMessage').textContent = message;
+      document.getElementById('errorMessage').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+    function showContent() {
+      document.getElementById('crosswordContent').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('errorMessage').style.display = 'none';
+    }
+    
+    async function initApp() {
+      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
+        return false;
+      }
+      
+      try {
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+        const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          window.location.href = '/login.html';
+          return;
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const crosswordId = urlParams.get('id');
+
+        if (!crosswordId) {
+          showError('❌ Кроссворд не указан');
+          return;
+        }
+
+        let crossword = null;
+        let assignments = [];
+        let userProgress = [];
+        let crosswordAccess = [];
+
+        async function loadCrossword() {
+          try {
+            // Загружаем кроссворд
+            const { data: crosswordData, error: crosswordError } = await supabase
+              .from('crosswords')
+              .select('*')
+              .eq('id', crosswordId)
+              .single();
+
+            if (crosswordError) throw crosswordError;
+            crossword = crosswordData;
+
+            // Проверяем доступ
+            const { data: accessData, error: accessError } = await supabase
+              .from('crossword_access')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('crossword_id', crosswordId)
+              .single();
+
+            crosswordAccess = accessData;
+
+            // Если кроссворд не доступен по умолчанию и нет доступа
+            if (!crossword.is_available && !crosswordAccess) {
+              document.getElementById('lockedMessage').style.display = 'block';
+              showContent();
+              return;
+            }
+
+            // Загружаем задания кроссворда
+            const { data: assignmentsData, error: assignmentsError } = await supabase
+              .from('assignments')
+              .select('*')
+              .eq('crossword_id', crosswordId)
+              .order('order_index');
+
+            if (assignmentsError) throw assignmentsError;
+            assignments = assignmentsData || [];
+
+            // Загружаем прогресс пользователя
+            const { data: progressData, error: progressError } = await supabase
+              .from('user_progress')
+              .select('*')
+              .eq('user_id', user.id)
+              .in('assignment_id', assignments.map(a => a.id));
+
+            if (progressError) throw progressError;
+            userProgress = progressData || [];
+
+            renderCrossword();
+            renderAssignments();
+            showContent();
+
+          } catch (error) {
+            console.error('Ошибка загрузки кроссворда:', error);
+            showError('❌ Ошибка загрузки кроссворда: ' + error.message);
+          }
+        }
+
+        function renderCrossword() {
+          document.getElementById('crosswordTitle').textContent = crossword.title;
+          document.getElementById('crosswordDescription').textContent = crossword.description || 'Разгадайте кроссворд';
+
+          const completedCount = userProgress.filter(up => up.is_completed).length;
+          const totalCount = assignments.length;
+          const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+          document.getElementById('completedCount').textContent = completedCount;
+          document.getElementById('totalCount').textContent = totalCount;
+          document.getElementById('progressPercent').textContent = progressPercent + '%';
+
+          document.getElementById('crosswordHeader').style.display = 'block';
+          document.getElementById('assignmentsCard').style.display = 'block';
+        }
+
+        function renderAssignments() {
+          const list = document.getElementById('assignmentsList');
+          list.innerHTML = '';
+
+          if (assignments.length === 0) {
+            list.innerHTML = `
+              <div style="text-align: center; padding: 40px; color: #666;">
+                <p>🧩 Слова пока не добавлены</p>
+                <p class="small-muted">Скоро здесь появятся слова для разгадывания</p>
+              </div>
+            `;
+            return;
+          }
+
+          assignments.forEach(assignment => {
+            const progress = userProgress.find(up => up.assignment_id === assignment.id);
+            const isCompleted = progress ? progress.is_completed : false;
+
+            const item = document.createElement('div');
+            item.className = `assignment-item ${isCompleted ? 'completed' : ''}`;
+            item.onclick = () => {
+              window.location.href = `/assignment.html?id=${assignment.id}&source=crossword&sourceId=${crosswordId}`;
+            };
+
+            item.innerHTML = `
+              <div class="assignment-icon">🧩</div>
+              <div class="assignment-content">
+                <div class="assignment-title">${assignment.title}</div>
+                <div class="assignment-type">Слово кроссворда</div>
+              </div>
+              <div class="assignment-status ${isCompleted ? 'status-completed' : 'status-pending'}">
+                ${isCompleted ? '✅ Разгадано' : '⏳ Ожидает'}
+              </div>
+            `;
+
+            list.appendChild(item);
+          });
+        }
+
+        await loadCrossword();
+        return true;
+        
+      } catch (error) {
+        showError('❌ Ошибка инициализации: ' + error.message);
+        return false;
+      }
+    }
+    
+    if (window.SUPABASE_URL) {
+      initApp();
+    } else {
+      window.addEventListener('configLoaded', initApp);
+    }
+  </script>
+</body>
+</html>

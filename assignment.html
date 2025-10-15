@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Задание — Edu Keys</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .assignment-container {
+      width: 95%;
+      max-width: 800px;
+      margin: 20px auto;
+    }
+    
+    .assignment-header {
+      margin-bottom: 20px;
+    }
+    
+    .assignment-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #333;
+    }
+    
+    .assignment-content {
+      background: white;
+      border-radius: 12px;
+      padding: 25px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    
+    .question {
+      margin-bottom: 25px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .question:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    
+    .question-text {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      line-height: 1.5;
+    }
+    
+    .question-image {
+      max-width: 100%;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+    
+    /* Стили для тестовых вопросов */
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border: 2px solid #f0f0f0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .option:hover {
+      border-color: var(--accent2);
+      background: #f8fffe;
+    }
+    
+    .option.selected {
+      border-color: var(--accent2);
+      background: #f0fffd;
+    }
+    
+    .option input[type="radio"] {
+      margin: 0;
+    }
+    
+    /* Стили для ввода ответа */
+    .fill-input {
+      padding: 12px 15px;
+      border: 2px solid #f0f0f0;
+      border-radius: 8px;
+      font-size: 16px;
+      width: 100%;
+      max-width: 400px;
+      transition: border-color 0.2s ease;
+    }
+    
+    .fill-input:focus {
+      border-color: var(--accent2);
+      outline: none;
+    }
+    
+    /* Стили для заполнения предложений */
+    .sentence-container {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 15px 0;
+    }
+    
+    .sentence-text {
+      font-size: 16px;
+      line-height: 1.6;
+      margin-bottom: 15px;
+    }
+    
+    .sentence-gap {
+      display: inline-block;
+      min-width: 120px;
+      margin: 0 5px;
+    }
+    
+    .sentence-input {
+      padding: 8px 12px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      width: 100%;
+      text-align: center;
+    }
+    
+    .sentence-input:focus {
+      border-color: var(--accent2);
+      outline: none;
+    }
+    
+    .actions {
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 25px;
+      flex-wrap: wrap;
+    }
+    
+    .completion-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+    
+    .status-completed {
+      color: var(--accent2);
+    }
+    
+    .status-pending {
+      color: #ffa726;
+    }
+    
+    .back-button {
+      margin-bottom: 20px;
+    }
+
+    .loading { 
+      text-align: center; 
+      padding: 40px; 
+      display: none;
+    }
+    .spinner { 
+      border: 4px solid #f3f3f3; 
+      border-top: 4px solid var(--accent2); 
+      border-radius: 50%; 
+      width: 40px; 
+      height: 40px; 
+      animation: spin 2s linear infinite; 
+      margin: 0 auto 20px; 
+    }
+    @keyframes spin { 
+      0% { transform: rotate(0deg); } 
+      100% { transform: rotate(360deg); } 
+    }
+    .error { 
+      background: #ffebee; 
+      color: #c62828; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin: 20px; 
+      text-align: center; 
+      display: none; 
+    }
+
+    @media (max-width: 768px) {
+      .assignment-container {
+        width: 100%;
+        padding: 0 10px;
+      }
+      
+      .assignment-content {
+        padding: 20px;
+      }
+      
+      .actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+  
+  <script src="/load-config.js"></script>
+</head>
+<body>
+  <div class="assignment-container">
+    <div class="back-button">
+      <button class="btn secondary" id="backButton">← Назад</button>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Загружаем задание...</p>
+    </div>
+    
+    <div id="errorMessage" class="error"></div>
+
+    <div id="assignmentContent" style="display: none;">
+      <div class="assignment-header">
+        <div class="assignment-title" id="assignmentTitle">Название задания</div>
+        <div class="small-muted" id="assignmentSource">Источник задания</div>
+      </div>
+
+      <div class="assignment-content" id="questionsContainer">
+        <!-- Вопросы будут добавляться динамически -->
+      </div>
+
+      <div class="actions">
+        <div class="completion-status" id="completionStatus">
+          <span>⏳ Задание не выполнено</span>
+        </div>
+        <div>
+          <button class="btn" id="completeBtn">✅ Завершить задание</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    document.getElementById('loading').style.display = 'block';
+    
+    function showError(message) {
+      document.getElementById('errorMessage').textContent = message;
+      document.getElementById('errorMessage').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+    function showContent() {
+      document.getElementById('assignmentContent').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('errorMessage').style.display = 'none';
+    }
+    
+    async function initApp() {
+      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
+        return false;
+      }
+      
+      try {
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+        const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          window.location.href = '/login.html';
+          return;
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const assignmentId = urlParams.get('id');
+        const source = urlParams.get('source'); // 'textbook' или 'crossword'
+        const sourceId = urlParams.get('sourceId');
+
+        if (!assignmentId) {
+          showError('❌ Задание не указано');
+          return;
+        }
+
+        let assignment = null;
+        let userProgress = null;
+        let sourceData = null;
+
+        // Обработчик кнопки "Назад"
+        document.getElementById('backButton').addEventListener('click', () => {
+          if (source && sourceId) {
+            window.location.href = `/${source}.html?id=${sourceId}`;
+          } else {
+            window.location.href = '/materials.html';
+          }
+        });
+
+        async function loadAssignment() {
+          try {
+            // Загружаем задание
+            const { data: assignmentData, error: assignmentError } = await supabase
+              .from('assignments')
+              .select('*')
+              .eq('id', assignmentId)
+              .single();
+
+            if (assignmentError) throw assignmentError;
+            assignment = assignmentData;
+
+            // Загружаем источник (учебник или кроссворд)
+            if (source === 'textbook' && sourceId) {
+              const { data: textbookData, error: textbookError } = await supabase
+                .from('textbooks')
+                .select('title')
+                .eq('id', sourceId)
+                .single();
+
+              if (!textbookError) sourceData = textbookData;
+            } else if (source === 'crossword' && sourceId) {
+              const { data: crosswordData, error: crosswordError } = await supabase
+                .from('crosswords')
+                .select('title')
+                .eq('id', sourceId)
+                .single();
+
+              if (!crosswordError) sourceData = crosswordData;
+            }
+
+            // Загружаем прогресс пользователя
+            const { data: progressData, error: progressError } = await supabase
+              .from('user_progress')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('assignment_id', assignmentId)
+              .single();
+
+            userProgress = progressData;
+
+            renderAssignment();
+            showContent();
+
+          } catch (error) {
+            console.error('Ошибка загрузки задания:', error);
+            showError('❌ Ошибка загрузки задания: ' + error.message);
+          }
+        }
+
+        function renderAssignment() {
+          document.getElementById('assignmentTitle').textContent = assignment.title;
+          
+          if (sourceData) {
+            document.getElementById('assignmentSource').textContent = 
+              `Из ${source === 'textbook' ? 'учебника' : 'кроссворда'}: ${sourceData.title}`;
+          }
+
+          // Обновляем статус выполнения
+          updateCompletionStatus();
+
+          // Рендерим вопросы
+          renderQuestions();
+        }
+
+        function renderQuestions() {
+          const container = document.getElementById('questionsContainer');
+          container.innerHTML = '';
+
+          const questions = assignment.content?.questions || [];
+          
+          if (questions.length === 0) {
+            container.innerHTML = `
+              <div style="text-align: center; padding: 40px; color: #666;">
+                <p>📝 Вопросы пока не добавлены</p>
+                <p class="small-muted">Скоро здесь появятся вопросы для выполнения</p>
+              </div>
+            `;
+            return;
+          }
+
+          questions.forEach((question, index) => {
+            const questionEl = document.createElement('div');
+            questionEl.className = 'question';
+            questionEl.innerHTML = `<div class="question-text">${index + 1}. ${question.q}</div>`;
+
+            if (question.image) {
+              questionEl.innerHTML += `
+                <img src="${question.image}" alt="Изображение" class="question-image" 
+                     onerror="this.style.display='none'">
+              `;
+            }
+
+            // Рендерим в зависимости от типа вопроса
+            if (question.type === 'test') {
+              renderTestQuestion(questionEl, question, index);
+            } else if (question.type === 'fill') {
+              renderFillQuestion(questionEl, question, index);
+            } else if (question.type === 'sentence') {
+              renderSentenceQuestion(questionEl, question, index);
+            }
+
+            container.appendChild(questionEl);
+          });
+        }
+
+        function renderTestQuestion(container, question, questionIndex) {
+          const optionsContainer = document.createElement('div');
+          optionsContainer.className = 'options';
+
+          question.options.forEach((option, optionIndex) => {
+            const optionEl = document.createElement('label');
+            optionEl.className = 'option';
+            optionEl.innerHTML = `
+              <input type="radio" name="q${questionIndex}" value="${optionIndex}">
+              <span>${option}</span>
+            `;
+
+            // Восстанавливаем сохраненный ответ
+            if (userProgress && userProgress.answers && userProgress.answers[questionIndex] === optionIndex) {
+              optionEl.querySelector('input').checked = true;
+              optionEl.classList.add('selected');
+            }
+
+            optionEl.querySelector('input').addEventListener('change', function() {
+              document.querySelectorAll(`.option input[name="q${questionIndex}"]`).forEach(opt => {
+                opt.closest('.option').classList.remove('selected');
+              });
+              this.closest('.option').classList.add('selected');
+              saveProgress();
+            });
+
+            optionsContainer.appendChild(optionEl);
+          });
+
+          container.appendChild(optionsContainer);
+        }
+
+        function renderFillQuestion(container, question, questionIndex) {
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'fill-input';
+          input.placeholder = 'Введите ваш ответ...';
+          
+          // Восстанавливаем сохраненный ответ
+          if (userProgress && userProgress.answers && userProgress.answers[questionIndex]) {
+            input.value = userProgress.answers[questionIndex];
+          }
+
+          input.addEventListener('input', () => {
+            saveProgress();
+          });
+
+          container.appendChild(input);
+        }
+
+        function renderSentenceQuestion(container, question, questionIndex) {
+          const sentenceContainer = document.createElement('div');
+          sentenceContainer.className = 'sentence-container';
+
+          let sentenceHTML = `<div class="sentence-text">`;
+          
+          // Разбиваем предложение на части и заменяем пропуски на инпуты
+          const parts = question.sentence.split('___');
+          
+          parts.forEach((part, partIndex) => {
+            sentenceHTML += part;
+            if (partIndex < parts.length - 1) {
+              sentenceHTML += `
+                <span class="sentence-gap">
+                  <input type="text" class="sentence-input" 
+                         data-question="${questionIndex}" 
+                         data-gap="${partIndex}" 
+                         placeholder="...">
+                </span>
+              `;
+            }
+          });
+          
+          sentenceHTML += `</div>`;
+          sentenceContainer.innerHTML = sentenceHTML;
+
+          // Восстанавливаем сохраненные ответы
+          if (userProgress && userProgress.answers && userProgress.answers[questionIndex]) {
+            const savedAnswers = userProgress.answers[questionIndex];
+            sentenceContainer.querySelectorAll('.sentence-input').forEach((input, gapIndex) => {
+              if (savedAnswers[gapIndex]) {
+                input.value = savedAnswers[gapIndex];
+              }
+            });
+          }
+
+          // Обработчики ввода
+          sentenceContainer.querySelectorAll('.sentence-input').forEach(input => {
+            input.addEventListener('input', () => {
+              saveProgress();
+            });
+          });
+
+          container.appendChild(sentenceContainer);
+        }
+
+        async function saveProgress() {
+          try {
+            const answers = collectAnswers();
+            
+            const progressData = {
+              user_id: user.id,
+              assignment_id: assignmentId,
+              answers: answers,
+              is_completed: false // Пока не завершено
+            };
+
+            if (userProgress) {
+              // Обновляем существующий прогресс
+              const { error } = await supabase
+                .from('user_progress')
+                .update(progressData)
+                .eq('id', userProgress.id);
+
+              if (error) throw error;
+            } else {
+              // Создаем новую запись прогресса
+              const { error } = await supabase
+                .from('user_progress')
+                .insert([progressData]);
+
+              if (error) throw error;
+              
+              // Перезагружаем прогресс
+              const { data: newProgress } = await supabase
+                .from('user_progress')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('assignment_id', assignmentId)
+                .single();
+
+              userProgress = newProgress;
+            }
+
+          } catch (error) {
+            console.error('Ошибка сохранения прогресса:', error);
+          }
+        }
+
+        function collectAnswers() {
+          const answers = [];
+          const questions = assignment.content?.questions || [];
+
+          questions.forEach((question, questionIndex) => {
+            if (question.type === 'test') {
+              const selected = document.querySelector(`input[name="q${questionIndex}"]:checked`);
+              answers[questionIndex] = selected ? parseInt(selected.value) : null;
+            } else if (question.type === 'fill') {
+              const input = document.querySelectorAll('.fill-input')[questionIndex];
+              answers[questionIndex] = input ? input.value.trim() : '';
+            } else if (question.type === 'sentence') {
+              const gapInputs = document.querySelectorAll(`.sentence-input[data-question="${questionIndex}"]`);
+              const gapAnswers = Array.from(gapInputs).map(input => input.value.trim());
+              answers[questionIndex] = gapAnswers;
+            }
+          });
+
+          return answers;
+        }
+
+        function updateCompletionStatus() {
+          const statusElement = document.getElementById('completionStatus');
+          const completeBtn = document.getElementById('completeBtn');
+
+          if (userProgress && userProgress.is_completed) {
+            statusElement.innerHTML = '<span class="status-completed">✅ Задание выполнено</span>';
+            completeBtn.disabled = true;
+            completeBtn.textContent = '✅ Задание завершено';
+          } else {
+            statusElement.innerHTML = '<span class="status-pending">⏳ Задание не выполнено</span>';
+            completeBtn.disabled = false;
+            completeBtn.textContent = '✅ Завершить задание';
+          }
+        }
+
+        // Обработчик кнопки завершения
+        document.getElementById('completeBtn').addEventListener('click', async () => {
+          try {
+            if (!userProgress) {
+              // Сначала сохраняем прогресс
+              await saveProgress();
+            }
+
+            const { error } = await supabase
+              .from('user_progress')
+              .update({ 
+                is_completed: true,
+                completed_at: new Date().toISOString()
+              })
+              .eq('id', userProgress.id);
+
+            if (error) throw error;
+
+            // Обновляем статус
+            userProgress.is_completed = true;
+            updateCompletionStatus();
+
+            // Показываем сообщение об успехе
+            alert('🎉 Задание успешно завершено!');
+
+          } catch (error) {
+            console.error('Ошибка завершения задания:', error);
+            alert('❌ Ошибка при завершении задания: ' + error.message);
+          }
+        });
+
+        await loadAssignment();
+        return true;
+        
+      } catch (error) {
+        showError('❌ Ошибка инициализации: ' + error.message);
+        return false;
+      }
+    }
+    
+    if (window.SUPABASE_URL) {
+      initApp();
+    } else {
+      window.addEventListener('configLoaded', initApp);
+    }
+  </script>
+</body>
+</html>
