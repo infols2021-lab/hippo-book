@@ -1,815 +1,1418 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <title>Админ-панель — Edu Keys</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="css/style.css" />
+  <meta charset="UTF-8">
+  <title>Админ — Edu Keys</title>
+  <link rel="stylesheet" href="css/style.css">
   <style>
-    :root{
-      --bg:#f7f7fb;
-      --card:#ffffff;
-      --ink:#1f2937;
-      --muted:#6b7280;
-      --line:#e5e7eb;
-      --ok:#22c55e;
-      --warn:#f59e0b;
-      --err:#ef4444;
+    .admin-container { width:95%; max-width:1400px; margin:20px auto; }
+    .admin-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding:15px; background:var(--card); border-radius:16px; box-shadow:0 8px 26px rgba(0,0,0,0.08); }
+    .admin-tabs { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+    .admin-tab { padding:12px 20px; background:var(--card); border-radius:12px; cursor:pointer; font-weight:700; box-shadow:0 4px 12px rgba(0,0,0,0.1); transition:all 0.2s; }
+    .admin-tab.active { background:var(--accent2); color:white; }
+    .admin-section { display:none; }
+    .admin-section.active { display:block; }
+    .admin-table { width:100%; border-collapse:collapse; margin-top:15px; background:var(--card); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+    .admin-table th, .admin-table td { padding:12px 15px; text-align:left; border-bottom:1px solid rgba(0,0,0,0.06); }
+    .admin-table th { background-color:var(--bg1); font-weight:700; }
+    .admin-table tr:last-child td { border-bottom:none; }
+    .form-group { margin-bottom:15px; }
+    .form-group label { display:block; margin-bottom:5px; font-weight:600; }
+    .subtask-item { background:var(--bg1); padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid rgba(0,0,0,0.1); }
+    .btn-danger { background:#e74c3c; }
+    .btn-warning { background:#f39c12; }
+    .btn-small { padding:6px 12px; font-size:14px; }
+    .user-stats { display:flex; gap:10px; margin-top:5px; flex-wrap:wrap; }
+    .stat-badge { background:var(--bg1); padding:4px 8px; border-radius:6px; font-size:12px; }
+    .user-actions { display:flex; flex-direction:column; gap:5px; }
+    .search-container { margin-bottom:15px; }
+    .search-container input { width:100%; }
+    .image-preview { max-width:200px; max-height:150px; border-radius:8px; margin:10px 0; display:none; }
+    .upload-area { border:2px dashed #ccc; border-radius:8px; padding:20px; text-align:center; cursor:pointer; transition:border-color 0.3s; margin:10px 0; }
+    .upload-area:hover { border-color:var(--accent2); }
+    .upload-area.dragover { border-color:var(--accent2); background-color:rgba(78,205,196,0.1); }
+    .upload-progress { width:100%; height:4px; background:#f0f0f0; border-radius:2px; margin:10px 0; display:none; }
+    .upload-progress-bar { height:100%; background:var(--accent2); border-radius:2px; width:0%; transition:width 0.3s; }
+    .material-form { display: none; margin-top: 20px; }
+    .material-form.active { display: block; }
+    .assignment-form { display: none; margin-top: 20px; }
+    .assignment-form.active { display: block; }
+    .access-management { display: none; margin-top: 20px; }
+    .access-management.active { display: block; }
+    .question-type-selector { display:flex; gap:10px; margin-bottom:15px; }
+    .type-btn { padding:10px 15px; border:2px solid #ddd; border-radius:8px; cursor:pointer; background:white; transition:all 0.3s; }
+    .type-btn.active { border-color:var(--accent2); background:var(--accent2); color:white; }
+    .fill-inputs-container { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+    .fill-input-item { display: flex; gap: 10px; align-items: center; }
+    .fill-input-item input { flex: 1; padding: 8px 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: 14px; }
+    .remove-input-btn { background: #e74c3c; color: white; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+    .add-input-btn { background: var(--accent2); color: white; border: none; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 14px; margin-top: 5px; }
+    .input-count { font-size: 12px; color: #666; margin-top: 5px; }
+    .sentence-builder { background: #f8f9fa; border-radius: 8px; padding: 15px; margin: 10px 0; }
+    .sentence-preview { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin-bottom: 10px; font-size: 16px; line-height: 1.5; }
+    .sentence-input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 10px; }
+    .add-gap-btn { background: #17a2b8; color: white; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 14px; }
+    .loading { text-align: center; padding: 40px; display: none; }
+    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--accent2); border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 0 auto 20px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .error { background: #ffebee; color: #c62828; padding: 20px; border-radius: 8px; margin: 20px; text-align: center; display: none; }
+    .config-loading { text-align: center; padding: 40px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+    .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; border-left: 4px solid var(--accent2); }
+    .stat-number { font-size: 2rem; font-weight: 700; color: var(--accent2); margin-bottom: 5px; }
+    .stat-label { font-size: 14px; color: #666; font-weight: 600; }
+
+    /* Изображения в вопросах */
+    .question-image-upload { margin: 10px 0; }
+    .question-image-preview { max-width: 200px; max-height: 150px; border-radius: 8px; margin-top: 10px; display: none; }
+
+    /* Модалка доступа пользователей */
+    .user-access-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 10000; }
+    .user-access-content { background: white; border-radius: 12px; padding: 20px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; }
+    .access-category { margin: 15px 0; }
+    .access-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; margin: 10px 0; }
+    .access-item { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
+
+    @media (max-width: 1024px) {
+      .admin-container { width: 98%; margin: 15px auto; }
+      .admin-table { font-size: 14px; }
+      .admin-table th, .admin-table td { padding: 8px 10px; }
+      .admin-tabs { gap: 5px; }
+      .admin-tab { padding: 10px 15px; font-size: 14px; }
     }
-    body{
-      background:var(--bg);
-      color:var(--ink);
-      font-family: 'Poppins', 'Segoe UI', Roboto, Arial, sans-serif;
+    @media (max-width: 768px) {
+      .admin-container { width: 100%; margin: 10px auto; padding: 0 10px; }
+      .admin-header { flex-direction: column; gap: 15px; text-align: center; padding: 15px; }
+      .admin-header h1 { font-size: 1.5rem; }
+      .admin-tabs { flex-direction: column; gap: 5px; }
+      .admin-tab { text-align: center; padding: 12px; }
+      .admin-table { display: block; overflow-x: auto; white-space: nowrap; font-size: 13px; }
+      .admin-table th, .admin-table td { padding: 6px 8px; min-width: 120px; }
+      .question-type-selector { flex-direction: column; gap: 8px; }
+      .type-btn { padding: 12px; text-align: center; }
+      .user-actions { flex-direction: row; gap: 5px; }
+      .user-actions .btn-small { padding: 4px 8px; font-size: 12px; }
     }
-    .admin-container{
-      width:95%;
-      max-width:1300px;
-      margin:20px auto 40px;
-    }
-    .header{
-      display:flex; align-items:center; justify-content:space-between;
-      gap:16px; margin-bottom:16px;
-    }
-    .brand{
-      display:flex; align-items:center; gap:12px;
-    }
-    .brand .mark{
-      width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
-      color:#fff;font-weight:800;font-size:18px;
-      background:linear-gradient(135deg,#ff6b6b,#ffa726);
-      box-shadow:0 6px 16px rgba(255,107,107,.3);
-    }
-    .brand h2{margin:0;font-weight:800;}
-    .brand .sub{font-size:12px;color:var(--muted); margin-top:2px}
-    .top-actions{display:flex; gap:10px; flex-wrap:wrap}
-    .btn{
-      background:var(--accent2,#4ecdc4);
-      color:#fff;border:none;border-radius:10px;padding:10px 14px;
-      font-weight:700; cursor:pointer;
-    }
-    .btn.secondary{background:#111; color:#fff}
-    .btn.line{background:#fff; color:#111; border:2px solid var(--line)}
-    .btn.warn{background:var(--warn); color:#111}
-    .btn.ok{background:var(--ok)}
-    .btn:disabled{opacity:.6; cursor:not-allowed}
-    .tabs{
-      display:flex; gap:8px; flex-wrap:wrap; border-bottom:2px solid var(--line); margin:10px 0 16px;
-    }
-    .tab{
-      padding:10px 14px; font-weight:700; color:var(--muted);
-      border:none;background:transparent; cursor:pointer;
-      border-radius:10px 10px 0 0;
-    }
-    .tab.active{
-      color:#111; background:#fff; border:2px solid var(--line); border-bottom:none;
-    }
-    .section{display:none}
-    .section.active{display:block}
-    .grid{
-      display:grid; gap:16px;
-      grid-template-columns: repeat(12, 1fr);
-    }
-    .card{
-      background:var(--card); border:1px solid var(--line);
-      border-radius:14px; padding:16px;
-      box-shadow:0 4px 16px rgba(0,0,0,.06);
-    }
-    .card h3{margin:0 0 10px}
-    .two-col{grid-column: span 12}
-    @media(min-width: 900px){
-      .two-col{grid-column: span 6}
-    }
-    .form-row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px}
-    .input, select, textarea{
-      border:2px solid var(--line); border-radius:10px; padding:10px 12px; font-size:14px;
-      outline:none; width:100%; min-width:220px;
-    }
-    textarea{min-height:90px}
-    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-    .muted{color:var(--muted); font-size:12px}
-    .mini{font-size:12px}
-    .table{width:100%; border-collapse: collapse}
-    .table th,.table td{border-bottom:1px solid var(--line); padding:10px; text-align:left}
-    .table tr:hover{background:#fafafa}
-    .pill{display:inline-block; padding:4px 8px; font-size:12px; border-radius:999px; border:1px solid var(--line)}
-    .ok{color:var(--ok)}
-    .err{color:var(--err)}
-    .warnc{color:var(--warn)}
-    .thumb{
-      width:68px;height:48px;border-radius:8px; object-fit:cover; background:#eee; display:block;
-    }
-    .toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
-    .search{
-      border:2px solid var(--line); border-radius:10px; padding:10px 12px; min-width:260px;
-    }
-    .split{
-      display:grid; gap:16px; grid-template-columns: 1.2fr .8fr;
-    }
-    @media(max-width: 960px){ .split{grid-template-columns:1fr} }
-    .drop{
-      border:2px dashed var(--line); border-radius:12px; padding:16px; text-align:center; color:var(--muted)
-    }
-    .progress{
-      height:8px; background:#f3f4f6; border-radius:6px; overflow:hidden;
-    }
-    .progress > div{height:100%; width:0; background:linear-gradient(90deg,#4ecdc4,#45b7d1)}
-    .kbd{background:#111;color:#fff;border-radius:6px;padding:2px 6px;font-size:12px}
-    .sticky-actions{position:sticky; bottom:0; background:#fff; padding-top:8px; margin-top:8px}
-    .danger{background:#fee2e2; border:1px solid #fecaca; color:#991b1b; border-radius:10px; padding:10px}
-    .hint{background:#ecfeff; border:1px solid #cffafe; color:#155e75; border-radius:10px; padding:10px}
-    .success{background:#ecfdf5;border:1px solid #d1fae5;color:#065f46;border-radius:10px;padding:10px}
-    .loader{display:none; align-items:center; gap:8px; color:var(--muted)}
-    .loader.on{display:flex}
   </style>
+
   <script src="/load-config.js"></script>
 </head>
 <body>
-  <div class="admin-container">
-    <div class="header">
-      <div class="brand">
-        <div class="mark">EK</div>
+  <div id="configLoading" class="config-loading">
+    <div class="spinner"></div>
+    <p>🔄 Загружаем конфигурацию админ-панели...</p>
+  </div>
+  <div id="errorMessage" class="error"></div>
+
+  <div id="mainContent" style="display: none;">
+    <!-- Модальное окно управления доступом пользователя -->
+    <div class="user-access-modal" id="userAccessModal">
+      <div class="user-access-content card">
+        <h3>🔐 Управление доступом пользователя</h3>
+        <div id="userAccessInfo"></div>
+
+        <div class="access-category">
+          <h4>📚 Доступ к учебникам</h4>
+          <div class="access-list" id="textbookAccessList"></div>
+        </div>
+
+        <div class="access-category">
+          <h4>🧩 Доступ к кроссвордам</h4>
+          <div class="access-list" id="crosswordAccessList"></div>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn" id="saveUserAccessBtn">💾 Сохранить доступы</button>
+          <button class="btn secondary" id="closeUserAccessModal">❌ Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-container">
+      <div class="admin-header">
+        <h1>⚙️ Панель администратора</h1>
         <div>
-          <h2>Админ-панель</h2>
-          <div class="sub">Управление учебниками, кроссвордами, заданиями и файлами</div>
+          <button class="btn" onclick="location.href='/profile.html'">👤 Мой профиль</button>
+          <button class="btn secondary" id="logoutBtn">🚪 Выйти</button>
         </div>
       </div>
-      <div class="top-actions">
-        <button class="btn line" onclick="location.href='/materials.html'">← К материалам</button>
-        <button class="btn secondary" id="logoutBtn">Выйти</button>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-number" id="totalTextbooks">0</div>
+          <div class="stat-label">Учебников</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="totalCrosswords">0</div>
+          <div class="stat-label">Кроссвордов</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="totalAssignments">0</div>
+          <div class="stat-label">Заданий</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="totalUsers">0</div>
+          <div class="stat-label">Пользователей</div>
+        </div>
+      </div>
+
+      <div class="admin-tabs">
+        <div class="admin-tab active" data-tab="textbooks">📚 Учебники</div>
+        <div class="admin-tab" data-tab="crosswords">🧩 Кроссворды</div>
+        <div class="admin-tab" data-tab="assignments">📝 Задания</div>
+        <div class="admin-tab" data-tab="users">👥 Пользователи</div>
+      </div>
+
+      <!-- Секция учебников -->
+      <div class="admin-section active" id="textbooks-section">
+        <div class="card">
+          <h2>Управление учебниками</h2>
+          <div class="admin-controls">
+            <button class="btn" id="createTextbookBtn">➕ Создать учебник</button>
+          </div>
+
+          <div class="material-form" id="textbookForm">
+            <h3 id="textbookFormTitle">Создать учебник</h3>
+
+            <div class="form-group">
+              <label>Название учебника:</label>
+              <input type="text" id="textbookTitle" class="input" placeholder="Введите название учебника">
+            </div>
+
+            <div class="form-group">
+              <label>Описание:</label>
+              <textarea id="textbookDescription" class="input" placeholder="Введите описание учебника" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Обложка (опционально):</label>
+              <div class="upload-area" id="textbookUploadArea">
+                <p>📁 Нажмите для загрузки обложки или перетащите файл сюда</p>
+                <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP (макс. 5MB)</p>
+                <input type="file" id="textbookCoverInput" style="display:none" accept="image/*">
+              </div>
+              <div class="upload-progress" id="textbookCoverProgress">
+                <div class="upload-progress-bar" id="textbookCoverProgressBar"></div>
+              </div>
+              <input type="hidden" id="textbookCoverUrl">
+              <img class="image-preview" id="textbookCoverPreview" alt="Предпросмотр обложки">
+            </div>
+
+            <div class="form-group">
+              <label>Порядок отображения:</label>
+              <input type="number" id="textbookOrder" class="input" value="0" min="0">
+            </div>
+
+            <div class="form-group">
+              <label><input type="checkbox" id="textbookIsAvailable"> Доступен для всех пользователей</label>
+            </div>
+
+            <div style="margin-top:20px; display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="btn" id="saveTextbookBtn">💾 Сохранить учебник</button>
+              <button class="btn secondary" id="cancelTextbookBtn">❌ Отмена</button>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto; margin-top: 20px;">
+            <table class="admin-table" id="textbooksTable">
+              <thead>
+                <tr>
+                  <th>Название</th>
+                  <th>Описание</th>
+                  <th>Заданий</th>
+                  <th>Доступ</th>
+                  <th>Статус</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Секция кроссвордов -->
+      <div class="admin-section" id="crosswords-section">
+        <div class="card">
+          <h2>Управление кроссвордами</h2>
+          <div class="admin-controls">
+            <button class="btn" id="createCrosswordBtn">➕ Создать кроссворд</button>
+          </div>
+
+          <div class="material-form" id="crosswordForm">
+            <h3 id="crosswordFormTitle">Создать кроссворд</h3>
+
+            <div class="form-group">
+              <label>Название кроссворда:</label>
+              <input type="text" id="crosswordTitle" class="input" placeholder="Введите название кроссворда">
+            </div>
+
+            <div class="form-group">
+              <label>Описание:</label>
+              <textarea id="crosswordDescription" class="input" placeholder="Введите описание кроссворда" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Обложка (опционально):</label>
+              <div class="upload-area" id="crosswordUploadArea">
+                <p>📁 Нажмите для загрузки обложки или перетащите файл сюда</p>
+                <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP (макс. 5MB)</p>
+                <input type="file" id="crosswordCoverInput" style="display:none" accept="image/*">
+              </div>
+              <div class="upload-progress" id="crosswordCoverProgress">
+                <div class="upload-progress-bar" id="crosswordCoverProgressBar"></div>
+              </div>
+              <input type="hidden" id="crosswordCoverUrl">
+              <img class="image-preview" id="crosswordCoverPreview" alt="Предпросмотр обложки">
+            </div>
+
+            <div class="form-group">
+              <label>Порядок отображения:</label>
+              <input type="number" id="crosswordOrder" class="input" value="0" min="0">
+            </div>
+
+            <div class="form-group">
+              <label><input type="checkbox" id="crosswordIsAvailable"> Доступен для всех пользователей</label>
+            </div>
+
+            <div style="margin-top:20px; display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="btn" id="saveCrosswordBtn">💾 Сохранить кроссворд</button>
+              <button class="btn secondary" id="cancelCrosswordBtn">❌ Отмена</button>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto; margin-top: 20px;">
+            <table class="admin-table" id="crosswordsTable">
+              <thead>
+                <tr>
+                  <th>Название</th>
+                  <th>Описание</th>
+                  <th>Заданий</th>
+                  <th>Доступ</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Секция заданий -->
+      <div class="admin-section" id="assignments-section">
+        <div class="card">
+          <h2>Управление заданиями</h2>
+
+          <div class="form-group">
+            <label>Выберите материал:</label>
+            <select id="materialSelect" class="input">
+              <option value="">-- Выберите учебник или кроссворд --</option>
+            </select>
+          </div>
+
+          <div class="admin-controls">
+            <button class="btn" id="createAssignmentBtn" disabled>➕ Создать задание</button>
+          </div>
+
+          <div class="assignment-form" id="assignmentForm">
+            <h3 id="assignmentFormTitle">Создать задание</h3>
+
+            <div class="form-group">
+              <label>Название задания:</label>
+              <input type="text" id="assignmentTitle" class="input" placeholder="Введите название задания">
+            </div>
+
+            <div class="form-group">
+              <label>Порядок отображения:</label>
+              <input type="number" id="assignmentOrder" class="input" value="0" min="0">
+            </div>
+
+            <div id="assignmentContent">
+              <h3>Вопросы задания</h3>
+
+              <div class="question-type-selector">
+                <div class="type-btn active" data-type="test">📝 Тестовый вопрос</div>
+                <div class="type-btn" data-type="fill">✍️ Вписать ответ</div>
+                <div class="type-btn" data-type="sentence">📝 Заполнить предложение</div>
+              </div>
+
+              <div id="questionsContainer"><!-- динамика --></div>
+              <button class="btn" id="addQuestionBtn">➕ Добавить вопрос</button>
+            </div>
+
+            <div style="margin-top:20px; display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="btn" id="saveAssignmentBtn">💾 Сохранить задание</button>
+              <button class="btn secondary" id="cancelAssignmentBtn">❌ Отмена</button>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto; margin-top: 20px;">
+            <table class="admin-table" id="assignmentsTable">
+              <thead>
+                <tr>
+                  <th>Название</th>
+                  <th>Материал</th>
+                  <th>Тип</th>
+                  <th>Вопросов</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Секция пользователей -->
+      <div class="admin-section" id="users-section">
+        <div class="card">
+          <h2>Список пользователей</h2>
+          <div class="search-container">
+            <input type="text" id="userSearch" placeholder="Поиск по имени или email..." class="input">
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="admin-table" id="usersTable">
+              <thead>
+                <tr>
+                  <th>ФИО</th>
+                  <th>Email</th>
+                  <th>Прогресс</th>
+                  <th>Статус</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal" style="display: none;">
+    <div class="modal-body card">
+      <h3 id="modalTitle"></h3>
+      <p id="modalText" style="white-space: pre-line;"></p>
+      <div style="margin-top: 12px; text-align: center;">
+        <button class="btn" id="modalOk">ОК</button>
       </div>
     </div>
+  </div>
 
-    <div class="tabs" id="tabs">
-      <button class="tab active" data-tab="overview">Обзор</button>
-      <button class="tab" data-tab="textbooks">Учебники</button>
-      <button class="tab" data-tab="crosswords">Кроссворды</button>
-      <button class="tab" data-tab="assignments">Задания</button>
-      <button class="tab" data-tab="media">Файлы</button>
-      <button class="tab" data-tab="access">Доступы</button>
-      <button class="tab" data-tab="settings">Настройки</button>
-    </div>
+  <script type="module">
+    // ============ БАЗОВЫЕ UI ХЕЛПЕРЫ ============
+    document.getElementById('configLoading').style.display = 'block';
 
-    <!-- OVERVIEW -->
-    <section class="section active" id="overview">
-      <div class="grid">
-        <div class="card two-col">
-          <h3>Быстрые действия</h3>
-          <div class="toolbar">
-            <button class="btn" id="quickNewTextbook">+ Учебник</button>
-            <button class="btn" id="quickNewCrossword">+ Кроссворд</button>
-            <button class="btn" id="quickNewAssignment">+ Задание</button>
-            <button class="btn line" id="openMedia">📁 Менеджер файлов</button>
-          </div>
-          <div class="hint" style="margin-top:10px">
-            💡 Используйте загрузчик ниже, чтобы быстро добавить обложки/изображения в нужные бакеты Storage.
-          </div>
-        </div>
+    function showError(message) {
+      const el = document.getElementById('errorMessage');
+      el.textContent = message;
+      el.style.display = 'block';
+      document.getElementById('configLoading').style.display = 'none';
+    }
 
-        <div class="card two-col">
-          <h3>Статистика</h3>
-          <div class="row">
-            <div class="pill"><span id="statTextbooks">0</span> учебников</div>
-            <div class="pill"><span id="statCrosswords">0</span> кроссвордов</div>
-            <div class="pill"><span id="statAssignments">0</span> заданий</div>
-            <div class="pill"><span id="statUsers">0</span> пользователей</div>
-          </div>
-          <div class="loader" id="statLoader"><span class="kbd">...</span> Обновляем статистику</div>
-        </div>
+    function showContent() {
+      document.getElementById('mainContent').style.display = 'block';
+      document.getElementById('configLoading').style.display = 'none';
+      document.getElementById('errorMessage').style.display = 'none';
+    }
 
-        <div class="card two-col">
-          <h3>Быстрая загрузка изображения</h3>
-          <div class="split">
-            <div>
-              <div class="form-row">
-                <select id="quickBucket">
-                  <option value="covers">covers (обложки)</option>
-                  <option value="question-images">question-images (картинки к заданиям)</option>
-                  <option value="help-images">help-images (помощь/скрины)</option>
-                  <option value="backgrounds">backgrounds (фон профиля)</option>
-                </select>
-              </div>
-              <div id="quickDrop" class="drop">
-                Перетащите файл сюда или выберите ниже
-              </div>
-              <div class="form-row">
-                <input type="file" id="quickFile" accept="image/*" />
-                <button class="btn" id="quickUpload">Загрузить</button>
-              </div>
-              <div class="progress"><div id="quickProgress"></div></div>
-              <div class="mini muted" id="quickResult"></div>
-              <div class="danger" id="quickErr" style="display:none"></div>
-            </div>
-            <div>
-              <img id="quickPreview" class="thumb" style="width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;border:1px solid var(--line);border-radius:10px;display:none" alt="preview" />
-              <div class="muted mini" style="margin-top:8px">
-                ✅ После загрузки получите публичный URL. Добавляйте параметр <span class="kbd">?v=TIMESTAMP</span>, чтобы обойти кэш.
-              </div>
-            </div>
-          </div>
-        </div>
+    function showModal(title, text) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalText').textContent = text;
+      document.getElementById('modal').style.display = 'flex';
+    }
+    // ============ ПРОВЕРКА АДМИНА ============
+    async function checkAdmin(supabase) {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        if (!user) {
+          window.location.href = '/login.html';
+          return false;
+        }
 
-        <div class="card two-col">
-          <h3>Проверка конфигурации</h3>
-          <div class="row">
-            <button class="btn line" id="checkConfigBtn">Проверить переменные</button>
-            <div class="loader" id="checkLoader"><span class="kbd">...</span> Проверяем</div>
-          </div>
-          <div id="checkResult" class="mini muted" style="margin-top:8px"></div>
-        </div>
-      </div>
-    </section>
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('is_admin, full_name, email')
+          .eq('id', user.id)
+          .single();
 
-    <!-- TEXTBOOKS -->
-    <section class="section" id="textbooks">
-      <div class="grid">
-        <div class="card two-col">
-          <h3>Учебники</h3>
-          <div class="toolbar" style="margin-bottom:10px">
-            <input id="tbSearch" class="search" placeholder="Поиск по названию..." />
-            <select id="tbFilterAvailability">
-              <option value="all">Показать все</option>
-              <option value="available">Только доступные всем</option>
-              <option value="private">Только по доступу</option>
-            </select>
-            <button class="btn" id="tbReload">Обновить</button>
-            <button class="btn ok" id="tbNew">+ Добавить учебник</button>
-          </div>
-          <table class="table" id="tbTable">
-            <thead>
-              <tr>
-                <th style="width:72px">Обложка</th>
-                <th>Название</th>
-                <th>Описание</th>
-                <th>Доступ</th>
-                <th>Порядок</th>
-                <th>Активен</th>
-                <th style="width:220px">Действия</th>
-              </tr>
-            </thead>
-            <tbody><!-- rows --></tbody>
-          </table>
-          <div class="loader" id="tbLoader"><span class="kbd">...</span> Загружаем учебники</div>
-        </div>
+        if (profileError) {
+          // Профиля нет — создаём пустой и уводим
+          if (profileError.code === 'PGRST116') {
+            await supabase.from('profiles').insert({
+              id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || '',
+              is_admin: false,
+              created_at: new Date().toISOString()
+            });
+            showModal('Доступ запрещен', 'Профиль создан, но прав администратора нет. Обратитесь к администратору.');
+            setTimeout(() => { window.location.href = '/profile.html'; }, 2500);
+            return false;
+          }
+          throw profileError;
+        }
 
-        <div class="card two-col">
-          <h3 id="tbFormTitle">Новый учебник</h3>
-          <div class="form-row">
-            <input id="tbId" type="hidden" />
-            <input id="tbTitle" class="input" placeholder="Название" />
-            <input id="tbOrder" class="input" placeholder="Порядок (число)" type="number" />
-          </div>
-          <div class="form-row">
-            <textarea id="tbDesc" placeholder="Описание"></textarea>
-          </div>
-          <div class="form-row">
-            <label class="row" style="gap:6px">
-              <input type="checkbox" id="tbActive" /> Активен
-            </label>
-            <label class="row" style="gap:6px">
-              <input type="checkbox" id="tbAvailable" /> Доступен всем (без выдачи)
-            </label>
-          </div>
-          <div class="form-row">
-            <input id="tbCover" class="input" placeholder="URL обложки (публичная ссылка)" />
-          </div>
-          <div class="form-row">
-            <div class="row">
-              <input type="file" id="tbCoverFile" accept="image/*" />
-              <button class="btn" id="tbUploadBtn">Загрузить в covers</button>
-            </div>
-            <div class="mini muted">Подставим URL автоматически, + добавим <span class="kbd">?v=TIMESTAMP</span> для сброса кэша</div>
-          </div>
-          <div class="row">
-            <img id="tbCoverPreview" class="thumb" style="width:180px; height:120px" alt="cover" />
-          </div>
-          <div class="sticky-actions row" style="justify-content:flex-end">
-            <button class="btn line" id="tbReset">Сбросить</button>
-            <button class="btn ok" id="tbSave">Сохранить</button>
-            <button class="btn warn" id="tbDelete" disabled>Удалить</button>
-          </div>
-          <div class="danger" id="tbErr" style="display:none"></div>
-          <div class="success" id="tbOk" style="display:none"></div>
-        </div>
-      </div>
-    </section>
+        if (!profile?.is_admin) {
+          showModal('Доступ запрещен', 'Нужны права администратора.');
+          setTimeout(() => { window.location.href = '/profile.html'; }, 2000);
+          return false;
+        }
 
-    <!-- CROSSWORDS -->
-    <section class="section" id="crosswords">
-      <div class="grid">
-        <div class="card two-col">
-          <h3>Кроссворды</h3>
-          <div class="toolbar" style="margin-bottom:10px">
-            <input id="cwSearch" class="search" placeholder="Поиск по названию..." />
-            <select id="cwFilterAvailability">
-              <option value="all">Показать все</option>
-              <option value="available">Только доступные всем</option>
-              <option value="private">Только по доступу</option>
-            </select>
-            <button class="btn" id="cwReload">Обновить</button>
-            <button class="btn ok" id="cwNew">+ Добавить кроссворд</button>
-          </div>
-          <table class="table" id="cwTable">
-            <thead>
-              <tr>
-                <th style="width:72px">Обложка</th>
-                <th>Название</th>
-                <th>Описание</th>
-                <th>Доступ</th>
-                <th>Порядок</th>
-                <th>Активен</th>
-                <th style="width:220px">Действия</th>
-              </tr>
-            </thead>
-            <tbody><!-- rows --></tbody>
-          </table>
-          <div class="loader" id="cwLoader"><span class="kbd">...</span> Загружаем кроссворды</div>
-        </div>
-
-        <div class="card two-col">
-          <h3 id="cwFormTitle">Новый кроссворд</h3>
-          <div class="form-row">
-            <input id="cwId" type="hidden" />
-            <input id="cwTitle" class="input" placeholder="Название" />
-            <input id="cwOrder" class="input" placeholder="Порядок (число)" type="number" />
-          </div>
-          <div class="form-row">
-            <textarea id="cwDesc" placeholder="Описание"></textarea>
-          </div>
-          <div class="form-row">
-            <label class="row" style="gap:6px">
-              <input type="checkbox" id="cwActive" /> Активен
-            </label>
-            <label class="row" style="gap:6px">
-              <input type="checkbox" id="cwAvailable" /> Доступен всем (без выдачи)
-            </label>
-          </div>
-          <div class="form-row">
-            <input id="cwCover" class="input" placeholder="URL обложки (публичная ссылка)" />
-          </div>
-          <div class="form-row">
-            <div class="row">
-              <input type="file" id="cwCoverFile" accept="image/*" />
-              <button class="btn" id="cwUploadBtn">Загрузить в covers</button>
-            </div>
-            <div class="mini muted">Подставим URL автоматически, + добавим <span class="kbd">?v=TIMESTAMP</span> для сброса кэша</div>
-          </div>
-          <div class="row">
-            <img id="cwCoverPreview" class="thumb" style="width:180px; height:120px" alt="cover" />
-          </div>
-          <div class="sticky-actions row" style="justify-content:flex-end">
-            <button class="btn line" id="cwReset">Сбросить</button>
-            <button class="btn ok" id="cwSave">Сохранить</button>
-            <button class="btn warn" id="cwDelete" disabled>Удалить</button>
-          </div>
-          <div class="danger" id="cwErr" style="display:none"></div>
-          <div class="success" id="cwOk" style="display:none"></div>
-        </div>
-      </div>
-    </section>
-    <!-- ASSIGNMENTS -->
-    <section class="section" id="assignments">
-      <div class="grid">
-        <div class="card two-col">
-          <h3>Задания</h3>
-          <div class="toolbar" style="margin-bottom:10px">
-            <input id="asSearch" class="search" placeholder="Поиск по названию..." />
-            <select id="asFilterType">
-              <option value="all">Все типы</option>
-              <option value="test">Тест</option>
-              <option value="fill">Ввод ответа</option>
-              <option value="sentence">Заполнение предложения</option>
-            </select>
-            <select id="asFilterSource">
-              <option value="all">Все источники</option>
-              <option value="textbook">Только у учебников</option>
-              <option value="crossword">Только у кроссвордов</option>
-              <option value="orphan">Без привязки</option>
-            </select>
-            <button class="btn" id="asReload">Обновить</button>
-            <button class="btn ok" id="asNew">+ Добавить задание</button>
-          </div>
-          <table class="table" id="asTable">
-            <thead>
-              <tr>
-                <th>Название</th>
-                <th>Тип</th>
-                <th>Источник</th>
-                <th>Порядок</th>
-                <th>Активно</th>
-                <th style="width:220px">Действия</th>
-              </tr>
-            </thead>
-            <tbody><!-- rows --></tbody>
-          </table>
-          <div class="loader" id="asLoader"><span class="kbd">...</span> Загружаем задания</div>
-        </div>
-
-        <div class="card two-col">
-          <h3 id="asFormTitle">Новое задание</h3>
-          <input id="asId" type="hidden" />
-          <div class="form-row">
-            <input id="asTitle" class="input" placeholder="Название" />
-            <input id="asOrder" class="input" placeholder="Порядок (число)" type="number" />
-          </div>
-
-          <div class="form-row">
-            <select id="asType">
-              <option value="test">Тест (варианты)</option>
-              <option value="fill">Ввод ответа</option>
-              <option value="sentence">Заполнение предложения</option>
-            </select>
-            <label class="row" style="gap:6px">
-              <input type="checkbox" id="asActive" /> Активно
-            </label>
-          </div>
-
-          <div class="form-row">
-            <select id="asBindKind">
-              <option value="none">Без привязки</option>
-              <option value="textbook">Привязать к учебнику</option>
-              <option value="crossword">Привязать к кроссворду</option>
-            </select>
-            <select id="asBindId">
-              <option value="">— выберите объект —</option>
-            </select>
-          </div>
-
-          <div class="hint" style="margin:10px 0">
-            💡 Содержимое задания в JSON. Для <b>test</b> — массив questions с полями
-            <code class="kbd">question, options[], correctIndex</code>. Для <b>fill</b> — <code class="kbd">question, answer</code>.
-            Для <b>sentence</b> — <code class="kbd">template, answer</code>. Изображения добавляйте через блок справа — они загрузятся в
-            <b>question-images</b> и в JSON подставляйте их публичный URL.
-          </div>
-
-          <div class="split" style="margin-top:10px">
-            <div>
-              <textarea id="asContent" placeholder='Пример для "test":
-{
-  "questions":[
-    { "type":"test","question":"2+2?", "imageUrl":"", "options":["3","4","5"], "correctIndex":1 }
-  ]
-}
-
-Пример для "fill":
-{
-  "questions":[
-    { "type":"fill","question":"Столица Франции?", "imageUrl":"", "answer":"Париж" }
-  ]
-}
-
-Пример для "sentence":
-{
-  "questions":[
-    { "type":"sentence","template":"I ___ a book", "imageUrl":"", "answer":"have" }
-  ]
-}'></textarea>
-              <div class="danger" id="asErr" style="display:none"></div>
-              <div class="success" id="asOk" style="display:none"></div>
-              <div class="sticky-actions row" style="justify-content:flex-end; margin-top:10px">
-                <button class="btn line" id="asReset">Сбросить</button>
-                <button class="btn ok" id="asSave">Сохранить</button>
-                <button class="btn warn" id="asDelete" disabled>Удалить</button>
-              </div>
-            </div>
-
-            <!-- RIGHT: question images helper -->
-            <div>
-              <h4 style="margin:0 0 8px">Изображения к вопросам</h4>
-              <div class="drop" id="qiDrop">Перетащите картинку сюда</div>
-              <div class="form-row" style="margin-top:8px">
-                <input type="file" id="qiFile" accept="image/*" />
-                <button class="btn" id="qiUpload">Загрузить в question-images</button>
-              </div>
-              <div class="progress" style="margin-top:8px"><div id="qiProgress"></div></div>
-              <img id="qiPreview" class="thumb" style="width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;border:1px solid var(--line);border-radius:10px;display:none;margin-top:8px" alt="preview"/>
-              <div class="mini muted" id="qiResult" style="margin-top:6px"></div>
-              <div class="danger" id="qiErr" style="display:none;margin-top:6px"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- MEDIA (STORAGE MANAGER) -->
-    <section class="section" id="media">
-      <div class="grid">
-        <div class="card two-col">
-          <h3>Менеджер файлов (Supabase Storage)</h3>
-          <div class="toolbar" style="margin-bottom:10px">
-            <select id="smBucket">
-              <option value="covers">covers (обложки)</option>
-              <option value="question-images">question-images (к заданиям)</option>
-              <option value="help-images">help-images (помощь)</option>
-              <option value="backgrounds">backgrounds (фон профиля)</option>
-            </select>
-            <input id="smSearch" class="search" placeholder="Фильтр по имени..." />
-            <button class="btn" id="smReload">Обновить</button>
-          </div>
-
-          <table class="table" id="smTable">
-            <thead>
-              <tr>
-                <th style="width:72px">Превью</th>
-                <th>Файл</th>
-                <th>Публичный URL</th>
-                <th style="width:220px">Действия</th>
-              </tr>
-            </thead>
-            <tbody><!-- rows --></tbody>
-          </table>
-          <div class="loader" id="smLoader"><span class="kbd">...</span> Загружаем список</div>
-        </div>
-
-        <div class="card two-col">
-          <h3>Загрузка файла</h3>
-          <div class="form-row">
-            <select id="smUploadBucket">
-              <option value="covers">covers</option>
-              <option value="question-images">question-images</option>
-              <option value="help-images">help-images</option>
-              <option value="backgrounds">backgrounds</option>
-            </select>
-            <input id="smPrefix" class="input" placeholder="Папка/префикс (опционально), напр. unit1/" />
-          </div>
-          <div id="smDrop" class="drop">Перетащите файл сюда или выберите ниже</div>
-          <div class="form-row" style="margin-top:8px">
-            <input type="file" id="smFile" accept="image/*" />
-            <button class="btn" id="smUpload">Загрузить</button>
-          </div>
-          <div class="progress" style="margin-top:8px"><div id="smProgress"></div></div>
-          <img id="smPreview" class="thumb" style="width:240px;height:auto;display:none;margin-top:8px" alt="preview" />
-          <div class="mini muted" id="smResult" style="margin-top:6px"></div>
-          <div class="danger" id="smErr" style="display:none;margin-top:6px"></div>
-
-          <div class="hint" style="margin-top:10px">
-            ⚠️ Убедитесь, что бакет <b>публичный</b> и в его политике RLS разрешены <code class="kbd">ANON</code> на <b>insert/select</b>, либо включён Public access.
-            Для обновления кэша добавляйте <span class="kbd">?v=TIMESTAMP</span> к URL.
-          </div>
-        </div>
-      </div>
-    </section>
-    <!-- ACCESS -->
-    <section class="section" id="access">
-      <div class="grid">
-        <div class="card two-col">
-          <h3>Управление доступами</h3>
-          <div class="toolbar" style="margin-bottom:10px">
-            <input id="accSearch" class="search" placeholder="Поиск по email или ID пользователя..." />
-            <select id="accType">
-              <option value="textbook">Учебники</option>
-              <option value="crossword">Кроссворды</option>
-            </select>
-            <button class="btn" id="accReload">Обновить</button>
-          </div>
-
-          <table class="table" id="accTable">
-            <thead>
-              <tr>
-                <th>Пользователь</th>
-                <th>Объект</th>
-                <th>Тип</th>
-                <th>Дата выдачи</th>
-                <th style="width:220px">Действия</th>
-              </tr>
-            </thead>
-            <tbody><!-- rows --></tbody>
-          </table>
-          <div class="loader" id="accLoader"><span class="kbd">...</span> Загружаем доступы</div>
-        </div>
-
-        <div class="card two-col">
-          <h3>Выдать доступ</h3>
-          <div class="form-row">
-            <input id="accUserId" class="input" placeholder="User ID" />
-            <select id="accObjectType">
-              <option value="textbook">Учебник</option>
-              <option value="crossword">Кроссворд</option>
-            </select>
-            <select id="accObjectId">
-              <option value="">— выберите объект —</option>
-            </select>
-          </div>
-          <div class="sticky-actions row" style="justify-content:flex-end">
-            <button class="btn ok" id="accGrant">Выдать</button>
-          </div>
-          <div class="success" id="accOk" style="display:none"></div>
-          <div class="danger" id="accErr" style="display:none"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- SETTINGS -->
-    <section class="section" id="settings">
-      <div class="grid">
-        <div class="card two-col">
-          <h3>Системные настройки и отладка</h3>
-          <div class="form-row">
-            <button class="btn" id="syncStats">Обновить статистику</button>
-            <button class="btn line" id="checkBuckets">Проверить бакеты Storage</button>
-          </div>
-          <div class="loader" id="setLoader"><span class="kbd">...</span> Проверяем</div>
-          <div id="setResult" class="mini muted" style="margin-top:8px"></div>
-        </div>
-
-        <div class="card two-col">
-          <h3>Создать недостающие бакеты</h3>
-          <div class="hint" style="margin-bottom:10px">
-            💡 Используйте эту функцию, если у вас возникают ошибки вроде <code class="kbd">bucket not found</code>.
-            Она создаст стандартные бакеты: <b>covers</b>, <b>question-images</b>, <b>help-images</b>, <b>backgrounds</b>.
-          </div>
-          <button class="btn ok" id="createBuckets">Создать бакеты автоматически</button>
-          <div class="success" id="createBucketsOk" style="display:none"></div>
-          <div class="danger" id="createBucketsErr" style="display:none"></div>
-        </div>
-      </div>
-    </section>
-
-    <div id="globalLoading" class="loader" style="position:fixed;bottom:16px;right:16px;background:#fff;padding:10px 16px;border:1px solid var(--line);border-radius:10px;box-shadow:0 3px 10px rgba(0,0,0,.1);z-index:999;display:none">
-      <span class="kbd">...</span> Выполняется запрос
-    </div>
-
-    <script type="module">
-      import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
-      const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-
-      // ========== ОБЩИЕ УТИЛИТЫ ==========
-      const tabs = document.querySelectorAll(".tab");
-      const sections = document.querySelectorAll(".section");
-      const showLoader = (el, show=true) => el.classList.toggle("on", show);
-      const globalLoader = document.getElementById("globalLoading");
-      const showGlobal = (s) => globalLoader.style.display = s ? "flex" : "none";
-
-      function notify(elOk, elErr, okMsg, errMsg) {
-        elOk.style.display = okMsg ? "block" : "none";
-        elErr.style.display = errMsg ? "block" : "none";
-        if (okMsg) elOk.textContent = okMsg;
-        if (errMsg) elErr.textContent = errMsg;
-        setTimeout(()=>{elOk.style.display="none"; elErr.style.display="none";}, 4000);
+        return user;
+      } catch (e) {
+        console.error('Admin check error', e);
+        showModal('Ошибка доступа', 'Не удалось проверить права: ' + (e?.message || e));
+        setTimeout(() => { window.location.href = '/login.html'; }, 2000);
+        return false;
       }
+    }
 
-      tabs.forEach(t=>{
-        t.addEventListener("click",()=>{
-          tabs.forEach(x=>x.classList.remove("active"));
-          sections.forEach(s=>s.classList.remove("active"));
-          t.classList.add("active");
-          document.getElementById(t.dataset.tab).classList.add("active");
-        });
+    // ============ УТИЛИТЫ ============
+    function generateQuestionId() {
+      return 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    }
+
+    // Безопасное имя файла
+    function safeName(name) {
+      return name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    }
+
+    // Загрузка файла в Supabase Storage с красивым прогрессом + public URL
+    async function uploadImageToSupabase({ supabase, file, bucket }) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      const allowed = ['jpg','jpeg','png','gif','webp','avif'];
+      if (!allowed.includes(ext)) throw new Error('Поддерживаются только JPG, PNG, GIF, WebP, AVIF');
+      if (file.size > 5 * 1024 * 1024) throw new Error('Размер > 5MB');
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const folder = `${user?.id || 'anon'}/${new Date().toISOString().slice(0,10)}`;
+      const filename = `${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+      const path = `${folder}/${safeName(filename)}`;
+
+      // Загрузка
+      const { error } = await supabase.storage.from(bucket).upload(path, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || 'application/octet-stream'
       });
 
-      // ========== АВТОРИЗАЦИЯ ==========
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData?.user) {
-        alert("Вы не авторизованы!");
-        location.href = "/login.html";
+      if (error) {
+        // Клиентским (anon) ключом нельзя создавать бакеты. Если бакета нет — покажем чёткую подсказку.
+        if ((error.message || '').toLowerCase().includes('not found') ||
+            (error.message || '').toLowerCase().includes('bucket')) {
+          throw new Error(`Бакет "${bucket}" не найден. Создайте в Supabase Storage бакет с именем "${bucket}" и сделайте его публичным.`);
+        }
+        throw error;
       }
-      document.getElementById("logoutBtn").onclick = async()=>{
-        await supabase.auth.signOut();
-        location.href="/login.html";
-      };
 
-      // ========== ОБЗОР / СТАТИСТИКА ==========
-      async function loadStats() {
-        const statL = document.getElementById("statLoader");
-        statL.classList.add("on");
-        try {
-          const [tb, cw, as, pr] = await Promise.all([
-            supabase.from("textbooks").select("*",{count:"exact"}),
-            supabase.from("crosswords").select("*",{count:"exact"}),
-            supabase.from("assignments").select("*",{count:"exact"}),
-            supabase.from("profiles").select("*",{count:"exact"}),
-          ]);
-          document.getElementById("statTextbooks").textContent = tb.count ?? 0;
-          document.getElementById("statCrosswords").textContent = cw.count ?? 0;
-          document.getElementById("statAssignments").textContent = as.count ?? 0;
-          document.getElementById("statUsers").textContent = pr.count ?? 0;
-        } catch(e) { console.error(e); }
-        statL.classList.remove("on");
+      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+      return pub.publicUrl;
+    }
+
+    // Инициализация drag&drop или клика для загрузки
+    function initImageUpload({ uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId, bucket, supabase }) {
+      const area = document.getElementById(uploadAreaId);
+      const input = document.getElementById(fileInputId);
+      const barWrap = document.getElementById(progressId);
+      const bar = document.getElementById(progressBarId);
+      const preview = document.getElementById(previewId);
+      const urlInput = document.getElementById(urlInputId);
+
+      function resetProgress() {
+        barWrap.style.display = 'none';
+        bar.style.width = '0%';
       }
-      loadStats();
-      // ========== ПРОВЕРКА КОНФИГА ==========
-      document.getElementById("checkConfigBtn").onclick = ()=>{
-        const ok = !!window.SUPABASE_URL && !!window.SUPABASE_ANON_KEY;
-        const res = document.getElementById("checkResult");
-        res.textContent = ok ? "✅ Конфигурация загружена корректно." : "❌ Ошибка: переменные не найдены.";
-      };
 
-      // ========== СОЗДАНИЕ БАКЕТОВ ==========
-      document.getElementById("createBuckets").onclick = async()=>{
-        const ok = document.getElementById("createBucketsOk");
-        const err = document.getElementById("createBucketsErr");
-        showGlobal(true);
+      async function handle(file) {
         try {
-          const buckets = ["covers","question-images","help-images","backgrounds"];
-          for (const b of buckets) {
-            const { data: exists } = await supabase.storage.getBucket(b);
-            if (!exists) await supabase.storage.createBucket(b, { public: true });
+          barWrap.style.display = 'block';
+          bar.style.width = '20%';
+          const objectUrl = URL.createObjectURL(file);
+          preview.src = objectUrl;
+          preview.style.display = 'block';
+
+          bar.style.width = '60%';
+          const publicUrl = await uploadImageToSupabase({ supabase, file, bucket });
+          bar.style.width = '100%';
+          urlInput.value = publicUrl;
+          setTimeout(resetProgress, 400);
+        } catch (e) {
+          resetProgress();
+          preview.style.display = 'none';
+          showModal('Ошибка загрузки', e?.message || e);
+        }
+      }
+
+      area.addEventListener('click', () => input.click());
+      input.addEventListener('change', e => {
+        if (e.target.files?.length) handle(e.target.files[0]);
+      });
+
+      area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('dragover'); });
+      area.addEventListener('dragleave', e => { e.preventDefault(); area.classList.remove('dragover'); });
+      area.addEventListener('drop', e => {
+        e.preventDefault(); area.classList.remove('dragover');
+        if (e.dataTransfer.files?.length) handle(e.dataTransfer.files[0]);
+      });
+    }
+
+    // Инициализация загрузки для вопроса
+    function initQuestionImageUpload(questionId, supabase) {
+      initImageUpload({
+        uploadAreaId: `questionUploadArea_${questionId}`,
+        fileInputId: `questionImageInput_${questionId}`,
+        progressId: `questionImageProgress_${questionId}`,
+        progressBarId: `questionImageProgressBar_${questionId}`,
+        previewId: `questionImagePreview_${questionId}`,
+        urlInputId: `questionImageUrl_${questionId}`,
+        bucket: 'question-images',
+        supabase
+      });
+    }
+
+    // Обновление предпросмотра предложения (глобально)
+    window.updateSentencePreview = function(qid) {
+      const input = document.getElementById(`sentenceInput_${qid}`);
+      const preview = document.getElementById(`sentencePreview_${qid}`);
+      if (!input || !preview) return;
+      const raw = input.value || '';
+      if (!raw.trim()) {
+        preview.textContent = 'Введите предложение ниже';
+        return;
+      }
+      let i = 0;
+      preview.innerHTML = raw.replace(/___/g, () => {
+        i++;
+        return `<span style="border-bottom:2px dashed #666; padding:0 10px; margin:0 2px;">[${i}]</span>`;
+      });
+    };
+
+    // ============ ПРИЛОЖЕНИЕ ============
+    async function initApp() {
+      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
+        return;
+      }
+
+      try {
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+        const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+        const user = await checkAdmin(supabase);
+        if (!user) return;
+
+        // Кнопки/вкладки/модалка
+        document.getElementById('modalOk').addEventListener('click', () => {
+          document.getElementById('modal').style.display = 'none';
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+          if (confirm('Выйти из аккаунта?')) {
+            await supabase.auth.signOut();
+            window.location.href = '/login.html';
           }
-          notify(ok, err, "✅ Бакеты успешно созданы или уже существуют.", "");
-        } catch(e){
-          notify(ok, err, "", "❌ Ошибка создания бакетов: " + e.message);
-        }
-        showGlobal(false);
-      };
+        });
 
-      // ========== ЗАГРУЗКА ФАЙЛОВ ==========
-      async function uploadFile(bucket, file, prefix="") {
-        const name = `${prefix}${Date.now()}_${file.name}`;
-        const { error } = await supabase.storage.from(bucket).upload(name, file, { upsert:true });
-        if (error) throw error;
-        const { data } = supabase.storage.from(bucket).getPublicUrl(name);
-        return data.publicUrl + `?v=${Date.now()}`;
-      }
+        document.querySelectorAll('.admin-tab').forEach(tab => {
+          tab.addEventListener('click', () => {
+            const tabName = tab.getAttribute('data-tab');
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById(`${tabName}-section`).classList.add('active');
 
-      // Быстрая загрузка
-      document.getElementById("quickUpload").onclick = async()=>{
-        const file = document.getElementById("quickFile").files[0];
-        const bucket = document.getElementById("quickBucket").value;
-        const prog = document.getElementById("quickProgress");
-        const res = document.getElementById("quickResult");
-        const err = document.getElementById("quickErr");
-        const prev = document.getElementById("quickPreview");
-        err.style.display="none"; res.textContent="";
-        if (!file) return alert("Выберите файл");
-        showGlobal(true);
-        try {
-          prog.style.width="40%";
-          const url = await uploadFile(bucket, file);
-          prog.style.width="100%";
-          prev.src = url; prev.style.display="block";
-          res.textContent="✅ Загрузка успешна: "+url;
-        } catch(e){
-          err.textContent=e.message; err.style.display="block";
-        }
-        showGlobal(false);
-      };
-
-      // ========== ТАБЛИЦЫ / CRUD ==========
-      async function loadTable(name, tableEl, loaderEl) {
-        loaderEl.classList.add("on");
-        try {
-          const { data, error } = await supabase.from(name).select("*").order("order",{ascending:true});
-          if (error) throw error;
-          const body = tableEl.querySelector("tbody");
-          body.innerHTML = "";
-          data.forEach(row=>{
-            const tr=document.createElement("tr");
-            if (name==="textbooks"||name==="crosswords") {
-              tr.innerHTML = `
-                <td><img class="thumb" src="${row.cover_url||''}" /></td>
-                <td>${row.title||''}</td>
-                <td>${row.description||''}</td>
-                <td>${row.available_to_all?'✅':'❌'}</td>
-                <td>${row.order||0}</td>
-                <td>${row.is_active?'✅':'❌'}</td>
-                <td>
-                  <button class="btn line mini" data-id="${row.id}" data-type="${name}" data-act="edit">✏️</button>
-                  <button class="btn warn mini" data-id="${row.id}" data-type="${name}" data-act="del">🗑️</button>
-                </td>`;
-            } else if (name==="assignments"){
-              tr.innerHTML = `
-                <td>${row.title||''}</td>
-                <td>${row.type}</td>
-                <td>${row.textbook_id?'Учебник':row.crossword_id?'Кроссворд':'—'}</td>
-                <td>${row.order||0}</td>
-                <td>${row.is_active?'✅':'❌'}</td>
-                <td>
-                  <button class="btn line mini" data-id="${row.id}" data-type="${name}" data-act="edit">✏️</button>
-                  <button class="btn warn mini" data-id="${row.id}" data-type="${name}" data-act="del">🗑️</button>
-                </td>`;
-            }
-            body.appendChild(tr);
+            if (tabName === 'textbooks') loadTextbooks();
+            if (tabName === 'crosswords') loadCrosswords();
+            if (tabName === 'assignments') { loadMaterialsForAssignments(); loadAssignments(); }
+            if (tabName === 'users') loadUsers();
           });
-        } catch(e){
-          console.error(e);
+        });
+
+        // Инициализация зон загрузки для обложек
+        initImageUpload({
+          uploadAreaId: 'textbookUploadArea',
+          fileInputId: 'textbookCoverInput',
+          progressId: 'textbookCoverProgress',
+          progressBarId: 'textbookCoverProgressBar',
+          previewId: 'textbookCoverPreview',
+          urlInputId: 'textbookCoverUrl',
+          bucket: 'covers',
+          supabase
+        });
+        initImageUpload({
+          uploadAreaId: 'crosswordUploadArea',
+          fileInputId: 'crosswordCoverInput',
+          progressId: 'crosswordCoverProgress',
+          progressBarId: 'crosswordCoverProgressBar',
+          previewId: 'crosswordCoverPreview',
+          urlInputId: 'crosswordCoverUrl',
+          bucket: 'covers',
+          supabase
+        });
+
+        // ===== Статистика
+        async function loadStats() {
+          try {
+            const [{ data: t }, { data: c }, { data: a }, { data: u }] = await Promise.all([
+              supabase.from('textbooks').select('id'),
+              supabase.from('crosswords').select('id'),
+              supabase.from('assignments').select('id'),
+              supabase.from('profiles').select('id')
+            ]);
+            document.getElementById('totalTextbooks').textContent = t?.length || 0;
+            document.getElementById('totalCrosswords').textContent = c?.length || 0;
+            document.getElementById('totalAssignments').textContent = a?.length || 0;
+            document.getElementById('totalUsers').textContent = u?.length || 0;
+          } catch (e) {
+            console.warn('Stats load error', e);
+          }
         }
-        loaderEl.classList.remove("on");
+
+        // ===== Учебники
+        let editingTextbookId = null;
+
+        function showTextbookForm() {
+          editingTextbookId = null;
+          document.getElementById('textbookForm').classList.add('active');
+          document.getElementById('textbookFormTitle').textContent = 'Создать учебник';
+          document.getElementById('textbookTitle').value = '';
+          document.getElementById('textbookDescription').value = '';
+          document.getElementById('textbookOrder').value = '0';
+          document.getElementById('textbookIsAvailable').checked = false;
+          document.getElementById('textbookCoverUrl').value = '';
+          document.getElementById('textbookCoverPreview').style.display = 'none';
+        }
+        function hideTextbookForm(){ document.getElementById('textbookForm').classList.remove('active'); }
+
+        async function saveTextbook() {
+          const title = document.getElementById('textbookTitle').value.trim();
+          const description = document.getElementById('textbookDescription').value.trim();
+          const orderIndex = parseInt(document.getElementById('textbookOrder').value || '0',10);
+          const isAvailable = document.getElementById('textbookIsAvailable').checked;
+          const coverUrl = document.getElementById('textbookCoverUrl').value;
+
+          if (!title) return showModal('Ошибка', 'Введите название учебника');
+
+          const payload = {
+            title,
+            description,
+            order_index: orderIndex,
+            is_available: isAvailable,
+            is_active: true,
+            created_by: user.id
+          };
+          if (coverUrl) payload.cover_image_url = coverUrl;
+
+          let res;
+          if (editingTextbookId) {
+            res = await supabase.from('textbooks').update(payload).eq('id', editingTextbookId);
+          } else {
+            res = await supabase.from('textbooks').insert(payload);
+          }
+          if (res.error) return showModal('Ошибка', res.error.message);
+
+          showModal('Готово', editingTextbookId ? 'Учебник обновлён' : 'Учебник создан');
+          hideTextbookForm(); loadTextbooks(); loadStats();
+        }
+
+        async function loadTextbooks() {
+          const tbody = document.querySelector('#textbooksTable tbody');
+          tbody.innerHTML = '<tr><td colspan="6" style="padding:14px;">Загрузка...</td></tr>';
+
+          const { data: textbooks, error } = await supabase.from('textbooks').select('*').order('order_index');
+          if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
+
+          const { data: ass } = await supabase.from('assignments').select('id,textbook_id');
+          const counts = {};
+          (ass||[]).forEach(a => { if (a.textbook_id) counts[a.textbook_id]=(counts[a.textbook_id]||0)+1; });
+
+          tbody.innerHTML = '';
+          if (!textbooks?.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Учебники не найдены</td></tr>';
+            return;
+          }
+
+          textbooks.forEach(tb => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${tb.title}</td>
+              <td>${tb.description || '—'}</td>
+              <td>${counts[tb.id] || 0}</td>
+              <td>${tb.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
+              <td>${tb.is_active ? '✅ Активен' : '❌ Неактивен'}</td>
+              <td>
+                <button class="btn btn-small" data-edit-textbook="${tb.id}">✏️ Редактировать</button>
+                <button class="btn btn-small btn-danger" data-del-textbook="${tb.id}" data-title="${tb.title}">🗑️ Удалить</button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          tbody.querySelectorAll('[data-edit-textbook]').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+              const id = btn.getAttribute('data-edit-textbook');
+              const { data, error } = await supabase.from('textbooks').select('*').eq('id', id).single();
+              if (error) return showModal('Ошибка', error.message);
+              editingTextbookId = id;
+              document.getElementById('textbookForm').classList.add('active');
+              document.getElementById('textbookFormTitle').textContent = 'Редактировать учебник';
+              document.getElementById('textbookTitle').value = data.title || '';
+              document.getElementById('textbookDescription').value = data.description || '';
+              document.getElementById('textbookOrder').value = data.order_index || 0;
+              document.getElementById('textbookIsAvailable').checked = !!data.is_available;
+              document.getElementById('textbookCoverUrl').value = data.cover_image_url || '';
+              const prev = document.getElementById('textbookCoverPreview');
+              if (data.cover_image_url) { prev.src = data.cover_image_url; prev.style.display='block'; } else { prev.style.display='none'; }
+            });
+          });
+
+          tbody.querySelectorAll('[data-del-textbook]').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+              const id = btn.getAttribute('data-del-textbook');
+              const title = btn.getAttribute('data-title') || '';
+              if (!confirm(`Удалить учебник "${title}"? Связанные задания также будут удалены.`)) return;
+              const { error } = await supabase.from('textbooks').delete().eq('id', id);
+              if (error) return showModal('Ошибка', error.message);
+              showModal('Готово', 'Учебник удалён'); loadTextbooks(); loadStats();
+            });
+          });
+        }
+
+        document.getElementById('createTextbookBtn').addEventListener('click', showTextbookForm);
+        document.getElementById('cancelTextbookBtn').addEventListener('click', hideTextbookForm);
+        document.getElementById('saveTextbookBtn').addEventListener('click', saveTextbook);
+
+        // ===== Кроссворды
+        let editingCrosswordId = null;
+
+        function showCrosswordForm() {
+          editingCrosswordId = null;
+          document.getElementById('crosswordForm').classList.add('active');
+          document.getElementById('crosswordFormTitle').textContent = 'Создать кроссворд';
+          document.getElementById('crosswordTitle').value = '';
+          document.getElementById('crosswordDescription').value = '';
+          document.getElementById('crosswordOrder').value = '0';
+          document.getElementById('crosswordIsAvailable').checked = false;
+          document.getElementById('crosswordCoverUrl').value = '';
+          document.getElementById('crosswordCoverPreview').style.display = 'none';
+        }
+        function hideCrosswordForm(){ document.getElementById('crosswordForm').classList.remove('active'); }
+
+        async function saveCrossword() {
+          const title = document.getElementById('crosswordTitle').value.trim();
+          const description = document.getElementById('crosswordDescription').value.trim();
+          const orderIndex = parseInt(document.getElementById('crosswordOrder').value || '0',10);
+          const isAvailable = document.getElementById('crosswordIsAvailable').checked;
+          const coverUrl = document.getElementById('crosswordCoverUrl').value;
+
+          if (!title) return showModal('Ошибка', 'Введите название кроссворда');
+
+          const payload = {
+            title,
+            description,
+            order_index: orderIndex,
+            is_available: isAvailable,
+            is_active: true,
+            created_by: user.id
+          };
+          if (coverUrl) payload.cover_image_url = coverUrl;
+
+          let res;
+          if (editingCrosswordId) {
+            res = await supabase.from('crosswords').update(payload).eq('id', editingCrosswordId);
+          } else {
+            res = await supabase.from('crosswords').insert(payload);
+          }
+          if (res.error) return showModal('Ошибка', res.error.message);
+
+          showModal('Готово', editingCrosswordId ? 'Кроссворд обновлён' : 'Кроссворд создан');
+          hideCrosswordForm(); loadCrosswords(); loadStats();
+        }
+
+        async function loadCrosswords() {
+          const tbody = document.querySelector('#crosswordsTable tbody');
+          tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;">Загрузка...</td></tr>';
+
+          const { data: crosswords, error } = await supabase.from('crosswords').select('*').order('order_index');
+          if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
+
+          const { data: ass } = await supabase.from('assignments').select('id,crossword_id');
+          const counts = {};
+          (ass||[]).forEach(a => { if (a.crossword_id) counts[a.crossword_id]=(counts[a.crossword_id]||0)+1; });
+
+          tbody.innerHTML = '';
+          if (!crosswords?.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Кроссворды не найдены</td></tr>';
+            return;
+          }
+
+          crosswords.forEach(cw => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${cw.title}</td>
+              <td>${cw.description || '—'}</td>
+              <td>${counts[cw.id] || 0}</td>
+              <td>${cw.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
+              <td>
+                <button class="btn btn-small" data-edit-crossword="${cw.id}">✏️ Редактировать</button>
+                <button class="btn btn-small btn-danger" data-del-crossword="${cw.id}" data-title="${cw.title}">🗑️ Удалить</button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          tbody.querySelectorAll('[data-edit-crossword]').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+              const id = btn.getAttribute('data-edit-crossword');
+              const { data, error } = await supabase.from('crosswords').select('*').eq('id', id).single();
+              if (error) return showModal('Ошибка', error.message);
+              editingCrosswordId = id;
+              document.getElementById('crosswordForm').classList.add('active');
+              document.getElementById('crosswordFormTitle').textContent = 'Редактировать кроссворд';
+              document.getElementById('crosswordTitle').value = data.title || '';
+              document.getElementById('crosswordDescription').value = data.description || '';
+              document.getElementById('crosswordOrder').value = data.order_index || 0;
+              document.getElementById('crosswordIsAvailable').checked = !!data.is_available;
+              document.getElementById('crosswordCoverUrl').value = data.cover_image_url || '';
+              const prev = document.getElementById('crosswordCoverPreview');
+              if (data.cover_image_url) { prev.src = data.cover_image_url; prev.style.display='block'; } else { prev.style.display='none'; }
+            });
+          });
+
+          tbody.querySelectorAll('[data-del-crossword]').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+              const id = btn.getAttribute('data-del-crossword');
+              const title = btn.getAttribute('data-title') || '';
+              if (!confirm(`Удалить кроссворд "${title}"? Связанные задания также будут удалены.`)) return;
+              const { error } = await supabase.from('crosswords').delete().eq('id', id);
+              if (error) return showModal('Ошибка', error.message);
+              showModal('Готово', 'Кроссворд удалён'); loadCrosswords(); loadStats();
+            });
+          });
+        }
+
+        document.getElementById('createCrosswordBtn').addEventListener('click', showCrosswordForm);
+        document.getElementById('cancelCrosswordBtn').addEventListener('click', hideCrosswordForm);
+        document.getElementById('saveCrosswordBtn').addEventListener('click', saveCrossword);
+        // ===== ЗАДАНИЯ
+        let selectedMaterialId = '';
+        let editingAssignmentId = null;
+        let currentQuestionType = 'test';
+
+        // переключатели типов вопросов
+        document.querySelectorAll('.type-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentQuestionType = btn.getAttribute('data-type');
+          });
+        });
+
+        document.getElementById('materialSelect').addEventListener('change', function () {
+          selectedMaterialId = this.value;
+          document.getElementById('createAssignmentBtn').disabled = !selectedMaterialId;
+          loadAssignments();
+        });
+
+        document.getElementById('createAssignmentBtn').addEventListener('click', showAssignmentForm);
+        document.getElementById('cancelAssignmentBtn').addEventListener('click', hideAssignmentForm);
+        document.getElementById('saveAssignmentBtn').addEventListener('click', saveAssignment);
+        document.getElementById('addQuestionBtn').addEventListener('click', () => addQuestion());
+
+        function showAssignmentForm() {
+          editingAssignmentId = null;
+          document.getElementById('assignmentForm').classList.add('active');
+          document.getElementById('assignmentFormTitle').textContent = 'Создать задание';
+          document.getElementById('assignmentTitle').value = '';
+          document.getElementById('assignmentOrder').value = '0';
+          // Сброс типа к test
+          document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
+          document.querySelector('.type-btn[data-type="test"]').classList.add('active');
+          currentQuestionType = 'test';
+
+          const cont = document.getElementById('questionsContainer');
+          cont.innerHTML = '';
+          addQuestion(); // хотя бы один вопрос
+        }
+
+        function hideAssignmentForm() {
+          document.getElementById('assignmentForm').classList.remove('active');
+        }
+
+        async function loadMaterialsForAssignments() {
+          const select = document.getElementById('materialSelect');
+          select.innerHTML = '<option value="">-- Выберите учебник или кроссворд --</option>';
+
+          const [{ data: textbooks }, { data: crosswords }] = await Promise.all([
+            supabase.from('textbooks').select('id,title,is_active').order('order_index'),
+            supabase.from('crosswords').select('id,title,is_active').order('order_index')
+          ]);
+
+          if (textbooks?.length) {
+            const og = document.createElement('optgroup');
+            og.label = '📚 Учебники';
+            textbooks.filter(t=>t.is_active!==false).forEach(t=>{
+              const opt = document.createElement('option');
+              opt.value = `textbook_${t.id}`;
+              opt.textContent = t.title;
+              og.appendChild(opt);
+            });
+            select.appendChild(og);
+          }
+
+          if (crosswords?.length) {
+            const og = document.createElement('optgroup');
+            og.label = '🧩 Кроссворды';
+            crosswords.filter(c=>c.is_active!==false).forEach(c=>{
+              const opt = document.createElement('option');
+              opt.value = `crossword_${c.id}`;
+              opt.textContent = c.title;
+              og.appendChild(opt);
+            });
+            select.appendChild(og);
+          }
+
+          // восстановим выбранный материал если есть
+          if (selectedMaterialId) {
+            const has = Array.from(select.options).some(o=>o.value===selectedMaterialId);
+            if (has) select.value = selectedMaterialId;
+          }
+        }
+
+        function addQuestion(prefill) {
+          const container = document.getElementById('questionsContainer');
+          const qid = generateQuestionId();
+          const qType = prefill?.type || currentQuestionType;
+
+          const wrap = document.createElement('div');
+          wrap.className = 'subtask-item';
+          wrap.setAttribute('data-id', qid);
+          wrap.setAttribute('data-type', qType);
+
+          const imageUploadBlock = `
+            <div class="form-group question-image-upload">
+              <label>Изображение для вопроса (опционально):</label>
+              <div class="upload-area" id="questionUploadArea_${qid}">
+                <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
+                <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. 5MB)</p>
+                <input type="file" id="questionImageInput_${qid}" style="display:none" accept="image/*">
+              </div>
+              <div class="upload-progress" id="questionImageProgress_${qid}">
+                <div class="upload-progress-bar" id="questionImageProgressBar_${qid}"></div>
+              </div>
+              <input type="hidden" id="questionImageUrl_${qid}" value="${prefill?.image || ''}">
+              <img class="question-image-preview" id="questionImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
+            </div>
+          `;
+
+          let inner = `
+            <div class="form-group">
+              <label>Текст вопроса:</label>
+              <input type="text" class="input question-text" placeholder="Введите вопрос" value="${prefill?.q ? String(prefill.q).replace(/"/g,'&quot;') : ''}">
+            </div>
+            ${imageUploadBlock}
+          `;
+
+          if (qType === 'test') {
+            inner += `
+              <div class="form-group">
+                <label>Варианты ответов (каждый с новой строки):</label>
+                <textarea class="input test-options" rows="4">${(prefill?.options || []).join('\n')}</textarea>
+              </div>
+              <div class="form-group">
+                <label>Правильный ответ (номер варианта, начиная с 1):</label>
+                <input type="number" class="input test-correct" min="1" value="${(typeof prefill?.correct === 'number' ? prefill.correct+1 : 1)}">
+              </div>
+            `;
+          } else if (qType === 'fill') {
+            inner += `
+              <div class="form-group">
+                <label>Правильные ответы (каждый с новой строки):</label>
+                <textarea class="input fill-answers" rows="3">${(prefill?.answers || []).join('\n')}</textarea>
+                <div class="small-muted">Ответ засчитается, если совпадёт с любым вариантом</div>
+              </div>
+            `;
+          } else if (qType === 'sentence') {
+            const sentence = prefill?.sentence || '';
+            const previewHtml = sentence
+              ? sentence.replace(/___/g,'<span style="border-bottom:2px dashed #666; padding:0 10px; margin:0 2px;">[?]</span>')
+              : 'Введите предложение ниже';
+            inner += `
+              <div class="form-group">
+                <label>Предложение с пропусками:</label>
+                <div class="sentence-builder">
+                  <div class="sentence-preview" id="sentencePreview_${qid}">${previewHtml}</div>
+                  <textarea class="sentence-input" id="sentenceInput_${qid}" rows="2" placeholder="Используйте ___ для пропусков. Например: Я ___ яблоко.">${sentence}</textarea>
+                  <button type="button" class="btn btn-small add-gap-btn" onclick="window.updateSentencePreview('${qid}')">Обновить предпросмотр</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Правильные ответы для пропусков (каждый с новой строки, по порядку пропусков):</label>
+                <textarea class="input sentence-answers" rows="3">${(prefill?.answers || []).join('\n')}</textarea>
+              </div>
+            `;
+            // live preview
+            setTimeout(()=>{
+              const si = document.getElementById(`sentenceInput_${qid}`);
+              si?.addEventListener('input', ()=>window.updateSentencePreview(qid));
+            },0);
+          }
+
+          inner += `<button class="btn btn-small btn-danger remove-question" type="button">🗑️ Удалить вопрос</button>`;
+          wrap.innerHTML = inner;
+          container.appendChild(wrap);
+
+          // init загрузчик
+          initQuestionImageUpload(qid, supabase);
+
+          // удаление вопроса
+          wrap.querySelector('.remove-question').addEventListener('click', () => {
+            const all = document.querySelectorAll('.subtask-item');
+            if (all.length > 1) wrap.remove();
+            else alert('Должен остаться хотя бы один вопрос.');
+          });
+        }
+
+        async function saveAssignment() {
+          const title = document.getElementById('assignmentTitle').value.trim();
+          const orderIndex = parseInt(document.getElementById('assignmentOrder').value || '0', 10);
+          if (!selectedMaterialId) return showModal('Ошибка', 'Выберите учебник или кроссворд');
+          if (!title) return showModal('Ошибка', 'Введите название задания');
+
+          const [kind, matId] = selectedMaterialId.split('_'); // textbook_ / crossword_
+          const qs = Array.from(document.querySelectorAll('.subtask-item'));
+          if (!qs.length) return showModal('Ошибка', 'Добавьте хотя бы один вопрос');
+
+          const questions = [];
+          for (let i=0;i<qs.length;i++) {
+            const el = qs[i];
+            const type = el.getAttribute('data-type') || 'test';
+            const q = el.querySelector('.question-text')?.value?.trim() || '';
+            const imgUrl = el.querySelector(`#questionImageUrl_${el.getAttribute('data-id')}`)?.value || '';
+            if (!q) return showModal('Ошибка', `Заполните текст вопроса ${i+1}`);
+
+            const qData = { type, q };
+            if (imgUrl) qData.image = imgUrl;
+
+            if (type === 'test') {
+              const optionsText = el.querySelector('.test-options')?.value || '';
+              const options = optionsText.split('\n').map(s=>s.trim()).filter(Boolean);
+              const correct = parseInt(el.querySelector('.test-correct')?.value || '1',10) - 1;
+              if (!options.length) return showModal('Ошибка', `Добавьте варианты ответа в вопросе ${i+1}`);
+              if (correct < 0 || correct >= options.length) return showModal('Ошибка', `Номер правильного ответа в вопросе ${i+1} должен соответствовать одному из вариантов`);
+              qData.options = options;
+              qData.correct = correct;
+            } else if (type === 'fill') {
+              const answersText = el.querySelector('.fill-answers')?.value || '';
+              const answers = answersText.split('\n').map(s=>s.trim()).filter(Boolean);
+              if (!answers.length) return showModal('Ошибка', `Добавьте хотя бы один правильный ответ в вопросе ${i+1}`);
+              qData.answers = answers;
+            } else if (type === 'sentence') {
+              const sentence = el.querySelector('.sentence-input')?.value?.trim() || '';
+              const answersText = el.querySelector('.sentence-answers')?.value || '';
+              const answers = answersText.split('\n').map(s=>s.trim()).filter(Boolean);
+              if (!sentence) return showModal('Ошибка', `Введите предложение с пропусками в вопросе ${i+1}`);
+              const gaps = (sentence.match(/___/g) || []).length;
+              if (!answers.length || answers.length !== gaps) {
+                return showModal('Ошибка', `Количество ответов (${answers.length}) должно совпадать с количеством пропусков (${gaps}) в вопросе ${i+1}`);
+              }
+              qData.sentence = sentence;
+              qData.answers = answers;
+            }
+
+            questions.push(qData);
+          }
+
+          const payload = {
+            title,
+            order_index: orderIndex,
+            content: { questions },
+            created_by: user.id
+          };
+          if (kind === 'textbook') payload.textbook_id = matId;
+          if (kind === 'crossword') payload.crossword_id = matId;
+
+          let res;
+          if (editingAssignmentId) {
+            res = await supabase.from('assignments').update(payload).eq('id', editingAssignmentId);
+          } else {
+            res = await supabase.from('assignments').insert(payload);
+          }
+          if (res.error) return showModal('Ошибка', res.error.message);
+
+          showModal('Готово', editingAssignmentId ? 'Задание обновлено' : 'Задание создано');
+          hideAssignmentForm(); loadAssignments(); loadStats();
+        }
+
+        async function loadAssignments() {
+          if (!selectedMaterialId) return;
+          const [kind, matId] = selectedMaterialId.split('_');
+
+          let q = supabase.from('assignments').select('*').order('order_index');
+          if (kind === 'textbook') q = q.eq('textbook_id', matId);
+          if (kind === 'crossword') q = q.eq('crossword_id', matId);
+
+          const { data: rows, error } = await q;
+          const tbody = document.querySelector('#assignmentsTable tbody');
+          if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
+
+          // подтянем название
+          let materialName = 'Материал';
+          if (kind === 'textbook') {
+            const { data } = await supabase.from('textbooks').select('title').eq('id', matId).single();
+            materialName = data?.title || 'Учебник';
+          } else {
+            const { data } = await supabase.from('crosswords').select('title').eq('id', matId).single();
+            materialName = data?.title || 'Кроссворд';
+          }
+
+          tbody.innerHTML = '';
+          if (!rows?.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Задания не найдены</td></tr>';
+            return;
+          }
+
+          rows.forEach(a=>{
+            const qs = a.content?.questions || [];
+            let typeText = '📝 Тест';
+            const types = new Set(qs.map(q=>q.type));
+            if (types.has('sentence')) typeText = '📝 Предложение';
+            else if (types.has('fill')) typeText = '✍️ Ввод';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${a.title}</td>
+              <td>${materialName}</td>
+              <td>${typeText}</td>
+              <td>${qs.length}</td>
+              <td>
+                <button class="btn btn-small" data-edit-assignment="${a.id}">✏️ Редактировать</button>
+                <button class="btn btn-small btn-danger" data-del-assignment="${a.id}" data-title="${a.title}">🗑️ Удалить</button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          tbody.querySelectorAll('[data-edit-assignment]').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+              const id = btn.getAttribute('data-edit-assignment');
+              const { data, error } = await supabase.from('assignments').select('*').eq('id', id).single();
+              if (error) return showModal('Ошибка', error.message);
+
+              // выставить селект
+              if (data.textbook_id) selectedMaterialId = `textbook_${data.textbook_id}`;
+              else if (data.crossword_id) selectedMaterialId = `crossword_${data.crossword_id}`;
+              document.getElementById('materialSelect').value = selectedMaterialId;
+              document.getElementById('createAssignmentBtn').disabled = false;
+
+              editingAssignmentId = id;
+              document.getElementById('assignmentForm').classList.add('active');
+              document.getElementById('assignmentFormTitle').textContent = 'Редактировать задание';
+              document.getElementById('assignmentTitle').value = data.title || '';
+              document.getElementById('assignmentOrder').value = data.order_index || 0;
+
+              const cont = document.getElementById('questionsContainer');
+              cont.innerHTML = '';
+              const qs = data.content?.questions || [];
+              if (!qs.length) addQuestion(); else qs.forEach(q => addQuestion(q));
+            });
+          });
+
+          tbody.querySelectorAll('[data-del-assignment]').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+              const id = btn.getAttribute('data-del-assignment');
+              const title = btn.getAttribute('data-title') || '';
+              if (!confirm(`Удалить задание "${title}"?`)) return;
+              const { error } = await supabase.from('assignments').delete().eq('id', id);
+              if (error) return showModal('Ошибка', error.message);
+              showModal('Готово', 'Задание удалено');
+              loadAssignments(); loadStats();
+            });
+          });
+        }
+
+        // ===== ПОЛЬЗОВАТЕЛИ / ДОСТУПЫ
+        let currentEditingUserId = null;
+        let searchTimeout = null;
+
+        document.getElementById('userSearch').addEventListener('input', () => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(loadUsers, 400);
+        });
+
+        async function loadUsers() {
+          const q = document.getElementById('userSearch').value.trim();
+          let query = supabase.from('profiles').select('*').order('created_at',{ascending:false});
+          if (q) query = query.or(`full_name.ilike.%${q}%,email.ilike.%${q}%`);
+
+          const { data, error } = await query;
+          const tbody = document.querySelector('#usersTable tbody');
+          if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
+
+          // Прогресс
+          const { data: prog } = await supabase.from('user_progress').select('user_id,is_completed');
+          const map = {};
+          (prog||[]).forEach(p=>{
+            map[p.user_id] ||= { total:0, completed:0 };
+            map[p.user_id].total++;
+            if (p.is_completed) map[p.user_id].completed++;
+          });
+
+          tbody.innerHTML = '';
+          if (!data?.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Пользователи не найдены</td></tr>';
+            return;
+          }
+
+          data.forEach(u=>{
+            const pr = map[u.id] || { total:0, completed:0 };
+            const pct = pr.total ? Math.round((pr.completed/pr.total)*100) : 0;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>
+                <div><strong>${u.full_name || 'Не указано'}</strong></div>
+                <div class="user-stats"><span class="stat-badge">ID: ${u.id.slice(0,8)}...</span></div>
+              </td>
+              <td>${u.email || '—'}</td>
+              <td><div class="user-stats"><span class="stat-badge">📊 ${pr.total ? `${pr.completed}/${pr.total} (${pct}%)` : 'Нет прогресса'}</span></div></td>
+              <td>${u.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
+              <td>
+                <div class="user-actions">
+                  <button class="btn btn-small ${u.is_admin ? 'secondary' : ''}" data-toggle-admin="${u.id}" data-make="${!u.is_admin}">${u.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}</button>
+                  <button class="btn btn-small" data-access="${u.id}" data-name="${u.full_name || u.email}">🔐 Управление доступом</button>
+                </div>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          // обработчики
+          tbody.querySelectorAll('[data-toggle-admin]').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+              const uid = btn.getAttribute('data-toggle-admin');
+              const make = btn.getAttribute('data-make') === 'true';
+              if (!confirm(`Вы уверены, что хотите ${make ? 'назначить' : 'снять'} права администратора?`)) return;
+              const { error } = await supabase.from('profiles').update({ is_admin: make }).eq('id', uid);
+              if (error) return showModal('Ошибка', error.message);
+              showModal('Готово', make ? 'Права администратора выданы' : 'Права администратора сняты');
+              loadUsers();
+            });
+          });
+
+          tbody.querySelectorAll('[data-access]').forEach(btn=>{
+            btn.addEventListener('click', ()=>openUserAccessModal(btn.getAttribute('data-access'), btn.getAttribute('data-name')));
+          });
+        }
+
+        document.getElementById('closeUserAccessModal').addEventListener('click', ()=>{
+          document.getElementById('userAccessModal').style.display='none';
+        });
+        document.getElementById('saveUserAccessBtn').addEventListener('click', saveUserAccess);
+
+        async function openUserAccessModal(userId, userName) {
+          currentEditingUserId = userId;
+          document.getElementById('userAccessInfo').innerHTML = `
+            <p><strong>Пользователь:</strong> ${userName}</p>
+            <p class="small-muted">Отметьте учебники и кроссворды, к которым пользователь должен иметь доступ</p>
+          `;
+
+          const [t, c, ta, ca] = await Promise.all([
+            supabase.from('textbooks').select('id,title').eq('is_active', true).order('order_index'),
+            supabase.from('crosswords').select('id,title').eq('is_active', true).order('order_index'),
+            supabase.from('textbook_access').select('textbook_id').eq('user_id', userId),
+            supabase.from('crossword_access').select('crossword_id').eq('user_id', userId)
+          ]);
+
+          const tSet = new Set((ta.data||[]).map(x=>String(x.textbook_id)));
+          const cSet = new Set((ca.data||[]).map(x=>String(x.crossword_id)));
+
+          const tList = document.getElementById('textbookAccessList');
+          tList.innerHTML = '';
+          if (t.data?.length) {
+            t.data.forEach(tb=>{
+              const item = document.createElement('div');
+              item.className = 'access-item';
+              const id = `textbook_${tb.id}`;
+              item.innerHTML = `<input type="checkbox" id="${id}" ${tSet.has(String(tb.id))?'checked':''}>
+                                <label for="${id}">${tb.title}</label>`;
+              tList.appendChild(item);
+            });
+          } else {
+            tList.innerHTML = '<p class="small-muted">Нет доступных учебников</p>';
+          }
+
+          const cList = document.getElementById('crosswordAccessList');
+          cList.innerHTML = '';
+          if (c.data?.length) {
+            c.data.forEach(cr=>{
+              const item = document.createElement('div');
+              item.className = 'access-item';
+              const id = `crossword_${cr.id}`;
+              item.innerHTML = `<input type="checkbox" id="${id}" ${cSet.has(String(cr.id))?'checked':''}>
+                                <label for="${id}">${cr.title}</label>`;
+              cList.appendChild(item);
+            });
+          } else {
+            cList.innerHTML = '<p class="small-muted">Нет доступных кроссвордов</p>';
+          }
+
+          document.getElementById('userAccessModal').style.display='flex';
+        }
+
+        async function saveUserAccess() {
+          if (!currentEditingUserId) return;
+
+          // собрать выбор
+          const textSelected = Array.from(document.querySelectorAll('#textbookAccessList input[type="checkbox"]:checked'))
+            .map(cb => cb.id.replace('textbook_',''));
+          const crossSelected = Array.from(document.querySelectorAll('#crosswordAccessList input[type="checkbox"]:checked'))
+            .map(cb => cb.id.replace('crossword_',''));
+
+          // перезаписать
+          const ops = [];
+          ops.push(supabase.from('textbook_access').delete().eq('user_id', currentEditingUserId));
+          ops.push(supabase.from('crossword_access').delete().eq('user_id', currentEditingUserId));
+          await Promise.all(ops);
+
+          if (textSelected.length) {
+            await supabase.from('textbook_access').insert(
+              textSelected.map(id=>({ user_id: currentEditingUserId, textbook_id: id, granted_by: user.id }))
+            );
+          }
+          if (crossSelected.length) {
+            await supabase.from('crossword_access').insert(
+              crossSelected.map(id=>({ user_id: currentEditingUserId, crossword_id: id, granted_by: user.id }))
+            );
+          }
+
+          showModal('Готово','Доступы обновлены');
+          document.getElementById('userAccessModal').style.display='none';
+        }
+
+        // Кнопки форм учебников/кроссвордов уже привязаны выше.
+        // Инициализация стартового состояния:
+        await loadStats();
+        await loadTextbooks();
+        await loadCrosswords();
+        await loadMaterialsForAssignments();
+        await loadUsers();
+
+        showContent();
+      } catch (e) {
+        showError('❌ Ошибка инициализации админ-панели: ' + (e?.message || e));
       }
+    }
 
-      document.getElementById("tbReload").onclick = ()=>loadTable("textbooks",document.getElementById("tbTable"),document.getElementById("tbLoader"));
-      document.getElementById("cwReload").onclick = ()=>loadTable("crosswords",document.getElementById("cwTable"),document.getElementById("cwLoader"));
-      document.getElementById("asReload").onclick = ()=>loadTable("assignments",document.getElementById("asTable"),document.getElementById("asLoader"));
-      loadTable("textbooks",document.getElementById("tbTable"),document.getElementById("tbLoader"));
-      loadTable("crosswords",document.getElementById("cwTable"),document.getElementById("cwLoader"));
-      loadTable("assignments",document.getElementById("asTable"),document.getElementById("asLoader"));
-
-      // ========== ПРОВЕРКА / СОЗДАНИЕ БАКЕТОВ ЧЕРЕЗ SETTINGS ==========
-      document.getElementById("checkBuckets").onclick = async()=>{
-        const out = document.getElementById("setResult");
-        const l = document.getElementById("setLoader");
-        showLoader(l,true);
-        try {
-          const { data } = await supabase.storage.listBuckets();
-          const names = data.map(b=>b.name);
-          out.textContent = "Найдено бакетов: "+names.join(", ");
-        } catch(e){ out.textContent="Ошибка: "+e.message; }
-        showLoader(l,false);
-      };
-
-      // ========== СИНХРОНИЗАЦИЯ ==========
-      document.getElementById("syncStats").onclick = ()=>loadStats();
-
-      console.log("✅ Админ-панель загружена полностью.");
-    </script>
-  </div>
+    // запуск по конфигу
+    if (window.SUPABASE_URL) {
+      initApp();
+    } else {
+      const timeout = setTimeout(()=> showError('❌ Таймаут загрузки конфигурации'), 1000);
+      window.addEventListener('configLoaded', () => { clearTimeout(timeout); initApp(); });
+    }
+  </script>
 </body>
 </html>
