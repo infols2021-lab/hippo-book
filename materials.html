@@ -271,6 +271,7 @@
         let userProgress = [];
         let textbookAccess = [];
         let crosswordAccess = [];
+        let assignments = [];
 
         // Загружаем данные
         async function loadMaterials() {
@@ -294,6 +295,14 @@
 
             if (crosswordsError) throw crosswordsError;
             crosswords = crosswordsData || [];
+
+            // Загружаем все задания
+            const { data: assignmentsData, error: assignmentsError } = await supabase
+              .from('assignments')
+              .select('*');
+
+            if (assignmentsError) throw assignmentsError;
+            assignments = assignmentsData || [];
 
             // Загружаем прогресс пользователя
             const { data: progressData, error: progressError } = await supabase
@@ -336,11 +345,21 @@
           const grid = document.getElementById('textbooksGrid');
           grid.innerHTML = '';
 
-          // Фильтруем учебники по доступу
-          const availableTextbooks = textbooks.filter(textbook => 
-            // Учебник доступен если нет системы доступа или пользователь имеет доступ
-            textbookAccess.length === 0 || textbookAccess.some(access => access.textbook_id === textbook.id)
-          );
+          // ИСПРАВЛЕННАЯ ЛОГИКА ДОСТУПА К УЧЕБНИКАМ
+          const availableTextbooks = textbooks.filter(textbook => {
+            // Проверяем, есть ли у пользователя явный доступ к учебнику
+            const hasExplicitAccess = textbookAccess.some(access => access.textbook_id === textbook.id);
+            
+            // Если есть явный доступ - показываем
+            if (hasExplicitAccess) return true;
+            
+            // Если нет записей в textbook_access для этого пользователя вообще,
+            // значит система доступов не настроена и показываем все учебники
+            if (textbookAccess.length === 0) return true;
+            
+            // Во всех остальных случаях - не показываем
+            return false;
+          });
 
           if (availableTextbooks.length === 0) {
             grid.innerHTML = `
@@ -354,24 +373,19 @@
 
           availableTextbooks.forEach(textbook => {
             // Считаем прогресс для учебника
-            const textbookAssignments = userProgress.filter(up => {
-              const assignment = assignments.find(a => a.id === up.assignment_id);
-              return assignment && assignment.textbook_id === textbook.id;
-            });
+            const textbookAssignments = assignments.filter(a => a.textbook_id === textbook.id);
+            const completedAssignments = userProgress.filter(up => 
+              up.is_completed && textbookAssignments.some(a => a.id === up.assignment_id)
+            ).length;
             
-            const completedCount = textbookAssignments.filter(up => up.is_completed).length;
-            const totalCount = assignments.filter(a => a.textbook_id === textbook.id).length;
-            const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+            const totalCount = textbookAssignments.length;
+            const progress = totalCount > 0 ? (completedAssignments / totalCount) * 100 : 0;
 
             const card = document.createElement('div');
             card.className = 'material-card';
             
-            // Проверяем доступ
-            const hasAccess = textbookAccess.length === 0 || textbookAccess.some(access => access.textbook_id === textbook.id);
-            
-            if (!hasAccess) {
-              card.classList.add('locked');
-            }
+            // Проверяем доступ (должно быть всегда true для availableTextbooks)
+            const hasAccess = true;
             
             card.onclick = () => {
               if (hasAccess) {
@@ -380,10 +394,10 @@
             };
 
             card.innerHTML = `
-              ${!hasAccess ? '<div class="locked-overlay">🔒 Недоступно</div>' : ''}
               <div class="material-cover">
                 ${textbook.cover_image_url ? 
-                  `<img src="${textbook.cover_image_url}" alt="${textbook.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">` : 
+                  `<img src="${textbook.cover_image_url}" alt="${textbook.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" 
+                       onerror="this.style.display='none'; this.parentElement.innerHTML='📚';">` : 
                   '📚'
                 }
               </div>
@@ -393,7 +407,7 @@
                 <div class="progress-fill" style="width: ${progress}%"></div>
               </div>
               <div class="material-stats">
-                <span>${completedCount}/${totalCount} заданий</span>
+                <span>${completedAssignments}/${totalCount} заданий</span>
                 <span>${Math.round(progress)}%</span>
               </div>
             `;
@@ -406,9 +420,13 @@
           const grid = document.getElementById('crosswordsGrid');
           grid.innerHTML = '';
 
-          const availableCrosswords = crosswords.filter(crossword => 
-            crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id)
-          );
+          // ИСПРАВЛЕННАЯ ЛОГИКА ДОСТУПА К КРОССВОРДАМ
+          const availableCrosswords = crosswords.filter(crossword => {
+            // Кроссворд доступен если:
+            // 1. Он помечен как доступный для всех, ИЛИ
+            // 2. У пользователя есть явный доступ
+            return crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id);
+          });
 
           if (availableCrosswords.length === 0) {
             grid.innerHTML = `
@@ -422,22 +440,17 @@
 
           availableCrosswords.forEach(crossword => {
             // Считаем прогресс для кроссворда
-            const crosswordAssignments = userProgress.filter(up => {
-              const assignment = assignments.find(a => a.id === up.assignment_id);
-              return assignment && assignment.crossword_id === crossword.id;
-            });
+            const crosswordAssignments = assignments.filter(a => a.crossword_id === crossword.id);
+            const completedAssignments = userProgress.filter(up => 
+              up.is_completed && crosswordAssignments.some(a => a.id === up.assignment_id)
+            ).length;
             
-            const completedCount = crosswordAssignments.filter(up => up.is_completed).length;
-            const totalCount = assignments.filter(a => a.crossword_id === crossword.id).length;
-            const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+            const totalCount = crosswordAssignments.length;
+            const progress = totalCount > 0 ? (completedAssignments / totalCount) * 100 : 0;
 
             const card = document.createElement('div');
             card.className = 'material-card';
-            const hasAccess = crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id);
-            
-            if (!hasAccess) {
-              card.classList.add('locked');
-            }
+            const hasAccess = true; // Всегда true для availableCrosswords
             
             card.onclick = () => {
               if (hasAccess) {
@@ -446,10 +459,10 @@
             };
 
             card.innerHTML = `
-              ${!hasAccess ? '<div class="locked-overlay">🔒 Недоступно</div>' : ''}
               <div class="material-cover">
                 ${crossword.cover_image_url ? 
-                  `<img src="${crossword.cover_image_url}" alt="${crossword.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">` : 
+                  `<img src="${crossword.cover_image_url}" alt="${crossword.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;"
+                       onerror="this.style.display='none'; this.parentElement.innerHTML='🧩';">` : 
                   '🧩'
                 }
               </div>
@@ -459,7 +472,7 @@
                 <div class="progress-fill" style="width: ${progress}%"></div>
               </div>
               <div class="material-stats">
-                <span>${completedCount}/${totalCount} слов</span>
+                <span>${completedAssignments}/${totalCount} слов</span>
                 <span>${Math.round(progress)}%</span>
               </div>
             `;
@@ -497,9 +510,6 @@
         return false;
       }
     }
-    
-    // Глобальные переменные для хранения данных
-    let assignments = [];
     
     if (window.SUPABASE_URL) {
       initApp();

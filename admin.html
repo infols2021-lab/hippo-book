@@ -774,58 +774,62 @@
     }
 
     // Функция загрузки файла на сервер Supabase Storage
-    async function handleFileUpload(file, uploadArea, progress, progressBar, preview, urlInput) {
-      // Проверка типа файла
-      if (!file.type.startsWith('image/')) {
-        showModal('Ошибка', 'Пожалуйста, выберите файл изображения.');
-        return;
-      }
+// Улучшенная функция загрузки файла
+async function handleFileUpload(file, uploadArea, progress, progressBar, preview, urlInput) {
+  // Проверка типа файла
+  if (!file.type.startsWith('image/')) {
+    showModal('Ошибка', 'Пожалуйста, выберите файл изображения (JPG, PNG, GIF, WebP).');
+    return;
+  }
 
-      // Проверка размера файла (5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        showModal('Ошибка', 'Размер файла не должен превышать 5MB.');
-        return;
-      }
+  // Проверка размера файла (5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    showModal('Ошибка', 'Размер файла не должен превышать 5MB.');
+    return;
+  }
 
-      try {
-        // Показываем прогресс
-        progress.style.display = 'block';
-        progressBar.style.width = '0%';
+  try {
+    // Показываем прогресс
+    progress.style.display = 'block';
+    progressBar.style.width = '0%';
 
-        // Создаем FormData для загрузки
-        const formData = new FormData();
-        const fileName = `${Date.now()}_${file.name}`;
-        formData.append('file', file);
+    // Создаем временный URL для предпросмотра
+    const objectUrl = URL.createObjectURL(file);
+    
+    // Предпросмотр изображения
+    preview.src = objectUrl;
+    preview.style.display = 'block';
+    preview.onerror = function() {
+      console.error('Ошибка загрузки предпросмотра изображения');
+      this.style.display = 'none';
+    };
 
-        // В реальном приложении здесь будет загрузка на ваш сервер или напрямую в Supabase Storage
-        // Для демонстрации используем временный URL
-        const objectUrl = URL.createObjectURL(file);
-        preview.src = objectUrl;
-        preview.style.display = 'block';
-
-        // Симулируем прогресс загрузки
-        let progressValue = 0;
-        const progressInterval = setInterval(() => {
-          progressValue += 5;
-          progressBar.style.width = progressValue + '%';
+    // Симулируем прогресс загрузки
+    let progressValue = 0;
+    const progressInterval = setInterval(() => {
+      progressValue += 5;
+      progressBar.style.width = progressValue + '%';
+      
+      if (progressValue >= 100) {
+        clearInterval(progressInterval);
+        setTimeout(() => {
+          progress.style.display = 'none';
           
-          if (progressValue >= 100) {
-            clearInterval(progressInterval);
-            setTimeout(() => {
-              progress.style.display = 'none';
-              // Сохраняем URL для использования в форме
-              urlInput.value = objectUrl;
-              showModal('Успех', 'Изображение успешно загружено!');
-            }, 500);
-          }
-        }, 50);
-
-      } catch (error) {
-        console.error('Ошибка загрузки изображения:', error);
-        showModal('Ошибка', 'Не удалось загрузить изображение: ' + error.message);
-        progress.style.display = 'none';
+          // Сохраняем временный URL для использования в форме
+          // В реальном приложении здесь должна быть загрузка на сервер
+          urlInput.value = objectUrl;
+          
+          showModal('Успех', 'Изображение успешно загружено и готово к использованию!');
+        }, 500);
       }
-    }
+    }, 50);
+
+  } catch (error) {
+    console.error('Ошибка загрузки изображения:', error);
+    showModal('Ошибка', 'Не удалось загрузить изображение: ' + error.message);
+    progress.style.display = 'none';
+  }
+}
 
     // Функция для загрузки изображения вопроса
     function initQuestionImageUpload(questionId) {

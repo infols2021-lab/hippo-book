@@ -52,8 +52,15 @@
     
     .question-image {
       max-width: 100%;
+      max-height: 300px;
       border-radius: 8px;
       margin-bottom: 15px;
+      display: block;
+    }
+    
+    .question-image-container {
+      text-align: center;
+      margin: 15px 0;
     }
     
     /* Стили для тестовых вопросов */
@@ -342,7 +349,7 @@
               .select('*')
               .eq('user_id', user.id)
               .eq('assignment_id', assignmentId)
-              .single();
+              .maybeSingle();
 
             userProgress = progressData;
 
@@ -391,11 +398,36 @@
             questionEl.className = 'question';
             questionEl.innerHTML = `<div class="question-text">${index + 1}. ${question.q}</div>`;
 
+            // ИСПРАВЛЕННАЯ ЛОГИКА ОТОБРАЖЕНИЯ ИЗОБРАЖЕНИЙ
             if (question.image) {
-              questionEl.innerHTML += `
-                <img src="${question.image}" alt="Изображение" class="question-image" 
-                     onerror="this.style.display='none'">
-              `;
+              const imageContainer = document.createElement('div');
+              imageContainer.className = 'question-image-container';
+              
+              const img = document.createElement('img');
+              img.className = 'question-image';
+              img.alt = 'Изображение для вопроса';
+              img.src = question.image;
+              
+              // Добавляем обработчики для корректной загрузки изображений
+              img.onload = function() {
+                console.log('Изображение успешно загружено:', question.image);
+              };
+              
+              img.onerror = function() {
+                console.error('Ошибка загрузки изображения:', question.image);
+                this.style.display = 'none';
+                
+                // Показываем альтернативный текст
+                const altText = document.createElement('div');
+                altText.className = 'small-muted';
+                altText.textContent = '❌ Изображение недоступно';
+                altText.style.textAlign = 'center';
+                altText.style.padding = '10px';
+                imageContainer.appendChild(altText);
+              };
+              
+              imageContainer.appendChild(img);
+              questionEl.appendChild(imageContainer);
             }
 
             // Рендерим в зависимости от типа вопроса
@@ -515,10 +547,10 @@
               user_id: user.id,
               assignment_id: assignmentId,
               answers: answers,
-              is_completed: false // Пока не завершено
+              is_completed: false
             };
 
-            if (userProgress) {
+            if (userProgress && userProgress.id) {
               // Обновляем существующий прогресс
               const { error } = await supabase
                 .from('user_progress')
@@ -528,21 +560,16 @@
               if (error) throw error;
             } else {
               // Создаем новую запись прогресса
-              const { error } = await supabase
+              const { data, error } = await supabase
                 .from('user_progress')
-                .insert([progressData]);
+                .insert([progressData])
+                .select()
+                .single();
 
               if (error) throw error;
               
-              // Перезагружаем прогресс
-              const { data: newProgress } = await supabase
-                .from('user_progress')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('assignment_id', assignmentId)
-                .single();
-
-              userProgress = newProgress;
+              // Сохраняем новую запись прогресса
+              userProgress = data;
             }
 
           } catch (error) {
@@ -586,12 +613,15 @@
           }
         }
 
-        // Обработчик кнопки завершения
+        // Обработчик кнопки завершения - ИСПРАВЛЕННАЯ ВЕРСИЯ
         document.getElementById('completeBtn').addEventListener('click', async () => {
           try {
-            if (!userProgress) {
-              // Сначала сохраняем прогресс
-              await saveProgress();
+            // Сначала сохраняем текущий прогресс
+            await saveProgress();
+            
+            // Проверяем, что userProgress обновлен
+            if (!userProgress || !userProgress.id) {
+              throw new Error('Не удалось сохранить прогресс перед завершением');
             }
 
             const { error } = await supabase
