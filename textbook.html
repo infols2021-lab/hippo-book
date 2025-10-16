@@ -148,6 +148,15 @@
       margin-bottom: 20px;
     }
 
+    .locked-message {
+      background: #fff3cd;
+      border: 2px solid #ffeaa7;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
     .loading { 
       text-align: center; 
       padding: 40px; 
@@ -215,7 +224,12 @@
     <div id="errorMessage" class="error"></div>
 
     <div id="textbookContent" style="display: none;">
-      <div class="textbook-header" id="textbookHeader">
+      <div id="lockedMessage" class="locked-message" style="display: none;">
+        <h3>🔒 Учебник недоступен</h3>
+        <p>Для доступа к этому учебнику обратитесь к администратору.</p>
+      </div>
+
+      <div class="textbook-header" id="textbookHeader" style="display: none;">
         <div class="textbook-title" id="textbookTitle">Название учебника</div>
         <div class="textbook-description" id="textbookDescription">Описание учебника</div>
         <div class="progress-stats">
@@ -234,7 +248,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="assignmentsCard" style="display: none;">
         <h3>Задания учебника</h3>
         <p class="small-muted">Выполняйте задания в любом порядке. Прогресс сохраняется автоматически.</p>
         
@@ -285,6 +299,7 @@
         let textbook = null;
         let assignments = [];
         let userProgress = [];
+        let textbookAccess = null;
 
         async function loadTextbook() {
           try {
@@ -297,6 +312,23 @@
 
             if (textbookError) throw textbookError;
             textbook = textbookData;
+
+            // ПРОВЕРЯЕМ ДОСТУП К УЧЕБНИКУ
+            const { data: accessData, error: accessError } = await supabase
+              .from('textbook_access')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('textbook_id', textbookId)
+              .single();
+
+            textbookAccess = accessData;
+
+            // Если учебник не доступен по умолчанию и нет доступа
+            if (!textbook.is_available && !textbookAccess) {
+              document.getElementById('lockedMessage').style.display = 'block';
+              showContent();
+              return;
+            }
 
             // Загружаем задания учебника
             const { data: assignmentsData, error: assignmentsError } = await supabase
@@ -339,6 +371,9 @@
           document.getElementById('completedCount').textContent = completedCount;
           document.getElementById('totalCount').textContent = totalCount;
           document.getElementById('progressPercent').textContent = progressPercent + '%';
+
+          document.getElementById('textbookHeader').style.display = 'block';
+          document.getElementById('assignmentsCard').style.display = 'block';
         }
 
         function renderAssignments() {
@@ -360,7 +395,7 @@
             const isCompleted = progress ? progress.is_completed : false;
             
             const assignmentData = assignment.content || {};
-            const assignmentType = assignmentData.type || 'test';
+            const assignmentType = assignmentData.questions?.[0]?.type || 'test';
             
             let typeIcon = '📝';
             let typeLabel = 'Тест';
