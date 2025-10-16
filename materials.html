@@ -60,6 +60,7 @@
       transition: transform 0.3s ease, box-shadow 0.3s ease;
       cursor: pointer;
       border: 2px solid transparent;
+      position: relative;
     }
     
     .material-card:hover {
@@ -137,7 +138,6 @@
     }
     
     .material-card.locked {
-      position: relative;
       cursor: not-allowed;
     }
     
@@ -269,6 +269,7 @@
         let textbooks = [];
         let crosswords = [];
         let userProgress = [];
+        let textbookAccess = [];
         let crosswordAccess = [];
 
         // Загружаем данные
@@ -303,14 +304,23 @@
             if (progressError) throw progressError;
             userProgress = progressData || [];
 
+            // Загружаем доступ к учебникам
+            const { data: textbookAccessData, error: textbookAccessError } = await supabase
+              .from('textbook_access')
+              .select('*')
+              .eq('user_id', user.id);
+
+            if (textbookAccessError) throw textbookAccessError;
+            textbookAccess = textbookAccessData || [];
+
             // Загружаем доступ к кроссвордам
-            const { data: accessData, error: accessError } = await supabase
+            const { data: crosswordAccessData, error: crosswordAccessError } = await supabase
               .from('crossword_access')
               .select('*')
               .eq('user_id', user.id);
 
-            if (accessError) throw accessError;
-            crosswordAccess = accessData || [];
+            if (crosswordAccessError) throw crosswordAccessError;
+            crosswordAccess = crosswordAccessData || [];
 
             renderTextbooks();
             renderCrosswords();
@@ -326,17 +336,23 @@
           const grid = document.getElementById('textbooksGrid');
           grid.innerHTML = '';
 
-          if (textbooks.length === 0) {
+          // Фильтруем учебники по доступу
+          const availableTextbooks = textbooks.filter(textbook => 
+            // Учебник доступен если нет системы доступа или пользователь имеет доступ
+            textbookAccess.length === 0 || textbookAccess.some(access => access.textbook_id === textbook.id)
+          );
+
+          if (availableTextbooks.length === 0) {
             grid.innerHTML = `
               <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #666;">
-                <p>📚 Учебники пока не добавлены</p>
-                <p class="small-muted">Скоро здесь появятся учебные материалы</p>
+                <p>📚 Учебники пока не доступны</p>
+                <p class="small-muted">Ожидайте, когда администратор предоставит доступ</p>
               </div>
             `;
             return;
           }
 
-          textbooks.forEach(textbook => {
+          availableTextbooks.forEach(textbook => {
             // Считаем прогресс для учебника
             const textbookAssignments = userProgress.filter(up => {
               const assignment = assignments.find(a => a.id === up.assignment_id);
@@ -349,11 +365,22 @@
 
             const card = document.createElement('div');
             card.className = 'material-card';
+            
+            // Проверяем доступ
+            const hasAccess = textbookAccess.length === 0 || textbookAccess.some(access => access.textbook_id === textbook.id);
+            
+            if (!hasAccess) {
+              card.classList.add('locked');
+            }
+            
             card.onclick = () => {
-              window.location.href = `/textbook.html?id=${textbook.id}`;
+              if (hasAccess) {
+                window.location.href = `/textbook.html?id=${textbook.id}`;
+              }
             };
 
             card.innerHTML = `
+              ${!hasAccess ? '<div class="locked-overlay">🔒 Недоступно</div>' : ''}
               <div class="material-cover">
                 ${textbook.cover_image_url ? 
                   `<img src="${textbook.cover_image_url}" alt="${textbook.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">` : 
@@ -406,20 +433,20 @@
 
             const card = document.createElement('div');
             card.className = 'material-card';
-            if (!crossword.is_available && !crosswordAccess.some(access => access.crossword_id === crossword.id)) {
+            const hasAccess = crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id);
+            
+            if (!hasAccess) {
               card.classList.add('locked');
             }
             
             card.onclick = () => {
-              if (crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id)) {
+              if (hasAccess) {
                 window.location.href = `/crossword.html?id=${crossword.id}`;
               }
             };
 
             card.innerHTML = `
-              ${!crossword.is_available && !crosswordAccess.some(access => access.crossword_id === crossword.id) ? 
-                '<div class="locked-overlay">🔒 Недоступно</div>' : ''
-              }
+              ${!hasAccess ? '<div class="locked-overlay">🔒 Недоступно</div>' : ''}
               <div class="material-cover">
                 ${crossword.cover_image_url ? 
                   `<img src="${crossword.cover_image_url}" alt="${crossword.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">` : 
