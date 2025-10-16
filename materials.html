@@ -1,620 +1,298 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Материалы — Edu Keys</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="css/style.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="css/style.css" />
   <style>
-    .materials-container {
-      width: 95%;
-      max-width: 1200px;
-      margin: 20px auto;
+    :root{
+      --card:white; --muted:#6b7280; --shadow:0 8px 26px rgba(0,0,0,.08);
+      --accent:#667eea; --accent2:#4ecdc4; --ring:rgba(78,205,196,.2);
+      --bg1:#f7f7fb;
     }
-    
-    .materials-tabs {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-      border-bottom: 2px solid #f0f0f0;
-      flex-wrap: wrap;
+    body{background: #f5f7fb;}
+    .materials-container{width:95%;max-width:1200px;margin:20px auto;}
+    .header{
+      display:flex;align-items:center;justify-content:space-between;
+      background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);
+      gap:10px;flex-wrap:wrap;
     }
-    
-    .material-tab {
-      padding: 12px 24px;
-      background: none;
-      border: none;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      border-radius: 8px 8px 0 0;
-      transition: all 0.3s ease;
-      color: #666;
+    .header h1{margin:0;font-size:1.4rem}
+    .header .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .grid{
+      margin-top:16px;
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;
     }
-    
-    .material-tab.active {
-      background: var(--accent2);
-      color: white;
+    .card{
+      background:var(--card);border-radius:16px;overflow:hidden;box-shadow:var(--shadow);
+      transition:transform .15s ease, box-shadow .15s ease; cursor:pointer; display:flex; flex-direction:column;
     }
-    
-    .materials-section {
-      display: none;
+    .card:hover{transform:translateY(-2px); box-shadow:0 12px 28px rgba(0,0,0,.12);}
+    .cover{
+      position:relative;background:#eef2ff;aspect-ratio:16/9;display:block;overflow:hidden;
     }
-    
-    .materials-section.active {
-      display: block;
+    .cover img{
+      width:100%;height:100%;object-fit:cover;display:block;
+      background:linear-gradient(135deg,#667eea22,#764ba222);
     }
-    
-    .materials-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 20px;
-      margin-top: 20px;
+    .cover .badge{
+      position:absolute;left:10px;top:10px;background:#0009;color:#fff;
+      padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px;backdrop-filter: blur(6px);
     }
-    
-    .material-card {
-      background: white;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-      cursor: pointer;
-      border: 2px solid transparent;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      min-height: 280px;
+    .content{padding:14px;display:flex;flex-direction:column;gap:6px}
+    .title{font-weight:800;color:#111827}
+    .desc{color:var(--muted);font-size:14px;height:40px;overflow:hidden}
+    .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+    .chip{background:var(--bg1);color:#374151;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700}
+    .searchbar{display:flex;gap:8px;width:100%}
+    .searchbar input{
+      flex:1;padding:10px 12px;border-radius:12px;border:2px solid #eef;outline:none;
+      font-size:14px;transition:border-color .2s;
     }
-    
-    .material-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-      border-color: var(--accent2);
-    }
-    
-    .material-cover {
-      width: 100%;
-      height: 160px;
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      border-radius: 8px;
-      margin-bottom: 15px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 48px;
-      font-weight: bold;
-      position: relative;
-      overflow: hidden;
-      user-select: none;
-    }
-
-    .material-cover img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-    
-    .material-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 8px;
-      color: #333;
-    }
-    
-    .material-description {
-      color: #666;
-      font-size: 14px;
-      margin-bottom: 12px;
-      line-height: 1.4;
-      min-height: 40px;
-    }
-    
-    .material-stats {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: #888;
-      margin-top: auto;
-    }
-    
-    .progress-bar {
-      width: 100%;
-      height: 6px;
-      background: #f0f0f0;
-      border-radius: 3px;
-      margin: 8px 0;
-      overflow: hidden;
-    }
-    
-    .progress-fill {
-      height: 100%;
-      background: var(--accent2);
-      border-radius: 3px;
-      transition: width 0.3s ease;
-    }
-    
-    .locked-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: 700;
-      font-size: 16px;
-    }
-    
-    .material-card.locked {
-      cursor: not-allowed;
-    }
-    
-    .material-card.locked:hover {
-      transform: none;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      border-color: transparent;
-    }
-
-    .loading { 
-      text-align: center; 
-      padding: 40px; 
-      display: none;
-    }
-    .spinner { 
-      border: 4px solid #f3f3f3; 
-      border-top: 4px solid var(--accent2); 
-      border-radius: 50%; 
-      width: 40px; 
-      height: 40px; 
-      animation: spin 2s linear infinite; 
-      margin: 0 auto 20px; 
-    }
-    @keyframes spin { 
-      0% { transform: rotate(0deg); } 
-      100% { transform: rotate(360deg); } 
-    }
-    .error { 
-      background: #ffebee; 
-      color: #c62828; 
-      padding: 20px; 
-      border-radius: 8px; 
-      margin: 20px; 
-      text-align: center; 
-      display: none; 
-    }
-
-    @media (max-width: 768px) {
-      .materials-grid {
-        grid-template-columns: 1fr;
-        gap: 15px;
-      }
-      
-      .material-tab {
-        padding: 10px 16px;
-        font-size: 14px;
-      }
-      
-      .materials-container {
-        width: 100%;
-        padding: 0 10px;
-      }
-    }
+    .searchbar input:focus{border-color:var(--accent2); box-shadow:0 0 0 6px var(--ring)}
+    .tabs{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+    .tab{padding:8px 12px;background:var(--card);border-radius:999px;box-shadow:var(--shadow);cursor:pointer;font-weight:700}
+    .tab.active{background:var(--accent2);color:white}
+    .section{display:none}
+    .section.active{display:block}
+    .loading{ text-align:center; padding:40px; }
+    .spinner{ border:4px solid #f3f3f3;border-top:4px solid var(--accent2);border-radius:50%;width:40px;height:40px;animation:spin 1.2s linear infinite;margin:0 auto 12px;}
+    @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+    .error{ background:#ffebee;color:#c62828;padding:16px;border-radius:12px;margin-top:16px;display:none }
+    .empty{padding:40px;text-align:center;color:#6b7280}
+    .tiny{font-size:12px;color:#6b7280}
+    .btn{padding:10px 12px;border-radius:12px;border:none;background:var(--accent2);color:#fff;font-weight:700;cursor:pointer}
+    .btn.secondary{background:#e5e7eb;color:#111}
   </style>
-  
-  <!-- ВАЖНО: правильное имя файла -->
   <script src="/load-config.js"></script>
 </head>
 <body>
   <div class="materials-container">
     <div class="header">
-      <div class="logo">
-        <div class="mark">EK</div>
-        <div>
-          <h3>Учебные материалы</h3>
-          <div class="small-muted">Выбирайте учебники и кроссворды</div>
+      <h1>Материалы</h1>
+      <div class="actions">
+        <div class="searchbar">
+          <input id="searchInput" placeholder="Поиск по названию или описанию…" />
         </div>
-      </div>
-      <div class="nav">
-        <button class="btn" onclick="location.href='/profile.html'">Профиль</button>
-        <button class="btn secondary" id="logoutBtn">Выйти</button>
+        <button class="btn secondary" id="toProfile">👤 Профиль</button>
+        <button class="btn secondary" id="toAdmin" style="display:none">⚙️ Админ</button>
+        <button class="btn" id="logoutBtn">🚪 Выйти</button>
       </div>
     </div>
 
-    <div class="materials-tabs">
-      <button class="material-tab active" data-tab="textbooks">📚 Учебники</button>
-      <button class="material-tab" data-tab="crosswords">🧩 Кроссворды</button>
+    <div class="tabs">
+      <div class="tab active" data-tab="textbooks">📚 Учебники</div>
+      <div class="tab" data-tab="crosswords">🧩 Кроссворды</div>
     </div>
+
+    <div id="errorBox" class="error"></div>
 
     <div id="loading" class="loading">
       <div class="spinner"></div>
-      <p>Загружаем материалы...</p>
-    </div>
-    
-    <div id="errorMessage" class="error"></div>
-
-    <div class="materials-section active" id="textbooks-section">
-      <h3>Доступные учебники</h3>
-      <p class="small-muted">Выберите учебник для изучения материалов и выполнения заданий</p>
-      <div class="materials-grid" id="textbooksGrid"></div>
+      <div>Загружаем материалы…</div>
     </div>
 
-    <div class="materials-section" id="crosswords-section">
-      <h3>Доступные кроссворды</h3>
-      <p class="small-muted">Разгадывайте кроссворды для закрепления знаний</p>
-      <div class="materials-grid" id="crosswordsGrid"></div>
+    <div id="textbooksSection" class="section active">
+      <div id="textbooksGrid" class="grid"></div>
+      <div id="textbooksEmpty" class="empty" style="display:none">Пока нет доступных учебников</div>
     </div>
+
+    <div id="crosswordsSection" class="section">
+      <div id="crosswordsGrid" class="grid"></div>
+      <div id="crosswordsEmpty" class="empty" style="display:none">Пока нет доступных кроссвордов</div>
+    </div>
+
+    <div class="tiny" style="margin-top:16px">Подсказка: если обложки не видны — проверь, что в Storage бакеты <b>covers</b> (или <b>backgrounds</b>) публичные.</div>
   </div>
 
   <script type="module">
-    // ===== Хелперы для корректной загрузки картинок из Supabase Storage =====
-    function isHttpUrl(v) {
-      return typeof v === 'string' && /^https?:\/\//i.test(v);
-    }
+    // UI helpers
+    const E = (id)=>document.getElementById(id);
+    const errorBox = E('errorBox');
+    const showError = (msg)=>{ errorBox.textContent = msg; errorBox.style.display='block'; };
+    const clearError=()=>{ errorBox.style.display='none'; errorBox.textContent=''; };
 
-    /**
-     * Универсальный резолвер URL обложки.
-     * Поддерживает:
-     *  - Полный URL (оставляем как есть)
-     *  - Относительный ключ в бакете (строим публичный URL)
-     *  - Пустые значения (возвращаем null)
-     * @param {string|null} value - что хранится в БД (url или ключ)
-     * @param {string} bucket - имя бакета в Supabase Storage
-     * @returns {string|null}
-     */
-    function resolvePublicUrl(value, bucket) {
-      if (!value) return null;
-      if (isHttpUrl(value)) return value;
+    // Tabs
+    document.querySelectorAll('.tab').forEach(t=>{
+      t.addEventListener('click',()=>{
+        document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+        t.classList.add('active');
+        const tab = t.dataset.tab;
+        document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+        (tab==='textbooks'?E('textbooksSection'):E('crosswordsSection')).classList.add('active');
+      });
+    });
 
-      // Убираем ведущие слеши и известные префиксы для аккуратности
-      const key = String(value).replace(/^\/+/, '').replace(/^storage\/v1\/object\/public\/[^/]+\//,'');
-      // timestamp для обхода жёсткого кэша CDN
-      const v = Date.now();
-      return `${window.SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(key)}?v=${v}`;
-    }
+    // Navigation
+    E('toProfile').onclick=()=>location.href='/profile.html';
+    E('toAdmin').onclick=()=>location.href='/admin.html';
 
-    // Аккуратное отображение ошибок/контента
-    function showError(message) {
-      document.getElementById('errorMessage').textContent = message;
-      document.getElementById('errorMessage').style.display = 'block';
-      document.getElementById('loading').style.display = 'none';
-    }
-    
-    function showContent() {
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('errorMessage').style.display = 'none';
-    }
-
-    document.getElementById('loading').style.display = 'block';
+    // Start
+    E('loading').style.display='block';
 
     async function initApp() {
-      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      if(!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY){
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
-        return false;
+        E('loading').style.display='none';
+        return;
       }
-      
-      try {
+      try{
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
         const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-        
+
+        // Auth
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          window.location.href = '/login.html';
-          return;
-        }
+        if(!user){ location.href='/login.html'; return; }
 
-        let textbooks = [];
-        let crosswords = [];
-        let userProgress = [];
-        let textbookAccess = [];
-        let crosswordAccess = [];
-        let assignments = [];
+        // Show admin button if user is admin
+        const { data: profile } = await supabase
+          .from('profiles').select('is_admin').eq('id', user.id).single();
+        if(profile?.is_admin) E('toAdmin').style.display='inline-block';
 
-        // ====== загрузка данных ======
-        async function loadMaterials() {
-          try {
-            // Учебники
-            const { data: textbooksData, error: textbooksError } = await supabase
-              .from('textbooks')
-              .select('*')
-              .eq('is_active', true)
-              .order('order_index');
+        // Load both lists with access rules
+        await Promise.all([
+          loadTextbooks(supabase, user),
+          loadCrosswords(supabase, user)
+        ]);
 
-            if (textbooksError) throw textbooksError;
-            textbooks = textbooksData || [];
-
-            // Кроссворды
-            const { data: crosswordsData, error: crosswordsError } = await supabase
-              .from('crosswords')
-              .select('*')
-              .eq('is_active', true)
-              .order('order_index');
-
-            if (crosswordsError) throw crosswordsError;
-            crosswords = crosswordsData || [];
-
-            // Все задания (для расчёта прогресса)
-            const { data: assignmentsData, error: assignmentsError } = await supabase
-              .from('assignments')
-              .select('*');
-
-            if (assignmentsError) throw assignmentsError;
-            assignments = assignmentsData || [];
-
-            // Прогресс пользователя
-            const { data: progressData, error: progressError } = await supabase
-              .from('user_progress')
-              .select('assignment_id,is_completed')
-              .eq('user_id', user.id);
-
-            if (progressError) throw progressError;
-            userProgress = progressData || [];
-
-            // Доступы
-            const { data: textbookAccessData, error: textbookAccessError } = await supabase
-              .from('textbook_access')
-              .select('textbook_id')
-              .eq('user_id', user.id);
-
-            if (textbookAccessError) throw textbookAccessError;
-            textbookAccess = textbookAccessData || [];
-
-            const { data: crosswordAccessData, error: crosswordAccessError } = await supabase
-              .from('crossword_access')
-              .select('crossword_id')
-              .eq('user_id', user.id);
-
-            if (crosswordAccessError) throw crosswordAccessError;
-            crosswordAccess = crosswordAccessData || [];
-
-            renderTextbooks();
-            renderCrosswords();
-            showContent();
-
-          } catch (error) {
-            console.error('Ошибка загрузки материалов:', error);
-            showError('❌ Ошибка загрузки материалов: ' + error.message);
-          }
-        }
-
-        // ====== отрисовка карточек с устойчивой загрузкой картинок ======
-        function imgElementForCover(rawValue, bucket, fallbackEmoji) {
-          const wrapper = document.createElement('div');
-          wrapper.className = 'material-cover';
-          wrapper.textContent = fallbackEmoji;
-
-          const url = resolvePublicUrl(rawValue, bucket);
-          if (!url) {
-            return wrapper; // оставляем эмодзи
-          }
-
-          const img = document.createElement('img');
-          img.loading = 'lazy';
-          img.alt = 'Обложка';
-          img.decoding = 'async';
-          img.src = url;
-
-          let replaced = false;
-
-          img.onload = () => {
-            if (replaced) return;
-            wrapper.textContent = '';
-            wrapper.appendChild(img);
-            replaced = true;
-          };
-
-          img.onerror = () => {
-            // если не загрузилось, показываем эмодзи (уже есть) и лог
-            console.warn('Не удалось загрузить изображение обложки:', url);
-          };
-
-          return wrapper;
-        }
-
-        function renderTextbooks() {
-          const grid = document.getElementById('textbooksGrid');
-          grid.innerHTML = '';
-
-          // Учебник доступен либо публично (is_available), либо по выдаче доступа
-          const availableTextbooks = textbooks.filter(textbook =>
-            textbook.is_available || textbookAccess.some(a => a.textbook_id === textbook.id)
-          );
-
-          if (availableTextbooks.length === 0) {
-            grid.innerHTML = `
-              <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #666;">
-                <p>📚 Учебники пока недоступны</p>
-                <p class="small-muted">Ожидайте, когда администратор предоставит доступ</p>
-              </div>
-            `;
-            return;
-          }
-
-          availableTextbooks.forEach(textbook => {
-            // Считаем прогресс по учебнику
-            const tAssignments = assignments.filter(a => a.textbook_id === textbook.id);
-            const completed = userProgress.filter(up => up.is_completed && tAssignments.some(a => a.id === up.assignment_id)).length;
-            const total = tAssignments.length;
-            const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-            const card = document.createElement('div');
-            card.className = 'material-card';
-            card.onclick = () => {
-              window.location.href = `/textbook.html?id=${textbook.id}`;
-            };
-
-            const cover = imgElementForCover(
-              // поддерживаем и полный URL, и ключ: если у тебя хранится только имя файла — ОК
-              textbook.cover_image_url,
-              // название бакета — можешь использовать одно из:
-              // 'covers', 'textbook-covers' — оставляю общий 'covers'
-              'covers',
-              '📚'
-            );
-
-            const title = document.createElement('div');
-            title.className = 'material-title';
-            title.textContent = textbook.title;
-
-            const desc = document.createElement('div');
-            desc.className = 'material-description';
-            desc.textContent = textbook.description || 'Учебные материалы и задания';
-
-            const pbar = document.createElement('div');
-            pbar.className = 'progress-bar';
-            pbar.innerHTML = `<div class="progress-fill" style="width:${progress}%"></div>`;
-
-            const stats = document.createElement('div');
-            stats.className = 'material-stats';
-            stats.innerHTML = `<span>${completed}/${total} заданий</span><span>${progress}%</span>`;
-
-            card.appendChild(cover);
-            card.appendChild(title);
-            card.appendChild(desc);
-            card.appendChild(pbar);
-            card.appendChild(stats);
-
-            grid.appendChild(card);
-          });
-
-          // Показать заблокированные (для инфо)
-          const locked = textbooks.filter(t => !t.is_available && !textbookAccess.some(a => a.textbook_id === t.id));
-          locked.forEach(textbook => {
-            const card = document.createElement('div');
-            card.className = 'material-card locked';
-
-            const cover = imgElementForCover(textbook.cover_image_url, 'covers', '📚');
-            cover.style.filter = 'grayscale(100%)';
-            cover.style.opacity = '0.6';
-
-            card.appendChild(cover);
-            card.innerHTML += `
-              <div class="material-title" style="color:#999">${textbook.title}</div>
-              <div class="material-description" style="color:#999">${textbook.description || 'Учебные материалы и задания'}</div>
-              <div class="locked-overlay">🔒 Недоступен</div>
-            `;
-
-            grid.appendChild(card);
-          });
-        }
-
-        function renderCrosswords() {
-          const grid = document.getElementById('crosswordsGrid');
-          grid.innerHTML = '';
-
-          const availableCrosswords = crosswords.filter(c =>
-            c.is_available || crosswordAccess.some(a => a.crossword_id === c.id)
-          );
-
-          if (availableCrosswords.length === 0) {
-            grid.innerHTML = `
-              <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #666;">
-                <p>🧩 Кроссворды пока недоступны</p>
-                <p class="small-muted">Ожидайте, когда администратор предоставит доступ</p>
-              </div>
-            `;
-            return;
-          }
-
-          availableCrosswords.forEach(crossword => {
-            const cAssignments = assignments.filter(a => a.crossword_id === crossword.id);
-            const completed = userProgress.filter(up => up.is_completed && cAssignments.some(a => a.id === up.assignment_id)).length;
-            const total = cAssignments.length;
-            const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-            const card = document.createElement('div');
-            card.className = 'material-card';
-            card.onclick = () => {
-              window.location.href = `/crossword.html?id=${crossword.id}`;
-            };
-
-            const cover = imgElementForCover(
-              crossword.cover_image_url,
-              // общий бакет для обложек
-              'covers',
-              '🧩'
-            );
-
-            const title = document.createElement('div');
-            title.className = 'material-title';
-            title.textContent = crossword.title;
-
-            const desc = document.createElement('div');
-            desc.className = 'material-description';
-            desc.textContent = crossword.description || 'Разгадайте кроссворд';
-
-            const pbar = document.createElement('div');
-            pbar.className = 'progress-bar';
-            pbar.innerHTML = `<div class="progress-fill" style="width:${progress}%"></div>`;
-
-            const stats = document.createElement('div');
-            stats.className = 'material-stats';
-            stats.innerHTML = `<span>${completed}/${total} слов</span><span>${progress}%</span>`;
-
-            card.appendChild(cover);
-            card.appendChild(title);
-            card.appendChild(desc);
-            card.appendChild(pbar);
-            card.appendChild(stats);
-
-            grid.appendChild(card);
-          });
-
-          // Показать заблокированные
-          const locked = crosswords.filter(c => !c.is_available && !crosswordAccess.some(a => a.crossword_id === c.id));
-          locked.forEach(crossword => {
-            const card = document.createElement('div');
-            card.className = 'material-card locked';
-
-            const cover = imgElementForCover(crossword.cover_image_url, 'covers', '🧩');
-            cover.style.filter = 'grayscale(100%)';
-            cover.style.opacity = '0.6';
-
-            card.appendChild(cover);
-            card.innerHTML += `
-              <div class="material-title" style="color:#999">${crossword.title}</div>
-              <div class="material-description" style="color:#999">${crossword.description || 'Разгадайте кроссворд'}</div>
-              <div class="locked-overlay">🔒 Недоступен</div>
-            `;
-
-            grid.appendChild(card);
-          });
-        }
-
-        // ===== вкладки =====
-        document.querySelectorAll('.material-tab').forEach(tab => {
-          tab.addEventListener('click', () => {
-            const tabName = tab.getAttribute('data-tab');
-            document.querySelectorAll('.material-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.materials-section').forEach(s => s.classList.remove('active'));
-            tab.classList.add('active');
-            document.getElementById(`${tabName}-section`).classList.add('active');
-          });
+        // Search
+        E('searchInput').addEventListener('input', ()=>{
+          filterCards(E('searchInput').value.trim().toLowerCase());
         });
 
-        // Выход
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-          if (confirm('Вы уверены, что хотите выйти?')) {
-            await supabase.auth.signOut();
-            window.location.href = '/login.html';
-          }
-        });
+        // Logout
+        E('logoutBtn').onclick= async ()=>{
+          await supabase.auth.signOut();
+          location.href='/login.html';
+        };
 
-        await loadMaterials();
-        return true;
-        
-      } catch (error) {
-        showError('❌ Ошибка инициализации: ' + error.message);
-        return false;
+      }catch(err){
+        console.error(err);
+        showError('❌ Ошибка инициализации: ' + err.message);
+      }finally{
+        E('loading').style.display='none';
       }
     }
-    
-    if (window.SUPABASE_URL) {
-      initApp();
-    } else {
+
+    function filterCards(query){
+      const cards = document.querySelectorAll('.card[data-search]');
+      cards.forEach(c=>{
+        const match = c.dataset.search.includes(query);
+        c.style.display = match ? '' : 'none';
+      });
+    }
+
+    function cardHTML({id,title,description,cover,items,isAvailable,type}){
+      const safeDesc = (description||'').trim();
+      const searchData = [title||'', safeDesc].join(' ').toLowerCase();
+      const href = type==='textbook'
+        ? `/textbook.html?id=${id}`
+        : `/crossword.html?id=${id}`;
+      // показываем заглушку, если нет cover
+      const coverTag = cover
+        ? `<img src="${cover}" alt="">`
+        : `<img alt="" src="data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 450'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23667eea22'/><stop offset='1' stop-color='%23764ba222'/></linearGradient></defs><rect width='800' height='450' fill='url(%23g)'/><g fill='%23667eea' opacity='.6'><circle cx='120' cy='120' r='40'/><circle cx='720' cy='340' r='60'/></g></svg>`)}">`;
+
+      return `
+        <a class="card" href="${href}" data-search="${searchData}">
+          <div class="cover">
+            ${coverTag}
+            <span class="badge">${isAvailable ? '🌍 Для всех' : '🔒 По доступу'}</span>
+          </div>
+          <div class="content">
+            <div class="title">${title||'Без названия'}</div>
+            <div class="desc">${safeDesc || '—'}</div>
+            <div class="meta">
+              <div class="chip">📝 ${items ?? 0} заданий</div>
+              ${type==='textbook' ? '<div class="chip">📚 Учебник</div>' : '<div class="chip">🧩 Кроссворд</div>'}
+            </div>
+          </div>
+        </a>
+      `;
+    }
+
+    async function loadTextbooks(supabase, user){
+      clearError();
+      const grid = E('textbooksGrid');
+      grid.innerHTML = '';
+      E('textbooksEmpty').style.display='none';
+
+      // доступные всем ИЛИ выданные пользователю
+      const [{ data: allTextbooks, error: tErr }, { data: tAccess }] = await Promise.all([
+        supabase.from('textbooks').select('id,title,description,cover_image_url,is_available').eq('is_active', true).order('order_index'),
+        supabase.from('textbook_access').select('textbook_id').eq('user_id', user.id)
+      ]);
+      if(tErr){ showError('Ошибка загрузки учебников: '+tErr.message); return; }
+
+      const allowedIds = new Set([...(tAccess?.map(a=>a.textbook_id)||[])]);
+      const list = (allTextbooks||[]).filter(t => t.is_available || allowedIds.has(t.id));
+
+      // получить количество заданий
+      const ids = list.map(x=>x.id);
+      let countBy = {};
+      if(ids.length){
+        const { data: ass } = await supabase
+          .from('assignments').select('id,textbook_id').in('textbook_id', ids);
+        (ass||[]).forEach(a=>{
+          countBy[a.textbook_id] = (countBy[a.textbook_id]||0)+1;
+        });
+      }
+
+      if(!list.length){ E('textbooksEmpty').style.display='block'; return; }
+
+      grid.innerHTML = list.map(t => cardHTML({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        cover: t.cover_image_url || null,   // важное исправление: показываем cover_image_url как есть (публичный)
+        items: countBy[t.id]||0,
+        isAvailable: t.is_available,
+        type: 'textbook'
+      })).join('');
+    }
+
+    async function loadCrosswords(supabase, user){
+      clearError();
+      const grid = E('crosswordsGrid');
+      grid.innerHTML = '';
+      E('crosswordsEmpty').style.display='none';
+
+      const [{ data: allCross, error: cErr }, { data: cAccess }] = await Promise.all([
+        supabase.from('crosswords').select('id,title,description,cover_image_url,is_available').eq('is_active', true).order('order_index'),
+        supabase.from('crossword_access').select('crossword_id').eq('user_id', user.id)
+      ]);
+      if(cErr){ showError('Ошибка загрузки кроссвордов: '+cErr.message); return; }
+
+      const allowedIds = new Set([...(cAccess?.map(a=>a.crossword_id)||[])]);
+      const list = (allCross||[]).filter(x => x.is_available || allowedIds.has(x.id));
+
+      // количество заданий
+      const ids = list.map(x=>x.id);
+      let countBy = {};
+      if(ids.length){
+        const { data: ass } = await supabase
+          .from('assignments').select('id,crossword_id').in('crossword_id', ids);
+        (ass||[]).forEach(a=>{
+          countBy[a.crossword_id] = (countBy[a.crossword_id]||0)+1;
+        });
+      }
+
+      if(!list.length){ E('crosswordsEmpty').style.display='block'; return; }
+
+      grid.innerHTML = list.map(x => cardHTML({
+        id: x.id,
+        title: x.title,
+        description: x.description,
+        cover: x.cover_image_url || null,  // важное исправление
+        items: countBy[x.id]||0,
+        isAvailable: x.is_available,
+        type: 'crossword'
+      })).join('');
+    }
+
+    if(window.SUPABASE_URL){ initApp(); }
+    else{
       window.addEventListener('configLoaded', initApp);
     }
   </script>
