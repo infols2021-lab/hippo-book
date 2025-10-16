@@ -1,697 +1,634 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Задание — Edu Keys</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="css/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="css/style.css" />
   <style>
-    .assignment-container {
+    .page {
       width: 95%;
-      max-width: 800px;
+      max-width: 1000px;
       margin: 20px auto;
     }
-    
-    .assignment-header {
-      margin-bottom: 20px;
+
+    .header-crumbs {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
     }
-    
-    .assignment-title {
-      font-size: 1.5rem;
+
+    .crumbs {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .title-card {
+      background: linear-gradient(135deg, #42a5f5, #26c6da);
+      color: #fff;
+      padding: 18px 20px;
+      border-radius: 14px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    }
+
+    .title-card h2 {
+      margin: 0 0 6px 0;
+      font-size: 1.6rem;
+    }
+
+    .meta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      opacity: .95;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,.18);
+      border: 1px solid rgba(255,255,255,.28);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      backdrop-filter: blur(2px);
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.08);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      display: none;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--accent2);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 2s linear infinite;
+      margin: 0 auto 18px;
+    }
+    @keyframes spin { 0% { transform: rotate(0) } 100% { transform: rotate(360deg) } }
+
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      padding: 16px;
+      border-radius: 8px;
+      display: none;
+      margin-bottom: 12px;
+      border: 1px solid #ffcdd2;
+    }
+
+    .success {
+      background: #e8f5e8;
+      color: #2e7d32;
+      padding: 14px;
+      border-radius: 8px;
+      display: none;
+      margin-bottom: 12px;
+      border: 1px solid #c8e6c9;
+    }
+
+    .question {
+      display: grid;
+      gap: 12px;
+    }
+
+    .q-title {
       font-weight: 700;
-      margin-bottom: 10px;
+      font-size: 1.05rem;
       color: #333;
     }
-    
-    .assignment-content {
-      background: white;
-      border-radius: 12px;
-      padding: 25px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      margin-bottom: 20px;
+
+    .q-image {
+      width: 100%;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #fafafa;
+      border: 1px solid #eee;
     }
-    
-    .question {
-      margin-bottom: 25px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid #f0f0f0;
-    }
-    
-    .question:last-child {
-      border-bottom: none;
-      margin-bottom: 0;
-      padding-bottom: 0;
-    }
-    
-    .question-text {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 15px;
-      line-height: 1.5;
-    }
-    
-    .question-image {
-      max-width: 100%;
-      max-height: 300px;
-      border-radius: 8px;
-      margin-bottom: 15px;
-      display: block;
-    }
-    
-    .question-image-container {
-      text-align: center;
-      margin: 15px 0;
-    }
-    
-    /* Стили для тестовых вопросов */
-    .options {
-      display: flex;
-      flex-direction: column;
+    .q-image img { width: 100%; height: auto; display: block; }
+
+    .choices {
+      display: grid;
       gap: 10px;
     }
-    
-    .option {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px;
+
+    .choice {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 10px;
+      align-items: flex-start;
       border: 2px solid #f0f0f0;
-      border-radius: 8px;
+      border-radius: 10px;
+      padding: 10px 12px;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: border-color .2s, box-shadow .2s, transform .02s;
+      background: #fff;
     }
-    
-    .option:hover {
-      border-color: var(--accent2);
-      background: #f8fffe;
-    }
-    
-    .option.selected {
-      border-color: var(--accent2);
-      background: #f0fffd;
-    }
-    
-    .option input[type="radio"] {
-      margin: 0;
-    }
-    
-    /* Стили для ввода ответа */
-    .fill-input {
-      padding: 12px 15px;
-      border: 2px solid #f0f0f0;
-      border-radius: 8px;
-      font-size: 16px;
+
+    .choice:hover { border-color: var(--accent2); box-shadow: 0 6px 16px rgba(0,0,0,.05); }
+    .choice input { margin-top: 3px; }
+
+    .choice .content { display: grid; gap: 8px; }
+    .choice .content .text { color: #333; }
+
+    .choice .thumb { border-radius: 8px; overflow: hidden; border: 1px solid #eee; }
+    .choice .thumb img { width: 100%; height: auto; display: block; }
+
+    .answer-input {
       width: 100%;
-      max-width: 400px;
-      transition: border-color 0.2s ease;
-    }
-    
-    .fill-input:focus {
-      border-color: var(--accent2);
-      outline: none;
-    }
-    
-    /* Стили для заполнения предложений */
-    .sentence-container {
-      background: #f8f9fa;
-      border-radius: 8px;
-      padding: 20px;
-      margin: 15px 0;
-    }
-    
-    .sentence-text {
+      padding: 12px 14px;
+      border: 2px solid #eee;
+      border-radius: 10px;
       font-size: 16px;
-      line-height: 1.6;
-      margin-bottom: 15px;
+      transition: border-color .2s;
     }
-    
-    .sentence-gap {
-      display: inline-block;
-      min-width: 120px;
-      margin: 0 5px;
-    }
-    
-    .sentence-input {
-      padding: 8px 12px;
-      border: 2px solid #ddd;
-      border-radius: 6px;
-      font-size: 14px;
-      width: 100%;
-      text-align: center;
-    }
-    
-    .sentence-input:focus {
-      border-color: var(--accent2);
-      outline: none;
-    }
-    
+    .answer-input:focus { outline: none; border-color: var(--accent2); }
+
     .actions {
       display: flex;
       gap: 10px;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      margin-top: 25px;
-      flex-wrap: wrap;
+      margin-top: 12px;
     }
-    
-    .completion-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+
+    .btn.primary { background: var(--accent2); color: #fff; }
+    .btn.secondary { background: #eceff1; color: #37474f; }
+    .btn {
+      border: 0;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .15s, opacity .15s;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+    .btn:disabled { opacity: .6; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .result {
+      margin-top: 10px;
       font-weight: 600;
     }
-    
-    .status-completed {
-      color: var(--accent2);
-    }
-    
-    .status-pending {
-      color: #ffa726;
-    }
-    
-    .back-button {
-      margin-bottom: 20px;
-    }
 
-    .loading { 
-      text-align: center; 
-      padding: 40px; 
-      display: none;
-    }
-    .spinner { 
-      border: 4px solid #f3f3f3; 
-      border-top: 4px solid var(--accent2); 
-      border-radius: 50%; 
-      width: 40px; 
-      height: 40px; 
-      animation: spin 2s linear infinite; 
-      margin: 0 auto 20px; 
-    }
-    @keyframes spin { 
-      0% { transform: rotate(0deg); } 
-      100% { transform: rotate(360deg); } 
-    }
-    .error { 
-      background: #ffebee; 
-      color: #c62828; 
-      padding: 20px; 
-      border-radius: 8px; 
-      margin: 20px; 
-      text-align: center; 
-      display: none; 
-    }
+    .muted { color: #666; font-size: 13px; }
 
     @media (max-width: 768px) {
-      .assignment-container {
-        width: 100%;
-        padding: 0 10px;
-      }
-      
-      .assignment-content {
-        padding: 20px;
-      }
-      
-      .actions {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      
-      .btn {
-        width: 100%;
-      }
+      .title-card h2 { font-size: 1.3rem; }
     }
   </style>
-  
+
+  <!-- ВАЖНО: корректное имя файла конфигурации -->
   <script src="/load-config.js"></script>
 </head>
 <body>
-  <div class="assignment-container">
-    <div class="back-button">
-      <button class="btn secondary" id="backButton">← Назад</button>
+  <div class="page">
+    <div class="header-crumbs">
+      <div class="crumbs" id="crumbs">Задание</div>
+      <div>
+        <button class="btn secondary" id="backBtn">← Назад</button>
+      </div>
     </div>
 
     <div id="loading" class="loading">
       <div class="spinner"></div>
-      <p>Загружаем задание...</p>
+      <p>Загружаем задание…</p>
     </div>
-    
+
     <div id="errorMessage" class="error"></div>
+    <div id="successMessage" class="success"></div>
 
-    <div id="assignmentContent" style="display: none;">
-      <div class="assignment-header">
-        <div class="assignment-title" id="assignmentTitle">Название задания</div>
-        <div class="small-muted" id="assignmentSource">Источник задания</div>
+    <div id="content" style="display:none">
+      <div class="title-card">
+        <h2 id="assignmentTitle">Название задания</h2>
+        <div class="meta">
+          <span class="badge" id="typeBadge">📝 Тип: —</span>
+          <span class="badge" id="progressBadge">📊 Статус: —</span>
+        </div>
       </div>
 
-      <div class="assignment-content" id="questionsContainer">
-        <!-- Вопросы будут добавляться динамически -->
-      </div>
+      <div class="card">
+        <div class="question" id="questionBox">
+          <!-- Вопрос рендерится из JS -->
+        </div>
 
-      <div class="actions">
-        <div class="completion-status" id="completionStatus">
-          <span>⏳ Задание не выполнено</span>
+        <div class="actions">
+          <div class="muted" id="hint"></div>
+          <div>
+            <button class="btn secondary" id="skipBtn">Пропустить</button>
+            <button class="btn primary" id="submitBtn">Отправить</button>
+          </div>
         </div>
-        <div>
-          <button class="btn" id="completeBtn">✅ Завершить задание</button>
-        </div>
+
+        <div class="result" id="resultBox"></div>
       </div>
     </div>
   </div>
 
   <script type="module">
-    document.getElementById('loading').style.display = 'block';
-    
+    // ==================== ХЕЛПЕРЫ ДЛЯ КАРТИНОК (обложки/вопросы/варианты) ====================
+    function isHttpUrl(v) {
+      return typeof v === 'string' && /^https?:\/\//i.test(v);
+    }
+    function resolvePublicUrl(value, bucket) {
+      if (!value) return null;
+      if (isHttpUrl(value)) return value;
+      // приводим возможный путь формата "folder/file.png" к публичному URL
+      const key = String(value).replace(/^\/+/, '').replace(/^storage\/v1\/object\/public\/[^/]+\//,'');
+      const v = Date.now(); // для обхода кэша
+      return `${window.SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(key)}?v=${v}`;
+    }
+    function imgEl(url, alt='') {
+      const wrap = document.createElement('div');
+      wrap.className = 'thumb';
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.src = url;
+      img.alt = alt;
+      wrap.appendChild(img);
+      return wrap;
+    }
+
+    // ==================== UI ХЕЛПЕРЫ ====================
     function showError(message) {
-      document.getElementById('errorMessage').textContent = message;
-      document.getElementById('errorMessage').style.display = 'block';
+      const el = document.getElementById('errorMessage');
+      el.textContent = message;
+      el.style.display = 'block';
+      document.getElementById('successMessage').style.display = 'none';
       document.getElementById('loading').style.display = 'none';
     }
-    
-    function showContent() {
-      document.getElementById('assignmentContent').style.display = 'block';
+    function showSuccess(message) {
+      const el = document.getElementById('successMessage');
+      el.textContent = message;
+      el.style.display = 'block';
+      document.getElementById('errorMessage').style.display = 'none';
       document.getElementById('loading').style.display = 'none';
+    }
+    function hideBanners() {
+      document.getElementById('successMessage').style.display = 'none';
       document.getElementById('errorMessage').style.display = 'none';
     }
-    
-    async function initApp() {
+    function showContent() {
+      document.getElementById('content').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+      hideBanners();
+    }
+
+    document.getElementById('loading').style.display = 'block';
+
+    // ==================== ОСНОВНАЯ ЛОГИКА ====================
+    async function init() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
-        return false;
+        return;
       }
-      
+
+      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+      const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        location.href = '/login.html';
+        return;
+      }
+
+      const params = new URLSearchParams(location.search);
+      const assignmentId = params.get('id');
+      const source = params.get('source') || '';      // textbook | crossword | ''
+      const sourceId = params.get('sourceId') || '';  // id учебника/кроссворда
+
+      if (!assignmentId) {
+        showError('❌ Задание не указано.');
+        return;
+      }
+
+      // Кнопка "назад"
+      const backBtn = document.getElementById('backBtn');
+      backBtn.onclick = () => {
+        if (source === 'textbook' && sourceId) {
+          location.href = `/textbook.html?id=${sourceId}`;
+        } else if (source === 'crossword' && sourceId) {
+          location.href = `/crossword.html?id=${sourceId}`;
+        } else {
+          location.href = '/materials.html';
+        }
+      };
+
+      let assignment = null;
+      let already = null; // существующая строка прогресса
+
       try {
-        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-        const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-        
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          window.location.href = '/login.html';
-          return;
-        }
+        // 1) Получаем задание
+        const { data: aData, error: aErr } = await supabase
+          .from('assignments')
+          .select('*')
+          .eq('id', assignmentId)
+          .single();
+        if (aErr) throw aErr;
+        assignment = aData;
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const assignmentId = urlParams.get('id');
-        const source = urlParams.get('source'); // 'textbook' или 'crossword'
-        const sourceId = urlParams.get('sourceId');
-
-        if (!assignmentId) {
-          showError('❌ Задание не указано');
-          return;
-        }
-
-        let assignment = null;
-        let userProgress = null;
-        let sourceData = null;
-
-        // Обработчик кнопки "Назад"
-        document.getElementById('backButton').addEventListener('click', () => {
-          if (source && sourceId) {
-            window.location.href = `/${source}.html?id=${sourceId}`;
-          } else {
-            window.location.href = '/materials.html';
-          }
-        });
-
-        async function loadAssignment() {
-          try {
-            // Загружаем задание
-            const { data: assignmentData, error: assignmentError } = await supabase
-              .from('assignments')
-              .select('*')
-              .eq('id', assignmentId)
-              .single();
-
-            if (assignmentError) throw assignmentError;
-            assignment = assignmentData;
-
-            // Загружаем источник (учебник или кроссворд)
-            if (source === 'textbook' && sourceId) {
-              const { data: textbookData, error: textbookError } = await supabase
-                .from('textbooks')
-                .select('title')
-                .eq('id', sourceId)
-                .single();
-
-              if (!textbookError) sourceData = textbookData;
-            } else if (source === 'crossword' && sourceId) {
-              const { data: crosswordData, error: crosswordError } = await supabase
-                .from('crosswords')
-                .select('title')
-                .eq('id', sourceId)
-                .single();
-
-              if (!crosswordError) sourceData = crosswordData;
-            }
-
-            // Загружаем прогресс пользователя
-            const { data: progressData, error: progressError } = await supabase
-              .from('user_progress')
-              .select('*')
+        // 2) Проверяем доступ (если пришли напрямую по ссылке)
+        // — доступ к учебнику
+        if (assignment.textbook_id) {
+          // Если учебник закрыт — проверим явный доступ
+          const { data: tb } = await supabase.from('textbooks').select('id,is_available').eq('id', assignment.textbook_id).single();
+          if (tb && !tb.is_available) {
+            const { data: acc } = await supabase
+              .from('textbook_access')
+              .select('id')
               .eq('user_id', user.id)
-              .eq('assignment_id', assignmentId)
+              .eq('textbook_id', assignment.textbook_id)
               .maybeSingle();
-
-            userProgress = progressData;
-
-            renderAssignment();
-            showContent();
-
-          } catch (error) {
-            console.error('Ошибка загрузки задания:', error);
-            showError('❌ Ошибка загрузки задания: ' + error.message);
+            if (!acc) {
+              showError('🔒 У вас нет доступа к этому заданию (учебник закрыт). Обратитесь к администратору.');
+              return;
+            }
+          }
+        }
+        // — доступ к кроссворду
+        if (assignment.crossword_id) {
+          const { data: cw } = await supabase.from('crosswords').select('id,is_available').eq('id', assignment.crossword_id).single();
+          if (cw && !cw.is_available) {
+            const { data: acc } = await supabase
+              .from('crossword_access')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('crossword_id', assignment.crossword_id)
+              .maybeSingle();
+            if (!acc) {
+              showError('🔒 У вас нет доступа к этому заданию (кроссворд закрыт). Обратитесь к администратору.');
+              return;
+            }
           }
         }
 
-        function renderAssignment() {
-          document.getElementById('assignmentTitle').textContent = assignment.title;
-          
-          if (sourceData) {
-            document.getElementById('assignmentSource').textContent = 
-              `Из ${source === 'textbook' ? 'учебника' : 'кроссворда'}: ${sourceData.title}`;
-          }
+        // 3) Тянем существующий прогресс (если есть)
+        const { data: upData, error: upErr } = await supabase
+          .from('user_progress')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('assignment_id', assignmentId)
+          .maybeSingle();
+        if (upErr && upErr.code !== 'PGRST116') throw upErr;
+        already = upData || null;
+      } catch (e) {
+        console.error('Load assignment error:', e);
+        showError('❌ Ошибка загрузки задания: ' + (e.message || 'неизвестно'));
+        return;
+      }
 
-          // Обновляем статус выполнения
-          updateCompletionStatus();
+      renderAssignment(assignment, already);
 
-          // Рендерим вопросы
-          renderQuestions();
+      // Обработчики
+      document.getElementById('submitBtn').onclick = () => submitAnswers(supabase, user, assignment, already);
+      document.getElementById('skipBtn').onclick = () => {
+        // Позволим вернуться, не сохраняя
+        backBtn.click();
+      };
+
+      showContent();
+    }
+
+    // РЕНДЕР
+    function renderAssignment(assignment, already) {
+      const content = assignment?.content || {};
+      const questions = Array.isArray(content?.questions) ? content.questions : [];
+      const first = questions[0] || {};
+
+      // Тип
+      const aType = first?.type || assignment?.type || 'test'; // test | fill | sentence
+
+      // Наверху
+      document.getElementById('assignmentTitle').textContent = assignment.title || 'Задание';
+      document.getElementById('crumbs').textContent =
+        (assignment.textbook_id ? 'Учебник → ' : (assignment.crossword_id ? 'Кроссворд → ' : 'Материалы → ')) +
+        (assignment.title || 'Задание');
+
+      const typeBadge = document.getElementById('typeBadge');
+      typeBadge.textContent = '📝 Тип: ' + (aType === 'fill' ? 'Ввод ответа' : (aType === 'sentence' ? 'Заполнение предложения' : 'Тест'));
+
+      const progressBadge = document.getElementById('progressBadge');
+      progressBadge.textContent = '📊 Статус: ' + (already?.is_completed ? 'выполнено' : 'не выполнено');
+
+      const questionBox = document.getElementById('questionBox');
+      questionBox.innerHTML = '';
+
+      // Заголовок вопроса
+      if (first?.text) {
+        const qTitle = document.createElement('div');
+        qTitle.className = 'q-title';
+        qTitle.textContent = first.text;
+        questionBox.appendChild(qTitle);
+      }
+
+      // Изображение вопроса (если есть)
+      if (first?.image_url) {
+        const url = resolvePublicUrl(first.image_url, 'assignment-images');
+        if (url) {
+          const wrap = document.createElement('div');
+          wrap.className = 'q-image';
+          wrap.appendChild(imgEl(url, 'Изображение к вопросу'));
+          questionBox.appendChild(wrap);
         }
+      }
 
-        function renderQuestions() {
-          const container = document.getElementById('questionsContainer');
-          container.innerHTML = '';
+      // Рендер по типу
+      if (aType === 'test') {
+        const choicesWrap = document.createElement('div');
+        choicesWrap.className = 'choices';
 
-          const questions = assignment.content?.questions || [];
-          
-          if (questions.length === 0) {
-            container.innerHTML = `
-              <div style="text-align: center; padding: 40px; color: #666;">
-                <p>📝 Вопросы пока не добавлены</p>
-                <p class="small-muted">Скоро здесь появятся вопросы для выполнения</p>
-              </div>
-            `;
-            return;
-          }
+        (first?.options || []).forEach((opt, idx) => {
+          const label = document.createElement('label');
+          label.className = 'choice';
+          label.setAttribute('data-index', String(idx));
 
-          questions.forEach((question, index) => {
-            const questionEl = document.createElement('div');
-            questionEl.className = 'question';
-            questionEl.innerHTML = `<div class="question-text">${index + 1}. ${question.q}</div>`;
-
-            // ИСПРАВЛЕННАЯ ЛОГИКА ОТОБРАЖЕНИЯ ИЗОБРАЖЕНИЙ
-            if (question.image) {
-              const imageContainer = document.createElement('div');
-              imageContainer.className = 'question-image-container';
-              
-              const img = document.createElement('img');
-              img.className = 'question-image';
-              img.alt = 'Изображение для вопроса';
-              
-              // УЛУЧШЕННАЯ ЗАГРУЗКА ИЗОБРАЖЕНИЙ
-              img.onload = function() {
-                console.log('✅ Изображение успешно загружено:', question.image);
-              };
-              
-              img.onerror = function() {
-                console.error('❌ Ошибка загрузки изображения:', question.image);
-                // Показываем альтернативный текст
-                const altText = document.createElement('div');
-                altText.className = 'small-muted';
-                altText.textContent = '❌ Изображение недоступно';
-                altText.style.textAlign = 'center';
-                altText.style.padding = '10px';
-                imageContainer.appendChild(altText);
-              };
-              
-              // Пробуем разные форматы URL для совместимости
-              if (question.image.startsWith('http')) {
-                img.src = question.image;
-              } else {
-                // Предполагаем, что изображение в bucket question-images
-                img.src = `${window.SUPABASE_URL}/storage/v1/object/public/question-images/${question.image}`;
-              }
-              
-              imageContainer.appendChild(img);
-              questionEl.appendChild(imageContainer);
-            }
-
-            // Рендерим в зависимости от типа вопроса
-            if (question.type === 'test') {
-              renderTestQuestion(questionEl, question, index);
-            } else if (question.type === 'fill') {
-              renderFillQuestion(questionEl, question, index);
-            } else if (question.type === 'sentence') {
-              renderSentenceQuestion(questionEl, question, index);
-            }
-
-            container.appendChild(questionEl);
-          });
-        }
-
-        function renderTestQuestion(container, question, questionIndex) {
-          const optionsContainer = document.createElement('div');
-          optionsContainer.className = 'options';
-
-          question.options.forEach((option, optionIndex) => {
-            const optionEl = document.createElement('label');
-            optionEl.className = 'option';
-            optionEl.innerHTML = `
-              <input type="radio" name="q${questionIndex}" value="${optionIndex}">
-              <span>${option}</span>
-            `;
-
-            // Восстанавливаем сохраненный ответ
-            if (userProgress && userProgress.answers && userProgress.answers[questionIndex] === optionIndex) {
-              optionEl.querySelector('input').checked = true;
-              optionEl.classList.add('selected');
-            }
-
-            optionEl.querySelector('input').addEventListener('change', function() {
-              document.querySelectorAll(`.option input[name="q${questionIndex}"]`).forEach(opt => {
-                opt.closest('.option').classList.remove('selected');
-              });
-              this.closest('.option').classList.add('selected');
-              saveProgress();
-            });
-
-            optionsContainer.appendChild(optionEl);
-          });
-
-          container.appendChild(optionsContainer);
-        }
-
-        function renderFillQuestion(container, question, questionIndex) {
           const input = document.createElement('input');
-          input.type = 'text';
-          input.className = 'fill-input';
-          input.placeholder = 'Введите ваш ответ...';
-          
-          // Восстанавливаем сохраненный ответ
-          if (userProgress && userProgress.answers && userProgress.answers[questionIndex]) {
-            input.value = userProgress.answers[questionIndex];
+          input.type = 'radio';
+          input.name = 'answer';
+          input.value = String(idx);
+
+          const content = document.createElement('div');
+          content.className = 'content';
+
+          if (opt?.text) {
+            const t = document.createElement('div');
+            t.className = 'text';
+            t.textContent = opt.text;
+            content.appendChild(t);
+          }
+          if (opt?.image_url) {
+            const url = resolvePublicUrl(opt.image_url, 'assignment-images');
+            if (url) content.appendChild(imgEl(url, 'Вариант ответа'));
           }
 
-          input.addEventListener('input', () => {
-            saveProgress();
-          });
-
-          container.appendChild(input);
-        }
-
-        function renderSentenceQuestion(container, question, questionIndex) {
-          const sentenceContainer = document.createElement('div');
-          sentenceContainer.className = 'sentence-container';
-
-          let sentenceHTML = `<div class="sentence-text">`;
-          
-          // Разбиваем предложение на части и заменяем пропуски на инпуты
-          const parts = question.sentence.split('___');
-          
-          parts.forEach((part, partIndex) => {
-            sentenceHTML += part;
-            if (partIndex < parts.length - 1) {
-              sentenceHTML += `
-                <span class="sentence-gap">
-                  <input type="text" class="sentence-input" 
-                         data-question="${questionIndex}" 
-                         data-gap="${partIndex}" 
-                         placeholder="...">
-                </span>
-              `;
-            }
-          });
-          
-          sentenceHTML += `</div>`;
-          sentenceContainer.innerHTML = sentenceHTML;
-
-          // Восстанавливаем сохраненные ответы
-          if (userProgress && userProgress.answers && userProgress.answers[questionIndex]) {
-            const savedAnswers = userProgress.answers[questionIndex];
-            sentenceContainer.querySelectorAll('.sentence-input').forEach((input, gapIndex) => {
-              if (savedAnswers[gapIndex]) {
-                input.value = savedAnswers[gapIndex];
-              }
-            });
-          }
-
-          // Обработчики ввода
-          sentenceContainer.querySelectorAll('.sentence-input').forEach(input => {
-            input.addEventListener('input', () => {
-              saveProgress();
-            });
-          });
-
-          container.appendChild(sentenceContainer);
-        }
-
-        async function saveProgress() {
-          try {
-            const answers = collectAnswers();
-            
-            const progressData = {
-              user_id: user.id,
-              assignment_id: assignmentId,
-              answers: answers,
-              is_completed: false
-            };
-
-            let result;
-
-            if (userProgress && userProgress.id) {
-              // Обновляем существующий прогресс
-              result = await supabase
-                .from('user_progress')
-                .update(progressData)
-                .eq('id', userProgress.id)
-                .select()
-                .single();
-            } else {
-              // Создаем новую запись прогресса
-              result = await supabase
-                .from('user_progress')
-                .insert([progressData])
-                .select()
-                .single();
-            }
-
-            const { data, error } = result;
-
-            if (error) {
-              console.error('Ошибка сохранения прогресса:', error);
-              throw error;
-            }
-            
-            // ВАЖНОЕ ИСПРАВЛЕНИЕ: Обновляем переменную userProgress
-            if (data) {
-              userProgress = data;
-              console.log('✅ Прогресс сохранен, userProgress обновлен:', userProgress.id);
-            }
-
-          } catch (error) {
-            console.error('Ошибка сохранения прогресса:', error);
-            throw error;
-          }
-        }
-
-        function collectAnswers() {
-          const answers = [];
-          const questions = assignment.content?.questions || [];
-
-          questions.forEach((question, questionIndex) => {
-            if (question.type === 'test') {
-              const selected = document.querySelector(`input[name="q${questionIndex}"]:checked`);
-              answers[questionIndex] = selected ? parseInt(selected.value) : null;
-            } else if (question.type === 'fill') {
-              const input = document.querySelectorAll('.fill-input')[questionIndex];
-              answers[questionIndex] = input ? input.value.trim() : '';
-            } else if (question.type === 'sentence') {
-              const gapInputs = document.querySelectorAll(`.sentence-input[data-question="${questionIndex}"]`);
-              const gapAnswers = Array.from(gapInputs).map(input => input.value.trim());
-              answers[questionIndex] = gapAnswers;
-            }
-          });
-
-          return answers;
-        }
-
-        function updateCompletionStatus() {
-          const statusElement = document.getElementById('completionStatus');
-          const completeBtn = document.getElementById('completeBtn');
-
-          if (userProgress && userProgress.is_completed) {
-            statusElement.innerHTML = '<span class="status-completed">✅ Задание выполнено</span>';
-            completeBtn.disabled = true;
-            completeBtn.textContent = '✅ Задание завершено';
-          } else {
-            statusElement.innerHTML = '<span class="status-pending">⏳ Задание не выполнено</span>';
-            completeBtn.disabled = false;
-            completeBtn.textContent = '✅ Завершить задание';
-          }
-        }
-
-        // ИСПРАВЛЕННЫЙ ОБРАБОТЧИК КНОПКИ ЗАВЕРШЕНИЯ
-        document.getElementById('completeBtn').addEventListener('click', async () => {
-          try {
-            console.log('🔄 Начинаем процесс завершения задания...');
-            
-            // Сначала сохраняем текущий прогресс
-            await saveProgress();
-            console.log('✅ Прогресс успешно сохранен');
-            
-            // Проверяем, что userProgress обновлен
-            if (!userProgress || !userProgress.id) {
-              console.error('❌ userProgress не обновлен:', userProgress);
-              throw new Error('Не удалось сохранить прогресс перед завершением');
-            }
-
-            console.log('🔄 Обновляем статус задания на завершенное...');
-            
-            const { data, error } = await supabase
-              .from('user_progress')
-              .update({ 
-                is_completed: true,
-                completed_at: new Date().toISOString()
-              })
-              .eq('id', userProgress.id)
-              .select()
-              .single();
-
-            if (error) {
-              console.error('❌ Ошибка обновления статуса:', error);
-              throw error;
-            }
-
-            // Обновляем статус
-            userProgress = data;
-            updateCompletionStatus();
-
-            console.log('✅ Задание успешно завершено!');
-            
-            // Показываем сообщение об успехе
-            alert('🎉 Задание успешно завершено!');
-            
-            // Обновляем кнопку назад для возврата к источнику
-            document.getElementById('backButton').focus();
-
-          } catch (error) {
-            console.error('❌ Ошибка завершения задания:', error);
-            alert('❌ Ошибка при завершении задания: ' + error.message);
-          }
+          label.appendChild(input);
+          label.appendChild(content);
+          choicesWrap.appendChild(label);
         });
 
-        await loadAssignment();
-        return true;
-        
-      } catch (error) {
-        showError('❌ Ошибка инициализации: ' + error.message);
-        return false;
+        questionBox.appendChild(choicesWrap);
+        document.getElementById('hint').textContent = 'Выберите вариант и нажмите «Отправить».';
+      } else if (aType === 'fill') {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = 'fillAnswer';
+        input.className = 'answer-input';
+        input.placeholder = 'Введите ответ';
+        questionBox.appendChild(input);
+        document.getElementById('hint').textContent = 'Введите ответ и нажмите «Отправить».';
+      } else { // sentence как подтип ввода
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = 'fillAnswer';
+        input.className = 'answer-input';
+        input.placeholder = 'Введите недостающее слово(а)';
+        questionBox.appendChild(input);
+        document.getElementById('hint').textContent = 'Дополните предложение и нажмите «Отправить».';
+      }
+
+      // Если задание уже выполнено — мягкий показ
+      if (already?.is_completed) {
+        const result = document.getElementById('resultBox');
+        result.style.color = '#2e7d32';
+        result.textContent = '✅ Задание уже отмечено как выполненное.';
       }
     }
-    
+
+    // ПРОВЕРКА И СОХРАНЕНИЕ
+    async function submitAnswers(supabase, user, assignment, already) {
+      hideBanners();
+
+      const content = assignment?.content || {};
+      const questions = Array.isArray(content?.questions) ? content.questions : [];
+      const first = questions[0] || {};
+      const aType = first?.type || assignment?.type || 'test';
+
+      // Собираем ответ
+      let isCorrect = true;     // если нет ключа — считаем как выполнено без оценки
+      let givenAnswer = null;   // то, что отправим в БД (для истории)
+      let score = null;
+
+      if (aType === 'test') {
+        const selected = document.querySelector('input[name="answer"]:checked');
+        if (!selected) {
+          showError('Выберите вариант ответа.');
+          return;
+        }
+        const idx = Number(selected.value);
+        givenAnswer = { type: 'test', selectedIndex: idx };
+
+        const correctIndex = typeof first.correctIndex === 'number' ? first.correctIndex : null;
+        if (correctIndex !== null) {
+          isCorrect = (idx === correctIndex);
+          score = isCorrect ? 1 : 0;
+        }
+      } else {
+        const val = (document.getElementById('fillAnswer')?.value || '').trim();
+        if (!val) {
+          showError('Введите ответ.');
+          return;
+        }
+        givenAnswer = { type: aType, text: val };
+
+        const correct = String(first.correct || '').trim();
+        if (correct) {
+          // сравнение без учета регистра/пробелов
+          isCorrect = correct.toLowerCase() === val.toLowerCase();
+          score = isCorrect ? 1 : 0;
+        }
+      }
+
+      // Пишем прогресс.
+      // ВАЖНО ДЛЯ RLS: всегда передаём user_id = auth.uid()!
+      const payload = {
+        user_id: user.id,
+        assignment_id: assignment.id,
+        is_completed: true,
+        score: score,
+        answers: givenAnswer ? JSON.stringify(givenAnswer) : null,
+        updated_at: new Date().toISOString()
+      };
+
+      // Если в таблице есть столбец "source" / "source_id", можно проставить (не обязательно)
+      if (assignment.textbook_id) {
+        payload.source = 'textbook';
+        payload.source_id = assignment.textbook_id;
+      } else if (assignment.crossword_id) {
+        payload.source = 'crossword';
+        payload.source_id = assignment.crossword_id;
+      }
+
+      // Сохраняем с onConflict по (user_id, assignment_id)
+      try {
+        disableButtons(true);
+        const { error } = await supabase
+          .from('user_progress')
+          .upsert(payload, { onConflict: 'user_id,assignment_id' });
+
+        if (error) {
+          // Частая причина: RLS запрещает вставку, когда не указан user_id или политика ожидает auth.uid()
+          if (String(error.message || '').toLowerCase().includes('row-level security')) {
+            showError('❌ Ошибка при завершении: политика безопасности не разрешила запись. Убедитесь, что в таблице user_progress есть политика INSERT вида: user_id = auth.uid().');
+          } else {
+            showError('❌ Ошибка при сохранении прогресса: ' + error.message);
+          }
+          disableButtons(false);
+          return;
+        }
+
+        // UI-результат
+        const res = document.getElementById('resultBox');
+        res.style.color = isCorrect ? '#2e7d32' : '#c62828';
+        res.textContent = isCorrect ? '✅ Ответ принят! Задание отмечено как выполненное.' : 'ℹ️ Ответ сохранён, задание отмечено как выполненное.';
+
+        showSuccess('✅ Прогресс сохранён!');
+
+        // Обновим бейдж
+        document.getElementById('progressBadge').textContent = '📊 Статус: выполнено';
+
+        // Кнопка назад через короткую паузу
+        setTimeout(() => {
+          const btn = document.getElementById('backBtn');
+          btn.click();
+        }, 1200);
+
+      } catch (e) {
+        console.error('Submit error:', e);
+        showError('❌ Неожиданная ошибка сохранения: ' + (e.message || 'неизвестно'));
+        disableButtons(false);
+      }
+    }
+
+    function disableButtons(state) {
+      document.getElementById('submitBtn').disabled = state;
+      document.getElementById('skipBtn').disabled = state;
+      document.getElementById('backBtn').disabled = state;
+    }
+
     if (window.SUPABASE_URL) {
-      initApp();
+      init().catch(err => showError('❌ Ошибка инициализации: ' + (err.message || 'неизвестно')));
     } else {
-      window.addEventListener('configLoaded', initApp);
+      window.addEventListener('configLoaded', () => {
+        init().catch(err => showError('❌ Ошибка инициализации: ' + (err.message || 'неизвестно')));
+      });
     }
   </script>
 </body>
