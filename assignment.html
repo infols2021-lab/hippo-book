@@ -406,18 +406,15 @@
               const img = document.createElement('img');
               img.className = 'question-image';
               img.alt = 'Изображение для вопроса';
-              img.src = question.image;
               
-              // Добавляем обработчики для корректной загрузки изображений
+              // ИСПРАВЛЕНИЕ: Добавляем обработчик для корректной загрузки изображений
               img.onload = function() {
-                console.log('Изображение успешно загружено:', question.image);
+                console.log('✅ Изображение успешно загружено:', question.image);
               };
               
               img.onerror = function() {
-                console.error('Ошибка загрузки изображения:', question.image);
-                this.style.display = 'none';
-                
-                // Показываем альтернативный текст
+                console.error('❌ Ошибка загрузки изображения:', question.image);
+                // Пробуем загрузить с другим URL или показываем альтернативный текст
                 const altText = document.createElement('div');
                 altText.className = 'small-muted';
                 altText.textContent = '❌ Изображение недоступно';
@@ -425,6 +422,16 @@
                 altText.style.padding = '10px';
                 imageContainer.appendChild(altText);
               };
+              
+              // УЛУЧШЕННАЯ ЗАГРУЗКА ИЗОБРАЖЕНИЙ
+              // Пробуем разные форматы URL для совместимости
+              if (question.image.startsWith('http')) {
+                img.src = question.image;
+              } else if (question.image.startsWith('/')) {
+                img.src = window.SUPABASE_URL + '/storage/v1/object/public/question-images' + question.image;
+              } else {
+                img.src = window.SUPABASE_URL + '/storage/v1/object/public/question-images/' + question.image;
+              }
               
               imageContainer.appendChild(img);
               questionEl.appendChild(imageContainer);
@@ -550,30 +557,40 @@
               is_completed: false
             };
 
+            let result;
+
             if (userProgress && userProgress.id) {
               // Обновляем существующий прогресс
-              const { error } = await supabase
+              result = await supabase
                 .from('user_progress')
                 .update(progressData)
-                .eq('id', userProgress.id);
-
-              if (error) throw error;
+                .eq('id', userProgress.id)
+                .select()
+                .single();
             } else {
               // Создаем новую запись прогресса
-              const { data, error } = await supabase
+              result = await supabase
                 .from('user_progress')
                 .insert([progressData])
                 .select()
                 .single();
+            }
 
-              if (error) throw error;
-              
-              // Сохраняем новую запись прогресса
+            const { data, error } = result;
+
+            if (error) {
+              console.error('Ошибка сохранения прогресса:', error);
+              throw error;
+            }
+            
+            // ВАЖНОЕ ИСПРАВЛЕНИЕ: Обновляем переменную userProgress
+            if (data) {
               userProgress = data;
             }
 
           } catch (error) {
             console.error('Ошибка сохранения прогресса:', error);
+            throw error; // Пробрасываем ошибку для обработки в completeBtn
           }
         }
 
@@ -613,36 +630,52 @@
           }
         }
 
-        // Обработчик кнопки завершения - ИСПРАВЛЕННАЯ ВЕРСИЯ
+        // ИСПРАВЛЕННЫЙ ОБРАБОТЧИК КНОПКИ ЗАВЕРШЕНИЯ
         document.getElementById('completeBtn').addEventListener('click', async () => {
           try {
+            console.log('🔄 Начинаем процесс завершения задания...');
+            
             // Сначала сохраняем текущий прогресс
             await saveProgress();
+            console.log('✅ Прогресс успешно сохранен');
             
             // Проверяем, что userProgress обновлен
             if (!userProgress || !userProgress.id) {
+              console.error('❌ userProgress не обновлен:', userProgress);
               throw new Error('Не удалось сохранить прогресс перед завершением');
             }
 
-            const { error } = await supabase
+            console.log('🔄 Обновляем статус задания на завершенное...');
+            
+            const { data, error } = await supabase
               .from('user_progress')
               .update({ 
                 is_completed: true,
                 completed_at: new Date().toISOString()
               })
-              .eq('id', userProgress.id);
+              .eq('id', userProgress.id)
+              .select()
+              .single();
 
-            if (error) throw error;
+            if (error) {
+              console.error('❌ Ошибка обновления статуса:', error);
+              throw error;
+            }
 
             // Обновляем статус
-            userProgress.is_completed = true;
+            userProgress = data;
             updateCompletionStatus();
 
+            console.log('✅ Задание успешно завершено!');
+            
             // Показываем сообщение об успехе
             alert('🎉 Задание успешно завершено!');
+            
+            // Обновляем кнопку назад для возврата к источнику
+            document.getElementById('backButton').focus();
 
           } catch (error) {
-            console.error('Ошибка завершения задания:', error);
+            console.error('❌ Ошибка завершения задания:', error);
             alert('❌ Ошибка при завершении задания: ' + error.message);
           }
         });

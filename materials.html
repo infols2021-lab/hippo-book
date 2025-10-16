@@ -316,7 +316,7 @@
             // Загружаем доступ к учебникам
             const { data: textbookAccessData, error: textbookAccessError } = await supabase
               .from('textbook_access')
-              .select('*')
+              .select('textbook_id')
               .eq('user_id', user.id);
 
             if (textbookAccessError) throw textbookAccessError;
@@ -325,7 +325,7 @@
             // Загружаем доступ к кроссвордам
             const { data: crosswordAccessData, error: crosswordAccessError } = await supabase
               .from('crossword_access')
-              .select('*')
+              .select('crossword_id')
               .eq('user_id', user.id);
 
             if (crosswordAccessError) throw crosswordAccessError;
@@ -348,8 +348,8 @@
           // ИСПРАВЛЕННАЯ ЛОГИКА ДОСТУПА К УЧЕБНИКАМ
           const availableTextbooks = textbooks.filter(textbook => {
             // Учебник доступен если:
-            // 1. Он помечен как доступный для всех, ИЛИ
-            // 2. У пользователя есть явный доступ
+            // 1. Он помечен как доступный для всех (is_available = true), ИЛИ
+            // 2. У пользователя есть явный доступ в textbook_access
             return textbook.is_available || textbookAccess.some(access => access.textbook_id === textbook.id);
           });
 
@@ -376,13 +376,8 @@
             const card = document.createElement('div');
             card.className = 'material-card';
             
-            // Проверяем доступ (должно быть всегда true для availableTextbooks)
-            const hasAccess = true;
-            
             card.onclick = () => {
-              if (hasAccess) {
-                window.location.href = `/textbook.html?id=${textbook.id}`;
-              }
+              window.location.href = `/textbook.html?id=${textbook.id}`;
             };
 
             card.innerHTML = `
@@ -406,6 +401,34 @@
 
             grid.appendChild(card);
           });
+
+          // Показываем заблокированные учебники для информации
+          const lockedTextbooks = textbooks.filter(textbook => 
+            !textbook.is_available && !textbookAccess.some(access => access.textbook_id === textbook.id)
+          );
+
+          if (lockedTextbooks.length > 0) {
+            lockedTextbooks.forEach(textbook => {
+              const card = document.createElement('div');
+              card.className = 'material-card locked';
+              
+              card.innerHTML = `
+                <div class="material-cover" style="filter: grayscale(100%); opacity: 0.6;">
+                  ${textbook.cover_image_url ? 
+                    `<img src="${textbook.cover_image_url}" alt="${textbook.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">` : 
+                    '📚'
+                  }
+                </div>
+                <div class="material-title" style="color: #999;">${textbook.title}</div>
+                <div class="material-description" style="color: #999;">${textbook.description || 'Учебные материалы и задания'}</div>
+                <div class="locked-overlay">
+                  🔒 Недоступен
+                </div>
+              `;
+
+              grid.appendChild(card);
+            });
+          }
         }
 
         function renderCrosswords() {
@@ -415,8 +438,8 @@
           // ИСПРАВЛЕННАЯ ЛОГИКА ДОСТУПА К КРОССВОРДАМ
           const availableCrosswords = crosswords.filter(crossword => {
             // Кроссворд доступен если:
-            // 1. Он помечен как доступный для всех, ИЛИ
-            // 2. У пользователя есть явный доступ
+            // 1. Он помечен как доступный для всех (is_available = true), ИЛИ
+            // 2. У пользователя есть явный доступ в crossword_access
             return crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id);
           });
 
@@ -442,12 +465,9 @@
 
             const card = document.createElement('div');
             card.className = 'material-card';
-            const hasAccess = true; // Всегда true для availableCrosswords
             
             card.onclick = () => {
-              if (hasAccess) {
-                window.location.href = `/crossword.html?id=${crossword.id}`;
-              }
+              window.location.href = `/crossword.html?id=${crossword.id}`;
             };
 
             card.innerHTML = `
@@ -471,6 +491,34 @@
 
             grid.appendChild(card);
           });
+
+          // Показываем заблокированные кроссворды для информации
+          const lockedCrosswords = crosswords.filter(crossword => 
+            !crossword.is_available && !crosswordAccess.some(access => access.crossword_id === crossword.id)
+          );
+
+          if (lockedCrosswords.length > 0) {
+            lockedCrosswords.forEach(crossword => {
+              const card = document.createElement('div');
+              card.className = 'material-card locked';
+              
+              card.innerHTML = `
+                <div class="material-cover" style="filter: grayscale(100%); opacity: 0.6;">
+                  ${crossword.cover_image_url ? 
+                    `<img src="${crossword.cover_image_url}" alt="${crossword.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">` : 
+                    '🧩'
+                  }
+                </div>
+                <div class="material-title" style="color: #999;">${crossword.title}</div>
+                <div class="material-description" style="color: #999;">${crossword.description || 'Разгадайте кроссворд'}</div>
+                <div class="locked-overlay">
+                  🔒 Недоступен
+                </div>
+              `;
+
+              grid.appendChild(card);
+            });
+          }
         }
 
         // Обработчики вкладок
