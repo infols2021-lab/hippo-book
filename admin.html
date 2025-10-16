@@ -741,37 +741,46 @@
     }
 
     // УЛУЧШЕННАЯ Функция загрузки файла в Supabase Storage
-    // УЛУЧШЕННАЯ Функция загрузки файла в Supabase Storage
-async function uploadImageToSupabase(supabase, file, bucketName) {
-  try {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-    const filePath = `${fileName}`;
+    async function uploadImageToSupabase(supabase, file, bucketName) {
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `${fileName}`;
 
-    console.log(`🔄 Загружаем изображение в ${bucketName}: ${fileName}`);
+        console.log(`🔄 Загружаем изображение в ${bucketName}: ${fileName}`);
 
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .upload(filePath, file);
+        // УБЕДИТЕСЬ, ЧТО БАКЕТ СУЩЕСТВУЕТ!
+        const { data, error } = await supabase.storage
+          .from(bucketName)
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
 
-    if (error) {
-      console.error('Ошибка загрузки в Storage:', error);
-      throw new Error(`Не удалось загрузить изображение: ${error.message}`);
+        if (error) {
+          console.error('Ошибка загрузки в Storage:', error);
+          
+          // Если бакет не существует, создаем его
+          if (error.message?.includes('bucket') || error.message?.includes('not found')) {
+            throw new Error(`Бакет ${bucketName} не существует. Создайте его вручную в Supabase Storage.`);
+          }
+          
+          throw new Error(`Не удалось загрузить изображение: ${error.message}`);
+        }
+
+        // Получаем публичный URL
+        const { data: urlData } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(filePath);
+
+        console.log('✅ Изображение загружено:', urlData.publicUrl);
+        return urlData.publicUrl;
+
+      } catch (error) {
+        console.error('Ошибка в uploadImageToSupabase:', error);
+        throw error;
+      }
     }
-
-    // Получаем публичный URL
-    const { data: urlData } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(filePath);
-
-    console.log('✅ Изображение загружено:', urlData.publicUrl);
-    return urlData.publicUrl;
-
-  } catch (error) {
-    console.error('Ошибка в uploadImageToSupabase:', error);
-    throw error;
-  }
-}
 
     // Функция для инициализации загрузки изображений
     function initImageUpload(uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId, bucketName, supabase) {
@@ -790,7 +799,7 @@ async function uploadImageToSupabase(supabase, file, bucketName) {
       // Обработчик выбора файла
       fileInput.addEventListener('change', async (e) => {
         if (e.target.files.length > 0) {
-         await handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput, 'question-images', supabase);
+          await handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput, bucketName, supabase);
         }
       });
 
@@ -809,7 +818,7 @@ async function uploadImageToSupabase(supabase, file, bucketName) {
         e.preventDefault();
         uploadArea.classList.remove('dragover');
         if (e.dataTransfer.files.length > 0) {
-        await handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput, 'question-images', supabase);
+          await handleFileUpload(e.dataTransfer.files[0], uploadArea, progress, progressBar, preview, urlInput, bucketName, supabase);
         }
       });
     }
@@ -864,6 +873,7 @@ async function uploadImageToSupabase(supabase, file, bucketName) {
         console.error('Ошибка загрузки изображения:', error);
         showModal('Ошибка', 'Не удалось загрузить изображение: ' + error.message);
         progress.style.display = 'none';
+        preview.style.display = 'none';
       }
     }
 
