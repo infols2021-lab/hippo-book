@@ -435,6 +435,13 @@
               <label>Порядок отображения:</label>
               <input type="number" id="textbookOrder" class="input" value="0" min="0">
             </div>
+
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="textbookIsAvailable">
+                Доступен для всех пользователей
+              </label>
+            </div>
             
             <div style="margin-top:20px; display: flex; gap: 10px; flex-wrap: wrap;">
               <button class="btn" id="saveTextbookBtn">💾 Сохранить учебник</button>
@@ -449,6 +456,7 @@
                   <th>Название</th>
                   <th>Описание</th>
                   <th>Заданий</th>
+                  <th>Доступ</th>
                   <th>Статус</th>
                   <th>Действия</th>
                 </tr>
@@ -732,8 +740,40 @@
       return 'q_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
+    // УЛУЧШЕННАЯ Функция загрузки файла в Supabase Storage
+    async function uploadImageToSupabase(supabase, file, bucketName) {
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        console.log(`🔄 Загружаем изображение в ${bucketName}: ${fileName}`);
+
+        const { data, error } = await supabase.storage
+          .from(bucketName)
+          .upload(filePath, file);
+
+        if (error) {
+          console.error('Ошибка загрузки в Storage:', error);
+          throw new Error(`Не удалось загрузить изображение: ${error.message}`);
+        }
+
+        // Получаем публичный URL
+        const { data: urlData } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(filePath);
+
+        console.log('✅ Изображение загружено:', urlData.publicUrl);
+        return urlData.publicUrl;
+
+      } catch (error) {
+        console.error('Ошибка в uploadImageToSupabase:', error);
+        throw error;
+      }
+    }
+
     // Функция для инициализации загрузки изображений
-    function initImageUpload(uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId) {
+    function initImageUpload(uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId, bucketName, supabase) {
       const uploadArea = document.getElementById(uploadAreaId);
       const fileInput = document.getElementById(fileInputId);
       const progress = document.getElementById(progressId);
@@ -747,9 +787,9 @@
       });
 
       // Обработчик выбора файла
-      fileInput.addEventListener('change', (e) => {
+      fileInput.addEventListener('change', async (e) => {
         if (e.target.files.length > 0) {
-          handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput);
+          await handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput, bucketName, supabase);
         }
       });
 
@@ -764,75 +804,70 @@
         uploadArea.classList.remove('dragover');
       });
 
-      uploadArea.addEventListener('drop', (e) => {
+      uploadArea.addEventListener('drop', async (e) => {
         e.preventDefault();
         uploadArea.classList.remove('dragover');
         if (e.dataTransfer.files.length > 0) {
-          handleFileUpload(e.dataTransfer.files[0], uploadArea, progress, progressBar, preview, urlInput);
+          await handleFileUpload(e.dataTransfer.files[0], uploadArea, progress, progressBar, preview, urlInput, bucketName, supabase);
         }
       });
     }
 
-    // Функция загрузки файла на сервер Supabase Storage
-// Улучшенная функция загрузки файла
-async function handleFileUpload(file, uploadArea, progress, progressBar, preview, urlInput) {
-  // Проверка типа файла
-  if (!file.type.startsWith('image/')) {
-    showModal('Ошибка', 'Пожалуйста, выберите файл изображения (JPG, PNG, GIF, WebP).');
-    return;
-  }
+    // УЛУЧШЕННАЯ функция загрузки файла
+    async function handleFileUpload(file, uploadArea, progress, progressBar, preview, urlInput, bucketName, supabase) {
+      // Проверка типа файла
+      if (!file.type.startsWith('image/')) {
+        showModal('Ошибка', 'Пожалуйста, выберите файл изображения (JPG, PNG, GIF, WebP).');
+        return;
+      }
 
-  // Проверка размера файла (5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    showModal('Ошибка', 'Размер файла не должен превышать 5MB.');
-    return;
-  }
+      // Проверка размера файла (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showModal('Ошибка', 'Размер файла не должен превышать 5MB.');
+        return;
+      }
 
-  try {
-    // Показываем прогресс
-    progress.style.display = 'block';
-    progressBar.style.width = '0%';
+      try {
+        // Показываем прогресс
+        progress.style.display = 'block';
+        progressBar.style.width = '0%';
 
-    // Создаем временный URL для предпросмотра
-    const objectUrl = URL.createObjectURL(file);
-    
-    // Предпросмотр изображения
-    preview.src = objectUrl;
-    preview.style.display = 'block';
-    preview.onerror = function() {
-      console.error('Ошибка загрузки предпросмотра изображения');
-      this.style.display = 'none';
-    };
+        // Создаем временный URL для предпросмотра
+        const objectUrl = URL.createObjectURL(file);
+        
+        // Предпросмотр изображения
+        preview.src = objectUrl;
+        preview.style.display = 'block';
+        preview.onerror = function() {
+          console.error('Ошибка загрузки предпросмотра изображения');
+          this.style.display = 'none';
+        };
 
-    // Симулируем прогресс загрузки
-    let progressValue = 0;
-    const progressInterval = setInterval(() => {
-      progressValue += 5;
-      progressBar.style.width = progressValue + '%';
-      
-      if (progressValue >= 100) {
-        clearInterval(progressInterval);
+        // Загружаем в Supabase Storage
+        progressBar.style.width = '30%';
+        
+        const publicUrl = await uploadImageToSupabase(supabase, file, bucketName);
+        
+        progressBar.style.width = '100%';
+        
         setTimeout(() => {
           progress.style.display = 'none';
           
-          // Сохраняем временный URL для использования в форме
-          // В реальном приложении здесь должна быть загрузка на сервер
-          urlInput.value = objectUrl;
+          // Сохраняем публичный URL для использования в форме
+          urlInput.value = publicUrl;
           
           showModal('Успех', 'Изображение успешно загружено и готово к использованию!');
         }, 500);
-      }
-    }, 50);
 
-  } catch (error) {
-    console.error('Ошибка загрузки изображения:', error);
-    showModal('Ошибка', 'Не удалось загрузить изображение: ' + error.message);
-    progress.style.display = 'none';
-  }
-}
+      } catch (error) {
+        console.error('Ошибка загрузки изображения:', error);
+        showModal('Ошибка', 'Не удалось загрузить изображение: ' + error.message);
+        progress.style.display = 'none';
+      }
+    }
 
     // Функция для загрузки изображения вопроса
-    function initQuestionImageUpload(questionId) {
+    function initQuestionImageUpload(questionId, supabase) {
       const uploadArea = document.querySelector(`#questionUploadArea${questionId}`);
       const fileInput = document.querySelector(`#questionImageInput${questionId}`);
       const progress = document.querySelector(`#questionImageProgress${questionId}`);
@@ -846,9 +881,9 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
         fileInput.click();
       });
 
-      fileInput.addEventListener('change', (e) => {
+      fileInput.addEventListener('change', async (e) => {
         if (e.target.files.length > 0) {
-          handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput);
+          await handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput, 'question-images', supabase);
         }
       });
 
@@ -863,11 +898,11 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
         uploadArea.classList.remove('dragover');
       });
 
-      uploadArea.addEventListener('drop', (e) => {
+      uploadArea.addEventListener('drop', async (e) => {
         e.preventDefault();
         uploadArea.classList.remove('dragover');
         if (e.dataTransfer.files.length > 0) {
-          handleFileUpload(e.dataTransfer.files[0], uploadArea, progress, progressBar, preview, urlInput);
+          await handleFileUpload(e.dataTransfer.files[0], uploadArea, progress, progressBar, preview, urlInput, 'question-images', supabase);
         }
       });
     }
@@ -904,7 +939,9 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
           'textbookCoverProgress', 
           'textbookCoverProgressBar', 
           'textbookCoverPreview', 
-          'textbookCoverUrl'
+          'textbookCoverUrl',
+          'backgrounds',
+          supabase
         );
 
         initImageUpload(
@@ -913,7 +950,9 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
           'crosswordCoverProgress', 
           'crosswordCoverProgressBar', 
           'crosswordCoverPreview', 
-          'crosswordCoverUrl'
+          'crosswordCoverUrl',
+          'backgrounds',
+          supabase
         );
 
         // ===== ОБРАБОТЧИКИ СОБЫТИЙ =====
@@ -1037,6 +1076,7 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
           document.getElementById('textbookTitle').value = '';
           document.getElementById('textbookDescription').value = '';
           document.getElementById('textbookOrder').value = '0';
+          document.getElementById('textbookIsAvailable').checked = false;
           document.getElementById('textbookCoverUrl').value = '';
           document.getElementById('textbookCoverPreview').style.display = 'none';
           editingTextbookId = null;
@@ -1050,6 +1090,7 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
           const title = document.getElementById('textbookTitle').value.trim();
           const description = document.getElementById('textbookDescription').value.trim();
           const orderIndex = parseInt(document.getElementById('textbookOrder').value);
+          const isAvailable = document.getElementById('textbookIsAvailable').checked;
           const coverUrl = document.getElementById('textbookCoverUrl').value;
           
           if (!title) {
@@ -1062,6 +1103,7 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
               title,
               description,
               order_index: orderIndex,
+              is_available: isAvailable,
               is_active: true,
               created_by: currentUser.id
             };
@@ -1124,7 +1166,7 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
             tbody.innerHTML = '';
             
             if (!textbooks || textbooks.length === 0) {
-              tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;">Учебники не найдены</td></tr>`;
+              tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;">Учебники не найдены</td></tr>`;
               return;
             }
             
@@ -1134,6 +1176,7 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
                 <td>${textbook.title}</td>
                 <td>${textbook.description || '—'}</td>
                 <td>${assignmentsCount[textbook.id] || 0}</td>
+                <td>${textbook.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
                 <td>${textbook.is_active ? '✅ Активен' : '❌ Неактивен'}</td>
                 <td>
                   <button class="btn btn-small edit-textbook" data-id="${textbook.id}">✏️ Редактировать</button>
@@ -1179,6 +1222,7 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
             document.getElementById('textbookTitle').value = textbook.title;
             document.getElementById('textbookDescription').value = textbook.description || '';
             document.getElementById('textbookOrder').value = textbook.order_index || 0;
+            document.getElementById('textbookIsAvailable').checked = textbook.is_available;
             document.getElementById('textbookCoverUrl').value = textbook.cover_image_url || '';
             
             if (textbook.cover_image_url) {
@@ -1569,7 +1613,7 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
           questionsContainer.appendChild(newQuestion);
           
           // Инициализируем загрузку изображения для этого вопроса
-          initQuestionImageUpload(questionId);
+          initQuestionImageUpload(questionId, supabase);
           
           const removeQuestionBtn = newQuestion.querySelector('.remove-question');
           removeQuestionBtn.addEventListener('click', function() {
@@ -1637,7 +1681,7 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
             const item = questionElements[i];
             const questionType = item.getAttribute('data-type') || 'test';
             const questionText = item.querySelector('.question-text').value;
-            const questionImageUrl = item.querySelector('.question-image-url')?.value || '';
+            const questionImageUrl = item.querySelector(`#questionImageUrl${item.getAttribute('data-id')}`)?.value || '';
             
             if (!questionText) {
               showModal('Ошибка', `Заполните текст вопроса ${i + 1}`);
@@ -1963,7 +2007,7 @@ async function handleFileUpload(file, uploadArea, progress, progressBar, preview
               questionsContainer.appendChild(questionDiv);
               
               // Инициализируем загрузку изображения для этого вопроса
-              initQuestionImageUpload(questionId);
+              initQuestionImageUpload(questionId, supabase);
               
               const removeQuestionBtn = questionDiv.querySelector('.remove-question');
               removeQuestionBtn.addEventListener('click', function() {

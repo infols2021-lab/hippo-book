@@ -347,18 +347,10 @@
 
           // ИСПРАВЛЕННАЯ ЛОГИКА ДОСТУПА К УЧЕБНИКАМ
           const availableTextbooks = textbooks.filter(textbook => {
-            // Проверяем, есть ли у пользователя явный доступ к учебнику
-            const hasExplicitAccess = textbookAccess.some(access => access.textbook_id === textbook.id);
-            
-            // Если есть явный доступ - показываем
-            if (hasExplicitAccess) return true;
-            
-            // Если нет записей в textbook_access для этого пользователя вообще,
-            // значит система доступов не настроена и показываем все учебники
-            if (textbookAccess.length === 0) return true;
-            
-            // Во всех остальных случаях - не показываем
-            return false;
+            // Учебник доступен если:
+            // 1. Он помечен как доступный для всех, ИЛИ
+            // 2. У пользователя есть явный доступ
+            return textbook.is_available || textbookAccess.some(access => access.textbook_id === textbook.id);
           });
 
           if (availableTextbooks.length === 0) {
