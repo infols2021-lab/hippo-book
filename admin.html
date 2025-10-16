@@ -399,7 +399,6 @@
       </div>
     </div>
   </div>
-
   <script type="module">
     // ============ БАЗОВЫЕ UI ХЕЛПЕРЫ ============
     document.getElementById('configLoading').style.display = 'block';
@@ -422,6 +421,7 @@
       document.getElementById('modalText').textContent = text;
       document.getElementById('modal').style.display = 'flex';
     }
+
     // ============ ПРОВЕРКА АДМИНА ============
     async function checkAdmin(supabase) {
       try {
@@ -474,25 +474,21 @@
     function generateQuestionId() {
       return 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
     }
-
-    // Безопасное имя файла
     function safeName(name) {
       return name.replace(/[^a-zA-Z0-9._-]/g, '_');
     }
 
-    // Загрузка файла в Supabase Storage с красивым прогрессом + public URL
+    // ВАЖНО: КЛЮЧ ХРАНИМ ПЛОСКО В КОРНЕ БАКЕТА (без /userId/дата)
+    // и сразу получаем public URL (бакет должен быть публичным)
     async function uploadImageToSupabase({ supabase, file, bucket }) {
-      const ext = file.name.split('.').pop().toLowerCase();
+      const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
       const allowed = ['jpg','jpeg','png','gif','webp','avif'];
       if (!allowed.includes(ext)) throw new Error('Поддерживаются только JPG, PNG, GIF, WebP, AVIF');
       if (file.size > 5 * 1024 * 1024) throw new Error('Размер > 5MB');
 
-      const { data: { user } } = await supabase.auth.getUser();
-      const folder = `${user?.id || 'anon'}/${new Date().toISOString().slice(0,10)}`;
       const filename = `${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
-      const path = `${folder}/${safeName(filename)}`;
+      const path = safeName(filename); // <— плоско: covers/<path> или question-images/<path>
 
-      // Загрузка
       const { error } = await supabase.storage.from(bucket).upload(path, file, {
         cacheControl: '3600',
         upsert: false,
@@ -500,19 +496,18 @@
       });
 
       if (error) {
-        // Клиентским (anon) ключом нельзя создавать бакеты. Если бакета нет — покажем чёткую подсказку.
-        if ((error.message || '').toLowerCase().includes('not found') ||
-            (error.message || '').toLowerCase().includes('bucket')) {
-          throw new Error(`Бакет "${bucket}" не найден. Создайте в Supabase Storage бакет с именем "${bucket}" и сделайте его публичным.`);
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('not found') || msg.includes('bucket')) {
+          throw new Error(`Бакет "${bucket}" не найден. Создайте его в Supabase Storage и сделайте публичным.`);
         }
         throw error;
       }
 
+      // Публичный URL (ключ плоский)
       const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
       return pub.publicUrl;
     }
 
-    // Инициализация drag&drop или клика для загрузки
     function initImageUpload({ uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId, bucket, supabase }) {
       const area = document.getElementById(uploadAreaId);
       const input = document.getElementById(fileInputId);
@@ -534,7 +529,7 @@
           preview.src = objectUrl;
           preview.style.display = 'block';
 
-          bar.style.width = '60%';
+          bar.style.width = '65%';
           const publicUrl = await uploadImageToSupabase({ supabase, file, bucket });
           bar.style.width = '100%';
           urlInput.value = publicUrl;
@@ -559,7 +554,7 @@
       });
     }
 
-    // Инициализация загрузки для вопроса
+    // Инициализация загрузки картинок в вопросах (bucket: question-images)
     function initQuestionImageUpload(questionId, supabase) {
       initImageUpload({
         uploadAreaId: `questionUploadArea_${questionId}`,
@@ -631,7 +626,7 @@
           });
         });
 
-        // Инициализация зон загрузки для обложек
+        // Инициализация зон загрузки для обложек (bucket: covers)
         initImageUpload({
           uploadAreaId: 'textbookUploadArea',
           fileInputId: 'textbookCoverInput',
@@ -897,6 +892,7 @@
         document.getElementById('createCrosswordBtn').addEventListener('click', showCrosswordForm);
         document.getElementById('cancelCrosswordBtn').addEventListener('click', hideCrosswordForm);
         document.getElementById('saveCrosswordBtn').addEventListener('click', saveCrossword);
+
         // ===== ЗАДАНИЯ
         let selectedMaterialId = '';
         let editingAssignmentId = null;
@@ -921,26 +917,6 @@
         document.getElementById('cancelAssignmentBtn').addEventListener('click', hideAssignmentForm);
         document.getElementById('saveAssignmentBtn').addEventListener('click', saveAssignment);
         document.getElementById('addQuestionBtn').addEventListener('click', () => addQuestion());
-
-        function showAssignmentForm() {
-          editingAssignmentId = null;
-          document.getElementById('assignmentForm').classList.add('active');
-          document.getElementById('assignmentFormTitle').textContent = 'Создать задание';
-          document.getElementById('assignmentTitle').value = '';
-          document.getElementById('assignmentOrder').value = '0';
-          // Сброс типа к test
-          document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
-          document.querySelector('.type-btn[data-type="test"]').classList.add('active');
-          currentQuestionType = 'test';
-
-          const cont = document.getElementById('questionsContainer');
-          cont.innerHTML = '';
-          addQuestion(); // хотя бы один вопрос
-        }
-
-        function hideAssignmentForm() {
-          document.getElementById('assignmentForm').classList.remove('active');
-        }
 
         async function loadMaterialsForAssignments() {
           const select = document.getElementById('materialSelect');
@@ -980,6 +956,26 @@
             const has = Array.from(select.options).some(o=>o.value===selectedMaterialId);
             if (has) select.value = selectedMaterialId;
           }
+        }
+
+        function showAssignmentForm() {
+          editingAssignmentId = null;
+          document.getElementById('assignmentForm').classList.add('active');
+          document.getElementById('assignmentFormTitle').textContent = 'Создать задание';
+          document.getElementById('assignmentTitle').value = '';
+          document.getElementById('assignmentOrder').value = '0';
+          // Сброс типа к test
+          document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
+          document.querySelector('.type-btn[data-type="test"]').classList.add('active');
+          currentQuestionType = 'test';
+
+          const cont = document.getElementById('questionsContainer');
+          cont.innerHTML = '';
+          addQuestion(); // хотя бы один вопрос
+        }
+
+        function hideAssignmentForm() {
+          document.getElementById('assignmentForm').classList.remove('active');
         }
 
         function addQuestion(prefill) {
@@ -1159,7 +1155,7 @@
           const tbody = document.querySelector('#assignmentsTable tbody');
           if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
 
-          // подтянем название
+          // подтянем название материала
           let materialName = 'Материал';
           if (kind === 'textbook') {
             const { data } = await supabase.from('textbooks').select('title').eq('id', matId).single();
@@ -1233,14 +1229,13 @@
             });
           });
         }
-
         // ===== ПОЛЬЗОВАТЕЛИ / ДОСТУПЫ
         let currentEditingUserId = null;
         let searchTimeout = null;
 
         document.getElementById('userSearch').addEventListener('input', () => {
           clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(loadUsers, 400);
+          searchTimeout = setTimeout(loadUsers, 350);
         });
 
         async function loadUsers() {
@@ -1379,12 +1374,12 @@
 
           if (textSelected.length) {
             await supabase.from('textbook_access').insert(
-              textSelected.map(id=>({ user_id: currentEditingUserId, textbook_id: id, granted_by: user.id }))
+              textSelected.map(id=>({ user_id: currentEditingUserId, textbook_id: id }))
             );
           }
           if (crossSelected.length) {
             await supabase.from('crossword_access').insert(
-              crossSelected.map(id=>({ user_id: currentEditingUserId, crossword_id: id, granted_by: user.id }))
+              crossSelected.map(id=>({ user_id: currentEditingUserId, crossword_id: id }))
             );
           }
 
@@ -1392,8 +1387,7 @@
           document.getElementById('userAccessModal').style.display='none';
         }
 
-        // Кнопки форм учебников/кроссвордов уже привязаны выше.
-        // Инициализация стартового состояния:
+        // ===== СТАРТОВАЯ ИНИЦИАЛИЗАЦИЯ
         await loadStats();
         await loadTextbooks();
         await loadCrosswords();
