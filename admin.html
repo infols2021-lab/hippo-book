@@ -741,36 +741,37 @@
     }
 
     // УЛУЧШЕННАЯ Функция загрузки файла в Supabase Storage
-    async function uploadImageToSupabase(supabase, file, bucketName) {
-      try {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-        const filePath = `${fileName}`;
+    // УЛУЧШЕННАЯ Функция загрузки файла в Supabase Storage
+async function uploadImageToSupabase(supabase, file, bucketName) {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+    const filePath = `${fileName}`;
 
-        console.log(`🔄 Загружаем изображение в ${bucketName}: ${fileName}`);
+    console.log(`🔄 Загружаем изображение в ${bucketName}: ${fileName}`);
 
-        const { data, error } = await supabase.storage
-          .from(bucketName)
-          .upload(filePath, file);
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .upload(filePath, file);
 
-        if (error) {
-          console.error('Ошибка загрузки в Storage:', error);
-          throw new Error(`Не удалось загрузить изображение: ${error.message}`);
-        }
-
-        // Получаем публичный URL
-        const { data: urlData } = supabase.storage
-          .from(bucketName)
-          .getPublicUrl(filePath);
-
-        console.log('✅ Изображение загружено:', urlData.publicUrl);
-        return urlData.publicUrl;
-
-      } catch (error) {
-        console.error('Ошибка в uploadImageToSupabase:', error);
-        throw error;
-      }
+    if (error) {
+      console.error('Ошибка загрузки в Storage:', error);
+      throw new Error(`Не удалось загрузить изображение: ${error.message}`);
     }
+
+    // Получаем публичный URL
+    const { data: urlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(filePath);
+
+    console.log('✅ Изображение загружено:', urlData.publicUrl);
+    return urlData.publicUrl;
+
+  } catch (error) {
+    console.error('Ошибка в uploadImageToSupabase:', error);
+    throw error;
+  }
+}
 
     // Функция для инициализации загрузки изображений
     function initImageUpload(uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId, bucketName, supabase) {
@@ -789,7 +790,7 @@
       // Обработчик выбора файла
       fileInput.addEventListener('change', async (e) => {
         if (e.target.files.length > 0) {
-          await handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput, bucketName, supabase);
+         await handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput, 'question-images', supabase);
         }
       });
 
@@ -808,7 +809,7 @@
         e.preventDefault();
         uploadArea.classList.remove('dragover');
         if (e.dataTransfer.files.length > 0) {
-          await handleFileUpload(e.dataTransfer.files[0], uploadArea, progress, progressBar, preview, urlInput, bucketName, supabase);
+        await handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput, 'question-images', supabase);
         }
       });
     }

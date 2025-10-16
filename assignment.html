@@ -407,14 +407,14 @@
               img.className = 'question-image';
               img.alt = 'Изображение для вопроса';
               
-              // ИСПРАВЛЕНИЕ: Добавляем обработчик для корректной загрузки изображений
+              // УЛУЧШЕННАЯ ЗАГРУЗКА ИЗОБРАЖЕНИЙ
               img.onload = function() {
                 console.log('✅ Изображение успешно загружено:', question.image);
               };
               
               img.onerror = function() {
                 console.error('❌ Ошибка загрузки изображения:', question.image);
-                // Пробуем загрузить с другим URL или показываем альтернативный текст
+                // Показываем альтернативный текст
                 const altText = document.createElement('div');
                 altText.className = 'small-muted';
                 altText.textContent = '❌ Изображение недоступно';
@@ -423,14 +423,12 @@
                 imageContainer.appendChild(altText);
               };
               
-              // УЛУЧШЕННАЯ ЗАГРУЗКА ИЗОБРАЖЕНИЙ
               // Пробуем разные форматы URL для совместимости
               if (question.image.startsWith('http')) {
                 img.src = question.image;
-              } else if (question.image.startsWith('/')) {
-                img.src = window.SUPABASE_URL + '/storage/v1/object/public/question-images' + question.image;
               } else {
-                img.src = window.SUPABASE_URL + '/storage/v1/object/public/question-images/' + question.image;
+                // Предполагаем, что изображение в bucket question-images
+                img.src = `${window.SUPABASE_URL}/storage/v1/object/public/question-images/${question.image}`;
               }
               
               imageContainer.appendChild(img);
@@ -586,11 +584,12 @@
             // ВАЖНОЕ ИСПРАВЛЕНИЕ: Обновляем переменную userProgress
             if (data) {
               userProgress = data;
+              console.log('✅ Прогресс сохранен, userProgress обновлен:', userProgress.id);
             }
 
           } catch (error) {
             console.error('Ошибка сохранения прогресса:', error);
-            throw error; // Пробрасываем ошибку для обработки в completeBtn
+            throw error;
           }
         }
 
