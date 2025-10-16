@@ -187,6 +187,58 @@
       font-weight: 600;
     }
 
+    /* Стили для загрузки изображений в вопросах */
+    .question-image-upload {
+      margin: 10px 0;
+    }
+    .question-image-preview {
+      max-width: 200px;
+      max-height: 150px;
+      border-radius: 8px;
+      margin-top: 10px;
+      display: none;
+    }
+
+    /* Стили для управления доступом пользователя */
+    .user-access-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    }
+    .user-access-content {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 800px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .access-category {
+      margin: 15px 0;
+    }
+    .access-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 10px;
+      margin: 10px 0;
+    }
+    .access-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+
     @media (max-width: 1024px) {
       .admin-container {
         width: 98%;
@@ -286,6 +338,29 @@
   <div id="errorMessage" class="error"></div>
   
   <div id="mainContent" style="display: none;">
+    <!-- Модальное окно управления доступом пользователя -->
+    <div class="user-access-modal" id="userAccessModal">
+      <div class="user-access-content card">
+        <h3>🔐 Управление доступом пользователя</h3>
+        <div id="userAccessInfo"></div>
+        
+        <div class="access-category">
+          <h4>📚 Доступ к учебникам</h4>
+          <div class="access-list" id="textbookAccessList"></div>
+        </div>
+        
+        <div class="access-category">
+          <h4>🧩 Доступ к кроссвордам</h4>
+          <div class="access-list" id="crosswordAccessList"></div>
+        </div>
+        
+        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn" id="saveUserAccessBtn">💾 Сохранить доступы</button>
+          <button class="btn secondary" id="closeUserAccessModal">❌ Закрыть</button>
+        </div>
+      </div>
+    </div>
+
     <div class="admin-container">
       <div class="admin-header">
         <h1>⚙️ Панель администратора</h1>
@@ -319,7 +394,6 @@
         <div class="admin-tab" data-tab="crosswords">🧩 Кроссворды</div>
         <div class="admin-tab" data-tab="assignments">📝 Задания</div>
         <div class="admin-tab" data-tab="users">👥 Пользователи</div>
-        <div class="admin-tab" data-tab="access">🔐 Доступы</div>
       </div>
 
       <!-- Секция учебников -->
@@ -543,48 +617,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Секция доступов -->
-      <div class="admin-section" id="access-section">
-        <div class="card">
-          <h2>Управление доступами к кроссвордам</h2>
-          
-          <div class="form-group">
-            <label>Выберите пользователя:</label>
-            <select id="userSelect" class="input">
-              <option value="">-- Выберите пользователя --</option>
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label>Выберите кроссворд:</label>
-            <select id="crosswordAccessSelect" class="input">
-              <option value="">-- Выберите кроссворд --</option>
-            </select>
-          </div>
-          
-          <div class="admin-controls">
-            <button class="btn" id="grantAccessBtn" disabled>🔐 Выдать доступ</button>
-          </div>
-          
-          <div class="access-management" id="accessManagement">
-            <h3>Текущие доступы</h3>
-            <div style="overflow-x: auto; margin-top: 20px;">
-              <table class="admin-table" id="accessTable">
-                <thead>
-                  <tr>
-                    <th>Пользователь</th>
-                    <th>Кроссворд</th>
-                    <th>Выдан</th>
-                    <th>Действия</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -741,7 +773,7 @@
       });
     }
 
-    // Функция загрузки файла
+    // Функция загрузки файла на сервер Supabase Storage
     async function handleFileUpload(file, uploadArea, progress, progressBar, preview, urlInput) {
       // Проверка типа файла
       if (!file.type.startsWith('image/')) {
@@ -760,12 +792,18 @@
         progress.style.display = 'block';
         progressBar.style.width = '0%';
 
-        // Создаем URL для предпросмотра
+        // Создаем FormData для загрузки
+        const formData = new FormData();
+        const fileName = `${Date.now()}_${file.name}`;
+        formData.append('file', file);
+
+        // В реальном приложении здесь будет загрузка на ваш сервер или напрямую в Supabase Storage
+        // Для демонстрации используем временный URL
         const objectUrl = URL.createObjectURL(file);
         preview.src = objectUrl;
         preview.style.display = 'block';
 
-        // Симулируем прогресс загрузки (в реальном приложении здесь будет настоящая загрузка)
+        // Симулируем прогресс загрузки
         let progressValue = 0;
         const progressInterval = setInterval(() => {
           progressValue += 5;
@@ -787,6 +825,47 @@
         showModal('Ошибка', 'Не удалось загрузить изображение: ' + error.message);
         progress.style.display = 'none';
       }
+    }
+
+    // Функция для загрузки изображения вопроса
+    function initQuestionImageUpload(questionId) {
+      const uploadArea = document.querySelector(`#questionUploadArea${questionId}`);
+      const fileInput = document.querySelector(`#questionImageInput${questionId}`);
+      const progress = document.querySelector(`#questionImageProgress${questionId}`);
+      const progressBar = document.querySelector(`#questionImageProgressBar${questionId}`);
+      const preview = document.querySelector(`#questionImagePreview${questionId}`);
+      const urlInput = document.querySelector(`#questionImageUrl${questionId}`);
+
+      if (!uploadArea) return;
+
+      uploadArea.addEventListener('click', () => {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+          handleFileUpload(e.target.files[0], uploadArea, progress, progressBar, preview, urlInput);
+        }
+      });
+
+      // Drag and drop для вопроса
+      uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+      });
+
+      uploadArea.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+      });
+
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+          handleFileUpload(e.dataTransfer.files[0], uploadArea, progress, progressBar, preview, urlInput);
+        }
+      });
     }
 
     async function initApp() {
@@ -812,6 +891,7 @@
         let editingCrosswordId = null;
         let editingAssignmentId = null;
         let selectedMaterialId = null;
+        let currentEditingUserId = null;
 
         // ===== ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ ЗАГРУЗКИ ИЗОБРАЖЕНИЙ =====
         initImageUpload(
@@ -868,10 +948,6 @@
               loadAssignments();
             } else if (tabName === 'users') {
               loadUsers();
-            } else if (tabName === 'access') {
-              loadUsersForAccess();
-              loadCrosswordsForAccess();
-              loadAccessList();
             }
           });
         });
@@ -910,11 +986,13 @@
           });
         });
 
-        // ===== УПРАВЛЕНИЕ ДОСТУПАМИ =====
+        // ===== УПРАВЛЕНИЕ ДОСТУПАМИ ПОЛЬЗОВАТЕЛЯ =====
         
-        document.getElementById('userSelect').addEventListener('change', updateAccessButton);
-        document.getElementById('crosswordAccessSelect').addEventListener('change', updateAccessButton);
-        document.getElementById('grantAccessBtn').addEventListener('click', grantAccess);
+        document.getElementById('closeUserAccessModal').addEventListener('click', () => {
+          document.getElementById('userAccessModal').style.display = 'none';
+        });
+        
+        document.getElementById('saveUserAccessBtn').addEventListener('click', () => saveUserAccess());
 
         // ===== ФУНКЦИИ ДЛЯ СТАТИСТИКИ =====
         
@@ -1412,12 +1490,30 @@
           newQuestion.setAttribute('data-type', currentQuestionType);
           newQuestion.setAttribute('data-id', questionId);
           
+          // HTML для загрузки изображения вопроса
+          const imageUploadHTML = `
+            <div class="form-group question-image-upload">
+              <label>Изображение для вопроса (опционально):</label>
+              <div class="upload-area" id="questionUploadArea${questionId}">
+                <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
+                <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP (макс. 5MB)</p>
+                <input type="file" id="questionImageInput${questionId}" style="display:none" accept="image/*">
+              </div>
+              <div class="upload-progress" id="questionImageProgress${questionId}">
+                <div class="upload-progress-bar" id="questionImageProgressBar${questionId}"></div>
+              </div>
+              <input type="hidden" id="questionImageUrl${questionId}">
+              <img class="question-image-preview" id="questionImagePreview${questionId}" alt="Предпросмотр изображения">
+            </div>
+          `;
+          
           if (currentQuestionType === 'test') {
             newQuestion.innerHTML = `
               <div class="form-group">
                 <label>Текст вопроса:</label>
                 <input type="text" class="input question-text" placeholder="Введите вопрос">
               </div>
+              ${imageUploadHTML}
               <div class="form-group">
                 <label>Варианты ответов (каждый с новой строки):</label>
                 <textarea class="input test-options" placeholder="Вариант 1\nВариант 2\nВариант 3\nВариант 4" rows="4"></textarea>
@@ -1434,6 +1530,7 @@
                 <label>Текст вопроса:</label>
                 <input type="text" class="input question-text" placeholder="Введите вопрос">
               </div>
+              ${imageUploadHTML}
               <div class="form-group">
                 <label>Правильные ответы (каждый с новой строки):</label>
                 <textarea class="input fill-answers" placeholder="Правильный ответ 1\nПравильный ответ 2\nПравильный ответ 3" rows="3"></textarea>
@@ -1443,6 +1540,11 @@
             `;
           } else if (currentQuestionType === 'sentence') {
             newQuestion.innerHTML = `
+              <div class="form-group">
+                <label>Текст вопроса:</label>
+                <input type="text" class="input question-text" placeholder="Введите вопрос">
+              </div>
+              ${imageUploadHTML}
               <div class="form-group">
                 <label>Предложение с пропусками:</label>
                 <div class="sentence-builder">
@@ -1461,6 +1563,9 @@
           }
           
           questionsContainer.appendChild(newQuestion);
+          
+          // Инициализируем загрузку изображения для этого вопроса
+          initQuestionImageUpload(questionId);
           
           const removeQuestionBtn = newQuestion.querySelector('.remove-question');
           removeQuestionBtn.addEventListener('click', function() {
@@ -1528,10 +1633,21 @@
             const item = questionElements[i];
             const questionType = item.getAttribute('data-type') || 'test';
             const questionText = item.querySelector('.question-text').value;
+            const questionImageUrl = item.querySelector('.question-image-url')?.value || '';
             
             if (!questionText) {
               showModal('Ошибка', `Заполните текст вопроса ${i + 1}`);
               return;
+            }
+            
+            const questionData = {
+              type: questionType,
+              q: questionText
+            };
+            
+            // Добавляем изображение, если есть
+            if (questionImageUrl) {
+              questionData.image = questionImageUrl;
             }
             
             if (questionType === 'test') {
@@ -1545,12 +1661,8 @@
                 return;
               }
               
-              questions.push({
-                type: 'test',
-                q: questionText,
-                options: options,
-                correct: correct
-              });
+              questionData.options = options;
+              questionData.correct = correct;
             } else if (questionType === 'fill') {
               const answersText = item.querySelector('.fill-answers').value;
               const answers = answersText.split('\n').filter(ans => ans.trim() !== '');
@@ -1560,11 +1672,7 @@
                 return;
               }
               
-              questions.push({
-                type: 'fill',
-                q: questionText,
-                answers: answers
-              });
+              questionData.answers = answers;
             } else if (questionType === 'sentence') {
               const sentence = item.querySelector('.sentence-input').value;
               const answersText = item.querySelector('.sentence-answers').value;
@@ -1588,13 +1696,11 @@
                 return;
               }
               
-              questions.push({
-                type: 'sentence',
-                q: questionText,
-                sentence: sentence,
-                answers: answers
-              });
+              questionData.sentence = sentence;
+              questionData.answers = answers;
             }
+            
+            questions.push(questionData);
           }
           
           const content = { questions };
@@ -1778,12 +1884,30 @@
               questionDiv.setAttribute('data-type', question.type || 'test');
               questionDiv.setAttribute('data-id', questionId);
               
+              // HTML для загрузки изображения вопроса
+              const imageUploadHTML = `
+                <div class="form-group question-image-upload">
+                  <label>Изображение для вопроса (опционально):</label>
+                  <div class="upload-area" id="questionUploadArea${questionId}">
+                    <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
+                    <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP (макс. 5MB)</p>
+                    <input type="file" id="questionImageInput${questionId}" style="display:none" accept="image/*">
+                  </div>
+                  <div class="upload-progress" id="questionImageProgress${questionId}">
+                    <div class="upload-progress-bar" id="questionImageProgressBar${questionId}"></div>
+                  </div>
+                  <input type="hidden" id="questionImageUrl${questionId}" value="${question.image || ''}">
+                  <img class="question-image-preview" id="questionImagePreview${questionId}" alt="Предпросмотр изображения" ${question.image ? `src="${question.image}" style="display:block"` : 'style="display:none"'}>
+                </div>
+              `;
+              
               if (question.type === 'test') {
                 questionDiv.innerHTML = `
                   <div class="form-group">
                     <label>Текст вопроса:</label>
                     <input type="text" class="input question-text" value="${question.q}" placeholder="Введите вопрос">
                   </div>
+                  ${imageUploadHTML}
                   <div class="form-group">
                     <label>Варианты ответов (каждый с новой строки):</label>
                     <textarea class="input test-options" placeholder="Вариант 1\nВариант 2\nВариант 3\nВариант 4" rows="4">${(question.options || []).join('\n')}</textarea>
@@ -1800,6 +1924,7 @@
                     <label>Текст вопроса:</label>
                     <input type="text" class="input question-text" value="${question.q}" placeholder="Введите вопрос">
                   </div>
+                  ${imageUploadHTML}
                   <div class="form-group">
                     <label>Правильные ответы (каждый с новой строки):</label>
                     <textarea class="input fill-answers" placeholder="Правильный ответ 1\nПравильный ответ 2\nПравильный ответ 3" rows="3">${(question.answers || []).join('\n')}</textarea>
@@ -1809,6 +1934,11 @@
                 `;
               } else if (question.type === 'sentence') {
                 questionDiv.innerHTML = `
+                  <div class="form-group">
+                    <label>Текст вопроса:</label>
+                    <input type="text" class="input question-text" value="${question.q}" placeholder="Введите вопрос">
+                  </div>
+                  ${imageUploadHTML}
                   <div class="form-group">
                     <label>Предложение с пропусками:</label>
                     <div class="sentence-builder">
@@ -1827,6 +1957,9 @@
               }
               
               questionsContainer.appendChild(questionDiv);
+              
+              // Инициализируем загрузку изображения для этого вопроса
+              initQuestionImageUpload(questionId);
               
               const removeQuestionBtn = questionDiv.querySelector('.remove-question');
               removeQuestionBtn.addEventListener('click', function() {
@@ -1944,6 +2077,7 @@
                     <button class="btn btn-small ${user.is_admin ? 'secondary' : ''}" data-user-id="${user.id}" data-make-admin="${!user.is_admin}">
                       ${user.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}
                     </button>
+                    <button class="btn btn-small" data-user-id="${user.id}" data-user-name="${user.full_name || user.email}">🔐 Управление доступом</button>
                   </div>
                 </td>
               `;
@@ -1954,7 +2088,15 @@
               btn.addEventListener('click', () => {
                 const userId = btn.getAttribute('data-user-id');
                 const makeAdmin = btn.getAttribute('data-make-admin') === 'true';
-                toggleAdmin(userId, makeAdmin);
+                const userName = btn.getAttribute('data-user-name');
+                
+                if (userName) {
+                  // Кнопка управления доступом
+                  openUserAccessModal(userId, userName);
+                } else {
+                  // Кнопка изменения прав администратора
+                  toggleAdmin(userId, makeAdmin);
+                }
               });
             });
           } catch (error) {
@@ -1984,176 +2126,117 @@
           }
         }
 
-        // ===== УПРАВЛЕНИЕ ДОСТУПАМИ =====
+        // ===== УПРАВЛЕНИЕ ДОСТУПАМИ ПОЛЬЗОВАТЕЛЯ =====
         
-        async function loadUsersForAccess() {
-          try {
-            const { data: users, error } = await supabase
-              .from('profiles')
-              .select('id, full_name, email')
-              .order('full_name');
+        async function openUserAccessModal(userId, userName) {
+          currentEditingUserId = userId;
+          
+          document.getElementById('userAccessInfo').innerHTML = `
+            <p><strong>Пользователь:</strong> ${userName}</p>
+            <p class="small-muted">Отметьте галочками учебники и кроссворды, к которым должен иметь доступ пользователь</p>
+          `;
+          
+          // Загружаем все учебники и кроссворды
+          const [textbooks, crosswords, userTextbookAccess, userCrosswordAccess] = await Promise.all([
+            supabase.from('textbooks').select('id, title').eq('is_active', true),
+            supabase.from('crosswords').select('id, title').eq('is_active', true),
+            supabase.from('textbook_access').select('textbook_id').eq('user_id', userId),
+            supabase.from('crossword_access').select('crossword_id').eq('user_id', userId)
+          ]);
+          
+          // Отображаем учебники
+          const textbookList = document.getElementById('textbookAccessList');
+          textbookList.innerHTML = '';
+          
+          if (textbooks.data && textbooks.data.length > 0) {
+            textbooks.data.forEach(textbook => {
+              const isChecked = userTextbookAccess.data?.some(access => access.textbook_id === textbook.id) || false;
               
-            if (error) throw error;
-            
-            const select = document.getElementById('userSelect');
-            select.innerHTML = '<option value="">-- Выберите пользователя --</option>';
-            
-            if (users && users.length > 0) {
-              users.forEach(user => {
-                const option = document.createElement('option');
-                option.value = user.id;
-                option.textContent = `${user.full_name || 'Без имени'} (${user.email})`;
-                select.appendChild(option);
-              });
-            }
-            
-          } catch (error) {
-            console.error('Ошибка загрузки пользователей:', error);
+              const item = document.createElement('div');
+              item.className = 'access-item';
+              item.innerHTML = `
+                <input type="checkbox" id="textbook_${textbook.id}" ${isChecked ? 'checked' : ''}>
+                <label for="textbook_${textbook.id}">${textbook.title}</label>
+              `;
+              textbookList.appendChild(item);
+            });
+          } else {
+            textbookList.innerHTML = '<p class="small-muted">Нет доступных учебников</p>';
           }
-        }
-        
-        async function loadCrosswordsForAccess() {
-          try {
-            const { data: crosswords, error } = await supabase
-              .from('crosswords')
-              .select('id, title')
-              .eq('is_active', true)
-              .order('title');
+          
+          // Отображаем кроссворды
+          const crosswordList = document.getElementById('crosswordAccessList');
+          crosswordList.innerHTML = '';
+          
+          if (crosswords.data && crosswords.data.length > 0) {
+            crosswords.data.forEach(crossword => {
+              const isChecked = userCrosswordAccess.data?.some(access => access.crossword_id === crossword.id) || false;
               
-            if (error) throw error;
-            
-            const select = document.getElementById('crosswordAccessSelect');
-            select.innerHTML = '<option value="">-- Выберите кроссворд --</option>';
-            
-            if (crosswords && crosswords.length > 0) {
-              crosswords.forEach(crossword => {
-                const option = document.createElement('option');
-                option.value = crossword.id;
-                option.textContent = crossword.title;
-                select.appendChild(option);
-              });
-            }
-            
-          } catch (error) {
-            console.error('Ошибка загрузки кроссвордов:', error);
+              const item = document.createElement('div');
+              item.className = 'access-item';
+              item.innerHTML = `
+                <input type="checkbox" id="crossword_${crossword.id}" ${isChecked ? 'checked' : ''}>
+                <label for="crossword_${crossword.id}">${crossword.title}</label>
+              `;
+              crosswordList.appendChild(item);
+            });
+          } else {
+            crosswordList.innerHTML = '<p class="small-muted">Нет доступных кроссвордов</p>';
           }
+          
+          document.getElementById('userAccessModal').style.display = 'flex';
         }
         
-        function updateAccessButton() {
-          const userId = document.getElementById('userSelect').value;
-          const crosswordId = document.getElementById('crosswordAccessSelect').value;
-          document.getElementById('grantAccessBtn').disabled = !userId || !crosswordId;
-        }
-        
-        async function grantAccess() {
-          const userId = document.getElementById('userSelect').value;
-          const crosswordId = document.getElementById('crosswordAccessSelect').value;
+        async function saveUserAccess() {
+          if (!currentEditingUserId) return;
           
           try {
-            // Проверяем, не выдан ли уже доступ
-            const { data: existingAccess, error: checkError } = await supabase
-              .from('crossword_access')
-              .select('id')
-              .eq('user_id', userId)
-              .eq('crossword_id', crosswordId);
-              
-            if (checkError) throw checkError;
+            // Собираем выбранные учебники
+            const selectedTextbooks = [];
+            document.querySelectorAll('#textbookAccessList input[type="checkbox"]:checked').forEach(checkbox => {
+              const textbookId = checkbox.id.replace('textbook_', '');
+              selectedTextbooks.push(textbookId);
+            });
             
-            if (existingAccess && existingAccess.length > 0) {
-              showModal('Ошибка', 'Доступ уже выдан этому пользователю');
-              return;
+            // Собираем выбранные кроссворды
+            const selectedCrosswords = [];
+            document.querySelectorAll('#crosswordAccessList input[type="checkbox"]:checked').forEach(checkbox => {
+              const crosswordId = checkbox.id.replace('crossword_', '');
+              selectedCrosswords.push(crosswordId);
+            });
+            
+            // Удаляем старые доступы и добавляем новые
+            await supabase.from('textbook_access').delete().eq('user_id', currentEditingUserId);
+            await supabase.from('crossword_access').delete().eq('user_id', currentEditingUserId);
+            
+            // Добавляем новые доступы к учебникам
+            if (selectedTextbooks.length > 0) {
+              const textbookAccessData = selectedTextbooks.map(textbookId => ({
+                user_id: currentEditingUserId,
+                textbook_id: textbookId,
+                granted_by: currentUser.id
+              }));
+              
+              await supabase.from('textbook_access').insert(textbookAccessData);
             }
             
-            const { error } = await supabase
-              .from('crossword_access')
-              .insert([{
-                user_id: userId,
+            // Добавляем новые доступы к кроссвордам
+            if (selectedCrosswords.length > 0) {
+              const crosswordAccessData = selectedCrosswords.map(crosswordId => ({
+                user_id: currentEditingUserId,
                 crossword_id: crosswordId,
                 granted_by: currentUser.id
-              }]);
+              }));
               
-            if (error) throw error;
-            
-            showModal('Успех', 'Доступ успешно выдан');
-            loadAccessList();
-            
-            // Сбрасываем форму
-            document.getElementById('userSelect').value = '';
-            document.getElementById('crosswordAccessSelect').value = '';
-            updateAccessButton();
-            
-          } catch (error) {
-            console.error('Ошибка выдачи доступа:', error);
-            showModal('Ошибка', 'Не удалось выдать доступ: ' + error.message);
-          }
-        }
-        
-        async function loadAccessList() {
-          try {
-            const { data: accessList, error } = await supabase
-              .from('crossword_access')
-              .select(`
-                *,
-                profiles:user_id(full_name, email),
-                crosswords:crossword_id(title),
-                granted_by_profiles:granted_by(full_name)
-              `)
-              .order('granted_at', { ascending: false });
-              
-            if (error) throw error;
-            
-            const tbody = document.querySelector('#accessTable tbody');
-            tbody.innerHTML = '';
-            
-            if (!accessList || accessList.length === 0) {
-              tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:20px;">Доступы не выданы</td></tr>`;
-              return;
+              await supabase.from('crossword_access').insert(crosswordAccessData);
             }
             
-            accessList.forEach(access => {
-              const tr = document.createElement('tr');
-              tr.innerHTML = `
-                <td>${access.profiles?.full_name || 'Без имени'} (${access.profiles?.email || 'нет email'})</td>
-                <td>${access.crosswords?.title || 'Неизвестно'}</td>
-                <td>${new Date(access.granted_at).toLocaleDateString('ru-RU')} (${access.granted_by_profiles?.full_name || 'Админ'})</td>
-                <td>
-                  <button class="btn btn-small btn-danger revoke-access" data-id="${access.id}" data-user="${access.profiles?.full_name}" data-crossword="${access.crosswords?.title}">🗑️ Отозвать</button>
-                </td>
-              `;
-              tbody.appendChild(tr);
-            });
-            
-            document.querySelectorAll('.revoke-access').forEach(btn => {
-              btn.addEventListener('click', async () => {
-                const accessId = btn.getAttribute('data-id');
-                const userName = btn.getAttribute('data-user');
-                const crosswordName = btn.getAttribute('data-crossword');
-                await revokeAccess(accessId, userName, crosswordName);
-              });
-            });
+            showModal('Успех', 'Доступы пользователя успешно обновлены');
+            document.getElementById('userAccessModal').style.display = 'none';
             
           } catch (error) {
-            console.error('Ошибка загрузки списка доступов:', error);
-          }
-        }
-        
-        async function revokeAccess(accessId, userName, crosswordName) {
-          if (!confirm(`Вы уверены, что хотите отозвать доступ пользователя "${userName}" к кроссворду "${crosswordName}"?`)) return;
-          
-          try {
-            const { error } = await supabase
-              .from('crossword_access')
-              .delete()
-              .eq('id', accessId);
-              
-            if (error) throw error;
-            
-            showModal('Успех', 'Доступ успешно отозван');
-            loadAccessList();
-            
-          } catch (error) {
-            console.error('Ошибка отзыва доступа:', error);
-            showModal('Ошибка', 'Не удалось отозвать доступ: ' + error.message);
+            console.error('Ошибка сохранения доступов:', error);
+            showModal('Ошибка', 'Не удалось сохранить доступы: ' + error.message);
           }
         }
 
@@ -2165,9 +2248,6 @@
           await loadCrosswords();
           await loadMaterialsForAssignments();
           await loadUsers();
-          await loadUsersForAccess();
-          await loadCrosswordsForAccess();
-          await loadAccessList();
         }
 
         // Поиск пользователей с задержкой
