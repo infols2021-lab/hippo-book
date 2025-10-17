@@ -116,18 +116,12 @@
             padding-top: 20px;
             border-top: 1px solid var(--bg1);
         }
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background: var(--bg1);
-            border-radius: 3px;
-            margin: 20px 0;
-            overflow: hidden;
-        }
-        .progress-fill {
-            height: 100%;
-            background: var(--accent2);
-            transition: width 0.3s ease;
+        .question-counter {
+            text-align: center;
+            font-size: 16px;
+            color: #666;
+            margin: 15px 0;
+            font-weight: 600;
         }
         .loading {
             text-align: center;
@@ -179,10 +173,12 @@
             padding: 20px;
             background: var(--bg1);
             border-radius: 12px;
+            text-align: left;
         }
         .completion-details h3 {
             margin-bottom: 15px;
             color: var(--accent2);
+            text-align: center;
         }
         .result-item {
             display: flex;
@@ -192,6 +188,66 @@
         }
         .result-item:last-child {
             border-bottom: none;
+        }
+        .previous-result {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 12px;
+            margin: 15px 0;
+            text-align: center;
+            border-left: 4px solid var(--accent2);
+        }
+        .question-review {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .question-review.correct {
+            border-left: 4px solid #4caf50;
+        }
+        .question-review.incorrect {
+            border-left: 4px solid #f44336;
+        }
+        .question-review.skipped {
+            border-left: 4px solid #ff9800;
+        }
+        .review-question {
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .review-answer {
+            margin: 5px 0;
+        }
+        .review-correct {
+            color: #4caf50;
+            font-weight: 600;
+        }
+        .review-user {
+            color: #f44336;
+        }
+        .review-status {
+            font-weight: 600;
+            margin-top: 5px;
+        }
+        .status-correct { color: #4caf50; }
+        .status-incorrect { color: #f44336; }
+        .status-skipped { color: #ff9800; }
+
+        @media (max-width: 768px) {
+            .assignment-container {
+                padding: 0 15px;
+            }
+            .question-card {
+                padding: 16px;
+            }
+            .question-text {
+                font-size: 16px;
+            }
+            .option-label {
+                padding: 12px;
+            }
         }
     </style>
 </head>
@@ -214,12 +270,8 @@
                 <div class="card">
                     <h2 id="assignmentTitle">Название задания</h2>
                     
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 14px; color: #666;">
-                        <span>Прогресс: <span id="progressText">0</span>%</span>
-                        <span>Вопрос <span id="currentQuestion">1</span> из <span id="totalQuestions">0</span></span>
+                    <div class="question-counter">
+                        Вопрос <span id="currentQuestion">1</span> из <span id="totalQuestions">0</span>
                     </div>
 
                     <div id="questionsContainer"></div>
@@ -257,6 +309,11 @@
                         <span>Пропущено вопросов:</span>
                         <span id="skippedQuestionsResult">0</span>
                     </div>
+                </div>
+
+                <div id="questionsReview" style="display: none;">
+                    <h3>🔍 Разбор ответов</h3>
+                    <div id="reviewContainer"></div>
                 </div>
                 
                 <div style="margin-top: 30px;">
@@ -336,20 +393,22 @@
 
                 // Загружаем прогресс пользователя
                 let userAnswers = {};
+                let previousScore = null;
                 const { data: progress } = await supabase
                     .from('user_progress')
-                    .select('answers')
+                    .select('*')
                     .eq('user_id', user.id)
                     .eq('assignment_id', assignmentId)
                     .maybeSingle();
 
-                if (progress && progress.answers) {
-                    userAnswers = progress.answers;
-                    console.log('✅ Прогресс загружен');
+                if (progress) {
+                    userAnswers = progress.answers || {};
+                    previousScore = progress.score;
+                    console.log('✅ Прогресс загружен, предыдущий результат:', previousScore + '%');
                 }
 
                 // Показываем задание
-                showAssignment(assignment, questions, userAnswers, supabase, user);
+                showAssignment(assignment, questions, userAnswers, supabase, user, previousScore);
 
             } catch (error) {
                 console.error('❌ Критическая ошибка:', error);
@@ -358,7 +417,7 @@
         }
 
         // Функция показа задания
-        function showAssignment(assignment, questions, userAnswers, supabase, user) {
+        function showAssignment(assignment, questions, userAnswers, supabase, user, previousScore) {
             // Скрываем загрузку, показываем контент
             document.getElementById('loading').style.display = 'none';
             document.getElementById('assignmentContent').style.display = 'block';
@@ -366,6 +425,20 @@
             // Устанавливаем заголовок
             document.getElementById('assignmentTitle').textContent = assignment.title;
             document.getElementById('totalQuestions').textContent = questions.length;
+
+            // Показываем предыдущий результат, если есть
+            if (previousScore !== null) {
+                const previousResult = document.createElement('div');
+                previousResult.className = 'previous-result';
+                previousResult.innerHTML = `
+                    <strong>📊 Предыдущий результат:</strong> ${previousScore}%
+                    <br><small>Новое прохождение обновит этот результат</small>
+                `;
+                document.querySelector('.assignment-container .card').insertBefore(
+                    previousResult, 
+                    document.querySelector('.question-counter')
+                );
+            }
 
             let currentQuestionIndex = 0;
 
@@ -419,8 +492,6 @@
                 document.getElementById('prevBtn').style.display = index > 0 ? 'block' : 'none';
                 document.getElementById('nextBtn').style.display = index < questions.length - 1 ? 'block' : 'none';
                 document.getElementById('finishBtn').style.display = index === questions.length - 1 ? 'block' : 'none';
-                
-                updateProgress();
             }
 
             // Рендерим тестовый вопрос
@@ -443,8 +514,7 @@
                         userAnswers[index] = optionIndex;
                         document.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
                         label.classList.add('selected');
-                        await saveProgress();
-                        updateProgress();
+                        await saveProgress(false);
                     });
                     
                     label.appendChild(radio);
@@ -465,8 +535,7 @@
                 
                 input.addEventListener('input', async () => {
                     userAnswers[index] = input.value;
-                    await saveProgress();
-                    updateProgress();
+                    await saveProgress(false);
                 });
                 
                 container.appendChild(input);
@@ -521,8 +590,7 @@
                                 userAnswers[index] = [];
                             }
                             userAnswers[index][partIndex] = input.value;
-                            await saveProgress();
-                            updateProgress();
+                            await saveProgress(false);
                         });
                         
                         gapContainer.appendChild(input);
@@ -535,14 +603,16 @@
             }
 
             // Функция сохранения прогресса
-            async function saveProgress() {
+            async function saveProgress(isCompleted = false) {
                 try {
+                    const score = isCompleted ? calculateScore().score : 0;
                     const progressData = {
                         user_id: user.id,
                         assignment_id: assignment.id,
                         answers: userAnswers,
-                        is_completed: false,
-                        score: 0
+                        is_completed: isCompleted,
+                        completed_at: isCompleted ? new Date().toISOString() : null,
+                        score: score
                     };
 
                     // Проверяем существующий прогресс
@@ -553,73 +623,28 @@
                         .eq('assignment_id', assignment.id)
                         .maybeSingle();
 
+                    let result;
                     if (existing) {
-                        await supabase
+                        result = await supabase
                             .from('user_progress')
                             .update(progressData)
                             .eq('id', existing.id);
                     } else {
-                        await supabase
-                            .from('user_progress')
-                            .insert(progressData);
-                    }
-                } catch (error) {
-                    console.error('Ошибка сохранения:', error);
-                }
-            }
-
-            // Функция обновления прогресса
-            function updateProgress() {
-                const answeredCount = Object.keys(userAnswers).filter(key => {
-                    const answer = userAnswers[key];
-                    if (Array.isArray(answer)) {
-                        return answer.some(item => item && item.trim() !== '');
-                    }
-                    return answer !== undefined && answer !== '' && answer !== null;
-                }).length;
-                
-                const progress = (answeredCount / questions.length) * 100;
-                document.getElementById('progressFill').style.width = `${progress}%`;
-                document.getElementById('progressText').textContent = Math.round(progress);
-            }
-
-            // Функция завершения задания
-            async function finishAssignment() {
-                try {
-                    const scoreResult = calculateScore();
-                    const progressData = {
-                        user_id: user.id,
-                        assignment_id: assignment.id,
-                        answers: userAnswers,
-                        is_completed: true,
-                        completed_at: new Date().toISOString(),
-                        score: scoreResult.score
-                    };
-
-                    const { data: existing } = await supabase
-                        .from('user_progress')
-                        .select('id')
-                        .eq('user_id', user.id)
-                        .eq('assignment_id', assignment.id)
-                        .maybeSingle();
-
-                    if (existing) {
-                        await supabase
-                            .from('user_progress')
-                            .update(progressData)
-                            .eq('id', existing.id);
-                    } else {
-                        await supabase
+                        result = await supabase
                             .from('user_progress')
                             .insert(progressData);
                     }
 
-                    // Показываем экран завершения с деталями
-                    showCompletionScreen(scoreResult);
+                    if (result.error) {
+                        console.error('Ошибка сохранения прогресса:', result.error);
+                        throw new Error('Не удалось сохранить прогресс');
+                    }
 
+                    console.log('✅ Прогресс сохранен');
+                    return true;
                 } catch (error) {
-                    console.error('Ошибка завершения:', error);
-                    alert('Ошибка при сохранении результата');
+                    console.error('❌ Ошибка сохранения:', error);
+                    return false;
                 }
             }
 
@@ -628,15 +653,29 @@
                 let correctAnswers = 0;
                 let incorrectAnswers = 0;
                 let skippedAnswers = 0;
+                const questionResults = [];
                 
                 questions.forEach((question, index) => {
                     const userAnswer = userAnswers[index];
+                    const result = {
+                        question: question.q,
+                        type: question.type,
+                        userAnswer: userAnswer,
+                        correctAnswer: null,
+                        isCorrect: false,
+                        isSkipped: false
+                    };
                     
                     // Проверяем, есть ли ответ
-                    if (userAnswer === undefined || userAnswer === null || 
-                        (Array.isArray(userAnswer) && userAnswer.every(item => !item || item.trim() === '')) ||
-                        (!Array.isArray(userAnswer) && (!userAnswer || userAnswer.trim() === ''))) {
+                    const hasAnswer = userAnswer !== undefined && 
+                                     userAnswer !== null && 
+                                     userAnswer !== '' &&
+                                     !(Array.isArray(userAnswer) && userAnswer.every(item => !item || item.trim() === ''));
+                    
+                    if (!hasAnswer) {
                         skippedAnswers++;
+                        result.isSkipped = true;
+                        questionResults.push(result);
                         return;
                     }
                     
@@ -644,28 +683,39 @@
                     
                     if (question.type === 'test') {
                         // Для тестовых вопросов сравниваем номер правильного ответа
+                        result.correctAnswer = question.correct;
+                        result.correctOptions = question.options;
                         isCorrect = parseInt(userAnswer) === question.correct;
                     } else if (question.type === 'fill') {
                         // Для вопросов с заполнением проверяем совпадение с любым из правильных ответов
+                        result.correctAnswer = question.answers;
                         const userAnswerNormalized = String(userAnswer).toLowerCase().trim();
                         const correctAnswersNormalized = question.answers.map(a => String(a).toLowerCase().trim());
                         isCorrect = correctAnswersNormalized.includes(userAnswerNormalized);
                     } else if (question.type === 'sentence') {
                         // Для предложений проверяем каждый пропуск
+                        result.correctAnswer = question.answers;
                         if (Array.isArray(userAnswer) && Array.isArray(question.answers)) {
-                            isCorrect = userAnswer.every((answer, gapIndex) => {
-                                if (!answer || !question.answers[gapIndex]) return false;
-                                return String(answer).toLowerCase().trim() === 
-                                       String(question.answers[gapIndex]).toLowerCase().trim();
-                            });
+                            // Проверяем, что все ответы совпадают и количество ответов правильное
+                            if (userAnswer.length === question.answers.length) {
+                                isCorrect = userAnswer.every((answer, gapIndex) => {
+                                    if (!answer || !question.answers[gapIndex]) return false;
+                                    return String(answer).toLowerCase().trim() === 
+                                           String(question.answers[gapIndex]).toLowerCase().trim();
+                                });
+                            }
                         }
                     }
+                    
+                    result.isCorrect = isCorrect;
                     
                     if (isCorrect) {
                         correctAnswers++;
                     } else {
                         incorrectAnswers++;
                     }
+                    
+                    questionResults.push(result);
                 });
                 
                 const totalAnswered = correctAnswers + incorrectAnswers;
@@ -676,8 +726,28 @@
                     correctAnswers: correctAnswers,
                     incorrectAnswers: incorrectAnswers,
                     skippedAnswers: skippedAnswers,
-                    totalQuestions: questions.length
+                    totalQuestions: questions.length,
+                    questionResults: questionResults
                 };
+            }
+
+            // Функция завершения задания
+            async function finishAssignment() {
+                try {
+                    const scoreResult = calculateScore();
+                    const success = await saveProgress(true);
+                    
+                    if (!success) {
+                        throw new Error('Не удалось сохранить результат');
+                    }
+
+                    // Показываем экран завершения с деталями
+                    showCompletionScreen(scoreResult);
+
+                } catch (error) {
+                    console.error('❌ Ошибка завершения:', error);
+                    alert('Ошибка при сохранении результата: ' + error.message);
+                }
             }
 
             // Функция показа экрана завершения
@@ -702,6 +772,92 @@
                 } else {
                     document.getElementById('completionMessage').textContent = 'Попробуйте пройти задание еще раз для лучшего результата.';
                 }
+                
+                // Показываем разбор ответов, если есть неправильные или пропущенные вопросы
+                if (scoreResult.incorrectAnswers > 0 || scoreResult.skippedAnswers > 0) {
+                    showQuestionsReview(scoreResult.questionResults);
+                }
+            }
+
+            // Функция показа разбора ответов
+            function showQuestionsReview(questionResults) {
+                const reviewContainer = document.getElementById('reviewContainer');
+                const questionsReview = document.getElementById('questionsReview');
+                
+                reviewContainer.innerHTML = '';
+                questionsReview.style.display = 'block';
+                
+                questionResults.forEach((result, index) => {
+                    const reviewItem = document.createElement('div');
+                    
+                    let statusClass = '';
+                    let statusText = '';
+                    let statusColor = '';
+                    
+                    if (result.isSkipped) {
+                        statusClass = 'skipped';
+                        statusText = 'Пропущен';
+                        statusColor = 'status-skipped';
+                    } else if (result.isCorrect) {
+                        statusClass = 'correct';
+                        statusText = 'Правильно';
+                        statusColor = 'status-correct';
+                    } else {
+                        statusClass = 'incorrect';
+                        statusText = 'Неправильно';
+                        statusColor = 'status-incorrect';
+                    }
+                    
+                    reviewItem.className = `question-review ${statusClass}`;
+                    
+                    let answerDetails = '';
+                    
+                    if (result.type === 'test') {
+                        const userOption = result.userAnswer !== undefined ? result.correctOptions[result.userAnswer] : 'Не отвечено';
+                        const correctOption = result.correctOptions[result.correctAnswer];
+                        
+                        answerDetails = `
+                            <div class="review-answer"><strong>Ваш ответ:</strong> ${userOption}</div>
+                            <div class="review-answer review-correct"><strong>Правильный ответ:</strong> ${correctOption}</div>
+                        `;
+                    } else if (result.type === 'fill') {
+                        const userAnswer = result.userAnswer || 'Не отвечено';
+                        const correctAnswer = Array.isArray(result.correctAnswer) ? 
+                            result.correctAnswer.join(' или ') : result.correctAnswer;
+                        
+                        answerDetails = `
+                            <div class="review-answer"><strong>Ваш ответ:</strong> ${userAnswer}</div>
+                            <div class="review-answer review-correct"><strong>Правильный ответ:</strong> ${correctAnswer}</div>
+                        `;
+                    } else if (result.type === 'sentence') {
+                        let userAnswerText = 'Не отвечено';
+                        if (Array.isArray(result.userAnswer)) {
+                            userAnswerText = result.userAnswer.map((ans, i) => 
+                                ans ? `[${i+1}: ${ans}]` : `[${i+1}: не отвечено]`
+                            ).join(' ');
+                        }
+                        
+                        let correctAnswerText = '';
+                        if (Array.isArray(result.correctAnswer)) {
+                            correctAnswerText = result.correctAnswer.map((ans, i) => 
+                                `[${i+1}: ${ans}]`
+                            ).join(' ');
+                        }
+                        
+                        answerDetails = `
+                            <div class="review-answer"><strong>Ваши ответы:</strong> ${userAnswerText}</div>
+                            <div class="review-answer review-correct"><strong>Правильные ответы:</strong> ${correctAnswerText}</div>
+                        `;
+                    }
+                    
+                    reviewItem.innerHTML = `
+                        <div class="review-question">Вопрос ${index + 1}: ${result.question}</div>
+                        ${answerDetails}
+                        <div class="review-status ${statusColor}">${statusText}</div>
+                    `;
+                    
+                    reviewContainer.appendChild(reviewItem);
+                });
             }
 
             // Обработчики кнопок
