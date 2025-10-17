@@ -20,9 +20,6 @@
             box-shadow: 0 8px 26px rgba(0,0,0,0.08);
         }
         .question-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
             margin-bottom: 20px;
         }
         .question-number {
@@ -176,17 +173,10 @@
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(78, 205, 196, 0.3);
         }
-        .btn-finish:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
 
         @media (max-width: 768px) {
             .assignment-container {
                 padding: 0 15px;
-                margin: 10px auto;
             }
             .question-card {
                 padding: 16px;
@@ -197,9 +187,6 @@
             .option-label {
                 padding: 12px;
             }
-            .sentence-input {
-                min-width: 80px;
-            }
         }
     </style>
 </head>
@@ -207,8 +194,7 @@
     <div class="container">
         <header class="header">
             <button class="btn secondary" onclick="location.href='/profile.html'">← Назад</button>
-            <h1 id="pageTitle">Задание</h1>
-            <div id="userInfo"></div>
+            <h1>Задание</h1>
         </header>
 
         <div id="loading" class="loading">
@@ -221,8 +207,7 @@
         <div id="assignmentContent" style="display: none;">
             <div class="assignment-container">
                 <div class="card">
-                    <h2 id="assignmentTitle"></h2>
-                    <div id="assignmentDescription"></div>
+                    <h2 id="assignmentTitle">Название задания</h2>
                     
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill"></div>
@@ -250,7 +235,6 @@
                 <p id="completionMessage"></p>
                 <div style="margin-top: 30px;">
                     <button class="btn" onclick="location.href='/profile.html'">Вернуться в профиль</button>
-                    <button class="btn secondary" onclick="location.reload()">Пройти заново</button>
                 </div>
             </div>
         </div>
@@ -259,8 +243,11 @@
     <script type="module">
         // Ждем загрузки конфигурации
         if (!window.SUPABASE_URL) {
+            console.log('⏳ Ожидаем загрузку конфигурации...');
             await window.CONFIG_READY;
         }
+
+        console.log('✅ Конфигурация загружена:', window.SUPABASE_URL ? 'Да' : 'Нет');
 
         let supabase;
         try {
@@ -269,26 +256,25 @@
             console.log('✅ Supabase клиент инициализирован');
         } catch (error) {
             console.error('❌ Ошибка инициализации Supabase:', error);
-            showError('Ошибка загрузки приложения: ' + error.message);
+            showError('Ошибка загрузки приложения');
             return;
         }
 
-        // Получаем параметры из URL
+        // Получаем ID задания из URL
         const urlParams = new URLSearchParams(window.location.search);
         const assignmentId = urlParams.get('id');
         
         if (!assignmentId) {
-            showError('ID задания не указан в URL');
+            showError('ID задания не указан');
             return;
         }
 
-        console.log('🔄 Загружаем задание ID:', assignmentId);
+        console.log('📝 ID задания:', assignmentId);
 
         let assignment = null;
         let questions = [];
         let currentQuestionIndex = 0;
         let userAnswers = {};
-        let userProgressId = null;
 
         // Элементы DOM
         const loadingEl = document.getElementById('loading');
@@ -310,26 +296,27 @@
         // Проверяем аутентификацию
         let user;
         try {
-            const { data: authData, error: authError } = await supabase.auth.getUser();
+            const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
             if (authError) throw authError;
-            user = authData.user;
+            user = authUser;
             
             if (!user) {
-                console.log('❌ Пользователь не авторизован, перенаправляем на логин');
+                console.log('❌ Пользователь не авторизован');
                 window.location.href = '/login.html';
                 return;
             }
             console.log('✅ Пользователь авторизован:', user.email);
         } catch (error) {
             console.error('❌ Ошибка аутентификации:', error);
-            showError('Ошибка проверки авторизации: ' + error.message);
+            window.location.href = '/login.html';
             return;
         }
 
         // Загружаем задание
         async function loadAssignment() {
             try {
-                console.log('🔄 Запрашиваем задание из базы...');
+                console.log('🔄 Загружаем задание...');
+                
                 const { data, error } = await supabase
                     .from('assignments')
                     .select('*')
@@ -337,8 +324,8 @@
                     .single();
 
                 if (error) {
-                    console.error('❌ Ошибка запроса задания:', error);
-                    throw error;
+                    console.error('❌ Ошибка загрузки задания:', error);
+                    throw new Error('Не удалось загрузить задание: ' + error.message);
                 }
 
                 if (!data) {
@@ -350,136 +337,87 @@
                 
                 console.log('✅ Задание загружено:', assignment.title);
                 console.log('📝 Вопросов:', questions.length);
-                
+
                 if (questions.length === 0) {
                     throw new Error('В задании нет вопросов');
                 }
 
-                // Загружаем прогресс пользователя
+                // Загружаем существующий прогресс
                 await loadUserProgress();
 
+                // Показываем задание
                 renderAssignment();
                 showQuestion(0);
 
             } catch (error) {
-                console.error('❌ Ошибка загрузки задания:', error);
-                showError('Не удалось загрузить задание: ' + error.message);
+                console.error('❌ Ошибка:', error);
+                showError(error.message);
             }
         }
 
         // Загружаем прогресс пользователя
         async function loadUserProgress() {
             try {
-                console.log('🔄 Загружаем прогресс пользователя...');
+                console.log('🔄 Загружаем прогресс...');
+                
                 const { data, error } = await supabase
                     .from('user_progress')
                     .select('*')
                     .eq('user_id', user.id)
                     .eq('assignment_id', assignmentId)
-                    .maybeSingle(); // Используем maybeSingle вместо single
+                    .maybeSingle();
 
-                if (error && error.code !== 'PGRST116') { // PGRST116 - "не найдено"
-                    console.error('❌ Ошибка загрузки прогресса:', error);
-                    throw error;
+                if (error && error.code !== 'PGRST116') {
+                    console.error('Ошибка загрузки прогресса:', error);
+                    return;
                 }
 
                 if (data) {
-                    userProgressId = data.id;
                     userAnswers = data.answers || {};
                     console.log('✅ Прогресс загружен, ответов:', Object.keys(userAnswers).length);
-                } else {
-                    console.log('ℹ️ Прогресс не найден, создадим новый');
-                    userAnswers = {};
                 }
             } catch (error) {
-                console.error('❌ Ошибка загрузки прогресса:', error);
-                // Не прерываем выполнение, продолжаем с пустыми ответами
-                userAnswers = {};
+                console.error('Ошибка загрузки прогресса:', error);
             }
         }
 
         // Сохраняем прогресс
-        async function saveProgress(isCompleted = false) {
+        async function saveProgress() {
             try {
-                const score = isCompleted ? calculateScore() : 0;
                 const progressData = {
                     user_id: user.id,
                     assignment_id: assignmentId,
                     answers: userAnswers,
-                    is_completed: isCompleted,
-                    completed_at: isCompleted ? new Date().toISOString() : null,
-                    score: score
+                    is_completed: false,
+                    score: 0
                 };
 
-                let result;
-                if (userProgressId) {
-                    result = await supabase
+                const { data: existingProgress } = await supabase
+                    .from('user_progress')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('assignment_id', assignmentId)
+                    .maybeSingle();
+
+                let error;
+                if (existingProgress) {
+                    const result = await supabase
                         .from('user_progress')
                         .update(progressData)
-                        .eq('id', userProgressId);
+                        .eq('id', existingProgress.id);
+                    error = result.error;
                 } else {
-                    result = await supabase
+                    const result = await supabase
                         .from('user_progress')
-                        .insert(progressData)
-                        .select();
-                    
-                    if (result.data && result.data.length > 0) {
-                        userProgressId = result.data[0].id;
-                    }
+                        .insert(progressData);
+                    error = result.error;
                 }
 
-                if (result.error) throw result.error;
+                if (error) throw error;
                 
-                console.log('✅ Прогресс сохранен');
-                return true;
             } catch (error) {
-                console.error('❌ Ошибка сохранения прогресса:', error);
-                return false;
+                console.error('Ошибка сохранения прогресса:', error);
             }
-        }
-
-        // Рассчитываем оценку
-        function calculateScore() {
-            if (questions.length === 0) return 0;
-            
-            let correctAnswers = 0;
-            
-            questions.forEach((question, index) => {
-                if (userAnswers[index] !== undefined && userAnswers[index] !== null && userAnswers[index] !== '') {
-                    if (question.type === 'test') {
-                        if (parseInt(userAnswers[index]) === question.correct) {
-                            correctAnswers++;
-                        }
-                    } else if (question.type === 'fill') {
-                        const userAnswer = String(userAnswers[index]).toLowerCase().trim();
-                        const correctAnswersList = question.answers.map(a => String(a).toLowerCase().trim());
-                        if (correctAnswersList.includes(userAnswer)) {
-                            correctAnswers++;
-                        }
-                    } else if (question.type === 'sentence') {
-                        // Для предложений проверяем каждый пропуск
-                        const userAnswerArray = Array.isArray(userAnswers[index]) ? userAnswers[index] : [userAnswers[index]];
-                        let correctGaps = 0;
-                        
-                        userAnswerArray.forEach((answer, gapIndex) => {
-                            if (answer && question.answers[gapIndex]) {
-                                const userAnswer = String(answer).toLowerCase().trim();
-                                const correctAnswer = String(question.answers[gapIndex]).toLowerCase().trim();
-                                if (userAnswer === correctAnswer) {
-                                    correctGaps++;
-                                }
-                            }
-                        });
-                        
-                        // Считаем вопрос правильным, если все пропуски заполнены верно
-                        if (correctGaps === question.answers.length) {
-                            correctAnswers++;
-                        }
-                    }
-                }
-            });
-            
-            return Math.round((correctAnswers / questions.length) * 100);
         }
 
         // Отображаем задание
@@ -491,7 +429,6 @@
             contentEl.style.display = 'block';
             
             updateProgress();
-            console.log('✅ Задание отображено');
         }
 
         // Показываем вопрос
@@ -507,18 +444,16 @@
             questionCard.className = 'question-card';
             
             // Заголовок вопроса
-            const questionHeader = document.createElement('div');
-            questionHeader.className = 'question-header';
-            questionHeader.innerHTML = `
-                <div>
+            questionCard.innerHTML = `
+                <div class="question-header">
                     <div class="question-number">Вопрос ${index + 1} из ${questions.length}</div>
                     <div class="question-text">${escapeHtml(question.q || 'Вопрос без текста')}</div>
                 </div>
             `;
-            questionCard.appendChild(questionHeader);
             
             // Изображение вопроса
             if (question.image) {
+                console.log('🖼️ Загружаем изображение:', question.image);
                 const img = document.createElement('img');
                 img.src = question.image;
                 img.alt = 'Изображение вопроса';
@@ -527,26 +462,22 @@
                     console.log('❌ Ошибка загрузки изображения:', question.image);
                     img.style.display = 'none';
                 };
-                img.onload = () => console.log('✅ Изображение загружено:', question.image);
                 questionCard.appendChild(img);
             }
             
-            // Контент вопроса в зависимости от типа
+            // Контент вопроса
             if (question.type === 'test') {
                 renderTestQuestion(question, index, questionCard);
             } else if (question.type === 'fill') {
                 renderFillQuestion(question, index, questionCard);
             } else if (question.type === 'sentence') {
                 renderSentenceQuestion(question, index, questionCard);
-            } else {
-                // Если тип не указан, показываем как текстовый вопрос
-                renderFillQuestion(question, index, questionCard);
             }
             
             questionsContainerEl.appendChild(questionCard);
             currentQuestionEl.textContent = index + 1;
             
-            // Обновляем навигацию
+            // Навигация
             prevBtn.style.display = index > 0 ? 'block' : 'none';
             nextBtn.style.display = index < questions.length - 1 ? 'block' : 'none';
             finishBtn.style.display = index === questions.length - 1 ? 'block' : 'none';
@@ -559,35 +490,33 @@
             const optionsContainer = document.createElement('div');
             optionsContainer.className = 'options-container';
             
-            if (!question.options || question.options.length === 0) {
-                optionsContainer.innerHTML = '<p style="color: #999; text-align: center;">Нет вариантов ответа</p>';
-                container.appendChild(optionsContainer);
-                return;
-            }
-            
-            question.options.forEach((option, optionIndex) => {
-                const label = document.createElement('label');
-                label.className = `option-label ${userAnswers[index] === optionIndex ? 'selected' : ''}`;
-                
-                const radio = document.createElement('input');
-                radio.type = 'radio';
-                radio.name = `question-${index}`;
-                radio.value = optionIndex;
-                radio.className = 'option-radio';
-                radio.checked = userAnswers[index] === optionIndex;
-                
-                radio.addEventListener('change', () => {
-                    userAnswers[index] = optionIndex;
-                    document.querySelectorAll(`.option-label`).forEach(l => l.classList.remove('selected'));
-                    label.classList.add('selected');
-                    saveProgress();
-                    updateProgress();
+            if (question.options && question.options.length > 0) {
+                question.options.forEach((option, optionIndex) => {
+                    const label = document.createElement('label');
+                    label.className = `option-label ${userAnswers[index] === optionIndex ? 'selected' : ''}`;
+                    
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = `question-${index}`;
+                    radio.value = optionIndex;
+                    radio.className = 'option-radio';
+                    radio.checked = userAnswers[index] === optionIndex;
+                    
+                    radio.addEventListener('change', () => {
+                        userAnswers[index] = optionIndex;
+                        document.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
+                        label.classList.add('selected');
+                        saveProgress();
+                        updateProgress();
+                    });
+                    
+                    label.appendChild(radio);
+                    label.appendChild(document.createTextNode(escapeHtml(option)));
+                    optionsContainer.appendChild(label);
                 });
-                
-                label.appendChild(radio);
-                label.appendChild(document.createTextNode(escapeHtml(option)));
-                optionsContainer.appendChild(label);
-            });
+            } else {
+                optionsContainer.innerHTML = '<p style="color: #999; text-align: center;">Нет вариантов ответа</p>';
+            }
             
             container.appendChild(optionsContainer);
         }
@@ -614,57 +543,47 @@
             const sentenceContainer = document.createElement('div');
             sentenceContainer.className = 'sentence-container';
             
-            const sentenceText = document.createElement('div');
-            sentenceText.className = 'sentence-text';
-            
-            if (!question.sentence) {
-                sentenceText.innerHTML = '<p style="color: #999;">Предложение не указано</p>';
-                sentenceContainer.appendChild(sentenceText);
-                container.appendChild(sentenceContainer);
-                return;
-            }
-            
-            // Разбиваем предложение на части и заменяем ___ на инпуты
-            const parts = question.sentence.split('___');
-            sentenceText.innerHTML = '';
-            
-            parts.forEach((part, partIndex) => {
-                // Добавляем текст
-                if (part) {
-                    sentenceText.appendChild(document.createTextNode(part));
-                }
+            if (question.sentence) {
+                const parts = question.sentence.split('___');
+                const sentenceText = document.createElement('div');
+                sentenceText.className = 'sentence-text';
                 
-                // Добавляем инпут для пропуска (кроме последней части)
-                if (partIndex < parts.length - 1) {
-                    const gapContainer = document.createElement('span');
-                    gapContainer.className = 'sentence-gap';
-                    
-                    const input = document.createElement('input');
-                    input.type = 'text';
-                    input.className = 'sentence-input';
-                    input.placeholder = `Ответ ${partIndex + 1}`;
-                    
-                    // Восстанавливаем сохраненный ответ
-                    const savedAnswers = Array.isArray(userAnswers[index]) ? userAnswers[index] : [];
-                    if (savedAnswers[partIndex] !== undefined) {
-                        input.value = savedAnswers[partIndex];
+                parts.forEach((part, partIndex) => {
+                    if (part) {
+                        sentenceText.appendChild(document.createTextNode(part));
                     }
                     
-                    input.addEventListener('input', () => {
-                        if (!Array.isArray(userAnswers[index])) {
-                            userAnswers[index] = [];
+                    if (partIndex < parts.length - 1) {
+                        const gapContainer = document.createElement('span');
+                        gapContainer.className = 'sentence-gap';
+                        
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.className = 'sentence-input';
+                        input.placeholder = `Ответ ${partIndex + 1}`;
+                        
+                        const savedAnswers = Array.isArray(userAnswers[index]) ? userAnswers[index] : [];
+                        if (savedAnswers[partIndex] !== undefined) {
+                            input.value = savedAnswers[partIndex];
                         }
-                        userAnswers[index][partIndex] = input.value;
-                        saveProgress();
-                        updateProgress();
-                    });
-                    
-                    gapContainer.appendChild(input);
-                    sentenceText.appendChild(gapContainer);
-                }
-            });
+                        
+                        input.addEventListener('input', () => {
+                            if (!Array.isArray(userAnswers[index])) {
+                                userAnswers[index] = [];
+                            }
+                            userAnswers[index][partIndex] = input.value;
+                            saveProgress();
+                            updateProgress();
+                        });
+                        
+                        gapContainer.appendChild(input);
+                        sentenceText.appendChild(gapContainer);
+                    }
+                });
+                
+                sentenceContainer.appendChild(sentenceText);
+            }
             
-            sentenceContainer.appendChild(sentenceText);
             container.appendChild(sentenceContainer);
         }
 
@@ -676,7 +595,7 @@
                       (!Array.isArray(answer) || answer.some(item => item !== ''));
             }).length;
             
-            const progress = (answeredCount / questions.length) * 100;
+            const progress = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
             
             progressFillEl.style.width = `${progress}%`;
             progressTextEl.textContent = Math.round(progress);
@@ -687,7 +606,6 @@
             loadingEl.style.display = 'none';
             errorEl.textContent = message;
             errorEl.style.display = 'block';
-            console.error('🚨 Ошибка:', message);
         }
 
         // Экранирование HTML
@@ -703,26 +621,99 @@
         // Завершаем задание
         async function finishAssignment() {
             const score = calculateScore();
-            const success = await saveProgress(true);
             
-            if (success) {
+            try {
+                const progressData = {
+                    user_id: user.id,
+                    assignment_id: assignmentId,
+                    answers: userAnswers,
+                    is_completed: true,
+                    completed_at: new Date().toISOString(),
+                    score: score
+                };
+
+                const { data: existingProgress } = await supabase
+                    .from('user_progress')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('assignment_id', assignmentId)
+                    .maybeSingle();
+
+                let error;
+                if (existingProgress) {
+                    const result = await supabase
+                        .from('user_progress')
+                        .update(progressData)
+                        .eq('id', existingProgress.id);
+                    error = result.error;
+                } else {
+                    const result = await supabase
+                        .from('user_progress')
+                        .insert(progressData);
+                    error = result.error;
+                }
+
+                if (error) throw error;
+
+                // Показываем экран завершения
                 contentEl.style.display = 'none';
                 completionEl.style.display = 'block';
-                
                 finalScoreEl.textContent = `${score}%`;
                 
                 if (score >= 80) {
-                    completionMessageEl.textContent = 'Отличный результат! Вы хорошо усвоили материал.';
+                    completionMessageEl.textContent = 'Отличный результат!';
                 } else if (score >= 60) {
-                    completionMessageEl.textContent = 'Хороший результат! Есть над чем поработать.';
+                    completionMessageEl.textContent = 'Хороший результат!';
                 } else {
-                    completionMessageEl.textContent = 'Попробуйте пройти задание еще раз для лучшего результата.';
+                    completionMessageEl.textContent = 'Попробуйте еще раз!';
                 }
                 
-                console.log('✅ Задание завершено с оценкой:', score + '%');
-            } else {
+            } catch (error) {
+                console.error('Ошибка завершения задания:', error);
                 alert('Ошибка при сохранении результата');
             }
+        }
+
+        // Рассчитываем оценку
+        function calculateScore() {
+            if (questions.length === 0) return 0;
+            
+            let correctAnswers = 0;
+            
+            questions.forEach((question, index) => {
+                if (userAnswers[index] !== undefined && userAnswers[index] !== null && userAnswers[index] !== '') {
+                    if (question.type === 'test') {
+                        if (parseInt(userAnswers[index]) === question.correct) {
+                            correctAnswers++;
+                        }
+                    } else if (question.type === 'fill') {
+                        const userAnswer = String(userAnswers[index]).toLowerCase().trim();
+                        const correctAnswersList = question.answers.map(a => String(a).toLowerCase().trim());
+                        if (correctAnswersList.includes(userAnswer)) {
+                            correctAnswers++;
+                        }
+                    } else if (question.type === 'sentence') {
+                        const userAnswerArray = Array.isArray(userAnswers[index]) ? userAnswers[index] : [userAnswers[index]];
+                        let correctGaps = 0;
+                        
+                        userAnswerArray.forEach((answer, gapIndex) => {
+                            if (answer && question.answers[gapIndex]) {
+                                const userAnswer = String(answer).toLowerCase().trim();
+                                const correctAnswer = String(question.answers[gapIndex]).toLowerCase().trim();
+                                if (userAnswer === correctAnswer) {
+                                    correctGaps++;
+                                }
+                            }
+                        });
+                        
+                        if (correctGaps === question.answers.length) {
+                            correctAnswers++;
+                        }
+                    }
+                }
+            });
+            
+            return Math.round((correctAnswers / questions.length) * 100);
         }
 
         // Обработчики событий
@@ -741,7 +732,6 @@
         finishBtn.addEventListener('click', finishAssignment);
 
         // Запускаем загрузку
-        console.log('🚀 Запускаем загрузку задания...');
         loadAssignment();
     </script>
 </body>
