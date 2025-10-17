@@ -62,9 +62,185 @@
     .stat-number { font-size: 2rem; font-weight: 700; color: var(--accent2); margin-bottom: 5px; }
     .stat-label { font-size: 14px; color: #666; font-weight: 600; }
 
-    /* Изображения в вопросах */
-    .question-image-upload { margin: 10px 0; }
-    .question-image-preview { max-width: 200px; max-height: 150px; border-radius: 8px; margin-top: 10px; display: none; }
+    /* Стили для конструктора кроссвордов */
+    .puzzle-builder {
+        margin: 20px 0;
+        padding: 20px;
+        background: var(--bg1);
+        border-radius: 12px;
+        border: 2px solid #e0e0e0;
+    }
+    
+    .puzzle-container {
+        display: grid;
+        grid-template-columns: 1fr 350px;
+        gap: 20px;
+        margin-top: 20px;
+    }
+    
+    .crossword-grid {
+        display: inline-grid;
+        gap: 2px;
+        background: #333;
+        padding: 3px;
+        border-radius: 6px;
+        border: 2px solid #555;
+    }
+    
+    .grid-cell {
+        width: 32px;
+        height: 32px;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        cursor: pointer;
+        position: relative;
+        user-select: none;
+        border: 1px solid #ddd;
+        transition: all 0.2s ease;
+    }
+    
+    .grid-cell:hover {
+        background: #f0f8ff;
+    }
+    
+    .grid-cell.black {
+        background: #2c3e50;
+        border-color: #34495e;
+    }
+    
+    .grid-cell.selected {
+        background: #e3f2fd;
+        border: 2px solid #2196f3;
+    }
+    
+    .grid-cell.numbered::before {
+        content: attr(data-number);
+        position: absolute;
+        top: 1px;
+        left: 2px;
+        font-size: 9px;
+        color: #e74c3c;
+        font-weight: 800;
+        z-index: 2;
+    }
+    
+    .grid-cell input {
+        width: 100%;
+        height: 100%;
+        border: none;
+        text-align: center;
+        font-size: 16px;
+        font-weight: bold;
+        text-transform: uppercase;
+        background: transparent;
+        outline: none;
+        color: #2c3e50;
+    }
+    
+    .grid-cell.black input {
+        display: none;
+    }
+    
+    .questions-panel {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        max-height: 500px;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+    }
+    
+    .question-item {
+        background: var(--card);
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+        transition: all 0.3s ease;
+    }
+    
+    .question-item:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .question-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .question-number {
+        background: var(--accent2);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    
+    .question-direction {
+        font-size: 12px;
+        color: #666;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+    
+    .simple-questions {
+        margin: 20px 0;
+        padding: 20px;
+        background: var(--bg1);
+        border-radius: 12px;
+        border: 1px solid #e0e0e0;
+    }
+    
+    .simple-question-item {
+        background: var(--card);
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+    }
+    
+    .puzzle-controls {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        border: 1px solid #e0e0e0;
+    }
+    
+    .grid-size-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    
+    .grid-size-controls input {
+        width: 80px;
+    }
+    
+    .question-image-upload {
+        margin: 10px 0;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+    
+    .question-image-preview {
+        max-width: 200px;
+        max-height: 150px;
+        border-radius: 8px;
+        margin-top: 10px;
+        display: none;
+        border: 2px solid #e0e0e0;
+    }
 
     /* Модалка доступа пользователей */
     .user-access-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 10000; }
@@ -79,6 +255,13 @@
       .admin-table th, .admin-table td { padding: 8px 10px; }
       .admin-tabs { gap: 5px; }
       .admin-tab { padding: 10px 15px; font-size: 14px; }
+      .puzzle-container {
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+      .crossword-grid {
+        justify-self: center;
+      }
     }
     @media (max-width: 768px) {
       .admin-container { width: 100%; margin: 10px auto; padding: 0 10px; }
@@ -92,6 +275,13 @@
       .type-btn { padding: 12px; text-align: center; }
       .user-actions { flex-direction: row; gap: 5px; }
       .user-actions .btn-small { padding: 4px 8px; font-size: 12px; }
+      .grid-cell {
+        width: 28px;
+        height: 28px;
+      }
+      .grid-cell input {
+        font-size: 14px;
+      }
     }
   </style>
 
@@ -275,6 +465,53 @@
               <label><input type="checkbox" id="crosswordIsAvailable"> Доступен для всех пользователей</label>
             </div>
 
+            <!-- НОВЫЙ БЛОК: Конструктор кроссвордов -->
+            <div class="form-group">
+              <label>Тип контента:</label>
+              <select id="crosswordContentType" class="input">
+                <option value="puzzle">🧩 Классический кроссворд с сеткой</option>
+                <option value="simple">📝 Простые вопросы (без сетки)</option>
+              </select>
+            </div>
+
+            <!-- Блок для классического кроссворда с сеткой -->
+            <div id="crosswordPuzzleBuilder" class="puzzle-builder" style="display: none;">
+              <h4>🧩 Конструктор кроссворда</h4>
+              
+              <div class="puzzle-controls">
+                <div class="form-group">
+                  <label>Размер сетки:</label>
+                  <div class="grid-size-controls">
+                    <input type="number" id="gridWidth" class="input" value="15" min="5" max="20" placeholder="Ширина">
+                    <input type="number" id="gridHeight" class="input" value="15" min="5" max="20" placeholder="Высота">
+                    <button type="button" class="btn btn-small" id="createGridBtn">Создать сетку</button>
+                    <button type="button" class="btn btn-small btn-warning" id="clearGridBtn">Очистить сетку</button>
+                  </div>
+                  <div class="small-muted">Нажмите на ячейку, чтобы сделать её черной. Вводите X для черных ячеек.</div>
+                </div>
+              </div>
+
+              <div class="puzzle-container">
+                <div class="grid-container">
+                  <div id="crosswordGrid" class="crossword-grid"></div>
+                </div>
+                
+                <div class="questions-panel">
+                  <h5>📝 Вопросы кроссворда</h5>
+                  <div class="questions-list" id="crosswordQuestions"></div>
+                  <button type="button" class="btn btn-small" id="addQuestionBtn">➕ Добавить вопрос</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Блок для простых вопросов -->
+            <div id="simpleQuestionsBuilder" class="simple-questions" style="display: none;">
+              <h4>📝 Вопросы для кроссворда</h4>
+              <p class="small-muted">Добавьте вопросы, которые будут отображаться как список</p>
+              <div id="simpleQuestionsList"></div>
+              <button type="button" class="btn btn-small" id="addSimpleQuestionBtn">➕ Добавить вопрос</button>
+            </div>
+
             <div style="margin-top:20px; display: flex; gap: 10px; flex-wrap: wrap;">
               <button class="btn" id="saveCrosswordBtn">💾 Сохранить кроссворд</button>
               <button class="btn secondary" id="cancelCrosswordBtn">❌ Отмена</button>
@@ -287,7 +524,8 @@
                 <tr>
                   <th>Название</th>
                   <th>Описание</th>
-                  <th>Заданий</th>
+                  <th>Тип</th>
+                  <th>Вопросов</th>
                   <th>Доступ</th>
                   <th>Действия</th>
                 </tr>
@@ -337,7 +575,7 @@
               </div>
 
               <div id="questionsContainer"><!-- динамика --></div>
-              <button class="btn" id="addQuestionBtn">➕ Добавить вопрос</button>
+              <button class="btn" id="addQuestionBtnAssignment">➕ Добавить вопрос</button>
             </div>
 
             <div style="margin-top:20px; display: flex; gap: 10px; flex-wrap: wrap;">
@@ -612,6 +850,540 @@
       });
     };
 
+    // ============ КОНСТРУКТОР КРОССВОРДОВ ============
+    let crosswordGrid = [];
+    let crosswordQuestions = [];
+    let currentQuestionNumber = 1;
+
+    // Инициализация конструктора кроссворда
+    function initCrosswordBuilder() {
+      const contentTypeSelect = document.getElementById('crosswordContentType');
+      const puzzleBuilder = document.getElementById('crosswordPuzzleBuilder');
+      const simpleBuilder = document.getElementById('simpleQuestionsBuilder');
+      
+      contentTypeSelect.addEventListener('change', function() {
+        if (this.value === 'puzzle') {
+          puzzleBuilder.style.display = 'block';
+          simpleBuilder.style.display = 'none';
+          createGrid(15, 15);
+        } else {
+          puzzleBuilder.style.display = 'none';
+          simpleBuilder.style.display = 'block';
+          initSimpleQuestions();
+        }
+      });
+      
+      // Создание сетки
+      document.getElementById('createGridBtn').addEventListener('click', function() {
+        const width = parseInt(document.getElementById('gridWidth').value);
+        const height = parseInt(document.getElementById('gridHeight').value);
+        createGrid(width, height);
+      });
+
+      // Очистка сетки
+      document.getElementById('clearGridBtn').addEventListener('click', function() {
+        crosswordGrid.forEach(row => {
+          row.forEach(cell => {
+            cell.value = '';
+            cell.isBlack = false;
+            cell.number = null;
+          });
+        });
+        updateGridDisplay();
+        updateGridNumbers();
+      });
+      
+      // Добавление вопроса
+      document.getElementById('addQuestionBtn').addEventListener('click', addQuestion);
+      document.getElementById('addSimpleQuestionBtn').addEventListener('click', addSimpleQuestion);
+    }
+
+    // Создание сетки кроссворда
+    function createGrid(width, height) {
+      const gridContainer = document.getElementById('crosswordGrid');
+      crosswordGrid = [];
+      
+      // Очищаем контейнер
+      gridContainer.innerHTML = '';
+      gridContainer.style.gridTemplateColumns = `repeat(${width}, 32px)`;
+      
+      // Создаем ячейки
+      for (let y = 0; y < height; y++) {
+        const row = [];
+        for (let x = 0; x < width; x++) {
+          const cell = document.createElement('div');
+          cell.className = 'grid-cell';
+          cell.dataset.x = x;
+          cell.dataset.y = y;
+          
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.maxLength = 1;
+          input.addEventListener('input', function(e) {
+            handleCellInput(x, y, e.target.value);
+          });
+          
+          input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !e.target.value) {
+              // Переход к предыдущей ячейке при удалении
+              moveToPreviousCell(x, y);
+            } else if (e.key.length === 1 && /[a-zA-Zа-яА-Я]/.test(e.key)) {
+              // Автопереход к следующей ячейке при вводе буквы
+              setTimeout(() => moveToNextCell(x, y), 10);
+            }
+          });
+          
+          cell.appendChild(input);
+          cell.addEventListener('click', function() {
+            toggleCell(x, y);
+          });
+          
+          gridContainer.appendChild(cell);
+          row.push({ x, y, value: '', isBlack: false, number: null });
+        }
+        crosswordGrid.push(row);
+      }
+    }
+
+    // Обновление отображения сетки
+    function updateGridDisplay() {
+      crosswordGrid.forEach((row, y) => {
+        row.forEach((cell, x) => {
+          const cellElement = document.querySelector(`.grid-cell[data-x="${x}"][data-y="${y}"]`);
+          const input = cellElement.querySelector('input');
+          
+          if (cell.isBlack) {
+            cellElement.classList.add('black');
+            input.value = '';
+          } else {
+            cellElement.classList.remove('black');
+            input.value = cell.value;
+          }
+          
+          if (cell.number) {
+            cellElement.classList.add('numbered');
+            cellElement.dataset.number = cell.number;
+          } else {
+            cellElement.classList.remove('numbered');
+            cellElement.removeAttribute('data-number');
+          }
+        });
+      });
+    }
+
+    // Перемещение к следующей ячейке
+    function moveToNextCell(x, y) {
+      const width = crosswordGrid[0].length;
+      const height = crosswordGrid.length;
+      
+      if (x < width - 1) {
+        const nextCell = document.querySelector(`.grid-cell[data-x="${x + 1}"][data-y="${y}"] input`);
+        if (nextCell && !crosswordGrid[y][x + 1].isBlack) {
+          nextCell.focus();
+          nextCell.select();
+        }
+      } else if (y < height - 1) {
+        const nextCell = document.querySelector(`.grid-cell[data-x="0"][data-y="${y + 1}"] input`);
+        if (nextCell && !crosswordGrid[y + 1][0].isBlack) {
+          nextCell.focus();
+          nextCell.select();
+        }
+      }
+    }
+
+    // Перемещение к предыдущей ячейке
+    function moveToPreviousCell(x, y) {
+      if (x > 0) {
+        const prevCell = document.querySelector(`.grid-cell[data-x="${x - 1}"][data-y="${y}"] input`);
+        if (prevCell && !crosswordGrid[y][x - 1].isBlack) {
+          prevCell.focus();
+          prevCell.select();
+        }
+      } else if (y > 0) {
+        const width = crosswordGrid[0].length;
+        const prevCell = document.querySelector(`.grid-cell[data-x="${width - 1}"][data-y="${y - 1}"] input`);
+        if (prevCell && !crosswordGrid[y - 1][width - 1].isBlack) {
+          prevCell.focus();
+          prevCell.select();
+        }
+      }
+    }
+
+    // Обработка ввода в ячейку
+    function handleCellInput(x, y, value) {
+      if (value.toUpperCase() === 'X' || value === '') {
+        crosswordGrid[y][x].isBlack = (value.toUpperCase() === 'X');
+        crosswordGrid[y][x].value = '';
+      } else {
+        crosswordGrid[y][x].value = value.toUpperCase();
+        crosswordGrid[y][x].isBlack = false;
+      }
+      
+      updateGridDisplay();
+      updateGridNumbers();
+    }
+
+    // Переключение ячейки (черная/белая)
+    function toggleCell(x, y) {
+      const cell = crosswordGrid[y][x];
+      cell.isBlack = !cell.isBlack;
+      cell.value = '';
+      
+      updateGridDisplay();
+      updateGridNumbers();
+    }
+
+    // Обновление номеров в сетке
+    function updateGridNumbers() {
+      // Сбрасываем все номера
+      crosswordGrid.forEach(row => {
+        row.forEach(cell => {
+          cell.number = null;
+        });
+      });
+      
+      let questionNumber = 1;
+      
+      // Находим начала слов по горизонтали и вертикали
+      for (let y = 0; y < crosswordGrid.length; y++) {
+        for (let x = 0; x < crosswordGrid[y].length; x++) {
+          const cell = crosswordGrid[y][x];
+          
+          if (cell.isBlack) continue;
+          
+          // Проверяем начало слова по горизонтали
+          const isHorizontalStart = (x === 0 || crosswordGrid[y][x-1].isBlack) && 
+                                  (x < crosswordGrid[y].length - 1 && !crosswordGrid[y][x+1].isBlack);
+          
+          // Проверяем начало слова по вертикали
+          const isVerticalStart = (y === 0 || crosswordGrid[y-1][x].isBlack) && 
+                                (y < crosswordGrid.length - 1 && !crosswordGrid[y+1][x].isBlack);
+          
+          if (isHorizontalStart || isVerticalStart) {
+            cell.number = questionNumber;
+            questionNumber++;
+          }
+        }
+      }
+      
+      updateGridDisplay();
+    }
+
+    // Добавление вопроса для классического кроссворда
+    function addQuestion() {
+      const questionId = Date.now();
+      const questionItem = document.createElement('div');
+      questionItem.className = 'question-item';
+      questionItem.innerHTML = `
+        <div class="question-header">
+          <div>
+            <span class="question-number">Вопрос ${currentQuestionNumber}</span>
+            <span class="question-direction" id="direction${questionId}">Не назначен</span>
+          </div>
+          <button type="button" class="btn btn-small btn-danger" onclick="removeQuestion(${questionId})">🗑️</button>
+        </div>
+        <div class="form-group">
+          <label>Текст вопроса:</label>
+          <textarea class="input question-text" placeholder="Введите текст вопроса" id="text${questionId}"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Ответ:</label>
+          <input type="text" class="input question-answer" placeholder="Введите ответ" id="answer${questionId}">
+        </div>
+        <div class="form-group">
+          <label>Направление:</label>
+          <select class="input question-direction-select" id="directionSelect${questionId}">
+            <option value="">-- Выберите направление --</option>
+            <option value="across">По горизонтали</option>
+            <option value="down">По вертикали</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Позиция (номер в сетке):</label>
+          <input type="number" class="input question-position" placeholder="Номер вопроса" id="position${questionId}" min="1">
+        </div>
+        <div class="form-group question-image-upload">
+          <label>Изображение для вопроса (опционально):</label>
+          <div class="upload-area" id="questionUploadArea_${questionId}">
+            <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
+            <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. 5MB)</p>
+            <input type="file" id="questionImageInput_${questionId}" style="display:none" accept="image/*">
+          </div>
+          <div class="upload-progress" id="questionImageProgress_${questionId}">
+            <div class="upload-progress-bar" id="questionImageProgressBar_${questionId}"></div>
+          </div>
+          <input type="hidden" id="questionImageUrl_${questionId}">
+          <img class="question-image-preview" id="questionImagePreview_${questionId}" alt="Предпросмотр изображения">
+        </div>
+      `;
+      
+      document.getElementById('crosswordQuestions').appendChild(questionItem);
+      
+      crosswordQuestions.push({
+        id: questionId,
+        number: currentQuestionNumber,
+        text: '',
+        answer: '',
+        direction: '',
+        position: null,
+        image: null
+      });
+      
+      // Инициализация загрузки изображения для вопроса
+      initQuestionImageUpload(questionId, window.supabaseClient);
+      
+      currentQuestionNumber++;
+    }
+
+    // Удаление вопроса
+    function removeQuestion(questionId) {
+      crosswordQuestions = crosswordQuestions.filter(q => q.id !== questionId);
+      const questionElement = document.querySelector(`#crosswordQuestions .question-item:has(#text${questionId})`);
+      if (questionElement) {
+        questionElement.remove();
+      }
+      // Пересчитываем номера вопросов
+      currentQuestionNumber = 1;
+      document.querySelectorAll('#crosswordQuestions .question-item').forEach((item, index) => {
+        const numberSpan = item.querySelector('.question-number');
+        if (numberSpan) {
+          numberSpan.textContent = `Вопрос ${index + 1}`;
+        }
+      });
+    }
+
+    // Инициализация простых вопросов
+    function initSimpleQuestions() {
+      document.getElementById('simpleQuestionsList').innerHTML = '';
+      crosswordQuestions = [];
+      currentQuestionNumber = 1;
+    }
+
+    // Добавление простого вопроса
+    function addSimpleQuestion() {
+      const questionId = Date.now();
+      const questionItem = document.createElement('div');
+      questionItem.className = 'simple-question-item';
+      questionItem.innerHTML = `
+        <div class="question-header">
+          <span class="question-number">Вопрос ${currentQuestionNumber}</span>
+          <button type="button" class="btn btn-small btn-danger" onclick="removeSimpleQuestion(${questionId})">🗑️</button>
+        </div>
+        <div class="form-group">
+          <label>Текст вопроса:</label>
+          <textarea class="input question-text" placeholder="Введите текст вопроса" id="simpleText${questionId}"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Ответ:</label>
+          <input type="text" class="input question-answer" placeholder="Введите ответ" id="simpleAnswer${questionId}">
+        </div>
+        <div class="form-group question-image-upload">
+          <label>Изображение для вопроса (опционально):</label>
+          <div class="upload-area" id="questionUploadArea_${questionId}">
+            <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
+            <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. 5MB)</p>
+            <input type="file" id="questionImageInput_${questionId}" style="display:none" accept="image/*">
+          </div>
+          <div class="upload-progress" id="questionImageProgress_${questionId}">
+            <div class="upload-progress-bar" id="questionImageProgressBar_${questionId}"></div>
+          </div>
+          <input type="hidden" id="questionImageUrl_${questionId}">
+          <img class="question-image-preview" id="questionImagePreview_${questionId}" alt="Предпросмотр изображения">
+        </div>
+      `;
+      
+      document.getElementById('simpleQuestionsList').appendChild(questionItem);
+      
+      crosswordQuestions.push({
+        id: questionId,
+        number: currentQuestionNumber,
+        text: '',
+        answer: '',
+        image: null
+      });
+      
+      // Инициализация загрузки изображения для вопроса
+      initQuestionImageUpload(questionId, window.supabaseClient);
+      
+      currentQuestionNumber++;
+    }
+
+    // Удаление простого вопроса
+    function removeSimpleQuestion(questionId) {
+      crosswordQuestions = crosswordQuestions.filter(q => q.id !== questionId);
+      const questionElement = document.querySelector(`#simpleQuestionsList .simple-question-item:has(#simpleText${questionId})`);
+      if (questionElement) {
+        questionElement.remove();
+      }
+      // Пересчитываем номера вопросов
+      currentQuestionNumber = 1;
+      document.querySelectorAll('#simpleQuestionsList .simple-question-item').forEach((item, index) => {
+        const numberSpan = item.querySelector('.question-number');
+        if (numberSpan) {
+          numberSpan.textContent = `Вопрос ${index + 1}`;
+        }
+      });
+    }
+
+    // Сохранение данных кроссворда перед отправкой
+    function getCrosswordData() {
+      const contentType = document.getElementById('crosswordContentType').value;
+      
+      if (contentType === 'puzzle') {
+        // Собираем данные сетки
+        const gridData = crosswordGrid.map(row => 
+          row.map(cell => ({
+            value: cell.value,
+            isBlack: cell.isBlack,
+            number: cell.number
+          }))
+        );
+        
+        // Собираем вопросы
+        const questionsData = crosswordQuestions.map(q => {
+          const questionData = {
+            number: q.number,
+            text: document.getElementById(`text${q.id}`)?.value || '',
+            answer: document.getElementById(`answer${q.id}`)?.value || '',
+            direction: document.getElementById(`directionSelect${q.id}`)?.value || '',
+            position: parseInt(document.getElementById(`position${q.id}`)?.value) || null
+          };
+          
+          // Добавляем URL изображения, если есть
+          const imageUrl = document.getElementById(`questionImageUrl_${q.id}`)?.value;
+          if (imageUrl) {
+            questionData.image = imageUrl;
+          }
+          
+          return questionData;
+        });
+        
+        return {
+          type: 'puzzle',
+          grid: gridData,
+          questions: questionsData
+        };
+      } else {
+        // Простые вопросы
+        const questionsData = crosswordQuestions.map(q => {
+          const questionData = {
+            number: q.number,
+            text: document.getElementById(`simpleText${q.id}`)?.value || '',
+            answer: document.getElementById(`simpleAnswer${q.id}`)?.value || ''
+          };
+          
+          // Добавляем URL изображения, если есть
+          const imageUrl = document.getElementById(`questionImageUrl_${q.id}`)?.value;
+          if (imageUrl) {
+            questionData.image = imageUrl;
+          }
+          
+          return questionData;
+        });
+        
+        return {
+          type: 'simple',
+          questions: questionsData
+        };
+      }
+    }
+
+    // Загрузка данных кроссворда для редактирования
+    function loadCrosswordData(crosswordData) {
+      if (!crosswordData) return;
+      
+      const data = crosswordData.puzzle_data;
+      if (!data) return;
+      
+      // Устанавливаем тип контента
+      document.getElementById('crosswordContentType').value = data.type || 'simple';
+      
+      // Триггерим изменение для отображения правильного конструктора
+      const event = new Event('change');
+      document.getElementById('crosswordContentType').dispatchEvent(event);
+      
+      if (data.type === 'puzzle') {
+        // Загружаем сетку
+        if (data.grid && data.grid.length > 0) {
+          const height = data.grid.length;
+          const width = data.grid[0].length;
+          
+          document.getElementById('gridWidth').value = width;
+          document.getElementById('gridHeight').value = height;
+          createGrid(width, height);
+          
+          // Заполняем данные сетки
+          setTimeout(() => {
+            data.grid.forEach((row, y) => {
+              row.forEach((cell, x) => {
+                crosswordGrid[y][x] = { ...cell };
+              });
+            });
+            updateGridDisplay();
+            updateGridNumbers();
+          }, 100);
+        }
+        
+        // Загружаем вопросы
+        if (data.questions) {
+          data.questions.forEach(question => {
+            addQuestion();
+            const questionId = crosswordQuestions[crosswordQuestions.length - 1].id;
+            
+            setTimeout(() => {
+              const textElem = document.getElementById(`text${questionId}`);
+              const answerElem = document.getElementById(`answer${questionId}`);
+              const directionElem = document.getElementById(`directionSelect${questionId}`);
+              const positionElem = document.getElementById(`position${questionId}`);
+              
+              if (textElem) textElem.value = question.text || '';
+              if (answerElem) answerElem.value = question.answer || '';
+              if (directionElem) directionElem.value = question.direction || '';
+              if (positionElem) positionElem.value = question.position || '';
+              
+              // Загружаем изображение, если есть
+              if (question.image) {
+                const imageUrlElem = document.getElementById(`questionImageUrl_${questionId}`);
+                const imagePreviewElem = document.getElementById(`questionImagePreview_${questionId}`);
+                if (imageUrlElem && imagePreviewElem) {
+                  imageUrlElem.value = question.image;
+                  imagePreviewElem.src = question.image;
+                  imagePreviewElem.style.display = 'block';
+                }
+              }
+            }, 50);
+          });
+        }
+      } else if (data.type === 'simple') {
+        // Загружаем простые вопросы
+        if (data.questions) {
+          data.questions.forEach(question => {
+            addSimpleQuestion();
+            const questionId = crosswordQuestions[crosswordQuestions.length - 1].id;
+            
+            setTimeout(() => {
+              const textElem = document.getElementById(`simpleText${questionId}`);
+              const answerElem = document.getElementById(`simpleAnswer${questionId}`);
+              
+              if (textElem) textElem.value = question.text || '';
+              if (answerElem) answerElem.value = question.answer || '';
+              
+              // Загружаем изображение, если есть
+              if (question.image) {
+                const imageUrlElem = document.getElementById(`questionImageUrl_${questionId}`);
+                const imagePreviewElem = document.getElementById(`questionImagePreview_${questionId}`);
+                if (imageUrlElem && imagePreviewElem) {
+                  imageUrlElem.value = question.image;
+                  imagePreviewElem.src = question.image;
+                  imagePreviewElem.style.display = 'block';
+                }
+              }
+            }, 50);
+          });
+        }
+      }
+    }
+
     // ============ ПРИЛОЖЕНИЕ ============
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
@@ -622,6 +1394,7 @@
       try {
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
         const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        window.supabaseClient = supabase; // Сохраняем для использования в конструкторе
 
         console.log('🔄 Начинаем инициализацию админ-панели...');
         
@@ -681,6 +1454,9 @@
           bucket: 'covers',
           supabase
         });
+
+        // Инициализация конструктора кроссвордов
+        initCrosswordBuilder();
 
         // ===== Статистика
         async function loadStats() {
@@ -827,8 +1603,23 @@
           document.getElementById('crosswordIsAvailable').checked = false;
           document.getElementById('crosswordCoverUrl').value = '';
           document.getElementById('crosswordCoverPreview').style.display = 'none';
+          document.getElementById('crosswordContentType').value = 'puzzle';
+          
+          // Сбрасываем конструктор
+          crosswordGrid = [];
+          crosswordQuestions = [];
+          currentQuestionNumber = 1;
+          document.getElementById('crosswordQuestions').innerHTML = '';
+          document.getElementById('simpleQuestionsList').innerHTML = '';
+          
+          // Триггерим изменение типа контента
+          const event = new Event('change');
+          document.getElementById('crosswordContentType').dispatchEvent(event);
         }
-        function hideCrosswordForm(){ document.getElementById('crosswordForm').classList.remove('active'); }
+        
+        function hideCrosswordForm(){ 
+          document.getElementById('crosswordForm').classList.remove('active'); 
+        }
 
         async function saveCrossword() {
           const title = document.getElementById('crosswordTitle').value.trim();
@@ -845,7 +1636,8 @@
             order_index: orderIndex,
             is_available: isAvailable,
             is_active: true,
-            created_by: user.id
+            created_by: user.id,
+            puzzle_data: getCrosswordData() // Добавляем данные кроссворда
           };
           if (coverUrl) payload.cover_image_url = coverUrl;
 
@@ -863,7 +1655,7 @@
 
         async function loadCrosswords() {
           const tbody = document.querySelector('#crosswordsTable tbody');
-          tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;">Загрузка...</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="padding:14px;">Загрузка...</td></tr>';
 
           const { data: crosswords, error } = await supabase.from('crosswords').select('*').order('order_index');
           if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
@@ -874,16 +1666,21 @@
 
           tbody.innerHTML = '';
           if (!crosswords?.length) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Кроссворды не найдены</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Кроссворды не найдены</td></tr>';
             return;
           }
 
           crosswords.forEach(cw => {
+            const puzzleType = cw.puzzle_data?.type || 'simple';
+            const questionsCount = cw.puzzle_data?.questions?.length || 0;
+            const typeText = puzzleType === 'puzzle' ? '🧩 Классический' : '📝 Простой';
+            
             const tr = document.createElement('tr');
             tr.innerHTML = `
               <td>${cw.title}</td>
               <td>${cw.description || '—'}</td>
-              <td>${counts[cw.id] || 0}</td>
+              <td>${typeText}</td>
+              <td>${questionsCount}</td>
               <td>${cw.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
               <td>
                 <button class="btn btn-small" data-edit-crossword="${cw.id}">✏️ Редактировать</button>
@@ -908,6 +1705,9 @@
               document.getElementById('crosswordCoverUrl').value = data.cover_image_url || '';
               const prev = document.getElementById('crosswordCoverPreview');
               if (data.cover_image_url) { prev.src = data.cover_image_url; prev.style.display='block'; } else { prev.style.display='none'; }
+              
+              // Загружаем данные кроссворда
+              loadCrosswordData(data);
             });
           });
 
@@ -915,7 +1715,7 @@
             btn.addEventListener('click', async ()=>{
               const id = btn.getAttribute('data-del-crossword');
               const title = btn.getAttribute('data-title') || '';
-              if (!confirm(`Удалить кроссворд "${title}"? Связанные задания также будут удалены.`)) return;
+              if (!confirm(`Удалить кроссворд "${title}"?`)) return;
               const { error } = await supabase.from('crosswords').delete().eq('id', id);
               if (error) return showModal('Ошибка', error.message);
               showModal('Готово', 'Кроссворд удалён'); loadCrosswords(); loadStats();
@@ -950,7 +1750,7 @@
         document.getElementById('createAssignmentBtn').addEventListener('click', showAssignmentForm);
         document.getElementById('cancelAssignmentBtn').addEventListener('click', hideAssignmentForm);
         document.getElementById('saveAssignmentBtn').addEventListener('click', saveAssignment);
-        document.getElementById('addQuestionBtn').addEventListener('click', () => addQuestion());
+        document.getElementById('addQuestionBtnAssignment').addEventListener('click', () => addAssignmentQuestion());
 
         async function loadMaterialsForAssignments() {
           const select = document.getElementById('materialSelect');
@@ -1005,14 +1805,14 @@
 
           const cont = document.getElementById('questionsContainer');
           cont.innerHTML = '';
-          addQuestion(); // хотя бы один вопрос
+          addAssignmentQuestion(); // хотя бы один вопрос
         }
 
         function hideAssignmentForm() {
           document.getElementById('assignmentForm').classList.remove('active');
         }
 
-        function addQuestion(prefill) {
+        function addAssignmentQuestion(prefill) {
           const container = document.getElementById('questionsContainer');
           const qid = generateQuestionId();
           const qType = prefill?.type || currentQuestionType;
@@ -1247,7 +2047,7 @@
               const cont = document.getElementById('questionsContainer');
               cont.innerHTML = '';
               const qs = data.content?.questions || [];
-              if (!qs.length) addQuestion(); else qs.forEach(q => addQuestion(q));
+              if (!qs.length) addAssignmentQuestion(); else qs.forEach(q => addAssignmentQuestion(q));
             });
           });
 
