@@ -422,12 +422,11 @@
       document.getElementById('modal').style.display = 'flex';
     }
 
-    // ============ ИСПРАВЛЕННАЯ ПРОВЕРКА АДМИНА ============
+    // ============ УЛУЧШЕННАЯ ПРОВЕРКА АДМИНА ============
     async function checkAdmin(supabase) {
       try {
         console.log('🔄 Начинаем проверку прав администратора...');
         
-        // ПРЯМОЙ ЗАПРОС К БАЗЕ ДАННЫХ БЕЗ СЛОЖНОЙ ЛОГИКИ
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError) {
           console.error('Ошибка аутентификации:', authError);
@@ -442,19 +441,19 @@
 
         console.log('✅ Пользователь авторизован:', user.email);
 
-        // ПРОСТОЙ И ПРЯМОЙ ЗАПРОС К PROFILES
+        // Пробуем получить профиль пользователя
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('is_admin')
+          .select('is_admin, full_name, email')
           .eq('id', user.id)
           .single();
 
         if (profileError) {
           console.error('❌ Ошибка загрузки профиля:', profileError);
           
-          // Если профиль не найден - создаем его как админа
+          // Если профиль не найден - создаем его
           if (profileError.code === 'PGRST116') {
-            console.log('📝 Профиль не найден, создаем новый с правами админа...');
+            console.log('📝 Профиль не найден, создаем новый...');
             
             const { error: insertError } = await supabase
               .from('profiles')
@@ -462,7 +461,7 @@
                 id: user.id,
                 email: user.email,
                 full_name: user.user_metadata?.full_name || '',
-                is_admin: true, // СРАЗУ ДЕЛАЕМ АДМИНОМ
+                is_admin: false,
                 created_at: new Date().toISOString()
               });
 
@@ -471,8 +470,9 @@
               throw new Error('Не удалось создать профиль: ' + insertError.message);
             }
 
-            console.log('✅ Профиль создан с правами администратора');
-            return user;
+            showModal('Доступ запрещен', 'Профиль создан, но прав администратора нет. Обратитесь к администратору.');
+            setTimeout(() => { window.location.href = '/profile.html'; }, 2500);
+            return false;
           }
           
           throw new Error('Ошибка загрузки профиля: ' + profileError.message);
@@ -480,10 +480,9 @@
 
         console.log('📊 Профиль загружен:', profile);
 
-        // ПРЯМАЯ ПРОВЕРКА is_admin
-        if (profile?.is_admin !== true) {
-          console.log('❌ У пользователя нет прав администратора:', profile);
-          showModal('Доступ запрещен', 'Нужны права администратора. Ваш статус: ' + (profile?.is_admin ? 'неопределен' : 'не админ'));
+        if (!profile?.is_admin) {
+          console.log('❌ У пользователя нет прав администратора');
+          showModal('Доступ запрещен', 'Нужны права администратора.');
           setTimeout(() => { window.location.href = '/profile.html'; }, 2000);
           return false;
         }
@@ -492,7 +491,7 @@
         return user;
       } catch (e) {
         console.error('❌ Ошибка проверки прав:', e);
-        showModal('Ошибка доступа', 'Не удалось проверить права: ' + (e?.message || e));
+        showModal('Ошибка доступа', 'Не удалось проверить права: ' + (e?.message || e) + '\n\nКод ошибки: ' + (e?.code || 'неизвестно'));
         setTimeout(() => { window.location.href = '/login.html'; }, 2000);
         return false;
       }
