@@ -19,9 +19,6 @@
             margin-bottom: 24px;
             box-shadow: 0 8px 26px rgba(0,0,0,0.08);
         }
-        .question-header {
-            margin-bottom: 20px;
-        }
         .question-number {
             font-size: 14px;
             color: var(--accent2);
@@ -74,33 +71,6 @@
             border-radius: 12px;
             font-size: 16px;
             margin: 10px 0;
-        }
-        .fill-input:focus {
-            border-color: var(--accent2);
-            outline: none;
-        }
-        .sentence-container {
-            background: var(--bg1);
-            padding: 20px;
-            border-radius: 12px;
-            margin: 20px 0;
-        }
-        .sentence-text {
-            font-size: 18px;
-            line-height: 1.6;
-            margin-bottom: 20px;
-        }
-        .sentence-gap {
-            display: inline-block;
-            min-width: 120px;
-            margin: 0 5px;
-        }
-        .sentence-input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
         }
         .navigation {
             display: flex;
@@ -167,26 +137,6 @@
             font-size: 18px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
-        }
-        .btn-finish:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(78, 205, 196, 0.3);
-        }
-
-        @media (max-width: 768px) {
-            .assignment-container {
-                padding: 0 15px;
-            }
-            .question-card {
-                padding: 16px;
-            }
-            .question-text {
-                font-size: 16px;
-            }
-            .option-label {
-                padding: 12px;
-            }
         }
     </style>
 </head>
@@ -241,498 +191,338 @@
     </div>
 
     <script type="module">
-        // Ждем загрузки конфигурации
-        if (!window.SUPABASE_URL) {
-            console.log('⏳ Ожидаем загрузку конфигурации...');
-            await window.CONFIG_READY;
+        // Простая функция для показа ошибок
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            console.error('Ошибка:', message);
         }
 
-        console.log('✅ Конфигурация загружена:', window.SUPABASE_URL ? 'Да' : 'Нет');
-
-        let supabase;
-        try {
-            const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-            supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-            console.log('✅ Supabase клиент инициализирован');
-        } catch (error) {
-            console.error('❌ Ошибка инициализации Supabase:', error);
-            showError('Ошибка загрузки приложения');
-            return;
-        }
-
-        // Получаем ID задания из URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const assignmentId = urlParams.get('id');
-        
-        if (!assignmentId) {
-            showError('ID задания не указан');
-            return;
-        }
-
-        console.log('📝 ID задания:', assignmentId);
-
-        let assignment = null;
-        let questions = [];
-        let currentQuestionIndex = 0;
-        let userAnswers = {};
-
-        // Элементы DOM
-        const loadingEl = document.getElementById('loading');
-        const errorEl = document.getElementById('errorMessage');
-        const contentEl = document.getElementById('assignmentContent');
-        const completionEl = document.getElementById('completionScreen');
-        const assignmentTitleEl = document.getElementById('assignmentTitle');
-        const questionsContainerEl = document.getElementById('questionsContainer');
-        const prevBtn = document.getElementById('prevBtn');
-        const nextBtn = document.getElementById('nextBtn');
-        const finishBtn = document.getElementById('finishBtn');
-        const progressFillEl = document.getElementById('progressFill');
-        const progressTextEl = document.getElementById('progressText');
-        const currentQuestionEl = document.getElementById('currentQuestion');
-        const totalQuestionsEl = document.getElementById('totalQuestions');
-        const finalScoreEl = document.getElementById('finalScore');
-        const completionMessageEl = document.getElementById('completionMessage');
-
-        // Проверяем аутентификацию
-        let user;
-        try {
-            const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-            if (authError) throw authError;
-            user = authUser;
-            
-            if (!user) {
-                console.log('❌ Пользователь не авторизован');
-                window.location.href = '/login.html';
-                return;
-            }
-            console.log('✅ Пользователь авторизован:', user.email);
-        } catch (error) {
-            console.error('❌ Ошибка аутентификации:', error);
-            window.location.href = '/login.html';
-            return;
-        }
-
-        // Загружаем задание
-        async function loadAssignment() {
+        // Основная функция инициализации
+        async function initAssignment() {
             try {
-                console.log('🔄 Загружаем задание...');
+                console.log('🚀 Начинаем загрузку задания...');
+
+                // Ждем конфигурацию если нужно
+                if (!window.SUPABASE_URL) {
+                    console.log('⏳ Ожидаем конфигурацию...');
+                    await window.CONFIG_READY;
+                }
+
+                // Импортируем Supabase
+                const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+                const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+                console.log('✅ Supabase подключен');
+
+                // Проверяем авторизацию
+                const { data: { user }, error: authError } = await supabase.auth.getUser();
+                if (authError || !user) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                console.log('✅ Пользователь авторизован:', user.email);
+
+                // Получаем ID задания из URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const assignmentId = urlParams.get('id');
                 
-                const { data, error } = await supabase
+                if (!assignmentId) {
+                    showError('ID задания не указан в URL');
+                    return;
+                }
+
+                console.log('📝 Загружаем задание ID:', assignmentId);
+
+                // Загружаем задание
+                const { data: assignment, error: assignmentError } = await supabase
                     .from('assignments')
                     .select('*')
                     .eq('id', assignmentId)
                     .single();
 
-                if (error) {
-                    console.error('❌ Ошибка загрузки задания:', error);
-                    throw new Error('Не удалось загрузить задание: ' + error.message);
+                if (assignmentError) {
+                    throw new Error('Не удалось загрузить задание: ' + assignmentError.message);
                 }
 
-                if (!data) {
+                if (!assignment) {
                     throw new Error('Задание не найдено');
                 }
 
-                assignment = data;
-                questions = data.content?.questions || [];
-                
-                console.log('✅ Задание загружено:', assignment.title);
-                console.log('📝 Вопросов:', questions.length);
+                const questions = assignment.content?.questions || [];
+                console.log('✅ Задание загружено:', assignment.title, 'Вопросов:', questions.length);
 
                 if (questions.length === 0) {
                     throw new Error('В задании нет вопросов');
                 }
 
-                // Загружаем существующий прогресс
-                await loadUserProgress();
+                // Загружаем прогресс пользователя
+                let userAnswers = {};
+                const { data: progress } = await supabase
+                    .from('user_progress')
+                    .select('answers')
+                    .eq('user_id', user.id)
+                    .eq('assignment_id', assignmentId)
+                    .maybeSingle();
+
+                if (progress && progress.answers) {
+                    userAnswers = progress.answers;
+                    console.log('✅ Прогресс загружен');
+                }
 
                 // Показываем задание
-                renderAssignment();
-                showQuestion(0);
+                showAssignment(assignment, questions, userAnswers, supabase, user);
 
             } catch (error) {
-                console.error('❌ Ошибка:', error);
+                console.error('❌ Критическая ошибка:', error);
                 showError(error.message);
             }
         }
 
-        // Загружаем прогресс пользователя
-        async function loadUserProgress() {
-            try {
-                console.log('🔄 Загружаем прогресс...');
+        // Функция показа задания
+        function showAssignment(assignment, questions, userAnswers, supabase, user) {
+            // Скрываем загрузку, показываем контент
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('assignmentContent').style.display = 'block';
+            
+            // Устанавливаем заголовок
+            document.getElementById('assignmentTitle').textContent = assignment.title;
+            document.getElementById('totalQuestions').textContent = questions.length;
+
+            let currentQuestionIndex = 0;
+
+            // Функция показа вопроса
+            function showQuestion(index) {
+                if (index < 0 || index >= questions.length) return;
+                currentQuestionIndex = index;
                 
-                const { data, error } = await supabase
-                    .from('user_progress')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('assignment_id', assignmentId)
-                    .maybeSingle();
-
-                if (error && error.code !== 'PGRST116') {
-                    console.error('Ошибка загрузки прогресса:', error);
-                    return;
-                }
-
-                if (data) {
-                    userAnswers = data.answers || {};
-                    console.log('✅ Прогресс загружен, ответов:', Object.keys(userAnswers).length);
-                }
-            } catch (error) {
-                console.error('Ошибка загрузки прогресса:', error);
-            }
-        }
-
-        // Сохраняем прогресс
-        async function saveProgress() {
-            try {
-                const progressData = {
-                    user_id: user.id,
-                    assignment_id: assignmentId,
-                    answers: userAnswers,
-                    is_completed: false,
-                    score: 0
-                };
-
-                const { data: existingProgress } = await supabase
-                    .from('user_progress')
-                    .select('id')
-                    .eq('user_id', user.id)
-                    .eq('assignment_id', assignmentId)
-                    .maybeSingle();
-
-                let error;
-                if (existingProgress) {
-                    const result = await supabase
-                        .from('user_progress')
-                        .update(progressData)
-                        .eq('id', existingProgress.id);
-                    error = result.error;
-                } else {
-                    const result = await supabase
-                        .from('user_progress')
-                        .insert(progressData);
-                    error = result.error;
-                }
-
-                if (error) throw error;
+                const question = questions[index];
+                const container = document.getElementById('questionsContainer');
                 
-            } catch (error) {
-                console.error('Ошибка сохранения прогресса:', error);
-            }
-        }
-
-        // Отображаем задание
-        function renderAssignment() {
-            assignmentTitleEl.textContent = assignment.title;
-            totalQuestionsEl.textContent = questions.length;
-            
-            loadingEl.style.display = 'none';
-            contentEl.style.display = 'block';
-            
-            updateProgress();
-        }
-
-        // Показываем вопрос
-        function showQuestion(index) {
-            if (index < 0 || index >= questions.length) return;
-            
-            currentQuestionIndex = index;
-            const question = questions[index];
-            
-            questionsContainerEl.innerHTML = '';
-            
-            const questionCard = document.createElement('div');
-            questionCard.className = 'question-card';
-            
-            // Заголовок вопроса
-            questionCard.innerHTML = `
-                <div class="question-header">
+                // Очищаем контейнер
+                container.innerHTML = '';
+                
+                // Создаем карточку вопроса
+                const questionCard = document.createElement('div');
+                questionCard.className = 'question-card';
+                
+                // Заголовок вопроса
+                questionCard.innerHTML = `
                     <div class="question-number">Вопрос ${index + 1} из ${questions.length}</div>
-                    <div class="question-text">${escapeHtml(question.q || 'Вопрос без текста')}</div>
-                </div>
-            `;
-            
-            // Изображение вопроса
-            if (question.image) {
-                console.log('🖼️ Загружаем изображение:', question.image);
-                const img = document.createElement('img');
-                img.src = question.image;
-                img.alt = 'Изображение вопроса';
-                img.className = 'question-image';
-                img.onerror = () => {
-                    console.log('❌ Ошибка загрузки изображения:', question.image);
-                    img.style.display = 'none';
-                };
-                questionCard.appendChild(img);
-            }
-            
-            // Контент вопроса
-            if (question.type === 'test') {
-                renderTestQuestion(question, index, questionCard);
-            } else if (question.type === 'fill') {
-                renderFillQuestion(question, index, questionCard);
-            } else if (question.type === 'sentence') {
-                renderSentenceQuestion(question, index, questionCard);
-            }
-            
-            questionsContainerEl.appendChild(questionCard);
-            currentQuestionEl.textContent = index + 1;
-            
-            // Навигация
-            prevBtn.style.display = index > 0 ? 'block' : 'none';
-            nextBtn.style.display = index < questions.length - 1 ? 'block' : 'none';
-            finishBtn.style.display = index === questions.length - 1 ? 'block' : 'none';
-            
-            updateProgress();
-        }
-
-        // Рендерим тестовый вопрос
-        function renderTestQuestion(question, index, container) {
-            const optionsContainer = document.createElement('div');
-            optionsContainer.className = 'options-container';
-            
-            if (question.options && question.options.length > 0) {
-                question.options.forEach((option, optionIndex) => {
-                    const label = document.createElement('label');
-                    label.className = `option-label ${userAnswers[index] === optionIndex ? 'selected' : ''}`;
-                    
-                    const radio = document.createElement('input');
-                    radio.type = 'radio';
-                    radio.name = `question-${index}`;
-                    radio.value = optionIndex;
-                    radio.className = 'option-radio';
-                    radio.checked = userAnswers[index] === optionIndex;
-                    
-                    radio.addEventListener('change', () => {
-                        userAnswers[index] = optionIndex;
-                        document.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
-                        label.classList.add('selected');
-                        saveProgress();
-                        updateProgress();
-                    });
-                    
-                    label.appendChild(radio);
-                    label.appendChild(document.createTextNode(escapeHtml(option)));
-                    optionsContainer.appendChild(label);
-                });
-            } else {
-                optionsContainer.innerHTML = '<p style="color: #999; text-align: center;">Нет вариантов ответа</p>';
-            }
-            
-            container.appendChild(optionsContainer);
-        }
-
-        // Рендерим вопрос с заполнением
-        function renderFillQuestion(question, index, container) {
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'fill-input';
-            input.placeholder = 'Введите ваш ответ...';
-            input.value = userAnswers[index] || '';
-            
-            input.addEventListener('input', () => {
-                userAnswers[index] = input.value;
-                saveProgress();
-                updateProgress();
-            });
-            
-            container.appendChild(input);
-        }
-
-        // Рендерим вопрос с предложением
-        function renderSentenceQuestion(question, index, container) {
-            const sentenceContainer = document.createElement('div');
-            sentenceContainer.className = 'sentence-container';
-            
-            if (question.sentence) {
-                const parts = question.sentence.split('___');
-                const sentenceText = document.createElement('div');
-                sentenceText.className = 'sentence-text';
+                    <div class="question-text">${question.q || 'Вопрос без текста'}</div>
+                `;
                 
-                parts.forEach((part, partIndex) => {
-                    if (part) {
-                        sentenceText.appendChild(document.createTextNode(part));
-                    }
+                // Изображение вопроса
+                if (question.image) {
+                    const img = document.createElement('img');
+                    img.src = question.image;
+                    img.alt = 'Изображение вопроса';
+                    img.className = 'question-image';
+                    img.onerror = () => img.style.display = 'none';
+                    questionCard.appendChild(img);
+                }
+                
+                // Варианты ответов для тестового вопроса
+                if (question.type === 'test' && question.options) {
+                    const optionsContainer = document.createElement('div');
+                    optionsContainer.className = 'options-container';
                     
-                    if (partIndex < parts.length - 1) {
-                        const gapContainer = document.createElement('span');
-                        gapContainer.className = 'sentence-gap';
+                    question.options.forEach((option, optionIndex) => {
+                        const label = document.createElement('label');
+                        label.className = `option-label ${userAnswers[index] === optionIndex ? 'selected' : ''}`;
                         
-                        const input = document.createElement('input');
-                        input.type = 'text';
-                        input.className = 'sentence-input';
-                        input.placeholder = `Ответ ${partIndex + 1}`;
+                        const radio = document.createElement('input');
+                        radio.type = 'radio';
+                        radio.name = `question-${index}`;
+                        radio.value = optionIndex;
+                        radio.className = 'option-radio';
+                        radio.checked = userAnswers[index] === optionIndex;
                         
-                        const savedAnswers = Array.isArray(userAnswers[index]) ? userAnswers[index] : [];
-                        if (savedAnswers[partIndex] !== undefined) {
-                            input.value = savedAnswers[partIndex];
-                        }
-                        
-                        input.addEventListener('input', () => {
-                            if (!Array.isArray(userAnswers[index])) {
-                                userAnswers[index] = [];
-                            }
-                            userAnswers[index][partIndex] = input.value;
-                            saveProgress();
+                        radio.addEventListener('change', async () => {
+                            userAnswers[index] = optionIndex;
+                            document.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
+                            label.classList.add('selected');
+                            await saveProgress();
                             updateProgress();
                         });
                         
-                        gapContainer.appendChild(input);
-                        sentenceText.appendChild(gapContainer);
+                        label.appendChild(radio);
+                        label.appendChild(document.createTextNode(option));
+                        optionsContainer.appendChild(label);
+                    });
+                    
+                    questionCard.appendChild(optionsContainer);
+                }
+                // Поле для ввода ответа
+                else if (question.type === 'fill') {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'fill-input';
+                    input.placeholder = 'Введите ваш ответ...';
+                    input.value = userAnswers[index] || '';
+                    
+                    input.addEventListener('input', async () => {
+                        userAnswers[index] = input.value;
+                        await saveProgress();
+                        updateProgress();
+                    });
+                    
+                    questionCard.appendChild(input);
+                }
+                
+                container.appendChild(questionCard);
+                
+                // Обновляем навигацию
+                document.getElementById('currentQuestion').textContent = index + 1;
+                document.getElementById('prevBtn').style.display = index > 0 ? 'block' : 'none';
+                document.getElementById('nextBtn').style.display = index < questions.length - 1 ? 'block' : 'none';
+                document.getElementById('finishBtn').style.display = index === questions.length - 1 ? 'block' : 'none';
+                
+                updateProgress();
+            }
+
+            // Функция сохранения прогресса
+            async function saveProgress() {
+                try {
+                    const progressData = {
+                        user_id: user.id,
+                        assignment_id: assignment.id,
+                        answers: userAnswers,
+                        is_completed: false,
+                        score: 0
+                    };
+
+                    // Проверяем существующий прогресс
+                    const { data: existing } = await supabase
+                        .from('user_progress')
+                        .select('id')
+                        .eq('user_id', user.id)
+                        .eq('assignment_id', assignment.id)
+                        .maybeSingle();
+
+                    if (existing) {
+                        await supabase
+                            .from('user_progress')
+                            .update(progressData)
+                            .eq('id', existing.id);
+                    } else {
+                        await supabase
+                            .from('user_progress')
+                            .insert(progressData);
+                    }
+                } catch (error) {
+                    console.error('Ошибка сохранения:', error);
+                }
+            }
+
+            // Функция обновления прогресса
+            function updateProgress() {
+                const answeredCount = Object.keys(userAnswers).filter(key => 
+                    userAnswers[key] !== undefined && userAnswers[key] !== '' && userAnswers[key] !== null
+                ).length;
+                
+                const progress = (answeredCount / questions.length) * 100;
+                document.getElementById('progressFill').style.width = `${progress}%`;
+                document.getElementById('progressText').textContent = Math.round(progress);
+            }
+
+            // Функция завершения задания
+            async function finishAssignment() {
+                try {
+                    const score = calculateScore();
+                    const progressData = {
+                        user_id: user.id,
+                        assignment_id: assignment.id,
+                        answers: userAnswers,
+                        is_completed: true,
+                        completed_at: new Date().toISOString(),
+                        score: score
+                    };
+
+                    const { data: existing } = await supabase
+                        .from('user_progress')
+                        .select('id')
+                        .eq('user_id', user.id)
+                        .eq('assignment_id', assignment.id)
+                        .maybeSingle();
+
+                    if (existing) {
+                        await supabase
+                            .from('user_progress')
+                            .update(progressData)
+                            .eq('id', existing.id);
+                    } else {
+                        await supabase
+                            .from('user_progress')
+                            .insert(progressData);
+                    }
+
+                    // Показываем экран завершения
+                    document.getElementById('assignmentContent').style.display = 'none';
+                    document.getElementById('completionScreen').style.display = 'block';
+                    document.getElementById('finalScore').textContent = `${score}%`;
+                    
+                    if (score >= 80) {
+                        document.getElementById('completionMessage').textContent = 'Отличный результат!';
+                    } else if (score >= 60) {
+                        document.getElementById('completionMessage').textContent = 'Хороший результат!';
+                    } else {
+                        document.getElementById('completionMessage').textContent = 'Попробуйте еще раз!';
+                    }
+
+                } catch (error) {
+                    console.error('Ошибка завершения:', error);
+                    alert('Ошибка при сохранении результата');
+                }
+            }
+
+            // Функция расчета оценки
+            function calculateScore() {
+                let correctAnswers = 0;
+                
+                questions.forEach((question, index) => {
+                    if (userAnswers[index] !== undefined) {
+                        if (question.type === 'test') {
+                            if (parseInt(userAnswers[index]) === question.correct) {
+                                correctAnswers++;
+                            }
+                        } else if (question.type === 'fill') {
+                            const userAnswer = String(userAnswers[index]).toLowerCase().trim();
+                            const correctAnswersList = question.answers.map(a => String(a).toLowerCase().trim());
+                            if (correctAnswersList.includes(userAnswer)) {
+                                correctAnswers++;
+                            }
+                        }
                     }
                 });
                 
-                sentenceContainer.appendChild(sentenceText);
+                return Math.round((correctAnswers / questions.length) * 100);
             }
-            
-            container.appendChild(sentenceContainer);
-        }
 
-        // Обновляем прогресс
-        function updateProgress() {
-            const answeredCount = Object.keys(userAnswers).filter(key => {
-                const answer = userAnswers[key];
-                return answer !== undefined && answer !== null && answer !== '' && 
-                      (!Array.isArray(answer) || answer.some(item => item !== ''));
-            }).length;
-            
-            const progress = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
-            
-            progressFillEl.style.width = `${progress}%`;
-            progressTextEl.textContent = Math.round(progress);
-        }
-
-        // Показываем ошибку
-        function showError(message) {
-            loadingEl.style.display = 'none';
-            errorEl.textContent = message;
-            errorEl.style.display = 'block';
-        }
-
-        // Экранирование HTML
-        function escapeHtml(unsafe) {
-            return unsafe
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
-        // Завершаем задание
-        async function finishAssignment() {
-            const score = calculateScore();
-            
-            try {
-                const progressData = {
-                    user_id: user.id,
-                    assignment_id: assignmentId,
-                    answers: userAnswers,
-                    is_completed: true,
-                    completed_at: new Date().toISOString(),
-                    score: score
-                };
-
-                const { data: existingProgress } = await supabase
-                    .from('user_progress')
-                    .select('id')
-                    .eq('user_id', user.id)
-                    .eq('assignment_id', assignmentId)
-                    .maybeSingle();
-
-                let error;
-                if (existingProgress) {
-                    const result = await supabase
-                        .from('user_progress')
-                        .update(progressData)
-                        .eq('id', existingProgress.id);
-                    error = result.error;
-                } else {
-                    const result = await supabase
-                        .from('user_progress')
-                        .insert(progressData);
-                    error = result.error;
-                }
-
-                if (error) throw error;
-
-                // Показываем экран завершения
-                contentEl.style.display = 'none';
-                completionEl.style.display = 'block';
-                finalScoreEl.textContent = `${score}%`;
-                
-                if (score >= 80) {
-                    completionMessageEl.textContent = 'Отличный результат!';
-                } else if (score >= 60) {
-                    completionMessageEl.textContent = 'Хороший результат!';
-                } else {
-                    completionMessageEl.textContent = 'Попробуйте еще раз!';
-                }
-                
-            } catch (error) {
-                console.error('Ошибка завершения задания:', error);
-                alert('Ошибка при сохранении результата');
-            }
-        }
-
-        // Рассчитываем оценку
-        function calculateScore() {
-            if (questions.length === 0) return 0;
-            
-            let correctAnswers = 0;
-            
-            questions.forEach((question, index) => {
-                if (userAnswers[index] !== undefined && userAnswers[index] !== null && userAnswers[index] !== '') {
-                    if (question.type === 'test') {
-                        if (parseInt(userAnswers[index]) === question.correct) {
-                            correctAnswers++;
-                        }
-                    } else if (question.type === 'fill') {
-                        const userAnswer = String(userAnswers[index]).toLowerCase().trim();
-                        const correctAnswersList = question.answers.map(a => String(a).toLowerCase().trim());
-                        if (correctAnswersList.includes(userAnswer)) {
-                            correctAnswers++;
-                        }
-                    } else if (question.type === 'sentence') {
-                        const userAnswerArray = Array.isArray(userAnswers[index]) ? userAnswers[index] : [userAnswers[index]];
-                        let correctGaps = 0;
-                        
-                        userAnswerArray.forEach((answer, gapIndex) => {
-                            if (answer && question.answers[gapIndex]) {
-                                const userAnswer = String(answer).toLowerCase().trim();
-                                const correctAnswer = String(question.answers[gapIndex]).toLowerCase().trim();
-                                if (userAnswer === correctAnswer) {
-                                    correctGaps++;
-                                }
-                            }
-                        });
-                        
-                        if (correctGaps === question.answers.length) {
-                            correctAnswers++;
-                        }
-                    }
+            // Обработчики кнопок
+            document.getElementById('prevBtn').addEventListener('click', () => {
+                if (currentQuestionIndex > 0) {
+                    showQuestion(currentQuestionIndex - 1);
                 }
             });
-            
-            return Math.round((correctAnswers / questions.length) * 100);
+
+            document.getElementById('nextBtn').addEventListener('click', () => {
+                if (currentQuestionIndex < questions.length - 1) {
+                    showQuestion(currentQuestionIndex + 1);
+                }
+            });
+
+            document.getElementById('finishBtn').addEventListener('click', finishAssignment);
+
+            // Показываем первый вопрос
+            showQuestion(0);
+
+            console.log('✅ Задание полностью загружено и отображено');
         }
 
-        // Обработчики событий
-        prevBtn.addEventListener('click', () => {
-            if (currentQuestionIndex > 0) {
-                showQuestion(currentQuestionIndex - 1);
-            }
-        });
-
-        nextBtn.addEventListener('click', () => {
-            if (currentQuestionIndex < questions.length - 1) {
-                showQuestion(currentQuestionIndex + 1);
-            }
-        });
-
-        finishBtn.addEventListener('click', finishAssignment);
-
-        // Запускаем загрузку
-        loadAssignment();
+        // Запускаем инициализацию
+        initAssignment();
     </script>
 </body>
 </html>
