@@ -422,16 +422,26 @@
       document.getElementById('modal').style.display = 'flex';
     }
 
-    // ============ ПРОВЕРКА АДМИНА ============
+    // ============ УЛУЧШЕННАЯ ПРОВЕРКА АДМИНА ============
     async function checkAdmin(supabase) {
       try {
+        console.log('🔄 Начинаем проверку прав администратора...');
+        
         const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError) throw authError;
+        if (authError) {
+          console.error('Ошибка аутентификации:', authError);
+          throw authError;
+        }
+        
         if (!user) {
+          console.log('❌ Пользователь не авторизован');
           window.location.href = '/login.html';
           return false;
         }
 
+        console.log('✅ Пользователь авторизован:', user.email);
+
+        // Пробуем получить профиль пользователя
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('is_admin, full_name, email')
@@ -439,32 +449,49 @@
           .single();
 
         if (profileError) {
-          // Профиля нет — создаём пустой и уводим
+          console.error('❌ Ошибка загрузки профиля:', profileError);
+          
+          // Если профиль не найден - создаем его
           if (profileError.code === 'PGRST116') {
-            await supabase.from('profiles').insert({
-              id: user.id,
-              email: user.email,
-              full_name: user.user_metadata?.full_name || '',
-              is_admin: false,
-              created_at: new Date().toISOString()
-            });
+            console.log('📝 Профиль не найден, создаем новый...');
+            
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name || '',
+                is_admin: false,
+                created_at: new Date().toISOString()
+              });
+
+            if (insertError) {
+              console.error('❌ Ошибка создания профиля:', insertError);
+              throw new Error('Не удалось создать профиль: ' + insertError.message);
+            }
+
             showModal('Доступ запрещен', 'Профиль создан, но прав администратора нет. Обратитесь к администратору.');
             setTimeout(() => { window.location.href = '/profile.html'; }, 2500);
             return false;
           }
-          throw profileError;
+          
+          throw new Error('Ошибка загрузки профиля: ' + profileError.message);
         }
 
+        console.log('📊 Профиль загружен:', profile);
+
         if (!profile?.is_admin) {
+          console.log('❌ У пользователя нет прав администратора');
           showModal('Доступ запрещен', 'Нужны права администратора.');
           setTimeout(() => { window.location.href = '/profile.html'; }, 2000);
           return false;
         }
 
+        console.log('✅ Права администратора подтверждены');
         return user;
       } catch (e) {
-        console.error('Admin check error', e);
-        showModal('Ошибка доступа', 'Не удалось проверить права: ' + (e?.message || e));
+        console.error('❌ Ошибка проверки прав:', e);
+        showModal('Ошибка доступа', 'Не удалось проверить права: ' + (e?.message || e) + '\n\nКод ошибки: ' + (e?.code || 'неизвестно'));
         setTimeout(() => { window.location.href = '/login.html'; }, 2000);
         return false;
       }
@@ -596,8 +623,15 @@
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
         const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
 
+        console.log('🔄 Начинаем инициализацию админ-панели...');
+        
         const user = await checkAdmin(supabase);
-        if (!user) return;
+        if (!user) {
+          console.log('❌ Проверка прав администратора не пройдена');
+          return;
+        }
+
+        console.log('✅ Админ-панель инициализирована для пользователя:', user.email);
 
         // Кнопки/вкладки/модалка
         document.getElementById('modalOk').addEventListener('click', () => {
