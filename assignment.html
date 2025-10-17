@@ -72,6 +72,42 @@
             font-size: 16px;
             margin: 10px 0;
         }
+        .fill-input:focus {
+            border-color: var(--accent2);
+            outline: none;
+        }
+        .sentence-container {
+            background: var(--bg1);
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+        .sentence-text {
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .sentence-gap {
+            display: inline-block;
+            min-width: 120px;
+            margin: 0 5px;
+        }
+        .sentence-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            text-align: center;
+        }
+        .sentence-input:focus {
+            border-color: var(--accent2);
+            outline: none;
+        }
         .navigation {
             display: flex;
             justify-content: space-between;
@@ -138,6 +174,25 @@
             font-weight: 600;
             cursor: pointer;
         }
+        .completion-details {
+            margin: 20px 0;
+            padding: 20px;
+            background: var(--bg1);
+            border-radius: 12px;
+        }
+        .completion-details h3 {
+            margin-bottom: 15px;
+            color: var(--accent2);
+        }
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .result-item:last-child {
+            border-bottom: none;
+        }
     </style>
 </head>
 <body>
@@ -183,8 +238,30 @@
                 <h2>🎉 Задание завершено!</h2>
                 <div class="score-display" id="finalScore">0%</div>
                 <p id="completionMessage"></p>
+                
+                <div class="completion-details">
+                    <h3>📊 Детали результатов</h3>
+                    <div class="result-item">
+                        <span>Всего вопросов:</span>
+                        <span id="totalQuestionsResult">0</span>
+                    </div>
+                    <div class="result-item">
+                        <span>Правильных ответов:</span>
+                        <span id="correctAnswersResult">0</span>
+                    </div>
+                    <div class="result-item">
+                        <span>Неправильных ответов:</span>
+                        <span id="incorrectAnswersResult">0</span>
+                    </div>
+                    <div class="result-item">
+                        <span>Пропущено вопросов:</span>
+                        <span id="skippedQuestionsResult">0</span>
+                    </div>
+                </div>
+                
                 <div style="margin-top: 30px;">
                     <button class="btn" onclick="location.href='/profile.html'">Вернуться в профиль</button>
+                    <button class="btn secondary" onclick="location.reload()" style="margin-left: 10px;">Пройти заново</button>
                 </div>
             </div>
         </div>
@@ -323,52 +400,16 @@
                     questionCard.appendChild(img);
                 }
                 
-                // Варианты ответов для тестового вопроса
+                // Обработка разных типов вопросов
                 if (question.type === 'test' && question.options) {
-                    const optionsContainer = document.createElement('div');
-                    optionsContainer.className = 'options-container';
-                    
-                    question.options.forEach((option, optionIndex) => {
-                        const label = document.createElement('label');
-                        label.className = `option-label ${userAnswers[index] === optionIndex ? 'selected' : ''}`;
-                        
-                        const radio = document.createElement('input');
-                        radio.type = 'radio';
-                        radio.name = `question-${index}`;
-                        radio.value = optionIndex;
-                        radio.className = 'option-radio';
-                        radio.checked = userAnswers[index] === optionIndex;
-                        
-                        radio.addEventListener('change', async () => {
-                            userAnswers[index] = optionIndex;
-                            document.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
-                            label.classList.add('selected');
-                            await saveProgress();
-                            updateProgress();
-                        });
-                        
-                        label.appendChild(radio);
-                        label.appendChild(document.createTextNode(option));
-                        optionsContainer.appendChild(label);
-                    });
-                    
-                    questionCard.appendChild(optionsContainer);
-                }
-                // Поле для ввода ответа
-                else if (question.type === 'fill') {
-                    const input = document.createElement('input');
-                    input.type = 'text';
-                    input.className = 'fill-input';
-                    input.placeholder = 'Введите ваш ответ...';
-                    input.value = userAnswers[index] || '';
-                    
-                    input.addEventListener('input', async () => {
-                        userAnswers[index] = input.value;
-                        await saveProgress();
-                        updateProgress();
-                    });
-                    
-                    questionCard.appendChild(input);
+                    renderTestQuestion(question, index, questionCard);
+                } else if (question.type === 'fill') {
+                    renderFillQuestion(question, index, questionCard);
+                } else if (question.type === 'sentence') {
+                    renderSentenceQuestion(question, index, questionCard);
+                } else {
+                    // Если тип не указан, показываем как текстовый вопрос
+                    renderFillQuestion(question, index, questionCard);
                 }
                 
                 container.appendChild(questionCard);
@@ -380,6 +421,117 @@
                 document.getElementById('finishBtn').style.display = index === questions.length - 1 ? 'block' : 'none';
                 
                 updateProgress();
+            }
+
+            // Рендерим тестовый вопрос
+            function renderTestQuestion(question, index, container) {
+                const optionsContainer = document.createElement('div');
+                optionsContainer.className = 'options-container';
+                
+                question.options.forEach((option, optionIndex) => {
+                    const label = document.createElement('label');
+                    label.className = `option-label ${userAnswers[index] === optionIndex ? 'selected' : ''}`;
+                    
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = `question-${index}`;
+                    radio.value = optionIndex;
+                    radio.className = 'option-radio';
+                    radio.checked = userAnswers[index] === optionIndex;
+                    
+                    radio.addEventListener('change', async () => {
+                        userAnswers[index] = optionIndex;
+                        document.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
+                        label.classList.add('selected');
+                        await saveProgress();
+                        updateProgress();
+                    });
+                    
+                    label.appendChild(radio);
+                    label.appendChild(document.createTextNode(option));
+                    optionsContainer.appendChild(label);
+                });
+                
+                container.appendChild(optionsContainer);
+            }
+
+            // Рендерим вопрос с заполнением
+            function renderFillQuestion(question, index, container) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'fill-input';
+                input.placeholder = 'Введите ваш ответ...';
+                input.value = userAnswers[index] || '';
+                
+                input.addEventListener('input', async () => {
+                    userAnswers[index] = input.value;
+                    await saveProgress();
+                    updateProgress();
+                });
+                
+                container.appendChild(input);
+            }
+
+            // Рендерим вопрос с предложением
+            function renderSentenceQuestion(question, index, container) {
+                const sentenceContainer = document.createElement('div');
+                sentenceContainer.className = 'sentence-container';
+                
+                // Создаем предпросмотр предложения
+                const sentencePreview = document.createElement('div');
+                sentencePreview.className = 'sentence-text';
+                
+                if (!question.sentence) {
+                    sentencePreview.textContent = 'Предложение не указано';
+                    sentenceContainer.appendChild(sentencePreview);
+                    container.appendChild(sentenceContainer);
+                    return;
+                }
+                
+                // Разбиваем предложение на части по пропускам
+                const parts = question.sentence.split('___');
+                sentencePreview.innerHTML = '';
+                
+                parts.forEach((part, partIndex) => {
+                    // Добавляем текст
+                    if (part) {
+                        sentencePreview.appendChild(document.createTextNode(part));
+                    }
+                    
+                    // Добавляем инпут для пропуска (кроме последней части)
+                    if (partIndex < parts.length - 1) {
+                        const gapContainer = document.createElement('span');
+                        gapContainer.className = 'sentence-gap';
+                        
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.className = 'sentence-input';
+                        input.placeholder = `Ответ ${partIndex + 1}`;
+                        
+                        // Восстанавливаем сохраненный ответ
+                        if (!Array.isArray(userAnswers[index])) {
+                            userAnswers[index] = [];
+                        }
+                        if (userAnswers[index][partIndex] !== undefined) {
+                            input.value = userAnswers[index][partIndex];
+                        }
+                        
+                        input.addEventListener('input', async () => {
+                            if (!Array.isArray(userAnswers[index])) {
+                                userAnswers[index] = [];
+                            }
+                            userAnswers[index][partIndex] = input.value;
+                            await saveProgress();
+                            updateProgress();
+                        });
+                        
+                        gapContainer.appendChild(input);
+                        sentencePreview.appendChild(gapContainer);
+                    }
+                });
+                
+                sentenceContainer.appendChild(sentencePreview);
+                container.appendChild(sentenceContainer);
             }
 
             // Функция сохранения прогресса
@@ -418,9 +570,13 @@
 
             // Функция обновления прогресса
             function updateProgress() {
-                const answeredCount = Object.keys(userAnswers).filter(key => 
-                    userAnswers[key] !== undefined && userAnswers[key] !== '' && userAnswers[key] !== null
-                ).length;
+                const answeredCount = Object.keys(userAnswers).filter(key => {
+                    const answer = userAnswers[key];
+                    if (Array.isArray(answer)) {
+                        return answer.some(item => item && item.trim() !== '');
+                    }
+                    return answer !== undefined && answer !== '' && answer !== null;
+                }).length;
                 
                 const progress = (answeredCount / questions.length) * 100;
                 document.getElementById('progressFill').style.width = `${progress}%`;
@@ -430,14 +586,14 @@
             // Функция завершения задания
             async function finishAssignment() {
                 try {
-                    const score = calculateScore();
+                    const scoreResult = calculateScore();
                     const progressData = {
                         user_id: user.id,
                         assignment_id: assignment.id,
                         answers: userAnswers,
                         is_completed: true,
                         completed_at: new Date().toISOString(),
-                        score: score
+                        score: scoreResult.score
                     };
 
                     const { data: existing } = await supabase
@@ -458,18 +614,8 @@
                             .insert(progressData);
                     }
 
-                    // Показываем экран завершения
-                    document.getElementById('assignmentContent').style.display = 'none';
-                    document.getElementById('completionScreen').style.display = 'block';
-                    document.getElementById('finalScore').textContent = `${score}%`;
-                    
-                    if (score >= 80) {
-                        document.getElementById('completionMessage').textContent = 'Отличный результат!';
-                    } else if (score >= 60) {
-                        document.getElementById('completionMessage').textContent = 'Хороший результат!';
-                    } else {
-                        document.getElementById('completionMessage').textContent = 'Попробуйте еще раз!';
-                    }
+                    // Показываем экран завершения с деталями
+                    showCompletionScreen(scoreResult);
 
                 } catch (error) {
                     console.error('Ошибка завершения:', error);
@@ -477,27 +623,85 @@
                 }
             }
 
-            // Функция расчета оценки
+            // Функция расчета оценки с детальной статистикой
             function calculateScore() {
                 let correctAnswers = 0;
+                let incorrectAnswers = 0;
+                let skippedAnswers = 0;
                 
                 questions.forEach((question, index) => {
-                    if (userAnswers[index] !== undefined) {
-                        if (question.type === 'test') {
-                            if (parseInt(userAnswers[index]) === question.correct) {
-                                correctAnswers++;
-                            }
-                        } else if (question.type === 'fill') {
-                            const userAnswer = String(userAnswers[index]).toLowerCase().trim();
-                            const correctAnswersList = question.answers.map(a => String(a).toLowerCase().trim());
-                            if (correctAnswersList.includes(userAnswer)) {
-                                correctAnswers++;
-                            }
+                    const userAnswer = userAnswers[index];
+                    
+                    // Проверяем, есть ли ответ
+                    if (userAnswer === undefined || userAnswer === null || 
+                        (Array.isArray(userAnswer) && userAnswer.every(item => !item || item.trim() === '')) ||
+                        (!Array.isArray(userAnswer) && (!userAnswer || userAnswer.trim() === ''))) {
+                        skippedAnswers++;
+                        return;
+                    }
+                    
+                    let isCorrect = false;
+                    
+                    if (question.type === 'test') {
+                        // Для тестовых вопросов сравниваем номер правильного ответа
+                        isCorrect = parseInt(userAnswer) === question.correct;
+                    } else if (question.type === 'fill') {
+                        // Для вопросов с заполнением проверяем совпадение с любым из правильных ответов
+                        const userAnswerNormalized = String(userAnswer).toLowerCase().trim();
+                        const correctAnswersNormalized = question.answers.map(a => String(a).toLowerCase().trim());
+                        isCorrect = correctAnswersNormalized.includes(userAnswerNormalized);
+                    } else if (question.type === 'sentence') {
+                        // Для предложений проверяем каждый пропуск
+                        if (Array.isArray(userAnswer) && Array.isArray(question.answers)) {
+                            isCorrect = userAnswer.every((answer, gapIndex) => {
+                                if (!answer || !question.answers[gapIndex]) return false;
+                                return String(answer).toLowerCase().trim() === 
+                                       String(question.answers[gapIndex]).toLowerCase().trim();
+                            });
                         }
+                    }
+                    
+                    if (isCorrect) {
+                        correctAnswers++;
+                    } else {
+                        incorrectAnswers++;
                     }
                 });
                 
-                return Math.round((correctAnswers / questions.length) * 100);
+                const totalAnswered = correctAnswers + incorrectAnswers;
+                const score = totalAnswered > 0 ? Math.round((correctAnswers / questions.length) * 100) : 0;
+                
+                return {
+                    score: score,
+                    correctAnswers: correctAnswers,
+                    incorrectAnswers: incorrectAnswers,
+                    skippedAnswers: skippedAnswers,
+                    totalQuestions: questions.length
+                };
+            }
+
+            // Функция показа экрана завершения
+            function showCompletionScreen(scoreResult) {
+                document.getElementById('assignmentContent').style.display = 'none';
+                document.getElementById('completionScreen').style.display = 'block';
+                
+                // Устанавливаем результаты
+                document.getElementById('finalScore').textContent = `${scoreResult.score}%`;
+                document.getElementById('totalQuestionsResult').textContent = scoreResult.totalQuestions;
+                document.getElementById('correctAnswersResult').textContent = scoreResult.correctAnswers;
+                document.getElementById('incorrectAnswersResult').textContent = scoreResult.incorrectAnswers;
+                document.getElementById('skippedQuestionsResult').textContent = scoreResult.skippedAnswers;
+                
+                // Устанавливаем сообщение в зависимости от результата
+                if (scoreResult.score >= 90) {
+                    document.getElementById('completionMessage').textContent = 'Отличный результат! Вы прекрасно справились с заданием!';
+                } else if (scoreResult.score >= 70) {
+                    document.getElementById('completionMessage').textContent = 'Хороший результат! Вы хорошо усвоили материал.';
+                } else if (scoreResult.score >= 50) {
+                    document.getElementById('completionMessage').textContent = 'Неплохой результат! Есть над чем поработать.';
+                } else {
+                    document.getElementById('completionMessage').textContent = 'Попробуйте пройти задание еще раз для лучшего результата.';
+                }
             }
 
             // Обработчики кнопок
