@@ -2,50 +2,22 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/config.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "*.html",
+      "src": "**/*.html",
       "use": "@vercel/static"
     },
     {
-      "src": "*.js",
+      "src": "**/*.js", 
       "use": "@vercel/static"
     },
     {
-      "src": "css/*.css",
+      "src": "**/*.css",
       "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/api/config",
-      "dest": "/api/config.js"
-    },
-    {
-      "src": "/config.js",
-      "dest": "/config.js"
-    },
-    {
-      "src": "/css/(.*)",
-      "dest": "/css/$1"
-    },
-    {
-      "src": "/(.*\\.js)",
+      "src": "/(.*)",
       "dest": "/$1"
-    },
-    {
-      "src": "/(.*\\.html)",
-      "dest": "/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/login.html"
     }
-  ],
-  "env": {
-    "SUPABASE_URL": "https://zjvedphdbpuzqzvznqex.supabase.co",
-    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqdmVkcGhkYnB1enF6dnpucWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNDMxMDgsImV4cCI6MjA3NTkxOTEwOH0.rfIdcmTx9q-UZyQp0QKjBdGQGbDpMuy0R3_3P_DOV7I"
-  }
+  ]
 }
