@@ -235,6 +235,106 @@
         .status-incorrect { color: #f44336; }
         .status-skipped { color: #ff9800; }
 
+        /* СТИЛИ ДЛЯ КРОССВОРДА */
+        .crossword-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 2px solid #e9ecef;
+        }
+
+        .crossword-grid {
+            display: inline-block;
+            border: 3px solid #333;
+            background: white;
+            margin: 10px 0;
+        }
+
+        .crossword-row {
+            display: flex;
+        }
+
+        .crossword-cell {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #999;
+            position: relative;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .crossword-cell.blocked {
+            background: #333;
+            border-color: #333;
+        }
+
+        .crossword-cell input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            background: transparent;
+            outline: none;
+            font-family: inherit;
+            color: #2c3e50;
+        }
+
+        .crossword-cell input:focus {
+            background: #e3f2fd;
+        }
+
+        .crossword-cell.blocked input {
+            display: none;
+        }
+
+        .crossword-cell.correct {
+            background: #e8f5e8;
+        }
+
+        .crossword-cell.incorrect {
+            background: #ffebee;
+        }
+
+        .crossword-instructions {
+            background: #e8f5e8;
+            border: 1px solid #c8e6c9;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .crossword-instructions h4 {
+            margin: 0 0 10px 0;
+            color: #2e7d32;
+        }
+
+        .crossword-instructions ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .crossword-instructions li {
+            margin-bottom: 5px;
+        }
+
+        .crossword-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            margin: 10px 0;
+            display: block;
+        }
+
         @media (max-width: 768px) {
             .assignment-container {
                 padding: 0 15px;
@@ -247,6 +347,19 @@
             }
             .option-label {
                 padding: 12px;
+            }
+            .crossword-cell {
+                width: 35px;
+                height: 35px;
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .crossword-cell {
+                width: 30px;
+                height: 30px;
+                font-size: 12px;
             }
         }
     </style>
@@ -480,6 +593,8 @@
                     renderFillQuestion(question, index, questionCard);
                 } else if (question.type === 'sentence') {
                     renderSentenceQuestion(question, index, questionCard);
+                } else if (question.type === 'crossword') {
+                    renderCrosswordQuestion(question, index, questionCard);
                 } else {
                     // Если тип не указан, показываем как текстовый вопрос
                     renderFillQuestion(question, index, questionCard);
@@ -602,6 +717,143 @@
                 container.appendChild(sentenceContainer);
             }
 
+            // Рендерим вопрос с кроссвордом
+            function renderCrosswordQuestion(question, index, container) {
+                const crosswordContainer = document.createElement('div');
+                crosswordContainer.className = 'crossword-container';
+                
+                // Инструкции для кроссворда
+                const instructions = document.createElement('div');
+                instructions.className = 'crossword-instructions';
+                instructions.innerHTML = `
+                    <h4>🧩 Инструкция по решению кроссворда</h4>
+                    <ul>
+                        <li>Заполните все белые клетки буквами</li>
+                        <li>Черные клетки заблокированы и не заполняются</li>
+                        <li>Используйте стрелки для навигации между клетками</li>
+                        <li>Ответы проверяются автоматически при завершении задания</li>
+                    </ul>
+                `;
+                crosswordContainer.appendChild(instructions);
+
+                // Изображение кроссворда, если есть
+                if (question.image) {
+                    const img = document.createElement('img');
+                    img.src = question.image;
+                    img.alt = 'Изображение кроссворда';
+                    img.className = 'crossword-image';
+                    img.onerror = () => img.style.display = 'none';
+                    crosswordContainer.appendChild(img);
+                }
+
+                // Создаем сетку кроссворда
+                const gridContainer = document.createElement('div');
+                gridContainer.className = 'crossword-grid';
+                
+                const grid = question.grid || [];
+                const rows = question.metadata?.rows || grid.length;
+                const cols = question.metadata?.cols || (grid[0] ? grid[0].length : 0);
+                
+                // Инициализируем userAnswers для кроссворда, если нужно
+                if (!userAnswers[index] || !Array.isArray(userAnswers[index])) {
+                    userAnswers[index] = Array(rows).fill().map(() => Array(cols).fill(''));
+                }
+
+                for (let i = 0; i < rows; i++) {
+                    const rowDiv = document.createElement('div');
+                    rowDiv.className = 'crossword-row';
+                    
+                    for (let j = 0; j < cols; j++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'crossword-cell';
+                        
+                        // Если клетка заблокирована
+                        if (grid[i] && grid[i][j] === null) {
+                            cell.classList.add('blocked');
+                        } else {
+                            const input = document.createElement('input');
+                            input.type = 'text';
+                            input.maxLength = 1;
+                            input.value = userAnswers[index][i][j] || '';
+                            input.placeholder = '';
+                            
+                            input.addEventListener('input', async (e) => {
+                                // Сохраняем введенную букву
+                                if (!userAnswers[index][i]) userAnswers[index][i] = [];
+                                userAnswers[index][i][j] = e.target.value.toUpperCase();
+                                
+                                // Автопереход к следующей клетке
+                                if (e.target.value && j < cols - 1) {
+                                    const nextCell = gridContainer.querySelector(`[data-row="${i}"][data-col="${j + 1}"] input`);
+                                    if (nextCell && !nextCell.parentElement.classList.contains('blocked')) {
+                                        nextCell.focus();
+                                    }
+                                }
+                                
+                                await saveProgress(false);
+                            });
+                            
+                            input.addEventListener('keydown', (e) => {
+                                // Навигация стрелками
+                                switch(e.key) {
+                                    case 'ArrowLeft':
+                                        e.preventDefault();
+                                        if (j > 0) {
+                                            const prevCell = gridContainer.querySelector(`[data-row="${i}"][data-col="${j - 1}"] input`);
+                                            if (prevCell) prevCell.focus();
+                                        }
+                                        break;
+                                    case 'ArrowRight':
+                                        e.preventDefault();
+                                        if (j < cols - 1) {
+                                            const nextCell = gridContainer.querySelector(`[data-row="${i}"][data-col="${j + 1}"] input`);
+                                            if (nextCell) nextCell.focus();
+                                        }
+                                        break;
+                                    case 'ArrowUp':
+                                        e.preventDefault();
+                                        if (i > 0) {
+                                            const upCell = gridContainer.querySelector(`[data-row="${i - 1}"][data-col="${j}"] input`);
+                                            if (upCell) upCell.focus();
+                                        }
+                                        break;
+                                    case 'ArrowDown':
+                                        e.preventDefault();
+                                        if (i < rows - 1) {
+                                            const downCell = gridContainer.querySelector(`[data-row="${i + 1}"][data-col="${j}"] input`);
+                                            if (downCell) downCell.focus();
+                                        }
+                                        break;
+                                    case 'Backspace':
+                                        if (!e.target.value && j > 0) {
+                                            e.preventDefault();
+                                            const prevCell = gridContainer.querySelector(`[data-row="${i}"][data-col="${j - 1}"] input`);
+                                            if (prevCell) {
+                                                prevCell.focus();
+                                                prevCell.value = '';
+                                                if (!userAnswers[index][i]) userAnswers[index][i] = [];
+                                                userAnswers[index][i][j-1] = '';
+                                                saveProgress(false);
+                                            }
+                                        }
+                                        break;
+                                }
+                            });
+                            
+                            cell.appendChild(input);
+                        }
+                        
+                        cell.dataset.row = i;
+                        cell.dataset.col = j;
+                        rowDiv.appendChild(cell);
+                    }
+                    gridContainer.appendChild(rowDiv);
+                }
+                
+                crosswordContainer.appendChild(gridContainer);
+                container.appendChild(crosswordContainer);
+            }
+
             // Функция сохранения прогресса
             async function saveProgress(isCompleted = false) {
                 try {
@@ -667,10 +919,33 @@
                     };
                     
                     // Проверяем, есть ли ответ
-                    const hasAnswer = userAnswer !== undefined && 
-                                     userAnswer !== null && 
-                                     userAnswer !== '' &&
-                                     !(Array.isArray(userAnswer) && userAnswer.every(item => !item || item.trim() === ''));
+                    let hasAnswer = false;
+                    
+                    if (question.type === 'crossword') {
+                        // Для кроссворда проверяем, заполнены ли все незаблокированные клетки
+                        const grid = question.grid || [];
+                        const userGrid = userAnswer || [];
+                        let filledCells = 0;
+                        let totalCells = 0;
+                        
+                        for (let i = 0; i < grid.length; i++) {
+                            for (let j = 0; j < grid[i].length; j++) {
+                                if (grid[i][j] !== null) {
+                                    totalCells++;
+                                    if (userGrid[i] && userGrid[i][j] && userGrid[i][j].trim() !== '') {
+                                        filledCells++;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        hasAnswer = filledCells > 0; // Считаем, что ответ есть, если заполнена хотя бы одна клетка
+                    } else {
+                        hasAnswer = userAnswer !== undefined && 
+                                   userAnswer !== null && 
+                                   userAnswer !== '' &&
+                                   !(Array.isArray(userAnswer) && userAnswer.every(item => !item || item.trim() === ''));
+                    }
                     
                     if (!hasAnswer) {
                         skippedAnswers++;
@@ -705,6 +980,37 @@
                                 });
                             }
                         }
+                    } else if (question.type === 'crossword') {
+                        // Для кроссворда сравниваем каждую клетку
+                        result.correctAnswer = question.grid;
+                        const userGrid = userAnswer;
+                        const correctGrid = question.grid;
+                        
+                        let correctCells = 0;
+                        let totalCheckableCells = 0;
+                        
+                        for (let i = 0; i < correctGrid.length; i++) {
+                            for (let j = 0; j < correctGrid[i].length; j++) {
+                                // Проверяем только незаблокированные клетки
+                                if (correctGrid[i][j] !== null) {
+                                    totalCheckableCells++;
+                                    const userCell = userGrid[i] && userGrid[i][j] ? userGrid[i][j].toUpperCase().trim() : '';
+                                    const correctCell = correctGrid[i][j] ? correctGrid[i][j].toUpperCase().trim() : '';
+                                    
+                                    if (userCell === correctCell && userCell !== '') {
+                                        correctCells++;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Считаем кроссворд правильным, если все клетки заполнены верно
+                        isCorrect = correctCells === totalCheckableCells;
+                        result.crosswordStats = {
+                            correctCells: correctCells,
+                            totalCells: totalCheckableCells,
+                            percentage: totalCheckableCells > 0 ? Math.round((correctCells / totalCheckableCells) * 100) : 0
+                        };
                     }
                     
                     result.isCorrect = isCorrect;
@@ -847,6 +1153,12 @@
                         answerDetails = `
                             <div class="review-answer"><strong>Ваши ответы:</strong> ${userAnswerText}</div>
                             <div class="review-answer review-correct"><strong>Правильные ответы:</strong> ${correctAnswerText}</div>
+                        `;
+                    } else if (result.type === 'crossword') {
+                        const stats = result.crosswordStats || { correctCells: 0, totalCells: 0, percentage: 0 };
+                        answerDetails = `
+                            <div class="review-answer"><strong>Заполнено верно:</strong> ${stats.correctCells} из ${stats.totalCells} клеток (${stats.percentage}%)</div>
+                            <div class="review-answer review-correct"><strong>Требуется:</strong> Все ${stats.totalCells} клеток заполнены правильно</div>
                         `;
                     }
                     
