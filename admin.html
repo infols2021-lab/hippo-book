@@ -775,7 +775,7 @@
       const builder = document.getElementById(`crosswordSimpleBuilder_${qid}`);
       if (!builder) return;
 
-      // Инициализация данных кроссворда
+      // Инициализация данных кроссворда, если их нет
       if (!crosswordData[qid]) {
         crosswordData[qid] = {
           grid: [],
@@ -832,6 +832,10 @@
         } catch (e) {
           console.warn('Не удалось восстановить кроссворд:', e);
         }
+      } else if (crosswordData[qid].grid && crosswordData[qid].grid.length > 0) {
+        // Если данные уже есть в crosswordData, просто рендерим
+        renderSimpleGrid(qid);
+        updateSimpleCrosswordStats(qid);
       }
     }
 
@@ -1077,11 +1081,12 @@
       const validationContainer = document.getElementById(`crosswordSimpleValidation_${qid}`) || 
         createSimpleValidationContainer(qid);
       
-      // Проверяем, есть ли заполненные клетки
+      // ИСПРАВЛЕНИЕ: Проверяем, есть ли заполненные клетки (не заблокированные и не пустые)
       let hasFilledCells = false;
       for (let i = 0; i < data.rows; i++) {
         for (let j = 0; j < data.cols; j++) {
-          if (data.grid[i][j] && data.grid[i][j] !== '') {
+          // Клетка считается заполненной, если она не заблокирована и не пустая
+          if (data.grid[i][j] !== null && data.grid[i][j] !== '') {
             hasFilledCells = true;
             break;
           }
@@ -1674,9 +1679,9 @@
             `;
           }
 
-          if (qType !== 'crossword') {
-            inner += `<button class="btn btn-small btn-danger remove-question" type="button">🗑️ Удалить вопрос</button>`;
-          }
+          // ДОБАВЛЕНО: кнопка удаления для кроссворда тоже
+          inner += `<button class="btn btn-small btn-danger remove-question" type="button">🗑️ Удалить вопрос</button>`;
+          
           wrap.innerHTML = inner;
           container.appendChild(wrap);
 
@@ -1691,19 +1696,36 @@
                 rows: prefill.metadata?.rows || 15,
                 cols: prefill.metadata?.cols || 15
               };
-              renderSimpleGrid(qid);
+            } else {
+              // Если данных нет, создаем пустую сетку
+              crosswordData[qid] = {
+                grid: [],
+                rows: 15,
+                cols: 15
+              };
             }
-            initSimpleCrosswordBuilder(qid);
+            
+            // ИСПРАВЛЕНИЕ: Вызываем инициализацию после небольшой задержки, чтобы DOM успел обновиться
+            setTimeout(() => {
+              initSimpleCrosswordBuilder(qid);
+              renderSimpleGrid(qid);
+              updateSimpleCrosswordStats(qid);
+            }, 100);
           }
 
-          // удаление вопроса (только для не-кроссвордов)
-          if (qType !== 'crossword') {
-            wrap.querySelector('.remove-question').addEventListener('click', () => {
-              const all = document.querySelectorAll('.subtask-item');
-              if (all.length > 1) wrap.remove();
-              else alert('Должен остаться хотя бы один вопрос.');
-            });
-          }
+          // удаление вопроса (для всех типов)
+          wrap.querySelector('.remove-question').addEventListener('click', () => {
+            const all = document.querySelectorAll('.subtask-item');
+            if (all.length > 1) {
+              // Удаляем данные кроссворда если это был кроссворд
+              if (qType === 'crossword' && crosswordData[qid]) {
+                delete crosswordData[qid];
+              }
+              wrap.remove();
+            } else {
+              alert('Должен остаться хотя бы один вопрос.');
+            }
+          });
         }
 
         async function saveAssignment() {
