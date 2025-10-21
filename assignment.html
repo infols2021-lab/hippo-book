@@ -335,6 +335,56 @@
             display: block;
         }
 
+        /* Список слов для кроссворда */
+        .crossword-words {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .crossword-words h4 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+        }
+
+        .words-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .words-column h5 {
+            margin: 0 0 10px 0;
+            color: #34495e;
+        }
+
+        .word-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 5px 0;
+        }
+
+        .word-number {
+            background: var(--accent2);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .word-text {
+            font-weight: 500;
+        }
+
         @media (max-width: 768px) {
             .assignment-container {
                 padding: 0 15px;
@@ -352,6 +402,10 @@
                 width: 35px;
                 height: 35px;
                 font-size: 14px;
+            }
+            .words-columns {
+                grid-template-columns: 1fr;
+                gap: 10px;
             }
         }
 
@@ -731,6 +785,7 @@
                         <li>Заполните все белые клетки буквами</li>
                         <li>Черные клетки заблокированы и не заполняются</li>
                         <li>Используйте стрелки для навигации между клетками</li>
+                        <li>Tab/Shift+Tab для перехода между клетками</li>
                         <li>Ответы проверяются автоматически при завершении задания</li>
                     </ul>
                 `;
@@ -746,11 +801,65 @@
                     crosswordContainer.appendChild(img);
                 }
 
+                // Список слов для кроссворда
+                if (question.words && question.words.length > 0) {
+                    const wordsContainer = document.createElement('div');
+                    wordsContainer.className = 'crossword-words';
+                    
+                    const wordsColumns = document.createElement('div');
+                    wordsColumns.className = 'words-columns';
+                    
+                    // Разделяем слова по направлениям
+                    const acrossWords = question.words.filter(word => word.direction === 'across');
+                    const downWords = question.words.filter(word => word.direction === 'down');
+                    
+                    if (acrossWords.length > 0) {
+                        const acrossColumn = document.createElement('div');
+                        acrossColumn.className = 'words-column';
+                        acrossColumn.innerHTML = '<h5>→ По горизонтали:</h5>';
+                        
+                        acrossWords.forEach(word => {
+                            const wordItem = document.createElement('div');
+                            wordItem.className = 'word-item';
+                            wordItem.innerHTML = `
+                                <div class="word-number">${word.number}</div>
+                                <div class="word-text">${word.length} букв</div>
+                            `;
+                            acrossColumn.appendChild(wordItem);
+                        });
+                        
+                        wordsColumns.appendChild(acrossColumn);
+                    }
+                    
+                    if (downWords.length > 0) {
+                        const downColumn = document.createElement('div');
+                        downColumn.className = 'words-column';
+                        downColumn.innerHTML = '<h5>↓ По вертикали:</h5>';
+                        
+                        downWords.forEach(word => {
+                            const wordItem = document.createElement('div');
+                            wordItem.className = 'word-item';
+                            wordItem.innerHTML = `
+                                <div class="word-number">${word.number}</div>
+                                <div class="word-text">${word.length} букв</div>
+                            `;
+                            downColumn.appendChild(wordItem);
+                        });
+                        
+                        wordsColumns.appendChild(downColumn);
+                    }
+                    
+                    wordsContainer.innerHTML = '<h4>Слова для разгадывания:</h4>';
+                    wordsContainer.appendChild(wordsColumns);
+                    crosswordContainer.appendChild(wordsContainer);
+                }
+
                 // Создаем сетку кроссворда
                 const gridContainer = document.createElement('div');
                 gridContainer.className = 'crossword-grid';
                 
                 const grid = question.grid || [];
+                const blocks = question.blocks || [];
                 const rows = question.metadata?.rows || grid.length;
                 const cols = question.metadata?.cols || (grid[0] ? grid[0].length : 0);
                 
@@ -758,6 +867,9 @@
                 if (!userAnswers[index] || !Array.isArray(userAnswers[index])) {
                     userAnswers[index] = Array(rows).fill().map(() => Array(cols).fill(''));
                 }
+
+                // Создаем массив для хранения ссылок на инпуты для быстрого доступа
+                const inputRefs = Array(rows).fill().map(() => Array(cols).fill(null));
 
                 for (let i = 0; i < rows; i++) {
                     const rowDiv = document.createElement('div');
@@ -767,8 +879,10 @@
                         const cell = document.createElement('div');
                         cell.className = 'crossword-cell';
                         
-                        // Если клетка заблокирована
-                        if (grid[i] && grid[i][j] === null) {
+                        // Проверяем, заблокирована ли клетка
+                        const isBlocked = blocks.some(block => block.row === i && block.col === j);
+                        
+                        if (isBlocked) {
                             cell.classList.add('blocked');
                         } else {
                             const input = document.createElement('input');
@@ -777,6 +891,9 @@
                             input.value = userAnswers[index][i][j] || '';
                             input.placeholder = '';
                             
+                            // Сохраняем ссылку на инпут
+                            inputRefs[i][j] = input;
+                            
                             input.addEventListener('input', async (e) => {
                                 // Сохраняем введенную букву
                                 if (!userAnswers[index][i]) userAnswers[index][i] = [];
@@ -784,7 +901,7 @@
                                 
                                 // Автопереход к следующей клетке
                                 if (e.target.value && j < cols - 1) {
-                                    const nextCell = gridContainer.querySelector(`[data-row="${i}"][data-col="${j + 1}"] input`);
+                                    const nextCell = inputRefs[i][j + 1];
                                     if (nextCell && !nextCell.parentElement.classList.contains('blocked')) {
                                         nextCell.focus();
                                     }
@@ -794,40 +911,62 @@
                             });
                             
                             input.addEventListener('keydown', (e) => {
-                                // Навигация стрелками
+                                // Навигация стрелками и Tab
                                 switch(e.key) {
                                     case 'ArrowLeft':
                                         e.preventDefault();
                                         if (j > 0) {
-                                            const prevCell = gridContainer.querySelector(`[data-row="${i}"][data-col="${j - 1}"] input`);
+                                            const prevCell = inputRefs[i][j - 1];
                                             if (prevCell) prevCell.focus();
                                         }
                                         break;
                                     case 'ArrowRight':
                                         e.preventDefault();
                                         if (j < cols - 1) {
-                                            const nextCell = gridContainer.querySelector(`[data-row="${i}"][data-col="${j + 1}"] input`);
+                                            const nextCell = inputRefs[i][j + 1];
                                             if (nextCell) nextCell.focus();
                                         }
                                         break;
                                     case 'ArrowUp':
                                         e.preventDefault();
                                         if (i > 0) {
-                                            const upCell = gridContainer.querySelector(`[data-row="${i - 1}"][data-col="${j}"] input`);
+                                            const upCell = inputRefs[i - 1][j];
                                             if (upCell) upCell.focus();
                                         }
                                         break;
                                     case 'ArrowDown':
                                         e.preventDefault();
                                         if (i < rows - 1) {
-                                            const downCell = gridContainer.querySelector(`[data-row="${i + 1}"][data-col="${j}"] input`);
+                                            const downCell = inputRefs[i + 1][j];
                                             if (downCell) downCell.focus();
+                                        }
+                                        break;
+                                    case 'Tab':
+                                        e.preventDefault();
+                                        if (e.shiftKey) {
+                                            // Shift+Tab - предыдущая клетка
+                                            if (j > 0) {
+                                                const prevCell = inputRefs[i][j - 1];
+                                                if (prevCell) prevCell.focus();
+                                            } else if (i > 0) {
+                                                const prevCell = inputRefs[i - 1][cols - 1];
+                                                if (prevCell) prevCell.focus();
+                                            }
+                                        } else {
+                                            // Tab - следующая клетка
+                                            if (j < cols - 1) {
+                                                const nextCell = inputRefs[i][j + 1];
+                                                if (nextCell) nextCell.focus();
+                                            } else if (i < rows - 1) {
+                                                const nextCell = inputRefs[i + 1][0];
+                                                if (nextCell) nextCell.focus();
+                                            }
                                         }
                                         break;
                                     case 'Backspace':
                                         if (!e.target.value && j > 0) {
                                             e.preventDefault();
-                                            const prevCell = gridContainer.querySelector(`[data-row="${i}"][data-col="${j - 1}"] input`);
+                                            const prevCell = inputRefs[i][j - 1];
                                             if (prevCell) {
                                                 prevCell.focus();
                                                 prevCell.value = '';
@@ -839,6 +978,20 @@
                                         break;
                                 }
                             });
+                            
+                            // Добавляем номер, если клетка является началом слова
+                            const wordStartsHere = question.words?.some(word => 
+                                word.start.row === i && word.start.col === j
+                            );
+                            
+                            if (wordStartsHere) {
+                                cell.classList.add('start-word');
+                                const word = question.words.find(w => w.start.row === i && w.start.col === j);
+                                if (word) {
+                                    cell.setAttribute('data-number', word.number);
+                                    cell.classList.add('has-number');
+                                }
+                            }
                             
                             cell.appendChild(input);
                         }
@@ -924,13 +1077,16 @@
                     if (question.type === 'crossword') {
                         // Для кроссворда проверяем, заполнены ли все незаблокированные клетки
                         const grid = question.grid || [];
+                        const blocks = question.blocks || [];
                         const userGrid = userAnswer || [];
                         let filledCells = 0;
                         let totalCells = 0;
                         
                         for (let i = 0; i < grid.length; i++) {
                             for (let j = 0; j < grid[i].length; j++) {
-                                if (grid[i][j] !== null) {
+                                // Проверяем только незаблокированные клетки
+                                const isBlocked = blocks.some(block => block.row === i && block.col === j);
+                                if (!isBlocked) {
                                     totalCells++;
                                     if (userGrid[i] && userGrid[i][j] && userGrid[i][j].trim() !== '') {
                                         filledCells++;
@@ -985,6 +1141,7 @@
                         result.correctAnswer = question.grid;
                         const userGrid = userAnswer;
                         const correctGrid = question.grid;
+                        const blocks = question.blocks || [];
                         
                         let correctCells = 0;
                         let totalCheckableCells = 0;
@@ -992,7 +1149,8 @@
                         for (let i = 0; i < correctGrid.length; i++) {
                             for (let j = 0; j < correctGrid[i].length; j++) {
                                 // Проверяем только незаблокированные клетки
-                                if (correctGrid[i][j] !== null) {
+                                const isBlocked = blocks.some(block => block.row === i && block.col === j);
+                                if (!isBlocked && correctGrid[i][j]) {
                                     totalCheckableCells++;
                                     const userCell = userGrid[i] && userGrid[i][j] ? userGrid[i][j].toUpperCase().trim() : '';
                                     const correctCell = correctGrid[i][j] ? correctGrid[i][j].toUpperCase().trim() : '';
