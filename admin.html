@@ -141,7 +141,7 @@
         font-family: inherit;
         color: #2c3e50;
         cursor: pointer;
-        pointer-events: none; /* Важно: чтобы клик проходил через инпут на ячейку */
+        pointer-events: none;
     }
 
     .crossword-cell input:focus {
@@ -956,13 +956,8 @@
       // Инициализация сетки, если её нет
       if (data.grid.length === 0) {
         data.grid = Array(data.rows).fill().map(() => Array(data.cols).fill(''));
-        // Автоматически блокируем все клетки
+        // ВАЖНО: НЕ блокируем все клетки по умолчанию
         data.blocks = [];
-        for (let i = 0; i < data.rows; i++) {
-          for (let j = 0; j < data.cols; j++) {
-            data.blocks.push({row: i, col: j});
-          }
-        }
       }
 
       // Обработчики для создания сетки
@@ -1033,13 +1028,8 @@
       
       const data = crosswordData[qid];
       data.grid = Array(rows).fill().map(() => Array(cols).fill(''));
-      // Автоматически блокируем все клетки
+      // ВАЖНО: НЕ блокируем все клетки по умолчанию
       data.blocks = [];
-      for (let i = 0; i < rows; i++) {
-        for (let j = 0; j < cols; j++) {
-          data.blocks.push({row: i, col: j});
-        }
-      }
       data.words = [];
       data.rows = rows;
       data.cols = cols;
@@ -1058,13 +1048,8 @@
         const data = crosswordData[qid];
         if (data && data.grid) {
           data.grid = Array(data.rows).fill().map(() => Array(data.cols).fill(''));
-          // Автоматически блокируем все клетки
+          // ВАЖНО: НЕ блокируем все клетки при очистке
           data.blocks = [];
-          for (let i = 0; i < data.rows; i++) {
-            for (let j = 0; j < data.cols; j++) {
-              data.blocks.push({row: i, col: j});
-            }
-          }
           data.words = [];
           data.nextWordNumber = 1;
           renderAdvancedGrid(qid);
@@ -1109,7 +1094,7 @@
             input.maxLength = 1;
             input.value = data.grid[i][j] || '';
             input.placeholder = '';
-            input.disabled = true; // Запрещаем прямое редактирование
+            input.disabled = true;
             
             cell.appendChild(input);
           }
@@ -1128,12 +1113,35 @@
             }
           }
           
+          // Добавляем обработчик двойного клика для блокировки/разблокировки клетки
+          cell.ondblclick = function() {
+            toggleBlockCell(qid, i, j);
+          };
+          
           rowDiv.appendChild(cell);
         }
         gridElement.appendChild(rowDiv);
       }
       
       container.appendChild(gridElement);
+      updateAdvancedCrosswordStats(qid);
+      updateStudentPreview(qid);
+    }
+
+    // Функция для блокировки/разблокировки клетки
+    function toggleBlockCell(qid, row, col) {
+      const data = crosswordData[qid];
+      if (!data) return;
+
+      const index = data.blocks.findIndex(block => block.row === row && block.col === col);
+      if (index !== -1) {
+        // Разблокируем клетку
+        data.blocks.splice(index, 1);
+      } else {
+        // Блокируем клетку
+        data.blocks.push({row: row, col: col});
+      }
+      renderAdvancedGrid(qid);
       updateAdvancedCrosswordStats(qid);
       updateStudentPreview(qid);
     }
@@ -1296,12 +1304,6 @@
         const col = direction === 'across' ? startCol + i : startCol;
         
         data.grid[row][col] = word[i];
-        
-        // Разблокируем клетку
-        const blockIndex = data.blocks.findIndex(block => block.row === row && block.col === col);
-        if (blockIndex !== -1) {
-          data.blocks.splice(blockIndex, 1);
-        }
       }
       
       // Добавляем слово в список
@@ -1394,8 +1396,6 @@
           
           if (!belongsToOtherWord) {
             data.grid[row][col] = '';
-            // Блокируем клетку
-            data.blocks.push({row: row, col: col});
           }
         }
         
@@ -2131,6 +2131,7 @@
                   <p><strong>Режим работы:</strong></p>
                   <ul>
                     <li><strong>Размещение слов:</strong> Введите слово, выберите направление и кликните на стартовую клетку</li>
+                    <li><strong>Блокировка клеток:</strong> Двойной клик по клетке чтобы заблокировать/разблокировать (черные клетки)</li>
                   </ul>
                   <p><strong>Особенности:</strong></p>
                   <ul>
