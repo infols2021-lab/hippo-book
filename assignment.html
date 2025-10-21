@@ -823,7 +823,7 @@
                             wordItem.className = 'word-item';
                             wordItem.innerHTML = `
                                 <div class="word-number">${word.number}</div>
-                                <div class="word-text">${word.length} букв</div>
+                                <div class="word-text">${word.text} (${word.length} букв)</div>
                             `;
                             acrossColumn.appendChild(wordItem);
                         });
@@ -841,7 +841,7 @@
                             wordItem.className = 'word-item';
                             wordItem.innerHTML = `
                                 <div class="word-number">${word.number}</div>
-                                <div class="word-text">${word.length} букв</div>
+                                <div class="word-text">${word.text} (${word.length} букв)</div>
                             `;
                             downColumn.appendChild(wordItem);
                         });
@@ -860,6 +860,7 @@
                 
                 const grid = question.grid || [];
                 const blocks = question.blocks || [];
+                const words = question.words || [];
                 const rows = question.metadata?.rows || grid.length;
                 const cols = question.metadata?.cols || (grid[0] ? grid[0].length : 0);
                 
@@ -871,6 +872,16 @@
                 // Создаем массив для хранения ссылок на инпуты для быстрого доступа
                 const inputRefs = Array(rows).fill().map(() => Array(cols).fill(null));
 
+                // Определяем, какие клетки должны быть активными (входят в слова)
+                const activeCells = new Set();
+                words.forEach(word => {
+                    for (let i = 0; i < word.length; i++) {
+                        const row = word.direction === 'across' ? word.start.row : word.start.row + i;
+                        const col = word.direction === 'across' ? word.start.col + i : word.start.col;
+                        activeCells.add(`${row},${col}`);
+                    }
+                });
+
                 for (let i = 0; i < rows; i++) {
                     const rowDiv = document.createElement('div');
                     rowDiv.className = 'crossword-row';
@@ -879,8 +890,15 @@
                         const cell = document.createElement('div');
                         cell.className = 'crossword-cell';
                         
-                        // Проверяем, заблокирована ли клетка
-                        const isBlocked = blocks.some(block => block.row === i && block.col === j);
+                        // Проверяем, должна ли клетка быть заблокирована
+                        const isExplicitlyBlocked = blocks.some(block => block.row === i && block.col === j);
+                        const isInActiveCell = activeCells.has(`${i},${j}`);
+                        const isEmptyCell = !grid[i] || !grid[i][j];
+                        
+                        // Клетка блокируется если:
+                        // 1. Она явно заблокирована администратором ИЛИ
+                        // 2. Она не входит в активные клетки (слова) И она пустая
+                        const isBlocked = isExplicitlyBlocked || (!isInActiveCell && isEmptyCell);
                         
                         if (isBlocked) {
                             cell.classList.add('blocked');
@@ -979,21 +997,20 @@
                                 }
                             });
                             
-                            // Добавляем номер, если клетка является началом слова
-                            const wordStartsHere = question.words?.some(word => 
-                                word.start.row === i && word.start.col === j
-                            );
-                            
-                            if (wordStartsHere) {
-                                cell.classList.add('start-word');
-                                const word = question.words.find(w => w.start.row === i && w.start.col === j);
-                                if (word) {
-                                    cell.setAttribute('data-number', word.number);
-                                    cell.classList.add('has-number');
-                                }
-                            }
-                            
                             cell.appendChild(input);
+                        }
+                        
+                        // Добавляем номер, если клетка является началом слова
+                        const wordStartsHere = words.some(word => 
+                            word.start.row === i && word.start.col === j
+                        );
+                        
+                        if (wordStartsHere && !isBlocked) {
+                            const word = words.find(w => w.start.row === i && w.start.col === j);
+                            if (word) {
+                                cell.setAttribute('data-number', word.number);
+                                cell.classList.add('has-number');
+                            }
                         }
                         
                         cell.dataset.row = i;
@@ -1075,19 +1092,34 @@
                     let hasAnswer = false;
                     
                     if (question.type === 'crossword') {
-                        // Для кроссворда проверяем, заполнены ли все незаблокированные клетки
+                        // Для кроссворда проверяем, заполнены ли все активные клетки
                         const grid = question.grid || [];
                         const blocks = question.blocks || [];
+                        const words = question.words || [];
                         const userGrid = userAnswer || [];
+                        
+                        // Определяем активные клетки
+                        const activeCells = new Set();
+                        words.forEach(word => {
+                            for (let i = 0; i < word.length; i++) {
+                                const row = word.direction === 'across' ? word.start.row : word.start.row + i;
+                                const col = word.direction === 'across' ? word.start.col + i : word.start.col;
+                                activeCells.add(`${row},${col}`);
+                            }
+                        });
+                        
                         let filledCells = 0;
-                        let totalCells = 0;
+                        let totalActiveCells = 0;
                         
                         for (let i = 0; i < grid.length; i++) {
                             for (let j = 0; j < grid[i].length; j++) {
-                                // Проверяем только незаблокированные клетки
-                                const isBlocked = blocks.some(block => block.row === i && block.col === j);
+                                const isExplicitlyBlocked = blocks.some(block => block.row === i && block.col === j);
+                                const isInActiveCell = activeCells.has(`${i},${j}`);
+                                const isEmptyCell = !grid[i] || !grid[i][j];
+                                const isBlocked = isExplicitlyBlocked || (!isInActiveCell && isEmptyCell);
+                                
                                 if (!isBlocked) {
-                                    totalCells++;
+                                    totalActiveCells++;
                                     if (userGrid[i] && userGrid[i][j] && userGrid[i][j].trim() !== '') {
                                         filledCells++;
                                     }
@@ -1095,7 +1127,7 @@
                             }
                         }
                         
-                        hasAnswer = filledCells > 0; // Считаем, что ответ есть, если заполнена хотя бы одна клетка
+                        hasAnswer = filledCells > 0; // Считаем, что ответ есть, если заполнена хотя бы одна активная клетка
                     } else {
                         hasAnswer = userAnswer !== undefined && 
                                    userAnswer !== null && 
@@ -1137,21 +1169,36 @@
                             }
                         }
                     } else if (question.type === 'crossword') {
-                        // Для кроссворда сравниваем каждую клетку
+                        // Для кроссворда сравниваем каждую активную клетку
                         result.correctAnswer = question.grid;
                         const userGrid = userAnswer;
                         const correctGrid = question.grid;
                         const blocks = question.blocks || [];
+                        const words = question.words || [];
+                        
+                        // Определяем активные клетки
+                        const activeCells = new Set();
+                        words.forEach(word => {
+                            for (let i = 0; i < word.length; i++) {
+                                const row = word.direction === 'across' ? word.start.row : word.start.row + i;
+                                const col = word.direction === 'across' ? word.start.col + i : word.start.col;
+                                activeCells.add(`${row},${col}`);
+                            }
+                        });
                         
                         let correctCells = 0;
-                        let totalCheckableCells = 0;
+                        let totalActiveCells = 0;
                         
                         for (let i = 0; i < correctGrid.length; i++) {
                             for (let j = 0; j < correctGrid[i].length; j++) {
-                                // Проверяем только незаблокированные клетки
-                                const isBlocked = blocks.some(block => block.row === i && block.col === j);
+                                const isExplicitlyBlocked = blocks.some(block => block.row === i && block.col === j);
+                                const isInActiveCell = activeCells.has(`${i},${j}`);
+                                const isEmptyCell = !correctGrid[i] || !correctGrid[i][j];
+                                const isBlocked = isExplicitlyBlocked || (!isInActiveCell && isEmptyCell);
+                                
+                                // Проверяем только активные незаблокированные клетки
                                 if (!isBlocked && correctGrid[i][j]) {
-                                    totalCheckableCells++;
+                                    totalActiveCells++;
                                     const userCell = userGrid[i] && userGrid[i][j] ? userGrid[i][j].toUpperCase().trim() : '';
                                     const correctCell = correctGrid[i][j] ? correctGrid[i][j].toUpperCase().trim() : '';
                                     
@@ -1162,12 +1209,12 @@
                             }
                         }
                         
-                        // Считаем кроссворд правильным, если все клетки заполнены верно
-                        isCorrect = correctCells === totalCheckableCells;
+                        // Считаем кроссворд правильным, если все активные клетки заполнены верно
+                        isCorrect = correctCells === totalActiveCells;
                         result.crosswordStats = {
                             correctCells: correctCells,
-                            totalCells: totalCheckableCells,
-                            percentage: totalCheckableCells > 0 ? Math.round((correctCells / totalCheckableCells) * 100) : 0
+                            totalCells: totalActiveCells,
+                            percentage: totalActiveCells > 0 ? Math.round((correctCells / totalActiveCells) * 100) : 0
                         };
                     }
                     
