@@ -119,11 +119,13 @@
         justify-content: center;
         font-weight: bold;
         font-size: 16px;
+        cursor: pointer;
     }
 
     .crossword-cell.blocked {
         background: #333;
         border-color: #333;
+        cursor: not-allowed;
     }
 
     .crossword-cell input {
@@ -138,6 +140,8 @@
         outline: none;
         font-family: inherit;
         color: #2c3e50;
+        cursor: pointer;
+        pointer-events: none; /* Важно: чтобы клик проходил через инпут на ячейку */
     }
 
     .crossword-cell input:focus {
@@ -161,6 +165,11 @@
         font-weight: bold;
         color: #333;
         z-index: 1;
+    }
+
+    .crossword-cell.recently-added {
+        background-color: #fff3cd !important;
+        border: 2px solid #ffc107 !important;
     }
 
     .crossword-advanced-actions {
@@ -1161,6 +1170,36 @@
       }
     }
 
+    // Функция для подсветки слова после размещения
+    function highlightWord(qid, word) {
+      const data = crosswordData[qid];
+      if (!data) return;
+
+      // Находим все клетки слова
+      for (let i = 0; i < word.length; i++) {
+        const row = word.direction === 'across' ? word.start.row : word.start.row + i;
+        const col = word.direction === 'across' ? word.start.col + i : word.start.col;
+
+        const cell = document.querySelector(`#crosswordAdvancedBuilder_${qid} .crossword-cell[data-row="${row}"][data-col="${col}"]`);
+        if (cell) {
+          cell.classList.add('recently-added');
+        }
+      }
+
+      // Через 2 секунды убираем выделение
+      setTimeout(() => {
+        for (let i = 0; i < word.length; i++) {
+          const row = word.direction === 'across' ? word.start.row : word.start.row + i;
+          const col = word.direction === 'across' ? word.start.col + i : word.start.col;
+
+          const cell = document.querySelector(`#crosswordAdvancedBuilder_${qid} .crossword-cell[data-row="${row}"][data-col="${col}"]`);
+          if (cell) {
+            cell.classList.remove('recently-added');
+          }
+        }
+      }, 2000);
+    }
+
     // Обработчик клика по клетке для размещения слова
     document.addEventListener('click', function(e) {
       const cell = e.target.closest('.crossword-cell');
@@ -1204,6 +1243,10 @@
       updateAdvancedCrosswordStats(qid);
       updateWordList(qid);
       updateStudentPreview(qid);
+
+      // Подсвечиваем размещенное слово
+      const placedWord = data.words[data.words.length - 1];
+      highlightWord(qid, placedWord);
       
       showModal('✅ Успех', `Слово "${word}" размещено!`);
     }
@@ -1220,7 +1263,7 @@
         }
       }
       
-      // Проверяем пересечения с существующими словами
+      // Проверяем пересечения с заблокированными клетками и другими словами
       for (let i = 0; i < word.length; i++) {
         const currentRow = direction === 'across' ? startRow : startRow + i;
         const currentCol = direction === 'across' ? startCol + i : startCol;
@@ -1230,8 +1273,9 @@
           block.row === currentRow && block.col === currentCol
         );
         
-        // Если клетка заблокирована, но мы можем ее разблокировать для слова
-        // Продолжаем проверку
+        if (isBlocked) {
+          return { canPlace: false, reason: `Клетка [${currentRow}, ${currentCol}] заблокирована` };
+        }
         
         // Проверяем пересечения с существующими словами
         const existingLetter = data.grid[currentRow][currentCol];
