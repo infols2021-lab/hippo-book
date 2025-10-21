@@ -1220,7 +1220,7 @@
         }
       }
       
-      // Проверяем пересечения с заблокированными клетками и другими словами
+      // Проверяем пересечения с существующими словами
       for (let i = 0; i < word.length; i++) {
         const currentRow = direction === 'across' ? startRow : startRow + i;
         const currentCol = direction === 'across' ? startCol + i : startCol;
@@ -1230,10 +1230,8 @@
           block.row === currentRow && block.col === currentCol
         );
         
-        if (isBlocked) {
-          // Если клетка заблокирована, но мы можем ее разблокировать для слова
-          // Продолжаем проверку
-        }
+        // Если клетка заблокирована, но мы можем ее разблокировать для слова
+        // Продолжаем проверку
         
         // Проверяем пересечения с существующими словами
         const existingLetter = data.grid[currentRow][currentCol];
