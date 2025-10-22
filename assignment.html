@@ -303,15 +303,26 @@
             background: #ffebee;
         }
 
-        .crossword-cell.has-number::before {
-            content: attr(data-number);
+        /* НОВЫЕ СТИЛИ ДЛЯ НОМЕРОВ СЛОВ */
+        .crossword-number {
             position: absolute;
-            top: 2px;
-            left: 2px;
-            font-size: 10px;
+            font-size: 8px;
             font-weight: bold;
             color: #333;
             z-index: 1;
+            background: rgba(255,255,255,0.8);
+            padding: 1px 2px;
+            border-radius: 2px;
+        }
+
+        .crossword-number-across {
+            top: 1px;
+            left: 1px;
+        }
+
+        .crossword-number-down {
+            top: 1px;
+            right: 1px;
         }
 
         .crossword-instructions {
@@ -346,8 +357,87 @@
             display: block;
         }
 
-        /* Список слов для кроссворда - УДАЛЕН */
-        /* .crossword-words { display: none; } */
+        /* Список слов для кроссворда */
+        .crossword-words {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .crossword-words h4 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+        }
+
+        .words-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .words-column h5 {
+            margin: 0 0 10px 0;
+            color: #34495e;
+        }
+
+        .word-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 5px 0;
+        }
+
+        .word-number {
+            background: var(--accent2);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .word-text {
+            font-weight: 500;
+        }
+
+        /* Стили для разбора слов в результатах */
+        .crossword-review {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .crossword-review h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+
+        .crossword-words-review ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .crossword-words-review li {
+            margin-bottom: 5px;
+            padding: 5px 0;
+        }
+
+        .correct-word {
+            color: #4caf50;
+        }
+
+        .incorrect-word {
+            color: #f44336;
+        }
 
         @media (max-width: 768px) {
             .assignment-container {
@@ -367,6 +457,13 @@
                 height: 35px;
                 font-size: 14px;
             }
+            .words-columns {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            .crossword-number {
+                font-size: 7px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -374,6 +471,9 @@
                 width: 30px;
                 height: 30px;
                 font-size: 12px;
+            }
+            .crossword-number {
+                font-size: 6px;
             }
         }
     </style>
@@ -744,10 +844,10 @@
                     <ul>
                         <li>Заполните все белые клетки буквами</li>
                         <li>Черные клетки заблокированы и не заполняются</li>
-                        <li>Цифры в клетках обозначают номера слов</li>
                         <li>Используйте стрелки для навигации между клетками</li>
                         <li>Tab/Shift+Tab для перехода между клетками</li>
-                        <li>Ответы проверяются автоматически при завершении задания</li>
+                        <li>Каждое слово считается отдельным вопросом</li>
+                        <li>Номера слов отображаются в углах клеток</li>
                     </ul>
                 `;
                 crosswordContainer.appendChild(instructions);
@@ -760,6 +860,59 @@
                     img.className = 'crossword-image';
                     img.onerror = () => img.style.display = 'none';
                     crosswordContainer.appendChild(img);
+                }
+
+                // Список слов для кроссворда
+                if (question.words && question.words.length > 0) {
+                    const wordsContainer = document.createElement('div');
+                    wordsContainer.className = 'crossword-words';
+                    
+                    const wordsColumns = document.createElement('div');
+                    wordsColumns.className = 'words-columns';
+                    
+                    // Разделяем слова по направлениям
+                    const acrossWords = question.words.filter(word => word.direction === 'across');
+                    const downWords = question.words.filter(word => word.direction === 'down');
+                    
+                    if (acrossWords.length > 0) {
+                        const acrossColumn = document.createElement('div');
+                        acrossColumn.className = 'words-column';
+                        acrossColumn.innerHTML = '<h5>→ По горизонтали:</h5>';
+                        
+                        acrossWords.forEach(word => {
+                            const wordItem = document.createElement('div');
+                            wordItem.className = 'word-item';
+                            wordItem.innerHTML = `
+                                <div class="word-number">${word.number}</div>
+                                <div class="word-text">${word.text} (${word.length} букв)</div>
+                            `;
+                            acrossColumn.appendChild(wordItem);
+                        });
+                        
+                        wordsColumns.appendChild(acrossColumn);
+                    }
+                    
+                    if (downWords.length > 0) {
+                        const downColumn = document.createElement('div');
+                        downColumn.className = 'words-column';
+                        downColumn.innerHTML = '<h5>↓ По вертикали:</h5>';
+                        
+                        downWords.forEach(word => {
+                            const wordItem = document.createElement('div');
+                            wordItem.className = 'word-item';
+                            wordItem.innerHTML = `
+                                <div class="word-number">${word.number}</div>
+                                <div class="word-text">${word.text} (${word.length} букв)</div>
+                            `;
+                            downColumn.appendChild(wordItem);
+                        });
+                        
+                        wordsColumns.appendChild(downColumn);
+                    }
+                    
+                    wordsContainer.innerHTML = '<h4>Слова для разгадывания:</h4>';
+                    wordsContainer.appendChild(wordsColumns);
+                    crosswordContainer.appendChild(wordsContainer);
                 }
 
                 // Создаем сетку кроссворда
@@ -788,6 +941,16 @@
                         const col = word.direction === 'across' ? word.start.col + i : word.start.col;
                         activeCells.add(`${row},${col}`);
                     }
+                });
+
+                // Создаем объект для хранения номеров слов в клетках
+                const cellNumbers = {};
+                words.forEach(word => {
+                    const key = `${word.start.row}-${word.start.col}`;
+                    if (!cellNumbers[key]) {
+                        cellNumbers[key] = [];
+                    }
+                    cellNumbers[key].push({ number: word.number, direction: word.direction });
                 });
 
                 for (let i = 0; i < rows; i++) {
@@ -908,18 +1071,14 @@
                             cell.appendChild(input);
                         }
                         
-                        // Добавляем номер, если клетка является началом слова
-                        const wordStartsHere = words.some(word => 
-                            word.start.row === i && word.start.col === j
-                        );
-                        
-                        if (wordStartsHere && !isBlocked) {
-                            const word = words.find(w => w.start.row === i && w.start.col === j);
-                            if (word) {
-                                cell.setAttribute('data-number', word.number);
-                                cell.classList.add('has-number');
-                            }
-                        }
+                        // Добавляем номера слов, если клетка является началом слова
+                        const numbers = cellNumbers[`${i}-${j}`] || [];
+                        numbers.forEach(num => {
+                            const numberEl = document.createElement('div');
+                            numberEl.className = `crossword-number crossword-number-${num.direction}`;
+                            numberEl.textContent = num.number;
+                            cell.appendChild(numberEl);
+                        });
                         
                         cell.dataset.row = i;
                         cell.dataset.col = j;
@@ -1000,145 +1159,116 @@
                     let hasAnswer = false;
                     
                     if (question.type === 'crossword') {
-                        // Для кроссворда проверяем, заполнены ли все активные клетки
-                        const grid = question.grid || [];
-                        const blocks = question.blocks || [];
-                        const words = question.words || [];
-                        const userGrid = userAnswer || [];
+                        // Для кроссворда считаем слова, а не клетки
+                        let correctWords = 0;
+                        const wordResults = [];
                         
-                        // Определяем активные клетки
-                        const activeCells = new Set();
-                        words.forEach(word => {
-                            for (let i = 0; i < word.length; i++) {
-                                const row = word.direction === 'across' ? word.start.row : word.start.row + i;
-                                const col = word.direction === 'across' ? word.start.col + i : word.start.col;
-                                activeCells.add(`${row},${col}`);
-                            }
-                        });
-                        
-                        let filledCells = 0;
-                        let totalActiveCells = 0;
-                        
-                        for (let i = 0; i < grid.length; i++) {
-                            for (let j = 0; j < grid[i].length; j++) {
-                                const isExplicitlyBlocked = blocks.some(block => block.row === i && block.col === j);
-                                const isInActiveCell = activeCells.has(`${i},${j}`);
-                                const isEmptyCell = !grid[i] || !grid[i][j];
-                                const isBlocked = isExplicitlyBlocked || (!isInActiveCell && isEmptyCell);
-                                
-                                if (!isBlocked) {
-                                    totalActiveCells++;
-                                    if (userGrid[i] && userGrid[i][j] && userGrid[i][j].trim() !== '') {
-                                        filledCells++;
-                                    }
+                        question.words.forEach(word => {
+                            let isWordCorrect = true;
+                            
+                            // Проверяем каждую клетку слова
+                            for (let k = 0; k < word.length; k++) {
+                                const row = word.direction === 'across' ? word.start.row : word.start.row + k;
+                                const col = word.direction === 'across' ? word.start.col + k : word.start.col;
+
+                                const userLetter = (userAnswer[row] && userAnswer[row][col]) ? userAnswer[row][col].toUpperCase().trim() : '';
+                                const correctLetter = (question.grid[row] && question.grid[row][col]) ? question.grid[row][col].toUpperCase().trim() : '';
+
+                                if (userLetter !== correctLetter) {
+                                    isWordCorrect = false;
+                                    break;
                                 }
                             }
+                            
+                            if (isWordCorrect) {
+                                correctWords++;
+                            }
+                            
+                            wordResults.push({
+                                word: word,
+                                isCorrect: isWordCorrect
+                            });
+                        });
+                        
+                        // Считаем, что ответ есть, если заполнена хотя бы одна активная клетка
+                        const hasAnyAnswer = Object.keys(userAnswer).some(row => 
+                            Array.isArray(userAnswer[row]) && userAnswer[row].some(cell => cell && cell.trim() !== '')
+                        );
+                        
+                        hasAnswer = hasAnyAnswer;
+                        
+                        result.crosswordStats = {
+                            correctWords: correctWords,
+                            totalWords: question.words.length,
+                            wordResults: wordResults
+                        };
+                        
+                        // Для кроссворда правильные ответы = количество правильных слов
+                        // Неправильные ответы = количество неправильных слов
+                        if (hasAnswer) {
+                            correctAnswers += correctWords;
+                            incorrectAnswers += (question.words.length - correctWords);
+                            result.isCorrect = correctWords === question.words.length;
+                        } else {
+                            skippedAnswers += question.words.length;
+                            result.isSkipped = true;
                         }
                         
-                        hasAnswer = filledCells > 0; // Считаем, что ответ есть, если заполнена хотя бы одна активная клетка
                     } else {
                         hasAnswer = userAnswer !== undefined && 
                                    userAnswer !== null && 
                                    userAnswer !== '' &&
                                    !(Array.isArray(userAnswer) && userAnswer.every(item => !item || item.trim() === ''));
-                    }
                     
-                    if (!hasAnswer) {
-                        skippedAnswers++;
-                        result.isSkipped = true;
-                        questionResults.push(result);
-                        return;
-                    }
-                    
-                    let isCorrect = false;
-                    
-                    if (question.type === 'test') {
-                        // Для тестовых вопросов сравниваем номер правильного ответа
-                        result.correctAnswer = question.correct;
-                        result.correctOptions = question.options;
-                        isCorrect = parseInt(userAnswer) === question.correct;
-                    } else if (question.type === 'fill') {
-                        // Для вопросов с заполнением проверяем совпадение с любым из правильных ответов
-                        result.correctAnswer = question.answers;
-                        const userAnswerNormalized = String(userAnswer).toLowerCase().trim();
-                        const correctAnswersNormalized = question.answers.map(a => String(a).toLowerCase().trim());
-                        isCorrect = correctAnswersNormalized.includes(userAnswerNormalized);
-                    } else if (question.type === 'sentence') {
-                        // Для предложений проверяем каждый пропуск
-                        result.correctAnswer = question.answers;
-                        if (Array.isArray(userAnswer) && Array.isArray(question.answers)) {
-                            // Проверяем, что все ответы совпадают и количество ответов правильное
-                            if (userAnswer.length === question.answers.length) {
-                                isCorrect = userAnswer.every((answer, gapIndex) => {
-                                    if (!answer || !question.answers[gapIndex]) return false;
-                                    return String(answer).toLowerCase().trim() === 
-                                           String(question.answers[gapIndex]).toLowerCase().trim();
-                                });
-                            }
+                        if (!hasAnswer) {
+                            skippedAnswers++;
+                            result.isSkipped = true;
+                            questionResults.push(result);
+                            return;
                         }
-                    } else if (question.type === 'crossword') {
-                        // Для кроссворда сравниваем каждую активную клетку
-                        result.correctAnswer = question.grid;
-                        const userGrid = userAnswer;
-                        const correctGrid = question.grid;
-                        const blocks = question.blocks || [];
-                        const words = question.words || [];
                         
-                        // Определяем активные клетки
-                        const activeCells = new Set();
-                        words.forEach(word => {
-                            for (let i = 0; i < word.length; i++) {
-                                const row = word.direction === 'across' ? word.start.row : word.start.row + i;
-                                const col = word.direction === 'across' ? word.start.col + i : word.start.col;
-                                activeCells.add(`${row},${col}`);
-                            }
-                        });
+                        let isCorrect = false;
                         
-                        let correctCells = 0;
-                        let totalActiveCells = 0;
-                        
-                        for (let i = 0; i < correctGrid.length; i++) {
-                            for (let j = 0; j < correctGrid[i].length; j++) {
-                                const isExplicitlyBlocked = blocks.some(block => block.row === i && block.col === j);
-                                const isInActiveCell = activeCells.has(`${i},${j}`);
-                                const isEmptyCell = !correctGrid[i] || !correctGrid[i][j];
-                                const isBlocked = isExplicitlyBlocked || (!isInActiveCell && isEmptyCell);
-                                
-                                // Проверяем только активные незаблокированные клетки
-                                if (!isBlocked && correctGrid[i][j]) {
-                                    totalActiveCells++;
-                                    const userCell = userGrid[i] && userGrid[i][j] ? userGrid[i][j].toUpperCase().trim() : '';
-                                    const correctCell = correctGrid[i][j] ? correctGrid[i][j].toUpperCase().trim() : '';
-                                    
-                                    if (userCell === correctCell && userCell !== '') {
-                                        correctCells++;
-                                    }
+                        if (question.type === 'test') {
+                            // Для тестовых вопросов сравниваем номер правильного ответа
+                            result.correctAnswer = question.correct;
+                            result.correctOptions = question.options;
+                            isCorrect = parseInt(userAnswer) === question.correct;
+                        } else if (question.type === 'fill') {
+                            // Для вопросов с заполнением проверяем совпадение с любым из правильных ответов
+                            result.correctAnswer = question.answers;
+                            const userAnswerNormalized = String(userAnswer).toLowerCase().trim();
+                            const correctAnswersNormalized = question.answers.map(a => String(a).toLowerCase().trim());
+                            isCorrect = correctAnswersNormalized.includes(userAnswerNormalized);
+                        } else if (question.type === 'sentence') {
+                            // Для предложений проверяем каждый пропуск
+                            result.correctAnswer = question.answers;
+                            if (Array.isArray(userAnswer) && Array.isArray(question.answers)) {
+                                // Проверяем, что все ответы совпадают и количество ответов правильное
+                                if (userAnswer.length === question.answers.length) {
+                                    isCorrect = userAnswer.every((answer, gapIndex) => {
+                                        if (!answer || !question.answers[gapIndex]) return false;
+                                        return String(answer).toLowerCase().trim() === 
+                                               String(question.answers[gapIndex]).toLowerCase().trim();
+                                    });
                                 }
                             }
                         }
                         
-                        // Считаем кроссворд правильным, если все активные клетки заполнены верно
-                        isCorrect = correctCells === totalActiveCells;
-                        result.crosswordStats = {
-                            correctCells: correctCells,
-                            totalCells: totalActiveCells,
-                            percentage: totalActiveCells > 0 ? Math.round((correctCells / totalActiveCells) * 100) : 0
-                        };
-                    }
-                    
-                    result.isCorrect = isCorrect;
-                    
-                    if (isCorrect) {
-                        correctAnswers++;
-                    } else {
-                        incorrectAnswers++;
+                        result.isCorrect = isCorrect;
+                        
+                        if (isCorrect) {
+                            correctAnswers++;
+                        } else {
+                            incorrectAnswers++;
+                        }
                     }
                     
                     questionResults.push(result);
                 });
                 
-                const totalAnswered = correctAnswers + incorrectAnswers;
-                const score = totalAnswered > 0 ? Math.round((correctAnswers / questions.length) * 100) : 0;
+                const totalAnswered = correctAnswers + incorrectAnswers + skippedAnswers;
+                const score = totalAnswered > 0 ? Math.round((correctAnswers / totalAnswered) * 100) : 0;
                 
                 return {
                     score: score,
@@ -1176,7 +1306,7 @@
                 
                 // Устанавливаем результаты
                 document.getElementById('finalScore').textContent = `${scoreResult.score}%`;
-                document.getElementById('totalQuestionsResult').textContent = scoreResult.totalQuestions;
+                document.getElementById('totalQuestionsResult').textContent = scoreResult.correctAnswers + scoreResult.incorrectAnswers + scoreResult.skippedAnswers;
                 document.getElementById('correctAnswersResult').textContent = scoreResult.correctAnswers;
                 document.getElementById('incorrectAnswersResult').textContent = scoreResult.incorrectAnswers;
                 document.getElementById('skippedQuestionsResult').textContent = scoreResult.skippedAnswers;
@@ -1268,11 +1398,42 @@
                             <div class="review-answer review-correct"><strong>Правильные ответы:</strong> ${correctAnswerText}</div>
                         `;
                     } else if (result.type === 'crossword') {
-                        const stats = result.crosswordStats || { correctCells: 0, totalCells: 0, percentage: 0 };
+                        const stats = result.crosswordStats || { correctWords: 0, totalWords: 0, wordResults: [] };
+                        
+                        // Группируем слова по направлениям
+                        const acrossWords = stats.wordResults.filter(wr => wr.word.direction === 'across');
+                        const downWords = stats.wordResults.filter(wr => wr.word.direction === 'down');
+                        
                         answerDetails = `
-                            <div class="review-answer"><strong>Заполнено верно:</strong> ${stats.correctCells} из ${stats.totalCells} клеток (${stats.percentage}%)</div>
-                            <div class="review-answer review-correct"><strong>Требуется:</strong> Все ${stats.totalCells} клеток заполнены правильно</div>
+                            <div class="crossword-review">
+                                <h4>Разбор кроссворда</h4>
+                                <p>Правильно угадано слов: ${stats.correctWords} из ${stats.totalWords}</p>
+                                <div class="crossword-words-review">
                         `;
+                        
+                        if (acrossWords.length > 0) {
+                            answerDetails += `<h5>По горизонтали:</h5><ul>`;
+                            acrossWords.forEach(wr => {
+                                answerDetails += `<li class="${wr.isCorrect ? 'correct-word' : 'incorrect-word'}">
+                                    <strong>${wr.word.number}.</strong> ${wr.word.text} ${wr.isCorrect ? '✅' : '❌'}
+                                    ${!wr.isCorrect ? `<br><small>Правильный ответ: ${wr.word.text}</small>` : ''}
+                                </li>`;
+                            });
+                            answerDetails += `</ul>`;
+                        }
+                        
+                        if (downWords.length > 0) {
+                            answerDetails += `<h5>По вертикали:</h5><ul>`;
+                            downWords.forEach(wr => {
+                                answerDetails += `<li class="${wr.isCorrect ? 'correct-word' : 'incorrect-word'}">
+                                    <strong>${wr.word.number}.</strong> ${wr.word.text} ${wr.isCorrect ? '✅' : '❌'}
+                                    ${!wr.isCorrect ? `<br><small>Правильный ответ: ${wr.word.text}</small>` : ''}
+                                </li>`;
+                            });
+                            answerDetails += `</ul>`;
+                        }
+                        
+                        answerDetails += `</div></div>`;
                     }
                     
                     reviewItem.innerHTML = `
