@@ -303,6 +303,17 @@
             background: #ffebee;
         }
 
+        .crossword-cell.has-number::before {
+            content: attr(data-number);
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            font-size: 10px;
+            font-weight: bold;
+            color: #333;
+            z-index: 1;
+        }
+
         .crossword-instructions {
             background: #e8f5e8;
             border: 1px solid #c8e6c9;
@@ -335,55 +346,8 @@
             display: block;
         }
 
-        /* Список слов для кроссворда */
-        .crossword-words {
-            margin: 20px 0;
-            padding: 15px;
-            background: white;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-        }
-
-        .crossword-words h4 {
-            margin: 0 0 15px 0;
-            color: #2c3e50;
-        }
-
-        .words-columns {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        .words-column h5 {
-            margin: 0 0 10px 0;
-            color: #34495e;
-        }
-
-        .word-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 8px;
-            padding: 5px 0;
-        }
-
-        .word-number {
-            background: var(--accent2);
-            color: white;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
-            margin-right: 10px;
-        }
-
-        .word-text {
-            font-weight: 500;
-        }
+        /* Список слов для кроссворда - УДАЛЕН */
+        /* .crossword-words { display: none; } */
 
         @media (max-width: 768px) {
             .assignment-container {
@@ -402,10 +366,6 @@
                 width: 35px;
                 height: 35px;
                 font-size: 14px;
-            }
-            .words-columns {
-                grid-template-columns: 1fr;
-                gap: 10px;
             }
         }
 
@@ -784,6 +744,7 @@
                     <ul>
                         <li>Заполните все белые клетки буквами</li>
                         <li>Черные клетки заблокированы и не заполняются</li>
+                        <li>Цифры в клетках обозначают номера слов</li>
                         <li>Используйте стрелки для навигации между клетками</li>
                         <li>Tab/Shift+Tab для перехода между клетками</li>
                         <li>Ответы проверяются автоматически при завершении задания</li>
@@ -799,59 +760,6 @@
                     img.className = 'crossword-image';
                     img.onerror = () => img.style.display = 'none';
                     crosswordContainer.appendChild(img);
-                }
-
-                // Список слов для кроссворда
-                if (question.words && question.words.length > 0) {
-                    const wordsContainer = document.createElement('div');
-                    wordsContainer.className = 'crossword-words';
-                    
-                    const wordsColumns = document.createElement('div');
-                    wordsColumns.className = 'words-columns';
-                    
-                    // Разделяем слова по направлениям
-                    const acrossWords = question.words.filter(word => word.direction === 'across');
-                    const downWords = question.words.filter(word => word.direction === 'down');
-                    
-                    if (acrossWords.length > 0) {
-                        const acrossColumn = document.createElement('div');
-                        acrossColumn.className = 'words-column';
-                        acrossColumn.innerHTML = '<h5>→ По горизонтали:</h5>';
-                        
-                        acrossWords.forEach(word => {
-                            const wordItem = document.createElement('div');
-                            wordItem.className = 'word-item';
-                            wordItem.innerHTML = `
-                                <div class="word-number">${word.number}</div>
-                                <div class="word-text">${word.text} (${word.length} букв)</div>
-                            `;
-                            acrossColumn.appendChild(wordItem);
-                        });
-                        
-                        wordsColumns.appendChild(acrossColumn);
-                    }
-                    
-                    if (downWords.length > 0) {
-                        const downColumn = document.createElement('div');
-                        downColumn.className = 'words-column';
-                        downColumn.innerHTML = '<h5>↓ По вертикали:</h5>';
-                        
-                        downWords.forEach(word => {
-                            const wordItem = document.createElement('div');
-                            wordItem.className = 'word-item';
-                            wordItem.innerHTML = `
-                                <div class="word-number">${word.number}</div>
-                                <div class="word-text">${word.text} (${word.length} букв)</div>
-                            `;
-                            downColumn.appendChild(wordItem);
-                        });
-                        
-                        wordsColumns.appendChild(downColumn);
-                    }
-                    
-                    wordsContainer.innerHTML = '<h4>Слова для разгадывания:</h4>';
-                    wordsContainer.appendChild(wordsColumns);
-                    crosswordContainer.appendChild(wordsContainer);
                 }
 
                 // Создаем сетку кроссворда
