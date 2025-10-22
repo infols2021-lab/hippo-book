@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
   <style>
-    /* СИСТЕМА ФОНА - ЧИСТЫЙ БЕЗ ПРОЗРАЧНОСТИ */
     body {
       margin: 0;
       padding: 0;
@@ -27,7 +26,6 @@
       z-index: 2;
     }
 
-    /* Обновленный дизайн профиля */
     .profile-avatar {
       width: 220px;
       height: 220px;
@@ -46,7 +44,6 @@
       color: white;
     }
 
-    /* Новые стили для статистики */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -184,7 +181,6 @@
       display: none; 
     }
 
-    /* Анимация появления */
     @keyframes fadeInUp {
       from {
         opacity: 0;
@@ -200,7 +196,6 @@
       animation: fadeInUp 0.8s ease-out;
     }
 
-    /* Индикатор загрузки фона */
     .background-loading {
       position: fixed;
       top: 20px;
@@ -214,7 +209,6 @@
       display: none;
     }
 
-    /* Мобильная оптимизация */
     @media (max-width: 768px) {
       body {
         background-attachment: scroll;
@@ -284,13 +278,11 @@
   <script src="/load-config.js"></script>
 </head>
 <body id="profileBody">
-  <!-- Индикатор загрузки фона -->
   <div class="background-loading" id="backgroundLoading">
     <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
     Загружаем фон...
   </div>
 
-  <!-- Основной контент -->
   <div class="container">
     <div id="loading" class="loading">
       <div class="spinner"></div>
@@ -315,7 +307,6 @@
       </div>
 
       <div class="grid-2">
-        <!-- left: profile -->
         <div class="card profile-card">
           <div class="profile-avatar" role="img" aria-label="Профиль ученика">
             <div class="profile-avatar-icon">👤</div>
@@ -331,7 +322,6 @@
           </div>
         </div>
 
-        <!-- right: progress / statistics -->
         <div>
           <div class="card">
             <h3 style="color: var(--accent2); margin-bottom: 16px;">📊 Общая статистика</h3>
@@ -357,7 +347,6 @@
           <div class="card">
             <h3 style="color: var(--accent2); margin-bottom: 16px;">📚 Прогресс по материалам</h3>
             <div class="materials-progress" id="materialsProgress">
-              <!-- Прогресс по учебникам и кроссвордам будет добавлен динамически -->
               <div style="text-align: center; padding: 20px; color: #666;">
                 <p>📚 Загрузка материалов...</p>
               </div>
@@ -392,7 +381,6 @@
       document.getElementById('errorMessage').style.display = 'none';
     }
     
-    // ===== ПРОСТАЯ СИСТЕМА ЗАГРУЗКИ ФОНА =====
     async function loadProfileBackground(supabase) {
       const backgroundLoading = document.getElementById('backgroundLoading');
       const profileBody = document.getElementById('profileBody');
@@ -483,14 +471,12 @@
 
         async function loadProfile(){
           try {
-            // Загружаем профиль
             const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
             profile = profileData;
             
             document.getElementById('fullname').textContent = profile?.full_name || 'Ученик';
             document.getElementById('emailText').textContent = user.email;
             
-            // Загружаем учебники (только активные и доступные пользователю)
             const { data: textbooksData } = await supabase
               .from('textbooks')
               .select('*')
@@ -498,7 +484,6 @@
               .order('order_index');
             textbooks = textbooksData || [];
 
-            // Загружаем кроссворды (только активные)
             const { data: crosswordsData } = await supabase
               .from('crosswords')
               .select('*')
@@ -506,34 +491,29 @@
               .order('order_index');
             crosswords = crosswordsData || [];
 
-            // Загружаем все задания
             const { data: assignmentsData } = await supabase
               .from('assignments')
               .select('*');
             assignments = assignmentsData || [];
 
-            // Загружаем прогресс пользователя
             const { data: progressData } = await supabase
               .from('user_progress')
               .select('*')
               .eq('user_id', user.id);
             userProgress = progressData || [];
 
-            // Загружаем доступ к учебникам
             const { data: textbookAccessData } = await supabase
               .from('textbook_access')
               .select('*')
               .eq('user_id', user.id);
             textbookAccess = textbookAccessData || [];
 
-            // Загружаем доступ к кроссвордам
             const { data: crosswordAccessData } = await supabase
               .from('crossword_access')
               .select('*')
               .eq('user_id', user.id);
             crosswordAccess = crosswordAccessData || [];
 
-            // Обновляем статистику
             updateStatistics();
             renderMaterialsProgress();
 
@@ -544,14 +524,12 @@
         }
 
         function updateStatistics() {
-          // Общее количество выполненных заданий
           const completedAssignments = userProgress.filter(up => up.is_completed).length;
           const totalAssignments = assignments.length;
           
           document.getElementById('totalAssignmentsCount').textContent = `📊 Всего заданий: ${totalAssignments}`;
           document.getElementById('completedAssignmentsCount').textContent = `✅ Выполнено: ${completedAssignments}`;
 
-          // Фильтруем доступные материалы
           const availableTextbooks = textbooks.filter(textbook => 
             textbook.is_available || textbookAccess.some(access => access.textbook_id === textbook.id)
           );
@@ -560,11 +538,9 @@
             crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id)
           );
 
-          // Считаем пройденные материалы
           let completedMaterials = 0;
           let totalMaterials = availableTextbooks.length + availableCrosswords.length;
 
-          // Проверяем учебники
           availableTextbooks.forEach(textbook => {
             const textbookAssignments = assignments.filter(a => a.textbook_id === textbook.id);
             if (textbookAssignments.length === 0) return;
@@ -578,7 +554,6 @@
             }
           });
 
-          // Проверяем кроссворды
           availableCrosswords.forEach(crossword => {
             const crosswordAssignments = assignments.filter(a => a.crossword_id === crossword.id);
             if (crosswordAssignments.length === 0) return;
@@ -592,10 +567,8 @@
             }
           });
 
-          // Общий прогресс
           const successRate = totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
 
-          // Обновляем статистику
           document.getElementById('totalMaterials').textContent = totalMaterials;
           document.getElementById('completedMaterials').textContent = completedMaterials;
           document.getElementById('successRate').textContent = successRate + '%';
@@ -605,7 +578,6 @@
           const container = document.getElementById('materialsProgress');
           container.innerHTML = '';
 
-          // Фильтруем доступные материалы
           const availableTextbooks = textbooks.filter(textbook => 
             textbook.is_available || textbookAccess.some(access => access.textbook_id === textbook.id)
           );
@@ -614,7 +586,6 @@
             crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id)
           );
 
-          // Если нет материалов
           if (availableTextbooks.length === 0 && availableCrosswords.length === 0) {
             container.innerHTML = `
               <div style="text-align: center; padding: 20px; color: #666;">
@@ -625,7 +596,6 @@
             return;
           }
 
-          // Прогресс по учебникам
           availableTextbooks.forEach(textbook => {
             const textbookAssignments = assignments.filter(a => a.textbook_id === textbook.id);
             const completedTextbookAssignments = userProgress.filter(up => 
@@ -654,7 +624,6 @@
               <div class="progress-percentage">${progress}%</div>
             `;
             
-            // Добавляем обработчик клика для перехода к материалу
             progressItem.style.cursor = 'pointer';
             progressItem.addEventListener('click', () => {
               window.location.href = `/materials.html#textbook-${textbook.id}`;
@@ -663,7 +632,6 @@
             container.appendChild(progressItem);
           });
 
-          // Прогресс по кроссвордам
           availableCrosswords.forEach(crossword => {
             const crosswordAssignments = assignments.filter(a => a.crossword_id === crossword.id);
             const completedCrosswordAssignments = userProgress.filter(up => 
@@ -692,7 +660,6 @@
               <div class="progress-percentage">${progress}%</div>
             `;
             
-            // Добавляем обработчик клика для перехода к материалу
             progressItem.style.cursor = 'pointer';
             progressItem.addEventListener('click', () => {
               window.location.href = `/materials.html#crossword-${crossword.id}`;
@@ -702,7 +669,6 @@
           });
         }
 
-        // Выход из системы
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           if (confirm('Вы уверены, что хотите выйти?')) {
             await supabase.auth.signOut();
@@ -710,10 +676,7 @@
           }
         });
 
-        // Загружаем фон профиля
         await loadProfileBackground(supabase);
-        
-        // Загружаем данные профиля
         await loadProfile();
         showContent();
         return true;
