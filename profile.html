@@ -301,7 +301,7 @@
           </div>
         </div>
         <div class="nav">
-          <button class="btn" onclick="location.href='/materials.html'">📚 Материалы</button>
+          <a href="materials.html" class="btn">📚 Материалы</a>
           <button class="btn secondary" id="logoutBtn">🚪 Выйти</button>
         </div>
       </div>
@@ -457,7 +457,7 @@
         
         const { data: { user } } = await supabase.auth.getUser();
         if(!user) { 
-          location.href = '/login.html'; 
+          window.location.href = '/login.html'; 
           return; 
         }
 
@@ -626,7 +626,7 @@
             
             progressItem.style.cursor = 'pointer';
             progressItem.addEventListener('click', () => {
-              window.location.href = `/materials.html#textbook-${textbook.id}`;
+              window.location.href = `materials.html#textbook-${textbook.id}`;
             });
             
             container.appendChild(progressItem);
@@ -662,7 +662,7 @@
             
             progressItem.style.cursor = 'pointer';
             progressItem.addEventListener('click', () => {
-              window.location.href = `/materials.html#crossword-${crossword.id}`;
+              window.location.href = `materials.html#crossword-${crossword.id}`;
             });
             
             container.appendChild(progressItem);
@@ -672,7 +672,7 @@
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           if (confirm('Вы уверены, что хотите выйти?')) {
             await supabase.auth.signOut();
-            location.href = '/login.html';
+            window.location.href = '/login.html';
           }
         });
 
