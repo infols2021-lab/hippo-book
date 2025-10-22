@@ -862,7 +862,7 @@
                     crosswordContainer.appendChild(img);
                 }
 
-                // Список слов для кроссворда
+                // Список подсказок для кроссворда (только номера и количество букв)
                 if (question.words && question.words.length > 0) {
                     const wordsContainer = document.createElement('div');
                     wordsContainer.className = 'crossword-words';
@@ -884,7 +884,7 @@
                             wordItem.className = 'word-item';
                             wordItem.innerHTML = `
                                 <div class="word-number">${word.number}</div>
-                                <div class="word-text">${word.text} (${word.length} букв)</div>
+                                <div class="word-text">букв: ${word.length}</div>
                             `;
                             acrossColumn.appendChild(wordItem);
                         });
@@ -902,7 +902,7 @@
                             wordItem.className = 'word-item';
                             wordItem.innerHTML = `
                                 <div class="word-number">${word.number}</div>
-                                <div class="word-text">${word.text} (${word.length} букв)</div>
+                                <div class="word-text">букв: ${word.length}</div>
                             `;
                             downColumn.appendChild(wordItem);
                         });
@@ -910,7 +910,7 @@
                         wordsColumns.appendChild(downColumn);
                     }
                     
-                    wordsContainer.innerHTML = '<h4>Слова для разгадывания:</h4>';
+                    wordsContainer.innerHTML = '<h4>Подсказки:</h4>';
                     wordsContainer.appendChild(wordsColumns);
                     crosswordContainer.appendChild(wordsContainer);
                 }
