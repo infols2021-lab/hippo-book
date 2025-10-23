@@ -51,7 +51,8 @@
     .input-count { font-size: 12px; color: #666; margin-top: 5px; }
     .sentence-builder { background: #f8f9fa; border-radius: 8px; padding: 15px; margin: 10px 0; }
     .sentence-preview { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin-bottom: 10px; font-size: 16px; line-height: 1.5; }
-    .sentence-input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 10px; }
+    .sentence-input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 10px; min-height: 60px; }
+    .sentence-answers { min-height: 120px; }
     .add-gap-btn { background: #17a2b8; color: white; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 14px; }
     .loading { text-align: center; padding: 40px; display: none; }
     .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--accent2); border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 0 auto 20px; }
@@ -940,6 +941,28 @@
           numberElement.textContent = index + 1;
         }
       });
+    }
+
+    // ============ НОВАЯ ЛОГИКА ДЛЯ МНОЖЕСТВЕННЫХ ОТВЕТОВ ============
+    function parseMultipleAnswers(answerText) {
+      if (!answerText) return [];
+      
+      // Разделяем по точке с запятой и обрезаем пробелы
+      return answerText.split(';')
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+    }
+
+    function formatMultipleAnswers(answersArray) {
+      if (!Array.isArray(answersArray)) return '';
+      
+      // Если это массив массивов (новая структура)
+      if (answersArray.length > 0 && Array.isArray(answersArray[0])) {
+        return answersArray.map(subArray => subArray.join('; ')).join('\n');
+      }
+      
+      // Если это простой массив строк (старая структура)
+      return answersArray.join('\n');
     }
 
     // ============ УЛУЧШЕННЫЙ КОНСТРУКТОР КРОССВОРДОВ ============
@@ -2105,9 +2128,9 @@
             inner += `
               ${imageUploadBlock}
               <div class="form-group">
-                <label>Правильные ответы (каждый с новой строки):</label>
-                <textarea class="input fill-answers" rows="3">${(prefill?.answers || []).join('\n')}</textarea>
-                <div class="small-muted">Ответ засчитается, если совпадёт с любым вариантом</div>
+                <label>Правильные ответы (каждый с новой строки, несколько вариантов через ;):</label>
+                <textarea class="input fill-answers" rows="3" placeholder="яблоко;груша;апельсин&#10;кошка;собака">${formatMultipleAnswers(prefill?.answers || [])}</textarea>
+                <div class="small-muted">Для каждого ответа можно указать несколько вариантов через точку с запятой. Каждая новая строка - отдельный ответ.</div>
               </div>
             `;
           } else if (qType === 'sentence') {
@@ -2121,13 +2144,14 @@
                 <label>Предложение с пропусками:</label>
                 <div class="sentence-builder">
                   <div class="sentence-preview" id="sentencePreview_${qid}">${previewHtml}</div>
-                  <textarea class="sentence-input" id="sentenceInput_${qid}" rows="2" placeholder="Используйте ___ для пропусков. Например: Я ___ яблоко.">${sentence}</textarea>
+                  <textarea class="sentence-input" id="sentenceInput_${qid}" rows="4" placeholder="Используйте ___ для пропусков. Например: Я ___ яблоко.">${sentence}</textarea>
                   <button type="button" class="btn btn-small add-gap-btn" onclick="window.updateSentencePreview('${qid}')">Обновить предпросмотр</button>
                 </div>
               </div>
               <div class="form-group">
-                <label>Правильные ответы для пропусков (каждый с новой строки, по порядку пропусков):</label>
-                <textarea class="input sentence-answers" rows="3">${(prefill?.answers || []).join('\n')}</textarea>
+                <label>Правильные ответы для пропусков (каждый с новой строки, по порядку пропусков, несколько вариантов через ;):</label>
+                <textarea class="input sentence-answers" rows="4" placeholder="яблоко;груша;апельсин&#10;утром;вечером">${formatMultipleAnswers(prefill?.answers || [])}</textarea>
+                <div class="small-muted">Каждая строка соответствует одному пропуску. Для каждого пропуска можно указать несколько вариантов через точку с запятой.</div>
               </div>
             `;
             // live preview
@@ -2318,8 +2342,13 @@
               
             } else if (type === 'fill') {
               const answersText = el.querySelector('.fill-answers')?.value || '';
-              const answers = answersText.split('\n').map(s=>s.trim()).filter(Boolean);
-              if (!answers.length) return showModal('Ошибка', `Добавьте хотя бы один правильный ответ в вопросе ${i+1}`);
+              const answersLines = answersText.split('\n').map(s=>s.trim()).filter(Boolean);
+              
+              if (!answersLines.length) return showModal('Ошибка', `Добавьте хотя бы один правильный ответ в вопросе ${i+1}`);
+              
+              // НОВАЯ ЛОГИКА: каждый ответ может содержать несколько вариантов через ;
+              const answers = answersLines.map(line => parseMultipleAnswers(line));
+              
               qData.q = q;
               qData.answers = answers;
               
@@ -2329,12 +2358,19 @@
             } else if (type === 'sentence') {
               const sentence = el.querySelector('.sentence-input')?.value?.trim() || '';
               const answersText = el.querySelector('.sentence-answers')?.value || '';
-              const answers = answersText.split('\n').map(s=>s.trim()).filter(Boolean);
+              const answersLines = answersText.split('\n').map(s=>s.trim()).filter(Boolean);
+              
               if (!sentence) return showModal('Ошибка', `Введите предложение с пропусками в вопросе ${i+1}`);
+              
               const gaps = (sentence.match(/___/g) || []).length;
+              
+              // НОВАЯ ЛОГИКА: каждый пропуск может содержать несколько вариантов через ;
+              const answers = answersLines.map(line => parseMultipleAnswers(line));
+              
               if (!answers.length || answers.length !== gaps) {
                 return showModal('Ошибка', `Количество ответов (${answers.length}) должно совпадать с количеством пропусков (${gaps}) в вопросе ${i+1}`);
               }
+              
               qData.q = q;
               qData.sentence = sentence;
               qData.answers = answers;
