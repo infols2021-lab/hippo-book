@@ -301,7 +301,7 @@
           </div>
         </div>
         <div class="nav">
-          <a href="materials.html" class="btn">📚 Материалы</a>
+          <button class="btn" onclick="location.href='/materials.html'">📚 Материалы</button>
           <button class="btn secondary" id="logoutBtn">🚪 Выйти</button>
         </div>
       </div>
@@ -316,7 +316,7 @@
             <h3 id="fullname" style="color: #2c3e50; margin-bottom: 8px;">Ученик</h3>
             <div class="small-muted" id="emailText" style="color: #7f8c8d;">—</div>
             <div style="margin-top:16px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-              <span class="badge" id="totalAssignmentsCount" style="background: var(--accent2); padding: 8px 16px;">📊 Всего заданий: 0</span>
+              <span class="badge" id="totalAssignmentsCount" style="background: var(--accent2); padding: 8px 16px;">📊 Доступных заданий: 0</span>
               <span class="badge" id="completedAssignmentsCount" style="background: var(--accent); padding: 8px 16px;">✅ Выполнено: 0</span>
             </div>
           </div>
@@ -324,12 +324,12 @@
 
         <div>
           <div class="card">
-            <h3 style="color: var(--accent2); margin-bottom: 16px;">📊 Общая статистика</h3>
+            <h3 style="color: var(--accent2); margin-bottom: 16px;">📊 Статистика по доступным материалам</h3>
             
             <div class="stats-grid">
               <div class="stat-card">
                 <div class="stat-number" id="totalMaterials">0</div>
-                <div class="stat-label">Всего материалов</div>
+                <div class="stat-label">Доступных материалов</div>
               </div>
               <div class="stat-card">
                 <div class="stat-number" id="completedMaterials">0</div>
@@ -345,7 +345,7 @@
           <div style="height:18px"></div>
 
           <div class="card">
-            <h3 style="color: var(--accent2); margin-bottom: 16px;">📚 Прогресс по материалам</h3>
+            <h3 style="color: var(--accent2); margin-bottom: 16px;">📚 Прогресс по доступным материалам</h3>
             <div class="materials-progress" id="materialsProgress">
               <div style="text-align: center; padding: 20px; color: #666;">
                 <p>📚 Загрузка материалов...</p>
@@ -357,8 +357,8 @@
 
           <div class="card">
             <h3 style="color: var(--accent2); margin-bottom: 16px;">ℹ️ Информация</h3>
-            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">📈 На этой странице отображается ваш прогресс в обучении. Вы можете видеть, какие материалы вы уже изучили и над чем еще нужно поработать.</p>
-            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">📚 В разделе "Прогресс по материалам" показаны все доступные вам учебники и кроссворды с индикатором выполнения.</p>
+            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">📈 На этой странице отображается ваш прогресс по доступным учебникам и кроссвордам.</p>
+            <p class="small-muted" style="color: #5d4037; line-height: 1.5;">📚 В разделе "Прогресс по материалам" показаны все учебники и кроссворды, к которым у вас есть доступ.</p>
             <p class="small-muted" style="color: #5d4037; line-height: 1.5;"><strong>💡 Совет:</strong> Регулярно занимайтесь для достижения лучших результатов!</p>
           </div>
         </div>
@@ -387,7 +387,6 @@
       
       try {
         backgroundLoading.style.display = 'block';
-        console.log('🔄 Начинаем загрузку фона профиля...');
         
         const { data: background, error } = await supabase
           .from('backgrounds')
@@ -396,8 +395,6 @@
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
-
-        console.log('📋 Результат запроса фона:', { background, error });
 
         if (error) {
           if (error.code === 'PGRST116') {
@@ -414,10 +411,7 @@
           
           const img = new Image();
           img.onload = function() {
-            console.log('🖼️ Фон успешно загружен в память');
             profileBody.style.backgroundImage = `url('${background.image_url}')`;
-            
-            console.log('✅ Фон профиля установлен:', background.file_name);
             backgroundLoading.style.display = 'none';
           };
           
@@ -426,7 +420,6 @@
             backgroundLoading.style.display = 'none';
           };
           
-          console.log('📥 Загружаем изображение по URL:', background.image_url);
           img.src = background.image_url;
           
           setTimeout(() => {
@@ -457,7 +450,7 @@
         
         const { data: { user } } = await supabase.auth.getUser();
         if(!user) { 
-          window.location.href = '/login.html'; 
+          location.href = '/login.html'; 
           return; 
         }
 
@@ -477,6 +470,7 @@
             document.getElementById('fullname').textContent = profile?.full_name || 'Ученик';
             document.getElementById('emailText').textContent = user.email;
             
+            // Загружаем все учебники и кроссворды
             const { data: textbooksData } = await supabase
               .from('textbooks')
               .select('*')
@@ -524,12 +518,7 @@
         }
 
         function updateStatistics() {
-          const completedAssignments = userProgress.filter(up => up.is_completed).length;
-          const totalAssignments = assignments.length;
-          
-          document.getElementById('totalAssignmentsCount').textContent = `📊 Всего заданий: ${totalAssignments}`;
-          document.getElementById('completedAssignmentsCount').textContent = `✅ Выполнено: ${completedAssignments}`;
-
+          // Получаем только доступные материалы
           const availableTextbooks = textbooks.filter(textbook => 
             textbook.is_available || textbookAccess.some(access => access.textbook_id === textbook.id)
           );
@@ -538,9 +527,41 @@
             crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id)
           );
 
+          // Считаем задания только в доступных материалах
+          let totalAvailableAssignments = 0;
+          let completedAvailableAssignments = 0;
+
+          // Задания в доступных учебниках
+          availableTextbooks.forEach(textbook => {
+            const textbookAssignments = assignments.filter(a => a.textbook_id === textbook.id);
+            totalAvailableAssignments += textbookAssignments.length;
+            
+            const completedTextbookAssignments = userProgress.filter(up => 
+              up.is_completed && textbookAssignments.some(a => a.id === up.assignment_id)
+            ).length;
+            completedAvailableAssignments += completedTextbookAssignments;
+          });
+
+          // Задания в доступных кроссвордах
+          availableCrosswords.forEach(crossword => {
+            const crosswordAssignments = assignments.filter(a => a.crossword_id === crossword.id);
+            totalAvailableAssignments += crosswordAssignments.length;
+            
+            const completedCrosswordAssignments = userProgress.filter(up => 
+              up.is_completed && crosswordAssignments.some(a => a.id === up.assignment_id)
+            ).length;
+            completedAvailableAssignments += completedCrosswordAssignments;
+          });
+
+          // Обновляем бейджи
+          document.getElementById('totalAssignmentsCount').textContent = `📊 Доступных заданий: ${totalAvailableAssignments}`;
+          document.getElementById('completedAssignmentsCount').textContent = `✅ Выполнено: ${completedAvailableAssignments}`;
+
+          // Считаем пройденные материалы
           let completedMaterials = 0;
           let totalMaterials = availableTextbooks.length + availableCrosswords.length;
 
+          // Проверяем учебники
           availableTextbooks.forEach(textbook => {
             const textbookAssignments = assignments.filter(a => a.textbook_id === textbook.id);
             if (textbookAssignments.length === 0) return;
@@ -554,6 +575,7 @@
             }
           });
 
+          // Проверяем кроссворды
           availableCrosswords.forEach(crossword => {
             const crosswordAssignments = assignments.filter(a => a.crossword_id === crossword.id);
             if (crosswordAssignments.length === 0) return;
@@ -567,8 +589,11 @@
             }
           });
 
-          const successRate = totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
+          // Общий прогресс по доступным заданиям
+          const successRate = totalAvailableAssignments > 0 ? 
+            Math.round((completedAvailableAssignments / totalAvailableAssignments) * 100) : 0;
 
+          // Обновляем статистику
           document.getElementById('totalMaterials').textContent = totalMaterials;
           document.getElementById('completedMaterials').textContent = completedMaterials;
           document.getElementById('successRate').textContent = successRate + '%';
@@ -578,6 +603,7 @@
           const container = document.getElementById('materialsProgress');
           container.innerHTML = '';
 
+          // Получаем только доступные материалы
           const availableTextbooks = textbooks.filter(textbook => 
             textbook.is_available || textbookAccess.some(access => access.textbook_id === textbook.id)
           );
@@ -596,6 +622,7 @@
             return;
           }
 
+          // Прогресс по доступным учебникам
           availableTextbooks.forEach(textbook => {
             const textbookAssignments = assignments.filter(a => a.textbook_id === textbook.id);
             const completedTextbookAssignments = userProgress.filter(up => 
@@ -626,12 +653,13 @@
             
             progressItem.style.cursor = 'pointer';
             progressItem.addEventListener('click', () => {
-              window.location.href = `materials.html#textbook-${textbook.id}`;
+              window.location.href = `/materials.html#textbook-${textbook.id}`;
             });
             
             container.appendChild(progressItem);
           });
 
+          // Прогресс по доступным кроссвордам
           availableCrosswords.forEach(crossword => {
             const crosswordAssignments = assignments.filter(a => a.crossword_id === crossword.id);
             const completedCrosswordAssignments = userProgress.filter(up => 
@@ -662,7 +690,7 @@
             
             progressItem.style.cursor = 'pointer';
             progressItem.addEventListener('click', () => {
-              window.location.href = `materials.html#crossword-${crossword.id}`;
+              window.location.href = `/materials.html#crossword-${crossword.id}`;
             });
             
             container.appendChild(progressItem);
@@ -672,7 +700,7 @@
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           if (confirm('Вы уверены, что хотите выйти?')) {
             await supabase.auth.signOut();
-            window.location.href = '/login.html';
+            location.href = '/login.html';
           }
         });
 
