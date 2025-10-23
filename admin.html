@@ -18,7 +18,8 @@
     .admin-table tr:last-child td { border-bottom:none; }
     .form-group { margin-bottom:15px; }
     .form-group label { display:block; margin-bottom:5px; font-weight:600; }
-    .subtask-item { background:var(--bg1); padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid rgba(0,0,0,0.1); }
+    .subtask-item { background:var(--bg1); padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid rgba(0,0,0,0.1); position:relative; }
+    .question-number { position:absolute; top:10px; right:10px; background:var(--accent2); color:white; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:14px; }
     .btn-danger { background:#e74c3c; }
     .btn-warning { background:#f39c12; }
     .btn-small { padding:6px 12px; font-size:14px; }
@@ -929,6 +930,17 @@
         return `<span style="border-bottom:2px dashed #666; padding:0 10px; margin:0 2px;">[${i}]</span>`;
       });
     };
+
+    // ============ ФУНКЦИЯ ОБНОВЛЕНИЯ НОМЕРОВ ВОПРОСОВ ============
+    function renumberQuestions() {
+      const questions = document.querySelectorAll('.subtask-item');
+      questions.forEach((question, index) => {
+        const numberElement = question.querySelector('.question-number');
+        if (numberElement) {
+          numberElement.textContent = index + 1;
+        }
+      });
+    }
 
     // ============ УЛУЧШЕННЫЙ КОНСТРУКТОР КРОССВОРДОВ ============
     const crosswordData = {};
@@ -2216,7 +2228,10 @@
 
           inner += `<button class="btn btn-small btn-danger remove-question" type="button">🗑️ Удалить вопрос</button>`;
           
-          wrap.innerHTML = inner;
+          wrap.innerHTML = `
+            <div class="question-number">1</div>
+            ${inner}
+          `;
           container.appendChild(wrap);
 
           // init загрузчики
@@ -2257,10 +2272,14 @@
                 delete crosswordData[qid];
               }
               wrap.remove();
+              renumberQuestions(); // Обновляем номера после удаления
             } else {
               alert('Должен остаться хотя бы один вопрос.');
             }
           });
+
+          // Обновляем номера вопросов после добавления
+          renumberQuestions();
         }
 
         async function saveAssignment() {
