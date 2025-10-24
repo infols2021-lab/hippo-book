@@ -43,12 +43,20 @@
     .question-type-selector { display:flex; gap:10px; margin-bottom:15px; }
     .type-btn { padding:10px 15px; border:2px solid #ddd; border-radius:8px; cursor:pointer; background:white; transition:all 0.3s; }
     .type-btn.active { border-color:var(--accent2); background:var(--accent2); color:white; }
-    .fill-inputs-container { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
-    .fill-input-item { display: flex; gap: 10px; align-items: center; }
-    .fill-input-item input { flex: 1; padding: 8px 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: 14px; }
-    .remove-input-btn { background: #e74c3c; color: white; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
-    .add-input-btn { background: var(--accent2); color: white; border: none; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 14px; margin-top: 5px; }
+    
+    /* ОБНОВЛЕННЫЙ СТИЛЬ ДЛЯ ВПИСАТЬ ОТВЕТ */
+    .fill-inputs-container { display: flex; flex-direction: column; gap: 12px; margin: 15px 0; }
+    .fill-input-item { display: flex; gap: 10px; align-items: center; padding: 12px; background: white; border-radius: 8px; border: 1px solid #e0e0e0; }
+    .fill-input-number { background: var(--accent2); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0; }
+    .fill-input-item input { flex: 1; padding: 10px 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: 14px; }
+    .fill-input-item input:focus { border-color: var(--accent2); outline: none; }
+    .remove-input-btn { background: #e74c3c; color: white; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 12px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s; }
+    .remove-input-btn:hover { background: #c0392b; }
+    .remove-input-btn:disabled { background: #95a5a6; cursor: not-allowed; }
+    .add-input-btn { background: var(--accent2); color: white; border: none; border-radius: 8px; padding: 10px 15px; cursor: pointer; font-size: 14px; margin-top: 5px; display: flex; align-items: center; gap: 8px; width: fit-content; transition: background 0.2s; }
+    .add-input-btn:hover { background: #1a9c8a; }
     .input-count { font-size: 12px; color: #666; margin-top: 5px; }
+    
     .sentence-builder { background: #f8f9fa; border-radius: 8px; padding: 15px; margin: 10px 0; }
     .sentence-preview { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin-bottom: 10px; font-size: 16px; line-height: 1.5; }
     .sentence-input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 10px; min-height: 60px; }
@@ -392,6 +400,8 @@
       .crossword-cell { width: 35px; height: 35px; font-size: 14px; }
       .word-input-section { flex-direction: column; }
       .word-input-section .form-group { width: 100%; }
+      .fill-input-item { flex-direction: column; align-items: flex-start; }
+      .fill-input-item input { width: 100%; }
     }
 
     @media (max-width: 768px) {
@@ -409,10 +419,13 @@
       .crossword-cell { width: 30px; height: 30px; font-size: 12px; }
       .crossword-advanced-controls { flex-direction: column; }
       .crossword-advanced-controls .form-group { width: 100%; }
+      .fill-input-item { padding: 8px; }
     }
 
     @media (max-width: 480px) {
       .crossword-cell { width: 25px; height: 25px; font-size: 10px; }
+      .fill-input-number { width: 24px; height: 24px; font-size: 12px; }
+      .remove-input-btn { width: 32px; height: 32px; }
     }
   </style>
 
@@ -963,6 +976,112 @@
       
       // Если это простой массив строк (старая структура)
       return answersArray.join('\n');
+    }
+
+    // ============ ОБНОВЛЕННАЯ ЛОГИКА ДЛЯ ТИПА "ВПИСАТЬ ОТВЕТ" ============
+    function initFillInputs(qid, prefillAnswers = []) {
+      const container = document.getElementById(`fill-inputs-container_${qid}`);
+      if (!container) return;
+      
+      container.innerHTML = '';
+      
+      // Если есть предзаполненные данные, используем их
+      if (prefillAnswers && prefillAnswers.length > 0) {
+        prefillAnswers.forEach(answerGroup => {
+          if (Array.isArray(answerGroup) && answerGroup.length > 0) {
+            const value = answerGroup.join('; ');
+            addFillInput(qid, value);
+          }
+        });
+      }
+      
+      // Если нет данных, добавляем одно пустое поле
+      if (container.children.length === 0) {
+        addFillInput(qid);
+      }
+      
+      updateFillInputCount(qid);
+    }
+
+    function addFillInput(qid, value = '') {
+      const container = document.getElementById(`fill-inputs-container_${qid}`);
+      if (!container) return;
+      
+      const inputCount = container.children.length;
+      const inputGroup = document.createElement('div');
+      inputGroup.className = 'fill-input-item';
+      
+      inputGroup.innerHTML = `
+        <div class="fill-input-number">${inputCount + 1}</div>
+        <input type="text" class="input fill-answer-input" value="${value}" placeholder="Варианты ответа через ; (например: ежик;кошка)">
+        <button type="button" class="remove-input-btn" ${inputCount === 0 ? 'disabled' : ''}>🗑️</button>
+      `;
+      
+      container.appendChild(inputGroup);
+      
+      // Обработчик удаления
+      const removeBtn = inputGroup.querySelector('.remove-input-btn');
+      removeBtn.addEventListener('click', function() {
+        if (container.children.length > 1) {
+          inputGroup.remove();
+          renumberFillInputs(qid);
+          updateFillInputCount(qid);
+        }
+      });
+      
+      // Обновляем счетчик
+      updateFillInputCount(qid);
+    }
+
+    function renumberFillInputs(qid) {
+      const container = document.getElementById(`fill-inputs-container_${qid}`);
+      if (!container) return;
+      
+      Array.from(container.children).forEach((child, index) => {
+        const numberElement = child.querySelector('.fill-input-number');
+        if (numberElement) {
+          numberElement.textContent = index + 1;
+        }
+        
+        // Разблокируем кнопку удаления, если полей больше одного
+        const removeBtn = child.querySelector('.remove-input-btn');
+        if (container.children.length > 1) {
+          removeBtn.disabled = false;
+        } else {
+          removeBtn.disabled = true;
+        }
+      });
+    }
+
+    function updateFillInputCount(qid) {
+      const container = document.getElementById(`fill-inputs-container_${qid}`);
+      const countElement = document.getElementById(`fill-input-count_${qid}`);
+      
+      if (container && countElement) {
+        const count = container.children.length;
+        countElement.textContent = `Количество ответов: ${count}`;
+      }
+    }
+
+    function getFillAnswers(qid) {
+      const container = document.getElementById(`fill-inputs-container_${qid}`);
+      if (!container) return [];
+      
+      const answers = [];
+      const inputItems = container.querySelectorAll('.fill-answer-input');
+      
+      inputItems.forEach(input => {
+        const value = input.value.trim();
+        if (value) {
+          // Разбиваем по точке с запятой и обрезаем пробелы
+          const variants = parseMultipleAnswers(value);
+          if (variants.length > 0) {
+            answers.push(variants);
+          }
+        }
+      });
+      
+      return answers;
     }
 
     // ============ УЛУЧШЕННЫЙ КОНСТРУКТОР КРОССВОРДОВ ============
@@ -2125,12 +2244,22 @@
               </div>
             `;
           } else if (qType === 'fill') {
+            // ОБНОВЛЕННЫЙ БЛОК ДЛЯ ТИПА "ВПИСАТЬ ОТВЕТ"
             inner += `
               ${imageUploadBlock}
               <div class="form-group">
-                <label>Правильные ответы (каждый с новой строки, несколько вариантов через ;):</label>
-                <textarea class="input fill-answers" rows="3" placeholder="яблоко;груша;апельсин&#10;кошка;собака">${formatMultipleAnswers(prefill?.answers || [])}</textarea>
-                <div class="small-muted">Для каждого ответа можно указать несколько вариантов через точку с запятой. Каждая новая строка - отдельный ответ.</div>
+                <label>Правильные ответы:</label>
+                <div class="fill-inputs-container" id="fill-inputs-container_${qid}">
+                  <!-- Поля будут добавлены динамически -->
+                </div>
+                <button type="button" class="add-input-btn" id="add-fill-input_${qid}">
+                  ➕ Добавить ответ
+                </button>
+                <div class="input-count" id="fill-input-count_${qid}">Количество ответов: 0</div>
+                <div class="small-muted">
+                  Для каждого ответа можно указать несколько вариантов через точку с запятой (например: ежик;кошка). 
+                  Каждое поле - отдельный ответ с номером.
+                </div>
               </div>
             `;
           } else if (qType === 'sentence') {
@@ -2258,6 +2387,20 @@
           `;
           container.appendChild(wrap);
 
+          // Инициализация для типа "Вписать ответ"
+          if (qType === 'fill') {
+            // Инициализация полей ввода
+            initFillInputs(qid, prefill?.answers || []);
+            
+            // Обработчик для кнопки добавления ответа
+            const addBtn = document.getElementById(`add-fill-input_${qid}`);
+            if (addBtn) {
+              addBtn.addEventListener('click', () => {
+                addFillInput(qid);
+              });
+            }
+          }
+
           // init загрузчики
           if (qType !== 'crossword') {
             initQuestionImageUpload(qid, supabase);
@@ -2341,13 +2484,10 @@
               if (imgUrl) qData.image = imgUrl;
               
             } else if (type === 'fill') {
-              const answersText = el.querySelector('.fill-answers')?.value || '';
-              const answersLines = answersText.split('\n').map(s=>s.trim()).filter(Boolean);
+              // ОБНОВЛЕННАЯ ЛОГИКА ДЛЯ ТИПА "ВПИСАТЬ ОТВЕТ"
+              const answers = getFillAnswers(qid);
               
-              if (!answersLines.length) return showModal('Ошибка', `Добавьте хотя бы один правильный ответ в вопросе ${i+1}`);
-              
-              // НОВАЯ ЛОГИКА: каждый ответ может содержать несколько вариантов через ;
-              const answers = answersLines.map(line => parseMultipleAnswers(line));
+              if (!answers.length) return showModal('Ошибка', `Добавьте хотя бы один правильный ответ в вопросе ${i+1}`);
               
               qData.q = q;
               qData.answers = answers;
