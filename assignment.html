@@ -64,18 +64,54 @@
         .option-radio {
             margin-right: 12px;
         }
-        .fill-input {
-            width: 100%;
-            padding: 16px;
-            border: 2px solid var(--bg1);
-            border-radius: 12px;
-            font-size: 16px;
-            margin: 10px 0;
+        
+        /* ОБНОВЛЕННЫЕ СТИЛИ ДЛЯ ВПИСАТЬ ОТВЕТ */
+        .fill-inputs-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 20px 0;
         }
-        .fill-input:focus {
+        .fill-input-item {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .fill-input-number {
+            background: var(--accent2);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .fill-input-item input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid rgba(0,0,0,0.1);
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .fill-input-item input:focus {
             border-color: var(--accent2);
             outline: none;
         }
+        .fill-input-count {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            text-align: center;
+        }
+        
         .sentence-container {
             background: var(--bg1);
             padding: 20px;
@@ -464,6 +500,13 @@
             .crossword-number {
                 font-size: 7px;
             }
+            .fill-input-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .fill-input-item input {
+                width: 100%;
+            }
         }
 
         @media (max-width: 480px) {
@@ -474,6 +517,11 @@
             }
             .crossword-number {
                 font-size: 6px;
+            }
+            .fill-input-number {
+                width: 24px;
+                height: 24px;
+                font-size: 12px;
             }
         }
     </style>
@@ -767,20 +815,52 @@
                 container.appendChild(optionsContainer);
             }
 
-            // Рендерим вопрос с заполнением
+            // Рендерим вопрос с заполнением (ОБНОВЛЕННАЯ ФУНКЦИЯ)
             function renderFillQuestion(question, index, container) {
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.className = 'fill-input';
-                input.placeholder = 'Введите ваш ответ...';
-                input.value = userAnswers[index] || '';
+                const inputsContainer = document.createElement('div');
+                inputsContainer.className = 'fill-inputs-container';
                 
-                input.addEventListener('input', async () => {
-                    userAnswers[index] = input.value;
-                    await saveProgress(false);
+                // Получаем ответы пользователя для этого вопроса
+                let userAnswerArray = userAnswers[index];
+                if (!userAnswerArray || !Array.isArray(userAnswerArray)) {
+                    userAnswerArray = [];
+                    userAnswers[index] = userAnswerArray;
+                }
+                
+                // Получаем правильные ответы из вопроса
+                const correctAnswers = question.answers || [];
+                
+                // Создаем поля ввода для каждого ответа
+                correctAnswers.forEach((answerGroup, answerIndex) => {
+                    const inputItem = document.createElement('div');
+                    inputItem.className = 'fill-input-item';
+                    
+                    const numberDiv = document.createElement('div');
+                    numberDiv.className = 'fill-input-number';
+                    numberDiv.textContent = answerIndex + 1;
+                    
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.placeholder = `Введите ответ ${answerIndex + 1}...`;
+                    input.value = userAnswerArray[answerIndex] || '';
+                    
+                    input.addEventListener('input', async () => {
+                        userAnswerArray[answerIndex] = input.value;
+                        await saveProgress(false);
+                    });
+                    
+                    inputItem.appendChild(numberDiv);
+                    inputItem.appendChild(input);
+                    inputsContainer.appendChild(inputItem);
                 });
                 
-                container.appendChild(input);
+                // Добавляем счетчик ответов
+                const countDiv = document.createElement('div');
+                countDiv.className = 'fill-input-count';
+                countDiv.textContent = `Количество ответов: ${correctAnswers.length}`;
+                
+                container.appendChild(inputsContainer);
+                container.appendChild(countDiv);
             }
 
             // Рендерим вопрос с предложением
@@ -1163,15 +1243,25 @@
                         hasAnswer = userAnswer !== undefined && userAnswer !== null && userAnswer !== '';
                     } 
                     else if (question.type === 'fill') {
-                        // Для ввода текста - не пустая строка
-                        hasAnswer = userAnswer !== undefined && userAnswer !== null && userAnswer !== '' && userAnswer.trim() !== '';
+                        // ОБНОВЛЕННАЯ ЛОГИКА: Для ввода текста - все поля заполнены
+                        if (Array.isArray(userAnswer)) {
+                            const correctAnswersCount = question.answers?.length || 0;
+                            hasAnswer = userAnswer.length >= correctAnswersCount && 
+                                       userAnswer.every(answer => 
+                                           answer !== undefined && answer !== null && answer !== '' && answer.trim() !== ''
+                                       );
+                        } else {
+                            hasAnswer = false;
+                        }
                     }
                     else if (question.type === 'sentence') {
                         // Для предложения - все пропуски заполнены
                         if (Array.isArray(userAnswer)) {
-                            hasAnswer = userAnswer.length > 0 && userAnswer.every(answer => 
-                                answer !== undefined && answer !== null && answer !== '' && answer.trim() !== ''
-                            );
+                            const gapsCount = (question.sentence?.match(/___/g) || []).length;
+                            hasAnswer = userAnswer.length >= gapsCount && 
+                                       userAnswer.every(answer => 
+                                           answer !== undefined && answer !== null && answer !== '' && answer.trim() !== ''
+                                       );
                         } else {
                             hasAnswer = false;
                         }
@@ -1295,10 +1385,34 @@
                         }
                         
                     } else {
-                        hasAnswer = userAnswer !== undefined && 
-                                   userAnswer !== null && 
-                                   userAnswer !== '' &&
-                                   !(Array.isArray(userAnswer) && userAnswer.every(item => !item || item.trim() === ''));
+                        // ОБНОВЛЕННАЯ ЛОГИКА: Проверка заполнения для разных типов вопросов
+                        if (question.type === 'test') {
+                            hasAnswer = userAnswer !== undefined && userAnswer !== null && userAnswer !== '';
+                        } 
+                        else if (question.type === 'fill') {
+                            // Для ввода текста - проверяем, что все поля заполнены
+                            if (Array.isArray(userAnswer)) {
+                                const correctAnswersCount = question.answers?.length || 0;
+                                hasAnswer = userAnswer.length >= correctAnswersCount && 
+                                           userAnswer.every(answer => 
+                                               answer !== undefined && answer !== null && answer !== '' && answer.trim() !== ''
+                                           );
+                            } else {
+                                hasAnswer = false;
+                            }
+                        }
+                        else if (question.type === 'sentence') {
+                            // Для предложения - проверяем, что все пропуски заполнены
+                            if (Array.isArray(userAnswer)) {
+                                const gapsCount = (question.sentence?.match(/___/g) || []).length;
+                                hasAnswer = userAnswer.length >= gapsCount && 
+                                           userAnswer.every(answer => 
+                                               answer !== undefined && answer !== null && answer !== '' && answer.trim() !== ''
+                                           );
+                            } else {
+                                hasAnswer = false;
+                            }
+                        }
                     
                         if (!hasAnswer) {
                             skippedAnswers++;
@@ -1316,34 +1430,26 @@
                             isCorrect = parseInt(userAnswer) === question.correct;
                         } 
                         else if (question.type === 'fill') {
-                            // ДЛЯ ВПИСЫВАНИЯ ОТВЕТА: проверяем совпадение с ЛЮБЫМ из правильных вариантов
+                            // ОБНОВЛЕННАЯ ЛОГИКА: Для вписывания ответа - проверяем каждый ответ отдельно
                             result.correctAnswer = question.answers;
-                            const userAnswerNormalized = String(userAnswer).toLowerCase().trim();
-                            
-                            // Поддержка старого формата (массив строк) и нового (массив массивов)
-                            let correctVariants = [];
-                            if (question.answers && question.answers.length > 0) {
-                                if (Array.isArray(question.answers[0])) {
-                                    // Новый формат: массив массивов
-                                    correctVariants = question.answers[0].map(a => String(a).toLowerCase().trim());
-                                } else {
-                                    // Старый формат: массив строк
-                                    correctVariants = question.answers.map(a => String(a).toLowerCase().trim());
+                            if (Array.isArray(userAnswer) && Array.isArray(question.answers)) {
+                                // Проверяем, что все ответы совпадают и количество ответов правильное
+                                if (userAnswer.length === question.answers.length) {
+                                    isCorrect = userAnswer.every((answer, answerIndex) => {
+                                        if (!answer || !question.answers[answerIndex]) return false;
+                                        
+                                        const userAnswerNormalized = String(answer).toLowerCase().trim();
+                                        const correctVariants = question.answers[answerIndex].map(a => String(a).toLowerCase().trim());
+                                        
+                                        return correctVariants.some(correctVariant => 
+                                            userAnswerNormalized === correctVariant
+                                        );
+                                    });
                                 }
                             }
-                            
-                            isCorrect = correctVariants.some(correctVariant => 
-                                userAnswerNormalized === correctVariant
-                            );
-                            
-                            console.log('Fill question check:', {
-                                userAnswer: userAnswerNormalized,
-                                correctVariants: correctVariants,
-                                isCorrect: isCorrect
-                            });
                         } 
                         else if (question.type === 'sentence') {
-                            // ДЛЯ ПРЕДЛОЖЕНИЙ: проверяем каждый пропуск на соответствие ЛЮБОМУ из вариантов
+                            // Для предложений - проверяем каждый пропуск на соответствие ЛЮБОМУ из вариантов
                             result.correctAnswer = question.answers;
                             if (Array.isArray(userAnswer) && Array.isArray(question.answers)) {
                                 // Проверяем, что все ответы совпадают и количество ответов правильное
@@ -1494,22 +1600,28 @@
                             <div class="review-answer review-correct"><strong>Правильный ответ:</strong> ${correctOption}</div>
                         `;
                     } else if (result.type === 'fill') {
-                        const userAnswer = result.userAnswer || 'Не отвечено';
-                        let correctAnswerText = '';
+                        // ОБНОВЛЕННАЯ ЛОГИКА: Для ввода текста показываем все ответы
+                        let userAnswerText = 'Не отвечено';
+                        if (Array.isArray(result.userAnswer)) {
+                            userAnswerText = result.userAnswer.map((ans, i) => 
+                                ans ? `[${i+1}: ${ans}]` : `[${i+1}: не отвечено]`
+                            ).join(' ');
+                        }
                         
+                        let correctAnswerText = '';
                         if (Array.isArray(result.correctAnswer)) {
-                            if (Array.isArray(result.correctAnswer[0])) {
-                                // Новый формат: массив массивов
-                                correctAnswerText = result.correctAnswer[0].join(' или ');
-                            } else {
-                                // Старый формат: массив строк
-                                correctAnswerText = result.correctAnswer.join(' или ');
-                            }
+                            correctAnswerText = result.correctAnswer.map((ans, i) => {
+                                if (Array.isArray(ans)) {
+                                    return `[${i+1}: ${ans.join(' или ')}]`;
+                                } else {
+                                    return `[${i+1}: ${ans}]`;
+                                }
+                            }).join(' ');
                         }
                         
                         answerDetails = `
-                            <div class="review-answer"><strong>Ваш ответ:</strong> ${userAnswer}</div>
-                            <div class="review-answer review-correct"><strong>Правильный ответ:</strong> ${correctAnswerText}</div>
+                            <div class="review-answer"><strong>Ваши ответы:</strong> ${userAnswerText}</div>
+                            <div class="review-answer review-correct"><strong>Правильные ответы:</strong> ${correctAnswerText}</div>
                         `;
                     } else if (result.type === 'sentence') {
                         let userAnswerText = 'Не отвечено';
