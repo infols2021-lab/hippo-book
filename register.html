@@ -280,7 +280,6 @@
   </div>
 
   <script type="module">
-    // Расширенный список разрешенных почтовых доменов
     const ALLOWED_DOMAINS = [
       'gmail.com', 'yandex.ru', 'mail.ru', 'ya.ru', 'yandex.com',
       'outlook.com', 'hotmail.com', 'live.com', 'yahoo.com',
@@ -289,7 +288,6 @@
       'i.ua', 'meta.ua', 'email.ua'
     ];
 
-    // Расширенный список запрещенных (временных) доменов
     const BLOCKED_DOMAINS = [
       'tempmail.com', '10minutemail.com', 'guerrillamail.com',
       'mailinator.com', 'yopmail.com', 'throwawaymail.com',
@@ -300,7 +298,6 @@
       'spam4.me', 'fakeinbox.com', 'tmpmail.net', 'trashmail.com'
     ];
 
-    // Система ограничения регистраций
     const REGISTRATION_LIMIT = {
       maxAttempts: 3,
       timeWindow: 60 * 60 * 1000, // 1 час
@@ -432,7 +429,7 @@
       registerBtn.disabled = !(formatValid && matchValid && passwordValid && domainValid);
     }
     
-    function initApp() {
+    async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации системы');
         return;
