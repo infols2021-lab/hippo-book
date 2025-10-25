@@ -142,101 +142,6 @@
       text-align: left;
     }
 
-    /* Стили для модального окна помощи */
-    .help-modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 10000;
-      padding: 20px;
-    }
-    .help-modal-content {
-      background: white;
-      border-radius: 16px;
-      max-width: 800px;
-      width: 100%;
-      max-height: 90vh;
-      overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    .help-modal-header {
-      padding: 20px;
-      border-bottom: 1px solid #f0f0f0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .help-modal-tabs {
-      display: flex;
-      background: #f8f9fa;
-      border-bottom: 1px solid #e9ecef;
-    }
-    .help-tab {
-      flex: 1;
-      padding: 15px;
-      border: none;
-      background: none;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-    .help-tab.active {
-      background: white;
-      color: var(--accent2);
-      border-bottom: 3px solid var(--accent2);
-    }
-    .help-tab-content {
-      display: none;
-      padding: 0;
-      max-height: 60vh;
-      overflow-y: auto;
-    }
-    .help-tab-content.active {
-      display: block;
-    }
-    .help-image {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-    .help-close {
-      background: none;
-      border: none;
-      font-size: 24px;
-      cursor: pointer;
-      color: #666;
-      padding: 5px;
-    }
-    .help-close:hover {
-      color: #333;
-    }
-    .image-loading {
-      text-align: center;
-      padding: 40px;
-      color: #666;
-    }
-
-    /* Индикатор предзагрузки */
-    .preload-status {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: rgba(0,0,0,0.8);
-      color: white;
-      padding: 8px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      z-index: 9999;
-      display: none;
-    }
-
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -266,63 +171,12 @@
         padding: 14px 20px;
         font-size: 16px;
       }
-      
-      .help-modal-content {
-        margin: 10px;
-        max-height: 85vh;
-      }
-      
-      .help-modal-tabs {
-        flex-direction: column;
-      }
-      
-      .help-tab {
-        padding: 12px;
-      }
-
-      .preload-status {
-        bottom: 10px;
-        right: 10px;
-        font-size: 10px;
-      }
     }
   </style>
   
   <script src="/load-config.js"></script>
 </head>
 <body>
-  <!-- Индикатор предзагрузки -->
-  <div class="preload-status" id="preloadStatus">
-    <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
-    Предзагружаем помощь...
-  </div>
-
-  <!-- Модальное окно помощи -->
-  <div class="help-modal" id="helpModal">
-    <div class="help-modal-content">
-      <div class="help-modal-header">
-        <h3 style="margin: 0; color: #333;">📚 Помощь по платформе</h3>
-        <button class="help-close" id="closeHelpModal">✕</button>
-      </div>
-      <div class="help-modal-tabs">
-        <button class="help-tab active" data-tab="registration">📝 Регистрация</button>
-        <button class="help-tab" data-tab="rules">📋 Правила</button>
-      </div>
-      <div class="help-tab-content active" id="registrationContent">
-        <div class="image-loading">
-          <div class="spinner"></div>
-          <p>Загружаем инструкцию по регистрации...</p>
-        </div>
-      </div>
-      <div class="help-tab-content" id="rulesContent">
-        <div class="image-loading">
-          <div class="spinner"></div>
-          <p>Загружаем правила платформы...</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div class="login-container">
     <div class="login-card">
       <h2>Вход в Edu Keys</h2>
@@ -353,209 +207,12 @@
         <div class="link">
           <p>Нет аккаунта? <a href="/register.html">Зарегистрироваться</a></p>
           <p><a href="/reset.html">Забыли пароль?</a></p>
-          <button class="btn help" id="helpBtn">❓ Помощь по платформе</button>
         </div>
       </div>
     </div>
   </div>
 
   <script type="module">
-    // ===== УЛУЧШЕННАЯ СИСТЕМА ПОМОЩИ С ПРЕДЗАГРУЗКОЙ И ОБХОДОМ КЭША =====
-    function initHelpSystem(supabase) {
-      const helpModal = document.getElementById('helpModal');
-      const helpBtn = document.getElementById('helpBtn');
-      const closeHelpBtn = document.getElementById('closeHelpModal');
-      const helpTabs = document.querySelectorAll('.help-tab');
-      const tabContents = document.querySelectorAll('.help-tab-content');
-      const preloadStatus = document.getElementById('preloadStatus');
-      
-      // Объект для хранения предзагруженных изображений
-      const preloadedImages = {
-        registration: null,
-        rules: null
-      };
-
-      // Статусы загрузки
-      let imagesLoaded = {
-        registration: false,
-        rules: false
-      };
-
-      // Функция для получения публичного URL изображения из Storage С ПАРАМЕТРОМ ВЕРСИИ
-      function getHelpImageUrl(imageName) {
-        // Добавляем параметр версии чтобы избежать кэширования
-        const version = new Date().getTime(); // timestamp в миллисекундах
-        return `${window.SUPABASE_URL}/storage/v1/object/public/help-images/${imageName}?v=${version}`;
-      }
-
-      // Функция предзагрузки изображений
-      async function preloadHelpImages() {
-        preloadStatus.style.display = 'block';
-        console.log('🔄 Начинаем предзагрузку изображений помощи...');
-
-        const imagesToPreload = [
-          { name: 'registration', url: 'registration-help.png' },
-          { name: 'rules', url: 'rules-help.png' }
-        ];
-
-        const preloadPromises = imagesToPreload.map(({ name, url }) => {
-          return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-              preloadedImages[name] = img;
-              imagesLoaded[name] = true;
-              console.log(`✅ Предзагружено: ${name}`);
-              updatePreloadStatus();
-              resolve(name);
-            };
-            img.onerror = () => {
-              console.warn(`❌ Не удалось предзагрузить: ${name}`);
-              // Пробуем загрузить без кэша
-              loadWithoutCache(name, url).then(resolve);
-            };
-            // ДОБАВЛЯЕМ ПАРАМЕТР ВЕРСИИ ДЛЯ ОБХОДА КЭША
-            img.src = getHelpImageUrl(url);
-          });
-        });
-
-        await Promise.allSettled(preloadPromises);
-        
-        // Скрываем индикатор через 2 секунды
-        setTimeout(() => {
-          preloadStatus.style.display = 'none';
-        }, 2000);
-      }
-
-      // Дополнительная функция для загрузки без кэша
-      async function loadWithoutCache(tabName, imageName) {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            preloadedImages[tabName] = img;
-            imagesLoaded[tabName] = true;
-            console.log(`✅ Загружено без кэша: ${tabName}`);
-            updatePreloadStatus();
-            resolve(tabName);
-          };
-          img.onerror = () => {
-            console.warn(`❌ Окончательно не удалось загрузить: ${tabName}`);
-            updatePreloadStatus();
-            resolve(tabName);
-          };
-          // Используем другой параметр для обхода кэша
-          const timestamp = new Date().getTime();
-          img.src = `${window.SUPABASE_URL}/storage/v1/object/public/help-images/${imageName}?timestamp=${timestamp}&nocache=${Math.random()}`;
-        });
-      }
-
-      // Обновление статуса предзагрузки
-      function updatePreloadStatus() {
-        const loadedCount = Object.values(imagesLoaded).filter(Boolean).length;
-        const totalCount = Object.keys(imagesLoaded).length;
-        preloadStatus.innerHTML = `
-          <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
-          Помощь: ${loadedCount}/${totalCount}
-        `;
-      }
-
-      // Функция загрузки изображения помощи (использует предзагруженные)
-      function loadHelpImage(tabName) {
-        const contentDiv = document.getElementById(`${tabName}Content`);
-        
-        // Если изображение уже предзагружено, используем его
-        if (imagesLoaded[tabName] && preloadedImages[tabName]) {
-          contentDiv.innerHTML = '';
-          const img = preloadedImages[tabName].cloneNode();
-          img.className = 'help-image';
-          img.alt = tabName === 'registration' ? 'Инструкция по регистрации' : 'Правила платформы';
-          contentDiv.appendChild(img);
-          return;
-        }
-
-        // Fallback: загружаем обычным способом с обходом кэша
-        const imageName = tabName === 'registration' ? 'registration-help.png' : 'rules-help.png';
-        
-        const img = document.createElement('img');
-        img.className = 'help-image';
-        img.alt = tabName === 'registration' ? 'Инструкция по регистрации' : 'Правила платформы';
-        
-        // ДОБАВЛЯЕМ ПАРАМЕТР ДЛЯ ОБХОДА КЭША
-        img.src = getHelpImageUrl(imageName);
-        
-        img.onload = () => {
-          contentDiv.innerHTML = '';
-          contentDiv.appendChild(img);
-        };
-        
-        img.onerror = () => {
-          showImageError(contentDiv, tabName);
-        };
-      }
-
-      // Функция показа ошибки загрузки изображения
-      function showImageError(contentDiv, tabName) {
-        const title = tabName === 'registration' ? '📝 Инструкция по регистрации' : '📋 Правила платформы';
-        const message = tabName === 'registration' 
-          ? 'Изображение инструкции временно недоступно. Обратитесь к администратору.'
-          : 'Изображение правил временно недоступно. Обратитесь к администратору.';
-        
-        contentDiv.innerHTML = `
-          <div style="padding: 40px; text-align: center;">
-            <h3>${title}</h3>
-            <p>${message}</p>
-            <p class="small-muted">Если проблема повторяется, свяжитесь с администратором: @skebobingg</p>
-          </div>
-        `;
-      }
-
-      // Открытие модального окна
-      helpBtn.addEventListener('click', async () => {
-        helpModal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-        
-        // Показываем предзагруженные изображения
-        loadHelpImage('registration');
-        loadHelpImage('rules');
-      });
-      
-      // Закрытие модального окна
-      closeHelpBtn.addEventListener('click', () => {
-        helpModal.style.display = 'none';
-        document.body.style.overflow = '';
-      });
-      
-      // Закрытие по клику на фон
-      helpModal.addEventListener('click', (e) => {
-        if (e.target === helpModal) {
-          helpModal.style.display = 'none';
-          document.body.style.overflow = '';
-        }
-      });
-      
-      // Закрытие по Escape
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && helpModal.style.display === 'flex') {
-          helpModal.style.display = 'none';
-          document.body.style.overflow = '';
-        }
-      });
-      
-      // Переключение вкладок
-      helpTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          helpTabs.forEach(t => t.classList.remove('active'));
-          tabContents.forEach(c => c.classList.remove('active'));
-          
-          tab.classList.add('active');
-          const tabName = tab.getAttribute('data-tab');
-          document.getElementById(`${tabName}Content`).classList.add('active');
-        });
-      });
-
-      // Запускаем предзагрузку при инициализации
-      preloadHelpImages();
-    }
-
     function showError(message) {
       const errorEl = document.getElementById('errorMessage');
       errorEl.textContent = message;
@@ -626,17 +283,9 @@
       }
     }
 
-    // ПРОСТАЯ ЛОГИКА ОБРАБОТКИ ПОДТВЕРЖДЕНИЯ EMAIL
+    // ПРОВЕРКА ПОДТВЕРЖДЕНИЯ EMAIL ЧЕРЕЗ HASH ПАРАМЕТРЫ
     async function handleEmailConfirmation(supabase) {
-      // Проверяем URL параметры для сообщений о подтверждении
-      const urlParams = new URLSearchParams(window.location.search);
-      const message = urlParams.get('message');
-      
-      if (message === 'confirmed') {
-        showSuccess('✅ Email успешно подтвержден! Теперь вы можете войти в систему.');
-      }
-      
-      // Проверяем hash параметры (если пользователь перешел по ссылке подтверждения)
+      // Проверяем наличие hash параметров в URL
       if (window.location.hash && window.location.hash.includes('access_token')) {
         try {
           showWarning('🔐 Обрабатываем подтверждение email...');
@@ -653,14 +302,17 @@
               refresh_token: refreshToken
             });
 
-            if (error) throw error;
+            if (error) {
+              console.error('Session set error:', error);
+              throw new Error(`Ошибка установки сессии: ${error.message}`);
+            }
 
             if (data.user && data.user.email_confirmed_at) {
               // Создаем профиль если нужно
               await ensureProfileExists(supabase, data.user);
               
-              // Очищаем URL
-              window.history.replaceState(null, null, window.location.pathname + '?message=confirmed');
+              // Очищаем URL от hash параметров
+              window.history.replaceState(null, null, window.location.pathname);
               
               showSuccess('✅ Email успешно подтвержден! Сейчас вы будете перенаправлены...');
               
@@ -669,11 +321,13 @@
                 window.location.href = "/profile.html";
               }, 2000);
               return true;
+            } else {
+              throw new Error('Email не был подтвержден');
             }
           }
         } catch (error) {
           console.error('Email confirmation error:', error);
-          showError('❌ Ошибка подтверждения email. Попробуйте войти вручную.');
+          showError(`❌ Ошибка подтверждения email: ${error.message}. Попробуйте войти вручную.`);
           
           // Очищаем URL в случае ошибки
           window.history.replaceState(null, null, window.location.pathname);
@@ -694,7 +348,9 @@
       const urlParams = new URLSearchParams(window.location.search);
       const message = urlParams.get('message');
       
-      if (message === 'check_email') {
+      if (message === 'confirmed') {
+        showSuccess('✅ Email успешно подтвержден! Теперь вы можете войти в систему.');
+      } else if (message === 'check_email') {
         showWarning('📧 Проверьте вашу почту для подтверждения регистрации.');
       } else if (message === 'email_exists') {
         showError('❌ Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.');
@@ -705,9 +361,6 @@
       import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm')
         .then(({ createClient }) => {
           const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-          
-          // Инициализируем систему помощи с предзагрузкой
-          initHelpSystem(supabase);
           
           // Обрабатываем подтверждение email если есть hash параметры
           handleEmailConfirmation(supabase).then(handled => {

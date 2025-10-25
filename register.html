@@ -431,82 +431,6 @@
       const registerBtn = document.getElementById('registerBtn');
       registerBtn.disabled = !(formatValid && matchValid && passwordValid && domainValid);
     }
-
-    // Функция для создания профиля вручную (резервный метод)
-    async function createProfileManually(supabase, userId, email, fullName) {
-      try {
-        // Пробуем создать профиль напрямую через Supabase
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: userId,
-              email: email,
-              full_name: fullName,
-              created_at: new Date().toISOString(),
-              completed_assignments_count: 0,
-              is_admin: false
-            }
-          ]);
-
-        if (insertError) {
-          console.log('Direct profile creation failed:', insertError);
-          
-          // Пробуем через API endpoint
-          try {
-            const response = await fetch('/api/create-profile', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                user_id: userId,
-                email: email,
-                full_name: fullName
-              })
-            });
-            
-            const result = await response.json();
-            console.log('API profile creation result:', result);
-            
-            if (!response.ok) {
-              throw new Error(result.error || 'API profile creation failed');
-            }
-            
-            return { success: true, method: 'api' };
-          } catch (apiError) {
-            console.log('API profile creation failed:', apiError);
-            return { success: false, error: apiError.message };
-          }
-        }
-        
-        return { success: true, method: 'direct' };
-      } catch (error) {
-        console.log('Manual profile creation failed:', error);
-        return { success: false, error: error.message };
-      }
-    }
-
-    // Функция проверки существования профиля
-    async function checkProfileExists(supabase, userId) {
-      try {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', userId)
-          .single();
-
-        if (error && error.code !== 'PGRST116') { // PGRST116 = not found
-          console.log('Profile check error:', error);
-          return false;
-        }
-
-        return !!profile;
-      } catch (error) {
-        console.log('Profile check failed:', error);
-        return false;
-      }
-    }
     
     function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
@@ -574,7 +498,7 @@
               
               showWarning('🔄 Создаем ваш аккаунт...');
 
-              // УПРОЩЕННАЯ РЕГИСТРАЦИЯ - без сложных redirect
+              // РЕГИСТРАЦИЯ - без создания профиля заранее
               const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
@@ -582,7 +506,6 @@
                   data: { 
                     full_name: fullname
                   }
-                  // Убираем emailRedirectTo - используем стандартный шаблон Supabase
                 }
               });
 
@@ -617,32 +540,6 @@
               if (data.user) {
                 console.log('User created successfully:', data.user.id);
                 
-                // РЕЗЕРВНОЕ СОЗДАНИЕ ПРОФИЛЯ
-                setTimeout(async () => {
-                  try {
-                    console.log('Checking if profile was created automatically...');
-                    
-                    // Проверяем, создался ли профиль автоматически
-                    const profileExists = await checkProfileExists(supabase, data.user.id);
-                    
-                    if (!profileExists) {
-                      console.log('Profile not found, creating manually...');
-                      
-                      const profileResult = await createProfileManually(supabase, data.user.id, email, fullname);
-                      
-                      if (profileResult.success) {
-                        console.log(`Profile created successfully via ${profileResult.method} method`);
-                      } else {
-                        console.error('Failed to create profile manually:', profileResult.error);
-                      }
-                    } else {
-                      console.log('Profile already exists - automatic creation worked!');
-                    }
-                  } catch (profileError) {
-                    console.error('Profile creation process failed:', profileError);
-                  }
-                }, 2000);
-                
                 showSuccess('✅ Регистрация успешна! Проверьте вашу почту для подтверждения email. Без подтверждения вход невозможен.');
                 document.getElementById('registerBtn').style.display = 'none';
                 
@@ -654,6 +551,7 @@
                   • Проверьте папку "Входящие" и "Спам" в вашей почте<br>
                   • Нажмите на ссылку "Confirm your mail" в письме<br>
                   • После подтверждения вы сможете войти в систему<br>
+                  • При первом входе автоматически создастся профиль<br>
                   <br>
                   <strong>⚠️ Если не получили письмо:</strong><br>
                   • Напишите администратору в Telegram: @skebobingg<br>
