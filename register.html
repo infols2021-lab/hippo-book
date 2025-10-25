@@ -574,9 +574,9 @@
               
               showWarning('🔄 Создаем ваш аккаунт...');
 
-              // Прямая регистрация без предварительной проверки существования
-              const redirectUrl = `${window.location.origin}/login.html`;
-              console.log('Redirect URL:', redirectUrl);
+              // УЛУЧШЕННАЯ РЕГИСТРАЦИЯ - используем специальную страницу подтверждения
+              const redirectUrl = `${window.location.origin}/confirm.html`;
+              console.log('Redirect URL для подтверждения:', redirectUrl);
 
               const { data, error } = await supabase.auth.signUp({
                 email,
@@ -620,7 +620,7 @@
               if (data.user) {
                 console.log('User created successfully:', data.user.id);
                 
-                // РЕЗЕРВНОЕ СОЗДАНИЕ ПРОФИЛЯ - ОЖИДАЕМ И ПРОВЕРЯЕМ
+                // РЕЗЕРВНОЕ СОЗДАНИЕ ПРОФИЛЯ
                 setTimeout(async () => {
                   try {
                     console.log('Checking if profile was created automatically...');
@@ -630,7 +630,6 @@
                     
                     if (!profileExists) {
                       console.log('Profile not found, creating manually...');
-                      showWarning('🔄 Создаем профиль пользователя...');
                       
                       const profileResult = await createProfileManually(supabase, data.user.id, email, fullname);
                       
@@ -638,14 +637,12 @@
                         console.log(`Profile created successfully via ${profileResult.method} method`);
                       } else {
                         console.error('Failed to create profile manually:', profileResult.error);
-                        // Не показываем ошибку пользователю - профиль можно создать позже
                       }
                     } else {
                       console.log('Profile already exists - automatic creation worked!');
                     }
                   } catch (profileError) {
                     console.error('Profile creation process failed:', profileError);
-                    // Не прерываем процесс из-за ошибки профиля
                   }
                 }, 2000);
                 
@@ -659,7 +656,7 @@
                   <strong>📧 Что делать дальше?</strong><br>
                   • Проверьте папку "Входящие" и "Спам" в вашей почте<br>
                   • Нажмите на ссылку подтверждения в письме<br>
-                  • После подтверждения войдите в систему<br>
+                  • После подтверждения вы автоматически войдете в систему<br>
                   <br>
                   <strong>⚠️ Если возникли проблемы:</strong><br>
                   • Напишите администратору в Telegram: @skebobingg<br>
@@ -672,11 +669,7 @@
                 document.getElementById('email').value = '';
                 document.getElementById('confirmEmail').value = '';
                 document.getElementById('password').value = '';
-                
-                // УДАЛЕНО: Автоматический переход через 8 секунд
-                // Вместо этого просто показываем сообщение
               } else {
-                // Это не должно происходить, но на всякий случай
                 showError('❌ Неизвестная ошибка при создании пользователя');
                 document.getElementById('registerBtn').disabled = false;
                 document.getElementById('registerBtn').textContent = 'Создать аккаунт';
