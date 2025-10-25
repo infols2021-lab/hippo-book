@@ -673,10 +673,8 @@
                 document.getElementById('confirmEmail').value = '';
                 document.getElementById('password').value = '';
                 
-                // Автоматический переход через 8 секунд
-                setTimeout(() => {
-                  window.location.href = '/login.html?message=check_email';
-                }, 8000);
+                // УДАЛЕНО: Автоматический переход через 8 секунд
+                // Вместо этого просто показываем сообщение
               } else {
                 // Это не должно происходить, но на всякий случай
                 showError('❌ Неизвестная ошибка при создании пользователя');

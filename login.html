@@ -626,45 +626,54 @@
       }
     }
 
+    // НОВАЯ УПРОЩЕННАЯ ЛОГИКА ПОДТВЕРЖДЕНИЯ EMAIL
     async function handleEmailConfirmation(supabase) {
-      if (window.location.hash) {
+      // Проверяем наличие hash параметров в URL
+      if (window.location.hash && window.location.hash.includes('access_token')) {
         try {
           showWarning('🔐 Обрабатываем подтверждение email...');
           
+          // Парсим hash параметры
           const hashParams = new URLSearchParams(window.location.hash.substring(1));
           const accessToken = hashParams.get('access_token');
           const refreshToken = hashParams.get('refresh_token');
           const type = hashParams.get('type');
           
-          console.log('Hash params:', { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
+          console.log('Email confirmation detected:', { 
+            hasAccessToken: !!accessToken, 
+            hasRefreshToken: !!refreshToken, 
+            type 
+          });
 
           if (type === 'signup' && accessToken) {
+            // Устанавливаем сессию с полученными токенами
             const { data, error } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken
             });
 
             if (error) {
+              console.error('Session set error:', error);
               throw new Error(`Ошибка установки сессии: ${error.message}`);
             }
 
             if (data.user) {
+              console.log('User session set successfully:', data.user.id);
+              
               // УБЕЖДАЕМСЯ, ЧТО ПРОФИЛЬ СУЩЕСТВУЕТ
-              await ensureProfileExists(supabase, data.user);
+              const profileResult = await ensureProfileExists(supabase, data.user);
+              console.log('Profile ensured:', profileResult);
               
               if (data.user.email_confirmed_at) {
                 showSuccess('✅ Email успешно подтвержден! Сейчас вы будете перенаправлены...');
                 
-                // Выходим и заходим заново для чистоты сессии
-                await supabase.auth.signOut();
-                
                 // Очищаем URL от hash параметров
-                window.history.replaceState(null, null, window.location.pathname + '?message=confirmed');
+                window.history.replaceState(null, null, window.location.pathname);
                 
-                // Перенаправляем на страницу входа с сообщением об успехе
+                // Даем пользователю увидеть сообщение и перенаправляем
                 setTimeout(() => {
-                  window.location.href = '/login.html?message=confirmed';
-                }, 3000);
+                  checkUserRoleAndRedirect(data.user, supabase);
+                }, 2000);
                 return true;
               } else {
                 throw new Error('Email не был подтвержден');
@@ -672,11 +681,16 @@
             }
           }
         } catch (error) {
-          console.error('Email confirmation error:', error);
+          console.error('Email confirmation processing error:', error);
           showError(`❌ Ошибка подтверждения email: ${error.message}`);
           
           // Очищаем URL в случае ошибки
           window.history.replaceState(null, null, window.location.pathname);
+          
+          // Предлагаем пользователю войти вручную
+          setTimeout(() => {
+            showWarning('🔄 Попробуйте войти вручную с вашими данными');
+          }, 3000);
           return false;
         }
       }
@@ -719,8 +733,8 @@
           
           // Обрабатываем подтверждение email если есть hash параметры
           handleEmailConfirmation(supabase).then(handled => {
+            // Если подтверждение не обработано, проверяем текущую авторизацию
             if (!handled) {
-              // Проверяем, не авторизован ли пользователь уже
               supabase.auth.getUser().then(({ data: { user } }) => {
                 if (user) {
                   console.log('👤 Пользователь уже авторизован');
