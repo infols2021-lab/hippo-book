@@ -498,14 +498,19 @@
               
               showWarning('🔄 Создаем ваш аккаунт...');
 
-              // РЕГИСТРАЦИЯ - без создания профиля заранее
+              // ВАЖНО: Указываем redirect URL для подтверждения email
+              const redirectUrl = `${window.location.origin}/login.html`;
+              console.log('Redirect URL:', redirectUrl);
+
+              // Прямая регистрация с правильным redirect
               const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: { 
                   data: { 
                     full_name: fullname
-                  }
+                  },
+                  emailRedirectTo: redirectUrl // КРИТИЧЕСКИ ВАЖНО!
                 }
               });
 
@@ -549,13 +554,8 @@
                 helpDiv.innerHTML = `
                   <strong>📧 Что делать дальше?</strong><br>
                   • Проверьте папку "Входящие" и "Спам" в вашей почте<br>
-                  • Нажмите на ссылку "Confirm your mail" в письме<br>
-                  • После подтверждения вы сможете войти в систему<br>
-                  • При первом входе автоматически создастся профиль<br>
-                  <br>
-                  <strong>⚠️ Если не получили письмо:</strong><br>
-                  • Напишите администратору в Telegram: @skebobingg<br>
-                  • Укажите ваш email: ${email}
+                  • Нажмите на ссылку подтверждения в письме<br>
+                  • После подтверждения войдите в систему
                 `;
                 document.getElementById('registerForm').appendChild(helpDiv);
                 
@@ -564,7 +564,13 @@
                 document.getElementById('email').value = '';
                 document.getElementById('confirmEmail').value = '';
                 document.getElementById('password').value = '';
+                
+                // Автоматический переход на логин через 8 секунд
+                setTimeout(() => {
+                  window.location.href = '/login.html?message=check_email';
+                }, 8000);
               } else {
+                // Это не должно происходить, но на всякий случай
                 showError('❌ Неизвестная ошибка при создании пользователя');
                 document.getElementById('registerBtn').disabled = false;
                 document.getElementById('registerBtn').textContent = 'Создать аккаунт';

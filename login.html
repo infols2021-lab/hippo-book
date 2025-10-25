@@ -283,10 +283,9 @@
       }
     }
 
-    // ПРОВЕРКА ПОДТВЕРЖДЕНИЯ EMAIL ЧЕРЕЗ HASH ПАРАМЕТРЫ
+    // УЛУЧШЕННАЯ ОБРАБОТКА ПОДТВЕРЖДЕНИЯ EMAIL
     async function handleEmailConfirmation(supabase) {
-      // Проверяем наличие hash параметров в URL
-      if (window.location.hash && window.location.hash.includes('access_token')) {
+      if (window.location.hash) {
         try {
           showWarning('🔐 Обрабатываем подтверждение email...');
           
@@ -294,35 +293,40 @@
           const accessToken = hashParams.get('access_token');
           const refreshToken = hashParams.get('refresh_token');
           const type = hashParams.get('type');
+          
+          console.log('Hash params:', { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
 
           if (type === 'signup' && accessToken) {
-            // Устанавливаем сессию
             const { data, error } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken
             });
 
             if (error) {
-              console.error('Session set error:', error);
               throw new Error(`Ошибка установки сессии: ${error.message}`);
             }
 
-            if (data.user && data.user.email_confirmed_at) {
-              // Создаем профиль если нужно
-              await ensureProfileExists(supabase, data.user);
-              
-              // Очищаем URL от hash параметров
-              window.history.replaceState(null, null, window.location.pathname);
-              
-              showSuccess('✅ Email успешно подтвержден! Сейчас вы будете перенаправлены...');
-              
-              // Перенаправляем на профиль
-              setTimeout(() => {
-                window.location.href = "/profile.html";
-              }, 2000);
-              return true;
-            } else {
-              throw new Error('Email не был подтвержден');
+            if (data.user) {
+              if (data.user.email_confirmed_at) {
+                // СОЗДАЕМ ПРОФИЛЬ ПРИ ПОДТВЕРЖДЕНИИ EMAIL
+                await ensureProfileExists(supabase, data.user);
+                
+                showSuccess('✅ Email успешно подтвержден! Сейчас вы будете перенаправлены...');
+                
+                // ВАЖНО: ВЫХОДИМ ИЗ СЕССИИ ПОСЛЕ ПОДТВЕРЖДЕНИЯ
+                await supabase.auth.signOut();
+                
+                // Очищаем URL от hash параметров
+                window.history.replaceState(null, null, window.location.pathname + '?message=confirmed');
+                
+                // Редирект на логин с сообщением об успехе
+                setTimeout(() => {
+                  window.location.href = '/login.html?message=confirmed';
+                }, 3000);
+                return true;
+              } else {
+                throw new Error('Email не был подтвержден');
+              }
             }
           }
         } catch (error) {
@@ -331,6 +335,7 @@
           
           // Очищаем URL в случае ошибки
           window.history.replaceState(null, null, window.location.pathname);
+          return false;
         }
       }
       return false;
@@ -350,6 +355,11 @@
       
       if (message === 'confirmed') {
         showSuccess('✅ Email успешно подтвержден! Теперь вы можете войти в систему.');
+        
+        const helpDiv = document.createElement('div');
+        helpDiv.className = 'existing-account-help';
+        helpDiv.innerHTML = '<strong>🎉 Отлично! Ваш аккаунт активирован.</strong><br>Теперь вы можете войти в систему используя ваш email и пароль.';
+        document.getElementById('loginForm').insertBefore(helpDiv, document.getElementById('loginForm').firstChild);
       } else if (message === 'check_email') {
         showWarning('📧 Проверьте вашу почту для подтверждения регистрации.');
       } else if (message === 'email_exists') {
@@ -472,6 +482,15 @@
             showError('❌ Ошибка входа: ' + (error.message || 'Неизвестная ошибка'));
           }
           
+          document.getElementById('loginBtn').disabled = false;
+          document.getElementById('adminLoginBtn').disabled = false;
+          return;
+        }
+
+        // СТРОГАЯ ПРОВЕРКА ПОДТВЕРЖДЕНИЯ EMAIL
+        if (data.user && !data.user.email_confirmed_at) {
+          showError('❌ Email не подтвержден. Проверьте вашу почту для завершения регистрации.');
+          await supabase.auth.signOut();
           document.getElementById('loginBtn').disabled = false;
           document.getElementById('adminLoginBtn').disabled = false;
           return;
