@@ -55,6 +55,9 @@
       border-color: var(--accent2);
       outline: none;
     }
+    .register-card input.error {
+      border-color: #e74c3c;
+    }
     .btn {
       background: var(--accent2);
       color: #fff;
@@ -127,6 +130,37 @@
       animation: spin 1s linear infinite;
       margin: 0 auto 10px;
     }
+    .email-validation {
+      text-align: left;
+      margin: 10px 0;
+      font-size: 13px;
+    }
+    .validation-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 5px 0;
+      color: #666;
+    }
+    .validation-item.valid {
+      color: #4caf50;
+    }
+    .validation-item.invalid {
+      color: #f44336;
+    }
+    .validation-icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+    .rate-limit {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 8px;
+      padding: 10px;
+      margin: 10px 0;
+      font-size: 13px;
+    }
     .info-box {
       background: #e3f2fd;
       border: 1px solid #bbdefb;
@@ -145,26 +179,35 @@
       font-size: 13px;
       text-align: left;
     }
-    .success-container {
-      text-align: center;
-      padding: 20px;
-    }
-    .success-icon {
-      font-size: 48px;
-      margin-bottom: 15px;
-    }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
 
+    /* Мобильные стили */
     @media (max-width: 480px) {
-      body { padding: 15px; }
-      .register-container { max-width: 100%; }
-      .register-card { padding: 20px; border-radius: 16px; }
-      .register-card h2 { font-size: 1.3rem; margin-bottom: 15px; }
-      .register-card input { padding: 14px 16px; font-size: 16px; }
-      .btn { padding: 14px 20px; font-size: 16px; }
+      body {
+        padding: 15px;
+      }
+      .register-container {
+        max-width: 100%;
+      }
+      .register-card {
+        padding: 20px;
+        border-radius: 16px;
+      }
+      .register-card h2 {
+        font-size: 1.3rem;
+        margin-bottom: 15px;
+      }
+      .register-card input {
+        padding: 14px 16px;
+        font-size: 16px;
+      }
+      .btn {
+        padding: 14px 20px;
+        font-size: 16px;
+      }
     }
   </style>
   
@@ -189,6 +232,10 @@
           ✅ <strong>Подтверждение email обязательно!</strong> Без подтверждения вход в систему невозможен.
         </div>
 
+        <div class="rate-limit">
+          ⚠️ <strong>Защита от спама:</strong> Максимум 3 регистрации в час с одного устройства
+        </div>
+
         <div class="form-group">
           <label for="fullname">Полное имя:</label>
           <input type="text" id="fullname" placeholder="Иванов Иван Иванович" required>
@@ -209,134 +256,185 @@
           <input type="password" id="password" placeholder="Не менее 6 символов" required minlength="6">
         </div>
         
-        <button class="btn" id="registerBtn">Создать аккаунт</button>
+        <div class="email-validation">
+          <div class="validation-item" id="validationFormat">
+            <span class="validation-icon">⭕</span> Правильный формат email
+          </div>
+          <div class="validation-item" id="validationMatch">
+            <span class="validation-icon">⭕</span> Email адреса совпадают
+          </div>
+          <div class="validation-item" id="validationPassword">
+            <span class="validation-icon">⭕</span> Пароль не менее 6 символов
+          </div>
+          <div class="validation-item" id="validationDomain">
+            <span class="validation-icon">⭕</span> Разрешенный почтовый сервис
+          </div>
+        </div>
+        
+        <button class="btn" id="registerBtn" disabled>Создать аккаунт</button>
         <div class="link">
           <p>Уже есть аккаунт? <a href="/login.html">Войти в систему</a></p>
         </div>
-      </div>
-
-      <div id="successContainer" class="success-container" style="display: none;">
-        <div class="success-icon">🎉</div>
-        <h3>Регистрация успешна!</h3>
-        <div class="existing-account-help">
-          <strong>📧 Что делать дальше?</strong><br>
-          1. Проверьте папку "Входящие" и "Спам" в вашей почте<br>
-          2. Нажмите на ссылку подтверждения в письме<br>
-          3. После подтверждения войдите в систему
-        </div>
-        <button class="btn" onclick="window.location.href='/login.html'" style="margin-top: 15px;">
-          Перейти к входу
-        </button>
       </div>
     </div>
   </div>
 
   <script type="module">
-    let supabase = null;
+    // Расширенный список разрешенных почтовых доменов
+    const ALLOWED_DOMAINS = [
+      'gmail.com', 'yandex.ru', 'mail.ru', 'ya.ru', 'yandex.com',
+      'outlook.com', 'hotmail.com', 'live.com', 'yahoo.com',
+      'icloud.com', 'me.com', 'mac.com', 'rambler.ru', 'bk.ru',
+      'list.ru', 'inbox.ru', 'yandex.ua', 'mail.ua', 'ukr.net',
+      'i.ua', 'meta.ua', 'email.ua'
+    ];
+
+    // Расширенный список запрещенных (временных) доменов
+    const BLOCKED_DOMAINS = [
+      'tempmail.com', '10minutemail.com', 'guerrillamail.com',
+      'mailinator.com', 'yopmail.com', 'throwawaymail.com',
+      'fakeinbox.com', 'temp-mail.org', 'trashmail.com',
+      'getnada.com', 'tmpmail.org', 'maildrop.cc', 'disposablemail.com',
+      'fake-mail.com', 'tempinbox.com', 'jetable.org', 'mailnesia.com',
+      'sharklasers.com', 'guerrillamail.biz', 'grr.la', 'guerrillamail.info',
+      'spam4.me', 'fakeinbox.com', 'tmpmail.net', 'trashmail.com'
+    ];
+
+    // Система ограничения регистраций
+    const REGISTRATION_LIMIT = {
+      maxAttempts: 3,
+      timeWindow: 60 * 60 * 1000, // 1 час
+      key: 'edu-keys-registration-limits'
+    };
 
     function showError(message) {
-      document.getElementById('errorMessage').textContent = message;
-      document.getElementById('errorMessage').style.display = 'block';
+      const errorEl = document.getElementById('errorMessage');
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
       document.getElementById('successMessage').style.display = 'none';
       document.getElementById('warningMessage').style.display = 'none';
       document.getElementById('loading').style.display = 'none';
+      
+      // Добавляем класс error к полю email
+      document.getElementById('email').classList.add('error');
     }
     
     function showSuccess(message) {
-      document.getElementById('successMessage').textContent = message;
-      document.getElementById('successMessage').style.display = 'block';
+      const successEl = document.getElementById('successMessage');
+      successEl.textContent = message;
+      successEl.style.display = 'block';
       document.getElementById('errorMessage').style.display = 'none';
       document.getElementById('warningMessage').style.display = 'none';
       document.getElementById('loading').style.display = 'none';
     }
 
-    function showSuccessScreen() {
-      document.getElementById('registerForm').style.display = 'none';
-      document.getElementById('successContainer').style.display = 'block';
+    function showWarning(message) {
+      const warningEl = document.getElementById('warningMessage');
+      warningEl.textContent = message;
+      warningEl.style.display = 'block';
+      document.getElementById('errorMessage').style.display = 'none';
+      document.getElementById('successMessage').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+    // Функция валидации email
+    function validateEmail(email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email);
     }
 
-    // Функция регистрации
-    async function register() {
-      const fullname = document.getElementById('fullname').value.trim();
+    // Функция проверки домена
+    function validateDomain(email) {
+      const domain = email.split('@')[1]?.toLowerCase();
+      if (!domain) return { valid: false, message: 'Неверный формат email' };
+      
+      // Проверка запрещенных доменов
+      if (BLOCKED_DOMAINS.includes(domain)) {
+        return { valid: false, message: 'Временные email адреса запрещены' };
+      }
+      
+      // Проверка разрешенных доменов
+      if (!ALLOWED_DOMAINS.includes(domain)) {
+        return { 
+          valid: false, 
+          message: `Разрешены только email от популярных сервисов: Gmail, Yandex, Mail.ru, Outlook, Yahoo и др.` 
+        };
+      }
+      
+      return { valid: true };
+    }
+
+    // Система ограничения регистраций
+    function checkRateLimit() {
+      try {
+        const now = Date.now();
+        const limits = JSON.parse(localStorage.getItem(REGISTRATION_LIMIT.key) || '{"attempts":[],"lastReset":0}');
+        
+        // Сбрасываем старые попытки
+        const recentAttempts = limits.attempts.filter(time => now - time < REGISTRATION_LIMIT.timeWindow);
+        
+        if (recentAttempts.length >= REGISTRATION_LIMIT.maxAttempts) {
+          const nextAttempt = Math.min(...recentAttempts) + REGISTRATION_LIMIT.timeWindow;
+          const minutesLeft = Math.ceil((nextAttempt - now) / (60 * 1000));
+          return { allowed: false, message: `Превышен лимит регистраций. Попробуйте через ${minutesLeft} минут.` };
+        }
+        
+        // Сохраняем текущую попытку
+        recentAttempts.push(now);
+        localStorage.setItem(REGISTRATION_LIMIT.key, JSON.stringify({
+          attempts: recentAttempts,
+          lastReset: now
+        }));
+        
+        return { allowed: true };
+      } catch (e) {
+        console.warn('Rate limit check failed:', e);
+        return { allowed: true }; // В случае ошибки разрешаем регистрацию
+      }
+    }
+
+    // Функция обновления визуальной валидации
+    function updateValidation() {
       const email = document.getElementById('email').value.trim();
       const confirmEmail = document.getElementById('confirmEmail').value.trim();
       const password = document.getElementById('password').value;
-
-      // Базовая валидация
-      if (!fullname || !email || !confirmEmail || !password) {
-        showError('Заполните все поля');
-        return;
-      }
-
-      if (password.length < 6) {
-        showError('Пароль должен быть не менее 6 символов');
-        return;
-      }
-
-      if (email !== confirmEmail) {
-        showError('Email адреса не совпадают');
-        return;
-      }
-
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        showError('Неверный формат email');
-        return;
-      }
-
-      try {
-        document.getElementById('registerBtn').disabled = true;
-        document.getElementById('registerBtn').textContent = 'Создаем аккаунт...';
-        
-        showWarning('Создаем ваш аккаунт...');
-
-        // ВАЖНО: Правильный redirect URL
-        const redirectUrl = `${window.location.origin}/login.html`;
-
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { 
-            data: { 
-              full_name: fullname
-            },
-            emailRedirectTo: redirectUrl
-          }
-        });
-
-        if (error) {
-          if (error.message?.includes('already registered')) {
-            showError('Пользователь с таким email уже зарегистрирован');
-          } else if (error.message?.includes('rate limit')) {
-            showError('Слишком много попыток. Попробуйте позже.');
-          } else {
-            showError('Ошибка регистрации: ' + error.message);
-          }
-          
-          document.getElementById('registerBtn').disabled = false;
-          document.getElementById('registerBtn').textContent = 'Создать аккаунт';
-          return;
-        }
-
-        // УСПЕШНАЯ РЕГИСТРАЦИЯ
-        if (data.user) {
-          showSuccessScreen();
-        } else {
-          showError('Неизвестная ошибка при создании пользователя');
-          document.getElementById('registerBtn').disabled = false;
-          document.getElementById('registerBtn').textContent = 'Создать аккаунт';
-        }
-      } catch (error) {
-        showError('Неожиданная ошибка: ' + error.message);
-        document.getElementById('registerBtn').disabled = false;
-        document.getElementById('registerBtn').textContent = 'Создать аккаунт';
-      }
+      
+      // Сбрасываем стиль ошибки при изменении email
+      document.getElementById('email').classList.remove('error');
+      document.getElementById('errorMessage').style.display = 'none';
+      
+      // Валидация формата email
+      const formatValid = validateEmail(email);
+      const formatItem = document.getElementById('validationFormat');
+      formatItem.className = `validation-item ${formatValid ? 'valid' : (email ? 'invalid' : '')}`;
+      formatItem.querySelector('.validation-icon').textContent = formatValid ? '✅' : (email ? '❌' : '⭕');
+      
+      // Валидация совпадения email
+      const matchValid = email && confirmEmail && email === confirmEmail;
+      const matchItem = document.getElementById('validationMatch');
+      matchItem.className = `validation-item ${matchValid ? 'valid' : (confirmEmail ? 'invalid' : '')}`;
+      matchItem.querySelector('.validation-icon').textContent = matchValid ? '✅' : (confirmEmail ? '❌' : '⭕');
+      
+      // Валидация пароля
+      const passwordValid = password.length >= 6;
+      const passwordItem = document.getElementById('validationPassword');
+      passwordItem.className = `validation-item ${passwordValid ? 'valid' : (password ? 'invalid' : '')}`;
+      passwordItem.querySelector('.validation-icon').textContent = passwordValid ? '✅' : (password ? '❌' : '⭕');
+      
+      // Валидация домена
+      const domainValid = email ? validateDomain(email).valid : false;
+      const domainItem = document.getElementById('validationDomain');
+      domainItem.className = `validation-item ${domainValid ? 'valid' : (email ? 'invalid' : '')}`;
+      domainItem.querySelector('.validation-icon').textContent = domainValid ? '✅' : (email ? '❌' : '⭕');
+      
+      // Активация кнопки регистрации
+      const registerBtn = document.getElementById('registerBtn');
+      registerBtn.disabled = !(formatValid && matchValid && passwordValid && domainValid);
     }
-
-    // Инициализация
+    
     function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        showError('Ошибка конфигурации системы');
+        showError('❌ Ошибка конфигурации системы');
         return;
       }
       
@@ -345,29 +443,174 @@
       
       import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm')
         .then(({ createClient }) => {
-          supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+          const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
           
-          // Кнопка регистрации
-          document.getElementById('registerBtn').addEventListener('click', register);
+          // Обработчики ввода для валидации
+          document.getElementById('email').addEventListener('input', updateValidation);
+          document.getElementById('confirmEmail').addEventListener('input', updateValidation);
+          document.getElementById('password').addEventListener('input', updateValidation);
+          document.getElementById('fullname').addEventListener('input', updateValidation);
+          
+          document.getElementById('registerBtn').addEventListener('click', async () => {
+            const fullname = document.getElementById('fullname').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const confirmEmail = document.getElementById('confirmEmail').value.trim();
+            const password = document.getElementById('password').value;
 
-          // Поддержка Enter
+            // Базовая валидация
+            if (!fullname || !email || !confirmEmail || !password) {
+              showError('Заполните все поля');
+              return;
+            }
+
+            if (password.length < 6) {
+              showError('Пароль должен быть не менее 6 символов');
+              return;
+            }
+
+            if (email !== confirmEmail) {
+              showError('Email адреса не совпадают');
+              return;
+            }
+
+            // Расширенная валидация email
+            if (!validateEmail(email)) {
+              showError('Неверный формат email');
+              return;
+            }
+
+            const domainCheck = validateDomain(email);
+            if (!domainCheck.valid) {
+              showError(domainCheck.message);
+              return;
+            }
+
+            // Проверка ограничения регистраций
+            const rateLimit = checkRateLimit();
+            if (!rateLimit.allowed) {
+              showError(rateLimit.message);
+              return;
+            }
+
+            try {
+              document.getElementById('registerBtn').disabled = true;
+              document.getElementById('registerBtn').textContent = 'Создаем аккаунт...';
+              
+              showWarning('🔄 Создаем ваш аккаунт...');
+
+              // Прямая регистрация без предварительной проверки существования
+              const redirectUrl = `${window.location.origin}/login.html`;
+              console.log('Redirect URL:', redirectUrl);
+
+              const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: { 
+                  data: { 
+                    full_name: fullname
+                  },
+                  emailRedirectTo: redirectUrl
+                }
+              });
+
+              if (error) {
+                console.error('Registration error details:', error);
+                
+                // Улучшенная обработка ошибок
+                if (error.message?.includes('already registered') || 
+                    error.message?.includes('already exists') || 
+                    error.message?.includes('user already exists') ||
+                    error.code === 'user_already_exists' ||
+                    error.status === 400) {
+                  showError('❌ Пользователь с таким email уже зарегистрирован. Используйте другой email или войдите в существующий аккаунт.');
+                } else if (error.message?.includes('rate limit') || error.code === 'rate_limit_exceeded') {
+                  showError('❌ Слишком много попыток регистрации. Попробуйте через час.');
+                } else if (error.message?.includes('email sending is disabled')) {
+                  showError('❌ Временно недоступна отправка email. Попробуйте позже или свяжитесь с администратором.');
+                } else if (error.message?.includes('Invalid email')) {
+                  showError('❌ Неверный формат email адреса.');
+                } else if (error.message?.includes('Password should be at least')) {
+                  showError('❌ Пароль слишком короткий. Минимум 6 символов.');
+                } else {
+                  showError('❌ Ошибка регистрации: ' + (error.message || 'Неизвестная ошибка'));
+                }
+                
+                document.getElementById('registerBtn').disabled = false;
+                document.getElementById('registerBtn').textContent = 'Создать аккаунт';
+                return;
+              }
+
+              // УСПЕШНАЯ РЕГИСТРАЦИЯ
+              if (data.user) {
+                console.log('User created successfully:', data.user.id);
+                
+                showSuccess('✅ Регистрация успешна! Проверьте вашу почту для подтверждения email. Без подтверждения вход невозможен.');
+                document.getElementById('registerBtn').style.display = 'none';
+                
+                // Добавляем блок с информацией
+                const helpDiv = document.createElement('div');
+                helpDiv.className = 'existing-account-help';
+                helpDiv.innerHTML = `
+                  <strong>📧 Что делать дальше?</strong><br>
+                  • Проверьте папку "Входящие" и "Спам" в вашей почте<br>
+                  • Нажмите на ссылку подтверждения в письме<br>
+                  • После подтверждения войдите в систему
+                `;
+                document.getElementById('registerForm').appendChild(helpDiv);
+                
+                // Очищаем форму
+                document.getElementById('fullname').value = '';
+                document.getElementById('email').value = '';
+                document.getElementById('confirmEmail').value = '';
+                document.getElementById('password').value = '';
+                
+                // Автоматический переход через 8 секунд
+                setTimeout(() => {
+                  window.location.href = '/login.html?message=check_email';
+                }, 8000);
+              } else {
+                // Это не должно происходить, но на всякий случай
+                showError('❌ Неизвестная ошибка при создании пользователя');
+                document.getElementById('registerBtn').disabled = false;
+                document.getElementById('registerBtn').textContent = 'Создать аккаунт';
+              }
+            } catch (error) {
+              console.error('Unexpected registration error:', error);
+              showError('❌ Неожиданная ошибка: ' + error.message);
+              document.getElementById('registerBtn').disabled = false;
+              document.getElementById('registerBtn').textContent = 'Создать аккаунт';
+            }
+          });
+
+          // Поддержка Enter для формы
           const inputs = document.querySelectorAll('input');
           inputs.forEach(input => {
             input.addEventListener('keypress', (e) => {
-              if (e.key === 'Enter') register();
+              if (e.key === 'Enter') {
+                document.getElementById('registerBtn').click();
+              }
             });
           });
 
+          // Инициализация валидации
+          updateValidation();
         })
         .catch(error => {
-          showError('Ошибка загрузки системы: ' + error.message);
+          showError('❌ Ошибка загрузки системы: ' + error.message);
         });
     }
     
     if (window.SUPABASE_URL) {
       initApp();
     } else {
-      window.addEventListener('configLoaded', initApp);
+      const timeout = setTimeout(() => {
+        showError('❌ Таймаут загрузки конфигурации');
+      }, 1000);
+      
+      window.addEventListener('configLoaded', () => {
+        clearTimeout(timeout);
+        initApp();
+      });
     }
   </script>
 </body>
