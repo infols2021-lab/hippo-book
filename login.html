@@ -6,236 +6,171 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
   <style>
-    /* css/style.css */
-    :root{
-      --bg1: #fff7e6;
-      --accent: #ff6b6b;
-      --accent2: #4ecdc4;
-      --card: #ffffff;
-      --muted:#6b6b6b;
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #fdd835, #f48fb1);
+      font-family: 'Poppins', 'Comic Sans MS', cursive, sans-serif;
+      margin: 0;
+      padding: 20px;
     }
-
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family: 'Poppins', "Comic Sans MS", sans-serif;
-      background: linear-gradient(135deg,#fffaf0,#ffd6a5);
-      min-height:100vh;
-      color:#1f2937;
+    .login-container {
+      width: 100%;
+      max-width: 400px;
     }
-
-    .container {
-      width:95%;
-      max-width:1100px;
-      margin:28px auto;
+    .login-card {
+      background: #fff;
+      padding: 25px;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      text-align: center;
     }
-
-    /* Simple header */
-    .header {
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
-      margin-bottom:18px;
+    .login-card h2 {
+      margin: 0 0 20px 0;
+      color: #333;
+      font-size: 1.5rem;
     }
-    .logo {
-      display:flex;
-      gap:12px;
-      align-items:center;
+    .form-group {
+      margin-bottom: 15px;
+      text-align: left;
     }
-    .logo .mark {
-      width:56px;height:56px;border-radius:12px;
-      background:linear-gradient(135deg,var(--accent2),#6dd3c0);
-      display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:20px;
-      box-shadow:0 6px 18px rgba(0,0,0,0.08);
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: #333;
     }
-    .header .nav { display:flex; gap:8px; align-items:center; }
-
-    /* Cards */
-    .card {
-      background:var(--card);
-      border-radius:16px;
-      padding:18px;
-      box-shadow:0 8px 26px rgba(0,0,0,0.08);
+    .login-card input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #f0f0f0;
+      border-radius: 12px;
+      box-sizing: border-box;
+      font-size: 16px;
+      transition: border-color 0.3s;
     }
-
-    /* Buttons */
+    .login-card input:focus {
+      border-color: var(--accent2);
+      outline: none;
+    }
     .btn {
-      background:var(--accent2);
-      color:#fff;
-      border:0;
-      padding:10px 16px;
-      border-radius:12px;
-      font-weight:700;
-      cursor:pointer;
-      transition: transform .12s ease, box-shadow .12s;
-      box-shadow:0 6px 12px rgba(78,205,196,0.18);
+      background: var(--accent2);
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 10px;
+      width: 100%;
+      font-size: 16px;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
     }
-    .btn:hover{ transform:translateY(-3px) }
-    .btn.secondary { background: var(--accent); box-shadow:0 6px 12px rgba(255,107,107,0.18) }
-    .btn.ghost { background:transparent; color:var(--accent2); border:2px solid rgba(78,205,196,0.18) }
-    .btn.small { padding:6px 10px; font-size:13px; border-radius:10px }
-
-    /* Layout for main pages */
-    .grid-2 {
-      display:grid;
-      grid-template-columns: 360px 1fr;
-      gap:18px;
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(78, 205, 196, 0.3);
     }
-    @media (max-width:880px){ 
-      .grid-2 { 
-        grid-template-columns: 1fr;
-        gap: 12px;
-      } 
+    .btn.admin {
+      background: var(--accent);
+      margin-top: 8px;
     }
-
-    /* Profile */
-    .profile-card {
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      gap:12px;
-      text-align:center;
+    .btn.admin:hover {
+      box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
     }
-    .profile-avatar {
-      width:220px;height:220px;border-radius:20px;background:linear-gradient(135deg,#fff,#fff8e6);
-      position:relative; display:flex;align-items:center;justify-content:center;
-      box-shadow:0 10px 24px rgba(0,0,0,0.08);
-      border:6px solid #fff6d8;
+    .btn.help {
+      background: linear-gradient(135deg, #2196F3, #21CBF3);
+      margin-top: 15px;
     }
-    /* SVG decorative image container */
-    .profile-avatar svg { width:100%; height:100%; border-radius:14px; }
-
-    /* circles for keys (over image) */
-    .key-circles { position:absolute; inset:12px; pointer-events:none; }
-    .key-circle {
-      width:34px;height:34px;border-radius:50%;background:#111;opacity:0.9;
-      position:absolute; transform:translate(-50%,-50%);
-      box-shadow:0 4px 10px rgba(0,0,0,0.3);
+    .link {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #666;
     }
-    .key-circle.filled {
-      background:linear-gradient(135deg,#ffd166,#ff6b6b);
-      box-shadow:0 8px 18px rgba(255,107,107,0.28), 0 2px 6px rgba(0,0,0,0.12);
+    .link a {
+      color: var(--accent2);
+      text-decoration: none;
+      font-weight: 500;
     }
-
-    /* positions (7 spots) - placed in friendly arc */
-    .kpos1{ left:20%; top:28% }
-    .kpos2{ left:40%; top:16% }
-    .kpos3{ left:60%; top:14% }
-    .kpos4{ left:80%; top:26% }
-    .kpos5{ left:74%; top:54% }
-    .kpos6{ left:50%; top:66% }
-    .kpos7{ left:26%; top:58% }
-
-    /* Profile info */
-    .profile-info { width:100%; }
-    .badge { display:inline-block; padding:6px 10px; border-radius:999px; background:var(--accent2); color:#fff; font-weight:700; }
-
-    /* Tasks list */
-    .month-row { margin-bottom:12px; }
-    .month-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-    .tasks-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
-
-    /* each task card */
-    .task-card {
-      padding:12px;border-radius:12px;background:linear-gradient(180deg,#fff,#fff8ef);
-      box-shadow:0 6px 14px rgba(0,0,0,0.06); text-align:left;
+    .link a:hover {
+      text-decoration: underline;
     }
-    .task-card h4{ margin:0 0 8px 0; font-size:16px }
-    .task-card p{ margin:0; color:var(--muted) }
-    .task-card .meta { margin-top:10px; display:flex; gap:8px; align-items:center; justify-content:space-between }
-
-    /* Admin: controls & lists */
-    .admin-controls { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
-    .table { width:100%; border-collapse:collapse; margin-top:8px;}
-    .table th,.table td{ padding:10px; border-bottom:1px solid #f1f1f1; text-align:left; background:#fffef8 }
-
-    /* Modal */
-    .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.45); display:none; align-items:center; justify-content:center; z-index:999 }
-    .modal-body{ background:#fff; padding:18px; border-radius:12px; width:90%; max-width:760px }
-
-    /* small helpers */
-    .row{ display:flex; gap:8px; align-items:center }
-    .col{ display:flex; flex-direction:column; gap:8px }
-    .input, textarea, select { padding:8px 10px; border-radius:8px; border:2px solid rgba(0,0,0,0.06); font-size:15px; width:100% }
-    .small-muted{ font-size:13px; color:#666 }
-
-    /* Mobile optimizations */
-    @media (max-width: 768px) {
-      .container {
-        width: 100%;
-        margin: 0;
-        padding: 10px;
-        border-radius: 0;
-      }
-
-      .header {
-        flex-direction: column;
-        gap: 15px;
-        text-align: center;
-      }
-
-      .logo {
-        justify-content: center;
-      }
-
-      .nav {
-        justify-content: center;
-        flex-wrap: wrap;
-      }
-
-      .profile-avatar {
-        width: 180px;
-        height: 180px;
-      }
-
-      .card {
-        padding: 15px;
-        margin: 8px 0;
-      }
-
-      .btn {
-        padding: 12px 16px;
-        font-size: 14px;
-      }
-
-      .tasks-grid {
-        grid-template-columns: 1fr;
-        gap: 8px;
-      }
-
-      .month-title {
-        flex-direction: column;
-        gap: 8px;
-        text-align: center;
-      }
-
-      .key-circle {
-        width: 28px;
-        height: 28px;
-      }
+    .error, .success, .warning {
+      padding: 12px;
+      border-radius: 8px;
+      margin: 15px 0;
+      display: none;
+      font-size: 14px;
+    }
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #ffcdd2;
+    }
+    .success {
+      background: #e8f5e8;
+      color: #2e7d32;
+      border: 1px solid #c8e6c9;
+    }
+    .warning {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    .loading {
+      display: none;
+      margin: 15px 0;
+      text-align: center;
+    }
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid var(--accent2);
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+    .existing-account-help {
+      background: #e8f5e8;
+      border: 1px solid #c8e6c9;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 13px;
+      text-align: left;
     }
 
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Мобильные стили */
     @media (max-width: 480px) {
-      .profile-avatar {
-        width: 150px;
-        height: 150px;
+      body {
+        padding: 15px;
       }
-
-      .key-circle {
-        width: 24px;
-        height: 24px;
+      .login-container {
+        max-width: 100%;
       }
-
-      .badge {
-        padding: 4px 8px;
-        font-size: 12px;
+      .login-card {
+        padding: 20px;
+        border-radius: 16px;
       }
-
-      .grid-2 {
-        gap: 8px;
+      .login-card h2 {
+        font-size: 1.3rem;
+        margin-bottom: 15px;
       }
-
+      .login-card input {
+        padding: 14px 16px;
+        font-size: 16px;
+      }
+      .btn {
+        padding: 14px 20px;
+        font-size: 16px;
+      }
     }
   </style>
   
@@ -305,6 +240,189 @@
       document.getElementById('loading').style.display = 'none';
     }
 
+    // Функция для создания профиля вручную при необходимости
+    async function ensureProfileExists(supabase, user) {
+      try {
+        // Проверяем, существует ли профиль
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+
+        if (error || !profile) {
+          console.log('Profile not found, creating manually...');
+          
+          // Создаем профиль вручную
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name || '',
+                created_at: new Date().toISOString(),
+                completed_assignments_count: 0,
+                is_admin: false
+              }
+            ]);
+
+          if (insertError) {
+            console.error('Failed to create profile manually:', insertError);
+            return false;
+          }
+          
+          console.log('Profile created manually during login');
+          return true;
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Error ensuring profile exists:', error);
+        return false;
+      }
+    }
+
+    // ПРОВЕРКА ПОДТВЕРЖДЕНИЯ EMAIL ЧЕРЕЗ HASH ПАРАМЕТРЫ
+    async function handleEmailConfirmation(supabase) {
+      // Проверяем наличие hash параметров в URL
+      if (window.location.hash && window.location.hash.includes('access_token')) {
+        try {
+          showWarning('🔐 Обрабатываем подтверждение email...');
+          
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          const type = hashParams.get('type');
+
+          if (type === 'signup' && accessToken) {
+            // Устанавливаем сессию
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+
+            if (error) {
+              console.error('Session set error:', error);
+              throw new Error(`Ошибка установки сессии: ${error.message}`);
+            }
+
+            if (data.user && data.user.email_confirmed_at) {
+              // Создаем профиль если нужно
+              await ensureProfileExists(supabase, data.user);
+              
+              // Очищаем URL от hash параметров
+              window.history.replaceState(null, null, window.location.pathname);
+              
+              showSuccess('✅ Email успешно подтвержден! Сейчас вы будете перенаправлены...');
+              
+              // Перенаправляем на профиль
+              setTimeout(() => {
+                window.location.href = "/profile.html";
+              }, 2000);
+              return true;
+            } else {
+              throw new Error('Email не был подтвержден');
+            }
+          }
+        } catch (error) {
+          console.error('Email confirmation error:', error);
+          showError(`❌ Ошибка подтверждения email: ${error.message}. Попробуйте войти вручную.`);
+          
+          // Очищаем URL в случае ошибки
+          window.history.replaceState(null, null, window.location.pathname);
+        }
+      }
+      return false;
+    }
+    
+    function initApp() {
+      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+        showError('❌ Ошибка конфигурации системы');
+        return;
+      }
+      
+      document.getElementById('loginForm').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const message = urlParams.get('message');
+      
+      if (message === 'confirmed') {
+        showSuccess('✅ Email успешно подтвержден! Теперь вы можете войти в систему.');
+      } else if (message === 'check_email') {
+        showWarning('📧 Проверьте вашу почту для подтверждения регистрации.');
+      } else if (message === 'email_exists') {
+        showError('❌ Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.');
+      } else if (message === 'password_reset') {
+        showSuccess('✅ Пароль успешно изменен! Теперь вы можете войти с новым паролем.');
+      }
+      
+      import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm')
+        .then(({ createClient }) => {
+          const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+          
+          // Обрабатываем подтверждение email если есть hash параметры
+          handleEmailConfirmation(supabase).then(handled => {
+            // Если подтверждение не обработано, проверяем текущую авторизацию
+            if (!handled) {
+              supabase.auth.getUser().then(({ data: { user } }) => {
+                if (user) {
+                  console.log('👤 Пользователь уже авторизован');
+                  checkUserRoleAndRedirect(user, supabase);
+                }
+              });
+            }
+          });
+          
+          document.getElementById('loginBtn').addEventListener('click', () => login(supabase, false));
+          document.getElementById('adminLoginBtn').addEventListener('click', () => login(supabase, true));
+
+          document.getElementById('password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+              login(supabase, false);
+            }
+          });
+
+          document.getElementById('email').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+              document.getElementById('password').focus();
+            }
+          });
+        })
+        .catch(error => {
+          showError('❌ Ошибка загрузки системы: ' + error.message);
+        });
+    }
+
+    async function checkUserRoleAndRedirect(user, supabase) {
+      try {
+        // УБЕЖДАЕМСЯ, ЧТО ПРОФИЛЬ СУЩЕСТВУЕТ
+        await ensureProfileExists(supabase, user);
+        
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching profile:', error);
+          window.location.href = "/profile.html";
+          return;
+        }
+        
+        if (profile && profile.is_admin) {
+          window.location.href = "/admin.html";
+        } else {
+          window.location.href = "/profile.html";
+        }
+      } catch (error) {
+        console.error('Error in checkUserRoleAndRedirect:', error);
+        window.location.href = "/profile.html";
+      }
+    }
+    
     async function login(supabase, isAdmin) {
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
@@ -324,9 +442,9 @@
         document.getElementById('loginBtn').disabled = true;
         document.getElementById('adminLoginBtn').disabled = true;
         showWarning('🔐 Проверяем данные...');
-
+        
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
+        
         if (error) {
           console.error('Login error details:', error);
           
@@ -346,27 +464,46 @@
                 showSuccess('📧 Письмо с подтверждением отправлено повторно. Проверьте вашу почту.');
               }
             }
+          } else if (error.message?.includes('rate limit') || error.code === 'rate_limit_exceeded') {
+            showError('⚠️ Слишком много попыток. Попробуйте через несколько минут.');
+          } else if (error.message?.includes('User not found')) {
+            showError('❌ Пользователь с таким email не найден. Проверьте email или зарегистрируйтесь.');
           } else {
             showError('❌ Ошибка входа: ' + (error.message || 'Неизвестная ошибка'));
           }
-
+          
           document.getElementById('loginBtn').disabled = false;
           document.getElementById('adminLoginBtn').disabled = false;
           return;
         }
 
-        // После успешного входа, проверим, подтвержден ли email
-        const user = data.user;
-        if (!user.email_confirmed_at) {
-          showError('❌ Ваш email еще не подтвержден. Пожалуйста, подтвердите ваш email.');
-          document.getElementById('loginBtn').disabled = false;
-          document.getElementById('adminLoginBtn').disabled = false;
-          return;
-        }
+        // УБЕЖДАЕМСЯ, ЧТО ПРОФИЛЬ СУЩЕСТВУЕТ ПОСЛЕ УСПЕШНОГО ВХОДА
+        await ensureProfileExists(supabase, data.user);
 
-        // Если все прошло успешно, то перенаправляем на профиль
         if (isAdmin) {
-          window.location.href = "/admin.html";
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', data.user.id)
+            .single();
+            
+          if (profileError) {
+            console.error('Error fetching admin profile:', profileError);
+            showError('❌ Ошибка проверки прав доступа');
+            await supabase.auth.signOut();
+            document.getElementById('loginBtn').disabled = false;
+            document.getElementById('adminLoginBtn').disabled = false;
+            return;
+          }
+          
+          if (profile && profile.is_admin) {
+            window.location.href = "/admin.html";
+          } else {
+            showError('❌ У вас нет прав администратора');
+            await supabase.auth.signOut();
+            document.getElementById('loginBtn').disabled = false;
+            document.getElementById('adminLoginBtn').disabled = false;
+          }
         } else {
           window.location.href = "/profile.html";
         }
@@ -377,30 +514,9 @@
         document.getElementById('adminLoginBtn').disabled = false;
       }
     }
-
+    
     if (window.SUPABASE_URL) {
-      import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm')
-        .then(({ createClient }) => {
-          const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-
-          document.getElementById('loginBtn').addEventListener('click', () => login(supabase, false));
-          document.getElementById('adminLoginBtn').addEventListener('click', () => login(supabase, true));
-
-          document.getElementById('password').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-              login(supabase, false);
-            }
-          });
-
-          document.getElementById('email').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-              document.getElementById('password').focus();
-            }
-          });
-        })
-        .catch(error => {
-          showError('❌ Ошибка загрузки системы: ' + error.message);
-        });
+      initApp();
     } else {
       const timeout = setTimeout(() => {
         showError('❌ Таймаут загрузки конфигурации');
