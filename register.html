@@ -574,18 +574,15 @@
               
               showWarning('🔄 Создаем ваш аккаунт...');
 
-              // УЛУЧШЕННАЯ РЕГИСТРАЦИЯ - используем специальную страницу подтверждения
-              const redirectUrl = `${window.location.origin}/confirm.html`;
-              console.log('Redirect URL для подтверждения:', redirectUrl);
-
+              // УПРОЩЕННАЯ РЕГИСТРАЦИЯ - без сложных redirect
               const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: { 
                   data: { 
                     full_name: fullname
-                  },
-                  emailRedirectTo: redirectUrl
+                  }
+                  // Убираем emailRedirectTo - используем стандартный шаблон Supabase
                 }
               });
 
@@ -655,10 +652,10 @@
                 helpDiv.innerHTML = `
                   <strong>📧 Что делать дальше?</strong><br>
                   • Проверьте папку "Входящие" и "Спам" в вашей почте<br>
-                  • Нажмите на ссылку подтверждения в письме<br>
-                  • После подтверждения вы автоматически войдете в систему<br>
+                  • Нажмите на ссылку "Confirm your mail" в письме<br>
+                  • После подтверждения вы сможете войти в систему<br>
                   <br>
-                  <strong>⚠️ Если возникли проблемы:</strong><br>
+                  <strong>⚠️ Если не получили письмо:</strong><br>
                   • Напишите администратору в Telegram: @skebobingg<br>
                   • Укажите ваш email: ${email}
                 `;
