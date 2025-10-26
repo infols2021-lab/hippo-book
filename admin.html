@@ -44,18 +44,9 @@
     .type-btn { padding:10px 15px; border:2px solid #ddd; border-radius:8px; cursor:pointer; background:white; transition:all 0.3s; }
     .type-btn.active { border-color:var(--accent2); background:var(--accent2); color:white; }
     
-    /* НОВЫЕ СТИЛИ ДЛЯ ФОРМАТИРОВАНИЯ ТЕКСТА ВОПРОСА */
-    .question-text-editor { margin-bottom: 15px; }
+    /* СТИЛИ ДЛЯ МНОГОСТРОЧНОГО ТЕКСТА ВОПРОСА */
     .question-textarea { width: 100%; min-height: 100px; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; line-height: 1.5; font-family: inherit; resize: vertical; }
     .question-textarea:focus { border-color: var(--accent2); outline: none; }
-    .text-formatting-tools { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
-    .format-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; font-size: 12px; transition: all 0.2s; }
-    .format-btn:hover { background: #f5f5f5; }
-    .format-btn.active { background: var(--accent2); color: white; border-color: var(--accent2); }
-    .alignment-selector { display: flex; gap: 5px; margin-top: 8px; }
-    .alignment-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; font-size: 12px; transition: all 0.2s; }
-    .alignment-btn:hover { background: #f5f5f5; }
-    .alignment-btn.active { background: var(--accent2); color: white; border-color: var(--accent2); }
     .format-hint { font-size: 12px; color: #666; margin-top: 5px; }
     
     /* ОБНОВЛЕННЫЙ СТИЛЬ ДЛЯ ВПИСАТЬ ОТВЕТ */
@@ -416,7 +407,6 @@
       .word-input-section .form-group { width: 100%; }
       .fill-input-item { flex-direction: column; align-items: flex-start; }
       .fill-input-item input { width: 100%; }
-      .text-formatting-tools { flex-direction: column; }
     }
 
     @media (max-width: 768px) {
@@ -435,7 +425,6 @@
       .crossword-advanced-controls { flex-direction: column; }
       .crossword-advanced-controls .form-group { width: 100%; }
       .fill-input-item { padding: 8px; }
-      .alignment-selector { flex-wrap: wrap; }
     }
 
     @media (max-width: 480px) {
@@ -942,67 +931,6 @@
         bucket: 'question-images',
         supabase
       });
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Инициализация редактора текста вопроса
-    function initQuestionTextEditor(qid, prefill = {}) {
-      const textarea = document.getElementById(`questionText_${qid}`);
-      const alignmentLeft = document.getElementById(`alignLeft_${qid}`);
-      const alignmentCenter = document.getElementById(`alignCenter_${qid}`);
-      const alignmentRight = document.getElementById(`alignRight_${qid}`);
-      
-      if (!textarea) return;
-
-      // Восстанавливаем сохраненные данные
-      if (prefill.q) {
-        textarea.value = prefill.q;
-      }
-      
-      // Устанавливаем выравнивание
-      const textAlign = prefill.textAlign || 'left';
-      if (alignmentLeft) alignmentLeft.classList.toggle('active', textAlign === 'left');
-      if (alignmentCenter) alignmentCenter.classList.toggle('active', textAlign === 'center');
-      if (alignmentRight) alignmentRight.classList.toggle('active', textAlign === 'right');
-
-      // Обработчики для кнопок выравнивания
-      if (alignmentLeft) {
-        alignmentLeft.addEventListener('click', () => {
-          alignmentLeft.classList.add('active');
-          alignmentCenter.classList.remove('active');
-          alignmentRight.classList.remove('active');
-        });
-      }
-      
-      if (alignmentCenter) {
-        alignmentCenter.addEventListener('click', () => {
-          alignmentLeft.classList.remove('active');
-          alignmentCenter.classList.add('active');
-          alignmentRight.classList.remove('active');
-        });
-      }
-      
-      if (alignmentRight) {
-        alignmentRight.addEventListener('click', () => {
-          alignmentLeft.classList.remove('active');
-          alignmentCenter.classList.remove('active');
-          alignmentRight.classList.add('active');
-        });
-      }
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Получение данных форматирования текста
-    function getTextFormattingData(qid) {
-      const alignmentLeft = document.getElementById(`alignLeft_${qid}`);
-      const alignmentCenter = document.getElementById(`alignCenter_${qid}`);
-      const alignmentRight = document.getElementById(`alignRight_${qid}`);
-      
-      let textAlign = 'left';
-      if (alignmentCenter?.classList.contains('active')) textAlign = 'center';
-      if (alignmentRight?.classList.contains('active')) textAlign = 'right';
-      
-      return {
-        textAlign: textAlign
-      };
     }
 
     // ОБНОВЛЕННАЯ ФУНКЦИЯ: Обновление предпросмотра предложения с сохранением переносов строк
@@ -1861,13 +1789,9 @@
         return null;
       }
       
-      // Получаем данные форматирования текста
-      const formattingData = getTextFormattingData(qid);
-      
       return {
         type: 'crossword',
         q: document.querySelector(`#questionText_${qid}`).value,
-        textAlign: formattingData.textAlign,
         image: document.getElementById(`crosswordAdvancedImageUrl_${qid}`).value,
         grid: data.grid,
         words: data.words,
@@ -2306,20 +2230,13 @@
             </div>
           `;
 
-          // ОБНОВЛЕННЫЙ ШАБЛОН С РЕДАКТОРОМ ТЕКСТА ВОПРОСА
+          // УПРОЩЕННЫЙ ШАБЛОН С МНОГОСТРОЧНЫМ ТЕКСТОМ ВОПРОСА
           const questionEditor = `
-            <div class="form-group question-text-editor">
+            <div class="form-group">
               <label>Текст вопроса:</label>
               <textarea class="question-textarea" id="questionText_${qid}" placeholder="Введите текст вопроса. Используйте Enter для переноса строк">${prefill?.q ? String(prefill.q) : ''}</textarea>
-              <div class="text-formatting-tools">
-                <div class="alignment-selector">
-                  <button type="button" class="alignment-btn ${(prefill?.textAlign || 'left') === 'left' ? 'active' : ''}" id="alignLeft_${qid}" title="Выровнять по левому краю">⬅️</button>
-                  <button type="button" class="alignment-btn ${(prefill?.textAlign || 'left') === 'center' ? 'active' : ''}" id="alignCenter_${qid}" title="Выровнять по центру">↔️</button>
-                  <button type="button" class="alignment-btn ${(prefill?.textAlign || 'left') === 'right' ? 'active' : ''}" id="alignRight_${qid}" title="Выровнять по правому краю">➡️</button>
-                </div>
-              </div>
               <div class="format-hint">
-                💡 Используйте Enter для переноса строк. Выберите выравнивание текста.
+                💡 Используйте Enter для переноса строк
               </div>
             </div>
           `;
@@ -2482,9 +2399,6 @@
           `;
           container.appendChild(wrap);
 
-          // Инициализация редактора текста вопроса
-          initQuestionTextEditor(qid, prefill);
-
           // Инициализация для типа "Вписать ответ"
           if (qType === 'fill') {
             // Инициализация полей ввода
@@ -2567,10 +2481,6 @@
             if (type !== 'crossword' && !q) return showModal('Ошибка', `Заполните текст вопроса ${i+1}`);
 
             let qData = { type };
-
-            // ОБНОВЛЕННАЯ ЛОГИКА: Сохраняем форматирование текста для всех типов вопросов
-            const formattingData = getTextFormattingData(qid);
-            qData.textAlign = formattingData.textAlign;
 
             if (type === 'test') {
               const optionsText = el.querySelector('.test-options')?.value || '';
