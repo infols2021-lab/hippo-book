@@ -58,8 +58,8 @@
     .input-count { font-size: 12px; color: #666; margin-top: 5px; }
     
     .sentence-builder { background: #f8f9fa; border-radius: 8px; padding: 15px; margin: 10px 0; }
-    .sentence-preview { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin-bottom: 10px; font-size: 16px; line-height: 1.5; }
-    .sentence-input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 10px; min-height: 60px; }
+    .sentence-preview { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin-bottom: 10px; font-size: 16px; line-height: 1.5; white-space: pre-line; }
+    .sentence-input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 10px; min-height: 120px; font-family: inherit; }
     .sentence-answers { min-height: 120px; }
     .add-gap-btn { background: #17a2b8; color: white; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 14px; }
     .loading { text-align: center; padding: 40px; display: none; }
@@ -928,7 +928,7 @@
       });
     }
 
-    // Обновление предпросмотра предложения (глобально)
+    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Обновление предпросмотра предложения с сохранением переносов строк
     window.updateSentencePreview = function(qid) {
       const input = document.getElementById(`sentenceInput_${qid}`);
       const preview = document.getElementById(`sentencePreview_${qid}`);
@@ -939,6 +939,7 @@
         return;
       }
       let i = 0;
+      // Сохраняем переносы строк с помощью white-space: pre-line в CSS
       preview.innerHTML = raw.replace(/___/g, () => {
         i++;
         return `<span style="border-bottom:2px dashed #666; padding:0 10px; margin:0 2px;">[${i}]</span>`;
@@ -2264,6 +2265,7 @@
             `;
           } else if (qType === 'sentence') {
             const sentence = prefill?.sentence || '';
+            // ОБНОВЛЕННЫЙ ПРЕДПРОСМОТР С СОХРАНЕНИЕМ ПЕРЕНОСОВ СТРОК
             const previewHtml = sentence
               ? sentence.replace(/___/g,'<span style="border-bottom:2px dashed #666; padding:0 10px; margin:0 2px;">[?]</span>')
               : 'Введите предложение ниже';
@@ -2287,6 +2289,8 @@
             setTimeout(()=>{
               const si = document.getElementById(`sentenceInput_${qid}`);
               si?.addEventListener('input', ()=>window.updateSentencePreview(qid));
+              // Инициализируем предпросмотр сразу
+              window.updateSentencePreview(qid);
             },0);
           } else if (qType === 'crossword') {
             inner = `
