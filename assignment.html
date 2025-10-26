@@ -126,6 +126,7 @@
             background: white;
             border-radius: 8px;
             border: 1px solid #e0e0e0;
+            white-space: pre-line;
         }
         .sentence-gap {
             display: inline-block;
@@ -863,7 +864,7 @@
                 container.appendChild(countDiv);
             }
 
-            // Рендерим вопрос с предложением
+            // Рендерим вопрос с предложением (ОБНОВЛЕННАЯ ФУНКЦИЯ С СОХРАНЕНИЕМ ПЕРЕНОСОВ)
             function renderSentenceQuestion(question, index, container) {
                 const sentenceContainer = document.createElement('div');
                 sentenceContainer.className = 'sentence-container';
@@ -884,9 +885,10 @@
                 sentencePreview.innerHTML = '';
                 
                 parts.forEach((part, partIndex) => {
-                    // Добавляем текст
+                    // Добавляем текст (сохраняем переносы строк)
                     if (part) {
-                        sentencePreview.appendChild(document.createTextNode(part));
+                        const textNode = document.createTextNode(part);
+                        sentencePreview.appendChild(textNode);
                     }
                     
                     // Добавляем инпут для пропуска (кроме последней части)
