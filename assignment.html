@@ -30,6 +30,9 @@
             font-weight: 600;
             line-height: 1.5;
             margin-bottom: 16px;
+            white-space: pre-line; /* СОХРАНЕНИЕ ПЕРЕНОСОВ СТРОК */
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .question-image {
             max-width: 100%;
@@ -126,7 +129,7 @@
             background: white;
             border-radius: 8px;
             border: 1px solid #e0e0e0;
-            white-space: pre-line;
+            white-space: pre-line; /* СОХРАНЕНИЕ ПЕРЕНОСОВ ДЛЯ ПРЕДЛОЖЕНИЙ */
         }
         .sentence-gap {
             display: inline-block;
@@ -253,6 +256,7 @@
         .review-question {
             font-weight: 600;
             margin-bottom: 10px;
+            white-space: pre-line; /* СОХРАНЕНИЕ ПЕРЕНОСОВ В РАЗБОРЕ */
         }
         .review-answer {
             margin: 5px 0;
@@ -746,7 +750,7 @@
                 const questionCard = document.createElement('div');
                 questionCard.className = 'question-card';
                 
-                // Заголовок вопроса
+                // Заголовок вопроса с сохранением переносов строк
                 questionCard.innerHTML = `
                     <div class="question-number">Вопрос ${index + 1} из ${questions.length}</div>
                     <div class="question-text">${question.q || 'Вопрос без текста'}</div>
@@ -816,7 +820,7 @@
                 container.appendChild(optionsContainer);
             }
 
-            // Рендерим вопрос с заполнением (ОБНОВЛЕННАЯ ФУНКЦИЯ)
+            // Рендерим вопрос с заполнением
             function renderFillQuestion(question, index, container) {
                 const inputsContainer = document.createElement('div');
                 inputsContainer.className = 'fill-inputs-container';
@@ -864,12 +868,12 @@
                 container.appendChild(countDiv);
             }
 
-            // Рендерим вопрос с предложением (ОБНОВЛЕННАЯ ФУНКЦИЯ С СОХРАНЕНИЕМ ПЕРЕНОСОВ)
+            // Рендерим вопрос с предложением с сохранением переносов строк
             function renderSentenceQuestion(question, index, container) {
                 const sentenceContainer = document.createElement('div');
                 sentenceContainer.className = 'sentence-container';
                 
-                // Создаем предпросмотр предложения
+                // Создаем предпросмотр предложения с сохранением переносов
                 const sentencePreview = document.createElement('div');
                 sentencePreview.className = 'sentence-text';
                 
@@ -880,15 +884,17 @@
                     return;
                 }
                 
-                // Разбиваем предложение на части по пропускам
+                // Разбиваем предложение на части по пропускам с сохранением переносов
                 const parts = question.sentence.split('___');
                 sentencePreview.innerHTML = '';
                 
                 parts.forEach((part, partIndex) => {
                     // Добавляем текст (сохраняем переносы строк)
                     if (part) {
-                        const textNode = document.createTextNode(part);
-                        sentencePreview.appendChild(textNode);
+                        const textSpan = document.createElement('span');
+                        textSpan.style.whiteSpace = 'pre-line';
+                        textSpan.textContent = part;
+                        sentencePreview.appendChild(textSpan);
                     }
                     
                     // Добавляем инпут для пропуска (кроме последней части)
@@ -1245,7 +1251,7 @@
                         hasAnswer = userAnswer !== undefined && userAnswer !== null && userAnswer !== '';
                     } 
                     else if (question.type === 'fill') {
-                        // ОБНОВЛЕННАЯ ЛОГИКА: Для ввода текста - все поля заполнены
+                        // Для ввода текста - все поля заполнены
                         if (Array.isArray(userAnswer)) {
                             const correctAnswersCount = question.answers?.length || 0;
                             hasAnswer = userAnswer.length >= correctAnswersCount && 
@@ -1387,7 +1393,7 @@
                         }
                         
                     } else {
-                        // ОБНОВЛЕННАЯ ЛОГИКА: Проверка заполнения для разных типов вопросов
+                        // Проверка заполнения для разных типов вопросов
                         if (question.type === 'test') {
                             hasAnswer = userAnswer !== undefined && userAnswer !== null && userAnswer !== '';
                         } 
@@ -1432,7 +1438,7 @@
                             isCorrect = parseInt(userAnswer) === question.correct;
                         } 
                         else if (question.type === 'fill') {
-                            // ОБНОВЛЕННАЯ ЛОГИКА: Для вписывания ответа - проверяем каждый ответ отдельно
+                            // Для вписывания ответа - проверяем каждый ответ отдельно
                             result.correctAnswer = question.answers;
                             if (Array.isArray(userAnswer) && Array.isArray(question.answers)) {
                                 // Проверяем, что все ответы совпадают и количество ответов правильное
@@ -1560,7 +1566,7 @@
                 }
             }
 
-            // Функция показа разбора ответов
+            // Функция показа разбора ответов с сохранением переносов строк
             function showQuestionsReview(questionResults) {
                 const reviewContainer = document.getElementById('reviewContainer');
                 const questionsReview = document.getElementById('questionsReview');
@@ -1602,7 +1608,7 @@
                             <div class="review-answer review-correct"><strong>Правильный ответ:</strong> ${correctOption}</div>
                         `;
                     } else if (result.type === 'fill') {
-                        // ОБНОВЛЕННАЯ ЛОГИКА: Для ввода текста показываем все ответы
+                        // Для ввода текста показываем все ответы
                         let userAnswerText = 'Не отвечено';
                         if (Array.isArray(result.userAnswer)) {
                             userAnswerText = result.userAnswer.map((ans, i) => 
