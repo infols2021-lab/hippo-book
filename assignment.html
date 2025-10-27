@@ -30,7 +30,7 @@
             font-weight: 600;
             line-height: 1.5;
             margin-bottom: 16px;
-            white-space: pre-line; /* СОХРАНЕНИЕ ПЕРЕНОСОВ СТРОК */
+            white-space: pre-line;
             word-wrap: break-word;
             overflow-wrap: break-word;
         }
@@ -68,7 +68,6 @@
             margin-right: 12px;
         }
         
-        /* ОБНОВЛЕННЫЕ СТИЛИ ДЛЯ ВПИСАТЬ ОТВЕТ */
         .fill-inputs-container {
             display: flex;
             flex-direction: column;
@@ -129,7 +128,7 @@
             background: white;
             border-radius: 8px;
             border: 1px solid #e0e0e0;
-            white-space: pre-line; /* СОХРАНЕНИЕ ПЕРЕНОСОВ ДЛЯ ПРЕДЛОЖЕНИЙ */
+            white-space: pre-line;
         }
         .sentence-gap {
             display: inline-block;
@@ -256,7 +255,7 @@
         .review-question {
             font-weight: 600;
             margin-bottom: 10px;
-            white-space: pre-line; /* СОХРАНЕНИЕ ПЕРЕНОСОВ В РАЗБОРЕ */
+            white-space: pre-line;
         }
         .review-answer {
             margin: 5px 0;
@@ -276,7 +275,6 @@
         .status-incorrect { color: #f44336; }
         .status-skipped { color: #ff9800; }
 
-        /* СТИЛИ ДЛЯ КРОССВОРДА */
         .crossword-container {
             margin: 20px 0;
             padding: 20px;
@@ -344,7 +342,6 @@
             background: #ffebee;
         }
 
-        /* НОВЫЕ СТИЛИ ДЛЯ НОМЕРОВ СЛОВ */
         .crossword-number {
             position: absolute;
             font-size: 8px;
@@ -398,7 +395,6 @@
             display: block;
         }
 
-        /* Список слов для кроссворда */
         .crossword-words {
             margin: 20px 0;
             padding: 15px;
@@ -448,7 +444,6 @@
             font-weight: 500;
         }
 
-        /* Стили для разбора слов в результатах */
         .crossword-review {
             margin: 15px 0;
             padding: 15px;
@@ -478,6 +473,31 @@
 
         .incorrect-word {
             color: #f44336;
+        }
+
+        .restart-container {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #fff3e0;
+            border-radius: 12px;
+            border: 2px solid #ff9800;
+        }
+
+        .restart-btn {
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 0 10px;
+        }
+
+        .restart-btn:hover {
+            background: #f57c00;
         }
 
         @media (max-width: 768px) {
@@ -547,6 +567,15 @@
 
         <div id="assignmentContent" style="display: none;">
             <div class="assignment-container">
+                <div class="restart-container" id="restartContainer" style="display: none;">
+                    <h3>📊 У вас есть предыдущий результат</h3>
+                    <p>Вы можете просмотреть свои прошлые ответы или начать заново с чистыми полями</p>
+                    <div>
+                        <button class="restart-btn" id="startFreshBtn">Начать заново</button>
+                        <button class="btn secondary" id="viewPreviousBtn">Просмотреть прошлые ответы</button>
+                    </div>
+                </div>
+
                 <div class="card">
                     <h2 id="assignmentTitle">Название задания</h2>
                     
@@ -686,7 +715,9 @@
 
                 // Загружаем прогресс пользователя
                 let userAnswers = {};
-                let previousScore = null;
+                let previousProgress = null;
+                let usePreviousAnswers = false;
+                
                 const { data: progress } = await supabase
                     .from('user_progress')
                     .select('*')
@@ -695,13 +726,15 @@
                     .maybeSingle();
 
                 if (progress) {
-                    userAnswers = progress.answers || {};
-                    previousScore = progress.score;
-                    console.log('✅ Прогресс загружен, предыдущий результат:', previousScore + '%');
+                    previousProgress = progress;
+                    console.log('✅ Прогресс загружен, предыдущий результат:', previousProgress.score + '%');
+                    
+                    // Показываем выбор: начать заново или просмотреть предыдущие ответы
+                    showRestartChoice(assignment, questions, previousProgress, supabase, user);
+                } else {
+                    // Нет предыдущего прогресса - сразу показываем задание
+                    showAssignment(assignment, questions, userAnswers, supabase, user, null, false);
                 }
-
-                // Показываем задание
-                showAssignment(assignment, questions, userAnswers, supabase, user, previousScore);
 
             } catch (error) {
                 console.error('❌ Критическая ошибка:', error);
@@ -709,8 +742,33 @@
             }
         }
 
+        // Функция показа выбора режима (начать заново или просмотреть)
+        function showRestartChoice(assignment, questions, previousProgress, supabase, user) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('assignmentContent').style.display = 'block';
+            document.getElementById('restartContainer').style.display = 'block';
+
+            // Устанавливаем заголовок
+            document.getElementById('assignmentTitle').textContent = assignment.title;
+            document.getElementById('totalQuestions').textContent = questions.length;
+
+            // Кнопка "Начать заново"
+            document.getElementById('startFreshBtn').addEventListener('click', () => {
+                // Начинаем с чистыми ответами
+                showAssignment(assignment, questions, {}, supabase, user, previousProgress, false);
+                document.getElementById('restartContainer').style.display = 'none';
+            });
+
+            // Кнопка "Просмотреть прошлые ответы"
+            document.getElementById('viewPreviousBtn').addEventListener('click', () => {
+                // Показываем с предыдущими ответами
+                showAssignment(assignment, questions, previousProgress.answers || {}, supabase, user, previousProgress, true);
+                document.getElementById('restartContainer').style.display = 'none';
+            });
+        }
+
         // Функция показа задания
-        function showAssignment(assignment, questions, userAnswers, supabase, user, previousScore) {
+        function showAssignment(assignment, questions, userAnswers, supabase, user, previousProgress, viewMode = false) {
             // Скрываем загрузку, показываем контент
             document.getElementById('loading').style.display = 'none';
             document.getElementById('assignmentContent').style.display = 'block';
@@ -719,16 +777,32 @@
             document.getElementById('assignmentTitle').textContent = assignment.title;
             document.getElementById('totalQuestions').textContent = questions.length;
 
-            // Показываем предыдущий результат, если есть
-            if (previousScore !== null) {
+            // Показываем предыдущий результат, если есть и мы в режиме нового прохождения
+            if (previousProgress && !viewMode) {
                 const previousResult = document.createElement('div');
                 previousResult.className = 'previous-result';
                 previousResult.innerHTML = `
-                    <strong>📊 Предыдущий результат:</strong> ${previousScore}%
+                    <strong>📊 Предыдущий результат:</strong> ${previousProgress.score}%
                     <br><small>Новое прохождение обновит этот результат</small>
                 `;
                 document.querySelector('.assignment-container .card').insertBefore(
                     previousResult, 
+                    document.querySelector('.question-counter')
+                );
+            }
+
+            // Если режим просмотра, отключаем редактирование
+            if (viewMode) {
+                const viewModeNotice = document.createElement('div');
+                viewModeNotice.className = 'previous-result';
+                viewModeNotice.style.background = '#e8f5e8';
+                viewModeNotice.style.borderLeftColor = '#4caf50';
+                viewModeNotice.innerHTML = `
+                    <strong>👀 Режим просмотра</strong>
+                    <br><small>Вы просматриваете свои предыдущие ответы. Чтобы пройти заново, обновите страницу.</small>
+                `;
+                document.querySelector('.assignment-container .card').insertBefore(
+                    viewModeNotice, 
                     document.querySelector('.question-counter')
                 );
             }
@@ -768,16 +842,16 @@
                 
                 // Обработка разных типов вопросов
                 if (question.type === 'test' && question.options) {
-                    renderTestQuestion(question, index, questionCard);
+                    renderTestQuestion(question, index, questionCard, viewMode);
                 } else if (question.type === 'fill') {
-                    renderFillQuestion(question, index, questionCard);
+                    renderFillQuestion(question, index, questionCard, viewMode);
                 } else if (question.type === 'sentence') {
-                    renderSentenceQuestion(question, index, questionCard);
+                    renderSentenceQuestion(question, index, questionCard, viewMode);
                 } else if (question.type === 'crossword') {
-                    renderCrosswordQuestion(question, index, questionCard);
+                    renderCrosswordQuestion(question, index, questionCard, viewMode);
                 } else {
                     // Если тип не указан, показываем как текстовый вопрос
-                    renderFillQuestion(question, index, questionCard);
+                    renderFillQuestion(question, index, questionCard, viewMode);
                 }
                 
                 container.appendChild(questionCard);
@@ -785,12 +859,19 @@
                 // Обновляем навигацию
                 document.getElementById('currentQuestion').textContent = index + 1;
                 document.getElementById('prevBtn').style.display = index > 0 ? 'block' : 'none';
-                document.getElementById('nextBtn').style.display = index < questions.length - 1 ? 'block' : 'none';
-                document.getElementById('finishBtn').style.display = index === questions.length - 1 ? 'block' : 'none';
+                
+                // В режиме просмотра скрываем кнопки Далее и Завершить
+                if (viewMode) {
+                    document.getElementById('nextBtn').style.display = 'none';
+                    document.getElementById('finishBtn').style.display = 'none';
+                } else {
+                    document.getElementById('nextBtn').style.display = index < questions.length - 1 ? 'block' : 'none';
+                    document.getElementById('finishBtn').style.display = index === questions.length - 1 ? 'block' : 'none';
+                }
             }
 
             // Рендерим тестовый вопрос
-            function renderTestQuestion(question, index, container) {
+            function renderTestQuestion(question, index, container, viewMode) {
                 const optionsContainer = document.createElement('div');
                 optionsContainer.className = 'options-container';
                 
@@ -804,13 +885,16 @@
                     radio.value = optionIndex;
                     radio.className = 'option-radio';
                     radio.checked = userAnswers[index] === optionIndex;
+                    radio.disabled = viewMode;
                     
-                    radio.addEventListener('change', async () => {
-                        userAnswers[index] = optionIndex;
-                        document.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
-                        label.classList.add('selected');
-                        await saveProgress(false);
-                    });
+                    if (!viewMode) {
+                        radio.addEventListener('change', async () => {
+                            userAnswers[index] = optionIndex;
+                            document.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
+                            label.classList.add('selected');
+                            await saveProgress(false);
+                        });
+                    }
                     
                     label.appendChild(radio);
                     label.appendChild(document.createTextNode(option));
@@ -821,7 +905,7 @@
             }
 
             // Рендерим вопрос с заполнением
-            function renderFillQuestion(question, index, container) {
+            function renderFillQuestion(question, index, container, viewMode) {
                 const inputsContainer = document.createElement('div');
                 inputsContainer.className = 'fill-inputs-container';
                 
@@ -848,11 +932,14 @@
                     input.type = 'text';
                     input.placeholder = `Введите ответ ${answerIndex + 1}...`;
                     input.value = userAnswerArray[answerIndex] || '';
+                    input.disabled = viewMode;
                     
-                    input.addEventListener('input', async () => {
-                        userAnswerArray[answerIndex] = input.value;
-                        await saveProgress(false);
-                    });
+                    if (!viewMode) {
+                        input.addEventListener('input', async () => {
+                            userAnswerArray[answerIndex] = input.value;
+                            await saveProgress(false);
+                        });
+                    }
                     
                     inputItem.appendChild(numberDiv);
                     inputItem.appendChild(input);
@@ -869,7 +956,7 @@
             }
 
             // Рендерим вопрос с предложением с сохранением переносов строк
-            function renderSentenceQuestion(question, index, container) {
+            function renderSentenceQuestion(question, index, container, viewMode) {
                 const sentenceContainer = document.createElement('div');
                 sentenceContainer.className = 'sentence-container';
                 
@@ -906,6 +993,7 @@
                         input.type = 'text';
                         input.className = 'sentence-input';
                         input.placeholder = `Ответ ${partIndex + 1}`;
+                        input.disabled = viewMode;
                         
                         // Восстанавливаем сохраненный ответ
                         if (!Array.isArray(userAnswers[index])) {
@@ -915,13 +1003,15 @@
                             input.value = userAnswers[index][partIndex];
                         }
                         
-                        input.addEventListener('input', async () => {
-                            if (!Array.isArray(userAnswers[index])) {
-                                userAnswers[index] = [];
-                            }
-                            userAnswers[index][partIndex] = input.value;
-                            await saveProgress(false);
-                        });
+                        if (!viewMode) {
+                            input.addEventListener('input', async () => {
+                                if (!Array.isArray(userAnswers[index])) {
+                                    userAnswers[index] = [];
+                                }
+                                userAnswers[index][partIndex] = input.value;
+                                await saveProgress(false);
+                            });
+                        }
                         
                         gapContainer.appendChild(input);
                         sentencePreview.appendChild(gapContainer);
@@ -933,7 +1023,7 @@
             }
 
             // Рендерим вопрос с кроссвордом
-            function renderCrosswordQuestion(question, index, container) {
+            function renderCrosswordQuestion(question, index, container, viewMode) {
                 const crosswordContainer = document.createElement('div');
                 crosswordContainer.className = 'crossword-container';
                 
@@ -1080,94 +1170,97 @@
                             input.maxLength = 1;
                             input.value = userAnswers[index][i][j] || '';
                             input.placeholder = '';
+                            input.disabled = viewMode;
                             
                             // Сохраняем ссылку на инпут
                             inputRefs[i][j] = input;
                             
-                            input.addEventListener('input', async (e) => {
-                                // Сохраняем введенную букву
-                                if (!userAnswers[index][i]) userAnswers[index][i] = [];
-                                userAnswers[index][i][j] = e.target.value.toUpperCase();
-                                
-                                // Автопереход к следующей клетке
-                                if (e.target.value && j < cols - 1) {
-                                    const nextCell = inputRefs[i][j + 1];
-                                    if (nextCell && !nextCell.parentElement.classList.contains('blocked')) {
-                                        nextCell.focus();
+                            if (!viewMode) {
+                                input.addEventListener('input', async (e) => {
+                                    // Сохраняем введенную букву
+                                    if (!userAnswers[index][i]) userAnswers[index][i] = [];
+                                    userAnswers[index][i][j] = e.target.value.toUpperCase();
+                                    
+                                    // Автопереход к следующей клетке
+                                    if (e.target.value && j < cols - 1) {
+                                        const nextCell = inputRefs[i][j + 1];
+                                        if (nextCell && !nextCell.parentElement.classList.contains('blocked')) {
+                                            nextCell.focus();
+                                        }
                                     }
-                                }
+                                    
+                                    await saveProgress(false);
+                                });
                                 
-                                await saveProgress(false);
-                            });
-                            
-                            input.addEventListener('keydown', (e) => {
-                                // Навигация стрелками и Tab
-                                switch(e.key) {
-                                    case 'ArrowLeft':
-                                        e.preventDefault();
-                                        if (j > 0) {
-                                            const prevCell = inputRefs[i][j - 1];
-                                            if (prevCell) prevCell.focus();
-                                        }
-                                        break;
-                                    case 'ArrowRight':
-                                        e.preventDefault();
-                                        if (j < cols - 1) {
-                                            const nextCell = inputRefs[i][j + 1];
-                                            if (nextCell) nextCell.focus();
-                                        }
-                                        break;
-                                    case 'ArrowUp':
-                                        e.preventDefault();
-                                        if (i > 0) {
-                                            const upCell = inputRefs[i - 1][j];
-                                            if (upCell) upCell.focus();
-                                        }
-                                        break;
-                                    case 'ArrowDown':
-                                        e.preventDefault();
-                                        if (i < rows - 1) {
-                                            const downCell = inputRefs[i + 1][j];
-                                            if (downCell) downCell.focus();
-                                        }
-                                        break;
-                                    case 'Tab':
-                                        e.preventDefault();
-                                        if (e.shiftKey) {
-                                            // Shift+Tab - предыдущая клетка
+                                input.addEventListener('keydown', (e) => {
+                                    // Навигация стрелками и Tab
+                                    switch(e.key) {
+                                        case 'ArrowLeft':
+                                            e.preventDefault();
                                             if (j > 0) {
                                                 const prevCell = inputRefs[i][j - 1];
                                                 if (prevCell) prevCell.focus();
-                                            } else if (i > 0) {
-                                                const prevCell = inputRefs[i - 1][cols - 1];
-                                                if (prevCell) prevCell.focus();
                                             }
-                                        } else {
-                                            // Tab - следующая клетка
+                                            break;
+                                        case 'ArrowRight':
+                                            e.preventDefault();
                                             if (j < cols - 1) {
                                                 const nextCell = inputRefs[i][j + 1];
                                                 if (nextCell) nextCell.focus();
-                                            } else if (i < rows - 1) {
-                                                const nextCell = inputRefs[i + 1][0];
-                                                if (nextCell) nextCell.focus();
                                             }
-                                        }
-                                        break;
-                                    case 'Backspace':
-                                        if (!e.target.value && j > 0) {
+                                            break;
+                                        case 'ArrowUp':
                                             e.preventDefault();
-                                            const prevCell = inputRefs[i][j - 1];
-                                            if (prevCell) {
-                                                prevCell.focus();
-                                                prevCell.value = '';
-                                                if (!userAnswers[index][i]) userAnswers[index][i] = [];
-                                                userAnswers[index][i][j-1] = '';
-                                                saveProgress(false);
+                                            if (i > 0) {
+                                                const upCell = inputRefs[i - 1][j];
+                                                if (upCell) upCell.focus();
                                             }
-                                        }
-                                        break;
-                                }
-                            });
+                                            break;
+                                        case 'ArrowDown':
+                                            e.preventDefault();
+                                            if (i < rows - 1) {
+                                                const downCell = inputRefs[i + 1][j];
+                                                if (downCell) downCell.focus();
+                                            }
+                                            break;
+                                        case 'Tab':
+                                            e.preventDefault();
+                                            if (e.shiftKey) {
+                                                // Shift+Tab - предыдущая клетка
+                                                if (j > 0) {
+                                                    const prevCell = inputRefs[i][j - 1];
+                                                    if (prevCell) prevCell.focus();
+                                                } else if (i > 0) {
+                                                    const prevCell = inputRefs[i - 1][cols - 1];
+                                                    if (prevCell) prevCell.focus();
+                                                }
+                                            } else {
+                                                // Tab - следующая клетка
+                                                if (j < cols - 1) {
+                                                    const nextCell = inputRefs[i][j + 1];
+                                                    if (nextCell) nextCell.focus();
+                                                } else if (i < rows - 1) {
+                                                    const nextCell = inputRefs[i + 1][0];
+                                                    if (nextCell) nextCell.focus();
+                                                }
+                                            }
+                                            break;
+                                        case 'Backspace':
+                                            if (!e.target.value && j > 0) {
+                                                e.preventDefault();
+                                                const prevCell = inputRefs[i][j - 1];
+                                                if (prevCell) {
+                                                    prevCell.focus();
+                                                    prevCell.value = '';
+                                                    if (!userAnswers[index][i]) userAnswers[index][i] = [];
+                                                    userAnswers[index][i][j-1] = '';
+                                                    saveProgress(false);
+                                                }
+                                            }
+                                            break;
+                                    }
+                                });
+                            }
                             
                             cell.appendChild(input);
                         }
@@ -1716,7 +1809,9 @@
                 }
             });
 
-            document.getElementById('finishBtn').addEventListener('click', finishAssignment);
+            if (!viewMode) {
+                document.getElementById('finishBtn').addEventListener('click', finishAssignment);
+            }
 
             // Показываем первый вопрос
             showQuestion(0);
