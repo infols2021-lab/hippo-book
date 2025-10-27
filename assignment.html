@@ -509,6 +509,26 @@
             text-align: center;
         }
 
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .mode-switch-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .mode-switch-btn:hover {
+            background: #5a6268;
+        }
+
         @media (max-width: 768px) {
             .assignment-container {
                 padding: 0 15px;
@@ -541,6 +561,14 @@
             .fill-input-item input {
                 width: 100%;
             }
+            .header-buttons {
+                flex-direction: column;
+                gap: 5px;
+            }
+            .mode-switch-btn {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -563,7 +591,10 @@
 <body>
     <div class="container">
         <header class="header">
-            <button class="btn secondary" id="backButton">← Назад</button>
+            <div class="header-buttons">
+                <button class="btn secondary" id="backToMaterialsBtn">← К материалам</button>
+                <button class="mode-switch-btn" id="modeSwitchBtn" style="display: none;">↶ Сменить режим</button>
+            </div>
             <h1>Задание</h1>
         </header>
 
@@ -640,7 +671,7 @@
                 </div>
                 
                 <div style="margin-top: 30px;">
-                    <button class="btn" onclick="location.href='/profile.html'">Вернуться в профиль</button>
+                    <button class="btn" onclick="location.href='/materials.html'">Вернуться к материалам</button>
                     <button class="btn secondary" onclick="location.reload()" style="margin-left: 10px;">Пройти заново</button>
                 </div>
             </div>
@@ -657,7 +688,8 @@
             user: null,
             previousProgress: null,
             isViewMode: false,
-            currentQuestionIndex: 0
+            currentQuestionIndex: 0,
+            hasCompleted: false
         };
 
         // Простая функция для показа ошибок
@@ -682,18 +714,38 @@
             }, 5000);
         }
 
-        // Обработчик кнопки Назад
-        function setupBackButton() {
-            document.getElementById('backButton').addEventListener('click', () => {
-                // Если мы в режиме просмотра или выполнения задания и есть предыдущий прогресс
-                if (currentState.previousProgress && (currentState.isViewMode || currentState.userAnswers && Object.keys(currentState.userAnswers).length > 0)) {
-                    // Возвращаемся к выбору режима
-                    showRestartChoice();
-                } else {
-                    // Иначе возвращаемся в профиль
-                    location.href = '/profile.html';
-                }
+        // Функция скрытия всех основных экранов
+        function hideAllScreens() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('assignmentContent').style.display = 'none';
+            document.getElementById('completionScreen').style.display = 'none';
+            document.getElementById('restartContainer').style.display = 'none';
+            document.getElementById('questionsCard').style.display = 'none';
+        }
+
+        // Настройка кнопок навигации
+        function setupNavigationButtons() {
+            // Кнопка "К материалам" - всегда ведет на materials.html
+            document.getElementById('backToMaterialsBtn').addEventListener('click', () => {
+                location.href = '/materials.html';
             });
+
+            // Кнопка смены режима - показывает выбор режима
+            document.getElementById('modeSwitchBtn').addEventListener('click', () => {
+                showRestartChoice();
+            });
+        }
+
+        // Обновление видимости кнопки смены режима
+        function updateModeSwitchButton() {
+            const modeSwitchBtn = document.getElementById('modeSwitchBtn');
+            // Показываем кнопку только когда есть выбор режима (есть предыдущий прогресс)
+            if (currentState.previousProgress && !currentState.hasCompleted) {
+                modeSwitchBtn.style.display = 'block';
+            } else {
+                modeSwitchBtn.style.display = 'none';
+            }
         }
 
         // Основная функция инициализации
@@ -701,8 +753,8 @@
             try {
                 console.log('🚀 Начинаем загрузку задания...');
 
-                // Настраиваем кнопку Назад
-                setupBackButton();
+                // Настраиваем кнопки навигации
+                setupNavigationButtons();
 
                 // Ждем конфигурацию если нужно
                 if (!window.SUPABASE_URL) {
@@ -768,6 +820,7 @@
 
                 if (progress) {
                     currentState.previousProgress = progress;
+                    currentState.hasCompleted = progress.is_completed || false;
                     console.log('✅ Прогресс загружен, предыдущий результат:', currentState.previousProgress.score + '%');
                     
                     // Показываем выбор: начать заново или просмотреть предыдущие ответы
@@ -776,6 +829,7 @@
                     // Нет предыдущего прогресса - сразу показываем задание
                     currentState.isViewMode = false;
                     currentState.userAnswers = {};
+                    currentState.hasCompleted = false;
                     showAssignment();
                 }
 
@@ -787,10 +841,12 @@
 
         // Функция показа выбора режима (начать заново или просмотреть)
         function showRestartChoice() {
-            document.getElementById('loading').style.display = 'none';
+            hideAllScreens();
             document.getElementById('assignmentContent').style.display = 'block';
             document.getElementById('restartContainer').style.display = 'block';
-            document.getElementById('questionsCard').style.display = 'none';
+
+            // Обновляем кнопку смены режима
+            updateModeSwitchButton();
 
             // Устанавливаем заголовок
             document.getElementById('assignmentTitle').textContent = currentState.assignment.title;
@@ -808,27 +864,29 @@
                 // Начинаем с чистыми ответами
                 currentState.isViewMode = false;
                 currentState.userAnswers = {};
+                currentState.hasCompleted = false;
                 showAssignment();
-                document.getElementById('restartContainer').style.display = 'none';
             });
 
             // Кнопка "Просмотреть прошлые ответы"
             document.getElementById('viewPreviousBtn').addEventListener('click', () => {
                 // Показываем с предыдущими ответами
                 currentState.isViewMode = true;
-                currentState.userAnswers = currentState.previousProgress.answers || {};
+                currentState.userAnswers = JSON.parse(JSON.stringify(currentState.previousProgress.answers || {}));
+                currentState.hasCompleted = false;
                 showAssignment();
-                document.getElementById('restartContainer').style.display = 'none';
             });
         }
 
         // Функция показа задания
         function showAssignment() {
-            // Скрываем загрузку, показываем контент
-            document.getElementById('loading').style.display = 'none';
+            hideAllScreens();
             document.getElementById('assignmentContent').style.display = 'block';
             document.getElementById('questionsCard').style.display = 'block';
             
+            // Обновляем кнопку смены режима
+            updateModeSwitchButton();
+
             // Устанавливаем заголовок
             document.getElementById('assignmentTitle').textContent = currentState.assignment.title;
             document.getElementById('totalQuestions').textContent = currentState.questions.length;
@@ -841,7 +899,7 @@
             }
 
             // Показываем предыдущий результат, если есть и мы в режиме нового прохождения
-            if (currentState.previousProgress && !currentState.isViewMode) {
+            if (currentState.previousProgress && !currentState.isViewMode && !currentState.hasCompleted) {
                 const previousResult = document.createElement('div');
                 previousResult.className = 'previous-result';
                 previousResult.innerHTML = `
@@ -1678,6 +1736,15 @@
                     throw new Error('Не удалось сохранить результат');
                 }
 
+                // Обновляем состояние
+                currentState.hasCompleted = true;
+                currentState.previousProgress = {
+                    ...currentState.previousProgress,
+                    answers: currentState.userAnswers,
+                    score: scoreResult.score,
+                    is_completed: true
+                };
+
                 // Показываем экран завершения с деталями
                 showCompletionScreen(scoreResult);
 
@@ -1689,8 +1756,11 @@
 
         // Функция показа экрана завершения
         function showCompletionScreen(scoreResult) {
-            document.getElementById('assignmentContent').style.display = 'none';
+            hideAllScreens();
             document.getElementById('completionScreen').style.display = 'block';
+            
+            // Скрываем кнопку смены режима после завершения
+            document.getElementById('modeSwitchBtn').style.display = 'none';
             
             // Устанавливаем результаты
             document.getElementById('finalScore').textContent = `${scoreResult.score}%`;
