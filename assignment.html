@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/style.css">
     <script src="/load-config.js"></script>
     <style>
+        /* Все существующие стили остаются без изменений */
         .assignment-container {
             max-width: 800px;
             margin: 20px auto;
@@ -692,6 +693,51 @@
             hasCompleted: false
         };
 
+        // ============ НОВАЯ ФУНКЦИЯ: Нормализация текста для сравнения ============
+        function normalizeText(text) {
+            if (!text) return '';
+            
+            // Приводим к нижнему регистру и обрезаем пробелы
+            let normalized = String(text).toLowerCase().trim();
+            
+            // Заменяем все виды апострофов на стандартный '
+            normalized = normalized.replace(/[’‘ʼ`´]/g, "'");
+            
+            // Убираем пробелы непосредственно перед и после апострофа
+            normalized = normalized.replace(/\s*'\s*/g, "'");
+            
+            // Заменяем множественные пробелы на один
+            normalized = normalized.replace(/\s+/g, ' ');
+            
+            return normalized;
+        }
+
+        // ============ НОВАЯ ФУНКЦИЯ: Сравнение ответов с учетом нормализации ============
+        function compareAnswers(userAnswer, correctAnswer) {
+            if (!userAnswer && !correctAnswer) return true;
+            if (!userAnswer || !correctAnswer) return false;
+            
+            const normalizedUser = normalizeText(userAnswer);
+            const normalizedCorrect = normalizeText(correctAnswer);
+            
+            return normalizedUser === normalizedCorrect;
+        }
+
+        // ============ НОВАЯ ФУНКЦИЯ: Проверка ответа на соответствие любому из вариантов ============
+        function checkAnswerAgainstVariants(userAnswer, correctVariants) {
+            if (!userAnswer) return false;
+            
+            const normalizedUser = normalizeText(userAnswer);
+            
+            for (const variant of correctVariants) {
+                if (normalizeText(variant) === normalizedUser) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
         // Простая функция для показа ошибок
         function showError(message) {
             document.getElementById('loading').style.display = 'none';
@@ -979,7 +1025,7 @@
                 document.getElementById('nextBtn').style.display = index < currentState.questions.length - 1 ? 'block' : 'none';
                 document.getElementById('finishBtn').style.display = 'none';
             } else {
-                // В режиме выполнения показываем обычную навигацию
+                // В режиме выполнения показываем обычную навигации
                 document.getElementById('nextBtn').style.display = index < currentState.questions.length - 1 ? 'block' : 'none';
                 document.getElementById('finishBtn').style.display = index === currentState.questions.length - 1 ? 'block' : 'none';
             }
@@ -1523,7 +1569,7 @@
             };
         }
 
-        // Функция расчета оценки с поддержкой множественных ответов
+        // Функция расчета оценки с поддержкой множественных ответов и нормализацией апострофов
         function calculateScore() {
             let correctAnswers = 0;
             let incorrectAnswers = 0;
@@ -1646,7 +1692,7 @@
                         isCorrect = parseInt(userAnswer) === question.correct;
                     } 
                     else if (question.type === 'fill') {
-                        // Для вписывания ответа - проверяем каждый ответ отдельно
+                        // Для вписывания ответа - проверяем каждый ответ отдельно с нормализацией
                         result.correctAnswer = question.answers;
                         if (Array.isArray(userAnswer) && Array.isArray(question.answers)) {
                             // Проверяем, что все ответы совпадают и количество ответов правильное
@@ -1654,8 +1700,9 @@
                                 isCorrect = userAnswer.every((answer, answerIndex) => {
                                     if (!answer || !question.answers[answerIndex]) return false;
                                     
-                                    const userAnswerNormalized = String(answer).toLowerCase().trim();
-                                    const correctVariants = question.answers[answerIndex].map(a => String(a).toLowerCase().trim());
+                                    // ИСПРАВЛЕНИЕ: Используем нормализацию для сравнения
+                                    const userAnswerNormalized = normalizeText(String(answer));
+                                    const correctVariants = question.answers[answerIndex].map(a => normalizeText(String(a)));
                                     
                                     return correctVariants.some(correctVariant => 
                                         userAnswerNormalized === correctVariant
@@ -1665,7 +1712,7 @@
                         }
                     } 
                     else if (question.type === 'sentence') {
-                        // Для предложений - проверяем каждый пропуск на соответствие ЛЮБОМУ из вариантов
+                        // Для предложений - проверяем каждый пропуск на соответствие ЛЮБОМУ из вариантов с нормализацией
                         result.correctAnswer = question.answers;
                         if (Array.isArray(userAnswer) && Array.isArray(question.answers)) {
                             // Проверяем, что все ответы совпадают и количество ответов правильное
@@ -1673,16 +1720,17 @@
                                 isCorrect = userAnswer.every((answer, gapIndex) => {
                                     if (!answer || !question.answers[gapIndex]) return false;
                                     
-                                    const userGapAnswer = String(answer).toLowerCase().trim();
+                                    // ИСПРАВЛЕНИЕ: Используем нормализацию для сравнения
+                                    const userGapAnswer = normalizeText(String(answer));
                                     let correctGapVariants = [];
                                     
                                     // Поддержка старого и нового форматов
                                     if (Array.isArray(question.answers[gapIndex])) {
                                         // Новый формат: массив вариантов для пропуска
-                                        correctGapVariants = question.answers[gapIndex].map(a => String(a).toLowerCase().trim());
+                                        correctGapVariants = question.answers[gapIndex].map(a => normalizeText(String(a)));
                                     } else {
                                         // Старый формат: один вариант для пропуска
-                                        correctGapVariants = [String(question.answers[gapIndex]).toLowerCase().trim()];
+                                        correctGapVariants = [normalizeText(String(question.answers[gapIndex]))];
                                     }
                                     
                                     return correctGapVariants.some(correctVariant => 
