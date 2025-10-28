@@ -396,6 +396,64 @@
         z-index: 1;
     }
 
+    /* НОВЫЕ СТИЛИ ДЛЯ УПРАВЛЕНИЯ ЗАЯВКАМИ И ФИЛЬТРАЦИИ */
+    .users-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .users-stats {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .stat-badge-large {
+        background: white;
+        padding: 12px 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border-left: 4px solid var(--accent2);
+        font-weight: 600;
+    }
+
+    .stat-badge-large .number {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--accent2);
+        display: block;
+    }
+
+    .filters-container {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        align-items: end;
+    }
+
+    .filters-container .form-group {
+        margin-bottom: 0;
+    }
+
+    .filters-container select,
+    .filters-container input {
+        min-width: 200px;
+    }
+
+    .textbook-issued-checkbox {
+        transform: scale(1.3);
+        cursor: pointer;
+    }
+
+    .user-row-new {
+        background: #f8f9fa;
+    }
+
     @media (max-width: 1024px) {
       .admin-container { width: 98%; margin: 15px auto; }
       .admin-table { font-size: 14px; }
@@ -407,6 +465,10 @@
       .word-input-section .form-group { width: 100%; }
       .fill-input-item { flex-direction: column; align-items: flex-start; }
       .fill-input-item input { width: 100%; }
+      .users-controls { flex-direction: column; align-items: flex-start; }
+      .filters-container { flex-direction: column; width: 100%; }
+      .filters-container select,
+      .filters-container input { min-width: 100%; }
     }
 
     @media (max-width: 768px) {
@@ -425,6 +487,7 @@
       .crossword-advanced-controls { flex-direction: column; }
       .crossword-advanced-controls .form-group { width: 100%; }
       .fill-input-item { padding: 8px; }
+      .users-stats { flex-direction: column; gap: 10px; }
     }
 
     @media (max-width: 480px) {
@@ -463,6 +526,62 @@
         <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
           <button class="btn" id="saveUserAccessBtn">💾 Сохранить доступы</button>
           <button class="btn secondary" id="closeUserAccessModal">❌ Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно управления заявками -->
+    <div class="user-access-modal" id="requestsManagementModal">
+      <div class="user-access-content card" style="max-width: 1200px;">
+        <h3>📋 Управление заявками пользователей</h3>
+        
+        <div class="filters-container">
+          <div class="form-group">
+            <label>Фильтр по области:</label>
+            <select id="requestsRegionFilter" class="input">
+              <option value="">Все области</option>
+              <option value="Алматинская область">Алматинская область</option>
+              <option value="Астана">Астана</option>
+              <option value="Жамбылская область">Жамбылская область</option>
+              <option value="Карагандинская область">Карагандинская область</option>
+              <option value="Костанайская область">Костанайская область</option>
+              <option value="Павлодарская область">Павлодарская область</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label>Фильтр по статусу:</label>
+            <select id="requestsStatusFilter" class="input">
+              <option value="">Все заявки</option>
+              <option value="pending">Ожидают обработки</option>
+              <option value="approved">Одобренные</option>
+              <option value="rejected">Отклоненные</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto; margin-top: 20px;">
+          <table class="admin-table" id="requestsManagementTable">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Номер заявки</th>
+                <th>Дата создания</th>
+                <th>ФИО ученика</th>
+                <th>Email</th>
+                <th>Класс</th>
+                <th>Типы материалов</th>
+                <th>Область</th>
+                <th>Статус</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="requestsManagementTableBody"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn secondary" id="closeRequestsManagementModal">❌ Закрыть</button>
         </div>
       </div>
     </div>
@@ -706,17 +825,54 @@
       <!-- Секция пользователей -->
       <div class="admin-section" id="users-section">
         <div class="card">
-          <h2>Список пользователей</h2>
-          <div class="search-container">
-            <input type="text" id="userSearch" placeholder="Поиск по имени или email..." class="input">
+          <h2>👥 Управление пользователями</h2>
+          
+          <div class="users-controls">
+            <button class="btn" id="manageRequestsBtn">📋 Управление заявками</button>
+            
+            <div class="users-stats">
+              <div class="stat-badge-large">
+                <span class="number" id="totalIssuedTextbooks">0</span>
+                <span>Выдано учебников (всего)</span>
+              </div>
+              <div class="stat-badge-large">
+                <span class="number" id="regionalIssuedTextbooks">0</span>
+                <span>Выдано учебников (в области)</span>
+              </div>
+            </div>
           </div>
+
+          <div class="filters-container">
+            <div class="form-group">
+              <label>Поиск по имени или email:</label>
+              <input type="text" id="userSearch" placeholder="Введите для поиска..." class="input">
+            </div>
+            
+            <div class="form-group">
+              <label>Фильтр по области:</label>
+              <select id="regionFilter" class="input">
+                <option value="">Все области</option>
+                <option value="Алматинская область">Алматинская область</option>
+                <option value="Астана">Астана</option>
+                <option value="Жамбылская область">Жамбылская область</option>
+                <option value="Карагандинская область">Карагандинская область</option>
+                <option value="Костанайская область">Костанайская область</option>
+                <option value="Павлодарская область">Павлодарская область</option>
+              </select>
+            </div>
+          </div>
+
           <div style="overflow-x: auto;">
             <table class="admin-table" id="usersTable">
               <thead>
                 <tr>
+                  <th>№</th>
                   <th>ФИО</th>
                   <th>Email</th>
+                  <th>Контактный телефон</th>
+                  <th>Область</th>
                   <th>Прогресс</th>
+                  <th>Учебник выдан</th>
                   <th>Статус</th>
                   <th>Действия</th>
                 </tr>
@@ -1200,7 +1356,7 @@
       updateWordList(qid);
       updateStudentPreview(qid);
       
-      showModal('✅ Готово', `Сетка ${rows}×${cols} создана! Теперь добавьте слова.`);
+      showModal('✅ Готово', `Сетки ${rows}×${cols} создана! Теперь добавьте слова.`);
     }
 
     function clearAdvancedGrid(qid) {
@@ -2660,60 +2816,108 @@
         let currentEditingUserId = null;
         let searchTimeout = null;
 
-        document.getElementById('userSearch').addEventListener('input', () => {
-          clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(loadUsers, 350);
-        });
-
+        // ОБНОВЛЕННАЯ ФУНКЦИЯ: Загрузка пользователей с новыми полями
         async function loadUsers() {
-          const q = document.getElementById('userSearch').value.trim();
-          let query = supabase.from('profiles').select('*').order('created_at',{ascending:false});
-          if (q) query = query.or(`full_name.ilike.%${q}%,email.ilike.%${q}%`);
+          const searchQuery = document.getElementById('userSearch').value.trim();
+          const regionFilter = document.getElementById('regionFilter').value;
+
+          let query = supabase
+            .from('profiles')
+            .select('*')
+            .order('created_at', { ascending: false }); // новые сверху
+
+          if (searchQuery) {
+            query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
+          }
+
+          if (regionFilter) {
+            query = query.eq('region', regionFilter);
+          }
 
           const { data, error } = await query;
           const tbody = document.querySelector('#usersTable tbody');
           if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
 
-          // Прогресс
+          // Прогресс пользователей
           const { data: prog } = await supabase.from('user_progress').select('user_id,is_completed');
-          const map = {};
-          (prog||[]).forEach(p=>{
-            map[p.user_id] ||= { total:0, completed:0 };
-            map[p.user_id].total++;
-            if (p.is_completed) map[p.user_id].completed++;
+          const progressMap = {};
+          (prog||[]).forEach(p => {
+            progressMap[p.user_id] ||= { total: 0, completed: 0 };
+            progressMap[p.user_id].total++;
+            if (p.is_completed) progressMap[p.user_id].completed++;
           });
 
           tbody.innerHTML = '';
           if (!data?.length) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Пользователи не найдены</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;">Пользователи не найдены</td></tr>';
+            updateUsersStats();
             return;
           }
 
-          data.forEach(u=>{
-            const pr = map[u.id] || { total:0, completed:0 };
-            const pct = pr.total ? Math.round((pr.completed/pr.total)*100) : 0;
+          // Добавляем нумерацию и новые столбцы
+          data.forEach((u, index) => {
+            const pr = progressMap[u.id] || { total: 0, completed: 0 };
+            const pct = pr.total ? Math.round((pr.completed / pr.total) * 100) : 0;
             const tr = document.createElement('tr');
+            
+            // Добавляем класс для новых пользователей (последние 7 дней)
+            const userDate = new Date(u.created_at);
+            const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            if (userDate > weekAgo) {
+              tr.classList.add('user-row-new');
+            }
+
             tr.innerHTML = `
+              <td><strong>${index + 1}</strong></td>
               <td>
                 <div><strong>${u.full_name || 'Не указано'}</strong></div>
                 <div class="user-stats"><span class="stat-badge">ID: ${u.id.slice(0,8)}...</span></div>
               </td>
               <td>${u.email || '—'}</td>
-              <td><div class="user-stats"><span class="stat-badge">📊 ${pr.total ? `${pr.completed}/${pr.total} (${pct}%)` : 'Нет прогресса'}</span></div></td>
+              <td>${u.contact_phone || '—'}</td>
+              <td>${u.region || '—'}</td>
+              <td>
+                <div class="user-stats">
+                  <span class="stat-badge">📊 ${pr.total ? `${pr.completed}/${pr.total} (${pct}%)` : 'Нет прогресса'}</span>
+                </div>
+              </td>
+              <td>
+                <input type="checkbox" class="textbook-issued-checkbox" 
+                       data-user-id="${u.id}" 
+                       ${u.textbook_issued ? 'checked' : ''}
+                       title="${u.textbook_issued ? 'Учебник выдан' : 'Учебник не выдан'}">
+              </td>
               <td>${u.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
               <td>
                 <div class="user-actions">
-                  <button class="btn btn-small ${u.is_admin ? 'secondary' : ''}" data-toggle-admin="${u.id}" data-make="${!u.is_admin}">${u.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}</button>
-                  <button class="btn btn-small" data-access="${u.id}" data-name="${u.full_name || u.email}">🔐 Управление доступом</button>
+                  <button class="btn btn-small ${u.is_admin ? 'secondary' : ''}" 
+                          data-toggle-admin="${u.id}" 
+                          data-make="${!u.is_admin}">
+                    ${u.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}
+                  </button>
+                  <button class="btn btn-small" 
+                          data-access="${u.id}" 
+                          data-name="${u.full_name || u.email}">
+                    🔐 Управление доступом
+                  </button>
                 </div>
               </td>
             `;
             tbody.appendChild(tr);
           });
 
-          // обработчики
-          tbody.querySelectorAll('[data-toggle-admin]').forEach(btn=>{
-            btn.addEventListener('click', async ()=>{
+          // Обработчики для чекбоксов выдачи учебников
+          tbody.querySelectorAll('.textbook-issued-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+              const userId = this.getAttribute('data-user-id');
+              const issued = this.checked;
+              updateTextbookIssued(userId, issued);
+            });
+          });
+
+          // Обработчики для кнопок администратора
+          tbody.querySelectorAll('[data-toggle-admin]').forEach(btn => {
+            btn.addEventListener('click', async () => {
               const uid = btn.getAttribute('data-toggle-admin');
               const make = btn.getAttribute('data-make') === 'true';
               if (!confirm(`Вы уверены, что хотите ${make ? 'назначить' : 'снять'} права администратора?`)) return;
@@ -2724,95 +2928,202 @@
             });
           });
 
-          tbody.querySelectorAll('[data-access]').forEach(btn=>{
-            btn.addEventListener('click', ()=>openUserAccessModal(btn.getAttribute('data-access'), btn.getAttribute('data-name')));
+          // Обработчики для управления доступом
+          tbody.querySelectorAll('[data-access]').forEach(btn => {
+            btn.addEventListener('click', () => 
+              openUserAccessModal(btn.getAttribute('data-access'), btn.getAttribute('data-name')));
+          });
+
+          // Обновляем статистику
+          updateUsersStats();
+        }
+
+        // Функция обновления статуса выдачи учебника
+        async function updateTextbookIssued(userId, issued) {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ textbook_issued: issued })
+            .eq('id', userId);
+
+          if (error) {
+            showModal('Ошибка', 'Не удалось обновить статус выдачи учебника: ' + error.message);
+            // Перезагружаем данные для синхронизации
+            loadUsers();
+          } else {
+            console.log('Статус учебника обновлен');
+            // Обновляем статистику
+            updateUsersStats();
+          }
+        }
+
+        // Функция обновления статистики пользователей
+        async function updateUsersStats() {
+          const regionFilter = document.getElementById('regionFilter').value;
+          
+          // Общая статистика
+          let totalQuery = supabase
+            .from('profiles')
+            .select('textbook_issued', { count: 'exact' });
+
+          // Статистика по выбранной области
+          let regionalQuery = supabase
+            .from('profiles')
+            .select('textbook_issued', { count: 'exact' });
+
+          if (regionFilter) {
+            regionalQuery = regionalQuery.eq('region', regionFilter);
+          }
+
+          const [{ count: totalCount, error: totalError }, { count: regionalCount, error: regionalError }] = await Promise.all([
+            totalQuery,
+            regionalQuery
+          ]);
+
+          if (totalError || regionalError) {
+            console.error('Ошибка загрузки статистики:', totalError || regionalError);
+            return;
+          }
+
+          // Подсчет выданных учебников
+          const totalIssued = totalCount ? totalCount.filter(p => p.textbook_issued).length : 0;
+          const regionalIssued = regionalCount ? regionalCount.filter(p => p.textbook_issued).length : 0;
+
+          // Обновление интерфейса
+          document.getElementById('totalIssuedTextbooks').textContent = totalIssued;
+          document.getElementById('regionalIssuedTextbooks').textContent = regionalIssued;
+        }
+
+        // Обработчики фильтров
+        document.getElementById('userSearch').addEventListener('input', () => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(loadUsers, 350);
+        });
+
+        document.getElementById('regionFilter').addEventListener('change', () => {
+          loadUsers();
+        });
+
+        // ===== УПРАВЛЕНИЕ ЗАЯВКАМИ
+        document.getElementById('manageRequestsBtn').addEventListener('click', openRequestsManagementModal);
+        document.getElementById('closeRequestsManagementModal').addEventListener('click', () => {
+          document.getElementById('requestsManagementModal').style.display = 'none';
+        });
+
+        async function openRequestsManagementModal() {
+          document.getElementById('requestsManagementModal').style.display = 'flex';
+          await loadRequestsManagement();
+        }
+
+        async function loadRequestsManagement() {
+          const regionFilter = document.getElementById('requestsRegionFilter').value;
+          const statusFilter = document.getElementById('requestsStatusFilter').value;
+
+          let query = supabase
+            .from('purchase_requests')
+            .select(`
+              *,
+              profiles:user_id(full_name, email, region, contact_phone)
+            `)
+            .order('created_at', { ascending: false });
+
+          if (regionFilter) {
+            query = query.eq('profiles.region', regionFilter);
+          }
+
+          // Здесь можно добавить фильтрацию по статусу, когда добавите поле статуса в таблицу
+
+          const { data: requests, error } = await query;
+          const tbody = document.getElementById('requestsManagementTableBody');
+          
+          if (error) {
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:red;">Ошибка загрузки заявок</td></tr>';
+            return;
+          }
+
+          tbody.innerHTML = '';
+          if (!requests?.length) {
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;">Заявки не найдены</td></tr>';
+            return;
+          }
+
+          requests.forEach((request, index) => {
+            const userProfile = request.profiles;
+            const tr = document.createElement('tr');
+            
+            tr.innerHTML = `
+              <td><strong>${index + 1}</strong></td>
+              <td><strong>${request.request_number}</strong></td>
+              <td>${new Date(request.created_at).toLocaleDateString('ru-RU')}</td>
+              <td>${request.full_name}</td>
+              <td>${request.email}</td>
+              <td>${formatClassLevel(request.class_level)}</td>
+              <td>${formatTextbookTypes(request.textbook_types)}</td>
+              <td>${userProfile?.region || '—'}</td>
+              <td>
+                <span class="stat-badge" style="background:#fff3cd;color:#856404;">
+                  📝 Ожидает обработки
+                </span>
+              </td>
+              <td>
+                <div class="user-actions">
+                  <button class="btn btn-small" data-approve-request="${request.id}">✅ Одобрить</button>
+                  <button class="btn btn-small btn-danger" data-reject-request="${request.id}">❌ Отклонить</button>
+                </div>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          // Обработчики для кнопок заявок
+          tbody.querySelectorAll('[data-approve-request]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const requestId = btn.getAttribute('data-approve-request');
+              if (confirm('Одобрить эту заявку?')) {
+                // Здесь логика одобрения заявки
+                showModal('Успех', 'Заявка одобрена!');
+                loadRequestsManagement();
+              }
+            });
+          });
+
+          tbody.querySelectorAll('[data-reject-request]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const requestId = btn.getAttribute('data-reject-request');
+              if (confirm('Отклонить эту заявку?')) {
+                // Здесь логика отклонения заявки
+                showModal('Успех', 'Заявка отклонена!');
+                loadRequestsManagement();
+              }
+            });
           });
         }
 
-        document.getElementById('closeUserAccessModal').addEventListener('click', ()=>{
-          document.getElementById('userAccessModal').style.display='none';
-        });
-        document.getElementById('saveUserAccessBtn').addEventListener('click', saveUserAccess);
-
-        async function openUserAccessModal(userId, userName) {
-          currentEditingUserId = userId;
-          document.getElementById('userAccessInfo').innerHTML = `
-            <p><strong>Пользователь:</strong> ${userName}</p>
-            <p class="small-muted">Отметьте учебники и кроссворды, к которым пользователь должен иметь доступ</p>
-          `;
-
-          const [t, c, ta, ca] = await Promise.all([
-            supabase.from('textbooks').select('id,title').eq('is_active', true).order('order_index'),
-            supabase.from('crosswords').select('id,title').eq('is_active', true).order('order_index'),
-            supabase.from('textbook_access').select('textbook_id').eq('user_id', userId),
-            supabase.from('crossword_access').select('crossword_id').eq('user_id', userId)
-          ]);
-
-          const tSet = new Set((ta.data||[]).map(x=>String(x.textbook_id)));
-          const cSet = new Set((ca.data||[]).map(x=>String(x.crossword_id)));
-
-          const tList = document.getElementById('textbookAccessList');
-          tList.innerHTML = '';
-          if (t.data?.length) {
-            t.data.forEach(tb=>{
-              const item = document.createElement('div');
-              item.className = 'access-item';
-              const id = `textbook_${tb.id}`;
-              item.innerHTML = `<input type="checkbox" id="${id}" ${tSet.has(String(tb.id))?'checked':''}>
-                                <label for="${id}">${tb.title}</label>`;
-              tList.appendChild(item);
-            });
-          } else {
-            tList.innerHTML = '<p class="small-muted">Нет доступных учебников</p>';
-          }
-
-          const cList = document.getElementById('crosswordAccessList');
-          cList.innerHTML = '';
-          if (c.data?.length) {
-            c.data.forEach(cr=>{
-              const item = document.createElement('div');
-              item.className = 'access-item';
-              const id = `crossword_${cr.id}`;
-              item.innerHTML = `<input type="checkbox" id="${id}" ${cSet.has(String(cr.id))?'checked':''}>
-                                <label for="${id}">${cr.title}</label>`;
-              cList.appendChild(item);
-            });
-          } else {
-            cList.innerHTML = '<p class="small-muted">Нет доступных кроссвордов</p>';
-          }
-
-          document.getElementById('userAccessModal').style.display='flex';
+        // Вспомогательные функции для форматирования
+        function formatClassLevel(classLevel) {
+          const classMap = {
+            '1-2': '1-2 класс',
+            '3-4': '3-4 класс', 
+            '5-6': '5-6 класс',
+            '7': '7 класс',
+            '8-9': '8-9 класс',
+            '10-11': '10-11 класс',
+            '12': '12 класс'
+          };
+          return classMap[classLevel] || classLevel;
         }
 
-        async function saveUserAccess() {
-          if (!currentEditingUserId) return;
-
-          // собрать выбор
-          const textSelected = Array.from(document.querySelectorAll('#textbookAccessList input[type="checkbox"]:checked'))
-            .map(cb => cb.id.replace('textbook_',''));
-          const crossSelected = Array.from(document.querySelectorAll('#crosswordAccessList input[type="checkbox"]:checked'))
-            .map(cb => cb.id.replace('crossword_',''));
-
-          // перезаписать
-          const ops = [];
-          ops.push(supabase.from('textbook_access').delete().eq('user_id', currentEditingUserId));
-          ops.push(supabase.from('crossword_access').delete().eq('user_id', currentEditingUserId));
-          await Promise.all(ops);
-
-          if (textSelected.length) {
-            await supabase.from('textbook_access').insert(
-              textSelected.map(id=>({ user_id: currentEditingUserId, textbook_id: id }))
-            );
-          }
-          if (crossSelected.length) {
-            await supabase.from('crossword_access').insert(
-              crossSelected.map(id=>({ user_id: currentEditingUserId, crossword_id: id }))
-            );
-          }
-
-          showModal('Готово','Доступы обновлены');
-          document.getElementById('userAccessModal').style.display='none';
+        function formatTextbookTypes(types) {
+          if (!types || !Array.isArray(types)) return '';
+          const typeMap = {
+            'учебник': '📚 Учебник',
+            'кроссворд': '🧩 Кроссворд'
+          };
+          return types.map(type => typeMap[type] || type).join(', ');
         }
+
+        // Обработчики фильтров в модалке заявок
+        document.getElementById('requestsRegionFilter').addEventListener('change', loadRequestsManagement);
+        document.getElementById('requestsStatusFilter').addEventListener('change', loadRequestsManagement);
 
         // ===== СТАРТОВАЯ ИНИЦИАЛИЗАЦИЯ
         await loadStats();
