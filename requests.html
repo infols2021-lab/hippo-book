@@ -291,6 +291,23 @@
       color: #e65100;
     }
 
+    .status-badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .status-processed {
+      background: #d4edda;
+      color: #155724;
+    }
+
     @media (max-width: 768px) {
       .container {
         width: 100%;
@@ -488,6 +505,7 @@
               <th>Типы материалов</th>
               <th>Email</th>
               <th>ФИО ученика</th>
+              <th>Статус</th>
               <th>Действия</th>
             </tr>
           </thead>
@@ -649,78 +667,6 @@
       document.getElementById('paymentModal').style.display = 'none';
     }
 
-    // Загрузка заявок пользователя
-    async function loadRequests() {
-      try {
-        const { data: requests, error } = await supabaseClient
-          .from('purchase_requests')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        const tbody = document.getElementById('requestsTableBody');
-        tbody.innerHTML = '';
-
-        if (!requests || requests.length === 0) {
-          showEmptyState();
-          return;
-        }
-
-        requests.forEach(request => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td><strong>${request.request_number}</strong></td>
-            <td>${formatDateTime(request.created_at)}</td>
-            <td>${formatClassLevel(request.class_level)}</td>
-            <td>${formatTextbookTypes(request.textbook_types)}</td>
-            <td>${request.email}</td>
-            <td>${request.full_name}</td>
-            <td>
-              <button class="btn btn-small" data-edit="${request.id}">✏️ Редактировать</button>
-              <button class="btn btn-small btn-danger" data-delete="${request.id}">🗑️ Удалить</button>
-            </td>
-          `;
-          tbody.appendChild(row);
-        });
-
-        // Добавляем обработчики событий для кнопок
-        tbody.querySelectorAll('[data-edit]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const requestId = btn.getAttribute('data-edit');
-            const request = requests.find(r => r.id === requestId);
-            if (request) openEditRequestModal(request);
-          });
-        });
-
-        tbody.querySelectorAll('[data-delete]').forEach(btn => {
-          btn.addEventListener('click', async () => {
-            const requestId = btn.getAttribute('data-delete');
-            const request = requests.find(r => r.id === requestId);
-            
-            if (confirm(`Вы уверены, что хотите удалить заявку ${request.request_number}?`)) {
-              try {
-                const { error } = await supabaseClient
-                  .from('purchase_requests')
-                  .delete()
-                  .eq('id', requestId);
-
-                if (error) throw error;
-                
-                loadRequests(); // Перезагружаем список
-              } catch (error) {
-                showError('Ошибка при удалении заявки: ' + error.message);
-              }
-            }
-          });
-        });
-
-        showTable();
-      } catch (error) {
-        showError('Ошибка загрузки заявок: ' + error.message);
-      }
-    }
-
     // Форматирование отображения класса
     function formatClassLevel(classLevel) {
       const classMap = {
@@ -758,6 +704,94 @@
       });
     }
 
+    // Загрузка заявок пользователя - ИСПРАВЛЕННАЯ ВЕРСИЯ
+    async function loadRequests() {
+      try {
+        // ВСЕГДА загружаем только заявки текущего пользователя
+        const { data: requests, error } = await supabaseClient
+          .from('purchase_requests')
+          .select('*')
+          .eq('user_id', currentUser.id) // ФИЛЬТРУЕМ ПО ТЕКУЩЕМУ ПОЛЬЗОВАТЕЛЮ
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const tbody = document.getElementById('requestsTableBody');
+        tbody.innerHTML = '';
+
+        if (!requests || requests.length === 0) {
+          showEmptyState();
+          return;
+        }
+
+        requests.forEach(request => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td><strong>${request.request_number}</strong></td>
+            <td>${formatDateTime(request.created_at)}</td>
+            <td>${formatClassLevel(request.class_level)}</td>
+            <td>${formatTextbookTypes(request.textbook_types)}</td>
+            <td>${request.email}</td>
+            <td>${request.full_name}</td>
+            <td>
+              <span class="status-badge ${request.is_processed ? 'status-processed' : 'status-pending'}">
+                ${request.is_processed ? '✅ Обработана' : '⏳ Ожидает'}
+              </span>
+            </td>
+            <td>
+              <button class="btn btn-small" data-edit="${request.id}">✏️ Редактировать</button>
+              <button class="btn btn-small btn-danger" data-delete="${request.id}">🗑️ Удалить</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        // Добавляем обработчики событий для кнопок
+        tbody.querySelectorAll('[data-edit]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const requestId = btn.getAttribute('data-edit');
+            const request = requests.find(r => r.id === requestId);
+            if (request) openEditRequestModal(request);
+          });
+        });
+
+        tbody.querySelectorAll('[data-delete]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const requestId = btn.getAttribute('data-delete');
+            const request = requests.find(r => r.id === requestId);
+            
+            // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: пользователь может удалять только свои заявки
+            // Поскольку мы уже фильтровали по user_id, это дополнительная защита
+            if (request.user_id !== currentUser.id) {
+              alert('❌ Вы можете удалять только свои заявки');
+              return;
+            }
+            
+            if (confirm(`Вы уверены, что хотите удалить заявку ${request.request_number}?`)) {
+              try {
+                const { error } = await supabaseClient
+                  .from('purchase_requests')
+                  .delete()
+                  .eq('id', requestId)
+                  .eq('user_id', currentUser.id); // Двойная проверка на сервере
+
+                if (error) throw error;
+                
+                showNotification('✅ Заявка успешно удалена');
+                loadRequests(); // Перезагружаем список
+              } catch (error) {
+                showError('Ошибка при удалении заявки: ' + error.message);
+              }
+            }
+          });
+        });
+
+        showTable();
+      } catch (error) {
+        showError('Ошибка загрузки заявок: ' + error.message);
+      }
+    }
+
     // Сохранение заявки
     async function saveRequest() {
       const requestNumber = document.getElementById('requestNumber').value;
@@ -788,21 +822,34 @@
           class_level: classLevel,
           textbook_types: textbookTypes,
           email: email,
-          full_name: fullName
+          full_name: fullName,
+          user_id: currentUser.id // ВСЕГДА устанавливаем текущего пользователя
         };
 
         let error;
         if (currentEditingRequestId) {
-          // Редактирование существующей заявки
+          // Редактирование существующей заявки - проверяем принадлежность
+          const { data: existingRequest } = await supabaseClient
+            .from('purchase_requests')
+            .select('user_id')
+            .eq('id', currentEditingRequestId)
+            .single();
+
+          if (existingRequest && existingRequest.user_id !== currentUser.id) {
+            alert('❌ Вы можете редактировать только свои заявки');
+            return;
+          }
+
           ({ error } = await supabaseClient
             .from('purchase_requests')
             .update(requestData)
-            .eq('id', currentEditingRequestId));
+            .eq('id', currentEditingRequestId)
+            .eq('user_id', currentUser.id)); // Двойная проверка
         } else {
           // Создание новой заявки
           ({ error } = await supabaseClient
             .from('purchase_requests')
-            .insert([{ ...requestData, user_id: currentUser.id }]));
+            .insert([requestData]));
         }
 
         if (error) throw error;
@@ -813,6 +860,8 @@
         if (!currentEditingRequestId) {
           const totalAmount = textbookTypes.length * 1000;
           openPaymentModal(totalAmount);
+        } else {
+          showNotification('✅ Заявка успешно обновлена');
         }
         
         loadRequests(); // Перезагружаем список
@@ -820,6 +869,63 @@
         alert('Ошибка при сохранении заявки: ' + error.message);
       }
     }
+
+    // Функция для показа уведомлений
+    function showNotification(message, type = 'success') {
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#4caf50' : '#f44336'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10001;
+        max-width: 300px;
+        animation: slideInRight 0.3s ease-out;
+      `;
+      notification.textContent = message;
+      
+      document.body.appendChild(notification);
+      
+      // Автоматически удаляем через 4 секунды
+      setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease-in';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 300);
+      }, 4000);
+    }
+
+    // Добавляем CSS анимации для уведомлений
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideInRight {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      @keyframes slideOutRight {
+        from {
+          transform: translateX(0);
+          opacity: 1;
+        }
+        to {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+      }
+    `;
+    document.head.appendChild(style);
 
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
