@@ -18,7 +18,7 @@
     }
     .register-container {
       width: 100%;
-      max-width: 450px;
+      max-width: 500px;
     }
     .register-card {
       background: #fff;
@@ -42,7 +42,7 @@
       font-weight: 600;
       color: #333;
     }
-    .register-card input {
+    .register-card input, .register-card select {
       width: 100%;
       padding: 12px 15px;
       border: 2px solid #f0f0f0;
@@ -50,8 +50,9 @@
       box-sizing: border-box;
       font-size: 16px;
       transition: border-color 0.3s;
+      font-family: inherit;
     }
-    .register-card input:focus {
+    .register-card input:focus, .register-card select:focus {
       border-color: var(--accent2);
       outline: none;
     }
@@ -179,6 +180,20 @@
       font-size: 13px;
       text-align: left;
     }
+    .consent-text {
+      margin-top: 15px;
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .consent-text a {
+      color: var(--accent2);
+      text-decoration: none;
+    }
+    .consent-text a:hover {
+      text-decoration: underline;
+    }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -200,7 +215,7 @@
         font-size: 1.3rem;
         margin-bottom: 15px;
       }
-      .register-card input {
+      .register-card input, .register-card select {
         padding: 14px 16px;
         font-size: 16px;
       }
@@ -237,8 +252,26 @@
         </div>
 
         <div class="form-group">
-          <label for="fullname">Полное имя:</label>
+          <label for="fullname">ФИО:</label>
           <input type="text" id="fullname" placeholder="Иванов Иван Иванович" required>
+        </div>
+
+        <div class="form-group">
+          <label for="phone">Контактный телефон:</label>
+          <input type="tel" id="phone" placeholder="+7 (999) 123-45-67" required>
+        </div>
+
+        <div class="form-group">
+          <label for="region">Область проживания:</label>
+          <select id="region" required>
+            <option value="">-- Выберите область --</option>
+            <option value="Белгородская">Белгородская область</option>
+            <option value="Курская">Курская область</option>
+            <option value="Тамбовская">Тамбовская область</option>
+            <option value="Воронежская">Воронежская область</option>
+            <option value="Липецкая">Липецкая область</option>
+            <option value="Другое">Другая область</option>
+          </select>
         </div>
 
         <div class="form-group">
@@ -269,9 +302,20 @@
           <div class="validation-item" id="validationDomain">
             <span class="validation-icon">⭕</span> Разрешенный почтовый сервис
           </div>
+          <div class="validation-item" id="validationPhone">
+            <span class="validation-icon">⭕</span> Телефон заполнен
+          </div>
+          <div class="validation-item" id="validationRegion">
+            <span class="validation-icon">⭕</span> Область выбрана
+          </div>
         </div>
         
         <button class="btn" id="registerBtn" disabled>Создать аккаунт</button>
+        
+        <div class="consent-text">
+          Нажимая на кнопку "Создать аккаунт", вы соглашаетесь с <a href="https://docs.google.com/document/d/your-document-id/edit" target="_blank">положением о персональных данных</a>.
+        </div>
+        
         <div class="link">
           <p>Уже есть аккаунт? <a href="/login.html">Войти в систему</a></p>
         </div>
@@ -395,6 +439,9 @@
 
     // Функция обновления визуальной валидации
     function updateValidation() {
+      const fullname = document.getElementById('fullname').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const region = document.getElementById('region').value;
       const email = document.getElementById('email').value.trim();
       const confirmEmail = document.getElementById('confirmEmail').value.trim();
       const password = document.getElementById('password').value;
@@ -427,9 +474,21 @@
       domainItem.className = `validation-item ${domainValid ? 'valid' : (email ? 'invalid' : '')}`;
       domainItem.querySelector('.validation-icon').textContent = domainValid ? '✅' : (email ? '❌' : '⭕');
       
+      // Валидация телефона
+      const phoneValid = phone.length > 0;
+      const phoneItem = document.getElementById('validationPhone');
+      phoneItem.className = `validation-item ${phoneValid ? 'valid' : ''}`;
+      phoneItem.querySelector('.validation-icon').textContent = phoneValid ? '✅' : '⭕';
+      
+      // Валидация региона
+      const regionValid = region !== '';
+      const regionItem = document.getElementById('validationRegion');
+      regionItem.className = `validation-item ${regionValid ? 'valid' : ''}`;
+      regionItem.querySelector('.validation-icon').textContent = regionValid ? '✅' : '⭕';
+      
       // Активация кнопки регистрации
       const registerBtn = document.getElementById('registerBtn');
-      registerBtn.disabled = !(formatValid && matchValid && passwordValid && domainValid);
+      registerBtn.disabled = !(formatValid && matchValid && passwordValid && domainValid && phoneValid && regionValid);
     }
     
     function initApp() {
@@ -446,19 +505,23 @@
           const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
           
           // Обработчики ввода для валидации
+          document.getElementById('fullname').addEventListener('input', updateValidation);
+          document.getElementById('phone').addEventListener('input', updateValidation);
+          document.getElementById('region').addEventListener('change', updateValidation);
           document.getElementById('email').addEventListener('input', updateValidation);
           document.getElementById('confirmEmail').addEventListener('input', updateValidation);
           document.getElementById('password').addEventListener('input', updateValidation);
-          document.getElementById('fullname').addEventListener('input', updateValidation);
           
           document.getElementById('registerBtn').addEventListener('click', async () => {
             const fullname = document.getElementById('fullname').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const region = document.getElementById('region').value;
             const email = document.getElementById('email').value.trim();
             const confirmEmail = document.getElementById('confirmEmail').value.trim();
             const password = document.getElementById('password').value;
 
             // Базовая валидация
-            if (!fullname || !email || !confirmEmail || !password) {
+            if (!fullname || !phone || !region || !email || !confirmEmail || !password) {
               showError('Заполните все поля');
               return;
             }
@@ -507,7 +570,9 @@
                 password,
                 options: { 
                   data: { 
-                    full_name: fullname
+                    full_name: fullname,
+                    contact_phone: phone,
+                    region: region
                   },
                   emailRedirectTo: redirectUrl
                 }
@@ -560,6 +625,8 @@
                 
                 // Очищаем форму
                 document.getElementById('fullname').value = '';
+                document.getElementById('phone').value = '';
+                document.getElementById('region').value = '';
                 document.getElementById('email').value = '';
                 document.getElementById('confirmEmail').value = '';
                 document.getElementById('password').value = '';
