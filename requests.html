@@ -105,6 +105,11 @@
       color: #666;
       padding: 5px;
       line-height: 1;
+      transition: color 0.2s;
+    }
+
+    .modal-close:hover {
+      color: #333;
     }
 
     .form-group {
@@ -141,6 +146,7 @@
       cursor: not-allowed;
     }
 
+    /* ИСПРАВЛЕННЫЕ СТИЛИ ДЛЯ ЧЕКБОКСОВ */
     .checkbox-group {
       margin-top: 10px;
     }
@@ -149,28 +155,45 @@
       display: flex;
       align-items: center;
       margin-bottom: 10px;
-      padding: 10px;
+      padding: 12px 15px;
       background: #f8f9fa;
-      border-radius: 8px;
-      border: 1px solid #e9ecef;
+      border-radius: 10px;
+      border: 2px solid #e9ecef;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .checkbox-item:hover {
+      border-color: var(--accent2);
+      background: #f0f9ff;
+    }
+
+    .checkbox-item.checked {
+      border-color: var(--accent2);
+      background: rgba(78, 205, 196, 0.1);
     }
 
     .checkbox-item input[type="checkbox"] {
-      width: auto;
-      margin-right: 10px;
-      transform: scale(1.2);
+      width: 20px;
+      height: 20px;
+      margin-right: 12px;
+      cursor: pointer;
+      accent-color: var(--accent2);
     }
 
     .checkbox-item label {
       margin: 0;
-      font-weight: normal;
+      font-weight: 600;
+      color: #2c3e50;
       cursor: pointer;
+      flex: 1;
     }
 
     .price-info {
       color: #666;
       font-size: 12px;
       margin-left: 5px;
+      font-weight: normal;
     }
 
     .modal-actions {
@@ -308,6 +331,47 @@
       color: #155724;
     }
 
+    /* Стили для уведомлений */
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #4caf50;
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10001;
+      max-width: 300px;
+      animation: slideInRight 0.3s ease-out;
+    }
+
+    .notification.error {
+      background: #f44336;
+    }
+
+    @keyframes slideInRight {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOutRight {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+
     @media (max-width: 768px) {
       .container {
         width: 100%;
@@ -333,6 +397,10 @@
       .payment-qr img {
         max-width: 200px;
       }
+
+      .checkbox-item {
+        padding: 10px 12px;
+      }
     }
 
     @media (max-width: 480px) {
@@ -348,6 +416,16 @@
       
       .payment-qr img {
         max-width: 180px;
+      }
+
+      .checkbox-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .checkbox-item input[type="checkbox"] {
+        margin-right: 0;
       }
     }
   </style>
@@ -391,11 +469,11 @@
         <div class="form-group">
           <label>Тип учебника (стоимость каждого учебника 1000р):</label>
           <div class="checkbox-group">
-            <div class="checkbox-item">
+            <div class="checkbox-item" id="textbookCheckbox">
               <input type="checkbox" id="textbookType" name="textbookType" value="учебник">
               <label for="textbookType">Учебник <span class="price-info">(1000р)</span></label>
             </div>
-            <div class="checkbox-item">
+            <div class="checkbox-item" id="crosswordCheckbox">
               <input type="checkbox" id="crosswordType" name="textbookType" value="кроссворд">
               <label for="crosswordType">Кроссворд <span class="price-info">(1000р)</span></label>
             </div>
@@ -591,6 +669,62 @@
       }
     }
 
+    // Обновление стилей чекбоксов при изменении состояния
+    function updateCheckboxStyles() {
+      const textbookCheckbox = document.getElementById('textbookCheckbox');
+      const crosswordCheckbox = document.getElementById('crosswordCheckbox');
+      const textbookInput = document.getElementById('textbookType');
+      const crosswordInput = document.getElementById('crosswordType');
+      
+      if (textbookInput.checked) {
+        textbookCheckbox.classList.add('checked');
+      } else {
+        textbookCheckbox.classList.remove('checked');
+      }
+      
+      if (crosswordInput.checked) {
+        crosswordCheckbox.classList.add('checked');
+      } else {
+        crosswordCheckbox.classList.remove('checked');
+      }
+    }
+
+    // Инициализация чекбоксов
+    function initCheckboxes() {
+      const textbookCheckbox = document.getElementById('textbookCheckbox');
+      const crosswordCheckbox = document.getElementById('crosswordCheckbox');
+      const textbookInput = document.getElementById('textbookType');
+      const crosswordInput = document.getElementById('crosswordType');
+      
+      // Обработчики для клика по всей области чекбокса
+      textbookCheckbox.addEventListener('click', (e) => {
+        if (e.target !== textbookInput) {
+          textbookInput.checked = !textbookInput.checked;
+          updateCheckboxStyles();
+          updateTotalAmount();
+        }
+      });
+      
+      crosswordCheckbox.addEventListener('click', (e) => {
+        if (e.target !== crosswordInput) {
+          crosswordInput.checked = !crosswordInput.checked;
+          updateCheckboxStyles();
+          updateTotalAmount();
+        }
+      });
+      
+      // Обработчики для самих инпутов
+      textbookInput.addEventListener('change', () => {
+        updateCheckboxStyles();
+        updateTotalAmount();
+      });
+      
+      crosswordInput.addEventListener('change', () => {
+        updateCheckboxStyles();
+        updateTotalAmount();
+      });
+    }
+
     // Открытие модального окна для создания заявки
     function openCreateRequestModal() {
       currentEditingRequestId = null;
@@ -614,8 +748,9 @@
       document.getElementById('requestEmail').value = currentUser?.email || '';
       document.getElementById('requestFullName').value = currentProfile?.full_name || '';
       
-      // Сброс суммы
+      // Сброс суммы и стилей
       updateTotalAmount();
+      updateCheckboxStyles();
       
       document.getElementById('requestModal').style.display = 'flex';
     }
@@ -643,8 +778,9 @@
       document.getElementById('requestEmail').value = request.email;
       document.getElementById('requestFullName').value = request.full_name;
       
-      // Обновление суммы
+      // Обновление суммы и стилей
       updateTotalAmount();
+      updateCheckboxStyles();
       
       document.getElementById('requestModal').style.display = 'flex';
     }
@@ -704,14 +840,33 @@
       });
     }
 
-    // Загрузка заявок пользователя - ИСПРАВЛЕННАЯ ВЕРСИЯ
+    // Функция для показа уведомлений
+    function showNotification(message, type = 'success') {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type === 'error' ? 'error' : ''}`;
+      notification.textContent = message;
+      
+      document.body.appendChild(notification);
+      
+      // Автоматически удаляем через 4 секунды
+      setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease-in';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 300);
+      }, 4000);
+    }
+
+    // Загрузка заявок пользователя
     async function loadRequests() {
       try {
         // ВСЕГДА загружаем только заявки текущего пользователя
         const { data: requests, error } = await supabaseClient
           .from('purchase_requests')
           .select('*')
-          .eq('user_id', currentUser.id) // ФИЛЬТРУЕМ ПО ТЕКУЩЕМУ ПОЛЬЗОВАТЕЛЮ
+          .eq('user_id', currentUser.id)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -760,10 +915,9 @@
             const requestId = btn.getAttribute('data-delete');
             const request = requests.find(r => r.id === requestId);
             
-            // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: пользователь может удалять только свои заявки
-            // Поскольку мы уже фильтровали по user_id, это дополнительная защита
+            // Дополнительная проверка: пользователь может удалять только свои заявки
             if (request.user_id !== currentUser.id) {
-              alert('❌ Вы можете удалять только свои заявки');
+              showNotification('❌ Вы можете удалять только свои заявки', 'error');
               return;
             }
             
@@ -780,7 +934,7 @@
                 showNotification('✅ Заявка успешно удалена');
                 loadRequests(); // Перезагружаем список
               } catch (error) {
-                showError('Ошибка при удалении заявки: ' + error.message);
+                showNotification('Ошибка при удалении заявки: ' + error.message, 'error');
               }
             }
           });
@@ -806,24 +960,24 @@
 
       // Валидация
       if (!requestDateTime || !classLevel || !email || !fullName) {
-        alert('Пожалуйста, заполните все обязательные поля');
+        showNotification('❌ Пожалуйста, заполните все обязательные поля', 'error');
         return;
       }
 
       if (textbookTypes.length === 0) {
-        alert('Пожалуйста, выберите хотя бы один тип материала');
+        showNotification('❌ Пожалуйста, выберите хотя бы один тип материала', 'error');
         return;
       }
 
       try {
         const requestData = {
           request_number: requestNumber,
-          request_date: requestDateTime.split('T')[0], // Сохраняем только дату для совместимости
+          request_date: requestDateTime.split('T')[0],
           class_level: classLevel,
           textbook_types: textbookTypes,
           email: email,
           full_name: fullName,
-          user_id: currentUser.id // ВСЕГДА устанавливаем текущего пользователя
+          user_id: currentUser.id
         };
 
         let error;
@@ -836,7 +990,7 @@
             .single();
 
           if (existingRequest && existingRequest.user_id !== currentUser.id) {
-            alert('❌ Вы можете редактировать только свои заявки');
+            showNotification('❌ Вы можете редактировать только свои заявки', 'error');
             return;
           }
 
@@ -844,7 +998,7 @@
             .from('purchase_requests')
             .update(requestData)
             .eq('id', currentEditingRequestId)
-            .eq('user_id', currentUser.id)); // Двойная проверка
+            .eq('user_id', currentUser.id));
         } else {
           // Создание новой заявки
           ({ error } = await supabaseClient
@@ -864,68 +1018,11 @@
           showNotification('✅ Заявка успешно обновлена');
         }
         
-        loadRequests(); // Перезагружаем список
+        loadRequests();
       } catch (error) {
-        alert('Ошибка при сохранении заявки: ' + error.message);
+        showNotification('❌ Ошибка при сохранении заявки: ' + error.message, 'error');
       }
     }
-
-    // Функция для показа уведомлений
-    function showNotification(message, type = 'success') {
-      const notification = document.createElement('div');
-      notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'success' ? '#4caf50' : '#f44336'};
-        color: white;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 10001;
-        max-width: 300px;
-        animation: slideInRight 0.3s ease-out;
-      `;
-      notification.textContent = message;
-      
-      document.body.appendChild(notification);
-      
-      // Автоматически удаляем через 4 секунды
-      setTimeout(() => {
-        notification.style.animation = 'slideOutRight 0.3s ease-in';
-        setTimeout(() => {
-          if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
-          }
-        }, 300);
-      }, 4000);
-    }
-
-    // Добавляем CSS анимации для уведомлений
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes slideInRight {
-        from {
-          transform: translateX(100%);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(0);
-          opacity: 1;
-        }
-      }
-      @keyframes slideOutRight {
-        from {
-          transform: translateX(0);
-          opacity: 1;
-        }
-        to {
-          transform: translateX(100%);
-          opacity: 0;
-        }
-      }
-    `;
-    document.head.appendChild(style);
 
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
@@ -954,6 +1051,9 @@
         
         currentProfile = profileData;
 
+        // Инициализация чекбоксов
+        initCheckboxes();
+
         // Обработчики событий
         document.getElementById('createRequestBtn').addEventListener('click', openCreateRequestModal);
         document.getElementById('createRequestEmptyBtn').addEventListener('click', openCreateRequestModal);
@@ -963,10 +1063,7 @@
         document.getElementById('closePaymentModal').addEventListener('click', closePaymentModal);
         document.getElementById('closePaymentBtn').addEventListener('click', closePaymentModal);
         
-        // Обработчики для чекбоксов
-        document.querySelectorAll('input[name="textbookType"]').forEach(checkbox => {
-          checkbox.addEventListener('change', updateTotalAmount);
-        });
+        // Обработчики для чекбоксов уже установлены в initCheckboxes()
         
         document.getElementById('requestForm').addEventListener('submit', (e) => {
           e.preventDefault();
@@ -977,6 +1074,31 @@
           if (confirm('Вы уверены, что хотите выйти?')) {
             await supabaseClient.auth.signOut();
             location.href = '/login.html';
+          }
+        });
+
+        // Закрытие модальных окон по клику на фон
+        document.getElementById('requestModal').addEventListener('click', (e) => {
+          if (e.target === document.getElementById('requestModal')) {
+            closeRequestModal();
+          }
+        });
+
+        document.getElementById('paymentModal').addEventListener('click', (e) => {
+          if (e.target === document.getElementById('paymentModal')) {
+            closePaymentModal();
+          }
+        });
+
+        // Закрытие по Escape
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            if (document.getElementById('requestModal').style.display === 'flex') {
+              closeRequestModal();
+            }
+            if (document.getElementById('paymentModal').style.display === 'flex') {
+              closePaymentModal();
+            }
           }
         });
 
