@@ -141,6 +141,38 @@
       cursor: not-allowed;
     }
 
+    .checkbox-group {
+      margin-top: 10px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: auto;
+      margin-right: 10px;
+      transform: scale(1.2);
+    }
+
+    .checkbox-item label {
+      margin: 0;
+      font-weight: normal;
+      cursor: pointer;
+    }
+
+    .price-info {
+      color: #666;
+      font-size: 12px;
+      margin-left: 5px;
+    }
+
     .modal-actions {
       display: flex;
       gap: 12px;
@@ -239,6 +271,26 @@
       margin: 0 0 10px 0;
     }
 
+    .total-amount {
+      background: linear-gradient(135deg, #fff3e0, #ffecb3);
+      border: 1px solid #ffd54f;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+      text-align: center;
+    }
+
+    .total-amount h4 {
+      color: #f57c00;
+      margin: 0 0 8px 0;
+    }
+
+    .total-amount .amount {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #e65100;
+    }
+
     @media (max-width: 768px) {
       .container {
         width: 100%;
@@ -301,8 +353,8 @@
         </div>
 
         <div class="form-group">
-          <label for="requestDate">Дата заявки:</label>
-          <input type="date" id="requestDate" readonly>
+          <label for="requestDateTime">Дата и время создания:</label>
+          <input type="datetime-local" id="requestDateTime" readonly>
         </div>
 
         <div class="form-group">
@@ -320,6 +372,20 @@
         </div>
 
         <div class="form-group">
+          <label>Тип учебника (стоимость каждого учебника 1000р):</label>
+          <div class="checkbox-group">
+            <div class="checkbox-item">
+              <input type="checkbox" id="textbookType" name="textbookType" value="учебник">
+              <label for="textbookType">Учебник <span class="price-info">(1000р)</span></label>
+            </div>
+            <div class="checkbox-item">
+              <input type="checkbox" id="crosswordType" name="textbookType" value="кроссворд">
+              <label for="crosswordType">Кроссворд <span class="price-info">(1000р)</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
           <label for="requestEmail">Email:</label>
           <input type="email" id="requestEmail" readonly>
         </div>
@@ -327,6 +393,11 @@
         <div class="form-group">
           <label for="requestFullName">ФИО ученика:</label>
           <input type="text" id="requestFullName" readonly>
+        </div>
+        
+        <div class="total-amount" id="totalAmountContainer" style="display: none;">
+          <h4>💰 Общая сумма к оплате:</h4>
+          <div class="amount" id="totalAmount">0 руб.</div>
         </div>
         
         <div class="modal-actions">
@@ -347,8 +418,13 @@
       
       <div class="success-message">
         <h4>📋 Информация о заявке</h4>
-        <p><strong>Доступ к выбранному учебнику будет открыт через некоторое время после оплаты.</strong></p>
+        <p><strong>Доступ к выбранным материалам будет открыт через некоторое время после оплаты.</strong></p>
         <p>Оплатить можно по QR-коду ниже:</p>
+      </div>
+
+      <div class="total-amount">
+        <h4>💰 Сумма к оплате:</h4>
+        <div class="amount" id="paymentTotalAmount">0 руб.</div>
       </div>
 
       <div class="payment-qr">
@@ -356,7 +432,7 @@
       </div>
 
       <div style="text-align: center; margin-top: 15px;">
-        <p class="small-muted">После оплаты доступ к учебнику будет открыт в течение 24 часов</p>
+        <p class="small-muted">После оплаты доступ к материалам будет открыт в течение 24 часов</p>
       </div>
       
       <div class="modal-actions">
@@ -386,7 +462,7 @@
       
       <div class="payment-info">
         <h4>💰 Информация об оплате</h4>
-        <p>Оплата учебника происходит по QR-коду после создания заявки. После подтверждения оплаты доступ к учебнику будет открыт в течение 24 часов.</p>
+        <p>Оплата материалов происходит по QR-коду после создания заявки. Стоимость каждого учебника или кроссворда - 1000 рублей. После подтверждения оплаты доступ к материалам будет открыт в течение 24 часов.</p>
       </div>
 
       <div style="margin-bottom: 20px;">
@@ -407,8 +483,9 @@
           <thead>
             <tr>
               <th>Номер заявки</th>
-              <th>Дата заявки</th>
+              <th>Дата и время создания</th>
               <th>Класс</th>
+              <th>Типы материалов</th>
               <th>Email</th>
               <th>ФИО ученика</th>
               <th>Действия</th>
@@ -421,7 +498,7 @@
         
         <div id="emptyState" class="empty-state" style="display: none;">
           <h3>📭 Заявок пока нет</h3>
-          <p>Создайте свою первую заявку на покупку учебника</p>
+          <p>Создайте свою первую заявку на покупку учебников или кроссвордов</p>
           <button class="btn" id="createRequestEmptyBtn">
             ➕ Создать заявку
           </button>
@@ -437,6 +514,7 @@
     let currentProfile = null;
     let currentEditingRequestId = null;
     let supabaseClient = null;
+    let selectedTypes = [];
 
     function showError(message) {
       document.getElementById('errorMessage').textContent = message;
@@ -478,21 +556,48 @@
       return `${window.SUPABASE_URL}/storage/v1/object/public/help-images/oplata.png?t=${timestamp}`;
     }
 
+    // Обновление суммы
+    function updateTotalAmount() {
+      const checkboxes = document.querySelectorAll('input[name="textbookType"]:checked');
+      selectedTypes = Array.from(checkboxes).map(cb => cb.value);
+      const totalAmount = selectedTypes.length * 1000;
+      
+      const totalAmountElement = document.getElementById('totalAmount');
+      const totalAmountContainer = document.getElementById('totalAmountContainer');
+      
+      if (totalAmount > 0) {
+        totalAmountElement.textContent = `${totalAmount} руб.`;
+        totalAmountContainer.style.display = 'block';
+      } else {
+        totalAmountContainer.style.display = 'none';
+      }
+    }
+
     // Открытие модального окна для создания заявки
     function openCreateRequestModal() {
       currentEditingRequestId = null;
       document.getElementById('requestModalTitle').textContent = 'Создать заявку';
       document.getElementById('requestNumber').value = generateRequestNumber();
       
-      // Фиксированная текущая дата
-      const today = new Date().toISOString().split('T')[0];
-      document.getElementById('requestDate').value = today;
+      // Фиксированная текущая дата и время
+      const now = new Date();
+      const timezoneOffset = now.getTimezoneOffset() * 60000;
+      const localISOTime = new Date(now - timezoneOffset).toISOString().slice(0, 16);
+      document.getElementById('requestDateTime').value = localISOTime;
       
       document.getElementById('requestClass').value = '';
+      
+      // Сброс чекбоксов
+      document.querySelectorAll('input[name="textbookType"]').forEach(checkbox => {
+        checkbox.checked = false;
+      });
       
       // Фиксированные данные из профиля
       document.getElementById('requestEmail').value = currentUser?.email || '';
       document.getElementById('requestFullName').value = currentProfile?.full_name || '';
+      
+      // Сброс суммы
+      updateTotalAmount();
       
       document.getElementById('requestModal').style.display = 'flex';
     }
@@ -502,10 +607,27 @@
       currentEditingRequestId = request.id;
       document.getElementById('requestModalTitle').textContent = 'Редактировать заявку';
       document.getElementById('requestNumber').value = request.request_number;
-      document.getElementById('requestDate').value = request.request_date;
+      
+      // Форматирование даты и времени для поля datetime-local
+      const requestDate = new Date(request.created_at);
+      const timezoneOffset = requestDate.getTimezoneOffset() * 60000;
+      const localISOTime = new Date(requestDate - timezoneOffset).toISOString().slice(0, 16);
+      document.getElementById('requestDateTime').value = localISOTime;
+      
       document.getElementById('requestClass').value = request.class_level;
+      
+      // Установка чекбоксов
+      const textbookTypes = request.textbook_types || [];
+      document.querySelectorAll('input[name="textbookType"]').forEach(checkbox => {
+        checkbox.checked = textbookTypes.includes(checkbox.value);
+      });
+      
       document.getElementById('requestEmail').value = request.email;
       document.getElementById('requestFullName').value = request.full_name;
+      
+      // Обновление суммы
+      updateTotalAmount();
+      
       document.getElementById('requestModal').style.display = 'flex';
     }
 
@@ -515,9 +637,10 @@
     }
 
     // Открытие модального окна оплаты
-    function openPaymentModal() {
+    function openPaymentModal(totalAmount) {
       // Обновляем QR-код (чтобы избежать кэширования)
       document.getElementById('paymentQR').src = getPaymentQRUrl();
+      document.getElementById('paymentTotalAmount').textContent = `${totalAmount} руб.`;
       document.getElementById('paymentModal').style.display = 'flex';
     }
 
@@ -532,7 +655,7 @@
         const { data: requests, error } = await supabaseClient
           .from('purchase_requests')
           .select('*')
-          .order('request_date', { ascending: false });
+          .order('created_at', { ascending: false });
 
         if (error) throw error;
 
@@ -548,8 +671,9 @@
           const row = document.createElement('tr');
           row.innerHTML = `
             <td><strong>${request.request_number}</strong></td>
-            <td>${new Date(request.request_date).toLocaleDateString('ru-RU')}</td>
+            <td>${formatDateTime(request.created_at)}</td>
             <td>${formatClassLevel(request.class_level)}</td>
+            <td>${formatTextbookTypes(request.textbook_types)}</td>
             <td>${request.email}</td>
             <td>${request.full_name}</td>
             <td>
@@ -611,25 +735,58 @@
       return classMap[classLevel] || classLevel;
     }
 
+    // Форматирование типов учебников
+    function formatTextbookTypes(types) {
+      if (!types || !Array.isArray(types)) return '';
+      
+      const typeMap = {
+        'учебник': '📚 Учебник',
+        'кроссворд': '🧩 Кроссворд'
+      };
+      
+      return types.map(type => typeMap[type] || type).join(', ');
+    }
+
+    // Форматирование даты и времени
+    function formatDateTime(dateString) {
+      return new Date(dateString).toLocaleString('ru-RU', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
     // Сохранение заявки
     async function saveRequest() {
       const requestNumber = document.getElementById('requestNumber').value;
-      const requestDate = document.getElementById('requestDate').value;
+      const requestDateTime = document.getElementById('requestDateTime').value;
       const classLevel = document.getElementById('requestClass').value;
       const email = document.getElementById('requestEmail').value;
       const fullName = document.getElementById('requestFullName').value;
 
+      // Получаем выбранные типы
+      const checkboxes = document.querySelectorAll('input[name="textbookType"]:checked');
+      const textbookTypes = Array.from(checkboxes).map(cb => cb.value);
+
       // Валидация
-      if (!requestDate || !classLevel || !email || !fullName) {
-        alert('Пожалуйста, заполните все поля');
+      if (!requestDateTime || !classLevel || !email || !fullName) {
+        alert('Пожалуйста, заполните все обязательные поля');
+        return;
+      }
+
+      if (textbookTypes.length === 0) {
+        alert('Пожалуйста, выберите хотя бы один тип материала');
         return;
       }
 
       try {
         const requestData = {
           request_number: requestNumber,
-          request_date: requestDate,
+          request_date: requestDateTime.split('T')[0], // Сохраняем только дату для совместимости
           class_level: classLevel,
+          textbook_types: textbookTypes,
           email: email,
           full_name: fullName
         };
@@ -654,7 +811,8 @@
         
         // Показываем окно с информацией об оплате только при создании новой заявки
         if (!currentEditingRequestId) {
-          openPaymentModal();
+          const totalAmount = textbookTypes.length * 1000;
+          openPaymentModal(totalAmount);
         }
         
         loadRequests(); // Перезагружаем список
@@ -698,6 +856,11 @@
         
         document.getElementById('closePaymentModal').addEventListener('click', closePaymentModal);
         document.getElementById('closePaymentBtn').addEventListener('click', closePaymentModal);
+        
+        // Обработчики для чекбоксов
+        document.querySelectorAll('input[name="textbookType"]').forEach(checkbox => {
+          checkbox.addEventListener('change', updateTotalAmount);
+        });
         
         document.getElementById('requestForm').addEventListener('submit', (e) => {
           e.preventDefault();
