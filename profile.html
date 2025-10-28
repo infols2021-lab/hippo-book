@@ -351,13 +351,37 @@
       align-items: center;
       gap: 8px;
       transition: transform 0.2s, box-shadow 0.2s;
-      margin: 15px auto 0;
+      margin: 15px auto 10px;
       justify-content: center;
     }
 
     .edit-profile-btn:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(78, 205, 196, 0.3);
+    }
+
+    .requests-btn {
+      background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin: 10px auto 0;
+      justify-content: center;
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .requests-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
     }
 
     .profile-info {
@@ -459,6 +483,11 @@
         max-width: 280px;
         text-align: center;
       }
+
+      .edit-profile-btn, .requests-btn {
+        width: 100%;
+        max-width: 280px;
+      }
     }
 
     @media (max-width: 480px) {
@@ -479,7 +508,7 @@
         padding: 15px;
       }
 
-      .edit-profile-btn {
+      .edit-profile-btn, .requests-btn {
         width: 100%;
         max-width: 280px;
       }
@@ -591,6 +620,10 @@
             
             <button class="edit-profile-btn" id="editProfileBtn">
               ✏️ Редактировать профиль
+            </button>
+
+            <button class="requests-btn" onclick="location.href='/requests.html'">
+              📝 Перейти к заявкам на покупку
             </button>
           </div>
         </div>

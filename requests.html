@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Мои заявки — Edu Keys</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      font-family: 'Poppins', "Comic Sans MS", sans-serif;
+      color: #1f2937;
+    }
+
+    .container {
+      width: 95%;
+      max-width: 1200px;
+      margin: 20px auto;
+      position: relative;
+      z-index: 2;
+    }
+
+    .loading { 
+      text-align: center; 
+      padding: 40px; 
+      display: none;
+    }
+    .spinner { 
+      border: 4px solid #f3f3f3; 
+      border-top: 4px solid var(--accent2); 
+      border-radius: 50%; 
+      width: 40px; 
+      height: 40px; 
+      animation: spin 2s linear infinite; 
+      margin: 0 auto 20px; 
+    }
+    @keyframes spin { 
+      0% { transform: rotate(0deg); } 
+      100% { transform: rotate(360deg); } 
+    }
+    .error { 
+      background: #ffebee; 
+      color: #c62828; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin: 20px; 
+      text-align: center; 
+      display: none; 
+    }
+
+    /* Модальное окно */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      padding: 20px;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 16px;
+      padding: 25px;
+      max-width: 500px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      position: relative;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .modal-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #2c3e50;
+      margin: 0;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+      padding: 5px;
+      line-height: 1;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 15px;
+      transition: border-color 0.3s;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+
+    .form-group input:focus, .form-group select:focus {
+      border-color: var(--accent2);
+      outline: none;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 25px;
+      justify-content: flex-end;
+    }
+
+    .btn-secondary {
+      background: #95a5a6;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #7f8c8d;
+    }
+
+    /* Таблица заявок */
+    .requests-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .requests-table th, .requests-table td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .requests-table th {
+      background-color: var(--bg1);
+      font-weight: 700;
+    }
+
+    .requests-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 14px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .empty-state p {
+      margin: 10px 0;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        width: 100%;
+        margin: 0;
+        padding: 10px;
+      }
+      
+      .requests-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      
+      .modal-content {
+        margin: 10px;
+        padding: 20px;
+      }
+      
+      .modal-actions {
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .requests-table th, .requests-table td {
+        padding: 8px 10px;
+        font-size: 14px;
+      }
+      
+      .btn-small {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+    }
+  </style>
+  
+  <script src="/load-config.js"></script>
+</head>
+<body>
+  <!-- Модальное окно для создания/редактирования заявки -->
+  <div class="modal-overlay" id="requestModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="requestModalTitle">Создать заявку</h3>
+        <button class="modal-close" id="closeRequestModal">✕</button>
+      </div>
+      
+      <form id="requestForm">
+        <div class="form-group">
+          <label for="requestNumber">Номер заявки:</label>
+          <input type="text" id="requestNumber" readonly style="background-color: #f5f5f5;">
+        </div>
+
+        <div class="form-group">
+          <label for="requestDate">Дата заявки:</label>
+          <input type="date" id="requestDate" required>
+        </div>
+
+        <div class="form-group">
+          <label for="requestClass">Класс:</label>
+          <select id="requestClass" required>
+            <option value="">-- Выберите класс --</option>
+            <option value="1-2">1) 1-2 класс</option>
+            <option value="3-4">2) 3-4 класс</option>
+            <option value="5-6">3) 5-6 класс</option>
+            <option value="7">4) 7 класс</option>
+            <option value="8-9">5) 8-9 класс</option>
+            <option value="10-11">6) 10-11 класс (Техникум, колледж - 1й курс)</option>
+            <option value="12">7) 12 класс (Техникум, колледж)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="requestEmail">Email:</label>
+          <input type="email" id="requestEmail" required>
+        </div>
+
+        <div class="form-group">
+          <label for="requestFullName">ФИО ученика:</label>
+          <input type="text" id="requestFullName" required>
+        </div>
+        
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" id="cancelRequestBtn">❌ Отмена</button>
+          <button type="submit" class="btn" id="saveRequestBtn">💾 Сохранить заявку</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <div class="logo">
+        <div class="mark" style="background: linear-gradient(135deg, var(--accent2), #6dd3c0);">EK</div>
+        <div>
+          <h3 style="background: linear-gradient(135deg, var(--accent2), #6dd3c0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0;">Edu Keys</h3>
+          <div class="small-muted">🎓 Образовательная платформа</div>
+        </div>
+      </div>
+      <div class="nav">
+        <button class="btn" onclick="location.href='/materials.html'">📚 Материалы</button>
+        <button class="btn" onclick="location.href='/profile.html'">👤 Профиль</button>
+        <button class="btn secondary" id="logoutBtn">🚪 Выйти</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="color: var(--accent2); margin-bottom: 20px;">📝 Мои заявки на учебники</h2>
+      
+      <div style="margin-bottom: 20px;">
+        <button class="btn" id="createRequestBtn">
+          ➕ Создать новую заявку
+        </button>
+      </div>
+
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>🔄 Загружаем заявки...</p>
+      </div>
+      
+      <div id="errorMessage" class="error"></div>
+
+      <div id="requestsContent" style="display: none;">
+        <table class="requests-table" id="requestsTable">
+          <thead>
+            <tr>
+              <th>Номер заявки</th>
+              <th>Дата заявки</th>
+              <th>Класс</th>
+              <th>Email</th>
+              <th>ФИО ученика</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="requestsTableBody">
+            <!-- Заявки будут загружаться сюда -->
+          </tbody>
+        </table>
+        
+        <div id="emptyState" class="empty-state" style="display: none;">
+          <h3>📭 Заявок пока нет</h3>
+          <p>Создайте свою первую заявку на покупку учебника</p>
+          <button class="btn" onclick="openCreateRequestModal()">
+            ➕ Создать заявку
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    document.getElementById('loading').style.display = 'block';
+    
+    let currentUser = null;
+    let currentEditingRequestId = null;
+    let supabaseClient = null;
+
+    function showError(message) {
+      document.getElementById('errorMessage').textContent = message;
+      document.getElementById('errorMessage').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+    function showContent() {
+      document.getElementById('requestsContent').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('errorMessage').style.display = 'none';
+    }
+
+    function showEmptyState() {
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('requestsTable').style.display = 'none';
+      showContent();
+    }
+
+    function showTable() {
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('requestsTable').style.display = 'table';
+      showContent();
+    }
+
+    // Генерация номера заявки (временная, пока не реализована функция в БД)
+    function generateRequestNumber() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+      return `PR-${year}${month}${day}-${random}`;
+    }
+
+    // Открытие модального окна для создания заявки
+    function openCreateRequestModal() {
+      currentEditingRequestId = null;
+      document.getElementById('requestModalTitle').textContent = 'Создать заявку';
+      document.getElementById('requestNumber').value = generateRequestNumber();
+      document.getElementById('requestDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('requestClass').value = '';
+      document.getElementById('requestEmail').value = currentUser?.email || '';
+      document.getElementById('requestFullName').value = currentUser?.user_metadata?.full_name || '';
+      document.getElementById('requestModal').style.display = 'flex';
+    }
+
+    // Открытие модального окна для редактирования заявки
+    function openEditRequestModal(request) {
+      currentEditingRequestId = request.id;
+      document.getElementById('requestModalTitle').textContent = 'Редактировать заявку';
+      document.getElementById('requestNumber').value = request.request_number;
+      document.getElementById('requestDate').value = request.request_date;
+      document.getElementById('requestClass').value = request.class_level;
+      document.getElementById('requestEmail').value = request.email;
+      document.getElementById('requestFullName').value = request.full_name;
+      document.getElementById('requestModal').style.display = 'flex';
+    }
+
+    // Закрытие модального окна
+    function closeRequestModal() {
+      document.getElementById('requestModal').style.display = 'none';
+    }
+
+    // Загрузка заявок пользователя
+    async function loadRequests() {
+      try {
+        const { data: requests, error } = await supabaseClient
+          .from('purchase_requests')
+          .select('*')
+          .order('request_date', { ascending: false });
+
+        if (error) throw error;
+
+        const tbody = document.getElementById('requestsTableBody');
+        tbody.innerHTML = '';
+
+        if (!requests || requests.length === 0) {
+          showEmptyState();
+          return;
+        }
+
+        requests.forEach(request => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td><strong>${request.request_number}</strong></td>
+            <td>${new Date(request.request_date).toLocaleDateString('ru-RU')}</td>
+            <td>${formatClassLevel(request.class_level)}</td>
+            <td>${request.email}</td>
+            <td>${request.full_name}</td>
+            <td>
+              <button class="btn btn-small" data-edit="${request.id}">✏️ Редактировать</button>
+              <button class="btn btn-small btn-danger" data-delete="${request.id}">🗑️ Удалить</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        // Добавляем обработчики событий для кнопок
+        tbody.querySelectorAll('[data-edit]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const requestId = btn.getAttribute('data-edit');
+            const request = requests.find(r => r.id === requestId);
+            if (request) openEditRequestModal(request);
+          });
+        });
+
+        tbody.querySelectorAll('[data-delete]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const requestId = btn.getAttribute('data-delete');
+            const request = requests.find(r => r.id === requestId);
+            
+            if (confirm(`Вы уверены, что хотите удалить заявку ${request.request_number}?`)) {
+              try {
+                const { error } = await supabaseClient
+                  .from('purchase_requests')
+                  .delete()
+                  .eq('id', requestId);
+
+                if (error) throw error;
+                
+                loadRequests(); // Перезагружаем список
+              } catch (error) {
+                showError('Ошибка при удалении заявки: ' + error.message);
+              }
+            }
+          });
+        });
+
+        showTable();
+      } catch (error) {
+        showError('Ошибка загрузки заявок: ' + error.message);
+      }
+    }
+
+    // Форматирование отображения класса
+    function formatClassLevel(classLevel) {
+      const classMap = {
+        '1-2': '1-2 класс',
+        '3-4': '3-4 класс',
+        '5-6': '5-6 класс',
+        '7': '7 класс',
+        '8-9': '8-9 класс',
+        '10-11': '10-11 класс (Техникум, колледж - 1й курс)',
+        '12': '12 класс (Техникум, колледж)'
+      };
+      return classMap[classLevel] || classLevel;
+    }
+
+    // Сохранение заявки
+    async function saveRequest() {
+      const requestNumber = document.getElementById('requestNumber').value;
+      const requestDate = document.getElementById('requestDate').value;
+      const classLevel = document.getElementById('requestClass').value;
+      const email = document.getElementById('requestEmail').value;
+      const fullName = document.getElementById('requestFullName').value;
+
+      // Валидация
+      if (!requestDate || !classLevel || !email || !fullName) {
+        alert('Пожалуйста, заполните все поля');
+        return;
+      }
+
+      try {
+        const requestData = {
+          request_number: requestNumber,
+          request_date: requestDate,
+          class_level: classLevel,
+          email: email,
+          full_name: fullName
+        };
+
+        let error;
+        if (currentEditingRequestId) {
+          // Редактирование существующей заявки
+          ({ error } = await supabaseClient
+            .from('purchase_requests')
+            .update(requestData)
+            .eq('id', currentEditingRequestId));
+        } else {
+          // Создание новой заявки
+          ({ error } = await supabaseClient
+            .from('purchase_requests')
+            .insert([{ ...requestData, user_id: currentUser.id }]));
+        }
+
+        if (error) throw error;
+
+        closeRequestModal();
+        loadRequests(); // Перезагружаем список
+      } catch (error) {
+        alert('Ошибка при сохранении заявки: ' + error.message);
+      }
+    }
+
+    async function initApp() {
+      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
+        return false;
+      }
+      
+      try {
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+        supabaseClient = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if(!user) { 
+          location.href = '/login.html'; 
+          return; 
+        }
+
+        currentUser = user;
+
+        // Обработчики событий
+        document.getElementById('createRequestBtn').addEventListener('click', openCreateRequestModal);
+        document.getElementById('closeRequestModal').addEventListener('click', closeRequestModal);
+        document.getElementById('cancelRequestBtn').addEventListener('click', closeRequestModal);
+        
+        document.getElementById('requestForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          saveRequest();
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+          if (confirm('Вы уверены, что хотите выйти?')) {
+            await supabaseClient.auth.signOut();
+            location.href = '/login.html';
+          }
+        });
+
+        // Загружаем заявки
+        await loadRequests();
+        return true;
+        
+      } catch (error) {
+        showError('❌ Ошибка инициализации: ' + error.message);
+        return false;
+      }
+    }
+    
+    if (window.SUPABASE_URL) {
+      initApp();
+    } else {
+      const timeout = setTimeout(() => {
+        showError('❌ Таймаут загрузки конфигурации');
+      }, 1000);
+      
+      window.addEventListener('configLoaded', () => {
+        clearTimeout(timeout);
+        initApp();
+      });
+    }
+  </script>
+</body>
+</html>
