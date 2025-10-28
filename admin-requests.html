@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Управление заявками — Админ-панель</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      font-family: 'Poppins', "Comic Sans MS", sans-serif;
+      color: #1f2937;
+    }
+
+    .container {
+      width: 95%;
+      max-width: 1400px;
+      margin: 20px auto;
+      position: relative;
+      z-index: 2;
+    }
+
+    .loading { 
+      text-align: center; 
+      padding: 40px; 
+      display: none;
+    }
+    .spinner { 
+      border: 4px solid #f3f3f3; 
+      border-top: 4px solid var(--accent2); 
+      border-radius: 50%; 
+      width: 40px; 
+      height: 40px; 
+      animation: spin 2s linear infinite; 
+      margin: 0 auto 20px; 
+    }
+    @keyframes spin { 
+      0% { transform: rotate(0deg); } 
+      100% { transform: rotate(360deg); } 
+    }
+    .error { 
+      background: #ffebee; 
+      color: #c62828; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin: 20px; 
+      text-align: center; 
+      display: none; 
+    }
+
+    .requests-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .requests-table th, .requests-table td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .requests-table th {
+      background-color: var(--bg1);
+      font-weight: 700;
+    }
+
+    .requests-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 14px;
+    }
+
+    .status-badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .status-processed {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .search-container {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      align-items: end;
+    }
+
+    .search-container .form-group {
+      margin-bottom: 0;
+      flex: 1;
+      min-width: 250px;
+    }
+
+    .search-container input {
+      width: 100%;
+      padding: 10px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .stats-bar {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 15px 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      flex: 1;
+      min-width: 150px;
+      text-align: center;
+      border-left: 4px solid var(--accent2);
+    }
+
+    .stat-number {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--accent2);
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+      font-weight: 600;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+
+    .empty-state p {
+      margin: 10px 0;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        width: 100%;
+        margin: 0;
+        padding: 10px;
+      }
+      
+      .requests-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      
+      .search-container {
+        flex-direction: column;
+      }
+      
+      .search-container .form-group {
+        width: 100%;
+      }
+      
+      .stats-bar {
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .requests-table th, .requests-table td {
+        padding: 8px 10px;
+        font-size: 14px;
+      }
+      
+      .btn-small {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      
+      .stat-card {
+        padding: 12px 15px;
+      }
+      
+      .stat-number {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+  
+  <script src="/load-config.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">
+        <div class="mark" style="background: linear-gradient(135deg, var(--accent2), #6dd3c0);">EK</div>
+        <div>
+          <h3 style="background: linear-gradient(135deg, var(--accent2), #6dd3c0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0;">Edu Keys</h3>
+          <div class="small-muted">🎓 Панель управления заявками</div>
+        </div>
+      </div>
+      <div class="nav">
+        <button class="btn secondary" onclick="location.href='/admin.html'">⬅️ Назад в админку</button>
+        <button class="btn secondary" id="logoutBtn">🚪 Выйти</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="color: var(--accent2); margin-bottom: 20px;">📋 Управление заявками на учебники</h2>
+
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-number" id="totalRequests">0</div>
+          <div class="stat-label">Всего заявок</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="pendingRequests">0</div>
+          <div class="stat-label">Ожидают обработки</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="processedRequests">0</div>
+          <div class="stat-label">Обработано</div>
+        </div>
+      </div>
+
+      <div class="search-container">
+        <div class="form-group">
+          <label>Поиск по ФИО:</label>
+          <input type="text" id="searchName" placeholder="Введите ФИО ученика..." class="input">
+        </div>
+        <div class="form-group">
+          <label>Поиск по email:</label>
+          <input type="text" id="searchEmail" placeholder="Введите email..." class="input">
+        </div>
+        <div class="form-group">
+          <button class="btn" id="clearSearchBtn">🗑️ Очистить поиск</button>
+        </div>
+      </div>
+
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>🔄 Загружаем заявки...</p>
+      </div>
+      
+      <div id="errorMessage" class="error"></div>
+
+      <div id="requestsContent" style="display: none;">
+        <div style="overflow-x: auto;">
+          <table class="requests-table" id="requestsTable">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Номер заявки</th>
+                <th>Дата и время создания</th>
+                <th>Класс</th>
+                <th>Типы материалов</th>
+                <th>Email</th>
+                <th>ФИО ученика</th>
+                <th>Статус</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="requestsTableBody">
+              <!-- Заявки будут загружаться сюда -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div id="emptyState" class="empty-state" style="display: none;">
+          <h3>📭 Заявок пока нет</h3>
+          <p>Заявки от пользователей будут отображаться здесь</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    document.getElementById('loading').style.display = 'block';
+    
+    let currentUser = null;
+    let supabaseClient = null;
+    let allRequests = [];
+    let searchTimeout = null;
+
+    function showError(message) {
+      document.getElementById('errorMessage').textContent = message;
+      document.getElementById('errorMessage').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+    function showContent() {
+      document.getElementById('requestsContent').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('errorMessage').style.display = 'none';
+    }
+
+    function showEmptyState() {
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('requestsTable').style.display = 'none';
+      showContent();
+    }
+
+    function showTable() {
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('requestsTable').style.display = 'table';
+      showContent();
+    }
+
+    // Форматирование отображения класса
+    function formatClassLevel(classLevel) {
+      const classMap = {
+        '1-2': '1-2 класс',
+        '3-4': '3-4 класс',
+        '5-6': '5-6 класс',
+        '7': '7 класс',
+        '8-9': '8-9 класс',
+        '10-11': '10-11 класс (Техникум, колледж - 1й курс)',
+        '12': '12 класс (Техникум, колледж)'
+      };
+      return classMap[classLevel] || classLevel;
+    }
+
+    // Форматирование типов учебников
+    function formatTextbookTypes(types) {
+      if (!types || !Array.isArray(types)) return '';
+      
+      const typeMap = {
+        'учебник': '📚 Учебник',
+        'кроссворд': '🧩 Кроссворд'
+      };
+      
+      return types.map(type => typeMap[type] || type).join(', ');
+    }
+
+    // Форматирование даты и времени
+    function formatDateTime(dateString) {
+      return new Date(dateString).toLocaleString('ru-RU', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    // Обновление статистики
+    function updateStats() {
+      const total = allRequests.length;
+      const pending = allRequests.filter(req => !req.is_processed).length;
+      const processed = allRequests.filter(req => req.is_processed).length;
+
+      document.getElementById('totalRequests').textContent = total;
+      document.getElementById('pendingRequests').textContent = pending;
+      document.getElementById('processedRequests').textContent = processed;
+
+      // Обновляем кнопку в админке (если мы на этой странице, то просто обновляем localStorage)
+      localStorage.setItem('pendingRequestsCount', pending);
+    }
+
+    // Фильтрация заявок
+    function filterRequests() {
+      const nameFilter = document.getElementById('searchName').value.toLowerCase();
+      const emailFilter = document.getElementById('searchEmail').value.toLowerCase();
+
+      const filtered = allRequests.filter(request => {
+        const matchesName = !nameFilter || 
+          (request.full_name && request.full_name.toLowerCase().includes(nameFilter));
+        const matchesEmail = !emailFilter || 
+          (request.email && request.email.toLowerCase().includes(emailFilter));
+        
+        return matchesName && matchesEmail;
+      });
+
+      renderRequests(filtered);
+    }
+
+    // Отрисовка заявок
+    function renderRequests(requests) {
+      const tbody = document.getElementById('requestsTableBody');
+      tbody.innerHTML = '';
+
+      if (!requests || requests.length === 0) {
+        showEmptyState();
+        return;
+      }
+
+      requests.forEach((request, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><strong>${index + 1}</strong></td>
+          <td><strong>${request.request_number}</strong></td>
+          <td>${formatDateTime(request.created_at)}</td>
+          <td>${formatClassLevel(request.class_level)}</td>
+          <td>${formatTextbookTypes(request.textbook_types)}</td>
+          <td>${request.email}</td>
+          <td>${request.full_name}</td>
+          <td>
+            <span class="status-badge ${request.is_processed ? 'status-processed' : 'status-pending'}">
+              ${request.is_processed ? '✅ Обработана' : '⏳ Ожидает'}
+            </span>
+          </td>
+          <td>
+            ${!request.is_processed ? 
+              `<button class="btn btn-small" data-process="${request.id}">✅ Обработать</button>` : 
+              `<button class="btn btn-small btn-warning" data-unprocess="${request.id}">↩️ Вернуть в ожидание</button>`
+            }
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      // Добавляем обработчики событий для кнопок
+      tbody.querySelectorAll('[data-process]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const requestId = btn.getAttribute('data-process');
+          await processRequest(requestId, true);
+        });
+      });
+
+      tbody.querySelectorAll('[data-unprocess]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const requestId = btn.getAttribute('data-unprocess');
+          await processRequest(requestId, false);
+        });
+      });
+
+      showTable();
+    }
+
+    // Обработка заявки
+    async function processRequest(requestId, isProcessed) {
+      try {
+        const { error } = await supabaseClient
+          .from('purchase_requests')
+          .update({ 
+            is_processed: isProcessed,
+            processed_at: isProcessed ? new Date().toISOString() : null
+          })
+          .eq('id', requestId);
+
+        if (error) throw error;
+
+        // Обновляем локальные данные
+        const requestIndex = allRequests.findIndex(req => req.id === requestId);
+        if (requestIndex !== -1) {
+          allRequests[requestIndex].is_processed = isProcessed;
+          allRequests[requestIndex].processed_at = isProcessed ? new Date().toISOString() : null;
+        }
+
+        // Перерисовываем таблицу
+        filterRequests();
+        updateStats();
+
+        showNotification(isProcessed ? '✅ Заявка обработана' : '↩️ Заявка возвращена в ожидание');
+      } catch (error) {
+        showError('Ошибка при обновлении заявки: ' + error.message);
+      }
+    }
+
+    // Уведомление
+    function showNotification(message) {
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: var(--accent2);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 10000;
+        font-weight: 600;
+      `;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+    }
+
+    // Загрузка всех заявок
+    async function loadAllRequests() {
+      try {
+        const { data: requests, error } = await supabaseClient
+          .from('purchase_requests')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        allRequests = requests || [];
+        filterRequests();
+        updateStats();
+      } catch (error) {
+        showError('Ошибка загрузки заявок: ' + error.message);
+      }
+    }
+
+    // Проверка прав администратора
+    async function checkAdmin(supabase) {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        
+        if (!user) {
+          window.location.href = '/login.html';
+          return false;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single();
+
+        if (profileError) throw profileError;
+
+        if (!profile?.is_admin) {
+          showModal('Доступ запрещен', 'Нужны права администратора.');
+          setTimeout(() => { window.location.href = '/profile.html'; }, 2000);
+          return false;
+        }
+
+        return user;
+      } catch (e) {
+        showError('Ошибка проверки прав: ' + (e?.message || e));
+        setTimeout(() => { window.location.href = '/login.html'; }, 2000);
+        return false;
+      }
+    }
+
+    async function initApp() {
+      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
+        return false;
+      }
+      
+      try {
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+        supabaseClient = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        
+        const user = await checkAdmin(supabaseClient);
+        if (!user) return false;
+
+        currentUser = user;
+
+        // Обработчики событий
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+          if (confirm('Вы уверены, что хотите выйти?')) {
+            await supabaseClient.auth.signOut();
+            location.href = '/login.html';
+          }
+        });
+
+        document.getElementById('clearSearchBtn').addEventListener('click', () => {
+          document.getElementById('searchName').value = '';
+          document.getElementById('searchEmail').value = '';
+          filterRequests();
+        });
+
+        // Обработчики поиска
+        document.getElementById('searchName').addEventListener('input', () => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(filterRequests, 350);
+        });
+
+        document.getElementById('searchEmail').addEventListener('input', () => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(filterRequests, 350);
+        });
+
+        // Загружаем заявки
+        await loadAllRequests();
+        return true;
+        
+      } catch (error) {
+        showError('❌ Ошибка инициализации: ' + error.message);
+        return false;
+      }
+    }
+    
+    if (window.SUPABASE_URL) {
+      initApp();
+    } else {
+      const timeout = setTimeout(() => {
+        showError('❌ Таймаут загрузки конфигурации');
+      }, 1000);
+      
+      window.addEventListener('configLoaded', () => {
+        clearTimeout(timeout);
+        initApp();
+      });
+    }
+
+    // Вспомогательная функция для показа модального окна
+    function showModal(title, text) {
+      alert(`${title}\n\n${text}`);
+    }
+  </script>
+</body>
+</html>
