@@ -530,62 +530,6 @@
       </div>
     </div>
 
-    <!-- Модальное окно управления заявками -->
-    <div class="user-access-modal" id="requestsManagementModal">
-      <div class="user-access-content card" style="max-width: 1200px;">
-        <h3>📋 Управление заявками пользователей</h3>
-        
-        <div class="filters-container">
-          <div class="form-group">
-            <label>Фильтр по области:</label>
-            <select id="requestsRegionFilter" class="input">
-              <option value="">Все области</option>
-              <option value="Алматинская область">Алматинская область</option>
-              <option value="Астана">Астана</option>
-              <option value="Жамбылская область">Жамбылская область</option>
-              <option value="Карагандинская область">Карагандинская область</option>
-              <option value="Костанайская область">Костанайская область</option>
-              <option value="Павлодарская область">Павлодарская область</option>
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label>Фильтр по статусу:</label>
-            <select id="requestsStatusFilter" class="input">
-              <option value="">Все заявки</option>
-              <option value="pending">Ожидают обработки</option>
-              <option value="approved">Одобренные</option>
-              <option value="rejected">Отклоненные</option>
-            </select>
-          </div>
-        </div>
-
-        <div style="overflow-x: auto; margin-top: 20px;">
-          <table class="admin-table" id="requestsManagementTable">
-            <thead>
-              <tr>
-                <th>№</th>
-                <th>Номер заявки</th>
-                <th>Дата создания</th>
-                <th>ФИО ученика</th>
-                <th>Email</th>
-                <th>Класс</th>
-                <th>Типы материалов</th>
-                <th>Область</th>
-                <th>Статус</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody id="requestsManagementTableBody"></tbody>
-          </table>
-        </div>
-
-        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-          <button class="btn secondary" id="closeRequestsManagementModal">❌ Закрыть</button>
-        </div>
-      </div>
-    </div>
-
     <div class="admin-container">
       <div class="admin-header">
         <h1>⚙️ Панель администратора</h1>
@@ -828,7 +772,7 @@
           <h2>👥 Управление пользователями</h2>
           
           <div class="users-controls">
-            <button class="btn" id="manageRequestsBtn">📋 Управление заявками</button>
+            <button class="btn" onclick="alert('Функция управления заявками будет добавлена позже')">📋 Управление заявками</button>
             
             <div class="users-stats">
               <div class="stat-badge-large">
@@ -852,12 +796,12 @@
               <label>Фильтр по области:</label>
               <select id="regionFilter" class="input">
                 <option value="">Все области</option>
-                <option value="Алматинская область">Алматинская область</option>
-                <option value="Астана">Астана</option>
-                <option value="Жамбылская область">Жамбылская область</option>
-                <option value="Карагандинская область">Карагандинская область</option>
-                <option value="Костанайская область">Костанайская область</option>
-                <option value="Павлодарская область">Павлодарская область</option>
+                <option value="Белгородская">Белгородская</option>
+                <option value="Тамбовская">Тамбовская</option>
+                <option value="Липецкая">Липецкая</option>
+                <option value="Воронежская">Воронежская</option>
+                <option value="Курская">Курская</option>
+                <option value="Другое">Другое</option>
               </select>
             </div>
           </div>
@@ -1356,7 +1300,7 @@
       updateWordList(qid);
       updateStudentPreview(qid);
       
-      showModal('✅ Готово', `Сетки ${rows}×${cols} создана! Теперь добавьте слова.`);
+      showModal('✅ Готово', `Сетка ${rows}×${cols} создана! Теперь добавьте слова.`);
     }
 
     function clearAdvancedGrid(qid) {
@@ -2961,23 +2905,20 @@
           const regionFilter = document.getElementById('regionFilter').value;
           
           // Общая статистика
-          let totalQuery = supabase
+          const { data: totalData, error: totalError } = await supabase
             .from('profiles')
-            .select('textbook_issued', { count: 'exact' });
+            .select('textbook_issued');
 
           // Статистика по выбранной области
           let regionalQuery = supabase
             .from('profiles')
-            .select('textbook_issued', { count: 'exact' });
+            .select('textbook_issued');
 
           if (regionFilter) {
             regionalQuery = regionalQuery.eq('region', regionFilter);
           }
 
-          const [{ count: totalCount, error: totalError }, { count: regionalCount, error: regionalError }] = await Promise.all([
-            totalQuery,
-            regionalQuery
-          ]);
+          const { data: regionalData, error: regionalError } = await regionalQuery;
 
           if (totalError || regionalError) {
             console.error('Ошибка загрузки статистики:', totalError || regionalError);
@@ -2985,8 +2926,8 @@
           }
 
           // Подсчет выданных учебников
-          const totalIssued = totalCount ? totalCount.filter(p => p.textbook_issued).length : 0;
-          const regionalIssued = regionalCount ? regionalCount.filter(p => p.textbook_issued).length : 0;
+          const totalIssued = totalData ? totalData.filter(p => p.textbook_issued).length : 0;
+          const regionalIssued = regionalData ? regionalData.filter(p => p.textbook_issued).length : 0;
 
           // Обновление интерфейса
           document.getElementById('totalIssuedTextbooks').textContent = totalIssued;
@@ -3003,127 +2944,91 @@
           loadUsers();
         });
 
-        // ===== УПРАВЛЕНИЕ ЗАЯВКАМИ
-        document.getElementById('manageRequestsBtn').addEventListener('click', openRequestsManagementModal);
-        document.getElementById('closeRequestsManagementModal').addEventListener('click', () => {
-          document.getElementById('requestsManagementModal').style.display = 'none';
+        // ===== УПРАВЛЕНИЕ ДОСТУПАМИ (ВОССТАНАВЛИВАЕМ СТАРЫЙ ФУНКЦИОНАЛ)
+        document.getElementById('closeUserAccessModal').addEventListener('click', ()=>{
+          document.getElementById('userAccessModal').style.display='none';
         });
+        document.getElementById('saveUserAccessBtn').addEventListener('click', saveUserAccess);
 
-        async function openRequestsManagementModal() {
-          document.getElementById('requestsManagementModal').style.display = 'flex';
-          await loadRequestsManagement();
-        }
+        async function openUserAccessModal(userId, userName) {
+          currentEditingUserId = userId;
+          document.getElementById('userAccessInfo').innerHTML = `
+            <p><strong>Пользователь:</strong> ${userName}</p>
+            <p class="small-muted">Отметьте учебники и кроссворды, к которым пользователь должен иметь доступ</p>
+          `;
 
-        async function loadRequestsManagement() {
-          const regionFilter = document.getElementById('requestsRegionFilter').value;
-          const statusFilter = document.getElementById('requestsStatusFilter').value;
+          const [t, c, ta, ca] = await Promise.all([
+            supabase.from('textbooks').select('id,title').eq('is_active', true).order('order_index'),
+            supabase.from('crosswords').select('id,title').eq('is_active', true).order('order_index'),
+            supabase.from('textbook_access').select('textbook_id').eq('user_id', userId),
+            supabase.from('crossword_access').select('crossword_id').eq('user_id', userId)
+          ]);
 
-          let query = supabase
-            .from('purchase_requests')
-            .select(`
-              *,
-              profiles:user_id(full_name, email, region, contact_phone)
-            `)
-            .order('created_at', { ascending: false });
+          const tSet = new Set((ta.data||[]).map(x=>String(x.textbook_id)));
+          const cSet = new Set((ca.data||[]).map(x=>String(x.crossword_id)));
 
-          if (regionFilter) {
-            query = query.eq('profiles.region', regionFilter);
-          }
-
-          // Здесь можно добавить фильтрацию по статусу, когда добавите поле статуса в таблицу
-
-          const { data: requests, error } = await query;
-          const tbody = document.getElementById('requestsManagementTableBody');
-          
-          if (error) {
-            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:red;">Ошибка загрузки заявок</td></tr>';
-            return;
-          }
-
-          tbody.innerHTML = '';
-          if (!requests?.length) {
-            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;">Заявки не найдены</td></tr>';
-            return;
-          }
-
-          requests.forEach((request, index) => {
-            const userProfile = request.profiles;
-            const tr = document.createElement('tr');
-            
-            tr.innerHTML = `
-              <td><strong>${index + 1}</strong></td>
-              <td><strong>${request.request_number}</strong></td>
-              <td>${new Date(request.created_at).toLocaleDateString('ru-RU')}</td>
-              <td>${request.full_name}</td>
-              <td>${request.email}</td>
-              <td>${formatClassLevel(request.class_level)}</td>
-              <td>${formatTextbookTypes(request.textbook_types)}</td>
-              <td>${userProfile?.region || '—'}</td>
-              <td>
-                <span class="stat-badge" style="background:#fff3cd;color:#856404;">
-                  📝 Ожидает обработки
-                </span>
-              </td>
-              <td>
-                <div class="user-actions">
-                  <button class="btn btn-small" data-approve-request="${request.id}">✅ Одобрить</button>
-                  <button class="btn btn-small btn-danger" data-reject-request="${request.id}">❌ Отклонить</button>
-                </div>
-              </td>
-            `;
-            tbody.appendChild(tr);
-          });
-
-          // Обработчики для кнопок заявок
-          tbody.querySelectorAll('[data-approve-request]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-              const requestId = btn.getAttribute('data-approve-request');
-              if (confirm('Одобрить эту заявку?')) {
-                // Здесь логика одобрения заявки
-                showModal('Успех', 'Заявка одобрена!');
-                loadRequestsManagement();
-              }
+          const tList = document.getElementById('textbookAccessList');
+          tList.innerHTML = '';
+          if (t.data?.length) {
+            t.data.forEach(tb=>{
+              const item = document.createElement('div');
+              item.className = 'access-item';
+              const id = `textbook_${tb.id}`;
+              item.innerHTML = `<input type="checkbox" id="${id}" ${tSet.has(String(tb.id))?'checked':''}>
+                                <label for="${id}">${tb.title}</label>`;
+              tList.appendChild(item);
             });
-          });
+          } else {
+            tList.innerHTML = '<p class="small-muted">Нет доступных учебников</p>';
+          }
 
-          tbody.querySelectorAll('[data-reject-request]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-              const requestId = btn.getAttribute('data-reject-request');
-              if (confirm('Отклонить эту заявку?')) {
-                // Здесь логика отклонения заявки
-                showModal('Успех', 'Заявка отклонена!');
-                loadRequestsManagement();
-              }
+          const cList = document.getElementById('crosswordAccessList');
+          cList.innerHTML = '';
+          if (c.data?.length) {
+            c.data.forEach(cr=>{
+              const item = document.createElement('div');
+              item.className = 'access-item';
+              const id = `crossword_${cr.id}`;
+              item.innerHTML = `<input type="checkbox" id="${id}" ${cSet.has(String(cr.id))?'checked':''}>
+                                <label for="${id}">${cr.title}</label>`;
+              cList.appendChild(item);
             });
-          });
+          } else {
+            cList.innerHTML = '<p class="small-muted">Нет доступных кроссвордов</p>';
+          }
+
+          document.getElementById('userAccessModal').style.display='flex';
         }
 
-        // Вспомогательные функции для форматирования
-        function formatClassLevel(classLevel) {
-          const classMap = {
-            '1-2': '1-2 класс',
-            '3-4': '3-4 класс', 
-            '5-6': '5-6 класс',
-            '7': '7 класс',
-            '8-9': '8-9 класс',
-            '10-11': '10-11 класс',
-            '12': '12 класс'
-          };
-          return classMap[classLevel] || classLevel;
-        }
+        async function saveUserAccess() {
+          if (!currentEditingUserId) return;
 
-        function formatTextbookTypes(types) {
-          if (!types || !Array.isArray(types)) return '';
-          const typeMap = {
-            'учебник': '📚 Учебник',
-            'кроссворд': '🧩 Кроссворд'
-          };
-          return types.map(type => typeMap[type] || type).join(', ');
-        }
+          // собрать выбор
+          const textSelected = Array.from(document.querySelectorAll('#textbookAccessList input[type="checkbox"]:checked'))
+            .map(cb => cb.id.replace('textbook_',''));
+          const crossSelected = Array.from(document.querySelectorAll('#crosswordAccessList input[type="checkbox"]:checked'))
+            .map(cb => cb.id.replace('crossword_',''));
 
-        // Обработчики фильтров в модалке заявок
-        document.getElementById('requestsRegionFilter').addEventListener('change', loadRequestsManagement);
-        document.getElementById('requestsStatusFilter').addEventListener('change', loadRequestsManagement);
+          // перезаписать
+          const ops = [];
+          ops.push(supabase.from('textbook_access').delete().eq('user_id', currentEditingUserId));
+          ops.push(supabase.from('crossword_access').delete().eq('user_id', currentEditingUserId));
+          await Promise.all(ops);
+
+          if (textSelected.length) {
+            await supabase.from('textbook_access').insert(
+              textSelected.map(id=>({ user_id: currentEditingUserId, textbook_id: id }))
+            );
+          }
+          if (crossSelected.length) {
+            await supabase.from('crossword_access').insert(
+              crossSelected.map(id=>({ user_id: currentEditingUserId, crossword_id: id }))
+            );
+          }
+
+          showModal('Готово','Доступы обновлены');
+          document.getElementById('userAccessModal').style.display='none';
+        }
 
         // ===== СТАРТОВАЯ ИНИЦИАЛИЗАЦИЯ
         await loadStats();
