@@ -135,6 +135,12 @@
       outline: none;
     }
 
+    .form-group input:read-only, .form-group input:disabled {
+      background-color: #f5f5f5;
+      color: #666;
+      cursor: not-allowed;
+    }
+
     .modal-actions {
       display: flex;
       gap: 12px;
@@ -192,6 +198,47 @@
       margin: 10px 0;
     }
 
+    .payment-info {
+      background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+      border-left: 4px solid #2196f3;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .payment-info h4 {
+      color: #1976d2;
+      margin: 0 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .payment-qr {
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    .payment-qr img {
+      max-width: 250px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .success-message {
+      background: #e8f5e8;
+      border: 1px solid #c8e6c9;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 15px 0;
+      text-align: center;
+    }
+
+    .success-message h4 {
+      color: #2e7d32;
+      margin: 0 0 10px 0;
+    }
+
     @media (max-width: 768px) {
       .container {
         width: 100%;
@@ -213,6 +260,10 @@
       .modal-actions {
         flex-direction: column;
       }
+      
+      .payment-qr img {
+        max-width: 200px;
+      }
     }
 
     @media (max-width: 480px) {
@@ -224,6 +275,10 @@
       .btn-small {
         padding: 4px 8px;
         font-size: 12px;
+      }
+      
+      .payment-qr img {
+        max-width: 180px;
       }
     }
   </style>
@@ -242,12 +297,12 @@
       <form id="requestForm">
         <div class="form-group">
           <label for="requestNumber">Номер заявки:</label>
-          <input type="text" id="requestNumber" readonly style="background-color: #f5f5f5;">
+          <input type="text" id="requestNumber" readonly>
         </div>
 
         <div class="form-group">
           <label for="requestDate">Дата заявки:</label>
-          <input type="date" id="requestDate" required>
+          <input type="date" id="requestDate" readonly>
         </div>
 
         <div class="form-group">
@@ -266,12 +321,12 @@
 
         <div class="form-group">
           <label for="requestEmail">Email:</label>
-          <input type="email" id="requestEmail" required>
+          <input type="email" id="requestEmail" readonly>
         </div>
 
         <div class="form-group">
           <label for="requestFullName">ФИО ученика:</label>
-          <input type="text" id="requestFullName" required>
+          <input type="text" id="requestFullName" readonly>
         </div>
         
         <div class="modal-actions">
@@ -279,6 +334,34 @@
           <button type="submit" class="btn" id="saveRequestBtn">💾 Сохранить заявку</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Модальное окно с информацией об оплате -->
+  <div class="modal-overlay" id="paymentModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">✅ Заявка создана успешно!</h3>
+        <button class="modal-close" id="closePaymentModal">✕</button>
+      </div>
+      
+      <div class="success-message">
+        <h4>📋 Информация о заявке</h4>
+        <p><strong>Доступ к выбранному учебнику будет открыт через некоторое время после оплаты.</strong></p>
+        <p>Оплатить можно по QR-коду ниже:</p>
+      </div>
+
+      <div class="payment-qr">
+        <img id="paymentQR" alt="QR-код для оплаты">
+      </div>
+
+      <div style="text-align: center; margin-top: 15px;">
+        <p class="small-muted">После оплаты доступ к учебнику будет открыт в течение 24 часов</p>
+      </div>
+      
+      <div class="modal-actions">
+        <button type="button" class="btn" id="closePaymentBtn">Понятно</button>
+      </div>
     </div>
   </div>
 
@@ -301,6 +384,11 @@
     <div class="card">
       <h2 style="color: var(--accent2); margin-bottom: 20px;">📝 Мои заявки на учебники</h2>
       
+      <div class="payment-info">
+        <h4>💰 Информация об оплате</h4>
+        <p>Оплата учебника происходит по QR-коду после создания заявки. После подтверждения оплаты доступ к учебнику будет открыт в течение 24 часов.</p>
+      </div>
+
       <div style="margin-bottom: 20px;">
         <button class="btn" id="createRequestBtn">
           ➕ Создать новую заявку
@@ -334,7 +422,7 @@
         <div id="emptyState" class="empty-state" style="display: none;">
           <h3>📭 Заявок пока нет</h3>
           <p>Создайте свою первую заявку на покупку учебника</p>
-          <button class="btn" onclick="openCreateRequestModal()">
+          <button class="btn" id="createRequestEmptyBtn">
             ➕ Создать заявку
           </button>
         </div>
@@ -346,6 +434,7 @@
     document.getElementById('loading').style.display = 'block';
     
     let currentUser = null;
+    let currentProfile = null;
     let currentEditingRequestId = null;
     let supabaseClient = null;
 
@@ -373,7 +462,7 @@
       showContent();
     }
 
-    // Генерация номера заявки (временная, пока не реализована функция в БД)
+    // Генерация номера заявки
     function generateRequestNumber() {
       const now = new Date();
       const year = now.getFullYear();
@@ -383,15 +472,28 @@
       return `PR-${year}${month}${day}-${random}`;
     }
 
+    // Получение QR-кода оплаты с предотвращением кэширования
+    function getPaymentQRUrl() {
+      const timestamp = new Date().getTime();
+      return `${window.SUPABASE_URL}/storage/v1/object/public/help-images/oplata.png?t=${timestamp}`;
+    }
+
     // Открытие модального окна для создания заявки
     function openCreateRequestModal() {
       currentEditingRequestId = null;
       document.getElementById('requestModalTitle').textContent = 'Создать заявку';
       document.getElementById('requestNumber').value = generateRequestNumber();
-      document.getElementById('requestDate').value = new Date().toISOString().split('T')[0];
+      
+      // Фиксированная текущая дата
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('requestDate').value = today;
+      
       document.getElementById('requestClass').value = '';
+      
+      // Фиксированные данные из профиля
       document.getElementById('requestEmail').value = currentUser?.email || '';
-      document.getElementById('requestFullName').value = currentUser?.user_metadata?.full_name || '';
+      document.getElementById('requestFullName').value = currentProfile?.full_name || '';
+      
       document.getElementById('requestModal').style.display = 'flex';
     }
 
@@ -407,9 +509,21 @@
       document.getElementById('requestModal').style.display = 'flex';
     }
 
-    // Закрытие модального окна
+    // Закрытие модального окна заявки
     function closeRequestModal() {
       document.getElementById('requestModal').style.display = 'none';
+    }
+
+    // Открытие модального окна оплаты
+    function openPaymentModal() {
+      // Обновляем QR-код (чтобы избежать кэширования)
+      document.getElementById('paymentQR').src = getPaymentQRUrl();
+      document.getElementById('paymentModal').style.display = 'flex';
+    }
+
+    // Закрытие модального окна оплаты
+    function closePaymentModal() {
+      document.getElementById('paymentModal').style.display = 'none';
     }
 
     // Загрузка заявок пользователя
@@ -537,6 +651,12 @@
         if (error) throw error;
 
         closeRequestModal();
+        
+        // Показываем окно с информацией об оплате только при создании новой заявки
+        if (!currentEditingRequestId) {
+          openPaymentModal();
+        }
+        
         loadRequests(); // Перезагружаем список
       } catch (error) {
         alert('Ошибка при сохранении заявки: ' + error.message);
@@ -561,10 +681,23 @@
 
         currentUser = user;
 
+        // Загружаем профиль пользователя
+        const { data: profileData } = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        currentProfile = profileData;
+
         // Обработчики событий
         document.getElementById('createRequestBtn').addEventListener('click', openCreateRequestModal);
+        document.getElementById('createRequestEmptyBtn').addEventListener('click', openCreateRequestModal);
         document.getElementById('closeRequestModal').addEventListener('click', closeRequestModal);
         document.getElementById('cancelRequestBtn').addEventListener('click', closeRequestModal);
+        
+        document.getElementById('closePaymentModal').addEventListener('click', closePaymentModal);
+        document.getElementById('closePaymentBtn').addEventListener('click', closePaymentModal);
         
         document.getElementById('requestForm').addEventListener('submit', (e) => {
           e.preventDefault();
