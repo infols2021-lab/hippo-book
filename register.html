@@ -609,6 +609,26 @@
               if (data.user) {
                 console.log('User created successfully:', data.user.id);
                 
+                // ОБНОВЛЯЕМ ПРОФИЛЬ СРАЗУ ПОСЛЕ РЕГИСТРАЦИИ - ЭТО ИСПРАВЛЕНИЕ!
+                try {
+                  const { error: profileError } = await supabase
+                    .from('profiles')
+                    .update({
+                      full_name: fullname,
+                      contact_phone: phone,
+                      region: region
+                    })
+                    .eq('id', data.user.id);
+
+                  if (profileError) {
+                    console.error('Ошибка обновления профиля:', profileError);
+                  } else {
+                    console.log('✅ Профиль успешно обновлен с данными:', { fullname, phone, region });
+                  }
+                } catch (profileError) {
+                  console.error('Ошибка при обновлении профиля:', profileError);
+                }
+                
                 showSuccess('✅ Регистрация успешна! Проверьте вашу почту для подтверждения email. Без подтверждения вход невозможен.');
                 document.getElementById('registerBtn').style.display = 'none';
                 
