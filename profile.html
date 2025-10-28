@@ -351,12 +351,39 @@
       align-items: center;
       gap: 8px;
       transition: transform 0.2s, box-shadow 0.2s;
-      margin-top: 15px;
+      margin: 15px auto 0;
+      justify-content: center;
     }
 
     .edit-profile-btn:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(78, 205, 196, 0.3);
+    }
+
+    .profile-info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 100%;
+    }
+
+    .badges-container {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 16px 0;
+      width: 100%;
+    }
+
+    .badge {
+      padding: 8px 16px;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
     }
 
     @media (max-width: 768px) {
@@ -421,6 +448,17 @@
       .modal-actions {
         flex-direction: column;
       }
+
+      .badges-container {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .badge {
+        width: 100%;
+        max-width: 280px;
+        text-align: center;
+      }
     }
 
     @media (max-width: 480px) {
@@ -439,6 +477,11 @@
 
       .modal-content {
         padding: 15px;
+      }
+
+      .edit-profile-btn {
+        width: 100%;
+        max-width: 280px;
       }
     }
   </style>
@@ -541,9 +584,9 @@
               </div>
             </div>
             
-            <div style="margin-top:16px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-              <span class="badge" id="totalAssignmentsCount" style="background: var(--accent2); padding: 8px 16px;">📊 Доступных заданий: 0</span>
-              <span class="badge" id="completedAssignmentsCount" style="background: var(--accent); padding: 8px 16px;">✅ Выполнено: 0</span>
+            <div class="badges-container">
+              <span class="badge" id="totalAssignmentsCount" style="background: var(--accent2);">📊 Доступных заданий: 0</span>
+              <span class="badge" id="completedAssignmentsCount" style="background: var(--accent);">✅ Выполнено: 0</span>
             </div>
             
             <button class="edit-profile-btn" id="editProfileBtn">
