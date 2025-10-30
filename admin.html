@@ -792,6 +792,7 @@
             <table class="admin-table" id="assignmentsTable">
               <thead>
                 <tr>
+                  <th>№</th>
                   <th>Название</th>
                   <th>Материал</th>
                   <th>Тип</th>
@@ -1372,7 +1373,7 @@
       updateWordList(qid);
       updateStudentPreview(qid);
       
-      showModal('✅ Готово', `Сетку ${rows}×${cols} создана! Теперь добавьте слова.`);
+      showModal('✅ Готово', `Сетка ${rows}×${cols} создана! Теперь добавьте слова.`);
     }
 
     function clearAdvancedGrid(qid) {
@@ -2772,11 +2773,12 @@
 
           tbody.innerHTML = '';
           if (!rows?.length) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Задания не найдены</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Задания не найдены</td></tr>';
             return;
           }
 
-          rows.forEach(a=>{
+          // ИСПРАВЛЕНИЕ: Добавляем нумерацию заданий по порядку отображения
+          rows.forEach((a, index) => {
             const qs = a.content?.questions || [];
             let typeText = '📝 Тест';
             const types = new Set(qs.map(q=>q.type));
@@ -2786,6 +2788,7 @@
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
+              <td><strong>${index + 1}</strong></td>
               <td>${a.title}</td>
               <td>${materialName}</td>
               <td>${typeText}</td>
