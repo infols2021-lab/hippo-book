@@ -781,7 +781,8 @@
               <button class="btn" id="addQuestionBtn">➕ Добавить вопрос</button>
             </div>
 
-            <div style="margin-top:20px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <!-- ИСПРАВЛЕНИЕ: Кнопки перенесены в центр -->
+            <div style="margin-top:20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
               <button class="btn" id="saveAssignmentBtn">💾 Сохранить задание</button>
               <button class="btn secondary" id="cancelAssignmentBtn">❌ Отмена</button>
             </div>
@@ -1371,7 +1372,7 @@
       updateWordList(qid);
       updateStudentPreview(qid);
       
-      showModal('✅ Готово', `Сетка ${rows}×${cols} создана! Теперь добавьте слова.`);
+      showModal('✅ Готово', `Сетку ${rows}×${cols} создана! Теперь добавьте слова.`);
     }
 
     function clearAdvancedGrid(qid) {
