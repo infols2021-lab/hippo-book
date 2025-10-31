@@ -171,15 +171,31 @@
         background: #fff3cd;
     }
 
-    .crossword-cell.has-number::before {
-        content: attr(data-number);
+    /* ИСПРАВЛЕНИЕ: Отображение номеров слов как в assignment.html */
+    .crossword-cell.has-number {
+        position: relative;
+    }
+
+    .crossword-number {
         position: absolute;
-        top: 2px;
-        left: 2px;
-        font-size: 10px;
+        font-size: 8px;
         font-weight: bold;
         color: #333;
         z-index: 1;
+        background: rgba(255,255,255,0.8);
+        padding: 1px 2px;
+        border-radius: 2px;
+        line-height: 1;
+    }
+
+    .crossword-number-across {
+        top: 1px;
+        left: 1px;
+    }
+
+    .crossword-number-down {
+        top: 1px;
+        right: 1px;
     }
 
     .crossword-cell.recently-added {
@@ -396,51 +412,6 @@
         z-index: 1;
     }
 
-    /* НОВЫЕ КНОПКИ УПРАВЛЕНИЯ ПРЕДПРОСМОТРОМ */
-    .preview-controls {
-        display: flex;
-        gap: 10px;
-        margin: 15px 0;
-        justify-content: center;
-    }
-
-    .preview-btn {
-        background: #2196f3;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 600;
-        transition: background 0.3s;
-    }
-
-    .preview-btn:hover {
-        background: #1976d2;
-    }
-
-    .preview-btn.hide {
-        background: #ff9800;
-    }
-
-    .preview-btn.hide:hover {
-        background: #f57c00;
-    }
-
-    .student-preview-container {
-        display: none;
-        margin: 20px 0;
-        padding: 20px;
-        background: #f8f9fa;
-        border-radius: 12px;
-        border: 2px solid #e9ecef;
-    }
-
-    .student-preview-container.active {
-        display: block;
-    }
-
     /* НОВЫЕ СТИЛИ ДЛЯ УПРАВЛЕНИЯ ЗАЯВКАМИ И ФИЛЬТРАЦИИ */
     .users-controls {
         display: flex;
@@ -571,8 +542,6 @@
       .crossword-advanced-controls .form-group { width: 100%; }
       .fill-input-item { padding: 8px; }
       .users-stats { flex-direction: column; gap: 10px; }
-      .preview-controls { flex-direction: column; }
-      .preview-btn { width: 100%; text-align: center; }
     }
 
     @media (max-width: 480px) {
@@ -1367,9 +1336,6 @@
       // Инициализация управления словами
       initWordManagement(qid);
 
-      // Инициализация кнопок предпросмотра
-      initPreviewButtons(qid);
-
       // Если есть предзаполненные данные, восстанавливаем сетку
       const questionText = document.getElementById(`questionText_${qid}`);
       if (questionText && questionText.value.includes('[CROSSWORD]')) {
@@ -1392,27 +1358,6 @@
         updateAdvancedCrosswordStats(qid);
         updateWordList(qid);
         updateStudentPreview(qid);
-      }
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Инициализация кнопок предпросмотра
-    function initPreviewButtons(qid) {
-      const showPreviewBtn = document.getElementById(`showPreviewBtn_${qid}`);
-      const hidePreviewBtn = document.getElementById(`hidePreviewBtn_${qid}`);
-      const previewContainer = document.getElementById(`studentPreviewContainer_${qid}`);
-
-      if (showPreviewBtn && hidePreviewBtn && previewContainer) {
-        showPreviewBtn.addEventListener('click', function() {
-          previewContainer.classList.add('active');
-          showPreviewBtn.style.display = 'none';
-          hidePreviewBtn.style.display = 'block';
-        });
-
-        hidePreviewBtn.addEventListener('click', function() {
-          previewContainer.classList.remove('active');
-          hidePreviewBtn.style.display = 'none';
-          showPreviewBtn.style.display = 'block';
-        });
       }
     }
 
@@ -1444,7 +1389,7 @@
       updateWordList(qid);
       updateStudentPreview(qid);
       
-      showModal('✅ Готово', `Сетка ${rows}×${cols} создана! Теперь добавьте слова.`);
+      showModal('✅ Готово', `Сетку ${rows}×${cols} создана! Теперь добавьте слова.`);
     }
 
     function clearAdvancedGrid(qid) {
@@ -1503,18 +1448,20 @@
             cell.appendChild(input);
           }
           
-          // Добавляем номер, если клетка является началом слова
-          const wordStartsHere = data.words.some(word => 
+          // ИСПРАВЛЕНИЕ: Отображение номеров слов как в assignment.html
+          const wordsStartingHere = data.words.filter(word => 
             word.start.row === i && word.start.col === j
           );
           
-          if (wordStartsHere) {
-            cell.classList.add('start-word');
-            const word = data.words.find(w => w.start.row === i && w.start.col === j);
-            if (word) {
-              cell.setAttribute('data-number', word.number);
-              cell.classList.add('has-number');
-            }
+          if (wordsStartingHere.length > 0) {
+            cell.classList.add('start-word', 'has-number');
+            
+            wordsStartingHere.forEach(word => {
+              const numberEl = document.createElement('div');
+              numberEl.textContent = word.number;
+              numberEl.className = `crossword-number crossword-number-${word.direction}`;
+              cell.appendChild(numberEl);
+            });
           }
           
           // Добавляем обработчик двойного клика для блокировки/разблокировки клетки
@@ -1892,9 +1839,9 @@
         previewContainer.id = `studentPreview_${qid}`;
         previewContainer.className = 'student-preview';
         
-        const container = document.getElementById(`studentPreviewContainer_${qid}`);
-        if (container) {
-          container.appendChild(previewContainer);
+        const builder = document.getElementById(`crosswordAdvancedBuilder_${qid}`);
+        if (builder) {
+          builder.appendChild(previewContainer);
         }
       }
 
@@ -1946,17 +1893,20 @@
             cell.classList.add('input-cell');
             cell.textContent = data.grid[i][j] || '';
             
-            // Добавляем номер, если клетка является началом слова
-            const wordStartsHere = data.words.some(word => 
+            // ИСПРАВЛЕНИЕ: Отображение номеров слов как в assignment.html
+            const wordsStartingHere = data.words.filter(word => 
               word.start.row === i && word.start.col === j
             );
             
-            if (wordStartsHere) {
-              const word = data.words.find(w => w.start.row === i && w.start.col === j);
-              if (word) {
-                cell.setAttribute('data-number', word.number);
-                cell.classList.add('has-number');
-              }
+            if (wordsStartingHere.length > 0) {
+              cell.classList.add('has-number');
+              
+              wordsStartingHere.forEach(word => {
+                const numberEl = document.createElement('div');
+                numberEl.textContent = word.number;
+                numberEl.className = `crossword-number crossword-number-${word.direction}`;
+                cell.appendChild(numberEl);
+              });
             }
           } else if (isBlocked) {
             cell.classList.add('blocked');
@@ -2636,16 +2586,6 @@
                   </div>
                   <input type="hidden" id="crosswordAdvancedImageUrl_${qid}" value="${prefill?.image || ''}">
                   <img class="image-preview" id="crosswordAdvancedImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
-                </div>
-
-                <!-- НОВЫЕ КНОПКИ УПРАВЛЕНИЯ ПРЕДПРОСМОТРОМ -->
-                <div class="preview-controls">
-                  <button type="button" class="preview-btn" id="showPreviewBtn_${qid}">👀 Показать предпросмотр</button>
-                  <button type="button" class="preview-btn hide" id="hidePreviewBtn_${qid}" style="display: none;">❌ Скрыть предпросмотр</button>
-                </div>
-
-                <div class="student-preview-container" id="studentPreviewContainer_${qid}">
-                  <!-- Предпросмотр для ученика будет здесь -->
                 </div>
 
                 ${questionEditor}
