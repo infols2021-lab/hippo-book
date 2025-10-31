@@ -396,6 +396,51 @@
         z-index: 1;
     }
 
+    /* НОВЫЕ КНОПКИ УПРАВЛЕНИЯ ПРЕДПРОСМОТРОМ */
+    .preview-controls {
+        display: flex;
+        gap: 10px;
+        margin: 15px 0;
+        justify-content: center;
+    }
+
+    .preview-btn {
+        background: #2196f3;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: background 0.3s;
+    }
+
+    .preview-btn:hover {
+        background: #1976d2;
+    }
+
+    .preview-btn.hide {
+        background: #ff9800;
+    }
+
+    .preview-btn.hide:hover {
+        background: #f57c00;
+    }
+
+    .student-preview-container {
+        display: none;
+        margin: 20px 0;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 12px;
+        border: 2px solid #e9ecef;
+    }
+
+    .student-preview-container.active {
+        display: block;
+    }
+
     /* НОВЫЕ СТИЛИ ДЛЯ УПРАВЛЕНИЯ ЗАЯВКАМИ И ФИЛЬТРАЦИИ */
     .users-controls {
         display: flex;
@@ -526,6 +571,8 @@
       .crossword-advanced-controls .form-group { width: 100%; }
       .fill-input-item { padding: 8px; }
       .users-stats { flex-direction: column; gap: 10px; }
+      .preview-controls { flex-direction: column; }
+      .preview-btn { width: 100%; text-align: center; }
     }
 
     @media (max-width: 480px) {
@@ -1320,6 +1367,9 @@
       // Инициализация управления словами
       initWordManagement(qid);
 
+      // Инициализация кнопок предпросмотра
+      initPreviewButtons(qid);
+
       // Если есть предзаполненные данные, восстанавливаем сетку
       const questionText = document.getElementById(`questionText_${qid}`);
       if (questionText && questionText.value.includes('[CROSSWORD]')) {
@@ -1342,6 +1392,27 @@
         updateAdvancedCrosswordStats(qid);
         updateWordList(qid);
         updateStudentPreview(qid);
+      }
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Инициализация кнопок предпросмотра
+    function initPreviewButtons(qid) {
+      const showPreviewBtn = document.getElementById(`showPreviewBtn_${qid}`);
+      const hidePreviewBtn = document.getElementById(`hidePreviewBtn_${qid}`);
+      const previewContainer = document.getElementById(`studentPreviewContainer_${qid}`);
+
+      if (showPreviewBtn && hidePreviewBtn && previewContainer) {
+        showPreviewBtn.addEventListener('click', function() {
+          previewContainer.classList.add('active');
+          showPreviewBtn.style.display = 'none';
+          hidePreviewBtn.style.display = 'block';
+        });
+
+        hidePreviewBtn.addEventListener('click', function() {
+          previewContainer.classList.remove('active');
+          hidePreviewBtn.style.display = 'none';
+          showPreviewBtn.style.display = 'block';
+        });
       }
     }
 
@@ -1821,9 +1892,9 @@
         previewContainer.id = `studentPreview_${qid}`;
         previewContainer.className = 'student-preview';
         
-        const builder = document.getElementById(`crosswordAdvancedBuilder_${qid}`);
-        if (builder) {
-          builder.appendChild(previewContainer);
+        const container = document.getElementById(`studentPreviewContainer_${qid}`);
+        if (container) {
+          container.appendChild(previewContainer);
         }
       }
 
@@ -2565,6 +2636,16 @@
                   </div>
                   <input type="hidden" id="crosswordAdvancedImageUrl_${qid}" value="${prefill?.image || ''}">
                   <img class="image-preview" id="crosswordAdvancedImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
+                </div>
+
+                <!-- НОВЫЕ КНОПКИ УПРАВЛЕНИЯ ПРЕДПРОСМОТРОМ -->
+                <div class="preview-controls">
+                  <button type="button" class="preview-btn" id="showPreviewBtn_${qid}">👀 Показать предпросмотр</button>
+                  <button type="button" class="preview-btn hide" id="hidePreviewBtn_${qid}" style="display: none;">❌ Скрыть предпросмотр</button>
+                </div>
+
+                <div class="student-preview-container" id="studentPreviewContainer_${qid}">
+                  <!-- Предпросмотр для ученика будет здесь -->
                 </div>
 
                 ${questionEditor}
