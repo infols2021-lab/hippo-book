@@ -508,6 +508,95 @@
         100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
     }
 
+    /* НОВЫЕ СТИЛИ ДЛЯ УДАЛЕНИЯ СЛОВ В КРОССВОРДЕ */
+    .delete-word-mode .crossword-cell:not(.blocked) {
+        cursor: no-drop;
+        position: relative;
+    }
+
+    .delete-word-mode .crossword-cell:not(.blocked):hover::before {
+        content: '🗑️';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 16px;
+        z-index: 10;
+        background: rgba(231, 76, 60, 0.9);
+        border-radius: 4px;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .delete-word-btn {
+        background: #e74c3c;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: background 0.2s;
+    }
+
+    .delete-word-btn:hover {
+        background: #c0392b;
+    }
+
+    .delete-word-btn.active {
+        background: #c0392b;
+        box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.5);
+    }
+
+    .word-selection-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 10001;
+    }
+
+    .word-selection-content {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .word-option {
+        padding: 12px;
+        margin: 8px 0;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .word-option:hover {
+        background: #f8f9fa;
+        border-color: var(--accent2);
+    }
+
+    .word-option.selected {
+        background: var(--accent2);
+        color: white;
+        border-color: var(--accent2);
+    }
+
     @media (max-width: 1024px) {
       .admin-container { width: 98%; margin: 15px auto; }
       .admin-table { font-size: 14px; }
@@ -580,6 +669,19 @@
         <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
           <button class="btn" id="saveUserAccessBtn">💾 Сохранить доступы</button>
           <button class="btn secondary" id="closeUserAccessModal">❌ Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно выбора слова для удаления -->
+    <div class="word-selection-modal" id="wordSelectionModal">
+      <div class="word-selection-content card">
+        <h3>🗑️ Выберите слово для удаления</h3>
+        <p>Найдено несколько слов в этой позиции. Выберите, какое хотите удалить:</p>
+        <div id="wordSelectionList"></div>
+        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn btn-danger" id="confirmDeleteWordBtn">🗑️ Удалить выбранное</button>
+          <button class="btn secondary" id="cancelDeleteWordBtn">❌ Отмена</button>
         </div>
       </div>
     </div>
@@ -1290,10 +1392,159 @@
           blocks: [],
           rows: 15,
           cols: 15,
-          nextWordNumber: 1
+          nextWordNumber: 1,
+          deleteMode: false
         };
       }
       return crosswordData[qid];
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Поиск слов в указанной позиции
+    function findWordsAtPosition(qid, row, col) {
+      const data = crosswordData[qid];
+      if (!data || !data.words) return [];
+      
+      const foundWords = [];
+      
+      data.words.forEach(word => {
+        if (word.direction === 'across') {
+          // Проверяем горизонтальное слово
+          if (word.start.row === row && 
+              col >= word.start.col && 
+              col < word.start.col + word.length) {
+            foundWords.push(word);
+          }
+        } else {
+          // Проверяем вертикальное слово
+          if (word.start.col === col &&
+              row >= word.start.row &&
+              row < word.start.row + word.length) {
+            foundWords.push(word);
+          }
+        }
+      });
+      
+      return foundWords;
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Удаление слова по номеру
+    function removeWordByNumber(qid, wordNumber) {
+      const data = crosswordData[qid];
+      if (!data) return;
+
+      const wordIndex = data.words.findIndex(w => w.number === wordNumber);
+      if (wordIndex === -1) return;
+
+      const word = data.words[wordIndex];
+
+      // Удаляем слово из списка
+      data.words.splice(wordIndex, 1);
+      
+      // Очищаем клетки, которые больше не используются другими словами
+      for (let i = 0; i < word.length; i++) {
+        const row = word.direction === 'across' ? word.start.row : word.start.row + i;
+        const col = word.direction === 'across' ? word.start.col + i : word.start.col;
+        
+        // Проверяем, принадлежит ли эта клетка другим словам
+        const belongsToOtherWord = data.words.some(otherWord => {
+          if (otherWord.direction === 'across') {
+            for (let j = 0; j < otherWord.length; j++) {
+              if (otherWord.start.row === row && otherWord.start.col + j === col) {
+                return true;
+              }
+            }
+          } else {
+            for (let j = 0; j < otherWord.length; j++) {
+              if (otherWord.start.row + j === row && otherWord.start.col === col) {
+                return true;
+              }
+            }
+          }
+          return false;
+        });
+        
+        if (!belongsToOtherWord) {
+          data.grid[row][col] = '';
+        }
+      }
+
+      // Перерисовываем сетку и обновляем статистику
+      renderAdvancedGrid(qid);
+      updateAdvancedCrosswordStats(qid);
+      updateWordList(qid);
+      updateStudentPreview(qid);
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Показать модальное окно выбора слова для удаления
+    function showWordSelectionModal(qid, words, row, col) {
+      const modal = document.getElementById('wordSelectionModal');
+      const list = document.getElementById('wordSelectionList');
+      
+      list.innerHTML = '';
+      
+      if (words.length === 0) {
+        showModal('❌ Ошибка', 'В этой позиции не найдено слов для удаления');
+        return;
+      }
+      
+      let selectedWord = null;
+      
+      words.forEach(word => {
+        const option = document.createElement('div');
+        option.className = 'word-option';
+        option.innerHTML = `
+          <strong>${word.text}</strong> 
+          (${word.direction === 'across' ? '→ горизонталь' : '↓ вертикаль'}) 
+          - №${word.number}
+        `;
+        
+        option.addEventListener('click', () => {
+          document.querySelectorAll('.word-option').forEach(opt => opt.classList.remove('selected'));
+          option.classList.add('selected');
+          selectedWord = word;
+        });
+        
+        list.appendChild(option);
+      });
+      
+      // Выбираем первое слово по умолчанию
+      if (words.length > 0) {
+        list.firstChild.classList.add('selected');
+        selectedWord = words[0];
+      }
+      
+      document.getElementById('confirmDeleteWordBtn').onclick = () => {
+        if (selectedWord) {
+          removeWordByNumber(qid, selectedWord.number);
+          modal.style.display = 'none';
+          showModal('✅ Успех', `Слово "${selectedWord.text}" удалено`);
+        }
+      };
+      
+      document.getElementById('cancelDeleteWordBtn').onclick = () => {
+        modal.style.display = 'none';
+      };
+      
+      modal.style.display = 'flex';
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Активация/деактивация режима удаления слов
+    function toggleDeleteWordMode(qid) {
+      const data = crosswordData[qid];
+      if (!data) return;
+      
+      data.deleteMode = !data.deleteMode;
+      const gridContainer = document.getElementById(`crosswordAdvancedGridContainer_${qid}`);
+      const deleteBtn = document.getElementById(`deleteWordBtn_${qid}`);
+      
+      if (data.deleteMode) {
+        gridContainer.classList.add('delete-word-mode');
+        deleteBtn.classList.add('active');
+        showModal('🗑️ Режим удаления', 'Кликните на слово, которое хотите удалить. Если в клетке несколько слов, выберите нужное из списка.');
+      } else {
+        gridContainer.classList.remove('delete-word-mode');
+        deleteBtn.classList.remove('active');
+      }
     }
 
     function initAdvancedCrosswordBuilder(qid) {
@@ -1312,6 +1563,7 @@
       // Обработчики для создания сетки
       const createGridBtn = document.getElementById(`createAdvancedGridBtn_${qid}`);
       const clearGridBtn = document.getElementById(`clearAdvancedGridBtn_${qid}`);
+      const deleteWordBtn = document.getElementById(`deleteWordBtn_${qid}`);
       
       if (createGridBtn) {
         createGridBtn.addEventListener('click', () => createAdvancedGrid(qid));
@@ -1319,6 +1571,11 @@
       
       if (clearGridBtn) {
         clearGridBtn.addEventListener('click', () => clearAdvancedGrid(qid));
+      }
+
+      // НОВЫЙ ОБРАБОТЧИК: Кнопка удаления слов
+      if (deleteWordBtn) {
+        deleteWordBtn.addEventListener('click', () => toggleDeleteWordMode(qid));
       }
 
       // Инициализация загрузки изображения для кроссворда
@@ -1383,6 +1640,7 @@
       data.rows = rows;
       data.cols = cols;
       data.nextWordNumber = 1;
+      data.deleteMode = false;
       
       renderAdvancedGrid(qid);
       updateAdvancedCrosswordStats(qid);
@@ -1401,6 +1659,7 @@
           data.blocks = [];
           data.words = [];
           data.nextWordNumber = 1;
+          data.deleteMode = false;
           renderAdvancedGrid(qid);
           updateAdvancedCrosswordStats(qid);
           updateWordList(qid);
@@ -1467,6 +1726,25 @@
           // Добавляем обработчик двойного клика для блокировки/разблокировки клетки
           cell.ondblclick = function() {
             toggleBlockCell(qid, i, j);
+          };
+          
+          // НОВЫЙ ОБРАБОТЧИК: Клик для удаления слов в режиме удаления
+          cell.onclick = function() {
+            if (data.deleteMode) {
+              const words = findWordsAtPosition(qid, i, j);
+              if (words.length === 1) {
+                // Если слово одно - удаляем сразу
+                removeWordByNumber(qid, words[0].number);
+                showModal('✅ Успех', `Слово "${words[0].text}" удалено`);
+                // Выходим из режима удаления после успешного удаления
+                toggleDeleteWordMode(qid);
+              } else if (words.length > 1) {
+                // Если слов несколько - показываем выбор
+                showWordSelectionModal(qid, words, i, j);
+              } else {
+                showModal('❌ Ошибка', 'В этой позиции не найдено слов для удаления');
+              }
+            }
           };
           
           rowDiv.appendChild(cell);
@@ -1719,43 +1997,7 @@
       const word = data.words[wordIndex];
       
       if (confirm(`Удалить слово "${word.text}"?`)) {
-        // Удаляем слово из списка
-        data.words.splice(wordIndex, 1);
-        
-        // Блокируем клетки, которые больше не используются другими словами
-        for (let i = 0; i < word.length; i++) {
-          const row = word.direction === 'across' ? word.start.row : word.start.row + i;
-          const col = word.direction === 'across' ? word.start.col + i : word.start.col;
-          
-          // Проверяем, принадлежит ли эта клетка другим словам
-          const belongsToOtherWord = data.words.some(otherWord => {
-            if (otherWord.direction === 'across') {
-              for (let j = 0; j < otherWord.length; j++) {
-                if (otherWord.start.row === row && otherWord.start.col + j === col) {
-                  return true;
-                }
-              }
-            } else {
-              for (let j = 0; j < otherWord.length; j++) {
-                if (otherWord.start.row + j === row && otherWord.start.col === col) {
-                  return true;
-                }
-              }
-            }
-            return false;
-          });
-          
-          if (!belongsToOtherWord) {
-            data.grid[row][col] = '';
-          }
-        }
-        
-        // Перерисовываем сетку и обновляем статистику
-        renderAdvancedGrid(qid);
-        updateAdvancedCrosswordStats(qid);
-        updateWordList(qid);
-        updateStudentPreview(qid);
-        
+        removeWordByNumber(qid, wordNumber);
         showModal('✅ Успех', `Слово "${word.text}" удалено`);
       }
     };
@@ -2514,6 +2756,7 @@
                   <ul>
                     <li><strong>Размещение слов:</strong> Введите слово, выберите направление и кликните на стартовую клетку</li>
                     <li><strong>Блокировка клеток:</strong> Двойной клик по клетке чтобы заблокировать/разблокировать (черные клетки)</li>
+                    <li><strong>Удаление слов:</strong> Нажмите кнопку "Удалить слово" и кликните на слово для удаления</li>
                   </ul>
                   <p><strong>Особенности:</strong></p>
                   <ul>
@@ -2522,6 +2765,7 @@
                     <li>Визуальное выделение начал слов</li>
                     <li>Управление списком слов</li>
                     <li>Предпросмотр для ученика (только клетки для ввода)</li>
+                    <li>Удаление отдельных слов без переделки всего кроссворда</li>
                   </ul>
                 </div>
 
@@ -2542,6 +2786,11 @@
                     </div>
                     <div class="form-group">
                       <button class="btn" id="placeWordBtn_${qid}">Разместить слово</button>
+                    </div>
+                    <div class="form-group">
+                      <button class="btn delete-word-btn" id="deleteWordBtn_${qid}">
+                        🗑️ Удалить слово
+                      </button>
                     </div>
                   </div>
 
@@ -2627,7 +2876,8 @@
                 blocks: prefill.blocks || [],
                 rows: prefill.metadata?.rows || 15,
                 cols: prefill.metadata?.cols || 15,
-                nextWordNumber: prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1
+                nextWordNumber: prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1,
+                deleteMode: false
               };
             } else {
               // Если данных нет, создаем пустую структуру
