@@ -1001,7 +1001,7 @@
       </div>
     </div>
   </div>
-  <script type="module">
+    <script type="module">
     // ============ БАЗОВЫЕ UI ХЕЛПЕРЫ ============
     document.getElementById('configLoading').style.display = 'block';
 
@@ -1393,10 +1393,22 @@
           rows: 15,
           cols: 15,
           nextWordNumber: 1,
-          deleteMode: false
+          deleteMode: false,
+          cellNumbers: {} // НОВОЕ: Храним номера клеток
         };
       }
       return crosswordData[qid];
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Получение номера для клетки
+    function getCellNumber(data, row, col) {
+      const cellKey = `${row}-${col}`;
+      if (data.cellNumbers[cellKey] !== undefined) {
+        return data.cellNumbers[cellKey];
+      }
+      // Если номера нет, назначаем следующий доступный
+      data.cellNumbers[cellKey] = data.nextWordNumber++;
+      return data.cellNumbers[cellKey];
     }
 
     // НОВАЯ ФУНКЦИЯ: Поиск слов в указанной позиции
@@ -1601,6 +1613,27 @@
           if (match) {
             const savedData = JSON.parse(match[1]);
             Object.assign(crosswordData[qid], savedData);
+            
+            // ВОССТАНАВЛИВАЕМ НОМЕРА КЛЕТОК ИЗ СОХРАНЕННЫХ ДАННЫХ
+            if (savedData.cellNumbers) {
+              data.cellNumbers = savedData.cellNumbers;
+              // Находим максимальный номер для nextWordNumber
+              const maxNumber = Math.max(...Object.values(data.cellNumbers), 0);
+              data.nextWordNumber = maxNumber + 1;
+            } else {
+              // Если cellNumbers нет в сохраненных данных, создаем из слов
+              data.cellNumbers = {};
+              data.words.forEach(word => {
+                const cellKey = `${word.start.row}-${word.start.col}`;
+                if (data.cellNumbers[cellKey] === undefined) {
+                  data.cellNumbers[cellKey] = word.number;
+                }
+              });
+              // Находим максимальный номер для nextWordNumber
+              const maxNumber = Math.max(...Object.values(data.cellNumbers), 0);
+              data.nextWordNumber = maxNumber + 1;
+            }
+            
             renderAdvancedGrid(qid);
             updateAdvancedCrosswordStats(qid);
             updateWordList(qid);
@@ -1640,6 +1673,7 @@
       data.rows = rows;
       data.cols = cols;
       data.nextWordNumber = 1;
+      data.cellNumbers = {}; // Сбрасываем номера клеток
       data.deleteMode = false;
       
       renderAdvancedGrid(qid);
@@ -1659,6 +1693,7 @@
           data.blocks = [];
           data.words = [];
           data.nextWordNumber = 1;
+          data.cellNumbers = {}; // Сбрасываем номера клеток
           data.deleteMode = false;
           renderAdvancedGrid(qid);
           updateAdvancedCrosswordStats(qid);
@@ -1707,20 +1742,17 @@
             cell.appendChild(input);
           }
           
-          // ИСПРАВЛЕНИЕ: Отображение номеров слов как в assignment.html
-          const wordsStartingHere = data.words.filter(word => 
-            word.start.row === i && word.start.col === j
-          );
+          // ИСПРАВЛЕНИЕ: Отображение ОДНОГО номера для клетки
+          const cellKey = `${i}-${j}`;
+          const cellNumber = data.cellNumbers[cellKey];
           
-          if (wordsStartingHere.length > 0) {
+          if (cellNumber !== undefined) {
             cell.classList.add('start-word', 'has-number');
             
-            wordsStartingHere.forEach(word => {
-              const numberEl = document.createElement('div');
-              numberEl.textContent = word.number;
-              numberEl.className = `crossword-number crossword-number-${word.direction}`;
-              cell.appendChild(numberEl);
-            });
+            const numberEl = document.createElement('div');
+            numberEl.textContent = cellNumber;
+            numberEl.className = `crossword-number crossword-number-single`;
+            cell.appendChild(numberEl);
           }
           
           // Добавляем обработчик двойного клика для блокировки/разблокировки клетки
@@ -1869,8 +1901,11 @@
         return;
       }
       
+      // ИСПРАВЛЕНИЕ: Получаем номер клетки (одинаковый для всех слов в этой клетке)
+      const wordNumber = getCellNumber(data, row, col);
+      
       // Размещаем слово
-      placeWord(data, word, direction, row, col);
+      placeWord(data, word, direction, row, col, wordNumber);
       
       // Сбрасываем режим размещения
       data.pendingWord = null;
@@ -1924,9 +1959,7 @@
       return { canPlace: true };
     }
 
-    function placeWord(data, word, direction, startRow, startCol) {
-      const wordNumber = data.nextWordNumber++;
-      
+    function placeWord(data, word, direction, startRow, startCol, wordNumber) {
       // Записываем буквы в сетку и разблокируем клетки
       for (let i = 0; i < word.length; i++) {
         const row = direction === 'across' ? startRow : startRow + i;
@@ -2136,19 +2169,15 @@
             cell.textContent = data.grid[i][j] || '';
             
             // ИСПРАВЛЕНИЕ: Отображение номеров слов как в assignment.html
-            const wordsStartingHere = data.words.filter(word => 
-              word.start.row === i && word.start.col === j
-            );
+            const cellNumber = data.cellNumbers[`${i}-${j}`];
             
-            if (wordsStartingHere.length > 0) {
+            if (cellNumber !== undefined) {
               cell.classList.add('has-number');
               
-              wordsStartingHere.forEach(word => {
-                const numberEl = document.createElement('div');
-                numberEl.textContent = word.number;
-                numberEl.className = `crossword-number crossword-number-${word.direction}`;
-                cell.appendChild(numberEl);
-              });
+              const numberEl = document.createElement('div');
+              numberEl.textContent = cellNumber;
+              numberEl.className = `crossword-number crossword-number-single`;
+              cell.appendChild(numberEl);
             }
           } else if (isBlocked) {
             cell.classList.add('blocked');
@@ -2232,6 +2261,7 @@
         grid: data.grid,
         words: data.words,
         blocks: data.blocks,
+        cellNumbers: data.cellNumbers, // Сохраняем номера клеток
         metadata: {
           rows: data.rows,
           cols: data.cols
@@ -2877,7 +2907,8 @@
                 rows: prefill.metadata?.rows || 15,
                 cols: prefill.metadata?.cols || 15,
                 nextWordNumber: prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1,
-                deleteMode: false
+                deleteMode: false,
+                cellNumbers: prefill.cellNumbers || {} // Восстанавливаем номера клеток
               };
             } else {
               // Если данных нет, создаем пустую структуру
