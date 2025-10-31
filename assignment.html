@@ -395,6 +395,7 @@
             background: #ffebee;
         }
 
+        /* ОБНОВЛЕННЫЕ СТИЛИ ДЛЯ НОМЕРОВ - ТЕПЕРЬ ТОЛЬКО В ЛЕВОМ ВЕРХНЕМ УГЛУ */
         .crossword-number {
             position: absolute;
             font-weight: bold;
@@ -403,32 +404,31 @@
             background: rgba(255,255,255,0.8);
             padding: 1px 2px;
             border-radius: 2px;
+            line-height: 1;
         }
 
         .crossword-cell.size-large .crossword-number {
             font-size: 6px;
-        }
-
-        .crossword-cell.size-medium .crossword-number {
-            font-size: 7px;
-        }
-
-        .crossword-cell.size-normal .crossword-number {
-            font-size: 8px;
-        }
-
-        .crossword-cell.size-small .crossword-number {
-            font-size: 8px;
-        }
-
-        .crossword-number-across {
             top: 1px;
             left: 1px;
         }
 
-        .crossword-number-down {
+        .crossword-cell.size-medium .crossword-number {
+            font-size: 7px;
             top: 1px;
-            right: 1px;
+            left: 1px;
+        }
+
+        .crossword-cell.size-normal .crossword-number {
+            font-size: 8px;
+            top: 1px;
+            left: 1px;
+        }
+
+        .crossword-cell.size-small .crossword-number {
+            font-size: 8px;
+            top: 1px;
+            left: 1px;
         }
 
         .crossword-instructions {
@@ -1743,6 +1743,7 @@
             const grid = question.grid || [];
             const blocks = question.blocks || [];
             const words = question.words || [];
+            const cellNumbers = question.cellNumbers || {}; // Получаем номера клеток
             const rows = question.metadata?.rows || grid.length;
             const cols = question.metadata?.cols || (grid[0] ? grid[0].length : 0);
             
@@ -1772,16 +1773,6 @@
                     const col = word.direction === 'across' ? word.start.col + i : word.start.col;
                     activeCells.add(`${row},${col}`);
                 }
-            });
-
-            // Создаем объект для хранения номеров слов в клетках
-            const cellNumbers = {};
-            words.forEach(word => {
-                const key = `${word.start.row}-${word.start.col}`;
-                if (!cellNumbers[key]) {
-                    cellNumbers[key] = [];
-                }
-                cellNumbers[key].push({ number: word.number, direction: word.direction });
             });
 
             for (let i = 0; i < rows; i++) {
@@ -1905,14 +1896,16 @@
                         cell.appendChild(input);
                     }
                     
-                    // Добавляем номера слов, если клетка является началом слова
-                    const numbers = cellNumbers[`${i}-${j}`] || [];
-                    numbers.forEach(num => {
+                    // ОБНОВЛЕННОЕ ОТОБРАЖЕНИЕ НОМЕРОВ: только в левом верхнем углу
+                    const cellKey = `${i}-${j}`;
+                    const cellNumber = cellNumbers[cellKey];
+                    
+                    if (cellNumber !== undefined) {
                         const numberEl = document.createElement('div');
-                        numberEl.className = `crossword-number crossword-number-${num.direction}`;
-                        numberEl.textContent = num.number;
+                        numberEl.className = 'crossword-number';
+                        numberEl.textContent = cellNumber;
                         cell.appendChild(numberEl);
-                    });
+                    }
                     
                     cell.dataset.row = i;
                     cell.dataset.col = j;
