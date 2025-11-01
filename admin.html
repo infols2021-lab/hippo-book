@@ -80,6 +80,7 @@
     /* Изображения в вопросах */
     .question-image-upload { margin: 10px 0; }
     .question-image-preview { max-width: 200px; max-height: 150px; border-radius: 8px; margin-top: 10px; display: none; }
+    .remove-image-btn { margin-top: 5px; }
 
     /* Модалка доступа пользователей */
     .user-access-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 10000; }
@@ -171,7 +172,7 @@
         background: #fff3cd;
     }
 
-    /* ИСПРАВЛЕНИЕ: Отображение номеров слов как в assignment.html */
+    /* ИСПРАВЛЕНИЕ: Отображение номеров слов слева сверху */
     .crossword-cell.has-number {
         position: relative;
     }
@@ -186,16 +187,8 @@
         padding: 1px 2px;
         border-radius: 2px;
         line-height: 1;
-    }
-
-    .crossword-number-across {
         top: 1px;
         left: 1px;
-    }
-
-    .crossword-number-down {
-        top: 1px;
-        right: 1px;
     }
 
     .crossword-cell.recently-added {
@@ -754,6 +747,7 @@
               </div>
               <input type="hidden" id="textbookCoverUrl">
               <img class="image-preview" id="textbookCoverPreview" alt="Предпросмотр обложки">
+              <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeTextbookCoverBtn" style="display: none; margin-top: 5px;">🗑️ Удалить обложку</button>
             </div>
 
             <div class="form-group">
@@ -822,6 +816,7 @@
               </div>
               <input type="hidden" id="crosswordCoverUrl">
               <img class="image-preview" id="crosswordCoverPreview" alt="Предпросмотр обложки">
+              <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeCrosswordCoverBtn" style="display: none; margin-top: 5px;">🗑️ Удалить обложку</button>
             </div>
 
             <div class="form-group">
@@ -1137,6 +1132,27 @@
       return name.replace(/[^a-zA-Z0-9._-]/g, '_');
     }
 
+    // НОВАЯ ФУНКЦИЯ: Удаление изображения
+    function setupRemoveImageButton(previewId, urlInputId, removeBtnId) {
+      const preview = document.getElementById(previewId);
+      const urlInput = document.getElementById(urlInputId);
+      const removeBtn = document.getElementById(removeBtnId);
+      
+      if (preview && urlInput && removeBtn) {
+        removeBtn.addEventListener('click', function() {
+          preview.style.display = 'none';
+          preview.src = '';
+          urlInput.value = '';
+          removeBtn.style.display = 'none';
+        });
+        
+        // Показываем кнопку удаления если есть изображение
+        if (urlInput.value) {
+          removeBtn.style.display = 'block';
+        }
+      }
+    }
+
     async function uploadImageToSupabase({ supabase, file, bucket }) {
       const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
       const allowed = ['jpg','jpeg','png','gif','webp','avif'];
@@ -1165,13 +1181,14 @@
       return pub.publicUrl;
     }
 
-    function initImageUpload({ uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId, bucket, supabase }) {
+    function initImageUpload({ uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId, removeBtnId, bucket, supabase }) {
       const area = document.getElementById(uploadAreaId);
       const input = document.getElementById(fileInputId);
       const barWrap = document.getElementById(progressId);
       const bar = document.getElementById(progressBarId);
       const preview = document.getElementById(previewId);
       const urlInput = document.getElementById(urlInputId);
+      const removeBtn = document.getElementById(removeBtnId);
 
       function resetProgress() {
         barWrap.style.display = 'none';
@@ -1185,6 +1202,7 @@
           const objectUrl = URL.createObjectURL(file);
           preview.src = objectUrl;
           preview.style.display = 'block';
+          if (removeBtn) removeBtn.style.display = 'block';
 
           bar.style.width = '65%';
           const publicUrl = await uploadImageToSupabase({ supabase, file, bucket });
@@ -1194,6 +1212,7 @@
         } catch (e) {
           resetProgress();
           preview.style.display = 'none';
+          if (removeBtn) removeBtn.style.display = 'none';
           showModal('Ошибка загрузки', e?.message || e);
         }
       }
@@ -1209,6 +1228,11 @@
         e.preventDefault(); area.classList.remove('dragover');
         if (e.dataTransfer.files?.length) handle(e.dataTransfer.files[0]);
       });
+
+      // Инициализация кнопки удаления
+      if (removeBtn) {
+        setupRemoveImageButton(previewId, urlInputId, removeBtnId);
+      }
     }
 
     // Инициализация загрузки картинок в вопросах (bucket: question-images)
@@ -1220,6 +1244,7 @@
         progressBarId: `questionImageProgressBar_${questionId}`,
         previewId: `questionImagePreview_${questionId}`,
         urlInputId: `questionImageUrl_${questionId}`,
+        removeBtnId: `removeQuestionImageBtn_${questionId}`,
         bucket: 'question-images',
         supabase
       });
@@ -1453,6 +1478,40 @@
       return foundWords;
     }
 
+    // НОВАЯ ФУНКЦИЯ: Проверка размера сетки для существующих слов
+    function validateGridSize(data, newRows, newCols) {
+      if (!data.words || data.words.length === 0) {
+        return { valid: true };
+      }
+
+      let maxRow = 0;
+      let maxCol = 0;
+
+      // Находим максимальные координаты всех слов
+      data.words.forEach(word => {
+        if (word.direction === 'across') {
+          maxRow = Math.max(maxRow, word.start.row);
+          maxCol = Math.max(maxCol, word.start.col + word.length - 1);
+        } else {
+          maxRow = Math.max(maxRow, word.start.row + word.length - 1);
+          maxCol = Math.max(maxCol, word.start.col);
+        }
+      });
+
+      // Проверяем, влезают ли слова в новую сетку
+      if (maxRow >= newRows || maxCol >= newCols) {
+        return {
+          valid: false,
+          message: `❌ Новая сетка ${newRows}×${newCols} слишком мала для существующих слов!\n\n` +
+                   `Текущие слова занимают до позиции [${maxRow}, ${maxCol}].\n` +
+                   `Минимальный размер сетки: ${maxRow + 1}×${maxCol + 1}\n\n` +
+                   `Увеличьте размер сетки или удалите некоторые слова.`
+        };
+      }
+
+      return { valid: true };
+    }
+
     // НОВАЯ ФУНКЦИЯ: Удаление слова
     function removeWordByNumber(qid, wordNumber) {
       const data = crosswordData[qid];
@@ -1614,6 +1673,7 @@
         progressBarId: `crosswordAdvancedImageProgressBar_${qid}`,
         previewId: `crosswordAdvancedImagePreview_${qid}`,
         urlInputId: `crosswordAdvancedImageUrl_${qid}`,
+        removeBtnId: `removeCrosswordImageBtn_${qid}`,
         bucket: 'question-images',
         supabase: window.supabase
       });
@@ -1682,6 +1742,14 @@
       }
       
       const data = crosswordData[qid];
+      
+      // НОВАЯ ПРОВЕРКА: Проверяем, что новая сетка достаточно большая для существующих слов
+      const sizeValidation = validateGridSize(data, rows, cols);
+      if (!sizeValidation.valid) {
+        showModal('❌ Ошибка изменения размера', sizeValidation.message);
+        return;
+      }
+      
       data.grid = Array(rows).fill().map(() => Array(cols).fill(''));
       data.blocks = [];
       data.words = [];
@@ -1756,7 +1824,7 @@
             cell.appendChild(input);
           }
           
-          // ИСПРАВЛЕНИЕ: Отображение ОДНОГО номера для клетки
+          // ИСПРАВЛЕНИЕ: Отображение ОДНОГО номера для клетки СЛЕВА СВЕРХУ
           const cellKey = `${i}-${j}`;
           const cellNumber = data.cellNumbers[cellKey];
           
@@ -1765,7 +1833,7 @@
             
             const numberEl = document.createElement('div');
             numberEl.textContent = cellNumber;
-            numberEl.className = `crossword-number crossword-number-single`;
+            numberEl.className = `crossword-number`;
             cell.appendChild(numberEl);
           }
           
@@ -2208,7 +2276,7 @@
             cell.classList.add('input-cell');
             cell.textContent = data.grid[i][j] || '';
             
-            // ИСПРАВЛЕНИЕ: Отображение номеров слов как в assignment.html
+            // ИСПРАВЛЕНИЕ: Отображение номеров слов СЛЕВА СВЕРХУ
             const cellNumber = data.cellNumbers[`${i}-${j}`];
             
             if (cellNumber !== undefined) {
@@ -2216,7 +2284,7 @@
               
               const numberEl = document.createElement('div');
               numberEl.textContent = cellNumber;
-              numberEl.className = `crossword-number crossword-number-single`;
+              numberEl.className = `crossword-number`;
               cell.appendChild(numberEl);
             }
           } else if (isBlocked) {
@@ -2304,7 +2372,8 @@
         cellNumbers: data.cellNumbers, // Сохраняем номера клеток
         metadata: {
           rows: data.rows,
-          cols: data.cols
+          cols: data.cols,
+          nextWordNumber: data.nextWordNumber
         }
       };
     }
@@ -2366,7 +2435,7 @@
           });
         });
 
-        // Инициализация зон загрузки для обложек (bucket: covers)
+        // Инициализация зон загрузки для обложек (bucket: covers) С ДОБАВЛЕНИЕМ КНОПОК УДАЛЕНИЯ
         initImageUpload({
           uploadAreaId: 'textbookUploadArea',
           fileInputId: 'textbookCoverInput',
@@ -2374,6 +2443,7 @@
           progressBarId: 'textbookCoverProgressBar',
           previewId: 'textbookCoverPreview',
           urlInputId: 'textbookCoverUrl',
+          removeBtnId: 'removeTextbookCoverBtn',
           bucket: 'covers',
           supabase
         });
@@ -2384,6 +2454,7 @@
           progressBarId: 'crosswordCoverProgressBar',
           previewId: 'crosswordCoverPreview',
           urlInputId: 'crosswordCoverUrl',
+          removeBtnId: 'removeCrosswordCoverBtn',
           bucket: 'covers',
           supabase
         });
@@ -2419,6 +2490,7 @@
           document.getElementById('textbookIsAvailable').checked = false;
           document.getElementById('textbookCoverUrl').value = '';
           document.getElementById('textbookCoverPreview').style.display = 'none';
+          document.getElementById('removeTextbookCoverBtn').style.display = 'none';
         }
         function hideTextbookForm(){ document.getElementById('textbookForm').classList.remove('active'); }
 
@@ -2500,7 +2572,15 @@
               document.getElementById('textbookIsAvailable').checked = !!data.is_available;
               document.getElementById('textbookCoverUrl').value = data.cover_image_url || '';
               const prev = document.getElementById('textbookCoverPreview');
-              if (data.cover_image_url) { prev.src = data.cover_image_url; prev.style.display='block'; } else { prev.style.display='none'; }
+              const removeBtn = document.getElementById('removeTextbookCoverBtn');
+              if (data.cover_image_url) { 
+                prev.src = data.cover_image_url; 
+                prev.style.display='block'; 
+                removeBtn.style.display='block';
+              } else { 
+                prev.style.display='none'; 
+                removeBtn.style.display='none';
+              }
             });
           });
 
@@ -2533,6 +2613,7 @@
           document.getElementById('crosswordIsAvailable').checked = false;
           document.getElementById('crosswordCoverUrl').value = '';
           document.getElementById('crosswordCoverPreview').style.display = 'none';
+          document.getElementById('removeCrosswordCoverBtn').style.display = 'none';
         }
         function hideCrosswordForm(){ document.getElementById('crosswordForm').classList.remove('active'); }
 
@@ -2613,7 +2694,15 @@
               document.getElementById('crosswordIsAvailable').checked = !!data.is_available;
               document.getElementById('crosswordCoverUrl').value = data.cover_image_url || '';
               const prev = document.getElementById('crosswordCoverPreview');
-              if (data.cover_image_url) { prev.src = data.cover_image_url; prev.style.display='block'; } else { prev.style.display='none'; }
+              const removeBtn = document.getElementById('removeCrosswordCoverBtn');
+              if (data.cover_image_url) { 
+                prev.src = data.cover_image_url; 
+                prev.style.display='block'; 
+                removeBtn.style.display='block';
+              } else { 
+                prev.style.display='none'; 
+                removeBtn.style.display='none';
+              }
             });
           });
 
@@ -2728,6 +2817,7 @@
           wrap.setAttribute('data-id', qid);
           wrap.setAttribute('data-type', qType);
 
+          // НОВЫЙ БЛОК: Кнопка удаления изображения для всех типов вопросов
           const imageUploadBlock = `
             <div class="form-group question-image-upload">
               <label>Изображение для вопроса (опционально):</label>
@@ -2741,6 +2831,7 @@
               </div>
               <input type="hidden" id="questionImageUrl_${qid}" value="${prefill?.image || ''}">
               <img class="question-image-preview" id="questionImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
+              <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeQuestionImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
             </div>
           `;
 
@@ -2909,6 +3000,7 @@
                   </div>
                   <input type="hidden" id="crosswordAdvancedImageUrl_${qid}" value="${prefill?.image || ''}">
                   <img class="image-preview" id="crosswordAdvancedImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
+                  <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeCrosswordImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
                 </div>
 
                 ${questionEditor}
