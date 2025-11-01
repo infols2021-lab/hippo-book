@@ -1001,7 +1001,8 @@
       </div>
     </div>
   </div>
-    <script type="module">
+
+  <script type="module">
     // ============ БАЗОВЫЕ UI ХЕЛПЕРЫ ============
     document.getElementById('configLoading').style.display = 'block';
 
@@ -1394,7 +1395,7 @@
           cols: 15,
           nextWordNumber: 1,
           deleteMode: false,
-          cellNumbers: {} // НОВОЕ: Храним номера клеток
+          cellNumbers: {} // Храним номера клеток
         };
       }
       return crosswordData[qid];
@@ -1403,12 +1404,25 @@
     // НОВАЯ ФУНКЦИЯ: Получение номера для клетки
     function getCellNumber(data, row, col) {
       const cellKey = `${row}-${col}`;
-      if (data.cellNumbers[cellKey] !== undefined) {
-        return data.cellNumbers[cellKey];
-      }
-      // Если номера нет, назначаем следующий доступный
-      data.cellNumbers[cellKey] = data.nextWordNumber++;
       return data.cellNumbers[cellKey];
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Установка номера для клетки
+    function setCellNumber(data, row, col, number) {
+      const cellKey = `${row}-${col}`;
+      data.cellNumbers[cellKey] = number;
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Удаление номера клетки если нет слов
+    function removeCellNumberIfNoWords(data, row, col) {
+      const cellKey = `${row}-${col}`;
+      const wordsAtCell = data.words.filter(word => 
+        word.start.row === row && word.start.col === col
+      );
+      
+      if (wordsAtCell.length === 0) {
+        delete data.cellNumbers[cellKey];
+      }
     }
 
     // НОВАЯ ФУНКЦИЯ: Поиск слов в указанной позиции
@@ -1439,7 +1453,7 @@
       return foundWords;
     }
 
-    // НОВАЯ ФУНКЦИЯ: Удаление слова по номеру
+    // НОВАЯ ФУНКЦИЯ: Удаление слова
     function removeWordByNumber(qid, wordNumber) {
       const data = crosswordData[qid];
       if (!data) return;
@@ -1451,6 +1465,9 @@
 
       // Удаляем слово из списка
       data.words.splice(wordIndex, 1);
+      
+      // Проверяем, остались ли слова в стартовой клетке
+      removeCellNumberIfNoWords(data, word.start.row, word.start.col);
       
       // Очищаем клетки, которые больше не используются другими словами
       for (let i = 0; i < word.length; i++) {
@@ -1568,7 +1585,6 @@
       // Инициализация сетки, если её нет
       if (data.grid.length === 0) {
         data.grid = Array(data.rows).fill().map(() => Array(data.cols).fill(''));
-        // ВАЖНО: НЕ блокируем все клетки по умолчанию
         data.blocks = [];
       }
 
@@ -1667,7 +1683,6 @@
       
       const data = crosswordData[qid];
       data.grid = Array(rows).fill().map(() => Array(cols).fill(''));
-      // ВАЖНО: НЕ блокируем все клетки по умолчанию
       data.blocks = [];
       data.words = [];
       data.rows = rows;
@@ -1689,7 +1704,6 @@
         const data = crosswordData[qid];
         if (data && data.grid) {
           data.grid = Array(data.rows).fill().map(() => Array(data.cols).fill(''));
-          // ВАЖНО: НЕ блокируем все клетки при очистке
           data.blocks = [];
           data.words = [];
           data.nextWordNumber = 1;
@@ -1814,6 +1828,7 @@
       const placeWordBtn = document.getElementById(`placeWordBtn_${qid}`);
       const wordInput = document.getElementById(`wordInput_${qid}`);
       const wordDirection = document.getElementById(`wordDirection_${qid}`);
+      const wordNumberInput = document.getElementById(`wordNumberInput_${qid}`);
       
       if (placeWordBtn) {
         placeWordBtn.addEventListener('click', () => {
@@ -1831,7 +1846,8 @@
           // Переходим в режим размещения слова
           data.pendingWord = {
             text: word,
-            direction: wordDirection.value
+            direction: wordDirection.value,
+            number: parseInt(wordNumberInput.value) || data.nextWordNumber
           };
           
           showModal('ℹ️ Режим размещения', `Кликните на клетку, где должно начаться слово "${word}" (${wordDirection.value === 'across' ? '→ по горизонтали' : '↓ по вертикали'})`);
@@ -1892,6 +1908,7 @@
       
       const word = data.pendingWord.text;
       const direction = data.pendingWord.direction;
+      let number = data.pendingWord.number;
       
       // Проверяем, можно ли разместить слово
       const canPlace = canPlaceWord(data, word, direction, row, col);
@@ -1901,14 +1918,33 @@
         return;
       }
       
-      // ИСПРАВЛЕНИЕ: Получаем номер клетки (одинаковый для всех слов в этой клетке)
-      const wordNumber = getCellNumber(data, row, col);
+      // ПРОВЕРЯЕМ ЕСТЬ ЛИ УЖЕ НОМЕР В КЛЕТКЕ
+      const existingNumber = getCellNumber(data, row, col);
+      if (existingNumber !== undefined) {
+        // Если номер уже есть, используем его
+        number = existingNumber;
+        showModal('ℹ️ Информация', `Используется существующий номер клетки: ${number}`);
+      } else {
+        // Если номера нет, устанавливаем указанный номер
+        setCellNumber(data, row, col, number);
+        
+        // Обновляем следующий доступный номер если нужно
+        if (number >= data.nextWordNumber) {
+          data.nextWordNumber = number + 1;
+        }
+      }
       
       // Размещаем слово
-      placeWord(data, word, direction, row, col, wordNumber);
+      placeWord(data, word, direction, row, col, number);
       
       // Сбрасываем режим размещения
       data.pendingWord = null;
+      
+      // Обновляем поле номера
+      const numberInput = document.getElementById(`wordNumberInput_${qid}`);
+      if (numberInput) {
+        numberInput.value = data.nextWordNumber;
+      }
       
       // Обновляем интерфейс
       renderAdvancedGrid(qid);
@@ -1920,7 +1956,7 @@
       const placedWord = data.words[data.words.length - 1];
       highlightWord(qid, placedWord);
       
-      showModal('✅ Успех', `Слово "${word}" размещено!`);
+      showModal('✅ Успех', `Слово "${word}" размещено с номером ${number}!`);
     }
 
     function canPlaceWord(data, word, direction, startRow, startCol) {
@@ -1959,7 +1995,7 @@
       return { canPlace: true };
     }
 
-    function placeWord(data, word, direction, startRow, startCol, wordNumber) {
+    function placeWord(data, word, direction, startRow, startCol, number) {
       // Записываем буквы в сетку и разблокируем клетки
       for (let i = 0; i < word.length; i++) {
         const row = direction === 'across' ? startRow : startRow + i;
@@ -1970,7 +2006,7 @@
       
       // Добавляем слово в список
       data.words.push({
-        number: wordNumber,
+        number: number,
         text: word,
         direction: direction,
         start: { row: startRow, col: startCol },
@@ -2084,6 +2120,10 @@
         <div class="crossword-stat-item">
           <span>Количество слов:</span>
           <span>${data.words.length}</span>
+        </div>
+        <div class="crossword-stat-item">
+          <span>Следующий номер:</span>
+          <span>${data.nextWordNumber}</span>
         </div>
       `;
     }
@@ -2784,18 +2824,18 @@
                   <h4>🧩 Конструктор кроссворда</h4>
                   <p><strong>Режим работы:</strong></p>
                   <ul>
-                    <li><strong>Размещение слов:</strong> Введите слово, выберите направление и кликните на стартовую клетку</li>
+                    <li><strong>Размещение слов:</strong> Введите слово, выберите направление и номер, затем кликните на стартовую клетку</li>
                     <li><strong>Блокировка клеток:</strong> Двойной клик по клетке чтобы заблокировать/разблокировать (черные клетки)</li>
                     <li><strong>Удаление слов:</strong> Нажмите кнопку "Удалить слово" и кликните на слово для удаления</li>
                   </ul>
                   <p><strong>Особенности:</strong></p>
                   <ul>
-                    <li>Автоматическая нумерация слов</li>
+                    <li>Ручное указание номера слова</li>
+                    <li>Если в клетке уже есть номер - используется существующий</li>
+                    <li>Один номер для горизонтального и вертикального слова в одной клетке</li>
                     <li>Проверка пересечений слов</li>
-                    <li>Визуальное выделение начал слов</li>
                     <li>Управление списком слов</li>
                     <li>Предпросмотр для ученика (только клетки для ввода)</li>
-                    <li>Удаление отдельных слов без переделки всего кроссворда</li>
                   </ul>
                 </div>
 
@@ -2813,6 +2853,10 @@
                         <option value="across">→ По горизонтали</option>
                         <option value="down">↓ По вертикали</option>
                       </select>
+                    </div>
+                    <div class="form-group">
+                      <label>Номер слова:</label>
+                      <input type="number" id="wordNumberInput_${qid}" min="1" value="${prefill?.metadata?.nextWordNumber || 1}">
                     </div>
                     <div class="form-group">
                       <button class="btn" id="placeWordBtn_${qid}">Разместить слово</button>
@@ -2906,7 +2950,7 @@
                 blocks: prefill.blocks || [],
                 rows: prefill.metadata?.rows || 15,
                 cols: prefill.metadata?.cols || 15,
-                nextWordNumber: prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1,
+                nextWordNumber: prefill.metadata?.nextWordNumber || (prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1),
                 deleteMode: false,
                 cellNumbers: prefill.cellNumbers || {} // Восстанавливаем номера клеток
               };
