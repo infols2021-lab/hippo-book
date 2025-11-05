@@ -445,10 +445,6 @@
         align-items: end;
     }
 
-    .filters-container .form-group {
-        margin-bottom: 0;
-    }
-
     .filters-container select,
     .filters-container input {
         min-width: 200px;
@@ -735,6 +731,21 @@
               <textarea id="textbookDescription" class="input" placeholder="Введите описание учебника" rows="3"></textarea>
             </div>
 
+            <!-- НОВОЕ ПОЛЕ: Класс -->
+            <div class="form-group">
+              <label>Класс:</label>
+              <select id="textbookClassLevel" class="input">
+                <option value="">-- Выберите класс --</option>
+                <option value="1-2">1-2 класс</option>
+                <option value="3-4">3-4 класс</option>
+                <option value="5-6">5-6 класс</option>
+                <option value="7">7 класс</option>
+                <option value="8-9">8-9 класс</option>
+                <option value="10-11">10-11 класс (Техникум, колледж - 1й курс)</option>
+                <option value="12">12 класс (Техникум, колледж)</option>
+              </select>
+            </div>
+
             <div class="form-group">
               <label>Обложка (опционально):</label>
               <div class="upload-area" id="textbookUploadArea">
@@ -771,6 +782,7 @@
                 <tr>
                   <th>Название</th>
                   <th>Описание</th>
+                  <th>Класс</th>
                   <th>Заданий</th>
                   <th>Доступ</th>
                   <th>Статус</th>
@@ -802,6 +814,21 @@
             <div class="form-group">
               <label>Описание:</label>
               <textarea id="crosswordDescription" class="input" placeholder="Введите описание кроссворда" rows="3"></textarea>
+            </div>
+
+            <!-- НОВОЕ ПОЛЕ: Класс -->
+            <div class="form-group">
+              <label>Класс:</label>
+              <select id="crosswordClassLevel" class="input">
+                <option value="">-- Выберите класс --</option>
+                <option value="1-2">1-2 класс</option>
+                <option value="3-4">3-4 класс</option>
+                <option value="5-6">5-6 класс</option>
+                <option value="7">7 класс</option>
+                <option value="8-9">8-9 класс</option>
+                <option value="10-11">10-11 класс (Техникум, колледж - 1й курс)</option>
+                <option value="12">12 класс (Техникум, колледж)</option>
+              </select>
             </div>
 
             <div class="form-group">
@@ -840,6 +867,7 @@
                 <tr>
                   <th>Название</th>
                   <th>Описание</th>
+                  <th>Класс</th>
                   <th>Заданий</th>
                   <th>Доступ</th>
                   <th>Действия</th>
@@ -2486,6 +2514,7 @@
           document.getElementById('textbookFormTitle').textContent = 'Создать учебник';
           document.getElementById('textbookTitle').value = '';
           document.getElementById('textbookDescription').value = '';
+          document.getElementById('textbookClassLevel').value = '';
           document.getElementById('textbookOrder').value = '0';
           document.getElementById('textbookIsAvailable').checked = false;
           document.getElementById('textbookCoverUrl').value = '';
@@ -2497,15 +2526,18 @@
         async function saveTextbook() {
           const title = document.getElementById('textbookTitle').value.trim();
           const description = document.getElementById('textbookDescription').value.trim();
+          const classLevel = document.getElementById('textbookClassLevel').value;
           const orderIndex = parseInt(document.getElementById('textbookOrder').value || '0',10);
           const isAvailable = document.getElementById('textbookIsAvailable').checked;
           const coverUrl = document.getElementById('textbookCoverUrl').value;
 
           if (!title) return showModal('Ошибка', 'Введите название учебника');
+          if (!classLevel) return showModal('Ошибка', 'Выберите класс');
 
           const payload = {
             title,
             description,
+            class_level: classLevel,
             order_index: orderIndex,
             is_available: isAvailable,
             is_active: true,
@@ -2527,7 +2559,7 @@
 
         async function loadTextbooks() {
           const tbody = document.querySelector('#textbooksTable tbody');
-          tbody.innerHTML = '<tr><td colspan="6" style="padding:14px;">Загрузка...</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" style="padding:14px;">Загрузка...</td></tr>';
 
           const { data: textbooks, error } = await supabase.from('textbooks').select('*').order('order_index');
           if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
@@ -2538,7 +2570,7 @@
 
           tbody.innerHTML = '';
           if (!textbooks?.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Учебники не найдены</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;">Учебники не найдены</td></tr>';
             return;
           }
 
@@ -2547,6 +2579,7 @@
             tr.innerHTML = `
               <td>${tb.title}</td>
               <td>${tb.description || '—'}</td>
+              <td>${tb.class_level || '—'}</td>
               <td>${counts[tb.id] || 0}</td>
               <td>${tb.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
               <td>${tb.is_active ? '✅ Активен' : '❌ Неактивен'}</td>
@@ -2568,6 +2601,7 @@
               document.getElementById('textbookFormTitle').textContent = 'Редактировать учебник';
               document.getElementById('textbookTitle').value = data.title || '';
               document.getElementById('textbookDescription').value = data.description || '';
+              document.getElementById('textbookClassLevel').value = data.class_level || '';
               document.getElementById('textbookOrder').value = data.order_index || 0;
               document.getElementById('textbookIsAvailable').checked = !!data.is_available;
               document.getElementById('textbookCoverUrl').value = data.cover_image_url || '';
@@ -2609,6 +2643,7 @@
           document.getElementById('crosswordFormTitle').textContent = 'Создать кроссворд';
           document.getElementById('crosswordTitle').value = '';
           document.getElementById('crosswordDescription').value = '';
+          document.getElementById('crosswordClassLevel').value = '';
           document.getElementById('crosswordOrder').value = '0';
           document.getElementById('crosswordIsAvailable').checked = false;
           document.getElementById('crosswordCoverUrl').value = '';
@@ -2620,15 +2655,18 @@
         async function saveCrossword() {
           const title = document.getElementById('crosswordTitle').value.trim();
           const description = document.getElementById('crosswordDescription').value.trim();
+          const classLevel = document.getElementById('crosswordClassLevel').value;
           const orderIndex = parseInt(document.getElementById('crosswordOrder').value || '0',10);
           const isAvailable = document.getElementById('crosswordIsAvailable').checked;
           const coverUrl = document.getElementById('crosswordCoverUrl').value;
 
           if (!title) return showModal('Ошибка', 'Введите название кроссворда');
+          if (!classLevel) return showModal('Ошибка', 'Выберите класс');
 
           const payload = {
             title,
             description,
+            class_level: classLevel,
             order_index: orderIndex,
             is_available: isAvailable,
             is_active: true,
@@ -2650,7 +2688,7 @@
 
         async function loadCrosswords() {
           const tbody = document.querySelector('#crosswordsTable tbody');
-          tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;">Загрузка...</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="padding:14px;">Загрузка...</td></tr>';
 
           const { data: crosswords, error } = await supabase.from('crosswords').select('*').order('order_index');
           if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
@@ -2661,7 +2699,7 @@
 
           tbody.innerHTML = '';
           if (!crosswords?.length) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Кроссворды не найдены</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Кроссворды не найдены</td></tr>';
             return;
           }
 
@@ -2670,6 +2708,7 @@
             tr.innerHTML = `
               <td>${cw.title}</td>
               <td>${cw.description || '—'}</td>
+              <td>${cw.class_level || '—'}</td>
               <td>${counts[cw.id] || 0}</td>
               <td>${cw.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
               <td>
@@ -2690,6 +2729,7 @@
               document.getElementById('crosswordFormTitle').textContent = 'Редактировать кроссворд';
               document.getElementById('crosswordTitle').value = data.title || '';
               document.getElementById('crosswordDescription').value = data.description || '';
+              document.getElementById('crosswordClassLevel').value = data.class_level || '';
               document.getElementById('crosswordOrder').value = data.order_index || 0;
               document.getElementById('crosswordIsAvailable').checked = !!data.is_available;
               document.getElementById('crosswordCoverUrl').value = data.cover_image_url || '';
@@ -2752,8 +2792,8 @@
           select.innerHTML = '<option value="">-- Выберите учебник или кроссворд --</option>';
 
           const [{ data: textbooks }, { data: crosswords }] = await Promise.all([
-            supabase.from('textbooks').select('id,title,is_active').order('order_index'),
-            supabase.from('crosswords').select('id,title,is_active').order('order_index')
+            supabase.from('textbooks').select('id,title,is_active,class_level').order('order_index'),
+            supabase.from('crosswords').select('id,title,is_active,class_level').order('order_index')
           ]);
 
           if (textbooks?.length) {
@@ -2762,7 +2802,7 @@
             textbooks.filter(t=>t.is_active!==false).forEach(t=>{
               const opt = document.createElement('option');
               opt.value = `textbook_${t.id}`;
-              opt.textContent = t.title;
+              opt.textContent = `${t.title} (${t.class_level || 'без класса'})`;
               og.appendChild(opt);
             });
             select.appendChild(og);
@@ -2774,7 +2814,7 @@
             crosswords.filter(c=>c.is_active!==false).forEach(c=>{
               const opt = document.createElement('option');
               opt.value = `crossword_${c.id}`;
-              opt.textContent = c.title;
+              opt.textContent = `${c.title} (${c.class_level || 'без класса'})`;
               og.appendChild(opt);
             });
             select.appendChild(og);
@@ -3479,8 +3519,8 @@
           `;
 
           const [t, c, ta, ca] = await Promise.all([
-            supabase.from('textbooks').select('id,title').eq('is_active', true).order('order_index'),
-            supabase.from('crosswords').select('id,title').eq('is_active', true).order('order_index'),
+            supabase.from('textbooks').select('id,title,class_level').eq('is_active', true).order('order_index'),
+            supabase.from('crosswords').select('id,title,class_level').eq('is_active', true).order('order_index'),
             supabase.from('textbook_access').select('textbook_id').eq('user_id', userId),
             supabase.from('crossword_access').select('crossword_id').eq('user_id', userId)
           ]);
@@ -3496,7 +3536,7 @@
               item.className = 'access-item';
               const id = `textbook_${tb.id}`;
               item.innerHTML = `<input type="checkbox" id="${id}" ${tSet.has(String(tb.id))?'checked':''}>
-                                <label for="${id}">${tb.title}</label>`;
+                                <label for="${id}">${tb.title} (${tb.class_level || 'без класса'})</label>`;
               tList.appendChild(item);
             });
           } else {
@@ -3511,7 +3551,7 @@
               item.className = 'access-item';
               const id = `crossword_${cr.id}`;
               item.innerHTML = `<input type="checkbox" id="${id}" ${cSet.has(String(cr.id))?'checked':''}>
-                                <label for="${id}">${cr.title}</label>`;
+                                <label for="${id}">${cr.title} (${cr.class_level || 'без класса'})</label>`;
               cList.appendChild(item);
             });
           } else {
