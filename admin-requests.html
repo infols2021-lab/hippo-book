@@ -164,6 +164,66 @@
       margin: 10px 0;
     }
 
+    /* НОВЫЕ СТИЛИ ДЛЯ ВКЛАДОК */
+    .requests-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .requests-tab {
+      padding: 12px 20px;
+      background: var(--card);
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.2s;
+    }
+
+    .requests-tab.active {
+      background: var(--accent2);
+      color: white;
+    }
+
+    .requests-section {
+      display: none;
+    }
+
+    .requests-section.active {
+      display: block;
+    }
+
+    /* Стили для информации о выданных материалах */
+    .materials-info {
+      background: #e8f5e8;
+      border: 1px solid #c8e6c9;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+
+    .materials-info h4 {
+      margin: 0 0 8px 0;
+      color: #2e7d32;
+    }
+
+    .materials-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .material-badge {
+      background: white;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      border: 1px solid #c8e6c9;
+    }
+
     @media (max-width: 768px) {
       .container {
         width: 100%;
@@ -187,6 +247,14 @@
       
       .stats-bar {
         flex-direction: column;
+      }
+
+      .requests-tabs {
+        flex-direction: column;
+      }
+
+      .requests-tab {
+        text-align: center;
       }
     }
 
@@ -247,6 +315,13 @@
         </div>
       </div>
 
+      <!-- НОВЫЕ ВКЛАДКИ -->
+      <div class="requests-tabs">
+        <div class="requests-tab active" data-tab="all">📋 Все заявки</div>
+        <div class="requests-tab" data-tab="pending">⏳ Ожидающие</div>
+        <div class="requests-tab" data-tab="processed">✅ Обработанные</div>
+      </div>
+
       <div class="search-container">
         <div class="form-group">
           <label>Поиск по ФИО:</label>
@@ -268,9 +343,10 @@
       
       <div id="errorMessage" class="error"></div>
 
-      <div id="requestsContent" style="display: none;">
+      <!-- Секция всех заявок -->
+      <div class="requests-section active" id="all-section">
         <div style="overflow-x: auto;">
-          <table class="requests-table" id="requestsTable">
+          <table class="requests-table" id="allRequestsTable">
             <thead>
               <tr>
                 <th>№</th>
@@ -284,15 +360,72 @@
                 <th>Действия</th>
               </tr>
             </thead>
-            <tbody id="requestsTableBody">
+            <tbody id="allRequestsTableBody">
               <!-- Заявки будут загружаться сюда -->
             </tbody>
           </table>
         </div>
         
-        <div id="emptyState" class="empty-state" style="display: none;">
+        <div id="allEmptyState" class="empty-state" style="display: none;">
           <h3>📭 Заявок пока нет</h3>
           <p>Заявки от пользователей будут отображаться здесь</p>
+        </div>
+      </div>
+
+      <!-- Секция ожидающих заявок -->
+      <div class="requests-section" id="pending-section">
+        <div style="overflow-x: auto;">
+          <table class="requests-table" id="pendingRequestsTable">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Номер заявки</th>
+                <th>Дата и время создания</th>
+                <th>Класс</th>
+                <th>Типы материалов</th>
+                <th>Email</th>
+                <th>ФИО ученика</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="pendingRequestsTableBody">
+              <!-- Ожидающие заявки будут загружаться сюда -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div id="pendingEmptyState" class="empty-state" style="display: none;">
+          <h3>✅ Все заявки обработаны</h3>
+          <p>Новых заявок, ожидающих обработки, нет</p>
+        </div>
+      </div>
+
+      <!-- Секция обработанных заявок -->
+      <div class="requests-section" id="processed-section">
+        <div style="overflow-x: auto;">
+          <table class="requests-table" id="processedRequestsTable">
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Номер заявки</th>
+                <th>Дата обработки</th>
+                <th>Класс</th>
+                <th>Типы материалов</th>
+                <th>Email</th>
+                <th>ФИО ученика</th>
+                <th>Выданные материалы</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="processedRequestsTableBody">
+              <!-- Обработанные заявки будут загружаться сюда -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div id="processedEmptyState" class="empty-state" style="display: none;">
+          <h3>📭 Обработанных заявок нет</h3>
+          <p>Обработанные заявки будут отображаться здесь</p>
         </div>
       </div>
     </div>
@@ -305,6 +438,7 @@
     let supabaseClient = null;
     let allRequests = [];
     let searchTimeout = null;
+    let currentTab = 'all';
 
     function showError(message) {
       document.getElementById('errorMessage').textContent = message;
@@ -313,21 +447,18 @@
     }
     
     function showContent() {
-      document.getElementById('requestsContent').style.display = 'block';
       document.getElementById('loading').style.display = 'none';
       document.getElementById('errorMessage').style.display = 'none';
     }
 
-    function showEmptyState() {
-      document.getElementById('emptyState').style.display = 'block';
-      document.getElementById('requestsTable').style.display = 'none';
-      showContent();
+    function showEmptyState(section) {
+      document.getElementById(`${section}EmptyState`).style.display = 'block';
+      document.getElementById(`${section}RequestsTable`).style.display = 'none';
     }
 
-    function showTable() {
-      document.getElementById('emptyState').style.display = 'none';
-      document.getElementById('requestsTable').style.display = 'table';
-      showContent();
+    function showTable(section) {
+      document.getElementById(`${section}EmptyState`).style.display = 'none';
+      document.getElementById(`${section}RequestsTable`).style.display = 'table';
     }
 
     // Форматирование отображения класса
@@ -381,12 +512,98 @@
       localStorage.setItem('pendingRequestsCount', pending);
     }
 
-    // Фильтрация заявок
+    // НОВАЯ ФУНКЦИЯ: Автоматическая выдача доступа к материалам
+    async function grantAccessToMaterials(userId, classLevel, textbookTypes) {
+      try {
+        console.log('🔄 Выдача доступа пользователю:', userId);
+        console.log('📚 Класс:', classLevel);
+        console.log('🎯 Типы материалов:', textbookTypes);
+
+        const grantedMaterials = [];
+
+        // Если выбран учебник - ищем учебники этого класса
+        if (textbookTypes.includes('учебник')) {
+          const { data: textbooks, error: textbooksError } = await supabaseClient
+            .from('textbooks')
+            .select('id, title')
+            .eq('class_level', classLevel)
+            .eq('is_active', true);
+
+          if (textbooksError) {
+            console.error('Ошибка поиска учебников:', textbooksError);
+          } else if (textbooks && textbooks.length > 0) {
+            // Выдаем доступ к найденным учебникам
+            for (const textbook of textbooks) {
+              const { error: accessError } = await supabaseClient
+                .from('textbook_access')
+                .upsert({
+                  user_id: userId,
+                  textbook_id: textbook.id,
+                  granted_by: currentUser.id,
+                  granted_at: new Date().toISOString()
+                }, {
+                  onConflict: 'user_id,textbook_id'
+                });
+
+              if (!accessError) {
+                grantedMaterials.push(`📚 ${textbook.title}`);
+                console.log('✅ Выдан доступ к учебнику:', textbook.title);
+              } else {
+                console.error('Ошибка выдачи доступа к учебнику:', accessError);
+              }
+            }
+          }
+        }
+
+        // Если выбран кроссворд - ищем кроссворды этого класса
+        if (textbookTypes.includes('кроссворд')) {
+          const { data: crosswords, error: crosswordsError } = await supabaseClient
+            .from('crosswords')
+            .select('id, title')
+            .eq('class_level', classLevel)
+            .eq('is_active', true);
+
+          if (crosswordsError) {
+            console.error('Ошибка поиска кроссвордов:', crosswordsError);
+          } else if (crosswords && crosswords.length > 0) {
+            // Выдаем доступ к найденным кроссвордам
+            for (const crossword of crosswords) {
+              const { error: accessError } = await supabaseClient
+                .from('crossword_access')
+                .upsert({
+                  user_id: userId,
+                  crossword_id: crossword.id,
+                  granted_by: currentUser.id,
+                  granted_at: new Date().toISOString()
+                }, {
+                  onConflict: 'user_id,crossword_id'
+                });
+
+              if (!accessError) {
+                grantedMaterials.push(`🧩 ${crossword.title}`);
+                console.log('✅ Выдан доступ к кроссворду:', crossword.title);
+              } else {
+                console.error('Ошибка выдачи доступа к кроссворду:', accessError);
+              }
+            }
+          }
+        }
+
+        console.log('✅ Всего выдано доступов:', grantedMaterials.length);
+        return grantedMaterials;
+
+      } catch (error) {
+        console.error('❌ Ошибка при выдаче доступа:', error);
+        return [];
+      }
+    }
+
+    // Фильтрация заявок для текущей вкладки
     function filterRequests() {
       const nameFilter = document.getElementById('searchName').value.toLowerCase();
       const emailFilter = document.getElementById('searchEmail').value.toLowerCase();
 
-      const filtered = allRequests.filter(request => {
+      let filtered = allRequests.filter(request => {
         const matchesName = !nameFilter || 
           (request.full_name && request.full_name.toLowerCase().includes(nameFilter));
         const matchesEmail = !emailFilter || 
@@ -395,22 +612,33 @@
         return matchesName && matchesEmail;
       });
 
-      renderRequests(filtered);
+      // Дополнительная фильтрация по вкладкам
+      if (currentTab === 'pending') {
+        filtered = filtered.filter(request => !request.is_processed);
+      } else if (currentTab === 'processed') {
+        filtered = filtered.filter(request => request.is_processed);
+      }
+
+      renderRequests(filtered, currentTab);
     }
 
-    // Отрисовка заявок
-    function renderRequests(requests) {
-      const tbody = document.getElementById('requestsTableBody');
+    // Отрисовка заявок для конкретной вкладки
+    function renderRequests(requests, section) {
+      const tbody = document.getElementById(`${section}RequestsTableBody`);
+      if (!tbody) return;
+
       tbody.innerHTML = '';
 
       if (!requests || requests.length === 0) {
-        showEmptyState();
+        showEmptyState(section);
         return;
       }
 
       requests.forEach((request, index) => {
         const row = document.createElement('tr');
-        row.innerHTML = `
+        
+        // Базовые колонки для всех таблиц
+        let rowContent = `
           <td><strong>${index + 1}</strong></td>
           <td><strong>${request.request_number}</strong></td>
           <td>${formatDateTime(request.created_at)}</td>
@@ -418,18 +646,47 @@
           <td>${formatTextbookTypes(request.textbook_types)}</td>
           <td>${request.email}</td>
           <td>${request.full_name}</td>
-          <td>
-            <span class="status-badge ${request.is_processed ? 'status-processed' : 'status-pending'}">
-              ${request.is_processed ? '✅ Обработана' : '⏳ Ожидает'}
-            </span>
-          </td>
-          <td>
-            ${!request.is_processed ? 
-              `<button class="btn btn-small" data-process="${request.id}">✅ Обработать</button>` : 
-              `<button class="btn btn-small btn-warning" data-unprocess="${request.id}">↩️ Вернуть в ожидание</button>`
-            }
-          </td>
         `;
+
+        // Дополнительные колонки в зависимости от вкладки
+        if (section === 'all') {
+          rowContent += `
+            <td>
+              <span class="status-badge ${request.is_processed ? 'status-processed' : 'status-pending'}">
+                ${request.is_processed ? '✅ Обработана' : '⏳ Ожидает'}
+              </span>
+            </td>
+            <td>
+              ${!request.is_processed ? 
+                `<button class="btn btn-small" data-process="${request.id}">✅ Обработать</button>` : 
+                `<button class="btn btn-small btn-warning" data-unprocess="${request.id}">↩️ Вернуть в ожидание</button>`
+              }
+            </td>
+          `;
+        } else if (section === 'pending') {
+          rowContent += `
+            <td>
+              <button class="btn btn-small" data-process="${request.id}">✅ Обработать</button>
+            </td>
+          `;
+        } else if (section === 'processed') {
+          rowContent += `
+            <td>${request.processed_at ? formatDateTime(request.processed_at) : '—'}</td>
+            <td>
+              <div class="materials-info">
+                <h4>🎁 Выданные материалы:</h4>
+                <div class="materials-list" id="materials_${request.id}">
+                  <!-- Материалы будут загружены динамически -->
+                </div>
+              </div>
+            </td>
+            <td>
+              <button class="btn btn-small btn-warning" data-unprocess="${request.id}">↩️ Вернуть в ожидание</button>
+            </td>
+          `;
+        }
+
+        row.innerHTML = rowContent;
         tbody.appendChild(row);
       });
 
@@ -448,12 +705,100 @@
         });
       });
 
-      showTable();
+      // Для обработанных заявок загружаем информацию о выданных материалах
+      if (section === 'processed') {
+        loadGrantedMaterials(requests);
+      }
+
+      showTable(section);
+    }
+
+    // Загрузка информации о выданных материалах
+    async function loadGrantedMaterials(requests) {
+      for (const request of requests) {
+        if (!request.is_processed) continue;
+
+        const container = document.getElementById(`materials_${request.id}`);
+        if (!container) continue;
+
+        try {
+          // Получаем доступы пользователя
+          const [textbookAccess, crosswordAccess] = await Promise.all([
+            supabaseClient
+              .from('textbook_access')
+              .select('textbooks(title)')
+              .eq('user_id', request.user_id)
+              .eq('granted_by', currentUser.id),
+            supabaseClient
+              .from('crossword_access')
+              .select('crosswords(title)')
+              .eq('user_id', request.user_id)
+              .eq('granted_by', currentUser.id)
+          ]);
+
+          const materials = [];
+
+          if (textbookAccess.data) {
+            textbookAccess.data.forEach(access => {
+              if (access.textbooks) {
+                materials.push(`📚 ${access.textbooks.title}`);
+              }
+            });
+          }
+
+          if (crosswordAccess.data) {
+            crosswordAccess.data.forEach(access => {
+              if (access.crosswords) {
+                materials.push(`🧩 ${access.crosswords.title}`);
+              }
+            });
+          }
+
+          if (materials.length > 0) {
+            container.innerHTML = materials.map(material => 
+              `<div class="material-badge">${material}</div>`
+            ).join('');
+          } else {
+            container.innerHTML = '<div class="material-badge">❌ Материалы не найдены</div>';
+          }
+        } catch (error) {
+          console.error('Ошибка загрузки материалов:', error);
+          container.innerHTML = '<div class="material-badge">⚠️ Ошибка загрузки</div>';
+        }
+      }
     }
 
     // Обработка заявки
     async function processRequest(requestId, isProcessed) {
       try {
+        const request = allRequests.find(req => req.id === requestId);
+        if (!request) return;
+
+        let grantedMaterials = [];
+
+        // Если обрабатываем заявку - выдаем доступ к материалам
+        if (isProcessed) {
+          grantedMaterials = await grantAccessToMaterials(
+            request.user_id, 
+            request.class_level, 
+            request.textbook_types
+          );
+        } else {
+          // Если возвращаем в ожидание - удаляем доступы, выданные этой заявкой
+          await supabaseClient
+            .from('textbook_access')
+            .delete()
+            .eq('user_id', request.user_id)
+            .eq('granted_by', currentUser.id);
+
+          await supabaseClient
+            .from('crossword_access')
+            .delete()
+            .eq('user_id', request.user_id)
+            .eq('granted_by', currentUser.id);
+        }
+
+        // Обновляем статус заявки
         const { error } = await supabaseClient
           .from('purchase_requests')
           .update({ 
@@ -471,11 +816,20 @@
           allRequests[requestIndex].processed_at = isProcessed ? new Date().toISOString() : null;
         }
 
-        // Перерисовываем таблицу
+        // Перерисовываем таблицы
         filterRequests();
         updateStats();
 
-        showNotification(isProcessed ? '✅ Заявка обработана' : '↩️ Заявка возвращена в ожидание');
+        // Показываем уведомление
+        if (isProcessed) {
+          let message = '✅ Заявка обработана';
+          if (grantedMaterials.length > 0) {
+            message += `\n\n🎁 Выданы материалы:\n${grantedMaterials.join('\n')}`;
+          }
+          showNotification(message);
+        } else {
+          showNotification('↩️ Заявка возвращена в ожидание');
+        }
       } catch (error) {
         showError('Ошибка при обновлении заявки: ' + error.message);
       }
@@ -495,13 +849,15 @@
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         z-index: 10000;
         font-weight: 600;
+        max-width: 400px;
+        white-space: pre-line;
       `;
       notification.textContent = message;
       document.body.appendChild(notification);
 
       setTimeout(() => {
         notification.remove();
-      }, 3000);
+      }, 5000);
     }
 
     // Загрузка всех заявок
@@ -555,6 +911,25 @@
       }
     }
 
+    // Инициализация вкладок
+    function initTabs() {
+      document.querySelectorAll('.requests-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          const tabName = tab.getAttribute('data-tab');
+          
+          // Обновляем активную вкладку
+          document.querySelectorAll('.requests-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.requests-section').forEach(s => s.classList.remove('active'));
+          
+          tab.classList.add('active');
+          document.getElementById(`${tabName}-section`).classList.add('active');
+          
+          currentTab = tabName;
+          filterRequests();
+        });
+      });
+    }
+
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
@@ -569,6 +944,9 @@
         if (!user) return false;
 
         currentUser = user;
+
+        // Инициализация вкладок
+        initTabs();
 
         // Обработчики событий
         document.getElementById('logoutBtn').addEventListener('click', async () => {
@@ -597,6 +975,7 @@
 
         // Загружаем заявки
         await loadAllRequests();
+        showContent();
         return true;
         
       } catch (error) {
