@@ -450,50 +450,6 @@
         min-width: 200px;
     }
 
-    /* НОВЫЕ СТИЛИ ДЛЯ ВЫДАННЫХ МАТЕРИАЛОВ */
-    .materials-info {
-        background: #e8f5e8;
-        border: 1px solid #c8e6c9;
-        border-radius: 8px;
-        padding: 12px;
-        margin: 10px 0;
-        font-size: 14px;
-        max-width: 300px;
-    }
-
-    .materials-info h4 {
-        margin: 0 0 8px 0;
-        color: #2e7d32;
-        font-size: 14px;
-    }
-
-    .materials-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        max-height: 120px;
-        overflow-y: auto;
-    }
-
-    .material-badge {
-        background: white;
-        padding: 4px 8px;
-        border-radius: 6px;
-        font-size: 11px;
-        border: 1px solid #c8e6c9;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .material-badge.textbook {
-        border-left: 3px solid #4CAF50;
-    }
-
-    .material-badge.crossword {
-        border-left: 3px solid #2196F3;
-    }
-
     .textbook-issued-checkbox {
         transform: scale(1.3);
         cursor: pointer;
@@ -503,7 +459,7 @@
         background: #f8f9fa;
     }
 
-    /* Стили для кнопки управления заявками с бейджем */
+    /* Стили для кнопки управления заявками с бейджом */
     .requests-btn {
         position: relative;
         transition: all 0.3s ease;
@@ -676,88 +632,6 @@
         font-weight: 600;
     }
 
-    /* НОВЫЕ СТИЛИ ДЛЯ ПАГИНАЦИИ */
-    .pagination {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 10px;
-        margin: 20px 0;
-        flex-wrap: wrap;
-    }
-
-    .pagination-btn {
-        padding: 8px 16px;
-        border: 2px solid #e0e0e0;
-        background: white;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 600;
-        transition: all 0.2s;
-    }
-
-    .pagination-btn:hover:not(:disabled) {
-        border-color: var(--accent2);
-        background: var(--accent2);
-        color: white;
-    }
-
-    .pagination-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    .pagination-btn.active {
-        background: var(--accent2);
-        color: white;
-        border-color: var(--accent2);
-    }
-
-    .pagination-info {
-        font-size: 14px;
-        color: #666;
-        margin: 0 10px;
-    }
-
-    .page-size-selector {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-left: 20px;
-    }
-
-    .page-size-selector select {
-        padding: 6px 10px;
-        border: 2px solid #e0e0e0;
-        border-radius: 6px;
-        background: white;
-    }
-
-    /* Стили для оптимизированной загрузки */
-    .virtual-scroll-container {
-        max-height: 600px;
-        overflow-y: auto;
-        position: relative;
-    }
-
-    .virtual-scroll-content {
-        position: relative;
-    }
-
-    .virtual-row {
-        position: absolute;
-        width: 100%;
-        left: 0;
-        transition: top 0.2s;
-    }
-
-    .loading-row {
-        padding: 20px;
-        text-align: center;
-        color: #666;
-        font-style: italic;
-    }
-
     @media (max-width: 1024px) {
       .admin-container { width: 98%; margin: 15px auto; }
       .admin-table { font-size: 14px; }
@@ -774,7 +648,6 @@
       .filters-container select,
       .filters-container input { min-width: 100%; }
       .class-level-select { min-height: 100px; }
-      .materials-info { max-width: 100%; }
     }
 
     @media (max-width: 768px) {
@@ -794,15 +667,12 @@
       .crossword-advanced-controls .form-group { width: 100%; }
       .fill-input-item { padding: 8px; }
       .users-stats { flex-direction: column; gap: 10px; }
-      .pagination { flex-direction: column; gap: 8px; }
-      .page-size-selector { margin-left: 0; margin-top: 10px; }
     }
 
     @media (max-width: 480px) {
       .crossword-cell { width: 25px; height: 25px; font-size: 10px; }
       .fill-input-number { width: 24px; height: 24px; font-size: 12px; }
       .remove-input-btn { width: 32px; height: 32px; }
-      .material-badge { font-size: 10px; padding: 3px 6px; }
     }
   </style>
 
@@ -1182,31 +1052,6 @@
                 <option value="Другое">Другое</option>
               </select>
             </div>
-
-            <!-- НОВЫЙ: Селектор размера страницы -->
-            <div class="form-group page-size-selector">
-              <label>Показывать:</label>
-              <select id="pageSizeSelect" class="input">
-                <option value="10">10</option>
-                <option value="25" selected>25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-              <span>пользователей</span>
-            </div>
-          </div>
-
-          <!-- НОВАЯ ПАГИНАЦИЯ -->
-          <div class="pagination" id="usersPagination">
-            <button class="pagination-btn" id="firstPageBtn" disabled>⏮️ Первая</button>
-            <button class="pagination-btn" id="prevPageBtn" disabled>◀️ Назад</button>
-            
-            <div class="pagination-info">
-              Страница <span id="currentPage">1</span> из <span id="totalPages">1</span>
-            </div>
-            
-            <button class="pagination-btn" id="nextPageBtn" disabled>Вперед ▶️</button>
-            <button class="pagination-btn" id="lastPageBtn" disabled>Последняя ⏭️</button>
           </div>
 
           <div style="overflow-x: auto;">
@@ -1219,28 +1064,13 @@
                   <th>Контактный телефон</th>
                   <th>Область</th>
                   <th>Прогресс</th>
-                  <th>Выданные материалы</th>
+                  <th>Учебник выдан</th>
                   <th>Статус</th>
                   <th>Действия</th>
                 </tr>
               </thead>
-              <tbody id="usersTableBody">
-                <!-- Данные будут загружаться динамически -->
-              </tbody>
+              <tbody></tbody>
             </table>
-          </div>
-
-          <!-- НОВАЯ ПАГИНАЦИЯ (внизу) -->
-          <div class="pagination" id="usersPaginationBottom">
-            <button class="pagination-btn" id="firstPageBtnBottom" disabled>⏮️ Первая</button>
-            <button class="pagination-btn" id="prevPageBtnBottom" disabled>◀️ Назад</button>
-            
-            <div class="pagination-info">
-              Страница <span id="currentPageBottom">1</span> из <span id="totalPagesBottom">1</span>
-            </div>
-            
-            <button class="pagination-btn" id="nextPageBtnBottom" disabled>Вперед ▶️</button>
-            <button class="pagination-btn" id="lastPageBtnBottom" disabled>Последняя ⏭️</button>
           </div>
         </div>
       </div>
@@ -2718,365 +2548,6 @@
       };
     }
 
-    // ============ НОВЫЕ ФУНКЦИИ ДЛЯ ПАГИНАЦИИ И ОПТИМИЗАЦИИ ============
-
-    // Переменные для пагинации пользователей
-    let currentUsersPage = 1;
-    let usersPerPage = 25;
-    let totalUsersCount = 0;
-    let allUsersCache = null;
-    let usersLastFetchTime = 0;
-    const USERS_CACHE_TTL = 30000; // 30 секунд
-
-    // НОВАЯ ФУНКЦИЯ: Загрузка пользователей с пагинацией
-    async function loadUsers(page = 1) {
-      const searchQuery = document.getElementById('userSearch').value.trim();
-      const regionFilter = document.getElementById('regionFilter').value;
-      const pageSize = parseInt(document.getElementById('pageSizeSelect').value) || 25;
-      
-      // Обновляем размер страницы если изменился
-      if (pageSize !== usersPerPage) {
-        usersPerPage = pageSize;
-        currentUsersPage = 1; // Сбрасываем на первую страницу при изменении размера
-      }
-
-      const start = (page - 1) * usersPerPage;
-      const end = start + usersPerPage - 1;
-
-      try {
-        // Используем кеширование для уменьшения запросов
-        const now = Date.now();
-        const shouldUseCache = !searchQuery && !regionFilter && 
-                              allUsersCache && 
-                              (now - usersLastFetchTime) < USERS_CACHE_TTL;
-
-        let usersData;
-        
-        if (shouldUseCache) {
-          usersData = allUsersCache;
-          console.log('🔄 Используем кешированные данные пользователей');
-        } else {
-          // Строим базовый запрос
-          let query = window.supabase
-            .from('profiles')
-            .select('*', { count: 'exacted' })
-            .order('created_at', { ascending: false });
-
-          // Применяем фильтры
-          if (searchQuery) {
-            query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
-          }
-
-          if (regionFilter) {
-            query = query.eq('region', regionFilter);
-          }
-
-          // Выполняем запрос
-          const { data: users, error, count } = await query.range(start, end);
-          
-          if (error) throw error;
-
-          usersData = { users, count };
-          
-          // Кешируем данные только если нет фильтров
-          if (!searchQuery && !regionFilter) {
-            allUsersCache = usersData;
-            usersLastFetchTime = now;
-          }
-        }
-
-        const { users, count } = usersData;
-        totalUsersCount = count;
-
-        // Обновляем пагинацию
-        updatePagination(page, count);
-        
-        // Загружаем материалы для пользователей на текущей странице
-        await renderUsersWithMaterials(users, page);
-        
-        // Обновляем статистику
-        updateUsersStats();
-
-      } catch (error) {
-        console.error('Ошибка загрузки пользователей:', error);
-        showModal('Ошибка', 'Не удалось загрузить пользователей: ' + error.message);
-      }
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Обновление пагинации
-    function updatePagination(currentPage, totalCount) {
-      const totalPages = Math.ceil(totalCount / usersPerPage);
-      
-      // Обновляем информацию о страницах
-      document.getElementById('currentPage').textContent = currentPage;
-      document.getElementById('totalPages').textContent = totalPages;
-      document.getElementById('currentPageBottom').textContent = currentPage;
-      document.getElementById('totalPagesBottom').textContent = totalPages;
-      
-      // Обновляем состояние кнопок
-      const firstBtn = document.getElementById('firstPageBtn');
-      const prevBtn = document.getElementById('prevPageBtn');
-      const nextBtn = document.getElementById('nextPageBtn');
-      const lastBtn = document.getElementById('lastPageBtn');
-      
-      const firstBtnBottom = document.getElementById('firstPageBtnBottom');
-      const prevBtnBottom = document.getElementById('prevPageBtnBottom');
-      const nextBtnBottom = document.getElementById('nextPageBtnBottom');
-      const lastBtnBottom = document.getElementById('lastPageBtnBottom');
-      
-      const disableFirstPrev = currentPage === 1;
-      const disableNextLast = currentPage === totalPages || totalPages === 0;
-      
-      [firstBtn, firstBtnBottom].forEach(btn => {
-        btn.disabled = disableFirstPrev;
-        btn.style.opacity = disableFirstPrev ? '0.5' : '1';
-      });
-      
-      [prevBtn, prevBtnBottom].forEach(btn => {
-        btn.disabled = disableFirstPrev;
-        btn.style.opacity = disableFirstPrev ? '0.5' : '1';
-      });
-      
-      [nextBtn, nextBtnBottom].forEach(btn => {
-        btn.disabled = disableNextLast;
-        btn.style.opacity = disableNextLast ? '0.5' : '1';
-      });
-      
-      [lastBtn, lastBtnBottom].forEach(btn => {
-        btn.disabled = disableNextLast;
-        btn.style.opacity = disableNextLast ? '0.5' : '1';
-      });
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Отрисовка пользователей с материалами (оптимизированная)
-    async function renderUsersWithMaterials(users, currentPage) {
-      const tbody = document.getElementById('usersTableBody');
-      if (!tbody) return;
-
-      // Показываем скелетон загрузки
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="9" style="text-align: center; padding: 20px;">
-            <div class="spinner" style="width: 20px; height: 20px; margin: 0 auto;"></div>
-            <p>Загружаем данные...</p>
-          </td>
-        </tr>
-      `;
-
-      if (!users || users.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="9" style="text-align: center; padding: 20px; color: #666;">
-              Пользователи не найдены
-            </td>
-          </tr>
-        `;
-        return;
-      }
-
-      // Получаем ID пользователей для загрузки материалов
-      const userIds = users.map(u => u.id);
-      
-      // Оптимизированная загрузка материалов - один запрос для всех пользователей
-      const [textbookAccess, crosswordAccess, userProgress] = await Promise.all([
-        window.supabase
-          .from('textbook_access')
-          .select('user_id, textbooks(id, title)')
-          .in('user_id', userIds),
-        window.supabase
-          .from('crossword_access')
-          .select('user_id, crosswords(id, title)')
-          .in('user_id', userIds),
-        window.supabase
-          .from('user_progress')
-          .select('user_id, is_completed')
-          .in('user_id', userIds)
-      ]);
-
-      // Создаем карту материалов для быстрого доступа
-      const materialsMap = {};
-      userIds.forEach(id => materialsMap[id] = { textbooks: [], crosswords: [] });
-
-      textbookAccess.data?.forEach(access => {
-        if (access.textbooks) {
-          materialsMap[access.user_id].textbooks.push(access.textbooks.title);
-        }
-      });
-
-      crosswordAccess.data?.forEach(access => {
-        if (access.crosswords) {
-          materialsMap[access.user_id].crosswords.push(access.crosswords.title);
-        }
-      });
-
-      // Создаем карту прогресса
-      const progressMap = {};
-      userProgress.data?.forEach(progress => {
-        if (!progressMap[progress.user_id]) {
-          progressMap[progress.user_id] = { total: 0, completed: 0 };
-        }
-        progressMap[progress.user_id].total++;
-        if (progress.is_completed) {
-          progressMap[progress.user_id].completed++;
-        }
-      });
-
-      // Отрисовываем пользователей
-      tbody.innerHTML = '';
-      
-      users.forEach((user, index) => {
-        const globalIndex = (currentPage - 1) * usersPerPage + index + 1;
-        const userMaterials = materialsMap[user.id] || { textbooks: [], crosswords: [] };
-        const progress = progressMap[user.id] || { total: 0, completed: 0 };
-        const progressPercent = progress.total ? Math.round((progress.completed / progress.total) * 100) : 0;
-        
-        const hasAnyMaterials = userMaterials.textbooks.length > 0 || userMaterials.crosswords.length > 0;
-        
-        const tr = document.createElement('tr');
-        
-        // Добавляем класс для новых пользователей (последние 7 дней)
-        const userDate = new Date(user.created_at);
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        if (userDate > weekAgo) {
-          tr.classList.add('user-row-new');
-        }
-
-        tr.innerHTML = `
-          <td><strong>${globalIndex}</strong></td>
-          <td>
-            <div><strong>${user.full_name || 'Не указано'}</strong></div>
-            <div class="user-stats"><span class="stat-badge">ID: ${user.id.slice(0,8)}...</span></div>
-          </td>
-          <td>${user.email || '—'}</td>
-          <td>${user.contact_phone || '—'}</td>
-          <td>${user.region || '—'}</td>
-          <td>
-            <div class="user-stats">
-              <span class="stat-badge">📊 ${progress.total ? `${progress.completed}/${progress.total} (${progressPercent}%)` : 'Нет прогресса'}</span>
-            </div>
-          </td>
-          <td>
-            ${hasAnyMaterials ? 
-              `<div class="materials-info">
-                <h4>🎁 Выданные материалы:</h4>
-                <div class="materials-list">
-                  ${userMaterials.textbooks.map(title => 
-                    `<div class="material-badge textbook">📚 ${title}</div>`
-                  ).join('')}
-                  ${userMaterials.crosswords.map(title => 
-                    `<div class="material-badge crossword">🧩 ${title}</div>`
-                  ).join('')}
-                </div>
-              </div>` : 
-              '<span style="color: #999; font-style: italic;">Нет материалов</span>'
-            }
-          </td>
-          <td>${user.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
-          <td>
-            <div class="user-actions">
-              <button class="btn btn-small ${user.is_admin ? 'secondary' : ''}" 
-                      data-toggle-admin="${user.id}" 
-                      data-make="${!user.is_admin}">
-                ${user.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}
-              </button>
-              <button class="btn btn-small" 
-                      data-access="${user.id}" 
-                      data-name="${user.full_name || user.email}">
-                🔐 Управление доступом
-              </button>
-            </div>
-          </td>
-        `;
-        
-        tbody.appendChild(tr);
-      });
-
-      // Добавляем обработчики событий
-      addUserEventHandlers();
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Добавление обработчиков событий для пользователей
-    function addUserEventHandlers() {
-      // Обработчики для кнопок администратора
-      document.querySelectorAll('[data-toggle-admin]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const uid = btn.getAttribute('data-toggle-admin');
-          const make = btn.getAttribute('data-make') === 'true';
-          if (!confirm(`Вы уверены, что хотите ${make ? 'назначить' : 'снять'} права администратора?`)) return;
-          
-          const { error } = await window.supabase
-            .from('profiles')
-            .update({ is_admin: make })
-            .eq('id', uid);
-            
-          if (error) {
-            showModal('Ошибка', error.message);
-          } else {
-            showModal('Готово', make ? 'Права администратора выданы' : 'Права администратора сняты');
-            // Перезагружаем текущую страницу
-            loadUsers(currentUsersPage);
-          }
-        });
-      });
-
-      // Обработчики для управления доступом
-      document.querySelectorAll('[data-access]').forEach(btn => {
-        btn.addEventListener('click', () => 
-          openUserAccessModal(btn.getAttribute('data-access'), btn.getAttribute('data-name')));
-      });
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Обновление статистики пользователей (оптимизированная)
-    async function updateUsersStats() {
-      const regionFilter = document.getElementById('regionFilter').value;
-      
-      try {
-        // Оптимизированный запрос для статистики - считаем пользователей с материалами
-        let textbookQuery = window.supabase
-          .from('textbook_access')
-          .select('user_id', { count: 'exact', distinct: true });
-          
-        let crosswordQuery = window.supabase
-          .from('crossword_access')  
-          .select('user_id', { count: 'exact', distinct: true });
-
-        // Если есть фильтр региона, нужно получить пользователей этого региона сначала
-        if (regionFilter) {
-          const { data: regionalUsers } = await window.supabase
-            .from('profiles')
-            .select('id')
-            .eq('region', regionFilter);
-            
-          const regionalUserIds = regionalUsers?.map(u => u.id) || [];
-          
-          if (regionalUserIds.length > 0) {
-            textbookQuery = textbookQuery.in('user_id', regionalUserIds);
-            crosswordQuery = crosswordQuery.in('user_id', regionalUserIds);
-          } else {
-            // Если в регионе нет пользователей
-            document.getElementById('totalIssuedTextbooks').textContent = '0';
-            document.getElementById('regionalIssuedTextbooks').textContent = '0';
-            return;
-          }
-        }
-
-        const [textbookResult, crosswordResult] = await Promise.all([
-          textbookQuery,
-          crosswordQuery
-        ]);
-
-        const totalWithTextbooks = textbookResult.count || 0;
-        const regionalWithTextbooks = textbookResult.count || 0;
-        
-        // Обновляем интерфейс
-        document.getElementById('totalIssuedTextbooks').textContent = totalWithTextbooks;
-        document.getElementById('regionalIssuedTextbooks').textContent = regionalWithTextbooks;
-
-      } catch (error) {
-        console.error('Ошибка загрузки статистики:', error);
-      }
-    }
-
     // ============ ПРИЛОЖЕНИЕ ============
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
@@ -3133,50 +2604,8 @@
             if (tabName === 'textbooks') loadTextbooks();
             if (tabName === 'crosswords') loadCrosswords();
             if (tabName === 'assignments') { loadMaterialsForAssignments(); loadAssignments(); }
-            if (tabName === 'users') {
-              // Сбрасываем кеш при переходе на вкладку пользователей
-              allUsersCache = null;
-              loadUsers(1);
-            }
+            if (tabName === 'users') loadUsers();
           });
-        });
-
-        // ============ НОВЫЕ ОБРАБОТЧИКИ ПАГИНАЦИИ ============
-        document.getElementById('firstPageBtn').addEventListener('click', () => loadUsers(1));
-        document.getElementById('prevPageBtn').addEventListener('click', () => loadUsers(currentUsersPage - 1));
-        document.getElementById('nextPageBtn').addEventListener('click', () => loadUsers(currentUsersPage + 1));
-        document.getElementById('lastPageBtn').addEventListener('click', () => {
-          const totalPages = Math.ceil(totalUsersCount / usersPerPage);
-          loadUsers(totalPages);
-        });
-
-        document.getElementById('firstPageBtnBottom').addEventListener('click', () => loadUsers(1));
-        document.getElementById('prevPageBtnBottom').addEventListener('click', () => loadUsers(currentUsersPage - 1));
-        document.getElementById('nextPageBtnBottom').addEventListener('click', () => loadUsers(currentUsersPage + 1));
-        document.getElementById('lastPageBtnBottom').addEventListener('click', () => {
-          const totalPages = Math.ceil(totalUsersCount / usersPerPage);
-          loadUsers(totalPages);
-        });
-
-        // Обработчик изменения размера страницы
-        document.getElementById('pageSizeSelect').addEventListener('change', () => {
-          currentUsersPage = 1;
-          loadUsers(1);
-        });
-
-        // Обработчики поиска и фильтров с дебаунсингом
-        let searchTimeout;
-        document.getElementById('userSearch').addEventListener('input', () => {
-          clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(() => {
-            currentUsersPage = 1;
-            loadUsers(1);
-          }, 500);
-        });
-
-        document.getElementById('regionFilter').addEventListener('change', () => {
-          currentUsersPage = 1;
-          loadUsers(1);
         });
 
         // Инициализация зон загрузки для обложек (bucket: covers) С ДОБАВЛЕНИЕМ КНОПОК УДАЛЕНИЯ
@@ -4073,6 +3502,194 @@
           });
         }
 
+        // ===== ПОЛЬЗОВАТЕЛИ / ДОСТУПЫ
+        let currentEditingUserId = null;
+        let searchTimeout = null;
+
+        // ОБНОВЛЕННАЯ ФУНКЦИЯ: Загрузка пользователей с новыми полями
+        async function loadUsers() {
+          const searchQuery = document.getElementById('userSearch').value.trim();
+          const regionFilter = document.getElementById('regionFilter').value;
+
+          let query = supabase
+            .from('profiles')
+            .select('*')
+            .order('created_at', { ascending: false }); // новые сверху
+
+          if (searchQuery) {
+            query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
+          }
+
+          if (regionFilter) {
+            query = query.eq('region', regionFilter);
+          }
+
+          const { data, error } = await query;
+          const tbody = document.querySelector('#usersTable tbody');
+          if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
+
+          // Прогресс пользователей
+          const { data: prog } = await supabase.from('user_progress').select('user_id,is_completed');
+          const progressMap = {};
+          (prog||[]).forEach(p => {
+            progressMap[p.user_id] ||= { total: 0, completed: 0 };
+            progressMap[p.user_id].total++;
+            if (p.is_completed) progressMap[p.user_id].completed++;
+          });
+
+          tbody.innerHTML = '';
+          if (!data?.length) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;">Пользователи не найдены</td></tr>';
+            updateUsersStats();
+            return;
+          }
+
+          // Добавляем нумерацию и новые столбцы
+          data.forEach((u, index) => {
+            const pr = progressMap[u.id] || { total: 0, completed: 0 };
+            const pct = pr.total ? Math.round((pr.completed / pr.total) * 100) : 0;
+            const tr = document.createElement('tr');
+            
+            // Добавляем класс для новых пользователей (последние 7 дней)
+            const userDate = new Date(u.created_at);
+            const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            if (userDate > weekAgo) {
+              tr.classList.add('user-row-new');
+            }
+
+            tr.innerHTML = `
+              <td><strong>${index + 1}</strong></td>
+              <td>
+                <div><strong>${u.full_name || 'Не указано'}</strong></div>
+                <div class="user-stats"><span class="stat-badge">ID: ${u.id.slice(0,8)}...</span></div>
+              </td>
+              <td>${u.email || '—'}</td>
+              <td>${u.contact_phone || '—'}</td>
+              <td>${u.region || '—'}</td>
+              <td>
+                <div class="user-stats">
+                  <span class="stat-badge">📊 ${pr.total ? `${pr.completed}/${pr.total} (${pct}%)` : 'Нет прогресса'}</span>
+                </div>
+              </td>
+              <td>
+                <input type="checkbox" class="textbook-issued-checkbox" 
+                       data-user-id="${u.id}" 
+                       ${u.textbook_issued ? 'checked' : ''}
+                       title="${u.textbook_issued ? 'Учебник выдан' : 'Учебник не выдан'}">
+              </td>
+              <td>${u.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
+              <td>
+                <div class="user-actions">
+                  <button class="btn btn-small ${u.is_admin ? 'secondary' : ''}" 
+                          data-toggle-admin="${u.id}" 
+                          data-make="${!u.is_admin}">
+                    ${u.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}
+                  </button>
+                  <button class="btn btn-small" 
+                          data-access="${u.id}" 
+                          data-name="${u.full_name || u.email}">
+                    🔐 Управление доступом
+                  </button>
+                </div>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          // Обработчики для чекбоксов выдачи учебников
+          tbody.querySelectorAll('.textbook-issued-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+              const userId = this.getAttribute('data-user-id');
+              const issued = this.checked;
+              updateTextbookIssued(userId, issued);
+            });
+          });
+
+          // Обработчики для кнопок администратора
+          tbody.querySelectorAll('[data-toggle-admin]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const uid = btn.getAttribute('data-toggle-admin');
+              const make = btn.getAttribute('data-make') === 'true';
+              if (!confirm(`Вы уверены, что хотите ${make ? 'назначить' : 'снять'} права администратора?`)) return;
+              const { error } = await supabase.from('profiles').update({ is_admin: make }).eq('id', uid);
+              if (error) return showModal('Ошибка', error.message);
+              showModal('Готово', make ? 'Права администратора выданы' : 'Права администратора сняты');
+              loadUsers();
+            });
+          });
+
+          // Обработчики для управления доступом
+          tbody.querySelectorAll('[data-access]').forEach(btn => {
+            btn.addEventListener('click', () => 
+              openUserAccessModal(btn.getAttribute('data-access'), btn.getAttribute('data-name')));
+          });
+
+          // Обновляем статистику
+          updateUsersStats();
+        }
+
+        // Функция обновления статуса выдачи учебника
+        async function updateTextbookIssued(userId, issued) {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ textbook_issued: issued })
+            .eq('id', userId);
+
+          if (error) {
+            showModal('Ошибка', 'Не удалось обновить статус выдачи учебника: ' + error.message);
+            // Перезагружаем данные для синхронизации
+            loadUsers();
+          } else {
+            console.log('Статус учебника обновлен');
+            // Обновляем статистику
+            updateUsersStats();
+          }
+        }
+
+        // Функция обновления статистики пользователей
+        async function updateUsersStats() {
+          const regionFilter = document.getElementById('regionFilter').value;
+          
+          // Общая статистика
+          const { data: totalData, error: totalError } = await supabase
+            .from('profiles')
+            .select('textbook_issued');
+
+          // Статистика по выбранной области
+          let regionalQuery = supabase
+            .from('profiles')
+            .select('textbook_issued');
+
+          if (regionFilter) {
+            regionalQuery = regionalQuery.eq('region', regionFilter);
+          }
+
+          const { data: regionalData, error: regionalError } = await regionalQuery;
+
+          if (totalError || regionalError) {
+            console.error('Ошибка загрузки статистики:', totalError || regionalError);
+            return;
+          }
+
+          // Подсчет выданных учебников
+          const totalIssued = totalData ? totalData.filter(p => p.textbook_issued).length : 0;
+          const regionalIssued = regionalData ? regionalData.filter(p => p.textbook_issued).length : 0;
+
+          // Обновление интерфейса
+          document.getElementById('totalIssuedTextbooks').textContent = totalIssued;
+          document.getElementById('regionalIssuedTextbooks').textContent = regionalIssued;
+        }
+
+        // Обработчики фильтров
+        document.getElementById('userSearch').addEventListener('input', () => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(loadUsers, 350);
+        });
+
+        document.getElementById('regionFilter').addEventListener('change', () => {
+          loadUsers();
+        });
+
         // ===== УПРАВЛЕНИЕ ДОСТУПАМИ (ВОССТАНАВЛИВАЕМ СТАРЫЙ ФУНКЦИОНАЛ)
         document.getElementById('closeUserAccessModal').addEventListener('click', ()=>{
           document.getElementById('userAccessModal').style.display='none';
@@ -4161,10 +3778,6 @@
 
           showModal('Готово','Доступы обновлены');
           document.getElementById('userAccessModal').style.display='none';
-          
-          // Обновляем данные пользователей после изменения доступов
-          allUsersCache = null;
-          loadUsers(currentUsersPage);
         }
 
         // ===== СТАРТОВАЯ ИНИЦИАЛИЗАЦИЯ
@@ -4172,7 +3785,7 @@
         await loadTextbooks();
         await loadCrosswords();
         await loadMaterialsForAssignments();
-        await loadUsers(1); // Загружаем первую страницу пользователей
+        await loadUsers();
 
         showContent();
       } catch (e) {
