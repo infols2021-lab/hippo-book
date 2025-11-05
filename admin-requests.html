@@ -353,6 +353,34 @@
       animation: spin 0.8s linear infinite;
     }
 
+    /* Стили для индикатора автообновления */
+    .auto-update-indicator {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--accent2);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0.9;
+    }
+
+    .update-spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid transparent;
+      border-top: 2px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
     @media (max-width: 768px) {
       .container {
         width: 100%;
@@ -405,6 +433,13 @@
         padding: 20px;
         margin: 20px;
       }
+
+      .auto-update-indicator {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        justify-content: center;
+      }
     }
 
     @media (max-width: 480px) {
@@ -438,6 +473,12 @@
       <div class="processing-text" id="processingText">Обрабатываем заявку...</div>
       <div class="processing-details" id="processingDetails">Пожалуйста, подождите</div>
     </div>
+  </div>
+
+  <!-- Индикатор автообновления -->
+  <div class="auto-update-indicator" id="autoUpdateIndicator">
+    <div class="update-spinner"></div>
+    <span>Автообновление включено</span>
   </div>
 
   <div class="container">
@@ -619,6 +660,100 @@
     let searchTimeout = null;
     let currentTab = 'all';
     let selectedRequests = new Set();
+    
+    // НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ АВТООБНОВЛЕНИЯ
+    let pollingInterval = null;
+    let isPollingActive = true;
+    let lastUpdateTime = null;
+
+    // НОВАЯ ФУНКЦИЯ: Запуск автообновления
+    function startAutoRefresh() {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+      
+      pollingInterval = setInterval(async () => {
+        if (!isPollingActive) return;
+        
+        try {
+          await refreshData();
+        } catch (error) {
+          console.log('Ошибка автообновления:', error);
+        }
+      }, 5000); // Обновление каждые 5 секунд
+      
+      console.log('🔄 Автообновление запущено (каждые 5 секунд)');
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Остановка автообновления
+    function stopAutoRefresh() {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+      }
+      console.log('⏸️ Автообновление остановлено');
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Обновление данных
+    async function refreshData() {
+      if (!supabaseClient) return;
+      
+      try {
+        const { data: requests, error } = await supabaseClient
+          .from('purchase_requests')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Проверяем, изменились ли данные
+        const hasChanges = JSON.stringify(requests) !== JSON.stringify(allRequests);
+        
+        if (hasChanges) {
+          console.log('🔄 Обнаружены изменения в данных, обновляю...');
+          allRequests = requests || [];
+          filterRequests();
+          updateStats();
+          lastUpdateTime = new Date();
+          
+          // Показываем временное уведомление об обновлении
+          showTempNotification('Данные обновлены');
+        }
+      } catch (error) {
+        console.error('Ошибка при автообновлении:', error);
+      }
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Временное уведомление
+    function showTempNotification(message) {
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--accent2);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        z-index: 10000;
+        opacity: 0;
+        transition: opacity 0.3s;
+      `;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+
+      // Показываем
+      setTimeout(() => notification.style.opacity = '1', 10);
+      
+      // Убираем через 2 секунды
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+      }, 2000);
+    }
 
     // НОВАЯ ФУНКЦИЯ: Показать индикатор загрузки
     function showProcessing(message = 'Обрабатываем заявку...', details = 'Пожалуйста, подождите') {
@@ -902,6 +1037,9 @@
     async function processMultipleRequests(isProcessed) {
       if (selectedRequests.size === 0) return;
       
+      // Временно отключаем автообновление на время обработки
+      isPollingActive = false;
+      
       // Блокируем кнопки массовых операций
       const processBtn = document.getElementById('processSelectedBtn');
       const unprocessBtn = document.getElementById('unprocessSelectedBtn');
@@ -1000,6 +1138,9 @@
         setButtonLoading(unprocessBtn, false);
         setButtonLoading(clearBtn, false);
         hideProcessing();
+        
+        // Включаем автообновление обратно
+        isPollingActive = true;
       }
     }
 
@@ -1199,6 +1340,9 @@
 
     // ОБНОВЛЕННАЯ ФУНКЦИЯ: Обработка заявки с индикатором
     async function processRequest(requestId, isProcessed) {
+      // Временно отключаем автообновление на время обработки
+      isPollingActive = false;
+      
       showProcessing(
         isProcessed ? 'Обрабатываем заявку...' : 'Возвращаем заявку в ожидание...',
         'Пожалуйста, подождите'
@@ -1268,6 +1412,8 @@
         showError('Ошибка при обновлении заявки: ' + error.message);
       } finally {
         hideProcessing();
+        // Включаем автообновление обратно
+        isPollingActive = true;
       }
     }
 
@@ -1309,6 +1455,10 @@
         allRequests = requests || [];
         filterRequests();
         updateStats();
+        
+        // Запускаем автообновление после успешной загрузки
+        startAutoRefresh();
+        
       } catch (error) {
         showError('Ошибка загрузки заявок: ' + error.message);
       }
@@ -1439,6 +1589,8 @@
         // Обработчики событий
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           if (confirm('Вы уверены, что хотите выйти?')) {
+            // Останавливаем автообновление при выходе
+            stopAutoRefresh();
             await supabaseClient.auth.signOut();
             location.href = '/login.html';
           }
@@ -1489,6 +1641,11 @@
     function showModal(title, text) {
       alert(`${title}\n\n${text}`);
     }
+
+    // Останавливаем автообновление при закрытии страницы
+    window.addEventListener('beforeunload', () => {
+      stopAutoRefresh();
+    });
   </script>
 </body>
 </html>
