@@ -270,6 +270,22 @@
       text-align: center;
     }
 
+    /* Стили для отображения множественных классов */
+    .class-levels {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .class-badge {
+      background: var(--accent2);
+      color: white;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
     @media (max-width: 768px) {
       .container {
         width: 100%;
@@ -428,7 +444,7 @@
                 <th>№</th>
                 <th>Номер заявки</th>
                 <th>Дата и время создания</th>
-                <th>Класс</th>
+                <th>Классы</th>
                 <th>Типы материалов</th>
                 <th>Email</th>
                 <th>ФИО ученика</th>
@@ -460,7 +476,7 @@
                 <th>№</th>
                 <th>Номер заявки</th>
                 <th>Дата и время создания</th>
-                <th>Класс</th>
+                <th>Классы</th>
                 <th>Типы материалов</th>
                 <th>Email</th>
                 <th>ФИО ученика</th>
@@ -491,7 +507,7 @@
                 <th>№</th>
                 <th>Номер заявки</th>
                 <th>Дата обработки</th>
-                <th>Класс</th>
+                <th>Классы</th>
                 <th>Типы материалов</th>
                 <th>Email</th>
                 <th>ФИО ученика</th>
@@ -544,7 +560,7 @@
       document.getElementById(`${section}RequestsTable`).style.display = 'table';
     }
 
-    // Форматирование отображения класса
+    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Форматирование отображения классов (массив)
     function formatClassLevel(classLevel) {
       const classMap = {
         '1-2': '1-2 класс',
@@ -552,10 +568,53 @@
         '5-6': '5-6 класс',
         '7': '7 класс',
         '8-9': '8-9 класс',
-        '10-11': '10-11 класс (Техникум, колледж - 1й курс)',
-        '12': '12 класс (Техникум, колледж)'
+        '10-11': '10-11 класс',
+        '12': '12 класс'
       };
+      
+      // Обрабатываем как массив (новая структура)
+      if (Array.isArray(classLevel)) {
+        return classLevel.map(cls => classMap[cls] || cls).join(', ');
+      }
+      
+      // Обрабатываем как строку (старая структура для обратной совместимости)
       return classMap[classLevel] || classLevel;
+    }
+
+    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Отображение классов в виде бейджей
+    function renderClassLevels(classLevel) {
+      const classMap = {
+        '1-2': '1-2 класс',
+        '3-4': '3-4 класс',
+        '5-6': '5-6 класс',
+        '7': '7 класс',
+        '8-9': '8-9 класс',
+        '10-11': '10-11 класс',
+        '12': '12 класс'
+      };
+      
+      let classLevels = [];
+      
+      // Обрабатываем как массив (новая структура)
+      if (Array.isArray(classLevel)) {
+        classLevels = classLevel;
+      } 
+      // Обрабатываем как строку (старая структура)
+      else if (classLevel) {
+        classLevels = [classLevel];
+      }
+      
+      if (classLevels.length === 0) {
+        return '<span style="color: #999;">—</span>';
+      }
+      
+      return `
+        <div class="class-levels">
+          ${classLevels.map(cls => 
+            `<span class="class-badge">${classMap[cls] || cls}</span>`
+          ).join('')}
+        </div>
+      `;
     }
 
     // Форматирование типов учебников
@@ -595,22 +654,31 @@
       localStorage.setItem('pendingRequestsCount', pending);
     }
 
-    // НОВАЯ ФУНКЦИЯ: Автоматическая выдача доступа к материалам
-    async function grantAccessToMaterials(userId, classLevel, textbookTypes) {
+    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Автоматическая выдача доступа к материалам
+    async function grantAccessToMaterials(userId, classLevels, textbookTypes) {
       try {
         console.log('🔄 Выдача доступа пользователю:', userId);
-        console.log('📚 Класс:', classLevel);
+        console.log('📚 Классы:', classLevels);
         console.log('🎯 Типы материалов:', textbookTypes);
 
         const grantedMaterials = [];
 
-        // Если выбран учебник - ищем учебники этого класса
+        // Обрабатываем classLevels как массив (новая структура)
+        let classLevelArray = [];
+        if (Array.isArray(classLevels)) {
+          classLevelArray = classLevels;
+        } else if (classLevels) {
+          // Для обратной совместимости со старыми заявками
+          classLevelArray = [classLevels];
+        }
+
+        // Если выбран учебник - ищем учебники подходящих классов
         if (textbookTypes.includes('учебник')) {
           const { data: textbooks, error: textbooksError } = await supabaseClient
             .from('textbooks')
-            .select('id, title')
-            .eq('class_level', classLevel)
-            .eq('is_active', true);
+            .select('id, title, class_level')
+            .eq('is_active', true)
+            .overlaps('class_level', classLevelArray); // Ищем пересечение массивов
 
           if (textbooksError) {
             console.error('Ошибка поиска учебников:', textbooksError);
@@ -635,16 +703,18 @@
                 console.error('Ошибка выдачи доступа к учебнику:', accessError);
               }
             }
+          } else {
+            console.log('ℹ️ Не найдено учебников для классов:', classLevelArray);
           }
         }
 
-        // Если выбран кроссворд - ищем кроссворды этого класса
+        // Если выбран кроссворд - ищем кроссворды подходящих классов
         if (textbookTypes.includes('кроссворд')) {
           const { data: crosswords, error: crosswordsError } = await supabaseClient
             .from('crosswords')
-            .select('id, title')
-            .eq('class_level', classLevel)
-            .eq('is_active', true);
+            .select('id, title, class_level')
+            .eq('is_active', true)
+            .overlaps('class_level', classLevelArray); // Ищем пересечение массивов
 
           if (crosswordsError) {
             console.error('Ошибка поиска кроссвордов:', crosswordsError);
@@ -669,6 +739,8 @@
                 console.error('Ошибка выдачи доступа к кроссворду:', accessError);
               }
             }
+          } else {
+            console.log('ℹ️ Не найдено кроссвордов для классов:', classLevelArray);
           }
         }
 
@@ -827,7 +899,7 @@
       renderRequests(filtered, currentTab);
     }
 
-    // Отрисовка заявок для конкретной вкладки
+    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Отрисовка заявок для конкретной вкладки
     function renderRequests(requests, section) {
       const tbody = document.getElementById(`${section}RequestsTableBody`);
       if (!tbody) return;
@@ -855,7 +927,7 @@
           <td><strong>${index + 1}</strong></td>
           <td><strong>${request.request_number}</strong></td>
           <td>${formatDateTime(request.created_at)}</td>
-          <td>${formatClassLevel(request.class_level)}</td>
+          <td>${renderClassLevels(request.class_level)}</td>
           <td>${formatTextbookTypes(request.textbook_types)}</td>
           <td>${request.email}</td>
           <td>${request.full_name}</td>
