@@ -724,20 +724,6 @@
         background: #f8f9fa;
     }
 
-    .page-size-selector {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 14px;
-    }
-
-    .page-size-selector select {
-        padding: 6px 10px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        background: white;
-    }
-
     /* СТИЛИ ДЛЯ ОПТИМИЗАЦИИ ЗАГРУЗКИ */
     .loading-row {
         text-align: center;
@@ -1204,12 +1190,12 @@
             
             <div class="users-stats">
               <div class="stat-badge-large">
-                <span class="number" id="totalIssuedTextbooks">0</span>
-                <span>Пользователей с материалами</span>
-              </div>
-              <div class="stat-badge-large">
                 <span class="number" id="totalUsersCount">0</span>
                 <span>Всего пользователей</span>
+              </div>
+              <div class="stat-badge-large">
+                <span class="number" id="usersWithMaterialsCount">0</span>
+                <span>С материалами</span>
               </div>
             </div>
           </div>
@@ -1246,7 +1232,7 @@
           <!-- Пагинация -->
           <div class="pagination-container" id="usersPagination" style="display: none;">
             <div class="pagination-info" id="paginationInfo">
-              Показано <span id="currentRange">0-0</span> из <span id="totalUsersCount">0</span>
+              Показано <span id="currentRange">0-0</span> из <span id="totalFilteredUsers">0</span>
             </div>
             <div class="pagination-controls">
               <button class="pagination-btn" id="firstPageBtn" disabled>⏮️</button>
@@ -1256,15 +1242,6 @@
               
               <button class="pagination-btn" id="nextPageBtn" disabled>▶️</button>
               <button class="pagination-btn" id="lastPageBtn" disabled>⏭️</button>
-            </div>
-            <div class="page-size-selector">
-              <span>На странице:</span>
-              <select id="pageSizeSelect">
-                <option value="15">15</option>
-                <option value="30">30</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
             </div>
           </div>
 
@@ -1341,59 +1318,15 @@
       document.getElementById('modal').style.display = 'flex';
     }
 
-    // ============ ОПТИМИЗАЦИОННЫЕ СИСТЕМЫ ============
-    
-    // Система кэширования
-    const cache = {
-      data: new Map(),
-      timestamps: new Map(),
-      ttl: 5 * 60 * 1000, // 5 минут
-      
-      set(key, data) {
-        this.data.set(key, data);
-        this.timestamps.set(key, Date.now());
-        this.showCacheIndicator();
-      },
-      
-      get(key) {
-        const timestamp = this.timestamps.get(key);
-        if (timestamp && Date.now() - timestamp < this.ttl) {
-          return this.data.get(key);
-        }
-        this.data.delete(key);
-        this.timestamps.delete(key);
-        return null;
-      },
-      
-      clear() {
-        this.data.clear();
-        this.timestamps.clear();
-      },
-      
-      showCacheIndicator() {
-        const indicator = document.getElementById('cacheIndicator');
-        indicator.style.display = 'block';
-        setTimeout(() => {
-          indicator.style.display = 'none';
-        }, 2000);
-      }
-    };
-
-    // Система пагинации для пользователей
+    // ============ СИСТЕМА ПАГИНАЦИИ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ============
     const usersPagination = {
       currentPage: 1,
-      pageSize: 15,
+      pageSize: 15, // ФИКСИРОВАННО 15 ПОЛЬЗОВАТЕЛЕЙ НА СТРАНИЦЕ
       totalUsers: 0,
       totalPages: 0,
       filteredUsers: [],
       
-      init() {
-        document.getElementById('pageSizeSelect').addEventListener('change', (e) => {
-          this.pageSize = parseInt(e.target.value);
-          this.currentPage = 1;
-          loadUsers();
-        });
-        
+      init() {        
         document.getElementById('firstPageBtn').addEventListener('click', () => {
           this.goToPage(1);
         });
@@ -1414,7 +1347,7 @@
       goToPage(page) {
         if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
           this.currentPage = page;
-          loadUsers();
+          renderUsersPage();
         }
       },
       
@@ -1423,7 +1356,7 @@
         const end = Math.min(this.currentPage * this.pageSize, this.totalUsers);
         
         document.getElementById('currentRange').textContent = `${start}-${end}`;
-        document.getElementById('totalUsersCount').textContent = this.totalUsers;
+        document.getElementById('totalFilteredUsers').textContent = this.totalUsers;
         
         // Обновляем кнопки
         document.getElementById('firstPageBtn').disabled = this.currentPage === 1;
@@ -1466,187 +1399,6 @@
         return this.filteredUsers.slice(startIndex, endIndex);
       }
     };
-
-    // Система ленивой загрузки материалов
-    const lazyMaterialsLoader = {
-      loadedMaterials: new Map(),
-      pendingRequests: new Map(),
-      
-      async loadUserMaterials(userId, supabase) {
-        // Если уже загружены, возвращаем из кэша
-        if (this.loadedMaterials.has(userId)) {
-          return this.loadedMaterials.get(userId);
-        }
-        
-        // Если запрос уже выполняется, ждем его
-        if (this.pendingRequests.has(userId)) {
-          return await this.pendingRequests.get(userId);
-        }
-        
-        // Создаем новый запрос
-        const request = this.fetchUserMaterials(userId, supabase);
-        this.pendingRequests.set(userId, request);
-        
-        try {
-          const materials = await request;
-          this.loadedMaterials.set(userId, materials);
-          return materials;
-        } finally {
-          this.pendingRequests.delete(userId);
-        }
-      },
-      
-      async fetchUserMaterials(userId, supabase) {
-        try {
-          const [textbookAccess, crosswordAccess] = await Promise.all([
-            supabase
-              .from('textbook_access')
-              .select('textbooks(title)')
-              .eq('user_id', userId),
-            supabase
-              .from('crossword_access')
-              .select('crosswords(title)')
-              .eq('user_id', userId)
-          ]);
-
-          const materials = [];
-
-          if (textbookAccess.data) {
-            textbookAccess.data.forEach(access => {
-              if (access.textbooks) {
-                materials.push(`📚 ${access.textbooks.title}`);
-              }
-            });
-          }
-
-          if (crosswordAccess.data) {
-            crosswordAccess.data.forEach(access => {
-              if (access.crosswords) {
-                materials.push(`🧩 ${access.crosswords.title}`);
-              }
-            });
-          }
-
-          return materials;
-        } catch (error) {
-          console.error('Ошибка загрузки материалов:', error);
-          return [];
-        }
-      },
-      
-      clearCache() {
-        this.loadedMaterials.clear();
-        this.pendingRequests.clear();
-      }
-    };
-
-    // ============ НОВЫЕ ФУНКЦИИ ДЛЯ МНОЖЕСТВЕННОГО ВЫБОРА КЛАССОВ ============
-    function initClassLevelSelectors() {
-      // Инициализация для учебников
-      const textbookSelect = document.getElementById('textbookClassLevel');
-      const textbookPreview = document.getElementById('textbookClassPreview');
-      
-      if (textbookSelect && textbookPreview) {
-        textbookSelect.addEventListener('change', function() {
-          updateClassPreview(this, textbookPreview);
-        });
-        
-        // Инициализация предпросмотра
-        updateClassPreview(textbookSelect, textbookPreview);
-      }
-
-      // Инициализация для кроссвордов
-      const crosswordSelect = document.getElementById('crosswordClassLevel');
-      const crosswordPreview = document.getElementById('crosswordClassPreview');
-      
-      if (crosswordSelect && crosswordPreview) {
-        crosswordSelect.addEventListener('change', function() {
-          updateClassPreview(this, crosswordPreview);
-        });
-        
-        // Инициализация предпросмотра
-        updateClassPreview(crosswordSelect, crosswordPreview);
-      }
-    }
-
-    function updateClassPreview(selectElement, previewContainer) {
-      const selectedOptions = Array.from(selectElement.selectedOptions).map(option => option.value);
-      
-      if (selectedOptions.length === 0) {
-        previewContainer.innerHTML = '<span class="class-badge">Ничего не выбрано</span>';
-      } else {
-        const classMap = {
-          '1-2': '1-2 класс',
-          '3-4': '3-4 класс',
-          '5-6': '5-6 класс',
-          '7': '7 класс',
-          '8-9': '8-9 класс',
-          '10-11': '10-11 класс',
-          '12': '12 класс'
-        };
-        
-        previewContainer.innerHTML = selectedOptions.map(option => 
-          `<span class="class-badge">${classMap[option] || option}</span>`
-        ).join('');
-      }
-    }
-
-    function getSelectedClassLevels(selectElement) {
-      return Array.from(selectElement.selectedOptions).map(option => option.value);
-    }
-
-    function setSelectedClassLevels(selectElement, classLevels) {
-      if (!classLevels || !Array.isArray(classLevels)) return;
-      
-      // Сбрасываем все выборы
-      Array.from(selectElement.options).forEach(option => {
-        option.selected = false;
-      });
-      
-      // Устанавливаем выбранные классы
-      classLevels.forEach(level => {
-        const option = Array.from(selectElement.options).find(opt => opt.value === level);
-        if (option) {
-          option.selected = true;
-        }
-      });
-      
-      // Обновляем предпросмотр
-      const previewId = selectElement.id === 'textbookClassLevel' ? 'textbookClassPreview' : 'crosswordClassPreview';
-      const previewContainer = document.getElementById(previewId);
-      if (previewContainer) {
-        updateClassPreview(selectElement, previewContainer);
-      }
-    }
-
-    // ============ ФУНКЦИЯ ДЛЯ ПРОВЕРКИ НЕОБРАБОТАННЫХ ЗАЯВОК ============
-    async function checkPendingRequests(supabase) {
-      try {
-        const { data: requests, error } = await supabase
-          .from('purchase_requests')
-          .select('id')
-          .eq('is_processed', false);
-
-        if (!error) {
-          const pendingCount = requests?.length || 0;
-          const badge = document.getElementById('requestsBadge');
-          const button = document.getElementById('manageRequestsBtn');
-          
-          if (pendingCount > 0) {
-            badge.style.display = 'flex';
-            badge.textContent = pendingCount;
-            button.classList.add('has-pending');
-            button.classList.remove('no-pending');
-          } else {
-            badge.style.display = 'none';
-            button.classList.remove('has-pending');
-            button.classList.add('no-pending');
-          }
-        }
-      } catch (e) {
-        console.log('Не удалось проверить заявки:', e);
-      }
-    }
 
     // ============ УЛУЧШЕННАЯ ПРОВЕРКА АДМИНА ============
     async function checkAdmin(supabase) {
@@ -3938,7 +3690,115 @@
         let currentEditingUserId = null;
         let searchTimeout = null;
 
-        // ОБНОВЛЕННАЯ ФУНКЦИЯ: Загрузка пользователей с пагинацией и оптимизацией
+        // НОВАЯ ФУНКЦИЯ: Проверка необработанных заявок
+        async function checkPendingRequests(supabase) {
+          try {
+            const { data: requests, error } = await supabase
+              .from('purchase_requests')
+              .select('id')
+              .eq('is_processed', false);
+
+            if (!error) {
+              const pendingCount = requests?.length || 0;
+              const badge = document.getElementById('requestsBadge');
+              const button = document.getElementById('manageRequestsBtn');
+              
+              if (pendingCount > 0) {
+                badge.style.display = 'flex';
+                badge.textContent = pendingCount;
+                button.classList.add('has-pending');
+                button.classList.remove('no-pending');
+              } else {
+                badge.style.display = 'none';
+                button.classList.remove('has-pending');
+                button.classList.add('no-pending');
+              }
+            }
+          } catch (e) {
+            console.log('Не удалось проверить заявки:', e);
+          }
+        }
+
+        // НОВАЯ ФУНКЦИЯ: Инициализация множественного выбора классов
+        function initClassLevelSelectors() {
+          // Инициализация для учебников
+          const textbookSelect = document.getElementById('textbookClassLevel');
+          const textbookPreview = document.getElementById('textbookClassPreview');
+          
+          if (textbookSelect && textbookPreview) {
+            textbookSelect.addEventListener('change', function() {
+              updateClassPreview(this, textbookPreview);
+            });
+            
+            // Инициализация предпросмотра
+            updateClassPreview(textbookSelect, textbookPreview);
+          }
+
+          // Инициализация для кроссвордов
+          const crosswordSelect = document.getElementById('crosswordClassLevel');
+          const crosswordPreview = document.getElementById('crosswordClassPreview');
+          
+          if (crosswordSelect && crosswordPreview) {
+            crosswordSelect.addEventListener('change', function() {
+              updateClassPreview(this, crosswordPreview);
+            });
+            
+            // Инициализация предпросмотра
+            updateClassPreview(crosswordSelect, crosswordPreview);
+          }
+        }
+
+        function updateClassPreview(selectElement, previewContainer) {
+          const selectedOptions = Array.from(selectElement.selectedOptions).map(option => option.value);
+          
+          if (selectedOptions.length === 0) {
+            previewContainer.innerHTML = '<span class="class-badge">Ничего не выбрано</span>';
+          } else {
+            const classMap = {
+              '1-2': '1-2 класс',
+              '3-4': '3-4 класс',
+              '5-6': '5-6 класс',
+              '7': '7 класс',
+              '8-9': '8-9 класс',
+              '10-11': '10-11 класс',
+              '12': '12 класс'
+            };
+            
+            previewContainer.innerHTML = selectedOptions.map(option => 
+              `<span class="class-badge">${classMap[option] || option}</span>`
+            ).join('');
+          }
+        }
+
+        function getSelectedClassLevels(selectElement) {
+          return Array.from(selectElement.selectedOptions).map(option => option.value);
+        }
+
+        function setSelectedClassLevels(selectElement, classLevels) {
+          if (!classLevels || !Array.isArray(classLevels)) return;
+          
+          // Сбрасываем все выборы
+          Array.from(selectElement.options).forEach(option => {
+            option.selected = false;
+          });
+          
+          // Устанавливаем выбранные классы
+          classLevels.forEach(level => {
+            const option = Array.from(selectElement.options).find(opt => opt.value === level);
+            if (option) {
+              option.selected = true;
+            }
+          });
+          
+          // Обновляем предпросмотр
+          const previewId = selectElement.id === 'textbookClassLevel' ? 'textbookClassPreview' : 'crosswordClassPreview';
+          const previewContainer = document.getElementById(previewId);
+          if (previewContainer) {
+            updateClassPreview(selectElement, previewContainer);
+          }
+        }
+
+        // ОБНОВЛЕННАЯ ФУНКЦИЯ: Загрузка пользователей с правильной пагинацией и фильтрацией
         async function loadUsers() {
           const searchQuery = document.getElementById('userSearch').value.trim();
           const regionFilter = document.getElementById('regionFilter').value;
@@ -3950,21 +3810,13 @@
           document.getElementById('usersEmptyState').style.display = 'none';
 
           try {
-            // Проверяем кэш
-            const cacheKey = `users_${searchQuery}_${regionFilter}_${materialStatusFilter}_${usersPagination.currentPage}_${usersPagination.pageSize}`;
-            const cachedData = cache.get(cacheKey);
-            
-            if (cachedData) {
-              console.log('⚡ Используем кэшированные данные пользователей');
-              renderUsersPage(cachedData.users, cachedData.stats);
-              return;
-            }
-
+            // Создаем базовый запрос
             let query = supabase
               .from('profiles')
-              .select('*', { count: 'exact' })
+              .select('*')
               .order('created_at', { ascending: false });
 
+            // Применяем фильтры поиска и региона
             if (searchQuery) {
               query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
             }
@@ -3973,35 +3825,37 @@
               query = query.eq('region', regionFilter);
             }
 
-            // Применяем пагинацию
-            const from = (usersPagination.currentPage - 1) * usersPagination.pageSize;
-            const to = from + usersPagination.pageSize - 1;
-            query = query.range(from, to);
+            // Получаем ВСЕХ пользователей с учетом фильтров
+            const { data: allUsers, error } = await query;
 
-            const { data: users, error, count } = await query;
-            
             if (error) throw error;
 
-            usersPagination.totalUsers = count || 0;
-            usersPagination.totalPages = Math.ceil(usersPagination.totalUsers / usersPagination.pageSize);
-            usersPagination.filteredUsers = users || [];
+            // Обогащаем пользователей данными о материалах
+            const usersWithMaterials = await enrichUsersWithMaterials(allUsers || []);
 
-            // Загружаем прогресс и материалы для текущей страницы
-            const usersWithData = await enrichUsersData(users || []);
-
-            // Фильтруем по статусу материалов если нужно
-            let filteredUsers = usersWithData;
+            // Применяем фильтр по материалам
+            let filteredUsers = usersWithMaterials;
             if (materialStatusFilter === 'has_materials') {
-              filteredUsers = usersWithData.filter(user => user.materials && user.materials.length > 0);
+              filteredUsers = usersWithMaterials.filter(user => user.hasMaterials);
             } else if (materialStatusFilter === 'no_materials') {
-              filteredUsers = usersWithData.filter(user => !user.materials || user.materials.length === 0);
+              filteredUsers = usersWithMaterials.filter(user => !user.hasMaterials);
             }
 
-            // Сохраняем в кэш
-            const stats = calculateUsersStats(filteredUsers);
-            cache.set(cacheKey, { users: filteredUsers, stats });
+            // Обновляем пагинацию
+            usersPagination.totalUsers = filteredUsers.length;
+            usersPagination.totalPages = Math.ceil(usersPagination.totalUsers / usersPagination.pageSize);
+            usersPagination.filteredUsers = filteredUsers;
 
-            renderUsersPage(filteredUsers, stats);
+            // Рассчитываем статистику для ВЫБРАННОЙ ОБЛАСТИ
+            const totalInRegion = allUsers?.length || 0;
+            const withMaterialsInRegion = usersWithMaterials.filter(user => user.hasMaterials).length;
+
+            // Обновляем статистику
+            document.getElementById('totalUsersCount').textContent = totalInRegion;
+            document.getElementById('usersWithMaterialsCount').textContent = withMaterialsInRegion;
+
+            // Рендерим текущую страницу
+            renderUsersPage();
 
           } catch (error) {
             document.getElementById('usersSkeleton').style.display = 'none';
@@ -4009,85 +3863,77 @@
           }
         }
 
-        // НОВАЯ ФУНКЦИЯ: Обогащение данных пользователей
-        async function enrichUsersData(users) {
+        // НОВАЯ ФУНКЦИЯ: Обогащение пользователей информацией о материалах
+        async function enrichUsersWithMaterials(users) {
           if (!users || users.length === 0) return [];
 
           const userIds = users.map(user => user.id);
           
           try {
-            // Параллельная загрузка прогресса и материалов
-            const [progressData, materialsData] = await Promise.all([
-              // Прогресс пользователей
+            // Получаем доступы к учебникам и кроссвордам для всех пользователей
+            const [textbookAccess, crosswordAccess] = await Promise.all([
               supabase
-                .from('user_progress')
-                .select('user_id,is_completed')
+                .from('textbook_access')
+                .select('user_id')
                 .in('user_id', userIds),
-              
-              // Материалы пользователей (ленивая загрузка)
-              Promise.all(users.map(user => lazyMaterialsLoader.loadUserMaterials(user.id, supabase)))
+              supabase
+                .from('crossword_access')
+                .select('user_id')
+                .in('user_id', userIds)
             ]);
 
-            const progressMap = {};
-            if (progressData.data) {
-              progressData.data.forEach(p => {
-                progressMap[p.user_id] ||= { total: 0, completed: 0 };
-                progressMap[p.user_id].total++;
-                if (p.is_completed) progressMap[p.user_id].completed++;
+            // Создаем Set пользователей, у которых есть хотя бы один материал
+            const usersWithMaterialsSet = new Set();
+            
+            if (textbookAccess.data) {
+              textbookAccess.data.forEach(access => {
+                usersWithMaterialsSet.add(access.user_id);
               });
             }
 
-            // Обогащаем пользователей данными
-            return users.map((user, index) => ({
+            if (crosswordAccess.data) {
+              crosswordAccess.data.forEach(access => {
+                usersWithMaterialsSet.add(access.user_id);
+              });
+            }
+
+            // Обогащаем пользователей флагом hasMaterials
+            return users.map(user => ({
               ...user,
-              progress: progressMap[user.id] || { total: 0, completed: 0 },
-              materials: materialsData[index] || []
+              hasMaterials: usersWithMaterialsSet.has(user.id),
+              materials: [] // Пока не загружаем детали материалов для оптимизации
             }));
 
           } catch (error) {
             console.error('Ошибка обогащения данных пользователей:', error);
             return users.map(user => ({
               ...user,
-              progress: { total: 0, completed: 0 },
+              hasMaterials: false,
               materials: []
             }));
           }
         }
 
-        // НОВАЯ ФУНКЦИЯ: Расчет статистики пользователей
-        function calculateUsersStats(users) {
-          const totalUsers = users.length;
-          const usersWithMaterials = users.filter(user => user.materials && user.materials.length > 0).length;
-          
-          return {
-            totalUsers,
-            usersWithMaterials,
-            usersWithoutMaterials: totalUsers - usersWithMaterials
-          };
-        }
-
         // ОБНОВЛЕННАЯ ФУНКЦИЯ: Отрисовка страницы пользователей
-        function renderUsersPage(users, stats) {
+        function renderUsersPage() {
           const tbody = document.getElementById('usersTableBody');
           document.getElementById('usersSkeleton').style.display = 'none';
 
+          const pageUsers = usersPagination.getCurrentPageUsers();
+          
           tbody.innerHTML = '';
 
-          if (!users || users.length === 0) {
+          if (!pageUsers || pageUsers.length === 0) {
             document.getElementById('usersEmptyState').style.display = 'block';
             document.getElementById('usersPagination').style.display = 'none';
             return;
           }
 
-          // Обновляем статистику
-          document.getElementById('totalUsersCount').textContent = stats.totalUsers;
-          document.getElementById('totalIssuedTextbooks').textContent = stats.usersWithMaterials;
+          document.getElementById('usersEmptyState').style.display = 'none';
 
-          // Отрисовываем пользователей
-          users.forEach((user, index) => {
+          // Отрисовываем пользователей текущей страницы
+          pageUsers.forEach((user, index) => {
             const globalIndex = ((usersPagination.currentPage - 1) * usersPagination.pageSize) + index + 1;
-            const pr = user.progress;
-            const pct = pr.total ? Math.round((pr.completed / pr.total) * 100) : 0;
             
             const tr = document.createElement('tr');
             
@@ -4109,16 +3955,14 @@
               <td>${user.region || '—'}</td>
               <td>
                 <div class="user-stats">
-                  <span class="stat-badge">📊 ${pr.total ? `${pr.completed}/${pr.total} (${pct}%)` : 'Нет прогресса'}</span>
+                  <span class="stat-badge">📊 Прогресс загружается...</span>
                 </div>
               </td>
               <td>
                 <div class="materials-info">
                   <div class="materials-list" id="materials_${user.id}">
-                    ${user.materials && user.materials.length > 0 
-                      ? user.materials.map(material => 
-                          `<div class="material-badge">${material}</div>`
-                        ).join('')
+                    ${user.hasMaterials 
+                      ? '<div class="material-badge">✅ Есть материалы</div>'
                       : '<div class="material-badge">❌ Нет материалов</div>'
                     }
                   </div>
@@ -4155,9 +3999,6 @@
               const { error } = await supabase.from('profiles').update({ is_admin: make }).eq('id', uid);
               if (error) return showModal('Ошибка', error.message);
               showModal('Готово', make ? 'Права администратора выданы' : 'Права администратора сняты');
-              // Очищаем кэш и перезагружаем
-              cache.clear();
-              lazyMaterialsLoader.clearCache();
               loadUsers();
             });
           });
@@ -4278,10 +4119,6 @@
 
           showModal('Готово','Доступы обновлены');
           document.getElementById('userAccessModal').style.display='none';
-          
-          // Очищаем кэш и перезагружаем пользователей
-          cache.clear();
-          lazyMaterialsLoader.clearCache();
           loadUsers();
         }
 
