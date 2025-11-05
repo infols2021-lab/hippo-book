@@ -459,7 +459,7 @@
         background: #f8f9fa;
     }
 
-    /* Стили для кнопки управления заявками с бейджем */
+    /* Стили для кнопки управления заявками с бейджом */
     .requests-btn {
         position: relative;
         transition: all 0.3s ease;
@@ -586,6 +586,52 @@
         border-color: var(--accent2);
     }
 
+    /* НОВЫЕ СТИЛИ ДЛЯ МНОЖЕСТВЕННОГО ВЫБОРА КЛАССОВ */
+    .class-level-select {
+        width: 100%;
+        min-height: 120px;
+        padding: 10px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        background: white;
+    }
+
+    .class-level-select:focus {
+        border-color: var(--accent2);
+        outline: none;
+    }
+
+    .class-level-hint {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+    }
+
+    .class-level-preview {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 8px;
+        font-size: 14px;
+    }
+
+    .class-level-preview .selected-classes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 5px;
+    }
+
+    .class-badge {
+        background: var(--accent2);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
     @media (max-width: 1024px) {
       .admin-container { width: 98%; margin: 15px auto; }
       .admin-table { font-size: 14px; }
@@ -601,6 +647,7 @@
       .filters-container { flex-direction: column; width: 100%; }
       .filters-container select,
       .filters-container input { min-width: 100%; }
+      .class-level-select { min-height: 100px; }
     }
 
     @media (max-width: 768px) {
@@ -731,11 +778,10 @@
               <textarea id="textbookDescription" class="input" placeholder="Введите описание учебника" rows="3"></textarea>
             </div>
 
-            <!-- НОВОЕ ПОЛЕ: Класс -->
+            <!-- ОБНОВЛЕННОЕ ПОЛЕ: Класс (множественный выбор) -->
             <div class="form-group">
-              <label>Класс:</label>
-              <select id="textbookClassLevel" class="input">
-                <option value="">-- Выберите класс --</option>
+              <label>Классы:</label>
+              <select multiple id="textbookClassLevel" class="class-level-select">
                 <option value="1-2">1-2 класс</option>
                 <option value="3-4">3-4 класс</option>
                 <option value="5-6">5-6 класс</option>
@@ -744,6 +790,15 @@
                 <option value="10-11">10-11 класс (Техникум, колледж - 1й курс)</option>
                 <option value="12">12 класс (Техникум, колледж)</option>
               </select>
+              <div class="class-level-hint">
+                💡 Удерживайте Ctrl (Cmd на Mac) для выбора нескольких классов
+              </div>
+              <div class="class-level-preview">
+                <strong>Выбранные классы:</strong>
+                <div class="selected-classes" id="textbookClassPreview">
+                  <span class="class-badge">Ничего не выбрано</span>
+                </div>
+              </div>
             </div>
 
             <div class="form-group">
@@ -782,7 +837,7 @@
                 <tr>
                   <th>Название</th>
                   <th>Описание</th>
-                  <th>Класс</th>
+                  <th>Классы</th>
                   <th>Заданий</th>
                   <th>Доступ</th>
                   <th>Статус</th>
@@ -816,11 +871,10 @@
               <textarea id="crosswordDescription" class="input" placeholder="Введите описание кроссворда" rows="3"></textarea>
             </div>
 
-            <!-- НОВОЕ ПОЛЕ: Класс -->
+            <!-- ОБНОВЛЕННОЕ ПОЛЕ: Класс (множественный выбор) -->
             <div class="form-group">
-              <label>Класс:</label>
-              <select id="crosswordClassLevel" class="input">
-                <option value="">-- Выберите класс --</option>
+              <label>Классы:</label>
+              <select multiple id="crosswordClassLevel" class="class-level-select">
                 <option value="1-2">1-2 класс</option>
                 <option value="3-4">3-4 класс</option>
                 <option value="5-6">5-6 класс</option>
@@ -829,6 +883,15 @@
                 <option value="10-11">10-11 класс (Техникум, колледж - 1й курс)</option>
                 <option value="12">12 класс (Техникум, колледж)</option>
               </select>
+              <div class="class-level-hint">
+                💡 Удерживайте Ctrl (Cmd на Mac) для выбора нескольких классов
+              </div>
+              <div class="class-level-preview">
+                <strong>Выбранные классы:</strong>
+                <div class="selected-classes" id="crosswordClassPreview">
+                  <span class="class-badge">Ничего не выбрано</span>
+                </div>
+              </div>
             </div>
 
             <div class="form-group">
@@ -867,7 +930,7 @@
                 <tr>
                   <th>Название</th>
                   <th>Описание</th>
-                  <th>Класс</th>
+                  <th>Классы</th>
                   <th>Заданий</th>
                   <th>Доступ</th>
                   <th>Действия</th>
@@ -1046,6 +1109,85 @@
       document.getElementById('modalTitle').textContent = title;
       document.getElementById('modalText').textContent = text;
       document.getElementById('modal').style.display = 'flex';
+    }
+
+    // ============ НОВЫЕ ФУНКЦИИ ДЛЯ МНОЖЕСТВЕННОГО ВЫБОРА КЛАССОВ ============
+    function initClassLevelSelectors() {
+      // Инициализация для учебников
+      const textbookSelect = document.getElementById('textbookClassLevel');
+      const textbookPreview = document.getElementById('textbookClassPreview');
+      
+      if (textbookSelect && textbookPreview) {
+        textbookSelect.addEventListener('change', function() {
+          updateClassPreview(this, textbookPreview);
+        });
+        
+        // Инициализация предпросмотра
+        updateClassPreview(textbookSelect, textbookPreview);
+      }
+
+      // Инициализация для кроссвордов
+      const crosswordSelect = document.getElementById('crosswordClassLevel');
+      const crosswordPreview = document.getElementById('crosswordClassPreview');
+      
+      if (crosswordSelect && crosswordPreview) {
+        crosswordSelect.addEventListener('change', function() {
+          updateClassPreview(this, crosswordPreview);
+        });
+        
+        // Инициализация предпросмотра
+        updateClassPreview(crosswordSelect, crosswordPreview);
+      }
+    }
+
+    function updateClassPreview(selectElement, previewContainer) {
+      const selectedOptions = Array.from(selectElement.selectedOptions).map(option => option.value);
+      
+      if (selectedOptions.length === 0) {
+        previewContainer.innerHTML = '<span class="class-badge">Ничего не выбрано</span>';
+      } else {
+        const classMap = {
+          '1-2': '1-2 класс',
+          '3-4': '3-4 класс',
+          '5-6': '5-6 класс',
+          '7': '7 класс',
+          '8-9': '8-9 класс',
+          '10-11': '10-11 класс',
+          '12': '12 класс'
+        };
+        
+        previewContainer.innerHTML = selectedOptions.map(option => 
+          `<span class="class-badge">${classMap[option] || option}</span>`
+        ).join('');
+      }
+    }
+
+    function getSelectedClassLevels(selectElement) {
+      return Array.from(selectElement.selectedOptions).map(option => option.value);
+    }
+
+    function setSelectedClassLevels(selectElement, classLevels) {
+      if (!classLevels || !Array.isArray(classLevels)) return;
+      
+      // Сбрасываем все выборы
+      Array.from(selectElement.options).forEach(option => {
+        option.selected = false;
+      });
+      
+      // Устанавливаем выбранные классы
+      classLevels.forEach(level => {
+        const option = Array.from(selectElement.options).find(opt => opt.value === level);
+        if (option) {
+          option.selected = true;
+        }
+      });
+      
+      // Обновляем предпросмотр
+      const previewId = selectElement.id === 'textbookClassLevel' ? 'textbookClassPreview' : 'crosswordClassPreview';
+      const previewContainer = document.getElementById(previewId);
+      if (previewContainer) {
+        updateClassPreview(selectElement, previewContainer);
+      }
     }
 
     // ============ ФУНКЦИЯ ДЛЯ ПРОВЕРКИ НЕОБРАБОТАННЫХ ЗАЯВОК ============
@@ -2436,6 +2578,9 @@
         // Проверяем необработанные заявки при загрузке
         await checkPendingRequests(supabase);
 
+        // Инициализация множественного выбора классов
+        initClassLevelSelectors();
+
         // Кнопки/вкладки/модалка
         document.getElementById('modalOk').addEventListener('click', () => {
           document.getElementById('modal').style.display = 'none';
@@ -2514,7 +2659,8 @@
           document.getElementById('textbookFormTitle').textContent = 'Создать учебник';
           document.getElementById('textbookTitle').value = '';
           document.getElementById('textbookDescription').value = '';
-          document.getElementById('textbookClassLevel').value = '';
+          // Сбрасываем множественный выбор классов
+          setSelectedClassLevels(document.getElementById('textbookClassLevel'), []);
           document.getElementById('textbookOrder').value = '0';
           document.getElementById('textbookIsAvailable').checked = false;
           document.getElementById('textbookCoverUrl').value = '';
@@ -2526,18 +2672,18 @@
         async function saveTextbook() {
           const title = document.getElementById('textbookTitle').value.trim();
           const description = document.getElementById('textbookDescription').value.trim();
-          const classLevel = document.getElementById('textbookClassLevel').value;
+          const classLevels = getSelectedClassLevels(document.getElementById('textbookClassLevel'));
           const orderIndex = parseInt(document.getElementById('textbookOrder').value || '0',10);
           const isAvailable = document.getElementById('textbookIsAvailable').checked;
           const coverUrl = document.getElementById('textbookCoverUrl').value;
 
           if (!title) return showModal('Ошибка', 'Введите название учебника');
-          if (!classLevel) return showModal('Ошибка', 'Выберите класс');
+          if (classLevels.length === 0) return showModal('Ошибка', 'Выберите хотя бы один класс');
 
           const payload = {
             title,
             description,
-            class_level: classLevel,
+            class_level: classLevels, // Теперь это массив
             order_index: orderIndex,
             is_available: isAvailable,
             is_active: true,
@@ -2574,12 +2720,28 @@
             return;
           }
 
+          const classMap = {
+            '1-2': '1-2 класс',
+            '3-4': '3-4 класс',
+            '5-6': '5-6 класс',
+            '7': '7 класс',
+            '8-9': '8-9 класс',
+            '10-11': '10-11 класс',
+            '12': '12 класс'
+          };
+
           textbooks.forEach(tb => {
             const tr = document.createElement('tr');
+            // Форматируем классы для отображения
+            const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
+            const classDisplay = classLevels.length > 0 
+              ? classLevels.map(cls => classMap[cls] || cls).join(', ')
+              : '—';
+            
             tr.innerHTML = `
               <td>${tb.title}</td>
               <td>${tb.description || '—'}</td>
-              <td>${tb.class_level || '—'}</td>
+              <td>${classDisplay}</td>
               <td>${counts[tb.id] || 0}</td>
               <td>${tb.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
               <td>${tb.is_active ? '✅ Активен' : '❌ Неактивен'}</td>
@@ -2601,7 +2763,8 @@
               document.getElementById('textbookFormTitle').textContent = 'Редактировать учебник';
               document.getElementById('textbookTitle').value = data.title || '';
               document.getElementById('textbookDescription').value = data.description || '';
-              document.getElementById('textbookClassLevel').value = data.class_level || '';
+              // Устанавливаем множественный выбор классов
+              setSelectedClassLevels(document.getElementById('textbookClassLevel'), data.class_level || []);
               document.getElementById('textbookOrder').value = data.order_index || 0;
               document.getElementById('textbookIsAvailable').checked = !!data.is_available;
               document.getElementById('textbookCoverUrl').value = data.cover_image_url || '';
@@ -2643,7 +2806,8 @@
           document.getElementById('crosswordFormTitle').textContent = 'Создать кроссворд';
           document.getElementById('crosswordTitle').value = '';
           document.getElementById('crosswordDescription').value = '';
-          document.getElementById('crosswordClassLevel').value = '';
+          // Сбрасываем множественный выбор классов
+          setSelectedClassLevels(document.getElementById('crosswordClassLevel'), []);
           document.getElementById('crosswordOrder').value = '0';
           document.getElementById('crosswordIsAvailable').checked = false;
           document.getElementById('crosswordCoverUrl').value = '';
@@ -2655,18 +2819,18 @@
         async function saveCrossword() {
           const title = document.getElementById('crosswordTitle').value.trim();
           const description = document.getElementById('crosswordDescription').value.trim();
-          const classLevel = document.getElementById('crosswordClassLevel').value;
+          const classLevels = getSelectedClassLevels(document.getElementById('crosswordClassLevel'));
           const orderIndex = parseInt(document.getElementById('crosswordOrder').value || '0',10);
           const isAvailable = document.getElementById('crosswordIsAvailable').checked;
           const coverUrl = document.getElementById('crosswordCoverUrl').value;
 
           if (!title) return showModal('Ошибка', 'Введите название кроссворда');
-          if (!classLevel) return showModal('Ошибка', 'Выберите класс');
+          if (classLevels.length === 0) return showModal('Ошибка', 'Выберите хотя бы один класс');
 
           const payload = {
             title,
             description,
-            class_level: classLevel,
+            class_level: classLevels, // Теперь это массив
             order_index: orderIndex,
             is_available: isAvailable,
             is_active: true,
@@ -2703,12 +2867,28 @@
             return;
           }
 
+          const classMap = {
+            '1-2': '1-2 класс',
+            '3-4': '3-4 класс',
+            '5-6': '5-6 класс',
+            '7': '7 класс',
+            '8-9': '8-9 класс',
+            '10-11': '10-11 класс',
+            '12': '12 класс'
+          };
+
           crosswords.forEach(cw => {
             const tr = document.createElement('tr');
+            // Форматируем классы для отображения
+            const classLevels = Array.isArray(cw.class_level) ? cw.class_level : [];
+            const classDisplay = classLevels.length > 0 
+              ? classLevels.map(cls => classMap[cls] || cls).join(', ')
+              : '—';
+            
             tr.innerHTML = `
               <td>${cw.title}</td>
               <td>${cw.description || '—'}</td>
-              <td>${cw.class_level || '—'}</td>
+              <td>${classDisplay}</td>
               <td>${counts[cw.id] || 0}</td>
               <td>${cw.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
               <td>
@@ -2729,7 +2909,8 @@
               document.getElementById('crosswordFormTitle').textContent = 'Редактировать кроссворд';
               document.getElementById('crosswordTitle').value = data.title || '';
               document.getElementById('crosswordDescription').value = data.description || '';
-              document.getElementById('crosswordClassLevel').value = data.class_level || '';
+              // Устанавливаем множественный выбор классов
+              setSelectedClassLevels(document.getElementById('crosswordClassLevel'), data.class_level || []);
               document.getElementById('crosswordOrder').value = data.order_index || 0;
               document.getElementById('crosswordIsAvailable').checked = !!data.is_available;
               document.getElementById('crosswordCoverUrl').value = data.cover_image_url || '';
@@ -2800,9 +2981,11 @@
             const og = document.createElement('optgroup');
             og.label = '📚 Учебники';
             textbooks.filter(t=>t.is_active!==false).forEach(t=>{
+              const classLevels = Array.isArray(t.class_level) ? t.class_level : [];
+              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
               const opt = document.createElement('option');
               opt.value = `textbook_${t.id}`;
-              opt.textContent = `${t.title} (${t.class_level || 'без класса'})`;
+              opt.textContent = `${t.title} (${classDisplay})`;
               og.appendChild(opt);
             });
             select.appendChild(og);
@@ -2812,9 +2995,11 @@
             const og = document.createElement('optgroup');
             og.label = '🧩 Кроссворды';
             crosswords.filter(c=>c.is_active!==false).forEach(c=>{
+              const classLevels = Array.isArray(c.class_level) ? c.class_level : [];
+              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
               const opt = document.createElement('option');
               opt.value = `crossword_${c.id}`;
-              opt.textContent = `${c.title} (${c.class_level || 'без класса'})`;
+              opt.textContent = `${c.title} (${classDisplay})`;
               og.appendChild(opt);
             });
             select.appendChild(og);
@@ -3532,11 +3717,13 @@
           tList.innerHTML = '';
           if (t.data?.length) {
             t.data.forEach(tb=>{
+              const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
+              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
               const item = document.createElement('div');
               item.className = 'access-item';
               const id = `textbook_${tb.id}`;
               item.innerHTML = `<input type="checkbox" id="${id}" ${tSet.has(String(tb.id))?'checked':''}>
-                                <label for="${id}">${tb.title} (${tb.class_level || 'без класса'})</label>`;
+                                <label for="${id}">${tb.title} (${classDisplay})</label>`;
               tList.appendChild(item);
             });
           } else {
@@ -3547,11 +3734,13 @@
           cList.innerHTML = '';
           if (c.data?.length) {
             c.data.forEach(cr=>{
+              const classLevels = Array.isArray(cr.class_level) ? cr.class_level : [];
+              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
               const item = document.createElement('div');
               item.className = 'access-item';
               const id = `crossword_${cr.id}`;
               item.innerHTML = `<input type="checkbox" id="${id}" ${cSet.has(String(cr.id))?'checked':''}>
-                                <label for="${id}">${cr.title} (${cr.class_level || 'без класса'})</label>`;
+                                <label for="${id}">${cr.title} (${classDisplay})</label>`;
               cList.appendChild(item);
             });
           } else {
