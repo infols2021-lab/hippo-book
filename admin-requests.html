@@ -164,6 +164,223 @@
       margin: 10px 0;
     }
 
+    /* НОВЫЕ СТИЛИ ДЛЯ ВКЛАДОК */
+    .requests-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .requests-tab {
+      padding: 12px 20px;
+      background: var(--card);
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.2s;
+    }
+
+    .requests-tab.active {
+      background: var(--accent2);
+      color: white;
+    }
+
+    .requests-section {
+      display: none;
+    }
+
+    .requests-section.active {
+      display: block;
+    }
+
+    /* Стили для информации о выданных материалах */
+    .materials-info {
+      background: #e8f5e8;
+      border: 1px solid #c8e6c9;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+
+    .materials-info h4 {
+      margin: 0 0 8px 0;
+      color: #2e7d32;
+    }
+
+    .materials-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .material-badge {
+      background: white;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      border: 1px solid #c8e6c9;
+    }
+
+    /* НОВЫЕ СТИЛИ ДЛЯ МАССОВЫХ ОПЕРАЦИЙ */
+    .bulk-actions {
+      background: #f8f9fa;
+      padding: 15px 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      display: none;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-left: 4px solid var(--accent2);
+    }
+
+    .bulk-actions.active {
+      display: flex;
+    }
+
+    .bulk-info {
+      font-weight: 600;
+      color: var(--accent2);
+      margin-right: 10px;
+    }
+
+    .bulk-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .checkbox-cell {
+      width: 40px;
+      text-align: center;
+    }
+
+    .checkbox-cell input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .select-all-cell {
+      width: 40px;
+      text-align: center;
+    }
+
+    /* Стили для отображения множественных классов */
+    .class-levels {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .class-badge {
+      background: var(--accent2);
+      color: white;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* НОВЫЕ СТИЛИ ДЛЯ ИНДИКАТОРА ЗАГРУЗКИ */
+    .processing-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      flex-direction: column;
+      color: white;
+    }
+
+    .processing-content {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      text-align: center;
+      color: #333;
+      max-width: 400px;
+      width: 90%;
+    }
+
+    .processing-spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--accent2);
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    .processing-text {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .processing-details {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .btn-loading {
+      position: relative;
+      color: transparent !important;
+    }
+
+    .btn-loading::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      top: 50%;
+      left: 50%;
+      margin-left: -10px;
+      margin-top: -10px;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      border-top-color: transparent;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* Стили для индикатора автообновления */
+    .auto-update-indicator {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--accent2);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0.9;
+    }
+
+    .update-spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid transparent;
+      border-top: 2px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
     @media (max-width: 768px) {
       .container {
         width: 100%;
@@ -187,6 +404,41 @@
       
       .stats-bar {
         flex-direction: column;
+      }
+
+      .requests-tabs {
+        flex-direction: column;
+      }
+
+      .requests-tab {
+        text-align: center;
+      }
+
+      .bulk-actions {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .bulk-buttons {
+        width: 100%;
+        justify-content: stretch;
+      }
+
+      .bulk-buttons .btn {
+        flex: 1;
+        text-align: center;
+      }
+
+      .processing-content {
+        padding: 20px;
+        margin: 20px;
+      }
+
+      .auto-update-indicator {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        justify-content: center;
       }
     }
 
@@ -214,6 +466,21 @@
   <script src="/load-config.js"></script>
 </head>
 <body>
+  <!-- ИНДИКАТОР ЗАГРУЗКИ -->
+  <div class="processing-overlay" id="processingOverlay">
+    <div class="processing-content">
+      <div class="processing-spinner"></div>
+      <div class="processing-text" id="processingText">Обрабатываем заявку...</div>
+      <div class="processing-details" id="processingDetails">Пожалуйста, подождите</div>
+    </div>
+  </div>
+
+  <!-- Индикатор автообновления -->
+  <div class="auto-update-indicator" id="autoUpdateIndicator">
+    <div class="update-spinner"></div>
+    <span>Автообновление включено</span>
+  </div>
+
   <div class="container">
     <div class="header">
       <div class="logo">
@@ -247,6 +514,25 @@
         </div>
       </div>
 
+      <!-- НОВЫЕ ВКЛАДКИ -->
+      <div class="requests-tabs">
+        <div class="requests-tab active" data-tab="all">📋 Все заявки</div>
+        <div class="requests-tab" data-tab="pending">⏳ Ожидающие</div>
+        <div class="requests-tab" data-tab="processed">✅ Обработанные</div>
+      </div>
+
+      <!-- ПАНЕЛЬ МАССОВЫХ ОПЕРАЦИЙ -->
+      <div class="bulk-actions" id="bulkActions">
+        <div class="bulk-info">
+          Выбрано: <span id="selectedCount">0</span> заявок
+        </div>
+        <div class="bulk-buttons">
+          <button class="btn" id="processSelectedBtn">✅ Обработать выбранные</button>
+          <button class="btn btn-warning" id="unprocessSelectedBtn">↩️ Вернуть выбранные в ожидание</button>
+          <button class="btn secondary" id="clearSelectionBtn">❌ Снять выделение</button>
+        </div>
+      </div>
+
       <div class="search-container">
         <div class="form-group">
           <label>Поиск по ФИО:</label>
@@ -268,15 +554,19 @@
       
       <div id="errorMessage" class="error"></div>
 
-      <div id="requestsContent" style="display: none;">
+      <!-- Секция всех заявок -->
+      <div class="requests-section active" id="all-section">
         <div style="overflow-x: auto;">
-          <table class="requests-table" id="requestsTable">
+          <table class="requests-table" id="allRequestsTable">
             <thead>
               <tr>
+                <th class="select-all-cell">
+                  <input type="checkbox" id="selectAllAll">
+                </th>
                 <th>№</th>
                 <th>Номер заявки</th>
                 <th>Дата и время создания</th>
-                <th>Класс</th>
+                <th>Классы</th>
                 <th>Типы материалов</th>
                 <th>Email</th>
                 <th>ФИО ученика</th>
@@ -284,15 +574,78 @@
                 <th>Действия</th>
               </tr>
             </thead>
-            <tbody id="requestsTableBody">
+            <tbody id="allRequestsTableBody">
               <!-- Заявки будут загружаться сюда -->
             </tbody>
           </table>
         </div>
         
-        <div id="emptyState" class="empty-state" style="display: none;">
+        <div id="allEmptyState" class="empty-state" style="display: none;">
           <h3>📭 Заявок пока нет</h3>
           <p>Заявки от пользователей будут отображаться здесь</p>
+        </div>
+      </div>
+
+      <!-- Секция ожидающих заявок -->
+      <div class="requests-section" id="pending-section">
+        <div style="overflow-x: auto;">
+          <table class="requests-table" id="pendingRequestsTable">
+            <thead>
+              <tr>
+                <th class="select-all-cell">
+                  <input type="checkbox" id="selectAllPending">
+                </th>
+                <th>№</th>
+                <th>Номер заявки</th>
+                <th>Дата и время создания</th>
+                <th>Классы</th>
+                <th>Типы материалов</th>
+                <th>Email</th>
+                <th>ФИО ученика</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="pendingRequestsTableBody">
+              <!-- Ожидающие заявки будут загружаться сюда -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div id="pendingEmptyState" class="empty-state" style="display: none;">
+          <h3>✅ Все заявки обработаны</h3>
+          <p>Новых заявок, ожидающих обработки, нет</p>
+        </div>
+      </div>
+
+      <!-- Секция обработанных заявок -->
+      <div class="requests-section" id="processed-section">
+        <div style="overflow-x: auto;">
+          <table class="requests-table" id="processedRequestsTable">
+            <thead>
+              <tr>
+                <th class="select-all-cell">
+                  <input type="checkbox" id="selectAllProcessed">
+                </th>
+                <th>№</th>
+                <th>Номер заявки</th>
+                <th>Дата обработки</th>
+                <th>Классы</th>
+                <th>Типы материалов</th>
+                <th>Email</th>
+                <th>ФИО ученика</th>
+                <th>Выданные материалы</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="processedRequestsTableBody">
+              <!-- Обработанные заявки будут загружаться сюда -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div id="processedEmptyState" class="empty-state" style="display: none;">
+          <h3>📭 Обработанных заявок нет</h3>
+          <p>Обработанные заявки будут отображаться здесь</p>
         </div>
       </div>
     </div>
@@ -305,6 +658,125 @@
     let supabaseClient = null;
     let allRequests = [];
     let searchTimeout = null;
+    let currentTab = 'all';
+    let selectedRequests = new Set();
+    
+    // НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ АВТООБНОВЛЕНИЯ
+    let pollingInterval = null;
+    let isPollingActive = true;
+    let lastUpdateTime = null;
+
+    // НОВАЯ ФУНКЦИЯ: Запуск автообновления
+    function startAutoRefresh() {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+      
+      pollingInterval = setInterval(async () => {
+        if (!isPollingActive) return;
+        
+        try {
+          await refreshData();
+        } catch (error) {
+          console.log('Ошибка автообновления:', error);
+        }
+      }, 5000); // Обновление каждые 5 секунд
+      
+      console.log('🔄 Автообновление запущено (каждые 5 секунд)');
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Остановка автообновления
+    function stopAutoRefresh() {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+      }
+      console.log('⏸️ Автообновление остановлено');
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Обновление данных
+    async function refreshData() {
+      if (!supabaseClient) return;
+      
+      try {
+        const { data: requests, error } = await supabaseClient
+          .from('purchase_requests')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Проверяем, изменились ли данные
+        const hasChanges = JSON.stringify(requests) !== JSON.stringify(allRequests);
+        
+        if (hasChanges) {
+          console.log('🔄 Обнаружены изменения в данных, обновляю...');
+          allRequests = requests || [];
+          filterRequests();
+          updateStats();
+          lastUpdateTime = new Date();
+          
+          // Показываем временное уведомление об обновлении
+          showTempNotification('Данные обновлены');
+        }
+      } catch (error) {
+        console.error('Ошибка при автообновлении:', error);
+      }
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Временное уведомление
+    function showTempNotification(message) {
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--accent2);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        z-index: 10000;
+        opacity: 0;
+        transition: opacity 0.3s;
+      `;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+
+      // Показываем
+      setTimeout(() => notification.style.opacity = '1', 10);
+      
+      // Убираем через 2 секунды
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+      }, 2000);
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Показать индикатор загрузки
+    function showProcessing(message = 'Обрабатываем заявку...', details = 'Пожалуйста, подождите') {
+      document.getElementById('processingText').textContent = message;
+      document.getElementById('processingDetails').textContent = details;
+      document.getElementById('processingOverlay').style.display = 'flex';
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Скрыть индикатор загрузки
+    function hideProcessing() {
+      document.getElementById('processingOverlay').style.display = 'none';
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Блокировка кнопки с индикатором загрузки
+    function setButtonLoading(button, isLoading) {
+      if (isLoading) {
+        button.disabled = true;
+        button.classList.add('btn-loading');
+      } else {
+        button.disabled = false;
+        button.classList.remove('btn-loading');
+      }
+    }
 
     function showError(message) {
       document.getElementById('errorMessage').textContent = message;
@@ -313,24 +785,21 @@
     }
     
     function showContent() {
-      document.getElementById('requestsContent').style.display = 'block';
       document.getElementById('loading').style.display = 'none';
       document.getElementById('errorMessage').style.display = 'none';
     }
 
-    function showEmptyState() {
-      document.getElementById('emptyState').style.display = 'block';
-      document.getElementById('requestsTable').style.display = 'none';
-      showContent();
+    function showEmptyState(section) {
+      document.getElementById(`${section}EmptyState`).style.display = 'block';
+      document.getElementById(`${section}RequestsTable`).style.display = 'none';
     }
 
-    function showTable() {
-      document.getElementById('emptyState').style.display = 'none';
-      document.getElementById('requestsTable').style.display = 'table';
-      showContent();
+    function showTable(section) {
+      document.getElementById(`${section}EmptyState`).style.display = 'none';
+      document.getElementById(`${section}RequestsTable`).style.display = 'table';
     }
 
-    // Форматирование отображения класса
+    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Форматирование отображения классов (массив)
     function formatClassLevel(classLevel) {
       const classMap = {
         '1-2': '1-2 класс',
@@ -338,10 +807,53 @@
         '5-6': '5-6 класс',
         '7': '7 класс',
         '8-9': '8-9 класс',
-        '10-11': '10-11 класс (Техникум, колледж - 1й курс)',
-        '12': '12 класс (Техникум, колледж)'
+        '10-11': '10-11 класс',
+        '12': '12 класс'
       };
+      
+      // Обрабатываем как массив (новая структура)
+      if (Array.isArray(classLevel)) {
+        return classLevel.map(cls => classMap[cls] || cls).join(', ');
+      }
+      
+      // Обрабатываем как строку (старая структура для обратной совместимости)
       return classMap[classLevel] || classLevel;
+    }
+
+    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Отображение классов в виде бейджей
+    function renderClassLevels(classLevel) {
+      const classMap = {
+        '1-2': '1-2 класс',
+        '3-4': '3-4 класс',
+        '5-6': '5-6 класс',
+        '7': '7 класс',
+        '8-9': '8-9 класс',
+        '10-11': '10-11 класс',
+        '12': '12 класс'
+      };
+      
+      let classLevels = [];
+      
+      // Обрабатываем как массив (новая структура)
+      if (Array.isArray(classLevel)) {
+        classLevels = classLevel;
+      } 
+      // Обрабатываем как строку (старая структура)
+      else if (classLevel) {
+        classLevels = [classLevel];
+      }
+      
+      if (classLevels.length === 0) {
+        return '<span style="color: #999;">—</span>';
+      }
+      
+      return `
+        <div class="class-levels">
+          ${classLevels.map(cls => 
+            `<span class="class-badge">${classMap[cls] || cls}</span>`
+          ).join('')}
+        </div>
+      `;
     }
 
     // Форматирование типов учебников
@@ -381,12 +893,263 @@
       localStorage.setItem('pendingRequestsCount', pending);
     }
 
-    // Фильтрация заявок
+    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Автоматическая выдача доступа к материалам
+    async function grantAccessToMaterials(userId, classLevels, textbookTypes) {
+      try {
+        console.log('🔄 Выдача доступа пользователю:', userId);
+        console.log('📚 Классы:', classLevels);
+        console.log('🎯 Типы материалов:', textbookTypes);
+
+        const grantedMaterials = [];
+
+        // Обрабатываем classLevels как массив (новая структура)
+        let classLevelArray = [];
+        if (Array.isArray(classLevels)) {
+          classLevelArray = classLevels;
+        } else if (classLevels) {
+          // Для обратной совместимости со старыми заявками
+          classLevelArray = [classLevels];
+        }
+
+        // Если выбран учебник - ищем учебники подходящих классов
+        if (textbookTypes.includes('учебник')) {
+          const { data: textbooks, error: textbooksError } = await supabaseClient
+            .from('textbooks')
+            .select('id, title, class_level')
+            .eq('is_active', true)
+            .overlaps('class_level', classLevelArray); // Ищем пересечение массивов
+
+          if (textbooksError) {
+            console.error('Ошибка поиска учебников:', textbooksError);
+          } else if (textbooks && textbooks.length > 0) {
+            // Выдаем доступ к найденным учебникам
+            for (const textbook of textbooks) {
+              const { error: accessError } = await supabaseClient
+                .from('textbook_access')
+                .upsert({
+                  user_id: userId,
+                  textbook_id: textbook.id,
+                  granted_by: currentUser.id,
+                  granted_at: new Date().toISOString()
+                }, {
+                  onConflict: 'user_id,textbook_id'
+                });
+
+              if (!accessError) {
+                grantedMaterials.push(`📚 ${textbook.title}`);
+                console.log('✅ Выдан доступ к учебнику:', textbook.title);
+              } else {
+                console.error('Ошибка выдачи доступа к учебнику:', accessError);
+              }
+            }
+          } else {
+            console.log('ℹ️ Не найдено учебников для классов:', classLevelArray);
+          }
+        }
+
+        // Если выбран кроссворд - ищем кроссворды подходящих классов
+        if (textbookTypes.includes('кроссворд')) {
+          const { data: crosswords, error: crosswordsError } = await supabaseClient
+            .from('crosswords')
+            .select('id, title, class_level')
+            .eq('is_active', true)
+            .overlaps('class_level', classLevelArray); // Ищем пересечение массивов
+
+          if (crosswordsError) {
+            console.error('Ошибка поиска кроссвордов:', crosswordsError);
+          } else if (crosswords && crosswords.length > 0) {
+            // Выдаем доступ к найденным кроссвордам
+            for (const crossword of crosswords) {
+              const { error: accessError } = await supabaseClient
+                .from('crossword_access')
+                .upsert({
+                  user_id: userId,
+                  crossword_id: crossword.id,
+                  granted_by: currentUser.id,
+                  granted_at: new Date().toISOString()
+                }, {
+                  onConflict: 'user_id,crossword_id'
+                });
+
+              if (!accessError) {
+                grantedMaterials.push(`🧩 ${crossword.title}`);
+                console.log('✅ Выдан доступ к кроссворду:', crossword.title);
+              } else {
+                console.error('Ошибка выдачи доступа к кроссворду:', accessError);
+              }
+            }
+          } else {
+            console.log('ℹ️ Не найдено кроссвордов для классов:', classLevelArray);
+          }
+        }
+
+        console.log('✅ Всего выдано доступов:', grantedMaterials.length);
+        return grantedMaterials;
+
+      } catch (error) {
+        console.error('❌ Ошибка при выдаче доступа:', error);
+        return [];
+      }
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Обновление панели массовых операций
+    function updateBulkActions() {
+      const selectedCount = selectedRequests.size;
+      document.getElementById('selectedCount').textContent = selectedCount;
+      
+      if (selectedCount > 0) {
+        document.getElementById('bulkActions').classList.add('active');
+      } else {
+        document.getElementById('bulkActions').classList.remove('active');
+      }
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Обработка чекбоксов
+    function handleCheckboxChange(requestId, isChecked) {
+      if (isChecked) {
+        selectedRequests.add(requestId);
+      } else {
+        selectedRequests.delete(requestId);
+      }
+      updateBulkActions();
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Выделение всех чекбоксов в текущей таблице
+    function handleSelectAll(checked) {
+      const currentSection = document.getElementById(`${currentTab}-section`);
+      const checkboxes = currentSection.querySelectorAll('.request-checkbox');
+      
+      checkboxes.forEach(checkbox => {
+        const requestId = checkbox.getAttribute('data-request-id');
+        checkbox.checked = checked;
+        
+        if (checked) {
+          selectedRequests.add(requestId);
+        } else {
+          selectedRequests.delete(requestId);
+        }
+      });
+      
+      updateBulkActions();
+    }
+
+    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Массовая обработка заявок с индикатором
+    async function processMultipleRequests(isProcessed) {
+      if (selectedRequests.size === 0) return;
+      
+      // Временно отключаем автообновление на время обработки
+      isPollingActive = false;
+      
+      // Блокируем кнопки массовых операций
+      const processBtn = document.getElementById('processSelectedBtn');
+      const unprocessBtn = document.getElementById('unprocessSelectedBtn');
+      const clearBtn = document.getElementById('clearSelectionBtn');
+      
+      setButtonLoading(processBtn, true);
+      setButtonLoading(unprocessBtn, true);
+      setButtonLoading(clearBtn, true);
+      
+      showProcessing(
+        isProcessed ? 'Обрабатываем выбранные заявки...' : 'Возвращаем заявки в ожидание...',
+        `Обрабатывается ${selectedRequests.size} заявок`
+      );
+
+      try {
+        const requestsToProcess = Array.from(selectedRequests);
+        let processedCount = 0;
+        let grantedMaterials = [];
+
+        for (const requestId of requestsToProcess) {
+          const request = allRequests.find(req => req.id === requestId);
+          if (!request) continue;
+
+          // Обновляем детали процесса
+          document.getElementById('processingDetails').textContent = 
+            `Обрабатывается заявка ${processedCount + 1} из ${requestsToProcess.length}`;
+
+          // Если обрабатываем заявку - выдаем доступ к материалам
+          if (isProcessed) {
+            const materials = await grantAccessToMaterials(
+              request.user_id, 
+              request.class_level, 
+              request.textbook_types
+            );
+            grantedMaterials = grantedMaterials.concat(materials);
+          } else {
+            // Если возвращаем в ожидание - удаляем доступы, выданные этой заявкой
+            await supabaseClient
+              .from('textbook_access')
+              .delete()
+              .eq('user_id', request.user_id)
+              .eq('granted_by', currentUser.id);
+
+            await supabaseClient
+              .from('crossword_access')
+              .delete()
+              .eq('user_id', request.user_id)
+              .eq('granted_by', currentUser.id);
+          }
+
+          // Обновляем статус заявки
+          const { error } = await supabaseClient
+            .from('purchase_requests')
+            .update({ 
+              is_processed: isProcessed,
+              processed_at: isProcessed ? new Date().toISOString() : null
+            })
+            .eq('id', requestId);
+
+          if (error) throw error;
+
+          // Обновляем локальные данные
+          const requestIndex = allRequests.findIndex(req => req.id === requestId);
+          if (requestIndex !== -1) {
+            allRequests[requestIndex].is_processed = isProcessed;
+            allRequests[requestIndex].processed_at = isProcessed ? new Date().toISOString() : null;
+          }
+
+          processedCount++;
+        }
+
+        // Очищаем выделение
+        selectedRequests.clear();
+        updateBulkActions();
+
+        // Перерисовываем таблицы
+        filterRequests();
+        updateStats();
+
+        // Показываем уведомление
+        let message = isProcessed ? 
+          `✅ Обработано ${processedCount} заявок` : 
+          `↩️ Возвращено в ожидание ${processedCount} заявок`;
+        
+        if (isProcessed && grantedMaterials.length > 0) {
+          const uniqueMaterials = [...new Set(grantedMaterials)];
+          message += `\n\n🎁 Выданы материалы:\n${uniqueMaterials.join('\n')}`;
+        }
+        
+        showNotification(message);
+      } catch (error) {
+        showError('Ошибка при массовой обработке заявок: ' + error.message);
+      } finally {
+        // Разблокируем кнопки
+        setButtonLoading(processBtn, false);
+        setButtonLoading(unprocessBtn, false);
+        setButtonLoading(clearBtn, false);
+        hideProcessing();
+        
+        // Включаем автообновление обратно
+        isPollingActive = true;
+      }
+    }
+
+    // Фильтрация заявок для текущей вкладки
     function filterRequests() {
       const nameFilter = document.getElementById('searchName').value.toLowerCase();
       const emailFilter = document.getElementById('searchEmail').value.toLowerCase();
 
-      const filtered = allRequests.filter(request => {
+      let filtered = allRequests.filter(request => {
         const matchesName = !nameFilter || 
           (request.full_name && request.full_name.toLowerCase().includes(nameFilter));
         const matchesEmail = !emailFilter || 
@@ -395,65 +1158,225 @@
         return matchesName && matchesEmail;
       });
 
-      renderRequests(filtered);
+      // Дополнительная фильтрация по вкладкам
+      if (currentTab === 'pending') {
+        filtered = filtered.filter(request => !request.is_processed);
+      } else if (currentTab === 'processed') {
+        filtered = filtered.filter(request => request.is_processed);
+      }
+
+      renderRequests(filtered, currentTab);
     }
 
-    // Отрисовка заявок
-    function renderRequests(requests) {
-      const tbody = document.getElementById('requestsTableBody');
+    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Отрисовка заявок для конкретной вкладки
+    function renderRequests(requests, section) {
+      const tbody = document.getElementById(`${section}RequestsTableBody`);
+      if (!tbody) return;
+
       tbody.innerHTML = '';
 
       if (!requests || requests.length === 0) {
-        showEmptyState();
+        showEmptyState(section);
         return;
       }
 
+      // Сбрасываем выделение при перерисовке
+      selectedRequests.clear();
+      updateBulkActions();
+
       requests.forEach((request, index) => {
         const row = document.createElement('tr');
-        row.innerHTML = `
+        const isSelected = selectedRequests.has(request.id);
+        
+        // Базовые колонки для всех таблиц
+        let rowContent = `
+          <td class="checkbox-cell">
+            <input type="checkbox" class="request-checkbox" data-request-id="${request.id}" ${isSelected ? 'checked' : ''}>
+          </td>
           <td><strong>${index + 1}</strong></td>
           <td><strong>${request.request_number}</strong></td>
           <td>${formatDateTime(request.created_at)}</td>
-          <td>${formatClassLevel(request.class_level)}</td>
+          <td>${renderClassLevels(request.class_level)}</td>
           <td>${formatTextbookTypes(request.textbook_types)}</td>
           <td>${request.email}</td>
           <td>${request.full_name}</td>
-          <td>
-            <span class="status-badge ${request.is_processed ? 'status-processed' : 'status-pending'}">
-              ${request.is_processed ? '✅ Обработана' : '⏳ Ожидает'}
-            </span>
-          </td>
-          <td>
-            ${!request.is_processed ? 
-              `<button class="btn btn-small" data-process="${request.id}">✅ Обработать</button>` : 
-              `<button class="btn btn-small btn-warning" data-unprocess="${request.id}">↩️ Вернуть в ожидание</button>`
-            }
-          </td>
         `;
+
+        // Дополнительные колонки в зависимости от вкладки
+        if (section === 'all') {
+          rowContent += `
+            <td>
+              <span class="status-badge ${request.is_processed ? 'status-processed' : 'status-pending'}">
+                ${request.is_processed ? '✅ Обработана' : '⏳ Ожидает'}
+              </span>
+            </td>
+            <td>
+              ${!request.is_processed ? 
+                `<button class="btn btn-small" data-process="${request.id}">✅ Обработать</button>` : 
+                `<button class="btn btn-small btn-warning" data-unprocess="${request.id}">↩️ Вернуть в ожидание</button>`
+              }
+            </td>
+          `;
+        } else if (section === 'pending') {
+          rowContent += `
+            <td>
+              <button class="btn btn-small" data-process="${request.id}">✅ Обработать</button>
+            </td>
+          `;
+        } else if (section === 'processed') {
+          rowContent += `
+            <td>${request.processed_at ? formatDateTime(request.processed_at) : '—'}</td>
+            <td>
+              <div class="materials-info">
+                <h4>🎁 Выданные материалы:</h4>
+                <div class="materials-list" id="materials_${request.id}">
+                  <!-- Материалы будут загружены динамически -->
+                </div>
+              </div>
+            </td>
+            <td>
+              <button class="btn btn-small btn-warning" data-unprocess="${request.id}">↩️ Вернуть в ожидание</button>
+            </td>
+          `;
+        }
+
+        row.innerHTML = rowContent;
         tbody.appendChild(row);
+      });
+
+      // Добавляем обработчики событий для чекбоксов
+      tbody.querySelectorAll('.request-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+          const requestId = e.target.getAttribute('data-request-id');
+          handleCheckboxChange(requestId, e.target.checked);
+        });
       });
 
       // Добавляем обработчики событий для кнопок
       tbody.querySelectorAll('[data-process]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const requestId = btn.getAttribute('data-process');
+        btn.addEventListener('click', async (e) => {
+          const requestId = e.target.getAttribute('data-process');
+          // Блокируем кнопку
+          setButtonLoading(e.target, true);
           await processRequest(requestId, true);
+          // Разблокируем кнопку
+          setButtonLoading(e.target, false);
         });
       });
 
       tbody.querySelectorAll('[data-unprocess]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const requestId = btn.getAttribute('data-unprocess');
+        btn.addEventListener('click', async (e) => {
+          const requestId = e.target.getAttribute('data-unprocess');
+          // Блокируем кнопку
+          setButtonLoading(e.target, true);
           await processRequest(requestId, false);
+          // Разблокируем кнопку
+          setButtonLoading(e.target, false);
         });
       });
 
-      showTable();
+      // Для обработанных заявок загружаем информацию о выданных материалах
+      if (section === 'processed') {
+        loadGrantedMaterials(requests);
+      }
+
+      showTable(section);
     }
 
-    // Обработка заявки
+    // Загрузка информации о выданных материалах
+    async function loadGrantedMaterials(requests) {
+      for (const request of requests) {
+        if (!request.is_processed) continue;
+
+        const container = document.getElementById(`materials_${request.id}`);
+        if (!container) continue;
+
+        try {
+          // Получаем доступы пользователя
+          const [textbookAccess, crosswordAccess] = await Promise.all([
+            supabaseClient
+              .from('textbook_access')
+              .select('textbooks(title)')
+              .eq('user_id', request.user_id)
+              .eq('granted_by', currentUser.id),
+            supabaseClient
+              .from('crossword_access')
+              .select('crosswords(title)')
+              .eq('user_id', request.user_id)
+              .eq('granted_by', currentUser.id)
+          ]);
+
+          const materials = [];
+
+          if (textbookAccess.data) {
+            textbookAccess.data.forEach(access => {
+              if (access.textbooks) {
+                materials.push(`📚 ${access.textbooks.title}`);
+              }
+            });
+          }
+
+          if (crosswordAccess.data) {
+            crosswordAccess.data.forEach(access => {
+              if (access.crosswords) {
+                materials.push(`🧩 ${access.crosswords.title}`);
+              }
+            });
+          }
+
+          if (materials.length > 0) {
+            container.innerHTML = materials.map(material => 
+              `<div class="material-badge">${material}</div>`
+            ).join('');
+          } else {
+            container.innerHTML = '<div class="material-badge">❌ Материалы не найдены</div>';
+          }
+        } catch (error) {
+          console.error('Ошибка загрузки материалов:', error);
+          container.innerHTML = '<div class="material-badge">⚠️ Ошибка загрузки</div>';
+        }
+      }
+    }
+
+    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Обработка заявки с индикатором
     async function processRequest(requestId, isProcessed) {
+      // Временно отключаем автообновление на время обработки
+      isPollingActive = false;
+      
+      showProcessing(
+        isProcessed ? 'Обрабатываем заявку...' : 'Возвращаем заявку в ожидание...',
+        'Пожалуйста, подождите'
+      );
+
       try {
+        const request = allRequests.find(req => req.id === requestId);
+        if (!request) return;
+
+        let grantedMaterials = [];
+
+        // Если обрабатываем заявку - выдаем доступ к материалам
+        if (isProcessed) {
+          grantedMaterials = await grantAccessToMaterials(
+            request.user_id, 
+            request.class_level, 
+            request.textbook_types
+          );
+        } else {
+          // Если возвращаем в ожидание - удаляем доступы, выданные этой заявкой
+          await supabaseClient
+            .from('textbook_access')
+            .delete()
+            .eq('user_id', request.user_id)
+            .eq('granted_by', currentUser.id);
+
+          await supabaseClient
+            .from('crossword_access')
+            .delete()
+            .eq('user_id', request.user_id)
+            .eq('granted_by', currentUser.id);
+        }
+
+        // Обновляем статус заявки
         const { error } = await supabaseClient
           .from('purchase_requests')
           .update({ 
@@ -471,13 +1394,26 @@
           allRequests[requestIndex].processed_at = isProcessed ? new Date().toISOString() : null;
         }
 
-        // Перерисовываем таблицу
+        // Перерисовываем таблицы
         filterRequests();
         updateStats();
 
-        showNotification(isProcessed ? '✅ Заявка обработана' : '↩️ Заявка возвращена в ожидание');
+        // Показываем уведомление
+        if (isProcessed) {
+          let message = '✅ Заявка обработана';
+          if (grantedMaterials.length > 0) {
+            message += `\n\n🎁 Выданы материалы:\n${grantedMaterials.join('\n')}`;
+          }
+          showNotification(message);
+        } else {
+          showNotification('↩️ Заявка возвращена в ожидание');
+        }
       } catch (error) {
         showError('Ошибка при обновлении заявки: ' + error.message);
+      } finally {
+        hideProcessing();
+        // Включаем автообновление обратно
+        isPollingActive = true;
       }
     }
 
@@ -495,13 +1431,15 @@
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         z-index: 10000;
         font-weight: 600;
+        max-width: 400px;
+        white-space: pre-line;
       `;
       notification.textContent = message;
       document.body.appendChild(notification);
 
       setTimeout(() => {
         notification.remove();
-      }, 3000);
+      }, 5000);
     }
 
     // Загрузка всех заявок
@@ -517,6 +1455,10 @@
         allRequests = requests || [];
         filterRequests();
         updateStats();
+        
+        // Запускаем автообновление после успешной загрузки
+        startAutoRefresh();
+        
       } catch (error) {
         showError('Ошибка загрузки заявок: ' + error.message);
       }
@@ -555,6 +1497,74 @@
       }
     }
 
+    // Инициализация вкладок
+    function initTabs() {
+      document.querySelectorAll('.requests-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          const tabName = tab.getAttribute('data-tab');
+          
+          // Обновляем активную вкладку
+          document.querySelectorAll('.requests-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.requests-section').forEach(s => s.classList.remove('active'));
+          
+          tab.classList.add('active');
+          document.getElementById(`${tabName}-section`).classList.add('active');
+          
+          currentTab = tabName;
+          
+          // Сбрасываем выделение при смене вкладки
+          selectedRequests.clear();
+          updateBulkActions();
+          
+          filterRequests();
+        });
+      });
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Инициализация массовых операций
+    function initBulkActions() {
+      // Обработчики для кнопок массовых операций
+      document.getElementById('processSelectedBtn').addEventListener('click', () => {
+        if (selectedRequests.size > 0) {
+          processMultipleRequests(true);
+        }
+      });
+
+      document.getElementById('unprocessSelectedBtn').addEventListener('click', () => {
+        if (selectedRequests.size > 0) {
+          processMultipleRequests(false);
+        }
+      });
+
+      document.getElementById('clearSelectionBtn').addEventListener('click', () => {
+        selectedRequests.clear();
+        updateBulkActions();
+        
+        // Снимаем выделение со всех чекбоксов
+        document.querySelectorAll('.request-checkbox').forEach(checkbox => {
+          checkbox.checked = false;
+        });
+        
+        // Снимаем выделение с "Выделить все"
+        document.querySelectorAll('th input[type="checkbox"]').forEach(checkbox => {
+          checkbox.checked = false;
+        });
+      });
+
+      // Обработчики для чекбоксов "Выделить все"
+      document.getElementById('selectAllAll').addEventListener('change', (e) => {
+        handleSelectAll(e.target.checked);
+      });
+
+      document.getElementById('selectAllPending').addEventListener('change', (e) => {
+        handleSelectAll(e.target.checked);
+      });
+
+      document.getElementById('selectAllProcessed').addEventListener('change', (e) => {
+        handleSelectAll(e.target.checked);
+      });
+    }
+
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
@@ -570,9 +1580,17 @@
 
         currentUser = user;
 
+        // Инициализация вкладок
+        initTabs();
+
+        // Инициализация массовых операций
+        initBulkActions();
+
         // Обработчики событий
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           if (confirm('Вы уверены, что хотите выйти?')) {
+            // Останавливаем автообновление при выходе
+            stopAutoRefresh();
             await supabaseClient.auth.signOut();
             location.href = '/login.html';
           }
@@ -597,6 +1615,7 @@
 
         // Загружаем заявки
         await loadAllRequests();
+        showContent();
         return true;
         
       } catch (error) {
@@ -622,6 +1641,11 @@
     function showModal(title, text) {
       alert(`${title}\n\n${text}`);
     }
+
+    // Останавливаем автообновление при закрытии страницы
+    window.addEventListener('beforeunload', () => {
+      stopAutoRefresh();
+    });
   </script>
 </body>
 </html>

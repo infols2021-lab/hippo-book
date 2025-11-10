@@ -41,6 +41,11 @@
             border-radius: 12px;
             margin: 16px 0;
             display: block;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .question-image:hover {
+            transform: scale(1.02);
         }
         .options-container {
             display: flex;
@@ -282,6 +287,15 @@
             background: #f8f9fa;
             border-radius: 12px;
             border: 2px solid #e9ecef;
+            text-align: center;
+        }
+
+        .crossword-grid-wrapper {
+            overflow: auto;
+            max-width: 100%;
+            margin: 10px 0;
+            display: flex;
+            justify-content: center;
         }
 
         .crossword-grid {
@@ -296,9 +310,6 @@
         }
 
         .crossword-cell {
-            width: 40px;
-            height: 40px;
-            border: 1px solid #999;
             position: relative;
             background: white;
             display: flex;
@@ -306,11 +317,37 @@
             justify-content: center;
             font-weight: bold;
             font-size: 16px;
+            border: 1px solid #999;
+        }
+
+        /* Размеры клеток для разных размеров кроссворда */
+        .crossword-cell.size-large {
+            width: 25px;
+            height: 25px;
+            font-size: 14px;
+        }
+
+        .crossword-cell.size-medium {
+            width: 30px;
+            height: 30px;
+            font-size: 14px;
+        }
+
+        .crossword-cell.size-normal {
+            width: 35px;
+            height: 35px;
+            font-size: 15px;
+        }
+
+        .crossword-cell.size-small {
+            width: 40px;
+            height: 40px;
+            font-size: 16px;
         }
 
         .crossword-cell.blocked {
-            background: #333;
-            border-color: #333;
+            background: #e3f2fd; /* Светло-голубой вместо черного */
+            border-color: #b3e5fc;
         }
 
         .crossword-cell input {
@@ -318,13 +355,28 @@
             height: 100%;
             border: none;
             text-align: center;
-            font-size: 18px;
             font-weight: bold;
             text-transform: uppercase;
             background: transparent;
             outline: none;
             font-family: inherit;
             color: #2c3e50;
+        }
+
+        .crossword-cell.size-large input {
+            font-size: 12px;
+        }
+
+        .crossword-cell.size-medium input {
+            font-size: 13px;
+        }
+
+        .crossword-cell.size-normal input {
+            font-size: 14px;
+        }
+
+        .crossword-cell.size-small input {
+            font-size: 16px;
         }
 
         .crossword-cell input:focus {
@@ -343,25 +395,40 @@
             background: #ffebee;
         }
 
+        /* ОБНОВЛЕННЫЕ СТИЛИ ДЛЯ НОМЕРОВ - ТЕПЕРЬ ТОЛЬКО В ЛЕВОМ ВЕРХНЕМ УГЛУ */
         .crossword-number {
             position: absolute;
-            font-size: 8px;
             font-weight: bold;
             color: #333;
             z-index: 1;
             background: rgba(255,255,255,0.8);
             padding: 1px 2px;
             border-radius: 2px;
+            line-height: 1;
         }
 
-        .crossword-number-across {
+        .crossword-cell.size-large .crossword-number {
+            font-size: 6px;
             top: 1px;
             left: 1px;
         }
 
-        .crossword-number-down {
+        .crossword-cell.size-medium .crossword-number {
+            font-size: 7px;
             top: 1px;
-            right: 1px;
+            left: 1px;
+        }
+
+        .crossword-cell.size-normal .crossword-number {
+            font-size: 8px;
+            top: 1px;
+            left: 1px;
+        }
+
+        .crossword-cell.size-small .crossword-number {
+            font-size: 8px;
+            top: 1px;
+            left: 1px;
         }
 
         .crossword-instructions {
@@ -388,12 +455,36 @@
             margin-bottom: 5px;
         }
 
+        .crossword-image-container {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            border: 2px solid #e0e0e0;
+        }
+
         .crossword-image {
-            max-width: 100%;
-            max-height: 300px;
+            max-width: 90%;
+            max-height: 400px;
             border-radius: 8px;
             margin: 10px 0;
-            display: block;
+            display: inline-block;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .crossword-image:hover {
+            transform: scale(1.03);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        .image-hint {
+            font-size: 14px;
+            color: #666;
+            margin-top: 8px;
+            font-style: italic;
         }
 
         .crossword-words {
@@ -530,6 +621,119 @@
             background: #5a6268;
         }
 
+        /* Модальное окно для изображений */
+        .image-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            backdrop-filter: blur(5px);
+            cursor: grab;
+        }
+
+        .image-modal:active {
+            cursor: grabbing;
+        }
+
+        .image-modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 95%;
+            max-height: 95%;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+            cursor: inherit;
+        }
+
+        .image-modal-close {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: #fff;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 1001;
+            background: rgba(0,0,0,0.5);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+        }
+
+        .image-modal-close:hover {
+            background: rgba(0,0,0,0.8);
+        }
+
+        .image-modal-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+            z-index: 1001;
+        }
+
+        .image-modal-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .image-modal-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.1);
+        }
+
+        .image-modal-zoom-info {
+            color: white;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 20px;
+        }
+
+        .image-modal-hint {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 14px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            z-index: 1001;
+        }
+
         @media (max-width: 768px) {
             .assignment-container {
                 padding: 0 15px;
@@ -543,7 +747,22 @@
             .option-label {
                 padding: 12px;
             }
-            .crossword-cell {
+            .crossword-cell.size-large {
+                width: 22px;
+                height: 22px;
+                font-size: 12px;
+            }
+            .crossword-cell.size-medium {
+                width: 26px;
+                height: 26px;
+                font-size: 12px;
+            }
+            .crossword-cell.size-normal {
+                width: 30px;
+                height: 30px;
+                font-size: 13px;
+            }
+            .crossword-cell.size-small {
                 width: 35px;
                 height: 35px;
                 font-size: 14px;
@@ -552,7 +771,16 @@
                 grid-template-columns: 1fr;
                 gap: 10px;
             }
-            .crossword-number {
+            .crossword-cell.size-large .crossword-number {
+                font-size: 5px;
+            }
+            .crossword-cell.size-medium .crossword-number {
+                font-size: 6px;
+            }
+            .crossword-cell.size-normal .crossword-number {
+                font-size: 7px;
+            }
+            .crossword-cell.size-small .crossword-number {
                 font-size: 7px;
             }
             .fill-input-item {
@@ -570,21 +798,73 @@
                 padding: 6px 12px;
                 font-size: 12px;
             }
+            .image-modal-content {
+                max-width: 98%;
+                max-height: 85%;
+            }
+            .image-modal-close {
+                top: 10px;
+                right: 15px;
+                font-size: 30px;
+                width: 40px;
+                height: 40px;
+            }
+            .image-modal-controls {
+                bottom: 15px;
+                padding: 10px;
+            }
+            .image-modal-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+            .crossword-image {
+                max-width: 95%;
+                max-height: 350px;
+            }
         }
 
         @media (max-width: 480px) {
-            .crossword-cell {
+            .crossword-cell.size-large {
+                width: 18px;
+                height: 18px;
+                font-size: 10px;
+            }
+            .crossword-cell.size-medium {
+                width: 22px;
+                height: 22px;
+                font-size: 10px;
+            }
+            .crossword-cell.size-normal {
+                width: 25px;
+                height: 25px;
+                font-size: 11px;
+            }
+            .crossword-cell.size-small {
                 width: 30px;
                 height: 30px;
                 font-size: 12px;
-            }
-            .crossword-number {
-                font-size: 6px;
             }
             .fill-input-number {
                 width: 24px;
                 height: 24px;
                 font-size: 12px;
+            }
+            .crossword-cell.size-large .crossword-number {
+                font-size: 4px;
+            }
+            .crossword-cell.size-medium .crossword-number {
+                font-size: 5px;
+            }
+            .crossword-cell.size-normal .crossword-number {
+                font-size: 6px;
+            }
+            .crossword-cell.size-small .crossword-number {
+                font-size: 6px;
+            }
+            .crossword-image {
+                max-width: 98%;
+                max-height: 300px;
             }
         }
     </style>
@@ -679,6 +959,21 @@
         </div>
     </div>
 
+    <!-- Модальное окно для изображений -->
+    <div id="imageModal" class="image-modal">
+        <span class="image-modal-close">&times;</span>
+        <img class="image-modal-content" id="modalImage">
+        <div class="image-modal-controls">
+            <button class="image-modal-btn" id="zoomOutBtn">−</button>
+            <div class="image-modal-zoom-info" id="zoomInfo">100%</div>
+            <button class="image-modal-btn" id="zoomInBtn">+</button>
+            <button class="image-modal-btn" id="resetZoomBtn">⟲</button>
+        </div>
+        <div class="image-modal-hint" id="modalHint">
+            🔍 Используйте колесико мыши для масштабирования • Зажмите и перетащите для перемещения
+        </div>
+    </div>
+
     <script type="module">
         // Глобальные переменные для управления состоянием
         let currentState = {
@@ -692,6 +987,172 @@
             currentQuestionIndex: 0,
             hasCompleted: false
         };
+
+        // Переменные для управления модальным окном изображений
+        let currentZoom = 1;
+        let isDragging = false;
+        let startX, startY, scrollLeft, scrollTop;
+        const ZOOM_STEP = 0.25;
+        const MIN_ZOOM = 0.5;
+        const MAX_ZOOM = 3;
+
+        // ============ ФУНКЦИИ ДЛЯ МОДАЛЬНОГО ОКНА ИЗОБРАЖЕНИЙ ============
+        function initImageModal() {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            const closeBtn = document.querySelector('.image-modal-close');
+            const zoomInBtn = document.getElementById('zoomInBtn');
+            const zoomOutBtn = document.getElementById('zoomOutBtn');
+            const resetZoomBtn = document.getElementById('resetZoomBtn');
+            const zoomInfo = document.getElementById('zoomInfo');
+            const modalHint = document.getElementById('modalHint');
+
+            // Закрытие модального окна
+            closeBtn.onclick = function() {
+                modal.style.display = 'none';
+                resetZoomAndPosition();
+            }
+
+            // Закрытие при клике вне изображения
+            modal.onclick = function(event) {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                    resetZoomAndPosition();
+                }
+            }
+
+            // Закрытие по ESC
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && modal.style.display === 'block') {
+                    modal.style.display = 'none';
+                    resetZoomAndPosition();
+                }
+            });
+
+            // Управление масштабом
+            zoomInBtn.onclick = function() {
+                if (currentZoom < MAX_ZOOM) {
+                    currentZoom += ZOOM_STEP;
+                    updateZoom();
+                }
+            }
+
+            zoomOutBtn.onclick = function() {
+                if (currentZoom > MIN_ZOOM) {
+                    currentZoom -= ZOOM_STEP;
+                    updateZoom();
+                }
+            }
+
+            resetZoomBtn.onclick = resetZoomAndPosition;
+
+            // Масштабирование колесиком мыши
+            modal.addEventListener('wheel', function(event) {
+                event.preventDefault();
+                if (event.deltaY < 0) {
+                    // Zoom in
+                    if (currentZoom < MAX_ZOOM) {
+                        currentZoom += ZOOM_STEP;
+                    }
+                } else {
+                    // Zoom out
+                    if (currentZoom > MIN_ZOOM) {
+                        currentZoom -= ZOOM_STEP;
+                    }
+                }
+                updateZoom();
+            });
+
+            // Перетаскивание изображения
+            modalImg.addEventListener('mousedown', startDragging);
+            modalImg.addEventListener('touchstart', startDraggingTouch);
+
+            function startDragging(e) {
+                isDragging = true;
+                startX = e.pageX - modalImg.offsetLeft;
+                startY = e.pageY - modalImg.offsetTop;
+                modal.style.cursor = 'grabbing';
+                e.preventDefault();
+            }
+
+            function startDraggingTouch(e) {
+                isDragging = true;
+                startX = e.touches[0].pageX - modalImg.offsetLeft;
+                startY = e.touches[0].pageY - modalImg.offsetTop;
+                modal.style.cursor = 'grabbing';
+                e.preventDefault();
+            }
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('touchmove', dragTouch);
+
+            function drag(e) {
+                if (!isDragging) return;
+                e.preventDefault();
+                const x = e.pageX - startX;
+                const y = e.pageY - startY;
+                modalImg.style.left = x + 'px';
+                modalImg.style.top = y + 'px';
+            }
+
+            function dragTouch(e) {
+                if (!isDragging) return;
+                e.preventDefault();
+                const x = e.touches[0].pageX - startX;
+                const y = e.touches[0].pageY - startY;
+                modalImg.style.left = x + 'px';
+                modalImg.style.top = y + 'px';
+            }
+
+            document.addEventListener('mouseup', stopDragging);
+            document.addEventListener('touchend', stopDragging);
+
+            function stopDragging() {
+                isDragging = false;
+                modal.style.cursor = 'grab';
+            }
+
+            function updateZoom() {
+                modalImg.style.transform = `scale(${currentZoom})`;
+                modalImg.style.left = '50%';
+                modalImg.style.top = '50%';
+                modalImg.style.transformOrigin = 'center center';
+                zoomInfo.textContent = Math.round(currentZoom * 100) + '%';
+                
+                // Показываем подсказку о перетаскивании только когда масштаб больше 100%
+                if (currentZoom > 1) {
+                    modalHint.style.display = 'block';
+                } else {
+                    modalHint.style.display = 'none';
+                }
+            }
+
+            function resetZoomAndPosition() {
+                currentZoom = 1;
+                modalImg.style.transform = 'translate(-50%, -50%) scale(1)';
+                modalImg.style.left = '50%';
+                modalImg.style.top = '50%';
+                zoomInfo.textContent = '100%';
+                modalHint.style.display = 'none';
+                modal.style.cursor = 'grab';
+            }
+        }
+
+        // Функция открытия изображения в модальном окне
+        function openImageModal(src) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            
+            modalImg.src = src;
+            modal.style.display = 'block';
+            currentZoom = 1;
+            modalImg.style.transform = 'translate(-50%, -50%) scale(1)';
+            modalImg.style.left = '50%';
+            modalImg.style.top = '50%';
+            document.getElementById('zoomInfo').textContent = '100%';
+            document.getElementById('modalHint').style.display = 'none';
+            modal.style.cursor = 'grab';
+        }
 
         // ============ НОВАЯ ФУНКЦИЯ: Нормализация текста для сравнения ============
         function normalizeText(text) {
@@ -798,6 +1259,9 @@
         async function initAssignment() {
             try {
                 console.log('🚀 Начинаем загрузку задания...');
+
+                // Инициализируем модальное окно для изображений
+                initImageModal();
 
                 // Настраиваем кнопки навигации
                 setupNavigationButtons();
@@ -982,16 +1446,6 @@
                 <div class="question-number">Вопрос ${index + 1} из ${currentState.questions.length}</div>
                 <div class="question-text">${question.q || 'Вопрос без текста'}</div>
             `;
-            
-            // Изображение вопроса
-            if (question.image) {
-                const img = document.createElement('img');
-                img.src = question.image;
-                img.alt = 'Изображение вопроса';
-                img.className = 'question-image';
-                img.onerror = () => img.style.display = 'none';
-                questionCard.appendChild(img);
-            }
             
             // Обработка разных типов вопросов
             if (question.type === 'test' && question.options) {
@@ -1195,7 +1649,7 @@
                 <h4>🧩 Инструкция по решению кроссворда</h4>
                 <ul>
                     <li>Заполните все белые клетки буквами</li>
-                    <li>Черные клетки заблокированы и не заполняются</li>
+                    <li>Светло-голубые клетки заблокированы и не заполняются</li>
                     <li>Используйте стрелки для навигации между клетками</li>
                     <li>Tab/Shift+Tab для перехода между клетками</li>
                     <li>Каждое слово считается отдельным вопросом</li>
@@ -1204,14 +1658,26 @@
             `;
             crosswordContainer.appendChild(instructions);
 
-            // Изображение кроссворда, если есть
+            // Изображение кроссворда - теперь только одно и по центру
             if (question.image) {
+                const imageContainer = document.createElement('div');
+                imageContainer.className = 'crossword-image-container';
+                
                 const img = document.createElement('img');
                 img.src = question.image;
                 img.alt = 'Изображение кроссворда';
                 img.className = 'crossword-image';
                 img.onerror = () => img.style.display = 'none';
-                crosswordContainer.appendChild(img);
+                // Добавляем обработчик для открытия в модальном окне
+                img.addEventListener('click', () => openImageModal(question.image));
+                
+                const hint = document.createElement('div');
+                hint.className = 'image-hint';
+                hint.textContent = '🔍 Нажмите на изображение для увеличения и детального просмотра';
+                
+                imageContainer.appendChild(img);
+                imageContainer.appendChild(hint);
+                crosswordContainer.appendChild(imageContainer);
             }
 
             // Список подсказок для кроссворда (только номера и количество букв)
@@ -1268,14 +1734,28 @@
             }
 
             // Создаем сетку кроссворда
+            const gridWrapper = document.createElement('div');
+            gridWrapper.className = 'crossword-grid-wrapper';
+            
             const gridContainer = document.createElement('div');
             gridContainer.className = 'crossword-grid';
             
             const grid = question.grid || [];
             const blocks = question.blocks || [];
             const words = question.words || [];
+            const cellNumbers = question.cellNumbers || {}; // Получаем номера клеток
             const rows = question.metadata?.rows || grid.length;
             const cols = question.metadata?.cols || (grid[0] ? grid[0].length : 0);
+            
+            // Определяем размер клеток в зависимости от размера кроссворда
+            let cellSizeClass = 'size-small';
+            if (rows > 15 || cols > 15) {
+                cellSizeClass = 'size-large';
+            } else if (rows > 12 || cols > 12) {
+                cellSizeClass = 'size-medium';
+            } else if (rows > 8 || cols > 8) {
+                cellSizeClass = 'size-normal';
+            }
             
             // Инициализируем userAnswers для кроссворда, если нужно
             if (!currentState.userAnswers[index] || !Array.isArray(currentState.userAnswers[index])) {
@@ -1295,23 +1775,13 @@
                 }
             });
 
-            // Создаем объект для хранения номеров слов в клетках
-            const cellNumbers = {};
-            words.forEach(word => {
-                const key = `${word.start.row}-${word.start.col}`;
-                if (!cellNumbers[key]) {
-                    cellNumbers[key] = [];
-                }
-                cellNumbers[key].push({ number: word.number, direction: word.direction });
-            });
-
             for (let i = 0; i < rows; i++) {
                 const rowDiv = document.createElement('div');
                 rowDiv.className = 'crossword-row';
                 
                 for (let j = 0; j < cols; j++) {
                     const cell = document.createElement('div');
-                    cell.className = 'crossword-cell';
+                    cell.className = `crossword-cell ${cellSizeClass}`;
                     
                     // Проверяем, должна ли клетка быть заблокирована
                     const isExplicitlyBlocked = blocks.some(block => block.row === i && block.col === j);
@@ -1426,14 +1896,16 @@
                         cell.appendChild(input);
                     }
                     
-                    // Добавляем номера слов, если клетка является началом слова
-                    const numbers = cellNumbers[`${i}-${j}`] || [];
-                    numbers.forEach(num => {
+                    // ОБНОВЛЕННОЕ ОТОБРАЖЕНИЕ НОМЕРОВ: только в левом верхнем углу
+                    const cellKey = `${i}-${j}`;
+                    const cellNumber = cellNumbers[cellKey];
+                    
+                    if (cellNumber !== undefined) {
                         const numberEl = document.createElement('div');
-                        numberEl.className = `crossword-number crossword-number-${num.direction}`;
-                        numberEl.textContent = num.number;
+                        numberEl.className = 'crossword-number';
+                        numberEl.textContent = cellNumber;
                         cell.appendChild(numberEl);
-                    });
+                    }
                     
                     cell.dataset.row = i;
                     cell.dataset.col = j;
@@ -1442,7 +1914,8 @@
                 gridContainer.appendChild(rowDiv);
             }
             
-            crosswordContainer.appendChild(gridContainer);
+            gridWrapper.appendChild(gridContainer);
+            crosswordContainer.appendChild(gridWrapper);
             container.appendChild(crosswordContainer);
         }
 
