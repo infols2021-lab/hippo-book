@@ -28,8 +28,6 @@
     .user-actions { display:flex; flex-direction:column; gap:5px; }
     .search-container { margin-bottom:15px; }
     .search-container input { width:100%; }
-    .textbook-issued-checkbox { transform: scale(1.3); cursor: pointer; }
-    .user-row-new { background: #f8f9fa; }
     .image-preview { max-width:200px; max-height:150px; border-radius:8px; margin:10px 0; display:none; }
     .upload-area { border:2px dashed #ccc; border-radius:8px; padding:20px; text-align:center; cursor:pointer; transition:border-color 0.3s; margin:10px 0; }
     .upload-area:hover { border-color:var(--accent2); }
@@ -82,7 +80,6 @@
     /* Изображения в вопросах */
     .question-image-upload { margin: 10px 0; }
     .question-image-preview { max-width: 200px; max-height: 150px; border-radius: 8px; margin-top: 10px; display: none; }
-    .remove-image-btn { margin-top: 5px; }
 
     /* Модалка доступа пользователей */
     .user-access-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 10000; }
@@ -174,23 +171,15 @@
         background: #fff3cd;
     }
 
-    /* ИСПРАВЛЕНИЕ: Отображение номеров слов слева сверху */
-    .crossword-cell.has-number {
-        position: relative;
-    }
-
-    .crossword-number {
+    .crossword-cell.has-number::before {
+        content: attr(data-number);
         position: absolute;
-        font-size: 8px;
+        top: 2px;
+        left: 2px;
+        font-size: 10px;
         font-weight: bold;
         color: #333;
         z-index: 1;
-        background: rgba(255,255,255,0.8);
-        padding: 1px 2px;
-        border-radius: 2px;
-        line-height: 1;
-        top: 1px;
-        left: 1px;
     }
 
     .crossword-cell.recently-added {
@@ -447,20 +436,25 @@
         align-items: end;
     }
 
+    .filters-container .form-group {
+        margin-bottom: 0;
+    }
+
     .filters-container select,
     .filters-container input {
         min-width: 200px;
     }
 
-<<<<<<< HEAD
-    /* Стили для кнопки управления заявками с бейджем */
-=======
+    .textbook-issued-checkbox {
+        transform: scale(1.3);
+        cursor: pointer;
+    }
+
     .user-row-new {
         background: #f8f9fa;
     }
 
-    /* Стили для кнопки управления заявками с бейджом */
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
+    /* Стили для кнопки управления заявками с бейджем */
     .requests-btn {
         position: relative;
         transition: all 0.3s ease;
@@ -498,225 +492,27 @@
         100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
     }
 
-<<<<<<< HEAD
-    /* НОВЫЕ СТИЛИ ДЛЯ ПАГИНАЦИИ И ВЫДАННЫХ МАТЕРИАЛОВ */
-=======
-    /* НОВЫЕ СТИЛИ ДЛЯ УДАЛЕНИЯ СЛОВ В КРОССВОРДЕ */
-    .delete-word-mode .crossword-cell:not(.blocked) {
-        cursor: no-drop;
-        position: relative;
-    }
-
-    .delete-word-mode .crossword-cell:not(.blocked):hover::before {
-        content: '🗑️';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 16px;
-        z-index: 10;
-        background: rgba(231, 76, 60, 0.9);
-        border-radius: 4px;
-        width: 30px;
-        height: 30px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .delete-word-btn {
-        background: #e74c3c;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        padding: 8px 12px;
-        cursor: pointer;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        transition: background 0.2s;
-    }
-
-    .delete-word-btn:hover {
-        background: #c0392b;
-    }
-
-    .delete-word-btn.active {
-        background: #c0392b;
-        box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.5);
-    }
-
-    .word-selection-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 10001;
-    }
-
-    .word-selection-content {
-        background: white;
-        border-radius: 12px;
-        padding: 20px;
-        max-width: 500px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
-    }
-
-    .word-option {
-        padding: 12px;
-        margin: 8px 0;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .word-option:hover {
-        background: #f8f9fa;
-        border-color: var(--accent2);
-    }
-
-    .word-option.selected {
-        background: var(--accent2);
-        color: white;
-        border-color: var(--accent2);
-    }
-
-    /* НОВЫЕ СТИЛИ ДЛЯ МНОЖЕСТВЕННОГО ВЫБОРА КЛАССОВ */
-    .class-level-select {
-        width: 100%;
-        min-height: 120px;
-        padding: 10px;
-        border: 2px solid #e0e0e0;
-        border-radius: 8px;
-        font-size: 14px;
-        background: white;
-    }
-
-    .class-level-select:focus {
-        border-color: var(--accent2);
-        outline: none;
-    }
-
-    .class-level-hint {
-        font-size: 12px;
-        color: #666;
-        margin-top: 5px;
-    }
-
-    .class-level-preview {
-        background: #f8f9fa;
-        padding: 10px;
-        border-radius: 6px;
-        margin-top: 8px;
-        font-size: 14px;
-    }
-
-    .class-level-preview .selected-classes {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 5px;
-    }
-
-    .class-badge {
-        background: var(--accent2);
-        color: white;
-        padding: 4px 8px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-
-    /* НОВЫЕ СТИЛИ ДЛЯ ВЫДАННЫХ МАТЕРИАЛОВ */
-    .materials-info {
-        background: #e8f5e8;
-        border: 1px solid #c8e6c9;
-        border-radius: 8px;
-        padding: 12px;
-        margin: 10px 0;
-        font-size: 14px;
-    }
-
-    .materials-info h4 {
-        margin: 0 0 8px 0;
-        color: #2e7d32;
-    }
-
-    .materials-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .material-badge {
-        background: white;
-        padding: 4px 8px;
-        border-radius: 6px;
-        font-size: 12px;
-        border: 1px solid #c8e6c9;
-    }
-
     /* НОВЫЕ СТИЛИ ДЛЯ ПАГИНАЦИИ */
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
     .pagination-container {
         display: flex;
         justify-content: space-between;
         align-items: center;
-<<<<<<< HEAD
-        margin: 20px 0;
-        flex-wrap: wrap;
-        gap: 15px;
-=======
         margin-top: 20px;
         padding: 15px;
-        background: white;
+        background: var(--card);
         border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         flex-wrap: wrap;
-        gap: 10px;
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
+        gap: 15px;
     }
 
     .pagination-info {
-        font-size: 14px;
         color: #666;
+        font-size: 14px;
         font-weight: 600;
     }
 
     .pagination-controls {
         display: flex;
-<<<<<<< HEAD
-        gap: 10px;
-        align-items: center;
-    }
-
-    .page-btn {
-        padding: 8px 16px;
-        border: 2px solid #e0e0e0;
-        background: white;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 600;
-        transition: all 0.2s;
-    }
-
-    .page-btn:hover:not(:disabled) {
-        border-color: var(--accent2);
-        background: var(--accent2);
-        color: white;
-    }
-
-    .page-btn:disabled {
-=======
         gap: 8px;
         align-items: center;
         flex-wrap: wrap;
@@ -739,182 +535,46 @@
     }
 
     .pagination-btn:disabled {
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
-        opacity: 0.5;
+        background: #f5f5f5;
+        color: #999;
         cursor: not-allowed;
     }
 
-<<<<<<< HEAD
-    .page-numbers {
-        display: flex;
-        gap: 5px;
-    }
-
-    .page-number {
-        padding: 8px 12px;
-        border: 2px solid #e0e0e0;
-        background: white;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 600;
-        min-width: 40px;
-        text-align: center;
-        transition: all 0.2s;
-    }
-
-    .page-number.active {
-        border-color: var(--accent2);
-        background: var(--accent2);
-        color: white;
-    }
-
-    .page-number:hover:not(.active) {
-        border-color: var(--accent2);
-    }
-
-    .issued-materials {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        max-width: 300px;
-    }
-
-    .material-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 10px;
-        background: #f8f9fa;
-        border-radius: 6px;
-        font-size: 12px;
-        border-left: 3px solid var(--accent2);
-    }
-
-    .material-icon {
-        font-size: 14px;
-        flex-shrink: 0;
-    }
-
-    .material-name {
-        flex: 1;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .no-materials {
-        color: #999;
-        font-style: italic;
-        font-size: 12px;
-    }
-
-    .loading-row {
-        text-align: center;
-        padding: 20px;
-    }
-
-    .loading-row td {
-        border: none;
-    }
-
-    .skeleton-loader {
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        animation: loading 1.5s infinite;
-        border-radius: 4px;
-        height: 16px;
-        margin: 4px 0;
-    }
-
-    @keyframes loading {
-=======
     .pagination-page {
         padding: 8px 12px;
-        border: 1px solid #ddd;
-        background: white;
-        border-radius: 6px;
-        cursor: pointer;
+        font-weight: 600;
+        color: var(--accent2);
+    }
+
+    .pagination-size {
+        display: flex;
+        gap: 8px;
+        align-items: center;
         font-size: 14px;
-        transition: all 0.2s;
     }
 
-    .pagination-page.active {
-        background: var(--accent2);
-        color: white;
-        border-color: var(--accent2);
+    .pagination-size select {
+        padding: 6px 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        background: white;
     }
 
-    .pagination-page:hover:not(.active) {
-        background: #f8f9fa;
-    }
-
-    /* СТИЛИ ДЛЯ ОПТИМИЗАЦИИ ЗАГРУЗКИ */
-    .loading-row {
+    .users-loading {
         text-align: center;
         padding: 20px;
         color: #666;
     }
 
-    .virtual-scroll-container {
-        max-height: 600px;
-        overflow-y: auto;
+    .table-container {
         position: relative;
+        min-height: 400px;
     }
 
-    .virtual-scroll-content {
-        position: relative;
+    .users-table-wrapper {
+        overflow-x: auto;
     }
 
-    .virtual-item {
-        position: absolute;
-        width: 100%;
-        left: 0;
-    }
-
-    /* СТИЛИ ДЛЯ СКЕЛЕТОН-ЗАГРУЗКИ */
-    .skeleton-loader {
-        animation: skeleton-pulse 1.5s ease-in-out infinite;
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        border-radius: 4px;
-    }
-
-    @keyframes skeleton-pulse {
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
-        0% { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
-    }
-
-<<<<<<< HEAD
-=======
-    .skeleton-text {
-        height: 16px;
-        margin-bottom: 8px;
-    }
-
-    .skeleton-badge {
-        height: 24px;
-        width: 60px;
-        border-radius: 12px;
-    }
-
-    /* СТИЛИ ДЛЯ КЭШИРОВАНИЯ */
-    .cache-indicator {
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
-        background: var(--accent2);
-        color: white;
-        padding: 8px 16px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-        z-index: 1000;
-        opacity: 0.9;
-        display: none;
-    }
-
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
     @media (max-width: 1024px) {
       .admin-container { width: 98%; margin: 15px auto; }
       .admin-table { font-size: 14px; }
@@ -930,12 +590,7 @@
       .filters-container { flex-direction: column; width: 100%; }
       .filters-container select,
       .filters-container input { min-width: 100%; }
-<<<<<<< HEAD
-      .pagination-container { flex-direction: column; align-items: stretch; }
-=======
-      .class-level-select { min-height: 100px; }
-      .pagination-container { flex-direction: column; gap: 15px; }
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
+      .pagination-container { flex-direction: column; gap: 10px; }
     }
 
     @media (max-width: 768px) {
@@ -955,25 +610,14 @@
       .crossword-advanced-controls .form-group { width: 100%; }
       .fill-input-item { padding: 8px; }
       .users-stats { flex-direction: column; gap: 10px; }
-<<<<<<< HEAD
-      .page-numbers { display: none; }
-=======
-      .materials-list { flex-direction: column; }
-      .material-badge { width: fit-content; }
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
+      .pagination-controls { justify-content: center; }
     }
 
     @media (max-width: 480px) {
       .crossword-cell { width: 25px; height: 25px; font-size: 10px; }
       .fill-input-number { width: 24px; height: 24px; font-size: 12px; }
       .remove-input-btn { width: 32px; height: 32px; }
-<<<<<<< HEAD
-      .material-item { font-size: 11px; padding: 4px 8px; }
-=======
-      .pagination-controls { justify-content: center; }
-      .pagination-page { padding: 6px 8px; font-size: 12px; }
       .pagination-btn { padding: 6px 8px; font-size: 12px; }
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
     }
   </style>
 
@@ -985,11 +629,6 @@
     <p>🔄 Загружаем конфигурацию админ-панели...</p>
   </div>
   <div id="errorMessage" class="error"></div>
-
-  <!-- Индикатор кэширования -->
-  <div class="cache-indicator" id="cacheIndicator">
-    ⚡ Данные загружены из кэша
-  </div>
 
   <div id="mainContent" style="display: none;">
     <!-- Модальное окно управления доступом пользователя -->
@@ -1011,19 +650,6 @@
         <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
           <button class="btn" id="saveUserAccessBtn">💾 Сохранить доступы</button>
           <button class="btn secondary" id="closeUserAccessModal">❌ Закрыть</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно выбора слова для удаления -->
-    <div class="word-selection-modal" id="wordSelectionModal">
-      <div class="word-selection-content card">
-        <h3>🗑️ Выберите слово для удаления</h3>
-        <p>Найдено несколько слов в этой позиции. Выберите, какое хотите удалить:</p>
-        <div id="wordSelectionList"></div>
-        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-          <button class="btn btn-danger" id="confirmDeleteWordBtn">🗑️ Удалить выбранное</button>
-          <button class="btn secondary" id="cancelDeleteWordBtn">❌ Отмена</button>
         </div>
       </div>
     </div>
@@ -1084,29 +710,6 @@
               <textarea id="textbookDescription" class="input" placeholder="Введите описание учебника" rows="3"></textarea>
             </div>
 
-            <!-- ОБНОВЛЕННОЕ ПОЛЕ: Класс (множественный выбор) -->
-            <div class="form-group">
-              <label>Классы:</label>
-              <select multiple id="textbookClassLevel" class="class-level-select">
-                <option value="1-2">1-2 класс</option>
-                <option value="3-4">3-4 класс</option>
-                <option value="5-6">5-6 класс</option>
-                <option value="7">7 класс</option>
-                <option value="8-9">8-9 класс</option>
-                <option value="10-11">10-11 класс (Техникум, колледж - 1й курс)</option>
-                <option value="12">12 класс (Техникум, колледж)</option>
-              </select>
-              <div class="class-level-hint">
-                💡 Удерживайте Ctrl (Cmd на Mac) для выбора нескольких классов
-              </div>
-              <div class="class-level-preview">
-                <strong>Выбранные классы:</strong>
-                <div class="selected-classes" id="textbookClassPreview">
-                  <span class="class-badge">Ничего не выбрано</span>
-                </div>
-              </div>
-            </div>
-
             <div class="form-group">
               <label>Обложка (опционально):</label>
               <div class="upload-area" id="textbookUploadArea">
@@ -1119,7 +722,6 @@
               </div>
               <input type="hidden" id="textbookCoverUrl">
               <img class="image-preview" id="textbookCoverPreview" alt="Предпросмотр обложки">
-              <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeTextbookCoverBtn" style="display: none; margin-top: 5px;">🗑️ Удалить обложку</button>
             </div>
 
             <div class="form-group">
@@ -1143,7 +745,6 @@
                 <tr>
                   <th>Название</th>
                   <th>Описание</th>
-                  <th>Классы</th>
                   <th>Заданий</th>
                   <th>Доступ</th>
                   <th>Статус</th>
@@ -1177,29 +778,6 @@
               <textarea id="crosswordDescription" class="input" placeholder="Введите описание кроссворда" rows="3"></textarea>
             </div>
 
-            <!-- ОБНОВЛЕННОЕ ПОЛЕ: Класс (множественный выбор) -->
-            <div class="form-group">
-              <label>Классы:</label>
-              <select multiple id="crosswordClassLevel" class="class-level-select">
-                <option value="1-2">1-2 класс</option>
-                <option value="3-4">3-4 класс</option>
-                <option value="5-6">5-6 класс</option>
-                <option value="7">7 класс</option>
-                <option value="8-9">8-9 класс</option>
-                <option value="10-11">10-11 класс (Техникум, колледж - 1й курс)</option>
-                <option value="12">12 класс (Техникум, колледж)</option>
-              </select>
-              <div class="class-level-hint">
-                💡 Удерживайте Ctrl (Cmd на Mac) для выбора нескольких классов
-              </div>
-              <div class="class-level-preview">
-                <strong>Выбранные классы:</strong>
-                <div class="selected-classes" id="crosswordClassPreview">
-                  <span class="class-badge">Ничего не выбрано</span>
-                </div>
-              </div>
-            </div>
-
             <div class="form-group">
               <label>Обложка (опционально):</label>
               <div class="upload-area" id="crosswordUploadArea">
@@ -1212,7 +790,6 @@
               </div>
               <input type="hidden" id="crosswordCoverUrl">
               <img class="image-preview" id="crosswordCoverPreview" alt="Предпросмотр обложки">
-              <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeCrosswordCoverBtn" style="display: none; margin-top: 5px;">🗑️ Удалить обложку</button>
             </div>
 
             <div class="form-group">
@@ -1236,7 +813,6 @@
                 <tr>
                   <th>Название</th>
                   <th>Описание</th>
-                  <th>Классы</th>
                   <th>Заданий</th>
                   <th>Доступ</th>
                   <th>Действия</th>
@@ -1291,8 +867,7 @@
               <button class="btn" id="addQuestionBtn">➕ Добавить вопрос</button>
             </div>
 
-            <!-- ИСПРАВЛЕНИЕ: Кнопки перенесены в центр -->
-            <div style="margin-top:20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+            <div style="margin-top:20px; display: flex; gap: 10px; flex-wrap: wrap;">
               <button class="btn" id="saveAssignmentBtn">💾 Сохранить задание</button>
               <button class="btn secondary" id="cancelAssignmentBtn">❌ Отмена</button>
             </div>
@@ -1302,7 +877,6 @@
             <table class="admin-table" id="assignmentsTable">
               <thead>
                 <tr>
-                  <th>№</th>
                   <th>Название</th>
                   <th>Материал</th>
                   <th>Тип</th>
@@ -1329,21 +903,12 @@
             
             <div class="users-stats">
               <div class="stat-badge-large">
-<<<<<<< HEAD
                 <span class="number" id="totalIssuedTextbooks">0</span>
-                <span>Пользователей с материалами (всего)</span>
+                <span>Выдано учебников (всего)</span>
               </div>
               <div class="stat-badge-large">
                 <span class="number" id="regionalIssuedTextbooks">0</span>
-                <span>Пользователей с материалами (в области)</span>
-=======
-                <span class="number" id="totalUsersCount">0</span>
-                <span>Всего пользователей</span>
-              </div>
-              <div class="stat-badge-large">
-                <span class="number" id="usersWithMaterialsCount">0</span>
-                <span>С материалами</span>
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
+                <span>Выдано учебников (в области)</span>
               </div>
             </div>
           </div>
@@ -1366,88 +931,61 @@
                 <option value="Другое">Другое</option>
               </select>
             </div>
-
-            <div class="form-group">
-              <label>Статус материалов:</label>
-              <select id="materialStatusFilter" class="input">
-                <option value="">Все пользователи</option>
-                <option value="has_materials">Есть материалы</option>
-                <option value="no_materials">Нет материалов</option>
-              </select>
-            </div>
           </div>
 
-          <!-- Пагинация -->
-          <div class="pagination-container" id="usersPagination" style="display: none;">
-            <div class="pagination-info" id="paginationInfo">
-              Показано <span id="currentRange">0-0</span> из <span id="totalFilteredUsers">0</span>
+          <div class="table-container">
+            <div class="users-loading" id="usersLoading">
+              <div class="spinner"></div>
+              <p>🔄 Загружаем пользователей...</p>
             </div>
-            <div class="pagination-controls">
-              <button class="pagination-btn" id="firstPageBtn" disabled>⏮️</button>
-              <button class="pagination-btn" id="prevPageBtn" disabled>◀️</button>
-              
-              <div id="pageNumbers"></div>
-              
-              <button class="pagination-btn" id="nextPageBtn" disabled>▶️</button>
-              <button class="pagination-btn" id="lastPageBtn" disabled>⏭️</button>
+            
+            <div class="users-table-wrapper">
+              <table class="admin-table" id="usersTable">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>ФИО</th>
+                    <th>Email</th>
+                    <th>Контактный телефон</th>
+                    <th>Область</th>
+                    <th>Прогресс</th>
+                    <th>Учебник выдан</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody"></tbody>
+              </table>
             </div>
-          </div>
 
-          <!-- Пагинация -->
-          <div class="pagination-container">
-            <div class="pagination-info" id="paginationInfo">
-              Загрузка...
-            </div>
-            <div class="pagination-controls">
-              <button class="page-btn" id="firstPageBtn" disabled>⏮️</button>
-              <button class="page-btn" id="prevPageBtn" disabled>◀️</button>
-              
-              <div class="page-numbers" id="pageNumbers">
-                <!-- Номера страниц будут генерироваться динамически -->
+            <!-- ПАГИНАЦИЯ -->
+            <div class="pagination-container">
+              <div class="pagination-info" id="paginationInfo">
+                Показано <span id="usersFrom">0</span>-<span id="usersTo">0</span> из <span id="totalUsersCount">0</span>
               </div>
               
-              <button class="page-btn" id="nextPageBtn" disabled>▶️</button>
-              <button class="page-btn" id="lastPageBtn" disabled>⏭️</button>
+              <div class="pagination-controls">
+                <button class="pagination-btn" id="firstPageBtn" title="Первая страница">«</button>
+                <button class="pagination-btn" id="prevPageBtn" title="Предыдущая страница">‹</button>
+                
+                <div class="pagination-page">
+                  Страница <span id="currentPage">1</span> из <span id="totalPages">1</span>
+                </div>
+                
+                <button class="pagination-btn" id="nextPageBtn" title="Следующая страница">›</button>
+                <button class="pagination-btn" id="lastPageBtn" title="Последняя страница">»</button>
+              </div>
+
+              <div class="pagination-size">
+                <label>Показывать:</label>
+                <select id="usersPerPage">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50" selected>50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
             </div>
-          </div>
-
-          <div style="overflow-x: auto;">
-            <table class="admin-table" id="usersTable">
-              <thead>
-                <tr>
-                  <th>№</th>
-                  <th>ФИО</th>
-                  <th>Email</th>
-                  <th>Контактный телефон</th>
-                  <th>Область</th>
-                  <th>Прогресс</th>
-                  <th>Выданные материалы</th>
-                  <th>Статус</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-              <tbody id="usersTableBody">
-<<<<<<< HEAD
-                <!-- Данные будут загружаться динамически -->
-=======
-                <!-- Данные будут загружаться через пагинацию -->
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Скелетон-загрузка -->
-          <div id="usersSkeleton" style="display: none;">
-            <div class="loading-row">
-              <div class="skeleton-loader skeleton-text"></div>
-              <div class="skeleton-loader skeleton-text" style="width: 80%;"></div>
-              <div class="skeleton-loader skeleton-text" style="width: 60%;"></div>
-            </div>
-          </div>
-
-          <div id="usersEmptyState" class="empty-state" style="display: none;">
-            <h3>👥 Пользователи не найдены</h3>
-            <p>Попробуйте изменить параметры поиска или фильтры</p>
           </div>
         </div>
       </div>
@@ -1464,7 +1002,6 @@
       </div>
     </div>
   </div>
-
   <script type="module">
     // ============ БАЗОВЫЕ UI ХЕЛПЕРЫ ============
     document.getElementById('configLoading').style.display = 'block';
@@ -1488,275 +1025,164 @@
       document.getElementById('modal').style.display = 'flex';
     }
 
-<<<<<<< HEAD
-    // ============ ПАГИНАЦИЯ И ОПТИМИЗАЦИЯ ============
-    const usersPagination = {
-      currentPage: 1,
-      pageSize: 15,
-      totalPages: 0,
-      totalUsers: 0,
-      isLoading: false,
-      cache: new Map(), // Кэш для страниц
-      searchQuery: '',
-      regionFilter: ''
-    };
+    // ============ ПАГИНАЦИЯ ПОЛЬЗОВАТЕЛЕЙ ============
+    let currentUsersPage = 1;
+    let usersPerPage = 50;
+    let totalUsersCount = 0;
+    let totalPages = 1;
+    let usersLoading = false;
 
-    // Инициализация пагинации
-    function initPagination() {
-      const firstPageBtn = document.getElementById('firstPageBtn');
-      const prevPageBtn = document.getElementById('prevPageBtn');
-      const nextPageBtn = document.getElementById('nextPageBtn');
-      const lastPageBtn = document.getElementById('lastPageBtn');
-
-      firstPageBtn.addEventListener('click', () => goToPage(1));
-      prevPageBtn.addEventListener('click', () => goToPage(usersPagination.currentPage - 1));
-      nextPageBtn.addEventListener('click', () => goToPage(usersPagination.currentPage + 1));
-      lastPageBtn.addEventListener('click', () => goToPage(usersPagination.totalPages));
-    }
-
-    // Переход на страницу
-    async function goToPage(page) {
-      if (page < 1 || page > usersPagination.totalPages || usersPagination.isLoading) return;
+    // Функция для загрузки пользователей с пагинацией
+    async function loadUsers(page = 1) {
+      if (usersLoading) return;
       
-      usersPagination.currentPage = page;
-      await loadUsersPage();
-      updatePaginationControls();
-    }
-
-    // Обновление элементов управления пагинацией
-    function updatePaginationControls() {
-      const firstPageBtn = document.getElementById('firstPageBtn');
-      const prevPageBtn = document.getElementById('prevPageBtn');
-      const nextPageBtn = document.getElementById('nextPageBtn');
-      const lastPageBtn = document.getElementById('lastPageBtn');
-      const pageNumbers = document.getElementById('pageNumbers');
-      const paginationInfo = document.getElementById('paginationInfo');
-
-      // Обновляем информацию о странице
-      const startUser = (usersPagination.currentPage - 1) * usersPagination.pageSize + 1;
-      const endUser = Math.min(usersPagination.currentPage * usersPagination.pageSize, usersPagination.totalUsers);
-      paginationInfo.textContent = `Показано ${startUser}-${endUser} из ${usersPagination.totalUsers} пользователей`;
-
-      // Обновляем кнопки
-      firstPageBtn.disabled = usersPagination.currentPage === 1;
-      prevPageBtn.disabled = usersPagination.currentPage === 1;
-      nextPageBtn.disabled = usersPagination.currentPage === usersPagination.totalPages;
-      lastPageBtn.disabled = usersPagination.currentPage === usersPagination.totalPages;
-
-      // Генерируем номера страниц
-      pageNumbers.innerHTML = '';
-      const maxPagesToShow = 5;
-      let startPage = Math.max(1, usersPagination.currentPage - Math.floor(maxPagesToShow / 2));
-      let endPage = Math.min(usersPagination.totalPages, startPage + maxPagesToShow - 1);
-
-      if (endPage - startPage + 1 < maxPagesToShow) {
-        startPage = Math.max(1, endPage - maxPagesToShow + 1);
-      }
-
-      for (let i = startPage; i <= endPage; i++) {
-        const pageBtn = document.createElement('button');
-        pageBtn.className = `page-number ${i === usersPagination.currentPage ? 'active' : ''}`;
-        pageBtn.textContent = i;
-        pageBtn.addEventListener('click', () => goToPage(i));
-        pageNumbers.appendChild(pageBtn);
-      }
-    }
-
-    // ============ ОПТИМИЗИРОВАННАЯ ЗАГРУЗКА ПОЛЬЗОВАТЕЛЕЙ ============
-    async function loadUsersPage() {
-      if (usersPagination.isLoading) return;
+      usersLoading = true;
+      currentUsersPage = page;
       
-      usersPagination.isLoading = true;
       const tbody = document.getElementById('usersTableBody');
+      const loadingEl = document.getElementById('usersLoading');
       
-      // Показываем скелетон-загрузку
-      tbody.innerHTML = `
-        <tr class="loading-row"><td colspan="9">
-          ${Array.from({length: usersPagination.pageSize}, () => `
-            <div class="skeleton-loader"></div>
-          `).join('')}
-        </td></tr>
-      `;
+      // Показываем загрузку только если это первая страница или если таблица пустая
+      if (page === 1 || tbody.children.length === 0) {
+        loadingEl.style.display = 'block';
+        tbody.innerHTML = '';
+      }
+
+      const searchQuery = document.getElementById('userSearch').value.trim();
+      const regionFilter = document.getElementById('regionFilter').value;
 
       try {
-        const cacheKey = `${usersPagination.currentPage}_${usersPagination.searchQuery}_${usersPagination.regionFilter}`;
-        
-        // Проверяем кэш
-        if (usersPagination.cache.has(cacheKey)) {
-          const cachedData = usersPagination.cache.get(cacheKey);
-          renderUsersPage(cachedData.users, cachedData.userAccessMap);
-          usersPagination.totalUsers = cachedData.totalCount;
-          usersPagination.totalPages = Math.ceil(cachedData.totalCount / usersPagination.pageSize);
-          updatePaginationControls();
-          usersPagination.isLoading = false;
-          return;
-        }
-
-        // Базовый запрос для пользователей
-        let usersQuery = window.supabase
+        // Считаем общее количество пользователей для пагинации
+        let countQuery = supabase
           .from('profiles')
-          .select('*', { count: 'exact' })
-          .order('created_at', { ascending: false });
+          .select('*', { count: 'exact', head: true });
 
-        // Применяем фильтры
-        if (usersPagination.searchQuery) {
-          usersQuery = usersQuery.or(`full_name.ilike.%${usersPagination.searchQuery}%,email.ilike.%${usersPagination.searchQuery}%,contact_phone.ilike.%${usersPagination.searchQuery}%`);
+        if (searchQuery) {
+          countQuery = countQuery.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
         }
 
-        if (usersPagination.regionFilter) {
-          usersQuery = usersQuery.eq('region', usersPagination.regionFilter);
+        if (regionFilter) {
+          countQuery = countQuery.eq('region', regionFilter);
         }
 
-        // Пагинация
-        const from = (usersPagination.currentPage - 1) * usersPagination.pageSize;
-        const to = from + usersPagination.pageSize - 1;
-        usersQuery = usersQuery.range(from, to);
+        const { count, error: countError } = await countQuery;
+        
+        if (countError) throw countError;
 
-        const { data: users, error, count } = await usersQuery;
+        totalUsersCount = count || 0;
+        totalPages = Math.ceil(totalUsersCount / usersPerPage);
+
+        // Загружаем данные для текущей страницы
+        const start = (page - 1) * usersPerPage;
+        const end = start + usersPerPage - 1;
+
+        let dataQuery = supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(start, end);
+
+        if (searchQuery) {
+          dataQuery = dataQuery.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
+        }
+
+        if (regionFilter) {
+          dataQuery = dataQuery.eq('region', regionFilter);
+        }
+
+        const { data: users, error } = await dataQuery;
 
         if (error) throw error;
 
-        usersPagination.totalUsers = count;
-        usersPagination.totalPages = Math.ceil(count / usersPagination.pageSize);
-
-        if (!users || users.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;">Пользователи не найдены</td></tr>';
-          updatePaginationControls();
-          usersPagination.isLoading = false;
-          return;
-        }
-
-        // Параллельно загружаем доступы и прогресс
+        // Загружаем прогресс для отображаемых пользователей
         const userIds = users.map(u => u.id);
-        
-        const [
-          { data: textbookAccess },
-          { data: crosswordAccess },
-          { data: userProgress }
-        ] = await Promise.all([
-          window.supabase.from('textbook_access').select('user_id, textbooks(title)').in('user_id', userIds),
-          window.supabase.from('crossword_access').select('user_id, crosswords(title)').in('user_id', userIds),
-          window.supabase.from('user_progress').select('user_id, is_completed').in('user_id', userIds)
-        ]);
+        let progressMap = {};
 
-        // Создаем карту доступов пользователей
-        const userAccessMap = new Map();
-        userIds.forEach(id => userAccessMap.set(id, { textbooks: [], crosswords: [] }));
+        if (userIds.length > 0) {
+          const { data: prog, error: progError } = await supabase
+            .from('user_progress')
+            .select('user_id,is_completed')
+            .in('user_id', userIds);
 
-        textbookAccess?.forEach(access => {
-          if (access.textbooks && userAccessMap.has(access.user_id)) {
-            userAccessMap.get(access.user_id).textbooks.push(access.textbooks.title);
+          if (!progError) {
+            prog.forEach(p => {
+              progressMap[p.user_id] ||= { total: 0, completed: 0 };
+              progressMap[p.user_id].total++;
+              if (p.is_completed) progressMap[p.user_id].completed++;
+            });
           }
-        });
-
-        crosswordAccess?.forEach(access => {
-          if (access.crosswords && userAccessMap.has(access.user_id)) {
-            userAccessMap.get(access.user_id).crosswords.push(access.crosswords.title);
-          }
-        });
-
-        // Создаем карту прогресса
-        const progressMap = {};
-        userProgress?.forEach(p => {
-          progressMap[p.user_id] ||= { total: 0, completed: 0 };
-          progressMap[p.user_id].total++;
-          if (p.is_completed) progressMap[p.user_id].completed++;
-        });
-
-        // Сохраняем в кэш
-        usersPagination.cache.set(cacheKey, {
-          users,
-          userAccessMap,
-          totalCount: count
-        });
-
-        // Ограничиваем размер кэша
-        if (usersPagination.cache.size > 10) {
-          const firstKey = usersPagination.cache.keys().next().value;
-          usersPagination.cache.delete(firstKey);
         }
 
-        renderUsersPage(users, userAccessMap, progressMap);
-        updatePaginationControls();
+        // Отрисовываем таблицу
+        renderUsersTable(users, progressMap, start);
+        
+        // Обновляем пагинацию
+        updatePagination();
+        
+        // Обновляем статистику
+        updateUsersStats();
 
       } catch (error) {
-        console.error('Ошибка загрузки пользователей:', error);
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:red;">Ошибка загрузки данных</td></tr>';
+        showModal('Ошибка', 'Не удалось загрузить пользователей: ' + error.message);
+      } finally {
+        loadingEl.style.display = 'none';
+        usersLoading = false;
       }
-
-      usersPagination.isLoading = false;
     }
 
-    // ============ ОТОБРАЖЕНИЕ ПОЛЬЗОВАТЕЛЕЙ С ВЫДАННЫМИ МАТЕРИАЛАМИ ============
-    function renderUsersPage(users, userAccessMap, progressMap = {}) {
+    // Функция отрисовки таблицы пользователей
+    function renderUsersTable(users, progressMap, startIndex = 0) {
       const tbody = document.getElementById('usersTableBody');
+      
+      if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;">Пользователи не найдены</td></tr>';
+        return;
+      }
+
       tbody.innerHTML = '';
 
-      users.forEach((user, index) => {
-        const globalIndex = (usersPagination.currentPage - 1) * usersPagination.pageSize + index + 1;
-        const access = userAccessMap.get(user.id) || { textbooks: [], crosswords: [] };
-        const pr = progressMap[user.id] || { total: 0, completed: 0 };
+      users.forEach((u, index) => {
+        const pr = progressMap[u.id] || { total: 0, completed: 0 };
         const pct = pr.total ? Math.round((pr.completed / pr.total) * 100) : 0;
-        
         const tr = document.createElement('tr');
         
-        // Добавляем класс для новых пользователей (последние 7 дней)
-        const userDate = new Date(user.created_at);
+        const userDate = new Date(u.created_at);
         const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         if (userDate > weekAgo) {
           tr.classList.add('user-row-new');
         }
 
-        // Создаем список выданных материалов
-        const allMaterials = [
-          ...access.textbooks.map(title => ({ type: 'textbook', title })),
-          ...access.crosswords.map(title => ({ type: 'crossword', title }))
-        ];
-
         tr.innerHTML = `
-          <td><strong>${globalIndex}</strong></td>
+          <td><strong>${startIndex + index + 1}</strong></td>
           <td>
-            <div><strong>${user.full_name || 'Не указано'}</strong></div>
-            <div class="user-stats"><span class="stat-badge">ID: ${user.id.slice(0,8)}...</span></div>
+            <div><strong>${u.full_name || 'Не указано'}</strong></div>
+            <div class="user-stats"><span class="stat-badge">ID: ${u.id.slice(0,8)}...</span></div>
           </td>
-          <td>${user.email || '—'}</td>
-          <td>${user.contact_phone || '—'}</td>
-          <td>${user.region || '—'}</td>
+          <td>${u.email || '—'}</td>
+          <td>${u.contact_phone || '—'}</td>
+          <td>${u.region || '—'}</td>
           <td>
             <div class="user-stats">
               <span class="stat-badge">📊 ${pr.total ? `${pr.completed}/${pr.total} (${pct}%)` : 'Нет прогресса'}</span>
             </div>
           </td>
           <td>
-            <div class="issued-materials">
-              ${allMaterials.length > 0 ? 
-                allMaterials.slice(0, 3).map(material => `
-                  <div class="material-item">
-                    <span class="material-icon">${material.type === 'textbook' ? '📚' : '🧩'}</span>
-                    <span class="material-name" title="${material.title}">${material.title}</span>
-                  </div>
-                `).join('') : 
-                '<div class="no-materials">Нет выданных материалов</div>'
-              }
-              ${allMaterials.length > 3 ? 
-                `<div class="material-item">
-                  <span class="material-icon">📋</span>
-                  <span class="material-name">и еще ${allMaterials.length - 3} материалов</span>
-                 </div>` : ''
-              }
-            </div>
+            <input type="checkbox" class="textbook-issued-checkbox" 
+                   data-user-id="${u.id}" 
+                   ${u.textbook_issued ? 'checked' : ''}
+                   title="${u.textbook_issued ? 'Учебник выдан' : 'Учебник не выдан'}">
           </td>
-          <td>${user.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
+          <td>${u.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
           <td>
             <div class="user-actions">
-              <button class="btn btn-small ${user.is_admin ? 'secondary' : ''}" 
-                      data-toggle-admin="${user.id}" 
-                      data-make="${!user.is_admin}">
-                ${user.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}
+              <button class="btn btn-small ${u.is_admin ? 'secondary' : ''}" 
+                      data-toggle-admin="${u.id}" 
+                      data-make="${!u.is_admin}">
+                ${u.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}
               </button>
               <button class="btn btn-small" 
-                      data-access="${user.id}" 
-                      data-name="${user.full_name || user.email}">
+                      data-access="${u.id}" 
+                      data-name="${u.full_name || u.email}">
                 🔐 Управление доступом
               </button>
             </div>
@@ -1765,18 +1191,25 @@
         tbody.appendChild(tr);
       });
 
+      // Обработчики для чекбоксов выдачи учебников
+      tbody.querySelectorAll('.textbook-issued-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+          const userId = this.getAttribute('data-user-id');
+          const issued = this.checked;
+          updateTextbookIssued(userId, issued);
+        });
+      });
+
       // Обработчики для кнопок администратора
       tbody.querySelectorAll('[data-toggle-admin]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const uid = btn.getAttribute('data-toggle-admin');
           const make = btn.getAttribute('data-make') === 'true';
           if (!confirm(`Вы уверены, что хотите ${make ? 'назначить' : 'снять'} права администратора?`)) return;
-          const { error } = await window.supabase.from('profiles').update({ is_admin: make }).eq('id', uid);
+          const { error } = await supabase.from('profiles').update({ is_admin: make }).eq('id', uid);
           if (error) return showModal('Ошибка', error.message);
           showModal('Готово', make ? 'Права администратора выданы' : 'Права администратора сняты');
-          // Инвалидируем кэш и перезагружаем
-          usersPagination.cache.clear();
-          loadUsersPage();
+          loadUsers(currentUsersPage);
         });
       });
 
@@ -1787,44 +1220,29 @@
       });
     }
 
-    // ============ ОБНОВЛЕННАЯ СТАТИСТИКА ============
-    async function updateUsersStats() {
-      try {
-        const regionFilter = usersPagination.regionFilter;
-        
-        // Запрос для общего количества пользователей с любым доступом
-        let totalQuery = window.supabase
-          .from('profiles')
-          .select('id', { count: 'exact' })
-          .or('textbook_access!inner(user_id).not.is.null,crossword_access!inner(user_id).not.is.null');
+    // Функция обновления пагинации
+    function updatePagination() {
+      const startItem = (currentUsersPage - 1) * usersPerPage + 1;
+      const endItem = Math.min(currentUsersPage * usersPerPage, totalUsersCount);
 
-        // Запрос для регионального количества пользователей с любым доступом
-        let regionalQuery = window.supabase
-          .from('profiles')
-          .select('id', { count: 'exact' })
-          .or('textbook_access!inner(user_id).not.is.null,crossword_access!inner(user_id).not.is.null');
+      document.getElementById('usersFrom').textContent = startItem;
+      document.getElementById('usersTo').textContent = endItem;
+      document.getElementById('totalUsersCount').textContent = totalUsersCount;
+      document.getElementById('currentPage').textContent = currentUsersPage;
+      document.getElementById('totalPages').textContent = totalPages;
 
-        if (regionFilter) {
-          regionalQuery = regionalQuery.eq('region', regionFilter);
-        }
+      // Обновляем состояние кнопок
+      document.getElementById('firstPageBtn').disabled = currentUsersPage === 1;
+      document.getElementById('prevPageBtn').disabled = currentUsersPage === 1;
+      document.getElementById('nextPageBtn').disabled = currentUsersPage === totalPages || totalPages === 0;
+      document.getElementById('lastPageBtn').disabled = currentUsersPage === totalPages || totalPages === 0;
 
-        const [totalResult, regionalResult] = await Promise.all([
-          totalQuery,
-          regionalQuery
-        ]);
-
-        const totalIssued = totalResult.count || 0;
-        const regionalIssued = regionalResult.count || 0;
-
-        document.getElementById('totalIssuedTextbooks').textContent = totalIssued;
-        document.getElementById('regionalIssuedTextbooks').textContent = regionalIssued;
-
-      } catch (error) {
-        console.error('Ошибка обновления статистики:', error);
-      }
+      // Обновляем информацию о пагинации
+      document.getElementById('paginationInfo').textContent = 
+        `Показано ${startItem}-${endItem} из ${totalUsersCount}`;
     }
 
-    // ============ ФУНКЦИЯ ДЛЯ ПРОВЕРКИ НЕОБРАБОТАННЫХ ЗАЯВОК ============
+    // Функция для проверки необработанных заявок
     async function checkPendingRequests(supabase) {
       try {
         const { data: requests, error } = await supabase
@@ -1847,89 +1265,11 @@
             button.classList.remove('has-pending');
             button.classList.add('no-pending');
           }
-=======
-    // ============ СИСТЕМА ПАГИНАЦИИ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ============
-    const usersPagination = {
-      currentPage: 1,
-      pageSize: 15, // ФИКСИРОВАННО 15 ПОЛЬЗОВАТЕЛЕЙ НА СТРАНИЦЕ
-      totalUsers: 0,
-      totalPages: 0,
-      filteredUsers: [],
-      
-      init() {        
-        document.getElementById('firstPageBtn').addEventListener('click', () => {
-          this.goToPage(1);
-        });
-        
-        document.getElementById('prevPageBtn').addEventListener('click', () => {
-          this.goToPage(this.currentPage - 1);
-        });
-        
-        document.getElementById('nextPageBtn').addEventListener('click', () => {
-          this.goToPage(this.currentPage + 1);
-        });
-        
-        document.getElementById('lastPageBtn').addEventListener('click', () => {
-          this.goToPage(this.totalPages);
-        });
-      },
-      
-      goToPage(page) {
-        if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
-          this.currentPage = page;
-          renderUsersPage();
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
         }
-      },
-      
-      updatePaginationInfo() {
-        const start = ((this.currentPage - 1) * this.pageSize) + 1;
-        const end = Math.min(this.currentPage * this.pageSize, this.totalUsers);
-        
-        document.getElementById('currentRange').textContent = `${start}-${end}`;
-        document.getElementById('totalFilteredUsers').textContent = this.totalUsers;
-        
-        // Обновляем кнопки
-        document.getElementById('firstPageBtn').disabled = this.currentPage === 1;
-        document.getElementById('prevPageBtn').disabled = this.currentPage === 1;
-        document.getElementById('nextPageBtn').disabled = this.currentPage === this.totalPages;
-        document.getElementById('lastPageBtn').disabled = this.currentPage === this.totalPages;
-        
-        // Обновляем номера страниц
-        this.renderPageNumbers();
-        
-        // Показываем/скрываем пагинацию
-        const paginationContainer = document.getElementById('usersPagination');
-        paginationContainer.style.display = this.totalUsers > 0 ? 'flex' : 'none';
-      },
-      
-      renderPageNumbers() {
-        const container = document.getElementById('pageNumbers');
-        container.innerHTML = '';
-        
-        const maxVisiblePages = 5;
-        let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(this.totalPages, startPage + maxVisiblePages - 1);
-        
-        if (endPage - startPage + 1 < maxVisiblePages) {
-          startPage = Math.max(1, endPage - maxVisiblePages + 1);
-        }
-        
-        for (let i = startPage; i <= endPage; i++) {
-          const pageBtn = document.createElement('button');
-          pageBtn.className = `pagination-page ${i === this.currentPage ? 'active' : ''}`;
-          pageBtn.textContent = i;
-          pageBtn.addEventListener('click', () => this.goToPage(i));
-          container.appendChild(pageBtn);
-        }
-      },
-      
-      getCurrentPageUsers() {
-        const startIndex = (this.currentPage - 1) * this.pageSize;
-        const endIndex = startIndex + this.pageSize;
-        return this.filteredUsers.slice(startIndex, endIndex);
+      } catch (e) {
+        console.log('Не удалось проверить заявки:', e);
       }
-    };
+    }
 
     // ============ УЛУЧШЕННАЯ ПРОВЕРКА АДМИНА ============
     async function checkAdmin(supabase) {
@@ -2014,27 +1354,6 @@
       return name.replace(/[^a-zA-Z0-9._-]/g, '_');
     }
 
-    // НОВАЯ ФУНКЦИЯ: Удаление изображения
-    function setupRemoveImageButton(previewId, urlInputId, removeBtnId) {
-      const preview = document.getElementById(previewId);
-      const urlInput = document.getElementById(urlInputId);
-      const removeBtn = document.getElementById(removeBtnId);
-      
-      if (preview && urlInput && removeBtn) {
-        removeBtn.addEventListener('click', function() {
-          preview.style.display = 'none';
-          preview.src = '';
-          urlInput.value = '';
-          removeBtn.style.display = 'none';
-        });
-        
-        // Показываем кнопку удаления если есть изображение
-        if (urlInput.value) {
-          removeBtn.style.display = 'block';
-        }
-      }
-    }
-
     async function uploadImageToSupabase({ supabase, file, bucket }) {
       const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
       const allowed = ['jpg','jpeg','png','gif','webp','avif'];
@@ -2063,14 +1382,13 @@
       return pub.publicUrl;
     }
 
-    function initImageUpload({ uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId, removeBtnId, bucket, supabase }) {
+    function initImageUpload({ uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId, bucket, supabase }) {
       const area = document.getElementById(uploadAreaId);
       const input = document.getElementById(fileInputId);
       const barWrap = document.getElementById(progressId);
       const bar = document.getElementById(progressBarId);
       const preview = document.getElementById(previewId);
       const urlInput = document.getElementById(urlInputId);
-      const removeBtn = document.getElementById(removeBtnId);
 
       function resetProgress() {
         barWrap.style.display = 'none';
@@ -2084,7 +1402,6 @@
           const objectUrl = URL.createObjectURL(file);
           preview.src = objectUrl;
           preview.style.display = 'block';
-          if (removeBtn) removeBtn.style.display = 'block';
 
           bar.style.width = '65%';
           const publicUrl = await uploadImageToSupabase({ supabase, file, bucket });
@@ -2094,7 +1411,6 @@
         } catch (e) {
           resetProgress();
           preview.style.display = 'none';
-          if (removeBtn) removeBtn.style.display = 'none';
           showModal('Ошибка загрузки', e?.message || e);
         }
       }
@@ -2110,11 +1426,6 @@
         e.preventDefault(); area.classList.remove('dragover');
         if (e.dataTransfer.files?.length) handle(e.dataTransfer.files[0]);
       });
-
-      // Инициализация кнопки удаления
-      if (removeBtn) {
-        setupRemoveImageButton(previewId, urlInputId, removeBtnId);
-      }
     }
 
     // Инициализация загрузки картинок в вопросах (bucket: question-images)
@@ -2126,7 +1437,6 @@
         progressBarId: `questionImageProgressBar_${questionId}`,
         previewId: `questionImagePreview_${questionId}`,
         urlInputId: `questionImageUrl_${questionId}`,
-        removeBtnId: `removeQuestionImageBtn_${questionId}`,
         bucket: 'question-images',
         supabase
       });
@@ -2300,221 +1610,10 @@
           blocks: [],
           rows: 15,
           cols: 15,
-          nextWordNumber: 1,
-          deleteMode: false,
-          cellNumbers: {} // Храним номера клеток
+          nextWordNumber: 1
         };
       }
       return crosswordData[qid];
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Получение номера для клетки
-    function getCellNumber(data, row, col) {
-      const cellKey = `${row}-${col}`;
-      return data.cellNumbers[cellKey];
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Установка номера для клетки
-    function setCellNumber(data, row, col, number) {
-      const cellKey = `${row}-${col}`;
-      data.cellNumbers[cellKey] = number;
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Удаление номера клетки если нет слов
-    function removeCellNumberIfNoWords(data, row, col) {
-      const cellKey = `${row}-${col}`;
-      const wordsAtCell = data.words.filter(word => 
-        word.start.row === row && word.start.col === col
-      );
-      
-      if (wordsAtCell.length === 0) {
-        delete data.cellNumbers[cellKey];
-      }
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Поиск слов в указанной позиции
-    function findWordsAtPosition(qid, row, col) {
-      const data = crosswordData[qid];
-      if (!data || !data.words) return [];
-      
-      const foundWords = [];
-      
-      data.words.forEach(word => {
-        if (word.direction === 'across') {
-          // Проверяем горизонтальное слово
-          if (word.start.row === row && 
-              col >= word.start.col && 
-              col < word.start.col + word.length) {
-            foundWords.push(word);
-          }
-        } else {
-          // Проверяем вертикальное слово
-          if (word.start.col === col &&
-              row >= word.start.row &&
-              row < word.start.row + word.length) {
-            foundWords.push(word);
-          }
-        }
-      });
-      
-      return foundWords;
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Проверка размера сетки для существующих слов
-    function validateGridSize(data, newRows, newCols) {
-      if (!data.words || data.words.length === 0) {
-        return { valid: true };
-      }
-
-      let maxRow = 0;
-      let maxCol = 0;
-
-      // Находим максимальные координаты всех слов
-      data.words.forEach(word => {
-        if (word.direction === 'across') {
-          maxRow = Math.max(maxRow, word.start.row);
-          maxCol = Math.max(maxCol, word.start.col + word.length - 1);
-        } else {
-          maxRow = Math.max(maxRow, word.start.row + word.length - 1);
-          maxCol = Math.max(maxCol, word.start.col);
-        }
-      });
-
-      // Проверяем, влезают ли слова в новую сетку
-      if (maxRow >= newRows || maxCol >= newCols) {
-        return {
-          valid: false,
-          message: `❌ Новая сетка ${newRows}×${newCols} слишком мала для существующих слов!\n\n` +
-                   `Текущие слова занимают до позиции [${maxRow}, ${maxCol}].\n` +
-                   `Минимальный размер сетки: ${maxRow + 1}×${maxCol + 1}\n\n` +
-                   `Увеличьте размер сетки или удалите некоторые слова.`
-        };
-      }
-
-      return { valid: true };
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Удаление слова
-    function removeWordByNumber(qid, wordNumber) {
-      const data = crosswordData[qid];
-      if (!data) return;
-
-      const wordIndex = data.words.findIndex(w => w.number === wordNumber);
-      if (wordIndex === -1) return;
-
-      const word = data.words[wordIndex];
-
-      // Удаляем слово из списка
-      data.words.splice(wordIndex, 1);
-      
-      // Проверяем, остались ли слова в стартовой клетке
-      removeCellNumberIfNoWords(data, word.start.row, word.start.col);
-      
-      // Очищаем клетки, которые больше не используются другими словами
-      for (let i = 0; i < word.length; i++) {
-        const row = word.direction === 'across' ? word.start.row : word.start.row + i;
-        const col = word.direction === 'across' ? word.start.col + i : word.start.col;
-        
-        // Проверяем, принадлежит ли эта клетка другим словам
-        const belongsToOtherWord = data.words.some(otherWord => {
-          if (otherWord.direction === 'across') {
-            for (let j = 0; j < otherWord.length; j++) {
-              if (otherWord.start.row === row && otherWord.start.col + j === col) {
-                return true;
-              }
-            }
-          } else {
-            for (let j = 0; j < otherWord.length; j++) {
-              if (otherWord.start.row + j === row && otherWord.start.col === col) {
-                return true;
-              }
-            }
-          }
-          return false;
-        });
-        
-        if (!belongsToOtherWord) {
-          data.grid[row][col] = '';
-        }
-      }
-
-      // Перерисовываем сетку и обновляем статистику
-      renderAdvancedGrid(qid);
-      updateAdvancedCrosswordStats(qid);
-      updateWordList(qid);
-      updateStudentPreview(qid);
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Показать модальное окно выбора слова для удаления
-    function showWordSelectionModal(qid, words, row, col) {
-      const modal = document.getElementById('wordSelectionModal');
-      const list = document.getElementById('wordSelectionList');
-      
-      list.innerHTML = '';
-      
-      if (words.length === 0) {
-        showModal('❌ Ошибка', 'В этой позиции не найдено слов для удаления');
-        return;
-      }
-      
-      let selectedWord = null;
-      
-      words.forEach(word => {
-        const option = document.createElement('div');
-        option.className = 'word-option';
-        option.innerHTML = `
-          <strong>${word.text}</strong> 
-          (${word.direction === 'across' ? '→ горизонталь' : '↓ вертикаль'}) 
-          - №${word.number}
-        `;
-        
-        option.addEventListener('click', () => {
-          document.querySelectorAll('.word-option').forEach(opt => opt.classList.remove('selected'));
-          option.classList.add('selected');
-          selectedWord = word;
-        });
-        
-        list.appendChild(option);
-      });
-      
-      // Выбираем первое слово по умолчанию
-      if (words.length > 0) {
-        list.firstChild.classList.add('selected');
-        selectedWord = words[0];
-      }
-      
-      document.getElementById('confirmDeleteWordBtn').onclick = () => {
-        if (selectedWord) {
-          removeWordByNumber(qid, selectedWord.number);
-          modal.style.display = 'none';
-          showModal('✅ Успех', `Слово "${selectedWord.text}" удалено`);
-        }
-      };
-      
-      document.getElementById('cancelDeleteWordBtn').onclick = () => {
-        modal.style.display = 'none';
-      };
-      
-      modal.style.display = 'flex';
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Активация/деактивация режима удаления слов
-    function toggleDeleteWordMode(qid) {
-      const data = crosswordData[qid];
-      if (!data) return;
-      
-      data.deleteMode = !data.deleteMode;
-      const gridContainer = document.getElementById(`crosswordAdvancedGridContainer_${qid}`);
-      const deleteBtn = document.getElementById(`deleteWordBtn_${qid}`);
-      
-      if (data.deleteMode) {
-        gridContainer.classList.add('delete-word-mode');
-        deleteBtn.classList.add('active');
-        showModal('🗑️ Режим удаления', 'Кликните на слово, которое хотите удалить. Если в клетке несколько слов, выберите нужное из списка.');
-      } else {
-        gridContainer.classList.remove('delete-word-mode');
-        deleteBtn.classList.remove('active');
-      }
     }
 
     function initAdvancedCrosswordBuilder(qid) {
@@ -2526,13 +1625,13 @@
       // Инициализация сетки, если её нет
       if (data.grid.length === 0) {
         data.grid = Array(data.rows).fill().map(() => Array(data.cols).fill(''));
+        // ВАЖНО: НЕ блокируем все клетки по умолчанию
         data.blocks = [];
       }
 
       // Обработчики для создания сетки
       const createGridBtn = document.getElementById(`createAdvancedGridBtn_${qid}`);
       const clearGridBtn = document.getElementById(`clearAdvancedGridBtn_${qid}`);
-      const deleteWordBtn = document.getElementById(`deleteWordBtn_${qid}`);
       
       if (createGridBtn) {
         createGridBtn.addEventListener('click', () => createAdvancedGrid(qid));
@@ -2540,11 +1639,6 @@
       
       if (clearGridBtn) {
         clearGridBtn.addEventListener('click', () => clearAdvancedGrid(qid));
-      }
-
-      // НОВЫЙ ОБРАБОТЧИК: Кнопка удаления слов
-      if (deleteWordBtn) {
-        deleteWordBtn.addEventListener('click', () => toggleDeleteWordMode(qid));
       }
 
       // Инициализация загрузки изображения для кроссворда
@@ -2555,7 +1649,6 @@
         progressBarId: `crosswordAdvancedImageProgressBar_${qid}`,
         previewId: `crosswordAdvancedImagePreview_${qid}`,
         urlInputId: `crosswordAdvancedImageUrl_${qid}`,
-        removeBtnId: `removeCrosswordImageBtn_${qid}`,
         bucket: 'question-images',
         supabase: window.supabase
       });
@@ -2571,27 +1664,6 @@
           if (match) {
             const savedData = JSON.parse(match[1]);
             Object.assign(crosswordData[qid], savedData);
-            
-            // ВОССТАНАВЛИВАЕМ НОМЕРА КЛЕТОК ИЗ СОХРАНЕННЫХ ДАННЫХ
-            if (savedData.cellNumbers) {
-              data.cellNumbers = savedData.cellNumbers;
-              // Находим максимальный номер для nextWordNumber
-              const maxNumber = Math.max(...Object.values(data.cellNumbers), 0);
-              data.nextWordNumber = maxNumber + 1;
-            } else {
-              // Если cellNumbers нет в сохраненных данных, создаем из слов
-              data.cellNumbers = {};
-              data.words.forEach(word => {
-                const cellKey = `${word.start.row}-${word.start.col}`;
-                if (data.cellNumbers[cellKey] === undefined) {
-                  data.cellNumbers[cellKey] = word.number;
-                }
-              });
-              // Находим максимальный номер для nextWordNumber
-              const maxNumber = Math.max(...Object.values(data.cellNumbers), 0);
-              data.nextWordNumber = maxNumber + 1;
-            }
-            
             renderAdvancedGrid(qid);
             updateAdvancedCrosswordStats(qid);
             updateWordList(qid);
@@ -2624,29 +1696,20 @@
       }
       
       const data = crosswordData[qid];
-      
-      // НОВАЯ ПРОВЕРКА: Проверяем, что новая сетка достаточно большая для существующих слов
-      const sizeValidation = validateGridSize(data, rows, cols);
-      if (!sizeValidation.valid) {
-        showModal('❌ Ошибка изменения размера', sizeValidation.message);
-        return;
-      }
-      
       data.grid = Array(rows).fill().map(() => Array(cols).fill(''));
+      // ВАЖНО: НЕ блокируем все клетки по умолчанию
       data.blocks = [];
       data.words = [];
       data.rows = rows;
       data.cols = cols;
       data.nextWordNumber = 1;
-      data.cellNumbers = {}; // Сбрасываем номера клеток
-      data.deleteMode = false;
       
       renderAdvancedGrid(qid);
       updateAdvancedCrosswordStats(qid);
       updateWordList(qid);
       updateStudentPreview(qid);
       
-      showModal('✅ Готово', `Сетку ${rows}×${cols} создана! Теперь добавьте слова.`);
+      showModal('✅ Готово', `Сетка ${rows}×${cols} создана! Теперь добавьте слова.`);
     }
 
     function clearAdvancedGrid(qid) {
@@ -2654,11 +1717,10 @@
         const data = crosswordData[qid];
         if (data && data.grid) {
           data.grid = Array(data.rows).fill().map(() => Array(data.cols).fill(''));
+          // ВАЖНО: НЕ блокируем все клетки при очистке
           data.blocks = [];
           data.words = [];
           data.nextWordNumber = 1;
-          data.cellNumbers = {}; // Сбрасываем номера клеток
-          data.deleteMode = false;
           renderAdvancedGrid(qid);
           updateAdvancedCrosswordStats(qid);
           updateWordList(qid);
@@ -2706,41 +1768,23 @@
             cell.appendChild(input);
           }
           
-          // ИСПРАВЛЕНИЕ: Отображение ОДНОГО номера для клетки СЛЕВА СВЕРХУ
-          const cellKey = `${i}-${j}`;
-          const cellNumber = data.cellNumbers[cellKey];
+          // Добавляем номер, если клетка является началом слова
+          const wordStartsHere = data.words.some(word => 
+            word.start.row === i && word.start.col === j
+          );
           
-          if (cellNumber !== undefined) {
-            cell.classList.add('start-word', 'has-number');
-            
-            const numberEl = document.createElement('div');
-            numberEl.textContent = cellNumber;
-            numberEl.className = `crossword-number`;
-            cell.appendChild(numberEl);
+          if (wordStartsHere) {
+            cell.classList.add('start-word');
+            const word = data.words.find(w => w.start.row === i && w.start.col === j);
+            if (word) {
+              cell.setAttribute('data-number', word.number);
+              cell.classList.add('has-number');
+            }
           }
           
           // Добавляем обработчик двойного клика для блокировки/разблокировки клетки
           cell.ondblclick = function() {
             toggleBlockCell(qid, i, j);
-          };
-          
-          // НОВЫЙ ОБРАБОТЧИК: Клик для удаления слов в режиме удаления
-          cell.onclick = function() {
-            if (data.deleteMode) {
-              const words = findWordsAtPosition(qid, i, j);
-              if (words.length === 1) {
-                // Если слово одно - удаляем сразу
-                removeWordByNumber(qid, words[0].number);
-                showModal('✅ Успех', `Слово "${words[0].text}" удалено`);
-                // Выходим из режима удаления после успешного удаления
-                toggleDeleteWordMode(qid);
-              } else if (words.length > 1) {
-                // Если слов несколько - показываем выбор
-                showWordSelectionModal(qid, words, i, j);
-              } else {
-                showModal('❌ Ошибка', 'В этой позиции не найдено слов для удаления');
-              }
-            }
           };
           
           rowDiv.appendChild(cell);
@@ -2778,7 +1822,6 @@
       const placeWordBtn = document.getElementById(`placeWordBtn_${qid}`);
       const wordInput = document.getElementById(`wordInput_${qid}`);
       const wordDirection = document.getElementById(`wordDirection_${qid}`);
-      const wordNumberInput = document.getElementById(`wordNumberInput_${qid}`);
       
       if (placeWordBtn) {
         placeWordBtn.addEventListener('click', () => {
@@ -2796,8 +1839,7 @@
           // Переходим в режим размещения слова
           data.pendingWord = {
             text: word,
-            direction: wordDirection.value,
-            number: parseInt(wordNumberInput.value) || data.nextWordNumber
+            direction: wordDirection.value
           };
           
           showModal('ℹ️ Режим размещения', `Кликните на клетку, где должно начаться слово "${word}" (${wordDirection.value === 'across' ? '→ по горизонтали' : '↓ по вертикали'})`);
@@ -2858,7 +1900,6 @@
       
       const word = data.pendingWord.text;
       const direction = data.pendingWord.direction;
-      let number = data.pendingWord.number;
       
       // Проверяем, можно ли разместить слово
       const canPlace = canPlaceWord(data, word, direction, row, col);
@@ -2868,33 +1909,11 @@
         return;
       }
       
-      // ПРОВЕРЯЕМ ЕСТЬ ЛИ УЖЕ НОМЕР В КЛЕТКЕ
-      const existingNumber = getCellNumber(data, row, col);
-      if (existingNumber !== undefined) {
-        // Если номер уже есть, используем его
-        number = existingNumber;
-        showModal('ℹ️ Информация', `Используется существующий номер клетки: ${number}`);
-      } else {
-        // Если номера нет, устанавливаем указанный номер
-        setCellNumber(data, row, col, number);
-        
-        // Обновляем следующий доступный номер если нужно
-        if (number >= data.nextWordNumber) {
-          data.nextWordNumber = number + 1;
-        }
-      }
-      
       // Размещаем слово
-      placeWord(data, word, direction, row, col, number);
+      placeWord(data, word, direction, row, col);
       
       // Сбрасываем режим размещения
       data.pendingWord = null;
-      
-      // Обновляем поле номера
-      const numberInput = document.getElementById(`wordNumberInput_${qid}`);
-      if (numberInput) {
-        numberInput.value = data.nextWordNumber;
-      }
       
       // Обновляем интерфейс
       renderAdvancedGrid(qid);
@@ -2906,7 +1925,7 @@
       const placedWord = data.words[data.words.length - 1];
       highlightWord(qid, placedWord);
       
-      showModal('✅ Успех', `Слово "${word}" размещено с номером ${number}!`);
+      showModal('✅ Успех', `Слово "${word}" размещено!`);
     }
 
     function canPlaceWord(data, word, direction, startRow, startCol) {
@@ -2945,7 +1964,9 @@
       return { canPlace: true };
     }
 
-    function placeWord(data, word, direction, startRow, startCol, number) {
+    function placeWord(data, word, direction, startRow, startCol) {
+      const wordNumber = data.nextWordNumber++;
+      
       // Записываем буквы в сетку и разблокируем клетки
       for (let i = 0; i < word.length; i++) {
         const row = direction === 'across' ? startRow : startRow + i;
@@ -2956,7 +1977,7 @@
       
       // Добавляем слово в список
       data.words.push({
-        number: number,
+        number: wordNumber,
         text: word,
         direction: direction,
         start: { row: startRow, col: startCol },
@@ -3016,7 +2037,43 @@
       const word = data.words[wordIndex];
       
       if (confirm(`Удалить слово "${word.text}"?`)) {
-        removeWordByNumber(qid, wordNumber);
+        // Удаляем слово из списка
+        data.words.splice(wordIndex, 1);
+        
+        // Блокируем клетки, которые больше не используются другими словами
+        for (let i = 0; i < word.length; i++) {
+          const row = word.direction === 'across' ? word.start.row : word.start.row + i;
+          const col = word.direction === 'across' ? word.start.col + i : word.start.col;
+          
+          // Проверяем, принадлежит ли эта клетка другим словам
+          const belongsToOtherWord = data.words.some(otherWord => {
+            if (otherWord.direction === 'across') {
+              for (let j = 0; j < otherWord.length; j++) {
+                if (otherWord.start.row === row && otherWord.start.col + j === col) {
+                  return true;
+                }
+              }
+            } else {
+              for (let j = 0; j < otherWord.length; j++) {
+                if (otherWord.start.row + j === row && otherWord.start.col === col) {
+                  return true;
+                }
+              }
+            }
+            return false;
+          });
+          
+          if (!belongsToOtherWord) {
+            data.grid[row][col] = '';
+          }
+        }
+        
+        // Перерисовываем сетку и обновляем статистику
+        renderAdvancedGrid(qid);
+        updateAdvancedCrosswordStats(qid);
+        updateWordList(qid);
+        updateStudentPreview(qid);
+        
         showModal('✅ Успех', `Слово "${word.text}" удалено`);
       }
     };
@@ -3070,10 +2127,6 @@
         <div class="crossword-stat-item">
           <span>Количество слов:</span>
           <span>${data.words.length}</span>
-        </div>
-        <div class="crossword-stat-item">
-          <span>Следующий номер:</span>
-          <span>${data.nextWordNumber}</span>
         </div>
       `;
     }
@@ -3158,16 +2211,17 @@
             cell.classList.add('input-cell');
             cell.textContent = data.grid[i][j] || '';
             
-            // ИСПРАВЛЕНИЕ: Отображение номеров слов СЛЕВА СВЕРХУ
-            const cellNumber = data.cellNumbers[`${i}-${j}`];
+            // Добавляем номер, если клетка является началом слова
+            const wordStartsHere = data.words.some(word => 
+              word.start.row === i && word.start.col === j
+            );
             
-            if (cellNumber !== undefined) {
-              cell.classList.add('has-number');
-              
-              const numberEl = document.createElement('div');
-              numberEl.textContent = cellNumber;
-              numberEl.className = `crossword-number`;
-              cell.appendChild(numberEl);
+            if (wordStartsHere) {
+              const word = data.words.find(w => w.start.row === i && w.start.col === j);
+              if (word) {
+                cell.setAttribute('data-number', word.number);
+                cell.classList.add('has-number');
+              }
             }
           } else if (isBlocked) {
             cell.classList.add('blocked');
@@ -3251,11 +2305,9 @@
         grid: data.grid,
         words: data.words,
         blocks: data.blocks,
-        cellNumbers: data.cellNumbers, // Сохраняем номера клеток
         metadata: {
           rows: data.rows,
-          cols: data.cols,
-          nextWordNumber: data.nextWordNumber
+          cols: data.cols
         }
       };
     }
@@ -3282,9 +2334,6 @@
 
         console.log('✅ Админ-панель инициализирована для пользователя:', user.email);
 
-        // Инициализация систем оптимизации
-        usersPagination.init();
-
         // ============ НОВАЯ КНОПКА УПРАВЛЕНИЯ ЗАЯВКАМИ ============
         document.getElementById('manageRequestsBtn').addEventListener('click', () => {
           location.href = '/admin-requests.html';
@@ -3292,14 +2341,6 @@
 
         // Проверяем необработанные заявки при загрузке
         await checkPendingRequests(supabase);
-
-<<<<<<< HEAD
-        // Инициализация пагинации
-        initPagination();
-=======
-        // Инициализация множественного выбора классов
-        initClassLevelSelectors();
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
 
         // Кнопки/вкладки/модалка
         document.getElementById('modalOk').addEventListener('click', () => {
@@ -3324,17 +2365,11 @@
             if (tabName === 'textbooks') loadTextbooks();
             if (tabName === 'crosswords') loadCrosswords();
             if (tabName === 'assignments') { loadMaterialsForAssignments(); loadAssignments(); }
-            if (tabName === 'users') {
-              // Сбрасываем пагинацию при переходе на вкладку пользователей
-              usersPagination.currentPage = 1;
-              usersPagination.cache.clear();
-              loadUsersPage();
-              updateUsersStats();
-            }
+            if (tabName === 'users') loadUsers(); // Загружаем первую страницу пользователей
           });
         });
 
-        // Инициализация зон загрузки для обложек (bucket: covers) С ДОБАВЛЕНИЕМ КНОПОК УДАЛЕНИЯ
+        // Инициализация зон загрузки для обложек (bucket: covers)
         initImageUpload({
           uploadAreaId: 'textbookUploadArea',
           fileInputId: 'textbookCoverInput',
@@ -3342,7 +2377,6 @@
           progressBarId: 'textbookCoverProgressBar',
           previewId: 'textbookCoverPreview',
           urlInputId: 'textbookCoverUrl',
-          removeBtnId: 'removeTextbookCoverBtn',
           bucket: 'covers',
           supabase
         });
@@ -3353,9 +2387,47 @@
           progressBarId: 'crosswordCoverProgressBar',
           previewId: 'crosswordCoverPreview',
           urlInputId: 'crosswordCoverUrl',
-          removeBtnId: 'removeCrosswordCoverBtn',
           bucket: 'covers',
           supabase
+        });
+
+        // ===== ОБРАБОТЧИКИ ПАГИНАЦИИ =====
+        document.getElementById('firstPageBtn').addEventListener('click', () => {
+          if (currentUsersPage > 1) loadUsers(1);
+        });
+
+        document.getElementById('prevPageBtn').addEventListener('click', () => {
+          if (currentUsersPage > 1) loadUsers(currentUsersPage - 1);
+        });
+
+        document.getElementById('nextPageBtn').addEventListener('click', () => {
+          if (currentUsersPage < totalPages) loadUsers(currentUsersPage + 1);
+        });
+
+        document.getElementById('lastPageBtn').addEventListener('click', () => {
+          if (currentUsersPage < totalPages) loadUsers(totalPages);
+        });
+
+        document.getElementById('usersPerPage').addEventListener('change', function() {
+          usersPerPage = parseInt(this.value);
+          currentUsersPage = 1;
+          loadUsers(currentUsersPage);
+        });
+
+        // ===== ПОИСК И ФИЛЬТРЫ ПОЛЬЗОВАТЕЛЕЙ =====
+        let searchTimeout = null;
+
+        document.getElementById('userSearch').addEventListener('input', () => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(() => {
+            currentUsersPage = 1;
+            loadUsers(currentUsersPage);
+          }, 350);
+        });
+
+        document.getElementById('regionFilter').addEventListener('change', () => {
+          currentUsersPage = 1;
+          loadUsers(currentUsersPage);
         });
 
         // ===== Статистика
@@ -3385,31 +2457,25 @@
           document.getElementById('textbookFormTitle').textContent = 'Создать учебник';
           document.getElementById('textbookTitle').value = '';
           document.getElementById('textbookDescription').value = '';
-          // Сбрасываем множественный выбор классов
-          setSelectedClassLevels(document.getElementById('textbookClassLevel'), []);
           document.getElementById('textbookOrder').value = '0';
           document.getElementById('textbookIsAvailable').checked = false;
           document.getElementById('textbookCoverUrl').value = '';
           document.getElementById('textbookCoverPreview').style.display = 'none';
-          document.getElementById('removeTextbookCoverBtn').style.display = 'none';
         }
         function hideTextbookForm(){ document.getElementById('textbookForm').classList.remove('active'); }
 
         async function saveTextbook() {
           const title = document.getElementById('textbookTitle').value.trim();
           const description = document.getElementById('textbookDescription').value.trim();
-          const classLevels = getSelectedClassLevels(document.getElementById('textbookClassLevel'));
           const orderIndex = parseInt(document.getElementById('textbookOrder').value || '0',10);
           const isAvailable = document.getElementById('textbookIsAvailable').checked;
           const coverUrl = document.getElementById('textbookCoverUrl').value;
 
           if (!title) return showModal('Ошибка', 'Введите название учебника');
-          if (classLevels.length === 0) return showModal('Ошибка', 'Выберите хотя бы один класс');
 
           const payload = {
             title,
             description,
-            class_level: classLevels, // Теперь это массив
             order_index: orderIndex,
             is_available: isAvailable,
             is_active: true,
@@ -3431,7 +2497,7 @@
 
         async function loadTextbooks() {
           const tbody = document.querySelector('#textbooksTable tbody');
-          tbody.innerHTML = '<tr><td colspan="7" style="padding:14px;">Загрузка...</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="padding:14px;">Загрузка...</td></tr>';
 
           const { data: textbooks, error } = await supabase.from('textbooks').select('*').order('order_index');
           if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
@@ -3442,32 +2508,15 @@
 
           tbody.innerHTML = '';
           if (!textbooks?.length) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;">Учебники не найдены</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Учебники не найдены</td></tr>';
             return;
           }
 
-          const classMap = {
-            '1-2': '1-2 класс',
-            '3-4': '3-4 класс',
-            '5-6': '5-6 класс',
-            '7': '7 класс',
-            '8-9': '8-9 класс',
-            '10-11': '10-11 класс',
-            '12': '12 класс'
-          };
-
           textbooks.forEach(tb => {
             const tr = document.createElement('tr');
-            // Форматируем классы для отображения
-            const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
-            const classDisplay = classLevels.length > 0 
-              ? classLevels.map(cls => classMap[cls] || cls).join(', ')
-              : '—';
-            
             tr.innerHTML = `
               <td>${tb.title}</td>
               <td>${tb.description || '—'}</td>
-              <td>${classDisplay}</td>
               <td>${counts[tb.id] || 0}</td>
               <td>${tb.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
               <td>${tb.is_active ? '✅ Активен' : '❌ Неактивен'}</td>
@@ -3489,21 +2538,11 @@
               document.getElementById('textbookFormTitle').textContent = 'Редактировать учебник';
               document.getElementById('textbookTitle').value = data.title || '';
               document.getElementById('textbookDescription').value = data.description || '';
-              // Устанавливаем множественный выбор классов
-              setSelectedClassLevels(document.getElementById('textbookClassLevel'), data.class_level || []);
               document.getElementById('textbookOrder').value = data.order_index || 0;
               document.getElementById('textbookIsAvailable').checked = !!data.is_available;
               document.getElementById('textbookCoverUrl').value = data.cover_image_url || '';
               const prev = document.getElementById('textbookCoverPreview');
-              const removeBtn = document.getElementById('removeTextbookCoverBtn');
-              if (data.cover_image_url) { 
-                prev.src = data.cover_image_url; 
-                prev.style.display='block'; 
-                removeBtn.style.display='block';
-              } else { 
-                prev.style.display='none'; 
-                removeBtn.style.display='none';
-              }
+              if (data.cover_image_url) { prev.src = data.cover_image_url; prev.style.display='block'; } else { prev.style.display='none'; }
             });
           });
 
@@ -3532,31 +2571,25 @@
           document.getElementById('crosswordFormTitle').textContent = 'Создать кроссворд';
           document.getElementById('crosswordTitle').value = '';
           document.getElementById('crosswordDescription').value = '';
-          // Сбрасываем множественный выбор классов
-          setSelectedClassLevels(document.getElementById('crosswordClassLevel'), []);
           document.getElementById('crosswordOrder').value = '0';
           document.getElementById('crosswordIsAvailable').checked = false;
           document.getElementById('crosswordCoverUrl').value = '';
           document.getElementById('crosswordCoverPreview').style.display = 'none';
-          document.getElementById('removeCrosswordCoverBtn').style.display = 'none';
         }
         function hideCrosswordForm(){ document.getElementById('crosswordForm').classList.remove('active'); }
 
         async function saveCrossword() {
           const title = document.getElementById('crosswordTitle').value.trim();
           const description = document.getElementById('crosswordDescription').value.trim();
-          const classLevels = getSelectedClassLevels(document.getElementById('crosswordClassLevel'));
           const orderIndex = parseInt(document.getElementById('crosswordOrder').value || '0',10);
           const isAvailable = document.getElementById('crosswordIsAvailable').checked;
           const coverUrl = document.getElementById('crosswordCoverUrl').value;
 
           if (!title) return showModal('Ошибка', 'Введите название кроссворда');
-          if (classLevels.length === 0) return showModal('Ошибка', 'Выберите хотя бы один класс');
 
           const payload = {
             title,
             description,
-            class_level: classLevels, // Теперь это массив
             order_index: orderIndex,
             is_available: isAvailable,
             is_active: true,
@@ -3578,7 +2611,7 @@
 
         async function loadCrosswords() {
           const tbody = document.querySelector('#crosswordsTable tbody');
-          tbody.innerHTML = '<tr><td colspan="6" style="padding:14px;">Загрузка...</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;">Загрузка...</td></tr>';
 
           const { data: crosswords, error } = await supabase.from('crosswords').select('*').order('order_index');
           if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
@@ -3589,32 +2622,15 @@
 
           tbody.innerHTML = '';
           if (!crosswords?.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Кроссворды не найдены</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Кроссворды не найдены</td></tr>';
             return;
           }
 
-          const classMap = {
-            '1-2': '1-2 класс',
-            '3-4': '3-4 класс',
-            '5-6': '5-6 класс',
-            '7': '7 класс',
-            '8-9': '8-9 класс',
-            '10-11': '10-11 класс',
-            '12': '12 класс'
-          };
-
           crosswords.forEach(cw => {
             const tr = document.createElement('tr');
-            // Форматируем классы для отображения
-            const classLevels = Array.isArray(cw.class_level) ? cw.class_level : [];
-            const classDisplay = classLevels.length > 0 
-              ? classLevels.map(cls => classMap[cls] || cls).join(', ')
-              : '—';
-            
             tr.innerHTML = `
               <td>${cw.title}</td>
               <td>${cw.description || '—'}</td>
-              <td>${classDisplay}</td>
               <td>${counts[cw.id] || 0}</td>
               <td>${cw.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
               <td>
@@ -3635,21 +2651,11 @@
               document.getElementById('crosswordFormTitle').textContent = 'Редактировать кроссворд';
               document.getElementById('crosswordTitle').value = data.title || '';
               document.getElementById('crosswordDescription').value = data.description || '';
-              // Устанавливаем множественный выбор классов
-              setSelectedClassLevels(document.getElementById('crosswordClassLevel'), data.class_level || []);
               document.getElementById('crosswordOrder').value = data.order_index || 0;
               document.getElementById('crosswordIsAvailable').checked = !!data.is_available;
               document.getElementById('crosswordCoverUrl').value = data.cover_image_url || '';
               const prev = document.getElementById('crosswordCoverPreview');
-              const removeBtn = document.getElementById('removeCrosswordCoverBtn');
-              if (data.cover_image_url) { 
-                prev.src = data.cover_image_url; 
-                prev.style.display='block'; 
-                removeBtn.style.display='block';
-              } else { 
-                prev.style.display='none'; 
-                removeBtn.style.display='none';
-              }
+              if (data.cover_image_url) { prev.src = data.cover_image_url; prev.style.display='block'; } else { prev.style.display='none'; }
             });
           });
 
@@ -3699,19 +2705,17 @@
           select.innerHTML = '<option value="">-- Выберите учебник или кроссворд --</option>';
 
           const [{ data: textbooks }, { data: crosswords }] = await Promise.all([
-            supabase.from('textbooks').select('id,title,is_active,class_level').order('order_index'),
-            supabase.from('crosswords').select('id,title,is_active,class_level').order('order_index')
+            supabase.from('textbooks').select('id,title,is_active').order('order_index'),
+            supabase.from('crosswords').select('id,title,is_active').order('order_index')
           ]);
 
           if (textbooks?.length) {
             const og = document.createElement('optgroup');
             og.label = '📚 Учебники';
             textbooks.filter(t=>t.is_active!==false).forEach(t=>{
-              const classLevels = Array.isArray(t.class_level) ? t.class_level : [];
-              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
               const opt = document.createElement('option');
               opt.value = `textbook_${t.id}`;
-              opt.textContent = `${t.title} (${classDisplay})`;
+              opt.textContent = t.title;
               og.appendChild(opt);
             });
             select.appendChild(og);
@@ -3721,11 +2725,9 @@
             const og = document.createElement('optgroup');
             og.label = '🧩 Кроссворды';
             crosswords.filter(c=>c.is_active!==false).forEach(c=>{
-              const classLevels = Array.isArray(c.class_level) ? c.class_level : [];
-              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
               const opt = document.createElement('option');
               opt.value = `crossword_${c.id}`;
-              opt.textContent = `${c.title} (${classDisplay})`;
+              opt.textContent = c.title;
               og.appendChild(opt);
             });
             select.appendChild(og);
@@ -3768,7 +2770,6 @@
           wrap.setAttribute('data-id', qid);
           wrap.setAttribute('data-type', qType);
 
-          // НОВЫЙ БЛОК: Кнопка удаления изображения для всех типов вопросов
           const imageUploadBlock = `
             <div class="form-group question-image-upload">
               <label>Изображение для вопроса (опционально):</label>
@@ -3782,7 +2783,6 @@
               </div>
               <input type="hidden" id="questionImageUrl_${qid}" value="${prefill?.image || ''}">
               <img class="question-image-preview" id="questionImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
-              <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeQuestionImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
             </div>
           `;
 
@@ -3866,16 +2866,14 @@
                   <h4>🧩 Конструктор кроссворда</h4>
                   <p><strong>Режим работы:</strong></p>
                   <ul>
-                    <li><strong>Размещение слов:</strong> Введите слово, выберите направление и номер, затем кликните на стартовую клетку</li>
+                    <li><strong>Размещение слов:</strong> Введите слово, выберите направление и кликните на стартовую клетку</li>
                     <li><strong>Блокировка клеток:</strong> Двойной клик по клетке чтобы заблокировать/разблокировать (черные клетки)</li>
-                    <li><strong>Удаление слов:</strong> Нажмите кнопку "Удалить слово" и кликните на слово для удаления</li>
                   </ul>
                   <p><strong>Особенности:</strong></p>
                   <ul>
-                    <li>Ручное указание номера слова</li>
-                    <li>Если в клетке уже есть номер - используется существующий</li>
-                    <li>Один номер для горизонтального и вертикального слова в одной клетке</li>
+                    <li>Автоматическая нумерация слов</li>
                     <li>Проверка пересечений слов</li>
+                    <li>Визуальное выделение начал слов</li>
                     <li>Управление списком слов</li>
                     <li>Предпросмотр для ученика (только клетки для ввода)</li>
                   </ul>
@@ -3897,16 +2895,7 @@
                       </select>
                     </div>
                     <div class="form-group">
-                      <label>Номер слова:</label>
-                      <input type="number" id="wordNumberInput_${qid}" min="1" value="${prefill?.metadata?.nextWordNumber || 1}">
-                    </div>
-                    <div class="form-group">
                       <button class="btn" id="placeWordBtn_${qid}">Разместить слово</button>
-                    </div>
-                    <div class="form-group">
-                      <button class="btn delete-word-btn" id="deleteWordBtn_${qid}">
-                        🗑️ Удалить слово
-                      </button>
                     </div>
                   </div>
 
@@ -3951,7 +2940,6 @@
                   </div>
                   <input type="hidden" id="crosswordAdvancedImageUrl_${qid}" value="${prefill?.image || ''}">
                   <img class="image-preview" id="crosswordAdvancedImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
-                  <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeCrosswordImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
                 </div>
 
                 ${questionEditor}
@@ -3993,9 +2981,7 @@
                 blocks: prefill.blocks || [],
                 rows: prefill.metadata?.rows || 15,
                 cols: prefill.metadata?.cols || 15,
-                nextWordNumber: prefill.metadata?.nextWordNumber || (prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1),
-                deleteMode: false,
-                cellNumbers: prefill.cellNumbers || {} // Восстанавливаем номера клеток
+                nextWordNumber: prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1
               };
             } else {
               // Если данных нет, создаем пустую структуру
@@ -4162,12 +3148,11 @@
 
           tbody.innerHTML = '';
           if (!rows?.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Задания не найдены</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Задания не найдены</td></tr>';
             return;
           }
 
-          // ИСПРАВЛЕНИЕ: Добавляем нумерацию заданий по порядку отображения
-          rows.forEach((a, index) => {
+          rows.forEach(a=>{
             const qs = a.content?.questions || [];
             let typeText = '📝 Тест';
             const types = new Set(qs.map(q=>q.type));
@@ -4177,7 +3162,6 @@
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-              <td><strong>${index + 1}</strong></td>
               <td>${a.title}</td>
               <td>${materialName}</td>
               <td>${typeText}</td>
@@ -4230,372 +3214,60 @@
 
         // ===== ПОЛЬЗОВАТЕЛИ / ДОСТУПЫ
         let currentEditingUserId = null;
-        let searchTimeout = null;
 
-<<<<<<< HEAD
-        // ОБНОВЛЕННЫЕ ОБРАБОТЧИКИ ПОИСКА И ФИЛЬТРОВ
-        document.getElementById('userSearch').addEventListener('input', (e) => {
-          usersPagination.searchQuery = e.target.value.trim();
-          clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(() => {
-            usersPagination.currentPage = 1;
-            usersPagination.cache.clear();
-            loadUsersPage();
-            updateUsersStats();
-          }, 350);
-        });
+        // Функция обновления статуса выдачи учебника
+        async function updateTextbookIssued(userId, issued) {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ textbook_issued: issued })
+            .eq('id', userId);
 
-        document.getElementById('regionFilter').addEventListener('change', (e) => {
-          usersPagination.regionFilter = e.target.value;
-          usersPagination.currentPage = 1;
-          usersPagination.cache.clear();
-          loadUsersPage();
-          updateUsersStats();
-        });
-=======
-        // НОВАЯ ФУНКЦИЯ: Проверка необработанных заявок
-        async function checkPendingRequests(supabase) {
-          try {
-            const { data: requests, error } = await supabase
-              .from('purchase_requests')
-              .select('id')
-              .eq('is_processed', false);
-
-            if (!error) {
-              const pendingCount = requests?.length || 0;
-              const badge = document.getElementById('requestsBadge');
-              const button = document.getElementById('manageRequestsBtn');
-              
-              if (pendingCount > 0) {
-                badge.style.display = 'flex';
-                badge.textContent = pendingCount;
-                button.classList.add('has-pending');
-                button.classList.remove('no-pending');
-              } else {
-                badge.style.display = 'none';
-                button.classList.remove('has-pending');
-                button.classList.add('no-pending');
-              }
-            }
-          } catch (e) {
-            console.log('Не удалось проверить заявки:', e);
-          }
-        }
-
-        // НОВАЯ ФУНКЦИЯ: Инициализация множественного выбора классов
-        function initClassLevelSelectors() {
-          // Инициализация для учебников
-          const textbookSelect = document.getElementById('textbookClassLevel');
-          const textbookPreview = document.getElementById('textbookClassPreview');
-          
-          if (textbookSelect && textbookPreview) {
-            textbookSelect.addEventListener('change', function() {
-              updateClassPreview(this, textbookPreview);
-            });
-            
-            // Инициализация предпросмотра
-            updateClassPreview(textbookSelect, textbookPreview);
-          }
-
-          // Инициализация для кроссвордов
-          const crosswordSelect = document.getElementById('crosswordClassLevel');
-          const crosswordPreview = document.getElementById('crosswordClassPreview');
-          
-          if (crosswordSelect && crosswordPreview) {
-            crosswordSelect.addEventListener('change', function() {
-              updateClassPreview(this, crosswordPreview);
-            });
-            
-            // Инициализация предпросмотра
-            updateClassPreview(crosswordSelect, crosswordPreview);
-          }
-        }
-
-        function updateClassPreview(selectElement, previewContainer) {
-          const selectedOptions = Array.from(selectElement.selectedOptions).map(option => option.value);
-          
-          if (selectedOptions.length === 0) {
-            previewContainer.innerHTML = '<span class="class-badge">Ничего не выбрано</span>';
+          if (error) {
+            showModal('Ошибка', 'Не удалось обновить статус выдачи учебника: ' + error.message);
+            // Перезагружаем данные для синхронизации
+            loadUsers(currentUsersPage);
           } else {
-            const classMap = {
-              '1-2': '1-2 класс',
-              '3-4': '3-4 класс',
-              '5-6': '5-6 класс',
-              '7': '7 класс',
-              '8-9': '8-9 класс',
-              '10-11': '10-11 класс',
-              '12': '12 класс'
-            };
-            
-            previewContainer.innerHTML = selectedOptions.map(option => 
-              `<span class="class-badge">${classMap[option] || option}</span>`
-            ).join('');
-          }
-        }
-
-        function getSelectedClassLevels(selectElement) {
-          return Array.from(selectElement.selectedOptions).map(option => option.value);
-        }
-
-        function setSelectedClassLevels(selectElement, classLevels) {
-          if (!classLevels || !Array.isArray(classLevels)) return;
-          
-          // Сбрасываем все выборы
-          Array.from(selectElement.options).forEach(option => {
-            option.selected = false;
-          });
-          
-          // Устанавливаем выбранные классы
-          classLevels.forEach(level => {
-            const option = Array.from(selectElement.options).find(opt => opt.value === level);
-            if (option) {
-              option.selected = true;
-            }
-          });
-          
-          // Обновляем предпросмотр
-          const previewId = selectElement.id === 'textbookClassLevel' ? 'textbookClassPreview' : 'crosswordClassPreview';
-          const previewContainer = document.getElementById(previewId);
-          if (previewContainer) {
-            updateClassPreview(selectElement, previewContainer);
-          }
-        }
-
-        // ОБНОВЛЕННАЯ ФУНКЦИЯ: Загрузка пользователей с правильной пагинацией и фильтрацией
-        async function loadUsers() {
-          const searchQuery = document.getElementById('userSearch').value.trim();
-          const regionFilter = document.getElementById('regionFilter').value;
-          const materialStatusFilter = document.getElementById('materialStatusFilter').value;
-
-          // Показываем скелетон-загрузку
-          document.getElementById('usersTableBody').innerHTML = '';
-          document.getElementById('usersSkeleton').style.display = 'block';
-          document.getElementById('usersEmptyState').style.display = 'none';
-
-          try {
-            // Создаем базовый запрос
-            let query = supabase
-              .from('profiles')
-              .select('*')
-              .order('created_at', { ascending: false });
-
-            // Применяем фильтры поиска и региона
-            if (searchQuery) {
-              query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
-            }
-
-            if (regionFilter) {
-              query = query.eq('region', regionFilter);
-            }
-
-            // Получаем ВСЕХ пользователей с учетом фильтров
-            const { data: allUsers, error } = await query;
-
-            if (error) throw error;
-
-            // Обогащаем пользователей данными о материалах
-            const usersWithMaterials = await enrichUsersWithMaterials(allUsers || []);
-
-            // Применяем фильтр по материалам
-            let filteredUsers = usersWithMaterials;
-            if (materialStatusFilter === 'has_materials') {
-              filteredUsers = usersWithMaterials.filter(user => user.hasMaterials);
-            } else if (materialStatusFilter === 'no_materials') {
-              filteredUsers = usersWithMaterials.filter(user => !user.hasMaterials);
-            }
-
-            // Обновляем пагинацию
-            usersPagination.totalUsers = filteredUsers.length;
-            usersPagination.totalPages = Math.ceil(usersPagination.totalUsers / usersPagination.pageSize);
-            usersPagination.filteredUsers = filteredUsers;
-
-            // Рассчитываем статистику для ВЫБРАННОЙ ОБЛАСТИ
-            const totalInRegion = allUsers?.length || 0;
-            const withMaterialsInRegion = usersWithMaterials.filter(user => user.hasMaterials).length;
-
+            console.log('Статус учебника обновлен');
             // Обновляем статистику
-            document.getElementById('totalUsersCount').textContent = totalInRegion;
-            document.getElementById('usersWithMaterialsCount').textContent = withMaterialsInRegion;
-
-            // Рендерим текущую страницу
-            renderUsersPage();
-
-          } catch (error) {
-            document.getElementById('usersSkeleton').style.display = 'none';
-            showError('Ошибка загрузки пользователей: ' + error.message);
+            updateUsersStats();
           }
         }
 
-        // НОВАЯ ФУНКЦИЯ: Обогащение пользователей информацией о материалах
-        async function enrichUsersWithMaterials(users) {
-          if (!users || users.length === 0) return [];
-
-          const userIds = users.map(user => user.id);
+        // Функция обновления статистики пользователей
+        async function updateUsersStats() {
+          const regionFilter = document.getElementById('regionFilter').value;
           
-          try {
-            // Получаем доступы к учебникам и кроссвордам для всех пользователей
-            const [textbookAccess, crosswordAccess] = await Promise.all([
-              supabase
-                .from('textbook_access')
-                .select('user_id')
-                .in('user_id', userIds),
-              supabase
-                .from('crossword_access')
-                .select('user_id')
-                .in('user_id', userIds)
-            ]);
+          // Общая статистика
+          const { data: totalData, error: totalError } = await supabase
+            .from('profiles')
+            .select('textbook_issued');
 
-            // Создаем Set пользователей, у которых есть хотя бы один материал
-            const usersWithMaterialsSet = new Set();
-            
-            if (textbookAccess.data) {
-              textbookAccess.data.forEach(access => {
-                usersWithMaterialsSet.add(access.user_id);
-              });
-            }
+          // Статистика по выбранной области
+          let regionalQuery = supabase
+            .from('profiles')
+            .select('textbook_issued');
 
-            if (crosswordAccess.data) {
-              crosswordAccess.data.forEach(access => {
-                usersWithMaterialsSet.add(access.user_id);
-              });
-            }
-
-            // Обогащаем пользователей флагом hasMaterials
-            return users.map(user => ({
-              ...user,
-              hasMaterials: usersWithMaterialsSet.has(user.id),
-              materials: [] // Пока не загружаем детали материалов для оптимизации
-            }));
-
-          } catch (error) {
-            console.error('Ошибка обогащения данных пользователей:', error);
-            return users.map(user => ({
-              ...user,
-              hasMaterials: false,
-              materials: []
-            }));
+          if (regionFilter) {
+            regionalQuery = regionalQuery.eq('region', regionFilter);
           }
-        }
 
-        // ОБНОВЛЕННАЯ ФУНКЦИЯ: Отрисовка страницы пользователей
-        function renderUsersPage() {
-          const tbody = document.getElementById('usersTableBody');
-          document.getElementById('usersSkeleton').style.display = 'none';
+          const { data: regionalData, error: regionalError } = await regionalQuery;
 
-          const pageUsers = usersPagination.getCurrentPageUsers();
-          
-          tbody.innerHTML = '';
-
-          if (!pageUsers || pageUsers.length === 0) {
-            document.getElementById('usersEmptyState').style.display = 'block';
-            document.getElementById('usersPagination').style.display = 'none';
+          if (totalError || regionalError) {
+            console.error('Ошибка загрузки статистики:', totalError || regionalError);
             return;
           }
 
-          document.getElementById('usersEmptyState').style.display = 'none';
+          // Подсчет выданных учебников
+          const totalIssued = totalData ? totalData.filter(p => p.textbook_issued).length : 0;
+          const regionalIssued = regionalData ? regionalData.filter(p => p.textbook_issued).length : 0;
 
-          // Отрисовываем пользователей текущей страницы
-          pageUsers.forEach((user, index) => {
-            const globalIndex = ((usersPagination.currentPage - 1) * usersPagination.pageSize) + index + 1;
-            
-            const tr = document.createElement('tr');
-            
-            // Добавляем класс для новых пользователей (последние 7 дней)
-            const userDate = new Date(user.created_at);
-            const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-            if (userDate > weekAgo) {
-              tr.classList.add('user-row-new');
-            }
-
-            tr.innerHTML = `
-              <td><strong>${globalIndex}</strong></td>
-              <td>
-                <div><strong>${user.full_name || 'Не указано'}</strong></div>
-                <div class="user-stats"><span class="stat-badge">ID: ${user.id.slice(0,8)}...</span></div>
-              </td>
-              <td>${user.email || '—'}</td>
-              <td>${user.contact_phone || '—'}</td>
-              <td>${user.region || '—'}</td>
-              <td>
-                <div class="user-stats">
-                  <span class="stat-badge">📊 Прогресс загружается...</span>
-                </div>
-              </td>
-              <td>
-                <div class="materials-info">
-                  <div class="materials-list" id="materials_${user.id}">
-                    ${user.hasMaterials 
-                      ? '<div class="material-badge">✅ Есть материалы</div>'
-                      : '<div class="material-badge">❌ Нет материалов</div>'
-                    }
-                  </div>
-                </div>
-              </td>
-              <td>${user.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
-              <td>
-                <div class="user-actions">
-                  <button class="btn btn-small ${user.is_admin ? 'secondary' : ''}" 
-                          data-toggle-admin="${user.id}" 
-                          data-make="${!user.is_admin}">
-                    ${user.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}
-                  </button>
-                  <button class="btn btn-small" 
-                          data-access="${user.id}" 
-                          data-name="${user.full_name || user.email}">
-                    🔐 Управление доступом
-                  </button>
-                </div>
-              </td>
-            `;
-            tbody.appendChild(tr);
-          });
-
-          // Обновляем пагинацию
-          usersPagination.updatePaginationInfo();
-
-          // Обработчики для кнопок администратора
-          tbody.querySelectorAll('[data-toggle-admin]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-              const uid = btn.getAttribute('data-toggle-admin');
-              const make = btn.getAttribute('data-make') === 'true';
-              if (!confirm(`Вы уверены, что хотите ${make ? 'назначить' : 'снять'} права администратора?`)) return;
-              const { error } = await supabase.from('profiles').update({ is_admin: make }).eq('id', uid);
-              if (error) return showModal('Ошибка', error.message);
-              showModal('Готово', make ? 'Права администратора выданы' : 'Права администратора сняты');
-              loadUsers();
-            });
-          });
-
-          // Обработчики для управления доступом
-          tbody.querySelectorAll('[data-access]').forEach(btn => {
-            btn.addEventListener('click', () => 
-              openUserAccessModal(btn.getAttribute('data-access'), btn.getAttribute('data-name')));
-          });
+          // Обновление интерфейса
+          document.getElementById('totalIssuedTextbooks').textContent = totalIssued;
+          document.getElementById('regionalIssuedTextbooks').textContent = regionalIssued;
         }
 
-        // Обработчики фильтров
-        function setupUsersFilters() {
-          document.getElementById('userSearch').addEventListener('input', () => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-              usersPagination.currentPage = 1;
-              loadUsers();
-            }, 500);
-          });
-
-          document.getElementById('regionFilter').addEventListener('change', () => {
-            usersPagination.currentPage = 1;
-            loadUsers();
-          });
-
-          document.getElementById('materialStatusFilter').addEventListener('change', () => {
-            usersPagination.currentPage = 1;
-            loadUsers();
-          });
-        }
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
-
-        // ===== УПРАВЛЕНИЕ ДОСТУПАМИ (ВОССТАНАВЛИВАЕМ СТАРЫЙ ФУНКЦИОНАЛ)
+        // ===== УПРАВЛЕНИЕ ДОСТУПАМИ
         document.getElementById('closeUserAccessModal').addEventListener('click', ()=>{
           document.getElementById('userAccessModal').style.display='none';
         });
@@ -4609,8 +3281,8 @@
           `;
 
           const [t, c, ta, ca] = await Promise.all([
-            supabase.from('textbooks').select('id,title,class_level').eq('is_active', true).order('order_index'),
-            supabase.from('crosswords').select('id,title,class_level').eq('is_active', true).order('order_index'),
+            supabase.from('textbooks').select('id,title').eq('is_active', true).order('order_index'),
+            supabase.from('crosswords').select('id,title').eq('is_active', true).order('order_index'),
             supabase.from('textbook_access').select('textbook_id').eq('user_id', userId),
             supabase.from('crossword_access').select('crossword_id').eq('user_id', userId)
           ]);
@@ -4622,13 +3294,11 @@
           tList.innerHTML = '';
           if (t.data?.length) {
             t.data.forEach(tb=>{
-              const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
-              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
               const item = document.createElement('div');
               item.className = 'access-item';
               const id = `textbook_${tb.id}`;
               item.innerHTML = `<input type="checkbox" id="${id}" ${tSet.has(String(tb.id))?'checked':''}>
-                                <label for="${id}">${tb.title} (${classDisplay})</label>`;
+                                <label for="${id}">${tb.title}</label>`;
               tList.appendChild(item);
             });
           } else {
@@ -4639,13 +3309,11 @@
           cList.innerHTML = '';
           if (c.data?.length) {
             c.data.forEach(cr=>{
-              const classLevels = Array.isArray(cr.class_level) ? cr.class_level : [];
-              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
               const item = document.createElement('div');
               item.className = 'access-item';
               const id = `crossword_${cr.id}`;
               item.innerHTML = `<input type="checkbox" id="${id}" ${cSet.has(String(cr.id))?'checked':''}>
-                                <label for="${id}">${cr.title} (${classDisplay})</label>`;
+                                <label for="${id}">${cr.title}</label>`;
               cList.appendChild(item);
             });
           } else {
@@ -4683,29 +3351,15 @@
 
           showModal('Готово','Доступы обновлены');
           document.getElementById('userAccessModal').style.display='none';
-<<<<<<< HEAD
-          
-          // Инвалидируем кэш и перезагружаем пользователей
-          usersPagination.cache.clear();
-          loadUsersPage();
-          updateUsersStats();
-=======
-          loadUsers();
->>>>>>> 588d7bb1261465defa881586480bcd23f24cb1fc
         }
-
-        // Инициализация фильтров пользователей
-        setupUsersFilters();
 
         // ===== СТАРТОВАЯ ИНИЦИАЛИЗАЦИЯ
         await loadStats();
         await loadTextbooks();
         await loadCrosswords();
         await loadMaterialsForAssignments();
-        
-        // Загружаем первую страницу пользователей
-        await loadUsersPage();
-        await updateUsersStats();
+        // Загружаем первую страницу пользователей при инициализации
+        await loadUsers(1);
 
         showContent();
       } catch (e) {
