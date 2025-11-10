@@ -575,6 +575,25 @@
         overflow-x: auto;
     }
 
+    /* Стили для статуса выдачи учебника */
+    .textbook-status {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .textbook-issued {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .textbook-not-issued {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
     @media (max-width: 1024px) {
       .admin-container { width: 98%; margin: 15px auto; }
       .admin-table { font-size: 14px; }
@@ -1113,14 +1132,34 @@
           }
         }
 
+        // Загружаем информацию о доступах для определения статуса учебника
+        let accessMap = {};
+        if (userIds.length > 0) {
+          const [textbookAccess, crosswordAccess] = await Promise.all([
+            supabase
+              .from('textbook_access')
+              .select('user_id')
+              .in('user_id', userIds),
+            supabase
+              .from('crossword_access')
+              .select('user_id')
+              .in('user_id', userIds)
+          ]);
+
+          const allAccess = [...(textbookAccess.data || []), ...(crosswordAccess.data || [])];
+          allAccess.forEach(access => {
+            accessMap[access.user_id] = true;
+          });
+        }
+
         // Отрисовываем таблицу
-        renderUsersTable(users, progressMap, start);
+        renderUsersTable(users, progressMap, accessMap, start);
         
         // Обновляем пагинацию
         updatePagination();
         
         // Обновляем статистику
-        updateUsersStats();
+        updateUsersStats(users, accessMap);
 
       } catch (error) {
         showModal('Ошибка', 'Не удалось загрузить пользователей: ' + error.message);
@@ -1131,7 +1170,7 @@
     }
 
     // Функция отрисовки таблицы пользователей
-    function renderUsersTable(users, progressMap, startIndex = 0) {
+    function renderUsersTable(users, progressMap, accessMap, startIndex = 0) {
       const tbody = document.getElementById('usersTableBody');
       
       if (!users || users.length === 0) {
@@ -1144,6 +1183,8 @@
       users.forEach((u, index) => {
         const pr = progressMap[u.id] || { total: 0, completed: 0 };
         const pct = pr.total ? Math.round((pr.completed / pr.total) * 100) : 0;
+        const hasAccess = accessMap[u.id] || false;
+        
         const tr = document.createElement('tr');
         
         const userDate = new Date(u.created_at);
@@ -1167,10 +1208,9 @@
             </div>
           </td>
           <td>
-            <input type="checkbox" class="textbook-issued-checkbox" 
-                   data-user-id="${u.id}" 
-                   ${u.textbook_issued ? 'checked' : ''}
-                   title="${u.textbook_issued ? 'Учебник выдан' : 'Учебник не выдан'}">
+            <div class="textbook-status ${hasAccess ? 'textbook-issued' : 'textbook-not-issued'}">
+              ${hasAccess ? 'Выдан' : 'Не выдан'}
+            </div>
           </td>
           <td>${u.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
           <td>
@@ -1189,15 +1229,6 @@
           </td>
         `;
         tbody.appendChild(tr);
-      });
-
-      // Обработчики для чекбоксов выдачи учебников
-      tbody.querySelectorAll('.textbook-issued-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-          const userId = this.getAttribute('data-user-id');
-          const issued = this.checked;
-          updateTextbookIssued(userId, issued);
-        });
       });
 
       // Обработчики для кнопок администратора
@@ -1268,6 +1299,73 @@
         }
       } catch (e) {
         console.log('Не удалось проверить заявки:', e);
+      }
+    }
+
+    // Функция обновления статистики пользователей
+    async function updateUsersStats(users, accessMap) {
+      const regionFilter = document.getElementById('regionFilter').value;
+      
+      try {
+        // Общая статистика
+        const { data: totalData, error: totalError } = await supabase
+          .from('profiles')
+          .select('id, region');
+
+        // Статистика по выбранной области
+        let regionalQuery = supabase
+          .from('profiles')
+          .select('id, region');
+
+        if (regionFilter) {
+          regionalQuery = regionalQuery.eq('region', regionFilter);
+        }
+
+        const { data: regionalData, error: regionalError } = await regionalQuery;
+
+        if (totalError || regionalError) {
+          console.error('Ошибка загрузки статистики:', totalError || regionalError);
+          return;
+        }
+
+        // Получаем доступы для всех пользователей
+        const allUserIds = totalData ? totalData.map(p => p.id) : [];
+        let allAccessMap = {};
+
+        if (allUserIds.length > 0) {
+          const [textbookAccess, crosswordAccess] = await Promise.all([
+            supabase
+              .from('textbook_access')
+              .select('user_id')
+              .in('user_id', allUserIds),
+            supabase
+              .from('crossword_access')
+              .select('user_id')
+              .in('user_id', allUserIds)
+          ]);
+
+          const allAccess = [...(textbookAccess.data || []), ...(crosswordAccess.data || [])];
+          allAccess.forEach(access => {
+            allAccessMap[access.user_id] = true;
+          });
+        }
+
+        // Подсчет выданных учебников (пользователей с хотя бы одним доступом)
+        const totalIssued = totalData ? totalData.filter(p => allAccessMap[p.id]).length : 0;
+        const regionalIssued = regionalData ? regionalData.filter(p => allAccessMap[p.id]).length : 0;
+
+        // Обновление интерфейса
+        const totalIssuedEl = document.getElementById('totalIssuedTextbooks');
+        const regionalIssuedEl = document.getElementById('regionalIssuedTextbooks');
+
+        if (totalIssuedEl) {
+          totalIssuedEl.textContent = totalIssued;
+        }
+        if (regionalIssuedEl) {
+          regionalIssuedEl.textContent = regionalIssued;
+        }
+      } catch (error) {
+        console.error('Ошибка при обновлении статистики:', error);
       }
     }
 
@@ -3215,58 +3313,6 @@
         // ===== ПОЛЬЗОВАТЕЛИ / ДОСТУПЫ
         let currentEditingUserId = null;
 
-        // Функция обновления статуса выдачи учебника
-        async function updateTextbookIssued(userId, issued) {
-          const { error } = await supabase
-            .from('profiles')
-            .update({ textbook_issued: issued })
-            .eq('id', userId);
-
-          if (error) {
-            showModal('Ошибка', 'Не удалось обновить статус выдачи учебника: ' + error.message);
-            // Перезагружаем данные для синхронизации
-            loadUsers(currentUsersPage);
-          } else {
-            console.log('Статус учебника обновлен');
-            // Обновляем статистику
-            updateUsersStats();
-          }
-        }
-
-        // Функция обновления статистики пользователей
-        async function updateUsersStats() {
-          const regionFilter = document.getElementById('regionFilter').value;
-          
-          // Общая статистика
-          const { data: totalData, error: totalError } = await supabase
-            .from('profiles')
-            .select('textbook_issued');
-
-          // Статистика по выбранной области
-          let regionalQuery = supabase
-            .from('profiles')
-            .select('textbook_issued');
-
-          if (regionFilter) {
-            regionalQuery = regionalQuery.eq('region', regionFilter);
-          }
-
-          const { data: regionalData, error: regionalError } = await regionalQuery;
-
-          if (totalError || regionalError) {
-            console.error('Ошибка загрузки статистики:', totalError || regionalError);
-            return;
-          }
-
-          // Подсчет выданных учебников
-          const totalIssued = totalData ? totalData.filter(p => p.textbook_issued).length : 0;
-          const regionalIssued = regionalData ? regionalData.filter(p => p.textbook_issued).length : 0;
-
-          // Обновление интерфейса
-          document.getElementById('totalIssuedTextbooks').textContent = totalIssued;
-          document.getElementById('regionalIssuedTextbooks').textContent = regionalIssued;
-        }
-
         // ===== УПРАВЛЕНИЕ ДОСТУПАМИ
         document.getElementById('closeUserAccessModal').addEventListener('click', ()=>{
           document.getElementById('userAccessModal').style.display='none';
@@ -3351,6 +3397,8 @@
 
           showModal('Готово','Доступы обновлены');
           document.getElementById('userAccessModal').style.display='none';
+          // Перезагружаем пользователей для обновления статуса
+          loadUsers(currentUsersPage);
         }
 
         // ===== СТАРТОВАЯ ИНИЦИАЛИЗАЦИЯ
