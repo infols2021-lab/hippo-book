@@ -1186,7 +1186,8 @@
           </div>
         </div>
       </div>
-            <!-- Секция пользователей -->
+
+      <!-- Секция пользователей -->
       <div class="admin-section" id="users-section">
         <div class="card">
           <h2>👥 Управление пользователями</h2>
@@ -1270,7 +1271,7 @@
                   <th>Email</th>
                   <th>Контактный телефон</th>
                   <th>Область</th>
-                  <th>Прогресс</th>
+                  <!-- УБРАН СТОЛБЕЦ ПРОГРЕСС -->
                   <th>Выданные материалы</th>
                   <th>Статус</th>
                   <th>Действия</th>
@@ -1297,8 +1298,7 @@
           </div>
         </div>
       </div>
-
-    </div>
+          </div>
   </div>
 
   <div class="modal-backdrop" id="modal" style="display: none;">
@@ -1334,10 +1334,10 @@
       document.getElementById('modal').style.display = 'flex';
     }
 
-    // ============ ОПТИМИЗИРОВАННАЯ СИСТЕМА ПАГИНАЦИИ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ============
+    // ============ ИСПРАВЛЕННАЯ СИСТЕМА ПАГИНАЦИИ ============
     const usersPagination = {
       currentPage: 1,
-      pageSize: 15, // ФИКСИРОВАННО 15 ПОЛЬЗОВАТЕЛЕЙ НА СТРАНИЦЕ
+      pageSize: 15,
       totalUsers: 0,
       totalPages: 0,
       filteredUsers: [],
@@ -1446,7 +1446,6 @@
 
         console.log('✅ Пользователь авторизован:', user.email);
 
-        // Пробуем получить профиль пользователя
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('is_admin, full_name, email')
@@ -1456,7 +1455,6 @@
         if (profileError) {
           console.error('❌ Ошибка загрузки профиля:', profileError);
           
-          // Если профиль не найден - создаем его
           if (profileError.code === 'PGRST116') {
             console.log('📝 Профиль не найден, создаем новый...');
             
@@ -1510,7 +1508,6 @@
       return name.replace(/[^a-zA-Z0-9._-]/g, '_');
     }
 
-    // НОВАЯ ФУНКЦИЯ: Удаление изображения
     function setupRemoveImageButton(previewId, urlInputId, removeBtnId) {
       const preview = document.getElementById(previewId);
       const urlInput = document.getElementById(urlInputId);
@@ -1524,7 +1521,6 @@
           removeBtn.style.display = 'none';
         });
         
-        // Показываем кнопку удаления если есть изображение
         if (urlInput.value) {
           removeBtn.style.display = 'block';
         }
@@ -1554,7 +1550,6 @@
         throw error;
       }
 
-      // Публичный URL (ключ плоский)
       const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
       return pub.publicUrl;
     }
@@ -1607,13 +1602,11 @@
         if (e.dataTransfer.files?.length) handle(e.dataTransfer.files[0]);
       });
 
-      // Инициализация кнопки удаления
       if (removeBtn) {
         setupRemoveImageButton(previewId, urlInputId, removeBtnId);
       }
     }
 
-    // Инициализация загрузки картинок в вопросах (bucket: question-images)
     function initQuestionImageUpload(questionId, supabase) {
       initImageUpload({
         uploadAreaId: `questionUploadArea_${questionId}`,
@@ -1628,7 +1621,6 @@
       });
     }
 
-    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Обновление предпросмотра предложения с сохранением переносов строк
     window.updateSentencePreview = function(qid) {
       const input = document.getElementById(`sentenceInput_${qid}`);
       const preview = document.getElementById(`sentencePreview_${qid}`);
@@ -1639,14 +1631,12 @@
         return;
       }
       let i = 0;
-      // Сохраняем переносы строк с помощью white-space: pre-line в CSS
       preview.innerHTML = raw.replace(/___/g, () => {
         i++;
         return `<span style="border-bottom:2px dashed #666; padding:0 10px; margin:0 2px;">[${i}]</span>`;
       });
     };
 
-    // ============ ФУНКЦИЯ ОБНОВЛЕНИЯ НОМЕРОВ ВОПРОСОВ ============
     function renumberQuestions() {
       const questions = document.querySelectorAll('.subtask-item');
       questions.forEach((question, index) => {
@@ -1657,11 +1647,9 @@
       });
     }
 
-    // ============ НОВАЯ ЛОГИКА ДЛЯ МНОЖЕСТВЕННЫХ ОТВЕТОВ ============
     function parseMultipleAnswers(answerText) {
       if (!answerText) return [];
       
-      // Разделяем по точке с запятой и обрезаем пробелы
       return answerText.split(';')
         .map(item => item.trim())
         .filter(item => item.length > 0);
@@ -1670,23 +1658,19 @@
     function formatMultipleAnswers(answersArray) {
       if (!Array.isArray(answersArray)) return '';
       
-      // Если это массив массивов (новая структура)
       if (answersArray.length > 0 && Array.isArray(answersArray[0])) {
         return answersArray.map(subArray => subArray.join('; ')).join('\n');
       }
       
-      // Если это простой массив строк (старая структура)
       return answersArray.join('\n');
     }
 
-    // ============ ОБНОВЛЕННАЯ ЛОГИКА ДЛЯ ТИПА "ВПИСАТЬ ОТВЕТ" ============
     function initFillInputs(qid, prefillAnswers = []) {
       const container = document.getElementById(`fill-inputs-container_${qid}`);
       if (!container) return;
       
       container.innerHTML = '';
       
-      // Если есть предзаполненные данные, используем их
       if (prefillAnswers && prefillAnswers.length > 0) {
         prefillAnswers.forEach(answerGroup => {
           if (Array.isArray(answerGroup) && answerGroup.length > 0) {
@@ -1696,7 +1680,6 @@
         });
       }
       
-      // Если нет данных, добавляем одно пустое поле
       if (container.children.length === 0) {
         addFillInput(qid);
       }
@@ -1720,7 +1703,6 @@
       
       container.appendChild(inputGroup);
       
-      // Обработчик удаления
       const removeBtn = inputGroup.querySelector('.remove-input-btn');
       removeBtn.addEventListener('click', function() {
         if (container.children.length > 1) {
@@ -1730,7 +1712,6 @@
         }
       });
       
-      // Обновляем счетчик
       updateFillInputCount(qid);
     }
 
@@ -1744,7 +1725,6 @@
           numberElement.textContent = index + 1;
         }
         
-        // Разблокируем кнопку удаления, если полей больше одного
         const removeBtn = child.querySelector('.remove-input-btn');
         if (container.children.length > 1) {
           removeBtn.disabled = false;
@@ -1774,7 +1754,6 @@
       inputItems.forEach(input => {
         const value = input.value.trim();
         if (value) {
-          // Разбиваем по точке с запятой и обрезаем пробелы
           const variants = parseMultipleAnswers(value);
           if (variants.length > 0) {
             answers.push(variants);
@@ -1785,7 +1764,7 @@
       return answers;
     }
 
-    // ============ УЛУЧШЕННЫЙ КОНСТРУКТОР КРОССВОРДОВ ============
+    // ============ КРОССВОРДЫ ============
     const crosswordData = {};
 
     function createCrosswordData(qid) {
@@ -1798,25 +1777,22 @@
           cols: 15,
           nextWordNumber: 1,
           deleteMode: false,
-          cellNumbers: {} // Храним номера клеток
+          cellNumbers: {}
         };
       }
       return crosswordData[qid];
     }
 
-    // НОВАЯ ФУНКЦИЯ: Получение номера для клетки
     function getCellNumber(data, row, col) {
       const cellKey = `${row}-${col}`;
       return data.cellNumbers[cellKey];
     }
 
-    // НОВАЯ ФУНКЦИЯ: Установка номера для клетки
     function setCellNumber(data, row, col, number) {
       const cellKey = `${row}-${col}`;
       data.cellNumbers[cellKey] = number;
     }
 
-    // НОВАЯ ФУНКЦИЯ: Удаление номера клетки если нет слов
     function removeCellNumberIfNoWords(data, row, col) {
       const cellKey = `${row}-${col}`;
       const wordsAtCell = data.words.filter(word => 
@@ -1828,7 +1804,6 @@
       }
     }
 
-    // НОВАЯ ФУНКЦИЯ: Поиск слов в указанной позиции
     function findWordsAtPosition(qid, row, col) {
       const data = crosswordData[qid];
       if (!data || !data.words) return [];
@@ -1837,14 +1812,12 @@
       
       data.words.forEach(word => {
         if (word.direction === 'across') {
-          // Проверяем горизонтальное слово
           if (word.start.row === row && 
               col >= word.start.col && 
               col < word.start.col + word.length) {
             foundWords.push(word);
           }
         } else {
-          // Проверяем вертикальное слово
           if (word.start.col === col &&
               row >= word.start.row &&
               row < word.start.row + word.length) {
@@ -1856,7 +1829,6 @@
       return foundWords;
     }
 
-    // НОВАЯ ФУНКЦИЯ: Проверка размера сетки для существующих слов
     function validateGridSize(data, newRows, newCols) {
       if (!data.words || data.words.length === 0) {
         return { valid: true };
@@ -1865,7 +1837,6 @@
       let maxRow = 0;
       let maxCol = 0;
 
-      // Находим максимальные координаты всех слов
       data.words.forEach(word => {
         if (word.direction === 'across') {
           maxRow = Math.max(maxRow, word.start.row);
@@ -1876,7 +1847,6 @@
         }
       });
 
-      // Проверяем, влезают ли слова в новую сетку
       if (maxRow >= newRows || maxCol >= newCols) {
         return {
           valid: false,
@@ -1890,7 +1860,6 @@
       return { valid: true };
     }
 
-    // НОВАЯ ФУНКЦИЯ: Удаление слова
     function removeWordByNumber(qid, wordNumber) {
       const data = crosswordData[qid];
       if (!data) return;
@@ -1900,18 +1869,14 @@
 
       const word = data.words[wordIndex];
 
-      // Удаляем слово из списка
       data.words.splice(wordIndex, 1);
       
-      // Проверяем, остались ли слова в стартовой клетке
       removeCellNumberIfNoWords(data, word.start.row, word.start.col);
       
-      // Очищаем клетки, которые больше не используются другими словами
       for (let i = 0; i < word.length; i++) {
         const row = word.direction === 'across' ? word.start.row : word.start.row + i;
         const col = word.direction === 'across' ? word.start.col + i : word.start.col;
         
-        // Проверяем, принадлежит ли эта клетка другим словам
         const belongsToOtherWord = data.words.some(otherWord => {
           if (otherWord.direction === 'across') {
             for (let j = 0; j < otherWord.length; j++) {
@@ -1934,14 +1899,12 @@
         }
       }
 
-      // Перерисовываем сетку и обновляем статистику
       renderAdvancedGrid(qid);
       updateAdvancedCrosswordStats(qid);
       updateWordList(qid);
       updateStudentPreview(qid);
     }
 
-    // НОВАЯ ФУНКЦИЯ: Показать модальное окно выбора слова для удаления
     function showWordSelectionModal(qid, words, row, col) {
       const modal = document.getElementById('wordSelectionModal');
       const list = document.getElementById('wordSelectionList');
@@ -1973,7 +1936,6 @@
         list.appendChild(option);
       });
       
-      // Выбираем первое слово по умолчанию
       if (words.length > 0) {
         list.firstChild.classList.add('selected');
         selectedWord = words[0];
@@ -1994,7 +1956,6 @@
       modal.style.display = 'flex';
     }
 
-    // НОВАЯ ФУНКЦИЯ: Активация/деактивация режима удаления слов
     function toggleDeleteWordMode(qid) {
       const data = crosswordData[qid];
       if (!data) return;
@@ -2019,13 +1980,11 @@
 
       const data = createCrosswordData(qid);
 
-      // Инициализация сетки, если её нет
       if (data.grid.length === 0) {
         data.grid = Array(data.rows).fill().map(() => Array(data.cols).fill(''));
         data.blocks = [];
       }
 
-      // Обработчики для создания сетки
       const createGridBtn = document.getElementById(`createAdvancedGridBtn_${qid}`);
       const clearGridBtn = document.getElementById(`clearAdvancedGridBtn_${qid}`);
       const deleteWordBtn = document.getElementById(`deleteWordBtn_${qid}`);
@@ -2038,12 +1997,10 @@
         clearGridBtn.addEventListener('click', () => clearAdvancedGrid(qid));
       }
 
-      // НОВЫЙ ОБРАБОТЧИК: Кнопка удаления слов
       if (deleteWordBtn) {
         deleteWordBtn.addEventListener('click', () => toggleDeleteWordMode(qid));
       }
 
-      // Инициализация загрузки изображения для кроссворда
       initImageUpload({
         uploadAreaId: `crosswordAdvancedUploadArea_${qid}`,
         fileInputId: `crosswordAdvancedImageInput_${qid}`,
@@ -2056,10 +2013,8 @@
         supabase: window.supabase
       });
 
-      // Инициализация управления словами
       initWordManagement(qid);
 
-      // Если есть предзаполненные данные, восстанавливаем сетку
       const questionText = document.getElementById(`questionText_${qid}`);
       if (questionText && questionText.value.includes('[CROSSWORD]')) {
         try {
@@ -2068,14 +2023,11 @@
             const savedData = JSON.parse(match[1]);
             Object.assign(crosswordData[qid], savedData);
             
-            // ВОССТАНАВЛИВАЕМ НОМЕРА КЛЕТОК ИЗ СОХРАНЕННЫХ ДАННЫХ
             if (savedData.cellNumbers) {
               data.cellNumbers = savedData.cellNumbers;
-              // Находим максимальный номер для nextWordNumber
               const maxNumber = Math.max(...Object.values(data.cellNumbers), 0);
               data.nextWordNumber = maxNumber + 1;
             } else {
-              // Если cellNumbers нет в сохраненных данных, создаем из слов
               data.cellNumbers = {};
               data.words.forEach(word => {
                 const cellKey = `${word.start.row}-${word.start.col}`;
@@ -2083,7 +2035,6 @@
                   data.cellNumbers[cellKey] = word.number;
                 }
               });
-              // Находим максимальный номер для nextWordNumber
               const maxNumber = Math.max(...Object.values(data.cellNumbers), 0);
               data.nextWordNumber = maxNumber + 1;
             }
@@ -2097,7 +2048,6 @@
           console.warn('Не удалось восстановить кроссворд:', e);
         }
       } else if (data.grid && data.grid.length > 0) {
-        // Если данные уже есть в crosswordData, просто рендерим
         renderAdvancedGrid(qid);
         updateAdvancedCrosswordStats(qid);
         updateWordList(qid);
@@ -2121,7 +2071,6 @@
       
       const data = crosswordData[qid];
       
-      // НОВАЯ ПРОВЕРКА: Проверяем, что новая сетка достаточно большая для существующих слов
       const sizeValidation = validateGridSize(data, rows, cols);
       if (!sizeValidation.valid) {
         showModal('❌ Ошибка изменения размера', sizeValidation.message);
@@ -2134,7 +2083,7 @@
       data.rows = rows;
       data.cols = cols;
       data.nextWordNumber = 1;
-      data.cellNumbers = {}; // Сбрасываем номера клеток
+      data.cellNumbers = {};
       data.deleteMode = false;
       
       renderAdvancedGrid(qid);
@@ -2153,7 +2102,7 @@
           data.blocks = [];
           data.words = [];
           data.nextWordNumber = 1;
-          data.cellNumbers = {}; // Сбрасываем номера клеток
+          data.cellNumbers = {};
           data.deleteMode = false;
           renderAdvancedGrid(qid);
           updateAdvancedCrosswordStats(qid);
@@ -2186,7 +2135,6 @@
           cell.dataset.row = i;
           cell.dataset.col = j;
           
-          // Проверяем, заблокирована ли клетка
           const isBlocked = data.blocks.some(block => block.row === i && block.col === j);
           
           if (isBlocked) {
@@ -2202,7 +2150,6 @@
             cell.appendChild(input);
           }
           
-          // ИСПРАВЛЕНИЕ: Отображение ОДНОГО номера для клетки СЛЕВА СВЕРХУ
           const cellKey = `${i}-${j}`;
           const cellNumber = data.cellNumbers[cellKey];
           
@@ -2215,23 +2162,18 @@
             cell.appendChild(numberEl);
           }
           
-          // Добавляем обработчик двойного клика для блокировки/разблокировки клетки
           cell.ondblclick = function() {
             toggleBlockCell(qid, i, j);
           };
           
-          // НОВЫЙ ОБРАБОТЧИК: Клик для удаления слов в режиме удаления
           cell.onclick = function() {
             if (data.deleteMode) {
               const words = findWordsAtPosition(qid, i, j);
               if (words.length === 1) {
-                // Если слово одно - удаляем сразу
                 removeWordByNumber(qid, words[0].number);
                 showModal('✅ Успех', `Слово "${words[0].text}" удалено`);
-                // Выходим из режима удаления после успешного удаления
                 toggleDeleteWordMode(qid);
               } else if (words.length > 1) {
-                // Если слов несколько - показываем выбор
                 showWordSelectionModal(qid, words, i, j);
               } else {
                 showModal('❌ Ошибка', 'В этой позиции не найдено слов для удаления');
@@ -2249,17 +2191,14 @@
       updateStudentPreview(qid);
     }
 
-    // Функция для блокировки/разблокировки клетки
     function toggleBlockCell(qid, row, col) {
       const data = crosswordData[qid];
       if (!data) return;
 
       const index = data.blocks.findIndex(block => block.row === row && block.col === col);
       if (index !== -1) {
-        // Разблокируем клетку
         data.blocks.splice(index, 1);
       } else {
-        // Блокируем клетку
         data.blocks.push({row: row, col: col});
       }
       renderAdvancedGrid(qid);
@@ -2270,7 +2209,6 @@
     function initWordManagement(qid) {
       const data = crosswordData[qid];
       
-      // Обработчики для управления словами
       const placeWordBtn = document.getElementById(`placeWordBtn_${qid}`);
       const wordInput = document.getElementById(`wordInput_${qid}`);
       const wordDirection = document.getElementById(`wordDirection_${qid}`);
@@ -2289,7 +2227,6 @@
             return;
           }
           
-          // Переходим в режим размещения слова
           data.pendingWord = {
             text: word,
             direction: wordDirection.value,
@@ -2301,12 +2238,10 @@
       }
     }
 
-    // Функция для подсветки слова после размещения
     function highlightWord(qid, word) {
       const data = crosswordData[qid];
       if (!data) return;
 
-      // Находим все клетки слова
       for (let i = 0; i < word.length; i++) {
         const row = word.direction === 'across' ? word.start.row : word.start.row + i;
         const col = word.direction === 'across' ? word.start.col + i : word.start.col;
@@ -2317,7 +2252,6 @@
         }
       }
 
-      // Через 2 секунды убираем выделение
       setTimeout(() => {
         for (let i = 0; i < word.length; i++) {
           const row = word.direction === 'across' ? word.start.row : word.start.row + i;
@@ -2331,7 +2265,6 @@
       }, 2000);
     }
 
-    // Обработчик клика по клетке для размещения слова
     document.addEventListener('click', function(e) {
       const cell = e.target.closest('.crossword-cell');
       if (!cell) return;
@@ -2356,7 +2289,6 @@
       const direction = data.pendingWord.direction;
       let number = data.pendingWord.number;
       
-      // Проверяем, можно ли разместить слово
       const canPlace = canPlaceWord(data, word, direction, row, col);
       
       if (!canPlace.canPlace) {
@@ -2364,41 +2296,32 @@
         return;
       }
       
-      // ПРОВЕРЯЕМ ЕСТЬ ЛИ УЖЕ НОМЕР В КЛЕТКЕ
       const existingNumber = getCellNumber(data, row, col);
       if (existingNumber !== undefined) {
-        // Если номер уже есть, используем его
         number = existingNumber;
         showModal('ℹ️ Информация', `Используется существующий номер клетки: ${number}`);
       } else {
-        // Если номера нет, устанавливаем указанный номер
         setCellNumber(data, row, col, number);
         
-        // Обновляем следующий доступный номер если нужно
         if (number >= data.nextWordNumber) {
           data.nextWordNumber = number + 1;
         }
       }
       
-      // Размещаем слово
       placeWord(data, word, direction, row, col, number);
       
-      // Сбрасываем режим размещения
       data.pendingWord = null;
       
-      // Обновляем поле номера
       const numberInput = document.getElementById(`wordNumberInput_${qid}`);
       if (numberInput) {
         numberInput.value = data.nextWordNumber;
       }
       
-      // Обновляем интерфейс
       renderAdvancedGrid(qid);
       updateAdvancedCrosswordStats(qid);
       updateWordList(qid);
       updateStudentPreview(qid);
 
-      // Подсвечиваем размещенное слово
       const placedWord = data.words[data.words.length - 1];
       highlightWord(qid, placedWord);
       
@@ -2406,7 +2329,6 @@
     }
 
     function canPlaceWord(data, word, direction, startRow, startCol) {
-      // Проверяем границы
       if (direction === 'across') {
         if (startCol + word.length > data.cols) {
           return { canPlace: false, reason: 'Слово выходит за границы сетки по горизонтали' };
@@ -2417,12 +2339,10 @@
         }
       }
       
-      // Проверяем пересечения с заблокированными клетками и другими словами
       for (let i = 0; i < word.length; i++) {
         const currentRow = direction === 'across' ? startRow : startRow + i;
         const currentCol = direction === 'across' ? startCol + i : startCol;
         
-        // Проверяем, не заблокирована ли клетка
         const isBlocked = data.blocks.some(block => 
           block.row === currentRow && block.col === currentCol
         );
@@ -2431,7 +2351,6 @@
           return { canPlace: false, reason: `Клетка [${currentRow}, ${currentCol}] заблокирована` };
         }
         
-        // Проверяем пересечения с существующими словами
         const existingLetter = data.grid[currentRow][currentCol];
         if (existingLetter && existingLetter !== word[i]) {
           return { canPlace: false, reason: `Буква '${word[i]}' конфликтует с существующей буквой '${existingLetter}'` };
@@ -2442,7 +2361,6 @@
     }
 
     function placeWord(data, word, direction, startRow, startCol, number) {
-      // Записываем буквы в сетку и разблокируем клетки
       for (let i = 0; i < word.length; i++) {
         const row = direction === 'across' ? startRow : startRow + i;
         const col = direction === 'across' ? startCol + i : startCol;
@@ -2450,7 +2368,6 @@
         data.grid[row][col] = word[i];
       }
       
-      // Добавляем слово в список
       data.words.push({
         number: number,
         text: word,
@@ -2473,7 +2390,6 @@
         return;
       }
       
-      // Сортируем слова по номеру
       const sortedWords = [...data.words].sort((a, b) => a.number - b.number);
       
       sortedWords.forEach(word => {
@@ -2501,7 +2417,6 @@
       });
     }
 
-    // Глобальная функция для удаления слов
     window.removeWord = function(qid, wordNumber) {
       const data = crosswordData[qid];
       if (!data) return;
@@ -2588,12 +2503,10 @@
       return container;
     }
 
-    // НОВАЯ ФУНКЦИЯ: Предпросмотр для ученика
     function updateStudentPreview(qid) {
       const data = crosswordData[qid];
       if (!data || !data.grid) return;
 
-      // Создаем или находим контейнер предпросмотра
       let previewContainer = document.getElementById(`studentPreview_${qid}`);
       if (!previewContainer) {
         previewContainer = document.createElement('div');
@@ -2606,7 +2519,6 @@
         }
       }
 
-      // Собираем все клетки, которые видны ученику (только те, что входят в слова)
       const studentCells = new Set();
       data.words.forEach(word => {
         for (let i = 0; i < word.length; i++) {
@@ -2616,7 +2528,6 @@
         }
       });
 
-      // Создаем HTML для предпросмотра
       previewContainer.innerHTML = `
         <h4>👀 Предпросмотр для ученика</h4>
         <p class="small-muted">Ученик увидит только клетки для ввода букв (выделены желтым)</p>
@@ -2626,7 +2537,6 @@
       const gridElement = document.getElementById(`studentPreviewGrid_${qid}`);
       if (!gridElement) return;
 
-      // Создаем минимальную сетку, содержащую все слова
       let minRow = data.rows, maxRow = 0, minCol = data.cols, maxCol = 0;
       
       studentCells.forEach(cell => {
@@ -2637,7 +2547,6 @@
         maxCol = Math.max(maxCol, col);
       });
 
-      // Рендерим только видимую часть сетки
       for (let i = minRow; i <= maxRow; i++) {
         const rowDiv = document.createElement('div');
         rowDiv.className = 'crossword-row';
@@ -2654,7 +2563,6 @@
             cell.classList.add('input-cell');
             cell.textContent = data.grid[i][j] || '';
             
-            // ИСПРАВЛЕНИЕ: Отображение номеров слов СЛЕВА СВЕРХУ
             const cellNumber = data.cellNumbers[`${i}-${j}`];
             
             if (cellNumber !== undefined) {
@@ -2690,7 +2598,6 @@
         return { valid: false, message: 'Нет слов в кроссворде' };
       }
       
-      // Проверяем, что все слова полностью заполнены
       let incompleteWords = [];
       for (const word of data.words) {
         let complete = true;
@@ -2747,7 +2654,7 @@
         grid: data.grid,
         words: data.words,
         blocks: data.blocks,
-        cellNumbers: data.cellNumbers, // Сохраняем номера клеток
+        cellNumbers: data.cellNumbers,
         metadata: {
           rows: data.rows,
           cols: data.cols,
@@ -2756,7 +2663,7 @@
       };
     }
 
-    // ============ ПРИЛОЖЕНИЕ ============
+    // ============ ОСНОВНОЕ ПРИЛОЖЕНИЕ ============
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
@@ -2778,21 +2685,15 @@
 
         console.log('✅ Админ-панель инициализирована для пользователя:', user.email);
 
-        // Инициализация систем оптимизации
+        // Инициализация пагинации
         usersPagination.init();
 
-        // ============ НОВАЯ КНОПКА УПРАВЛЕНИЯ ЗАЯВКАМИ ============
-        document.getElementById('manageRequestsBtn').addEventListener('click', () => {
-          location.href = '/admin-requests.html';
-        });
-
-        // Проверяем необработанные заявки при загрузке
+        // Проверяем необработанные заявки
         await checkPendingRequests(supabase);
 
         // Инициализация множественного выбора классов
         initClassLevelSelectors();
 
-        // Кнопки/вкладки/модалка
         document.getElementById('modalOk').addEventListener('click', () => {
           document.getElementById('modal').style.display = 'none';
         });
@@ -2819,7 +2720,7 @@
           });
         });
 
-        // Инициализация зон загрузки для обложек (bucket: covers) С ДОБАВЛЕНИЕМ КНОПОК УДАЛЕНИЯ
+        // Инициализация загрузки изображений
         initImageUpload({
           uploadAreaId: 'textbookUploadArea',
           fileInputId: 'textbookCoverInput',
@@ -2870,7 +2771,6 @@
           document.getElementById('textbookFormTitle').textContent = 'Создать учебник';
           document.getElementById('textbookTitle').value = '';
           document.getElementById('textbookDescription').value = '';
-          // Сбрасываем множественный выбор классов
           setSelectedClassLevels(document.getElementById('textbookClassLevel'), []);
           document.getElementById('textbookOrder').value = '0';
           document.getElementById('textbookIsAvailable').checked = false;
@@ -2894,7 +2794,7 @@
           const payload = {
             title,
             description,
-            class_level: classLevels, // Теперь это массив
+            class_level: classLevels,
             order_index: orderIndex,
             is_available: isAvailable,
             is_active: true,
@@ -2943,7 +2843,6 @@
 
           textbooks.forEach(tb => {
             const tr = document.createElement('tr');
-            // Форматируем классы для отображения
             const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
             const classDisplay = classLevels.length > 0 
               ? classLevels.map(cls => classMap[cls] || cls).join(', ')
@@ -2974,7 +2873,6 @@
               document.getElementById('textbookFormTitle').textContent = 'Редактировать учебник';
               document.getElementById('textbookTitle').value = data.title || '';
               document.getElementById('textbookDescription').value = data.description || '';
-              // Устанавливаем множественный выбор классов
               setSelectedClassLevels(document.getElementById('textbookClassLevel'), data.class_level || []);
               document.getElementById('textbookOrder').value = data.order_index || 0;
               document.getElementById('textbookIsAvailable').checked = !!data.is_available;
@@ -3017,7 +2915,6 @@
           document.getElementById('crosswordFormTitle').textContent = 'Создать кроссворд';
           document.getElementById('crosswordTitle').value = '';
           document.getElementById('crosswordDescription').value = '';
-          // Сбрасываем множественный выбор классов
           setSelectedClassLevels(document.getElementById('crosswordClassLevel'), []);
           document.getElementById('crosswordOrder').value = '0';
           document.getElementById('crosswordIsAvailable').checked = false;
@@ -3041,7 +2938,7 @@
           const payload = {
             title,
             description,
-            class_level: classLevels, // Теперь это массив
+            class_level: classLevels,
             order_index: orderIndex,
             is_available: isAvailable,
             is_active: true,
@@ -3090,7 +2987,6 @@
 
           crosswords.forEach(cw => {
             const tr = document.createElement('tr');
-            // Форматируем классы для отображения
             const classLevels = Array.isArray(cw.class_level) ? cw.class_level : [];
             const classDisplay = classLevels.length > 0 
               ? classLevels.map(cls => classMap[cls] || cls).join(', ')
@@ -3120,7 +3016,6 @@
               document.getElementById('crosswordFormTitle').textContent = 'Редактировать кроссворд';
               document.getElementById('crosswordTitle').value = data.title || '';
               document.getElementById('crosswordDescription').value = data.description || '';
-              // Устанавливаем множественный выбор классов
               setSelectedClassLevels(document.getElementById('crosswordClassLevel'), data.class_level || []);
               document.getElementById('crosswordOrder').value = data.order_index || 0;
               document.getElementById('crosswordIsAvailable').checked = !!data.is_available;
@@ -3159,7 +3054,6 @@
         let editingAssignmentId = null;
         let currentQuestionType = 'test';
 
-        // переключатели типов вопросов
         document.querySelectorAll('.type-btn').forEach(btn => {
           btn.addEventListener('click', () => {
             document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
@@ -3216,7 +3110,6 @@
             select.appendChild(og);
           }
 
-          // восстановим выбранный материал если есть
           if (selectedMaterialId) {
             const has = Array.from(select.options).some(o=>o.value===selectedMaterialId);
             if (has) select.value = selectedMaterialId;
@@ -3229,14 +3122,13 @@
           document.getElementById('assignmentFormTitle').textContent = 'Создать задание';
           document.getElementById('assignmentTitle').value = '';
           document.getElementById('assignmentOrder').value = '0';
-          // Сброс типа к test
           document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
           document.querySelector('.type-btn[data-type="test"]').classList.add('active');
           currentQuestionType = 'test';
 
           const cont = document.getElementById('questionsContainer');
           cont.innerHTML = '';
-          addQuestion(); // хотя бы один вопрос
+          addQuestion();
         }
 
         function hideAssignmentForm() {
@@ -3253,7 +3145,6 @@
           wrap.setAttribute('data-id', qid);
           wrap.setAttribute('data-type', qType);
 
-          // НОВЫЙ БЛОК: Кнопка удаления изображения для всех типов вопросов
           const imageUploadBlock = `
             <div class="form-group question-image-upload">
               <label>Изображение для вопроса (опционально):</label>
@@ -3271,7 +3162,6 @@
             </div>
           `;
 
-          // УПРОЩЕННЫЙ ШАБЛОН С МНОГОСТРОЧНЫМ ТЕКСТОМ ВОПРОСА
           const questionEditor = `
             <div class="form-group">
               <label>Текст вопроса:</label>
@@ -3297,13 +3187,11 @@
               </div>
             `;
           } else if (qType === 'fill') {
-            // ОБНОВЛЕННЫЙ БЛОК ДЛЯ ТИПА "ВПИСАТЬ ОТВЕТ"
             inner += `
               ${imageUploadBlock}
               <div class="form-group">
                 <label>Правильные ответы:</label>
                 <div class="fill-inputs-container" id="fill-inputs-container_${qid}">
-                  <!-- Поля будут добавлены динамически -->
                 </div>
                 <button type="button" class="add-input-btn" id="add-fill-input_${qid}">
                   ➕ Добавить ответ
@@ -3317,7 +3205,6 @@
             `;
           } else if (qType === 'sentence') {
             const sentence = prefill?.sentence || '';
-            // ОБНОВЛЕННЫЙ ПРЕДПРОСМОТР С СОХРАНЕНИЕМ ПЕРЕНОСОВ СТРОК
             const previewHtml = sentence
               ? sentence.replace(/___/g,'<span style="border-bottom:2px dashed #666; padding:0 10px; margin:0 2px;">[?]</span>')
               : 'Введите предложение ниже';
@@ -3337,11 +3224,9 @@
                 <div class="small-muted">Каждая строка соответствует одному пропуску. Для каждого пропуска можно указать несколько вариантов через точку с запятой.</div>
               </div>
             `;
-            // live preview
             setTimeout(()=>{
               const si = document.getElementById(`sentenceInput_${qid}`);
               si?.addEventListener('input', ()=>window.updateSentencePreview(qid));
-              // Инициализируем предпросмотр сразу
               window.updateSentencePreview(qid);
             },0);
           } else if (qType === 'crossword') {
@@ -3452,12 +3337,9 @@
           `;
           container.appendChild(wrap);
 
-          // Инициализация для типа "Вписать ответ"
           if (qType === 'fill') {
-            // Инициализация полей ввода
             initFillInputs(qid, prefill?.answers || []);
             
-            // Обработчик для кнопки добавления ответа
             const addBtn = document.getElementById(`add-fill-input_${qid}`);
             if (addBtn) {
               addBtn.addEventListener('click', () => {
@@ -3466,11 +3348,9 @@
             }
           }
 
-          // init загрузчики
           if (qType !== 'crossword') {
             initQuestionImageUpload(qid, supabase);
           } else {
-            // Для улучшенного кроссворда инициализируем конструктор
             if (prefill && prefill.grid) {
               crosswordData[qid] = {
                 grid: prefill.grid,
@@ -3480,14 +3360,12 @@
                 cols: prefill.metadata?.cols || 15,
                 nextWordNumber: prefill.metadata?.nextWordNumber || (prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1),
                 deleteMode: false,
-                cellNumbers: prefill.cellNumbers || {} // Восстанавливаем номера клеток
+                cellNumbers: prefill.cellNumbers || {}
               };
             } else {
-              // Если данных нет, создаем пустую структуру
               createCrosswordData(qid);
             }
             
-            // ИСПРАВЛЕНИЕ: Вызываем инициализацию после небольшой задержки, чтобы DOM успел обновиться
             setTimeout(() => {
               initAdvancedCrosswordBuilder(qid);
               renderAdvancedGrid(qid);
@@ -3497,22 +3375,19 @@
             }, 100);
           }
 
-          // удаление вопроса (для всех типов)
           wrap.querySelector('.remove-question').addEventListener('click', () => {
             const all = document.querySelectorAll('.subtask-item');
             if (all.length > 1) {
-              // Удаляем данные кроссворда если это был кроссворд
               if (qType === 'crossword' && crosswordData[qid]) {
                 delete crosswordData[qid];
               }
               wrap.remove();
-              renumberQuestions(); // Обновляем номера после удаления
+              renumberQuestions();
             } else {
               alert('Должен остаться хотя бы один вопрос.');
             }
           });
 
-          // Обновляем номера вопросов после добавления
           renumberQuestions();
         }
 
@@ -3522,7 +3397,7 @@
           if (!selectedMaterialId) return showModal('Ошибка', 'Выберите учебник или кроссворд');
           if (!title) return showModal('Ошибка', 'Введите название задания');
 
-          const [kind, matId] = selectedMaterialId.split('_'); // textbook_ / crossword_
+          const [kind, matId] = selectedMaterialId.split('_');
           const qs = Array.from(document.querySelectorAll('.subtask-item'));
           if (!qs.length) return showModal('Ошибка', 'Добавьте хотя бы один вопрос');
 
@@ -3551,7 +3426,6 @@
               if (imgUrl) qData.image = imgUrl;
               
             } else if (type === 'fill') {
-              // ОБНОВЛЕННАЯ ЛОГИКА ДЛЯ ТИПА "ВПИСАТЬ ОТВЕТ"
               const answers = getFillAnswers(qid);
               
               if (!answers.length) return showModal('Ошибка', `Добавьте хотя бы один правильный ответ в вопросе ${i+1}`);
@@ -3571,7 +3445,6 @@
               
               const gaps = (sentence.match(/___/g) || []).length;
               
-              // НОВАЯ ЛОГИКА: каждый пропуск может содержать несколько вариантов через ;
               const answers = answersLines.map(line => parseMultipleAnswers(line));
               
               if (!answers.length || answers.length !== gaps) {
@@ -3586,7 +3459,6 @@
               if (imgUrl) qData.image = imgUrl;
               
             } else if (type === 'crossword') {
-              // Валидация улучшенного кроссворда
               const validation = validateAdvancedCrossword(qid);
               if (!validation.valid) {
                 return showModal('❌ Ошибка', validation.message);
@@ -3635,7 +3507,6 @@
           const tbody = document.querySelector('#assignmentsTable tbody');
           if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
 
-          // подтянем название материала
           let materialName = 'Материал';
           if (kind === 'textbook') {
             const { data } = await supabase.from('textbooks').select('title').eq('id', matId).single();
@@ -3651,7 +3522,6 @@
             return;
           }
 
-          // ИСПРАВЛЕНИЕ: Добавляем нумерацию заданий по порядку отображения
           rows.forEach((a, index) => {
             const qs = a.content?.questions || [];
             let typeText = '📝 Тест';
@@ -3681,7 +3551,6 @@
               const { data, error } = await supabase.from('assignments').select('*').eq('id', id).single();
               if (error) return showModal('Ошибка', error.message);
 
-              // выставить селект
               if (data.textbook_id) selectedMaterialId = `textbook_${data.textbook_id}`;
               else if (data.crossword_id) selectedMaterialId = `crossword_${data.crossword_id}`;
               document.getElementById('materialSelect').value = selectedMaterialId;
@@ -3713,11 +3582,10 @@
           });
         }
 
-        // ===== ОПТИМИЗИРОВАННАЯ СИСТЕМА ЗАГРУЗКИ ПОЛЬЗОВАТЕЛЕЙ ============
+        // ===== ИСПРАВЛЕННАЯ СИСТЕМА ПОЛЬЗОВАТЕЛЕЙ ============
         let currentEditingUserId = null;
         let searchTimeout = null;
 
-        // НОВАЯ ФУНКЦИЯ: Проверка необработанных заявок
         async function checkPendingRequests(supabase) {
           try {
             const { data: requests, error } = await supabase
@@ -3746,9 +3614,7 @@
           }
         }
 
-        // НОВАЯ ФУНКЦИЯ: Инициализация множественного выбора классов
         function initClassLevelSelectors() {
-          // Инициализация для учебников
           const textbookSelect = document.getElementById('textbookClassLevel');
           const textbookPreview = document.getElementById('textbookClassPreview');
           
@@ -3757,11 +3623,9 @@
               updateClassPreview(this, textbookPreview);
             });
             
-            // Инициализация предпросмотра
             updateClassPreview(textbookSelect, textbookPreview);
           }
 
-          // Инициализация для кроссвордов
           const crosswordSelect = document.getElementById('crosswordClassLevel');
           const crosswordPreview = document.getElementById('crosswordClassPreview');
           
@@ -3770,7 +3634,6 @@
               updateClassPreview(this, crosswordPreview);
             });
             
-            // Инициализация предпросмотра
             updateClassPreview(crosswordSelect, crosswordPreview);
           }
         }
@@ -3804,12 +3667,10 @@
         function setSelectedClassLevels(selectElement, classLevels) {
           if (!classLevels || !Array.isArray(classLevels)) return;
           
-          // Сбрасываем все выборы
           Array.from(selectElement.options).forEach(option => {
             option.selected = false;
           });
           
-          // Устанавливаем выбранные классы
           classLevels.forEach(level => {
             const option = Array.from(selectElement.options).find(opt => opt.value === level);
             if (option) {
@@ -3817,7 +3678,6 @@
             }
           });
           
-          // Обновляем предпросмотр
           const previewId = selectElement.id === 'textbookClassLevel' ? 'textbookClassPreview' : 'crosswordClassPreview';
           const previewContainer = document.getElementById(previewId);
           if (previewContainer) {
@@ -3825,7 +3685,7 @@
           }
         }
 
-        // ОБНОВЛЕННАЯ ФУНКЦИЯ: Загрузка пользователей с правильной пагинацией и фильтрацией
+        // ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ПОЛЬЗОВАТЕЛЕЙ
         async function loadUsers() {
           if (usersPagination.isLoading) return;
           
@@ -3835,20 +3695,17 @@
           const regionFilter = document.getElementById('regionFilter').value;
           const materialStatusFilter = document.getElementById('materialStatusFilter').value;
 
-          // Показываем скелетон-загрузку
           document.getElementById('usersTableBody').innerHTML = '';
           document.getElementById('usersSkeleton').style.display = 'block';
           document.getElementById('usersEmptyState').style.display = 'none';
           document.getElementById('usersPagination').style.display = 'none';
 
           try {
-            // Создаем базовый запрос
             let query = supabase
               .from('profiles')
               .select('*')
               .order('created_at', { ascending: false });
 
-            // Применяем фильтры поиска и региона
             if (searchQuery) {
               query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
             }
@@ -3857,15 +3714,12 @@
               query = query.eq('region', regionFilter);
             }
 
-            // Получаем ВСЕХ пользователей с учетом фильтров
             const { data: allUsers, error } = await query;
 
             if (error) throw error;
 
-            // Обогащаем пользователей данными о материалах
             const usersWithMaterials = await enrichUsersWithMaterials(allUsers || []);
 
-            // Применяем фильтр по материалам
             let filteredUsers = usersWithMaterials;
             if (materialStatusFilter === 'has_materials') {
               filteredUsers = usersWithMaterials.filter(user => user.hasMaterials);
@@ -3873,20 +3727,16 @@
               filteredUsers = usersWithMaterials.filter(user => !user.hasMaterials);
             }
 
-            // Обновляем пагинацию
             usersPagination.totalUsers = filteredUsers.length;
             usersPagination.totalPages = Math.ceil(usersPagination.totalUsers / usersPagination.pageSize);
             usersPagination.filteredUsers = filteredUsers;
 
-            // Рассчитываем статистику для ВЫБРАННЫХ ФИЛЬТРОВ
             const totalInFilters = filteredUsers.length;
             const withMaterialsInFilters = filteredUsers.filter(user => user.hasMaterials).length;
 
-            // Обновляем статистику
             document.getElementById('totalUsersCount').textContent = totalInFilters;
             document.getElementById('usersWithMaterialsCount').textContent = withMaterialsInFilters;
 
-            // Рендерим текущую страницу
             renderUsersPage();
 
           } catch (error) {
@@ -3897,14 +3747,12 @@
           }
         }
 
-        // НОВАЯ ФУНКЦИЯ: Обогащение пользователей информацией о материалах
         async function enrichUsersWithMaterials(users) {
           if (!users || users.length === 0) return [];
 
           const userIds = users.map(user => user.id);
           
           try {
-            // Получаем доступы к учебникам и кроссвордам для всех пользователей
             const [textbookAccess, crosswordAccess] = await Promise.all([
               supabase
                 .from('textbook_access')
@@ -3916,7 +3764,6 @@
                 .in('user_id', userIds)
             ]);
 
-            // Создаем Set пользователей, у которых есть хотя бы один материал
             const usersWithMaterialsSet = new Set();
             
             if (textbookAccess.data) {
@@ -3931,11 +3778,10 @@
               });
             }
 
-            // Обогащаем пользователей флагом hasMaterials
             return users.map(user => ({
               ...user,
               hasMaterials: usersWithMaterialsSet.has(user.id),
-              materials: [] // Пока не загружаем детали материалов для оптимизации
+              materials: []
             }));
 
           } catch (error) {
@@ -3948,7 +3794,7 @@
           }
         }
 
-        // ОБНОВЛЕННАЯ ФУНКЦИЯ: Отрисовка страницы пользователей
+        // ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТРИСОВКИ ПОЛЬЗОВАТЕЛЕЙ
         function renderUsersPage() {
           const tbody = document.getElementById('usersTableBody');
           document.getElementById('usersSkeleton').style.display = 'none';
@@ -3965,19 +3811,18 @@
 
           document.getElementById('usersEmptyState').style.display = 'none';
 
-          // Отрисовываем пользователей текущей страницы
           pageUsers.forEach((user, index) => {
             const globalIndex = ((usersPagination.currentPage - 1) * usersPagination.pageSize) + index + 1;
             
             const tr = document.createElement('tr');
             
-            // Добавляем класс для новых пользователей (последние 7 дней)
             const userDate = new Date(user.created_at);
             const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
             if (userDate > weekAgo) {
               tr.classList.add('user-row-new');
             }
 
+            // ИСПРАВЛЕННЫЙ HTML - УБРАН СТОЛБЕЦ ПРОГРЕСС
             tr.innerHTML = `
               <td><strong>${globalIndex}</strong></td>
               <td>
@@ -3987,11 +3832,6 @@
               <td>${user.email || '—'}</td>
               <td>${user.contact_phone || '—'}</td>
               <td>${user.region || '—'}</td>
-              <td>
-                <div class="user-stats">
-                  <span class="stat-badge">📊 Прогресс загружается...</span>
-                </div>
-              </td>
               <td>
                 <div class="materials-info">
                   <div class="materials-list" id="materials_${user.id}">
@@ -4021,10 +3861,8 @@
             tbody.appendChild(tr);
           });
 
-          // Обновляем пагинацию
           usersPagination.updatePaginationInfo();
 
-          // Обработчики для кнопок администратора
           tbody.querySelectorAll('[data-toggle-admin]').forEach(btn => {
             btn.addEventListener('click', async () => {
               const uid = btn.getAttribute('data-toggle-admin');
@@ -4037,14 +3875,12 @@
             });
           });
 
-          // Обработчики для управления доступом
           tbody.querySelectorAll('[data-access]').forEach(btn => {
             btn.addEventListener('click', () => 
               openUserAccessModal(btn.getAttribute('data-access'), btn.getAttribute('data-name')));
           });
         }
 
-        // Обработчики фильтров
         function setupUsersFilters() {
           document.getElementById('userSearch').addEventListener('input', () => {
             clearTimeout(searchTimeout);
@@ -4065,7 +3901,7 @@
           });
         }
 
-        // ===== УПРАВЛЕНИЕ ДОСТУПАМИ (ВОССТАНАВЛИВАЕМ СТАРЫЙ ФУНКЦИОНАЛ)
+        // ===== УПРАВЛЕНИЕ ДОСТУПАМИ
         document.getElementById('closeUserAccessModal').addEventListener('click', ()=>{
           document.getElementById('userAccessModal').style.display='none';
         });
@@ -4128,13 +3964,11 @@
         async function saveUserAccess() {
           if (!currentEditingUserId) return;
 
-          // собрать выбор
           const textSelected = Array.from(document.querySelectorAll('#textbookAccessList input[type="checkbox"]:checked'))
             .map(cb => cb.id.replace('textbook_',''));
           const crossSelected = Array.from(document.querySelectorAll('#crosswordAccessList input[type="checkbox"]:checked'))
             .map(cb => cb.id.replace('crossword_',''));
 
-          // перезаписать
           const ops = [];
           ops.push(supabase.from('textbook_access').delete().eq('user_id', currentEditingUserId));
           ops.push(supabase.from('crossword_access').delete().eq('user_id', currentEditingUserId));
