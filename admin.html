@@ -454,7 +454,7 @@
         background: #f8f9fa;
     }
 
-    /* Стили для кнопки управления заявками с бейджом */
+    /* Стили для кнопки управления заявками с бейджем */
     .requests-btn {
         position: relative;
         transition: all 0.3s ease;
@@ -785,6 +785,17 @@
         z-index: 1000;
         opacity: 0.9;
         display: none;
+    }
+
+    /* ИНДИКАТОР ЗАГРУЗКИ ПОЛЬЗОВАТЕЛЕЙ */
+    .users-loading {
+        text-align: center;
+        padding: 40px;
+        display: none;
+    }
+
+    .users-loading.active {
+        display: block;
     }
 
     @media (max-width: 1024px) {
@@ -1175,8 +1186,7 @@
           </div>
         </div>
       </div>
-
-      <!-- Секция пользователей -->
+            <!-- Секция пользователей -->
       <div class="admin-section" id="users-section">
         <div class="card">
           <h2>👥 Управление пользователями</h2>
@@ -1227,6 +1237,12 @@
                 <option value="no_materials">Нет материалов</option>
               </select>
             </div>
+          </div>
+
+          <!-- Индикатор загрузки -->
+          <div class="users-loading" id="usersLoading">
+            <div class="spinner"></div>
+            <p>🔄 Загружаем пользователей...</p>
           </div>
 
           <!-- Пагинация -->
@@ -1318,13 +1334,14 @@
       document.getElementById('modal').style.display = 'flex';
     }
 
-    // ============ СИСТЕМА ПАГИНАЦИИ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ============
+    // ============ ОПТИМИЗИРОВАННАЯ СИСТЕМА ПАГИНАЦИИ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ============
     const usersPagination = {
       currentPage: 1,
       pageSize: 15, // ФИКСИРОВАННО 15 ПОЛЬЗОВАТЕЛЕЙ НА СТРАНИЦЕ
       totalUsers: 0,
       totalPages: 0,
       filteredUsers: [],
+      isLoading: false,
       
       init() {        
         document.getElementById('firstPageBtn').addEventListener('click', () => {
@@ -1345,7 +1362,7 @@
       },
       
       goToPage(page) {
-        if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
+        if (page >= 1 && page <= this.totalPages && page !== this.currentPage && !this.isLoading) {
           this.currentPage = page;
           renderUsersPage();
         }
@@ -1397,6 +1414,16 @@
         const startIndex = (this.currentPage - 1) * this.pageSize;
         const endIndex = startIndex + this.pageSize;
         return this.filteredUsers.slice(startIndex, endIndex);
+      },
+
+      setLoading(loading) {
+        this.isLoading = loading;
+        const loadingElement = document.getElementById('usersLoading');
+        if (loading) {
+          loadingElement.classList.add('active');
+        } else {
+          loadingElement.classList.remove('active');
+        }
       }
     };
 
@@ -3686,7 +3713,7 @@
           });
         }
 
-        // ===== ПОЛЬЗОВАТЕЛИ / ДОСТУПЫ
+        // ===== ОПТИМИЗИРОВАННАЯ СИСТЕМА ЗАГРУЗКИ ПОЛЬЗОВАТЕЛЕЙ ============
         let currentEditingUserId = null;
         let searchTimeout = null;
 
@@ -3800,6 +3827,10 @@
 
         // ОБНОВЛЕННАЯ ФУНКЦИЯ: Загрузка пользователей с правильной пагинацией и фильтрацией
         async function loadUsers() {
+          if (usersPagination.isLoading) return;
+          
+          usersPagination.setLoading(true);
+          
           const searchQuery = document.getElementById('userSearch').value.trim();
           const regionFilter = document.getElementById('regionFilter').value;
           const materialStatusFilter = document.getElementById('materialStatusFilter').value;
@@ -3808,6 +3839,7 @@
           document.getElementById('usersTableBody').innerHTML = '';
           document.getElementById('usersSkeleton').style.display = 'block';
           document.getElementById('usersEmptyState').style.display = 'none';
+          document.getElementById('usersPagination').style.display = 'none';
 
           try {
             // Создаем базовый запрос
@@ -3846,13 +3878,13 @@
             usersPagination.totalPages = Math.ceil(usersPagination.totalUsers / usersPagination.pageSize);
             usersPagination.filteredUsers = filteredUsers;
 
-            // Рассчитываем статистику для ВЫБРАННОЙ ОБЛАСТИ
-            const totalInRegion = allUsers?.length || 0;
-            const withMaterialsInRegion = usersWithMaterials.filter(user => user.hasMaterials).length;
+            // Рассчитываем статистику для ВЫБРАННЫХ ФИЛЬТРОВ
+            const totalInFilters = filteredUsers.length;
+            const withMaterialsInFilters = filteredUsers.filter(user => user.hasMaterials).length;
 
             // Обновляем статистику
-            document.getElementById('totalUsersCount').textContent = totalInRegion;
-            document.getElementById('usersWithMaterialsCount').textContent = withMaterialsInRegion;
+            document.getElementById('totalUsersCount').textContent = totalInFilters;
+            document.getElementById('usersWithMaterialsCount').textContent = withMaterialsInFilters;
 
             // Рендерим текущую страницу
             renderUsersPage();
@@ -3860,6 +3892,8 @@
           } catch (error) {
             document.getElementById('usersSkeleton').style.display = 'none';
             showError('Ошибка загрузки пользователей: ' + error.message);
+          } finally {
+            usersPagination.setLoading(false);
           }
         }
 
