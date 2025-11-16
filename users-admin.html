@@ -2,9 +2,33 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Управление пользователями - Edu Keys</title>
+  <title>Управление пользователями</title>
   <style>
-    /* СТИЛИ ДЛЯ УПРАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯМИ */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: transparent;
+      padding: 0;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 0;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+
     .users-controls {
       display: flex;
       justify-content: space-between;
@@ -16,15 +40,15 @@
 
     .users-stats {
       display: flex;
-      gap: 20px;
+      gap: 15px;
       flex-wrap: wrap;
     }
 
     .stat-badge-large {
       background: white;
       padding: 12px 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       border-left: 4px solid #4ECDC4;
       font-weight: 600;
     }
@@ -41,106 +65,43 @@
       gap: 15px;
       margin-bottom: 20px;
       flex-wrap: wrap;
-      align-items: end;
     }
 
-    .filters-container select,
-    .filters-container input {
-      min-width: 200px;
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .input, select {
+      width: 100%;
       padding: 10px 12px;
       border: 2px solid #e0e0e0;
-      border-radius: 8px;
+      border-radius: 6px;
       font-size: 14px;
       background: white;
     }
 
-    .filters-container select:focus,
-    .filters-container input:focus {
+    .input:focus, select:focus {
       border-color: #4ECDC4;
       outline: none;
     }
 
-    .user-row-new {
-      background: #f8f9fa !important;
-    }
-
-    /* Стили для кнопки управления заявками с бейджем */
-    .requests-btn {
-      position: relative;
-      transition: all 0.3s ease;
-      padding: 12px 20px;
-      background: #4ECDC4;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    .requests-badge {
-      position: absolute;
-      top: -8px;
-      right: -8px;
-      background: #e74c3c;
-      color: white;
-      border-radius: 50%;
-      width: 20px;
-      height: 20px;
-      font-size: 12px;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .requests-btn.has-pending {
-      border: 2px solid #e74c3c !important;
-      animation: pulse 2s infinite;
-    }
-
-    .requests-btn.no-pending {
-      border: 2px solid #27ae60 !important;
-    }
-
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
-      70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
-    }
-
-    .user-stats {
-      display: flex;
-      gap: 10px;
-      margin-top: 5px;
-      flex-wrap: wrap;
-    }
-
-    .stat-badge {
-      background: #f8f9fa;
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 12px;
-    }
-
-    .user-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-
     .btn {
-      padding: 8px 16px;
+      padding: 10px 16px;
       background: #4ECDC4;
       color: white;
       border: none;
       border-radius: 6px;
       cursor: pointer;
       font-size: 14px;
+      font-weight: 600;
       transition: background 0.2s;
-      text-decoration: none;
-      display: inline-block;
-      text-align: center;
     }
 
     .btn:hover {
@@ -168,29 +129,31 @@
       background: #7f8c8d;
     }
 
-    .input {
-      width: 100%;
-      padding: 10px 12px;
-      border: 2px solid #e0e0e0;
+    .requests-btn {
+      position: relative;
+      padding: 12px 20px;
+      background: #4ECDC4;
+      color: white;
+      border: none;
       border-radius: 8px;
-      font-size: 14px;
-      transition: border-color 0.2s;
-      background: white;
-    }
-
-    .input:focus {
-      border-color: #4ECDC4;
-      outline: none;
-    }
-
-    .form-group {
-      margin-bottom: 15px;
-    }
-
-    .form-group label {
-      display: block;
-      margin-bottom: 5px;
+      cursor: pointer;
       font-weight: 600;
+    }
+
+    .requests-badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #e74c3c;
+      color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .admin-table {
@@ -198,27 +161,153 @@
       border-collapse: collapse;
       margin-top: 15px;
       background: white;
-      border-radius: 12px;
+      border-radius: 8px;
       overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
     .admin-table th, .admin-table td {
       padding: 12px 15px;
       text-align: left;
-      border-bottom: 1px solid rgba(0,0,0,0.06);
+      border-bottom: 1px solid #f0f0f0;
     }
 
     .admin-table th {
       background-color: #f8f9fa;
       font-weight: 700;
+      color: #333;
     }
 
     .admin-table tr:last-child td {
       border-bottom: none;
     }
 
-    /* Модалка доступа пользователей */
+    .user-stats {
+      display: flex;
+      gap: 8px;
+      margin-top: 5px;
+    }
+
+    .stat-badge {
+      background: #f8f9fa;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #666;
+    }
+
+    .user-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .materials-info {
+      background: #e8f5e8;
+      border: 1px solid #c8e6c9;
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 12px;
+    }
+
+    .material-badge {
+      background: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    .pagination-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 20px;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .pagination-info {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .pagination-controls {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .pagination-btn {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .pagination-btn:hover:not(:disabled) {
+      background: #4ECDC4;
+      color: white;
+    }
+
+    .pagination-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .pagination-page {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .pagination-page.active {
+      background: #4ECDC4;
+      color: white;
+      border-color: #4ECDC4;
+    }
+
+    .users-loading {
+      text-align: center;
+      padding: 40px;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #4ECDC4;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+      text-align: center;
+    }
+
     .user-access-modal {
       position: fixed;
       top: 0;
@@ -234,9 +323,9 @@
 
     .user-access-content {
       background: white;
-      border-radius: 12px;
+      border-radius: 8px;
       padding: 20px;
-      max-width: 800px;
+      max-width: 600px;
       width: 90%;
       max-height: 80vh;
       overflow-y: auto;
@@ -248,8 +337,8 @@
 
     .access-list {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      gap: 10px;
+      grid-template-columns: 1fr;
+      gap: 8px;
       margin: 10px 0;
     }
 
@@ -259,269 +348,38 @@
       gap: 8px;
       padding: 8px;
       border: 1px solid #ddd;
-      border-radius: 6px;
-    }
-
-    .card {
-      background: white;
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 8px 26px rgba(0,0,0,0.08);
-      margin-bottom: 20px;
-    }
-
-    /* СТИЛИ ДЛЯ ВЫДАННЫХ МАТЕРИАЛОВ */
-    .materials-info {
-      background: #e8f5e8;
-      border: 1px solid #c8e6c9;
-      border-radius: 8px;
-      padding: 12px;
-      margin: 10px 0;
-      font-size: 14px;
-    }
-
-    .materials-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .material-badge {
-      background: white;
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 12px;
-      border: 1px solid #c8e6c9;
-    }
-
-    /* СТИЛИ ДЛЯ ПАГИНАЦИИ */
-    .pagination-container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 20px;
-      padding: 15px;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .pagination-info {
-      font-size: 14px;
-      color: #666;
-      font-weight: 600;
-    }
-
-    .pagination-controls {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .pagination-btn {
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      background: white;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.2s;
-    }
-
-    .pagination-btn:hover:not(:disabled) {
-      background: #4ECDC4;
-      color: white;
-      border-color: #4ECDC4;
-    }
-
-    .pagination-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .pagination-page {
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      background: white;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.2s;
-    }
-
-    .pagination-page.active {
-      background: #4ECDC4;
-      color: white;
-      border-color: #4ECDC4;
-    }
-
-    .pagination-page:hover:not(.active) {
-      background: #f8f9fa;
-    }
-
-    /* ИНДИКАТОР ЗАГРУЗКИ */
-    .users-loading {
-      text-align: center;
-      padding: 40px;
-      display: none;
-    }
-
-    .users-loading.active {
-      display: block;
-    }
-
-    .spinner {
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #4ECDC4;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 2s linear infinite;
-      margin: 0 auto 20px;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    /* СКЕЛЕТОН-ЗАГРУЗКА */
-    .skeleton-loader {
-      animation: skeleton-pulse 1.5s ease-in-out infinite;
-      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-      background-size: 200% 100%;
       border-radius: 4px;
     }
 
-    @keyframes skeleton-pulse {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
-
-    .skeleton-text {
-      height: 16px;
-      margin-bottom: 8px;
-    }
-
-    .loading-row {
-      text-align: center;
-      padding: 20px;
-      color: #666;
-    }
-
-    /* СТАТУСЫ */
-    .empty-state {
-      text-align: center;
-      padding: 40px;
-      color: #666;
-    }
-
-    .error {
-      background: #ffebee;
-      color: #c62828;
-      padding: 20px;
-      border-radius: 8px;
-      margin: 20px 0;
-      text-align: center;
-    }
-
-    .small-muted {
-      font-size: 12px;
-      color: #666;
-      margin-top: 5px;
-    }
-
-    /* АДАПТИВНОСТЬ */
-    @media (max-width: 1024px) {
-      .filters-container {
-        flex-direction: column;
-        width: 100%;
-      }
-      
-      .filters-container select,
-      .filters-container input {
-        min-width: 100%;
-      }
-      
+    @media (max-width: 768px) {
       .users-controls {
         flex-direction: column;
         align-items: flex-start;
       }
       
-      .pagination-container {
+      .filters-container {
         flex-direction: column;
-        gap: 15px;
       }
-    }
-
-    @media (max-width: 768px) {
+      
       .admin-table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
-        font-size: 13px;
+        font-size: 12px;
       }
       
       .admin-table th, .admin-table td {
-        padding: 6px 8px;
-        min-width: 120px;
+        padding: 8px 10px;
       }
       
       .user-actions {
         flex-direction: row;
-        gap: 5px;
-      }
-      
-      .user-actions .btn-small {
-        padding: 4px 8px;
-        font-size: 12px;
-      }
-      
-      .users-stats {
-        flex-direction: column;
-        gap: 10px;
-      }
-      
-      .materials-list {
-        flex-direction: column;
-      }
-      
-      .material-badge {
-        width: fit-content;
-      }
-      
-      .access-list {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .pagination-controls {
-        justify-content: center;
-      }
-      
-      .pagination-page {
-        padding: 6px 8px;
-        font-size: 12px;
-      }
-      
-      .pagination-btn {
-        padding: 6px 8px;
-        font-size: 12px;
       }
     }
   </style>
 </head>
 <body>
-  <!-- Основной контент управления пользователями -->
   <div class="card">
     <h2>👥 Управление пользователями</h2>
     
     <div class="users-controls">
-      <!-- Кнопка управления заявками с бейджем -->
       <button class="btn requests-btn" id="manageRequestsBtn">
         📋 Управление заявками
         <span class="requests-badge" id="requestsBadge" style="display: none;">0</span>
@@ -540,12 +398,12 @@
     </div>
 
     <div class="filters-container">
-      <div class="form-group">
+      <div class="form-group" style="flex: 1;">
         <label>Поиск по имени или email:</label>
         <input type="text" id="userSearch" placeholder="Введите для поиска..." class="input">
       </div>
       
-      <div class="form-group">
+      <div class="form-group" style="flex: 1;">
         <label>Фильтр по области:</label>
         <select id="regionFilter" class="input">
           <option value="">Все области</option>
@@ -558,7 +416,7 @@
         </select>
       </div>
 
-      <div class="form-group">
+      <div class="form-group" style="flex: 1;">
         <label>Статус материалов:</label>
         <select id="materialStatusFilter" class="input">
           <option value="">Все пользователи</option>
@@ -568,13 +426,11 @@
       </div>
     </div>
 
-    <!-- Индикатор загрузки -->
     <div class="users-loading" id="usersLoading">
       <div class="spinner"></div>
       <p>🔄 Загружаем пользователей...</p>
     </div>
 
-    <!-- Пагинация -->
     <div class="pagination-container" id="usersPagination" style="display: none;">
       <div class="pagination-info" id="paginationInfo">
         Показано <span id="currentRange">0-0</span> из <span id="totalFilteredUsers">0</span>
@@ -582,9 +438,7 @@
       <div class="pagination-controls">
         <button class="pagination-btn" id="firstPageBtn" disabled>⏮️</button>
         <button class="pagination-btn" id="prevPageBtn" disabled>◀️</button>
-        
         <div id="pageNumbers"></div>
-        
         <button class="pagination-btn" id="nextPageBtn" disabled>▶️</button>
         <button class="pagination-btn" id="lastPageBtn" disabled>⏭️</button>
       </div>
@@ -597,9 +451,9 @@
             <th>№</th>
             <th>ФИО</th>
             <th>Email</th>
-            <th>Контактный телефон</th>
+            <th>Телефон</th>
             <th>Область</th>
-            <th>Выданные материалы</th>
+            <th>Материалы</th>
             <th>Статус</th>
             <th>Действия</th>
           </tr>
@@ -610,22 +464,13 @@
       </table>
     </div>
 
-    <!-- Скелетон-загрузка -->
-    <div id="usersSkeleton" style="display: none;">
-      <div class="loading-row">
-        <div class="skeleton-loader skeleton-text"></div>
-        <div class="skeleton-loader skeleton-text" style="width: 80%;"></div>
-        <div class="skeleton-loader skeleton-text" style="width: 60%;"></div>
-      </div>
-    </div>
-
     <div id="usersEmptyState" class="empty-state" style="display: none;">
       <h3>👥 Пользователи не найдены</h3>
       <p>Попробуйте изменить параметры поиска или фильтры</p>
     </div>
   </div>
 
-  <!-- Модальное окно управления доступом пользователя -->
+  <!-- Модальное окно управления доступом -->
   <div class="user-access-modal" id="userAccessModal">
     <div class="user-access-content card">
       <h3>🔐 Управление доступом пользователя</h3>
@@ -642,46 +487,34 @@
       </div>
 
       <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-        <button class="btn" id="saveUserAccessBtn">💾 Сохранить доступы</button>
+        <button class="btn" id="saveUserAccessBtn">💾 Сохранить</button>
         <button class="btn btn-secondary" id="closeUserAccessModal">❌ Закрыть</button>
       </div>
     </div>
   </div>
 
   <script>
-    // ============ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ============
+    // Глобальные переменные
     let currentEditingUserId = null;
     let searchTimeout = null;
 
-    // ============ СИСТЕМА ПАГИНАЦИИ ============
+    // Простая система пагинации
     const usersPagination = {
       currentPage: 1,
-      pageSize: 15,
+      pageSize: 10,
       totalUsers: 0,
       totalPages: 0,
       filteredUsers: [],
-      isLoading: false,
       
       init() {        
-        document.getElementById('firstPageBtn').addEventListener('click', () => {
-          this.goToPage(1);
-        });
-        
-        document.getElementById('prevPageBtn').addEventListener('click', () => {
-          this.goToPage(this.currentPage - 1);
-        });
-        
-        document.getElementById('nextPageBtn').addEventListener('click', () => {
-          this.goToPage(this.currentPage + 1);
-        });
-        
-        document.getElementById('lastPageBtn').addEventListener('click', () => {
-          this.goToPage(this.totalPages);
-        });
+        document.getElementById('firstPageBtn').onclick = () => this.goToPage(1);
+        document.getElementById('prevPageBtn').onclick = () => this.goToPage(this.currentPage - 1);
+        document.getElementById('nextPageBtn').onclick = () => this.goToPage(this.currentPage + 1);
+        document.getElementById('lastPageBtn').onclick = () => this.goToPage(this.totalPages);
       },
       
       goToPage(page) {
-        if (page >= 1 && page <= this.totalPages && page !== this.currentPage && !this.isLoading) {
+        if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
           this.currentPage = page;
           renderUsersPage();
         }
@@ -704,8 +537,7 @@
         this.renderPageNumbers();
         
         // Показываем/скрываем пагинацию
-        const paginationContainer = document.getElementById('usersPagination');
-        paginationContainer.style.display = this.totalUsers > 0 ? 'flex' : 'none';
+        document.getElementById('usersPagination').style.display = this.totalUsers > 0 ? 'flex' : 'none';
       },
       
       renderPageNumbers() {
@@ -724,7 +556,7 @@
           const pageBtn = document.createElement('button');
           pageBtn.className = `pagination-page ${i === this.currentPage ? 'active' : ''}`;
           pageBtn.textContent = i;
-          pageBtn.addEventListener('click', () => this.goToPage(i));
+          pageBtn.onclick = () => this.goToPage(i);
           container.appendChild(pageBtn);
         }
       },
@@ -733,31 +565,26 @@
         const startIndex = (this.currentPage - 1) * this.pageSize;
         const endIndex = startIndex + this.pageSize;
         return this.filteredUsers.slice(startIndex, endIndex);
-      },
-
-      setLoading(loading) {
-        this.isLoading = loading;
-        const loadingElement = document.getElementById('usersLoading');
-        if (loading) {
-          loadingElement.classList.add('active');
-        } else {
-          loadingElement.classList.remove('active');
-        }
       }
     };
 
-    // ============ УТИЛИТЫ ============
+    // Утилиты
     function showModal(title, text) {
-      // Используем alert как fallback если нет родительского модального окна
-      alert(`${title}\n\n${text}`);
+      alert(title + '\n\n' + text);
     }
 
     function showError(message) {
-      // Используем alert как fallback если нет родительского модального окна
-      alert(`❌ Ошибка: ${message}`);
+      alert('❌ Ошибка: ' + message);
     }
 
-    // ============ ОСНОВНЫЕ ФУНКЦИИ ============
+    // Получение Supabase клиента
+    function getSupabase() {
+      if (window.supabase) return window.supabase;
+      if (window.parent && window.parent.supabase) return window.parent.supabase;
+      return null;
+    }
+
+    // Основные функции
     async function checkPendingRequests() {
       try {
         const supabase = getSupabase();
@@ -768,8 +595,8 @@
           .select('id')
           .eq('is_processed', false);
 
-        if (!error) {
-          const pendingCount = requests?.length || 0;
+        if (!error && requests) {
+          const pendingCount = requests.length;
           const badge = document.getElementById('requestsBadge');
           const button = document.getElementById('manageRequestsBtn');
           
@@ -777,11 +604,9 @@
             badge.style.display = 'flex';
             badge.textContent = pendingCount;
             button.classList.add('has-pending');
-            button.classList.remove('no-pending');
           } else {
             badge.style.display = 'none';
             button.classList.remove('has-pending');
-            button.classList.add('no-pending');
           }
         }
       } catch (e) {
@@ -789,94 +614,22 @@
       }
     }
 
-    function getSupabase() {
-      // Пытаемся получить supabase из различных источников
-      if (window.supabase) return window.supabase;
-      if (window.parent && window.parent.supabase) return window.parent.supabase;
-      if (window.opener && window.opener.supabase) return window.opener.supabase;
-      return null;
-    }
-
-    function getCurrentUser() {
-      // Пытаемся получить пользователя из различных источников
-      if (window.user) return window.user;
-      if (window.parent && window.parent.user) return window.parent.user;
-      if (window.opener && window.opener.user) return window.opener.user;
-      return null;
-    }
-
-    async function enrichUsersWithMaterials(users) {
-      if (!users || users.length === 0) return [];
-
-      const userIds = users.map(user => user.id);
-      const supabase = getSupabase();
-      
-      if (!supabase) return users;
-
-      try {
-        const [textbookAccess, crosswordAccess] = await Promise.all([
-          supabase
-            .from('textbook_access')
-            .select('user_id')
-            .in('user_id', userIds),
-          supabase
-            .from('crossword_access')
-            .select('user_id')
-            .in('user_id', userIds)
-        ]);
-
-        const usersWithMaterialsSet = new Set();
-        
-        if (textbookAccess.data) {
-          textbookAccess.data.forEach(access => {
-            usersWithMaterialsSet.add(access.user_id);
-          });
-        }
-
-        if (crosswordAccess.data) {
-          crosswordAccess.data.forEach(access => {
-            usersWithMaterialsSet.add(access.user_id);
-          });
-        }
-
-        return users.map(user => ({
-          ...user,
-          hasMaterials: usersWithMaterialsSet.has(user.id),
-          materials: []
-        }));
-
-      } catch (error) {
-        console.error('Ошибка обогащения данных пользователей:', error);
-        return users.map(user => ({
-          ...user,
-          hasMaterials: false,
-          materials: []
-        }));
-      }
-    }
-
-    // ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ПОЛЬЗОВАТЕЛЕЙ
+    // Загрузка пользователей
     async function loadUsers() {
-      if (usersPagination.isLoading) return;
-      
-      usersPagination.setLoading(true);
-      
-      const searchQuery = document.getElementById('userSearch').value.trim();
-      const regionFilter = document.getElementById('regionFilter').value;
-      const materialStatusFilter = document.getElementById('materialStatusFilter').value;
-
-      document.getElementById('usersTableBody').innerHTML = '';
-      document.getElementById('usersSkeleton').style.display = 'block';
-      document.getElementById('usersEmptyState').style.display = 'none';
-      document.getElementById('usersPagination').style.display = 'none';
-
       const supabase = getSupabase();
       if (!supabase) {
         showError('Supabase не инициализирован');
-        usersPagination.setLoading(false);
-        document.getElementById('usersSkeleton').style.display = 'none';
         return;
       }
+
+      document.getElementById('usersLoading').style.display = 'block';
+      document.getElementById('usersTableBody').innerHTML = '';
+      document.getElementById('usersEmptyState').style.display = 'none';
+      document.getElementById('usersPagination').style.display = 'none';
+
+      const searchQuery = document.getElementById('userSearch').value.trim();
+      const regionFilter = document.getElementById('regionFilter').value;
+      const materialStatusFilter = document.getElementById('materialStatusFilter').value;
 
       try {
         let query = supabase
@@ -885,51 +638,83 @@
           .order('created_at', { ascending: false });
 
         if (searchQuery) {
-          query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
+          query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
         }
 
         if (regionFilter) {
           query = query.eq('region', regionFilter);
         }
 
-        const { data: allUsers, error } = await query;
+        const { data: users, error } = await query;
 
         if (error) throw error;
 
-        const usersWithMaterials = await enrichUsersWithMaterials(allUsers || []);
+        // Обогащаем пользователей информацией о материалах
+        const enrichedUsers = await enrichUsersWithMaterials(users || []);
 
-        let filteredUsers = usersWithMaterials;
+        // Фильтрация по материалам
+        let filteredUsers = enrichedUsers;
         if (materialStatusFilter === 'has_materials') {
-          filteredUsers = usersWithMaterials.filter(user => user.hasMaterials);
+          filteredUsers = enrichedUsers.filter(user => user.hasMaterials);
         } else if (materialStatusFilter === 'no_materials') {
-          filteredUsers = usersWithMaterials.filter(user => !user.hasMaterials);
+          filteredUsers = enrichedUsers.filter(user => !user.hasMaterials);
         }
 
+        // Обновляем пагинацию
         usersPagination.totalUsers = filteredUsers.length;
         usersPagination.totalPages = Math.ceil(usersPagination.totalUsers / usersPagination.pageSize);
         usersPagination.filteredUsers = filteredUsers;
 
-        const totalInFilters = filteredUsers.length;
-        const withMaterialsInFilters = filteredUsers.filter(user => user.hasMaterials).length;
+        // Обновляем статистику
+        document.getElementById('totalUsersCount').textContent = filteredUsers.length;
+        document.getElementById('usersWithMaterialsCount').textContent = filteredUsers.filter(user => user.hasMaterials).length;
 
-        document.getElementById('totalUsersCount').textContent = totalInFilters;
-        document.getElementById('usersWithMaterialsCount').textContent = withMaterialsInFilters;
-
+        // Рендерим страницу
         renderUsersPage();
 
       } catch (error) {
-        document.getElementById('usersSkeleton').style.display = 'none';
         showError('Ошибка загрузки пользователей: ' + error.message);
       } finally {
-        usersPagination.setLoading(false);
+        document.getElementById('usersLoading').style.display = 'none';
       }
     }
 
-    // ФУНКЦИЯ ОТРИСОВКИ ПОЛЬЗОВАТЕЛЕЙ
+    async function enrichUsersWithMaterials(users) {
+      if (!users || users.length === 0) return users;
+
+      const supabase = getSupabase();
+      if (!supabase) return users;
+
+      try {
+        const userIds = users.map(user => user.id);
+        
+        const [textbookAccess, crosswordAccess] = await Promise.all([
+          supabase.from('textbook_access').select('user_id').in('user_id', userIds),
+          supabase.from('crossword_access').select('user_id').in('user_id', userIds)
+        ]);
+
+        const usersWithMaterials = new Set();
+        
+        if (textbookAccess.data) {
+          textbookAccess.data.forEach(access => usersWithMaterials.add(access.user_id));
+        }
+        if (crosswordAccess.data) {
+          crosswordAccess.data.forEach(access => usersWithMaterials.add(access.user_id));
+        }
+
+        return users.map(user => ({
+          ...user,
+          hasMaterials: usersWithMaterials.has(user.id)
+        }));
+
+      } catch (error) {
+        console.error('Ошибка обогащения данных:', error);
+        return users.map(user => ({ ...user, hasMaterials: false }));
+      }
+    }
+
     function renderUsersPage() {
       const tbody = document.getElementById('usersTableBody');
-      document.getElementById('usersSkeleton').style.display = 'none';
-
       const pageUsers = usersPagination.getCurrentPageUsers();
       
       tbody.innerHTML = '';
@@ -940,36 +725,25 @@
         return;
       }
 
-      document.getElementById('usersEmptyState').style.display = 'none';
-
       pageUsers.forEach((user, index) => {
         const globalIndex = ((usersPagination.currentPage - 1) * usersPagination.pageSize) + index + 1;
         
         const tr = document.createElement('tr');
-        
-        const userDate = new Date(user.created_at);
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        if (userDate > weekAgo) {
-          tr.classList.add('user-row-new');
-        }
-
         tr.innerHTML = `
           <td><strong>${globalIndex}</strong></td>
           <td>
             <div><strong>${user.full_name || 'Не указано'}</strong></div>
-            <div class="user-stats"><span class="stat-badge">ID: ${user.id?.slice(0,8) || 'N/A'}...</span></div>
+            <div class="user-stats"><span class="stat-badge">ID: ${user.id?.slice(0,8)}...</span></div>
           </td>
           <td>${user.email || '—'}</td>
           <td>${user.contact_phone || '—'}</td>
           <td>${user.region || '—'}</td>
           <td>
             <div class="materials-info">
-              <div class="materials-list" id="materials_${user.id}">
-                ${user.hasMaterials 
-                  ? '<div class="material-badge">✅ Есть материалы</div>'
-                  : '<div class="material-badge">❌ Нет материалов</div>'
-                }
-              </div>
+              ${user.hasMaterials 
+                ? '<div class="material-badge">✅ Есть материалы</div>'
+                : '<div class="material-badge">❌ Нет материалов</div>'
+              }
             </div>
           </td>
           <td>${user.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
@@ -983,7 +757,7 @@
               <button class="btn btn-small" 
                       data-access="${user.id}" 
                       data-name="${user.full_name || user.email}">
-                🔐 Управление доступом
+                🔐 Доступ
               </button>
             </div>
           </td>
@@ -993,55 +767,55 @@
 
       usersPagination.updatePaginationInfo();
 
-      // Навешиваем обработчики событий
+      // Навешиваем обработчики
       tbody.querySelectorAll('[data-toggle-admin]').forEach(btn => {
-        btn.addEventListener('click', async () => {
+        btn.onclick = async () => {
           const uid = btn.getAttribute('data-toggle-admin');
           const make = btn.getAttribute('data-make') === 'true';
-          const supabase = getSupabase();
           
-          if (!supabase) {
-            showError('Supabase не инициализирован');
-            return;
-          }
-
           if (!confirm(`Вы уверены, что хотите ${make ? 'назначить' : 'снять'} права администратора?`)) return;
           
+          const supabase = getSupabase();
           const { error } = await supabase.from('profiles').update({ is_admin: make }).eq('id', uid);
-          if (error) return showModal('Ошибка', error.message);
           
-          showModal('Готово', make ? 'Права администратора выданы' : 'Права администратора сняты');
-          loadUsers();
-        });
+          if (error) {
+            showModal('Ошибка', error.message);
+          } else {
+            showModal('Готово', make ? 'Права администратора выданы' : 'Права администратора сняты');
+            loadUsers();
+          }
+        };
       });
 
       tbody.querySelectorAll('[data-access]').forEach(btn => {
-        btn.addEventListener('click', () => 
-          openUserAccessModal(btn.getAttribute('data-access'), btn.getAttribute('data-name')));
+        btn.onclick = () => openUserAccessModal(
+          btn.getAttribute('data-access'), 
+          btn.getAttribute('data-name')
+        );
       });
     }
 
     function setupUsersFilters() {
-      document.getElementById('userSearch').addEventListener('input', () => {
+      document.getElementById('userSearch').oninput = () => {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
           usersPagination.currentPage = 1;
           loadUsers();
         }, 500);
-      });
+      };
 
-      document.getElementById('regionFilter').addEventListener('change', () => {
+      document.getElementById('regionFilter').onchange = () => {
         usersPagination.currentPage = 1;
         loadUsers();
-      });
+      };
 
-      document.getElementById('materialStatusFilter').addEventListener('change', () => {
+      document.getElementById('materialStatusFilter').onchange = () => {
         usersPagination.currentPage = 1;
         loadUsers();
-      });
+      };
     }
 
-    // ===== УПРАВЛЕНИЕ ДОСТУПАМИ =====
+    // Управление доступом
     async function openUserAccessModal(userId, userName) {
       const supabase = getSupabase();
       if (!supabase) {
@@ -1052,72 +826,73 @@
       currentEditingUserId = userId;
       document.getElementById('userAccessInfo').innerHTML = `
         <p><strong>Пользователь:</strong> ${userName}</p>
-        <p class="small-muted">Отметьте учебники и кроссворды, к которым пользователь должен иметь доступ</p>
+        <p>Отметьте учебники и кроссворды для доступа</p>
       `;
 
       try {
-        const [t, c, ta, ca] = await Promise.all([
-          supabase.from('textbooks').select('id,title,class_level').eq('is_active', true).order('order_index'),
-          supabase.from('crosswords').select('id,title,class_level').eq('is_active', true).order('order_index'),
+        const [textbooks, crosswords, textbookAccess, crosswordAccess] = await Promise.all([
+          supabase.from('textbooks').select('id,title').eq('is_active', true).order('order_index'),
+          supabase.from('crosswords').select('id,title').eq('is_active', true).order('order_index'),
           supabase.from('textbook_access').select('textbook_id').eq('user_id', userId),
           supabase.from('crossword_access').select('crossword_id').eq('user_id', userId)
         ]);
 
-        const tSet = new Set((ta.data||[]).map(x=>String(x.textbook_id)));
-        const cSet = new Set((ca.data||[]).map(x=>String(x.crossword_id)));
+        const textbookSet = new Set((textbookAccess.data || []).map(x => x.textbook_id));
+        const crosswordSet = new Set((crosswordAccess.data || []).map(x => x.crossword_id));
 
-        const tList = document.getElementById('textbookAccessList');
-        tList.innerHTML = '';
-        if (t.data?.length) {
-          t.data.forEach(tb=>{
-            const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
-            const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
+        // Учебники
+        const textbookList = document.getElementById('textbookAccessList');
+        textbookList.innerHTML = '';
+        
+        if (textbooks.data?.length) {
+          textbooks.data.forEach(tb => {
             const item = document.createElement('div');
             item.className = 'access-item';
-            const id = `textbook_${tb.id}`;
-            item.innerHTML = `<input type="checkbox" id="${id}" ${tSet.has(String(tb.id))?'checked':''}>
-                              <label for="${id}">${tb.title} (${classDisplay})</label>`;
-            tList.appendChild(item);
+            item.innerHTML = `
+              <input type="checkbox" id="textbook_${tb.id}" ${textbookSet.has(tb.id) ? 'checked' : ''}>
+              <label for="textbook_${tb.id}">${tb.title}</label>
+            `;
+            textbookList.appendChild(item);
           });
         } else {
-          tList.innerHTML = '<p class="small-muted">Нет доступных учебников</p>';
+          textbookList.innerHTML = '<p>Нет доступных учебников</p>';
         }
 
-        const cList = document.getElementById('crosswordAccessList');
-        cList.innerHTML = '';
-        if (c.data?.length) {
-          c.data.forEach(cr=>{
-            const classLevels = Array.isArray(cr.class_level) ? cr.class_level : [];
-            const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
+        // Кроссворды
+        const crosswordList = document.getElementById('crosswordAccessList');
+        crosswordList.innerHTML = '';
+        
+        if (crosswords.data?.length) {
+          crosswords.data.forEach(cw => {
             const item = document.createElement('div');
             item.className = 'access-item';
-            const id = `crossword_${cr.id}`;
-            item.innerHTML = `<input type="checkbox" id="${id}" ${cSet.has(String(cr.id))?'checked':''}>
-                              <label for="${id}">${cr.title} (${classDisplay})</label>`;
-            cList.appendChild(item);
+            item.innerHTML = `
+              <input type="checkbox" id="crossword_${cw.id}" ${crosswordSet.has(cw.id) ? 'checked' : ''}>
+              <label for="crossword_${cw.id}">${cw.title}</label>
+            `;
+            crosswordList.appendChild(item);
           });
         } else {
-          cList.innerHTML = '<p class="small-muted">Нет доступных кроссвордов</p>';
+          crosswordList.innerHTML = '<p>Нет доступных кроссвордов</p>';
         }
 
-        document.getElementById('userAccessModal').style.display='flex';
+        document.getElementById('userAccessModal').style.display = 'flex';
+
       } catch (error) {
-        showError('Ошибка загрузки данных доступа: ' + error.message);
+        showError('Ошибка загрузки данных: ' + error.message);
       }
     }
 
     async function saveUserAccess() {
       const supabase = getSupabase();
-      if (!supabase || !currentEditingUserId) {
-        showError('Supabase не инициализирован или пользователь не выбран');
-        return;
-      }
+      if (!supabase || !currentEditingUserId) return;
 
       try {
-        const textSelected = Array.from(document.querySelectorAll('#textbookAccessList input[type="checkbox"]:checked'))
-          .map(cb => cb.id.replace('textbook_',''));
-        const crossSelected = Array.from(document.querySelectorAll('#crosswordAccessList input[type="checkbox"]:checked'))
-          .map(cb => cb.id.replace('crossword_',''));
+        const textbookAccess = Array.from(document.querySelectorAll('#textbookAccessList input:checked'))
+          .map(cb => ({ user_id: currentEditingUserId, textbook_id: cb.id.replace('textbook_', '') }));
+        
+        const crosswordAccess = Array.from(document.querySelectorAll('#crosswordAccessList input:checked'))
+          .map(cb => ({ user_id: currentEditingUserId, crossword_id: cb.id.replace('crossword_', '') }));
 
         // Удаляем старые доступы
         await Promise.all([
@@ -1125,78 +900,60 @@
           supabase.from('crossword_access').delete().eq('user_id', currentEditingUserId)
         ]);
 
-        // Добавляем новые доступы
-        if (textSelected.length) {
-          await supabase.from('textbook_access').insert(
-            textSelected.map(id=>({ user_id: currentEditingUserId, textbook_id: id }))
-          );
+        // Добавляем новые
+        if (textbookAccess.length > 0) {
+          await supabase.from('textbook_access').insert(textbookAccess);
         }
-        if (crossSelected.length) {
-          await supabase.from('crossword_access').insert(
-            crossSelected.map(id=>({ user_id: currentEditingUserId, crossword_id: id }))
-          );
+        if (crosswordAccess.length > 0) {
+          await supabase.from('crossword_access').insert(crosswordAccess);
         }
 
-        showModal('Готово','Доступы обновлены');
-        document.getElementById('userAccessModal').style.display='none';
+        showModal('Готово', 'Доступы обновлены');
+        document.getElementById('userAccessModal').style.display = 'none';
         loadUsers();
+
       } catch (error) {
-        showError('Ошибка сохранения доступов: ' + error.message);
+        showError('Ошибка сохранения: ' + error.message);
       }
     }
 
-    // ============ ИНИЦИАЛИЗАЦИЯ ============
+    // Инициализация
     function initUsersModule() {
       console.log('🔄 Инициализация модуля пользователей...');
-
-      // Проверяем доступность Supabase
-      const supabase = getSupabase();
-      if (!supabase) {
-        console.warn('❌ Supabase не доступен в глобальной области видимости');
-        showError('Supabase не инициализирован. Модуль пользователей не может работать.');
-        return false;
-      }
 
       // Инициализация пагинации
       usersPagination.init();
 
-      // Навешиваем обработчики
-      document.getElementById('closeUserAccessModal').addEventListener('click', ()=>{
-        document.getElementById('userAccessModal').style.display='none';
-      });
+      // Обработчики
+      document.getElementById('closeUserAccessModal').onclick = () => {
+        document.getElementById('userAccessModal').style.display = 'none';
+      };
       
-      document.getElementById('saveUserAccessBtn').addEventListener('click', saveUserAccess);
+      document.getElementById('saveUserAccessBtn').onclick = saveUserAccess;
       
-      document.getElementById('manageRequestsBtn').addEventListener('click', () => {
-        showModal('Управление заявками', 'Функционал управления заявками будет добавлен в ближайшее время');
-      });
+      document.getElementById('manageRequestsBtn').onclick = () => {
+        showModal('Управление заявками', 'Функционал будет добавлен в ближайшее время');
+      };
 
-      // Инициализация фильтров
+      // Фильтры
       setupUsersFilters();
 
-      // Проверяем необработанные заявки
+      // Загрузка данных
       checkPendingRequests();
-
-      // Загружаем пользователей
       loadUsers();
 
       console.log('✅ Модуль пользователей инициализирован');
-      return true;
     }
 
-    // Функция для принудительной перезагрузки модуля
-    window.reloadUsersModule = function() {
-      loadUsers();
-    };
-
-    // Запускаем инициализацию когда DOM готов
+    // Запуск
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', initUsersModule);
     } else {
-      // Если DOM уже загружен, инициализируем сразу
       setTimeout(initUsersModule, 100);
     }
 
+    // Глобальная функция для перезагрузки
+    window.reloadUsersModule = loadUsers;
   </script>
 </body>
 </html>
