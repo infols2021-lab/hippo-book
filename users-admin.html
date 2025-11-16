@@ -25,14 +25,14 @@
       padding: 12px 20px;
       border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      border-left: 4px solid var(--accent2, #4ECDC4);
+      border-left: 4px solid #4ECDC4;
       font-weight: 600;
     }
 
     .stat-badge-large .number {
       font-size: 1.5rem;
       font-weight: 700;
-      color: var(--accent2, #4ECDC4);
+      color: #4ECDC4;
       display: block;
     }
 
@@ -47,6 +47,17 @@
     .filters-container select,
     .filters-container input {
       min-width: 200px;
+      padding: 10px 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+    }
+
+    .filters-container select:focus,
+    .filters-container input:focus {
+      border-color: #4ECDC4;
+      outline: none;
     }
 
     .user-row-new {
@@ -58,7 +69,7 @@
       position: relative;
       transition: all 0.3s ease;
       padding: 12px 20px;
-      background: var(--accent2, #4ECDC4);
+      background: #4ECDC4;
       color: white;
       border: none;
       border-radius: 8px;
@@ -106,7 +117,7 @@
     }
 
     .stat-badge {
-      background: var(--bg1, #f8f9fa);
+      background: #f8f9fa;
       padding: 4px 8px;
       border-radius: 6px;
       font-size: 12px;
@@ -120,17 +131,20 @@
 
     .btn {
       padding: 8px 16px;
-      background: var(--accent2, #4ECDC4);
+      background: #4ECDC4;
       color: white;
       border: none;
       border-radius: 6px;
       cursor: pointer;
       font-size: 14px;
       transition: background 0.2s;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
     }
 
     .btn:hover {
-      background: var(--accent2-dark, #3db8b0);
+      background: #3db8b0;
     }
 
     .btn-small {
@@ -161,10 +175,11 @@
       border-radius: 8px;
       font-size: 14px;
       transition: border-color 0.2s;
+      background: white;
     }
 
     .input:focus {
-      border-color: var(--accent2, #4ECDC4);
+      border-color: #4ECDC4;
       outline: none;
     }
 
@@ -195,7 +210,7 @@
     }
 
     .admin-table th {
-      background-color: var(--bg1, #f8f9fa);
+      background-color: #f8f9fa;
       font-weight: 700;
     }
 
@@ -265,11 +280,6 @@
       font-size: 14px;
     }
 
-    .materials-info h4 {
-      margin: 0 0 8px 0;
-      color: #2e7d32;
-    }
-
     .materials-list {
       display: flex;
       flex-wrap: wrap;
@@ -322,9 +332,9 @@
     }
 
     .pagination-btn:hover:not(:disabled) {
-      background: var(--accent2, #4ECDC4);
+      background: #4ECDC4;
       color: white;
-      border-color: var(--accent2, #4ECDC4);
+      border-color: #4ECDC4;
     }
 
     .pagination-btn:disabled {
@@ -343,9 +353,9 @@
     }
 
     .pagination-page.active {
-      background: var(--accent2, #4ECDC4);
+      background: #4ECDC4;
       color: white;
-      border-color: var(--accent2, #4ECDC4);
+      border-color: #4ECDC4;
     }
 
     .pagination-page:hover:not(.active) {
@@ -365,7 +375,7 @@
 
     .spinner {
       border: 4px solid #f3f3f3;
-      border-top: 4px solid var(--accent2, #4ECDC4);
+      border-top: 4px solid #4ECDC4;
       border-radius: 50%;
       width: 40px;
       height: 40px;
@@ -638,7 +648,7 @@
     </div>
   </div>
 
-  <script type="module">
+  <script>
     // ============ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ============
     let currentEditingUserId = null;
     let searchTimeout = null;
@@ -738,27 +748,19 @@
 
     // ============ УТИЛИТЫ ============
     function showModal(title, text) {
-      // Используем глобальную функцию showModal из основного файла, если доступна
-      if (window.parent && window.parent.showModal) {
-        window.parent.showModal(title, text);
-      } else {
-        alert(`${title}\n\n${text}`);
-      }
+      // Используем alert как fallback если нет родительского модального окна
+      alert(`${title}\n\n${text}`);
     }
 
     function showError(message) {
-      // Используем глобальную функцию showError из основного файла, если доступна
-      if (window.parent && window.parent.showError) {
-        window.parent.showError(message);
-      } else {
-        alert(`❌ Ошибка: ${message}`);
-      }
+      // Используем alert как fallback если нет родительского модального окна
+      alert(`❌ Ошибка: ${message}`);
     }
 
     // ============ ОСНОВНЫЕ ФУНКЦИИ ============
     async function checkPendingRequests() {
       try {
-        const supabase = window.supabase;
+        const supabase = getSupabase();
         if (!supabase) return;
 
         const { data: requests, error } = await supabase
@@ -787,11 +789,27 @@
       }
     }
 
+    function getSupabase() {
+      // Пытаемся получить supabase из различных источников
+      if (window.supabase) return window.supabase;
+      if (window.parent && window.parent.supabase) return window.parent.supabase;
+      if (window.opener && window.opener.supabase) return window.opener.supabase;
+      return null;
+    }
+
+    function getCurrentUser() {
+      // Пытаемся получить пользователя из различных источников
+      if (window.user) return window.user;
+      if (window.parent && window.parent.user) return window.parent.user;
+      if (window.opener && window.opener.user) return window.opener.user;
+      return null;
+    }
+
     async function enrichUsersWithMaterials(users) {
       if (!users || users.length === 0) return [];
 
       const userIds = users.map(user => user.id);
-      const supabase = window.supabase;
+      const supabase = getSupabase();
       
       if (!supabase) return users;
 
@@ -852,10 +870,11 @@
       document.getElementById('usersEmptyState').style.display = 'none';
       document.getElementById('usersPagination').style.display = 'none';
 
-      const supabase = window.supabase;
+      const supabase = getSupabase();
       if (!supabase) {
         showError('Supabase не инициализирован');
         usersPagination.setLoading(false);
+        document.getElementById('usersSkeleton').style.display = 'none';
         return;
       }
 
@@ -938,7 +957,7 @@
           <td><strong>${globalIndex}</strong></td>
           <td>
             <div><strong>${user.full_name || 'Не указано'}</strong></div>
-            <div class="user-stats"><span class="stat-badge">ID: ${user.id.slice(0,8)}...</span></div>
+            <div class="user-stats"><span class="stat-badge">ID: ${user.id?.slice(0,8) || 'N/A'}...</span></div>
           </td>
           <td>${user.email || '—'}</td>
           <td>${user.contact_phone || '—'}</td>
@@ -979,7 +998,7 @@
         btn.addEventListener('click', async () => {
           const uid = btn.getAttribute('data-toggle-admin');
           const make = btn.getAttribute('data-make') === 'true';
-          const supabase = window.supabase;
+          const supabase = getSupabase();
           
           if (!supabase) {
             showError('Supabase не инициализирован');
@@ -1022,9 +1041,9 @@
       });
     }
 
-    // ===== УПРАВЛЕНИЕ ДОСТУПАМИ
+    // ===== УПРАВЛЕНИЕ ДОСТУПАМИ =====
     async function openUserAccessModal(userId, userName) {
-      const supabase = window.supabase;
+      const supabase = getSupabase();
       if (!supabase) {
         showError('Supabase не инициализирован');
         return;
@@ -1036,84 +1055,94 @@
         <p class="small-muted">Отметьте учебники и кроссворды, к которым пользователь должен иметь доступ</p>
       `;
 
-      const [t, c, ta, ca] = await Promise.all([
-        supabase.from('textbooks').select('id,title,class_level').eq('is_active', true).order('order_index'),
-        supabase.from('crosswords').select('id,title,class_level').eq('is_active', true).order('order_index'),
-        supabase.from('textbook_access').select('textbook_id').eq('user_id', userId),
-        supabase.from('crossword_access').select('crossword_id').eq('user_id', userId)
-      ]);
+      try {
+        const [t, c, ta, ca] = await Promise.all([
+          supabase.from('textbooks').select('id,title,class_level').eq('is_active', true).order('order_index'),
+          supabase.from('crosswords').select('id,title,class_level').eq('is_active', true).order('order_index'),
+          supabase.from('textbook_access').select('textbook_id').eq('user_id', userId),
+          supabase.from('crossword_access').select('crossword_id').eq('user_id', userId)
+        ]);
 
-      const tSet = new Set((ta.data||[]).map(x=>String(x.textbook_id)));
-      const cSet = new Set((ca.data||[]).map(x=>String(x.crossword_id)));
+        const tSet = new Set((ta.data||[]).map(x=>String(x.textbook_id)));
+        const cSet = new Set((ca.data||[]).map(x=>String(x.crossword_id)));
 
-      const tList = document.getElementById('textbookAccessList');
-      tList.innerHTML = '';
-      if (t.data?.length) {
-        t.data.forEach(tb=>{
-          const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
-          const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
-          const item = document.createElement('div');
-          item.className = 'access-item';
-          const id = `textbook_${tb.id}`;
-          item.innerHTML = `<input type="checkbox" id="${id}" ${tSet.has(String(tb.id))?'checked':''}>
-                            <label for="${id}">${tb.title} (${classDisplay})</label>`;
-          tList.appendChild(item);
-        });
-      } else {
-        tList.innerHTML = '<p class="small-muted">Нет доступных учебников</p>';
+        const tList = document.getElementById('textbookAccessList');
+        tList.innerHTML = '';
+        if (t.data?.length) {
+          t.data.forEach(tb=>{
+            const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
+            const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
+            const item = document.createElement('div');
+            item.className = 'access-item';
+            const id = `textbook_${tb.id}`;
+            item.innerHTML = `<input type="checkbox" id="${id}" ${tSet.has(String(tb.id))?'checked':''}>
+                              <label for="${id}">${tb.title} (${classDisplay})</label>`;
+            tList.appendChild(item);
+          });
+        } else {
+          tList.innerHTML = '<p class="small-muted">Нет доступных учебников</p>';
+        }
+
+        const cList = document.getElementById('crosswordAccessList');
+        cList.innerHTML = '';
+        if (c.data?.length) {
+          c.data.forEach(cr=>{
+            const classLevels = Array.isArray(cr.class_level) ? cr.class_level : [];
+            const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
+            const item = document.createElement('div');
+            item.className = 'access-item';
+            const id = `crossword_${cr.id}`;
+            item.innerHTML = `<input type="checkbox" id="${id}" ${cSet.has(String(cr.id))?'checked':''}>
+                              <label for="${id}">${cr.title} (${classDisplay})</label>`;
+            cList.appendChild(item);
+          });
+        } else {
+          cList.innerHTML = '<p class="small-muted">Нет доступных кроссвордов</p>';
+        }
+
+        document.getElementById('userAccessModal').style.display='flex';
+      } catch (error) {
+        showError('Ошибка загрузки данных доступа: ' + error.message);
       }
-
-      const cList = document.getElementById('crosswordAccessList');
-      cList.innerHTML = '';
-      if (c.data?.length) {
-        c.data.forEach(cr=>{
-          const classLevels = Array.isArray(cr.class_level) ? cr.class_level : [];
-          const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
-          const item = document.createElement('div');
-          item.className = 'access-item';
-          const id = `crossword_${cr.id}`;
-          item.innerHTML = `<input type="checkbox" id="${id}" ${cSet.has(String(cr.id))?'checked':''}>
-                            <label for="${id}">${cr.title} (${classDisplay})</label>`;
-          cList.appendChild(item);
-        });
-      } else {
-        cList.innerHTML = '<p class="small-muted">Нет доступных кроссвордов</p>';
-      }
-
-      document.getElementById('userAccessModal').style.display='flex';
     }
 
     async function saveUserAccess() {
-      const supabase = window.supabase;
+      const supabase = getSupabase();
       if (!supabase || !currentEditingUserId) {
         showError('Supabase не инициализирован или пользователь не выбран');
         return;
       }
 
-      const textSelected = Array.from(document.querySelectorAll('#textbookAccessList input[type="checkbox"]:checked'))
-        .map(cb => cb.id.replace('textbook_',''));
-      const crossSelected = Array.from(document.querySelectorAll('#crosswordAccessList input[type="checkbox"]:checked'))
-        .map(cb => cb.id.replace('crossword_',''));
+      try {
+        const textSelected = Array.from(document.querySelectorAll('#textbookAccessList input[type="checkbox"]:checked'))
+          .map(cb => cb.id.replace('textbook_',''));
+        const crossSelected = Array.from(document.querySelectorAll('#crosswordAccessList input[type="checkbox"]:checked'))
+          .map(cb => cb.id.replace('crossword_',''));
 
-      const ops = [];
-      ops.push(supabase.from('textbook_access').delete().eq('user_id', currentEditingUserId));
-      ops.push(supabase.from('crossword_access').delete().eq('user_id', currentEditingUserId));
-      await Promise.all(ops);
+        // Удаляем старые доступы
+        await Promise.all([
+          supabase.from('textbook_access').delete().eq('user_id', currentEditingUserId),
+          supabase.from('crossword_access').delete().eq('user_id', currentEditingUserId)
+        ]);
 
-      if (textSelected.length) {
-        await supabase.from('textbook_access').insert(
-          textSelected.map(id=>({ user_id: currentEditingUserId, textbook_id: id }))
-        );
+        // Добавляем новые доступы
+        if (textSelected.length) {
+          await supabase.from('textbook_access').insert(
+            textSelected.map(id=>({ user_id: currentEditingUserId, textbook_id: id }))
+          );
+        }
+        if (crossSelected.length) {
+          await supabase.from('crossword_access').insert(
+            crossSelected.map(id=>({ user_id: currentEditingUserId, crossword_id: id }))
+          );
+        }
+
+        showModal('Готово','Доступы обновлены');
+        document.getElementById('userAccessModal').style.display='none';
+        loadUsers();
+      } catch (error) {
+        showError('Ошибка сохранения доступов: ' + error.message);
       }
-      if (crossSelected.length) {
-        await supabase.from('crossword_access').insert(
-          crossSelected.map(id=>({ user_id: currentEditingUserId, crossword_id: id }))
-        );
-      }
-
-      showModal('Готово','Доступы обновлены');
-      document.getElementById('userAccessModal').style.display='none';
-      loadUsers();
     }
 
     // ============ ИНИЦИАЛИЗАЦИЯ ============
@@ -1121,7 +1150,8 @@
       console.log('🔄 Инициализация модуля пользователей...');
 
       // Проверяем доступность Supabase
-      if (!window.supabase) {
+      const supabase = getSupabase();
+      if (!supabase) {
         console.warn('❌ Supabase не доступен в глобальной области видимости');
         showError('Supabase не инициализирован. Модуль пользователей не может работать.');
         return false;
@@ -1154,19 +1184,18 @@
       return true;
     }
 
+    // Функция для принудительной перезагрузки модуля
+    window.reloadUsersModule = function() {
+      loadUsers();
+    };
+
     // Запускаем инициализацию когда DOM готов
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', initUsersModule);
     } else {
-      initUsersModule();
+      // Если DOM уже загружен, инициализируем сразу
+      setTimeout(initUsersModule, 100);
     }
-
-    // Экспортируем функции для внешнего использования
-    window.usersModule = {
-      loadUsers,
-      initUsersModule,
-      checkPendingRequests
-    };
 
   </script>
 </body>
