@@ -289,6 +289,26 @@
   </style>
   
   <script src="/load-config.js"></script>
+  <!-- Глобальная загрузка Supabase как фолбэк -->
+  <script>
+  // Глобальная загрузка Supabase как фолбэк
+  if (!window.supabase) {
+    console.log('🔄 Загружаем Supabase через UMD...');
+    
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js';
+    script.onload = function() {
+      if (window.supabase && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+        console.log('✅ Supabase загружен через UMD');
+        window.supabaseClient = window.supabase.createClient(
+          window.SUPABASE_URL, 
+          window.SUPABASE_ANON_KEY
+        );
+      }
+    };
+    document.head.appendChild(script);
+  }
+  </script>
 </head>
 <body>
   <!-- Индикатор предзагрузки -->
@@ -658,9 +678,39 @@
         showError('❌ Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.');
       }
       
-      import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm')
-        .then(({ createClient }) => {
+      // Функция для надежной загрузки Supabase
+      async function loadSupabaseClient() {
+        // Сначала пробуем использовать уже загруженный через UMD
+        if (window.supabase && window.supabase.createClient) {
+          console.log('✅ Используем уже загруженный Supabase (UMD)');
+          return window.supabase.createClient;
+        }
+        
+        // Если UMD не загрузился, пробуем ES-модули
+        const urls = [
+          'https://esm.sh/@supabase/supabase-js@2.39.0',
+          'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/+esm',
+          'https://unpkg.com/@supabase/supabase-js@2.39.0/dist/supabase.mjs'
+        ];
+        
+        for (const url of urls) {
+          try {
+            console.log(`🔄 Пробуем загрузить Supabase с: ${url}`);
+            const { createClient } = await import(url);
+            console.log(`✅ Supabase загружен с: ${url}`);
+            return createClient;
+          } catch (e) {
+            console.warn(`❌ Не удалось загрузить с ${url}:`, e.message);
+          }
+        }
+        
+        throw new Error('Не удалось загрузить Supabase клиент ни с одного CDN');
+      }
+
+      loadSupabaseClient()
+        .then((createClient) => {
           const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+          window.supabase = supabase;
           
           // Инициализируем систему помощи с предзагрузкой
           initHelpSystem(supabase);
@@ -670,7 +720,7 @@
               supabase.auth.getUser().then(({ data: { user } }) => {
                 if (user) {
                   console.log('👤 Пользователь уже авторизован');
-                  checkUserRoleAndRedirect(user);
+                  checkUserRoleAndRedirect(user, supabase);
                 }
               });
             }
@@ -692,14 +742,22 @@
           });
         })
         .catch(error => {
-          showError('❌ Ошибка загрузки системы: ' + error.message);
+          showError('❌ Ошибка загрузки Supabase: ' + error.message);
+          console.error('Supabase load error:', error);
+          
+          // Последняя попытка: если есть глобальный supabaseClient
+          if (window.supabaseClient) {
+            console.log('🔄 Используем глобальный supabaseClient');
+            const supabase = window.supabaseClient;
+            window.supabase = supabase;
+            
+            document.getElementById('loginBtn').addEventListener('click', () => login(supabase, false));
+            document.getElementById('adminLoginBtn').addEventListener('click', () => login(supabase, true));
+          }
         });
     }
 
-    async function checkUserRoleAndRedirect(user) {
-      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-      const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-      
+    async function checkUserRoleAndRedirect(user, supabase) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('is_admin')
