@@ -11,24 +11,10 @@
   <script src="/supabase-global.js"></script>
   
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      min-height: 100vh;
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      background-attachment: fixed;
-      font-family: 'Poppins', "Comic Sans MS", sans-serif;
-      color: #1f2937;
-    }
-
     .materials-container {
       width: 95%;
       max-width: 1200px;
       margin: 20px auto;
-      position: relative;
-      z-index: 2;
     }
     
     .materials-tabs {
@@ -62,12 +48,6 @@
     
     .materials-section.active {
       display: block;
-      animation: fadeIn 0.5s ease-out;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
     }
     
     .materials-grid {
@@ -97,7 +77,7 @@
     .material-cover {
       width: 100%;
       height: 160px;
-      background: linear-gradient(135deg, var(--accent2), #6dd3c0);
+      background: linear-gradient(135deg, #667eea, #764ba2);
       border-radius: 8px;
       margin-bottom: 15px;
       display: flex;
@@ -106,14 +86,6 @@
       color: white;
       font-size: 48px;
       font-weight: bold;
-      overflow: hidden;
-    }
-    
-    .material-cover img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 8px;
     }
     
     .material-title {
@@ -128,7 +100,6 @@
       font-size: 14px;
       margin-bottom: 12px;
       line-height: 1.4;
-      min-height: 40px;
     }
     
     .material-stats {
@@ -169,17 +140,10 @@
       color: white;
       font-weight: 600;
       font-size: 16px;
-      flex-direction: column;
-      gap: 8px;
-    }
-    
-    .locked-overlay .lock-icon {
-      font-size: 32px;
     }
     
     .material-card.locked {
       cursor: not-allowed;
-      opacity: 0.7;
     }
     
     .material-card.locked:hover {
@@ -188,25 +152,11 @@
       border-color: transparent;
     }
 
-    .empty-state {
-      grid-column: 1 / -1;
-      text-align: center;
-      padding: 60px 20px;
-      color: #666;
-    }
-
-    .empty-state-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-      opacity: 0.5;
-    }
-
     .loading { 
       text-align: center; 
       padding: 40px; 
       display: none;
     }
-    
     .spinner { 
       border: 4px solid #f3f3f3; 
       border-top: 4px solid var(--accent2); 
@@ -216,12 +166,10 @@
       animation: spin 2s linear infinite; 
       margin: 0 auto 20px; 
     }
-    
     @keyframes spin { 
       0% { transform: rotate(0deg); } 
       100% { transform: rotate(360deg); } 
     }
-    
     .error { 
       background: #ffebee; 
       color: #c62828; 
@@ -232,24 +180,7 @@
       display: none; 
     }
 
-    .background-loading {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: rgba(0,0,0,0.7);
-      color: white;
-      padding: 8px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      z-index: 1000;
-      display: none;
-    }
-
     @media (max-width: 768px) {
-      body {
-        background-attachment: scroll;
-      }
-      
       .materials-grid {
         grid-template-columns: 1fr;
         gap: 15px;
@@ -263,483 +194,332 @@
       .materials-container {
         width: 100%;
         padding: 0 10px;
-        margin: 10px auto;
-      }
-      
-      .material-cover {
-        height: 140px;
-      }
-      
-      .background-loading {
-        top: 10px;
-        right: 10px;
-        font-size: 10px;
-        padding: 6px 10px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .material-cover {
-        height: 120px;
-        font-size: 36px;
-      }
-      
-      .material-title {
-        font-size: 16px;
-      }
-      
-      .material-description {
-        font-size: 13px;
       }
     }
   </style>
 </head>
-<body id="materialsBody">
-  <!-- ИНДИКАТОР ЗАГРУЗКИ ФОНА -->
-  <div class="background-loading" id="backgroundLoading">
-    <span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
-    Загружаем фон...
-  </div>
-
+<body>
   <div class="materials-container">
-    <div class="loading" id="loading">
+    <div class="header">
+      <div class="logo">
+        <div class="mark">EK</div>
+        <div>
+          <h3>Учебные материалы</h3>
+          <div class="small-muted">Выбирайте учебники и кроссворды</div>
+        </div>
+      </div>
+      <div class="nav">
+        <button class="btn" onclick="location.href='/profile.html'">Профиль</button>
+        <button class="btn secondary" id="logoutBtn">Выйти</button>
+      </div>
+    </div>
+
+    <div class="materials-tabs">
+      <button class="material-tab active" data-tab="textbooks">📚 Учебники</button>
+      <button class="material-tab" data-tab="crosswords">🧩 Кроссворды</button>
+    </div>
+
+    <div id="loading" class="loading">
       <div class="spinner"></div>
-      <p>🔄 Загружаем материалы...</p>
+      <p>Загружаем материалы...</p>
     </div>
     
-    <div class="error" id="errorMessage"></div>
+    <div id="errorMessage" class="error"></div>
 
-    <div id="mainContent" style="display: none;">
-      <div class="header">
-        <div class="logo">
-          <div class="mark" style="background: linear-gradient(135deg, var(--accent2), #6dd3c0);">EK</div>
-          <div>
-            <h3 style="background: linear-gradient(135deg, var(--accent2), #6dd3c0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0;">Edu Keys</h3>
-            <div class="small-muted">🎓 Образовательная платформа</div>
-          </div>
-        </div>
-        <div class="nav">
-          <button class="btn" onclick="location.href='/profile.html'">👤 Профиль</button>
-          <button class="btn secondary" id="logoutBtn">🚪 Выйти</button>
-        </div>
-      </div>
+    <div class="materials-section active" id="textbooks-section">
+      <h3>Доступные учебники</h3>
+      <p class="small-muted">Выберите учебник для изучения материалов и выполнения заданий</p>
+      <div class="materials-grid" id="textbooksGrid"></div>
+    </div>
 
-      <div class="materials-tabs">
-        <button class="material-tab active" data-tab="textbooks">📚 Учебники</button>
-        <button class="material-tab" data-tab="crosswords">🧩 Кроссворды</button>
-      </div>
-
-      <div class="materials-section active" id="textbooks-section">
-        <h3 style="color: var(--accent2);">📚 Доступные учебники</h3>
-        <p class="small-muted" style="color: #666;">Выберите учебник для изучения материалов и выполнения заданий</p>
-        <div class="materials-grid" id="textbooksGrid"></div>
-      </div>
-
-      <div class="materials-section" id="crosswords-section">
-        <h3 style="color: var(--accent2);">🧩 Доступные кроссворды</h3>
-        <p class="small-muted" style="color: #666;">Разгадывайте кроссворды для закрепления знаний</p>
-        <div class="materials-grid" id="crosswordsGrid"></div>
-      </div>
+    <div class="materials-section" id="crosswords-section">
+      <h3>Доступные кроссворды</h3>
+      <p class="small-muted">Разгадывайте кроссворды для закрепления знаний</p>
+      <div class="materials-grid" id="crosswordsGrid"></div>
     </div>
   </div>
 
   <script>
-    // БАЗОВЫЕ ФУНКЦИИ
     document.getElementById('loading').style.display = 'block';
     
     function showError(message) {
-      const errorEl = document.getElementById('errorMessage');
-      errorEl.textContent = message;
-      errorEl.style.display = 'block';
+      document.getElementById('errorMessage').textContent = message;
+      document.getElementById('errorMessage').style.display = 'block';
       document.getElementById('loading').style.display = 'none';
-      console.error('Ошибка:', message);
     }
     
     function showContent() {
-      document.getElementById('mainContent').style.display = 'block';
       document.getElementById('loading').style.display = 'none';
       document.getElementById('errorMessage').style.display = 'none';
     }
     
-    // Функция для загрузки фона
-    async function loadBackground(supabase) {
-      const backgroundLoading = document.getElementById('backgroundLoading');
-      const materialsBody = document.getElementById('materialsBody');
+    async function initApp(supabase) {
+      console.log('🚀 Инициализация материалов...');
       
       try {
-        backgroundLoading.style.display = 'block';
-        
-        const { data: background, error } = await supabase
-          .from('backgrounds')
-          .select('image_url, file_name')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.log('❌ Пользователь не авторизован');
+          window.location.href = '/login.html';
+          return;
+        }
 
-        if (error) {
-          if (error.code === 'PGRST116') {
-            console.log('ℹ️ Активный фон не найден');
-          } else {
-            console.error('❌ Ошибка загрузки фона:', error);
+        let textbooks = [];
+        let crosswords = [];
+        let userProgress = [];
+        let textbookAccess = [];
+        let crosswordAccess = [];
+        let assignments = [];
+
+        // Загружаем данные
+        async function loadMaterials() {
+          try {
+            // Загружаем учебники
+            const { data: textbooksData, error: textbooksError } = await supabase
+              .from('textbooks')
+              .select('*')
+              .eq('is_active', true)
+              .order('order_index');
+
+            if (textbooksError) throw textbooksError;
+            textbooks = textbooksData || [];
+
+            // Загружаем кроссворды
+            const { data: crosswordsData, error: crosswordsError } = await supabase
+              .from('crosswords')
+              .select('*')
+              .eq('is_active', true)
+              .order('order_index');
+
+            if (crosswordsError) throw crosswordsError;
+            crosswords = crosswordsData || [];
+
+            // Загружаем все задания
+            const { data: assignmentsData, error: assignmentsError } = await supabase
+              .from('assignments')
+              .select('*');
+
+            if (assignmentsError) throw assignmentsError;
+            assignments = assignmentsData || [];
+
+            // Загружаем прогресс пользователя
+            const { data: progressData, error: progressError } = await supabase
+              .from('user_progress')
+              .select('*')
+              .eq('user_id', user.id);
+
+            if (progressError) throw progressError;
+            userProgress = progressData || [];
+
+            // Загружаем доступ к учебникам
+            const { data: textbookAccessData, error: textbookAccessError } = await supabase
+              .from('textbook_access')
+              .select('textbook_id')
+              .eq('user_id', user.id);
+
+            if (textbookAccessError) throw textbookAccessError;
+            textbookAccess = textbookAccessData || [];
+
+            // Загружаем доступ к кроссвордам
+            const { data: crosswordAccessData, error: crosswordAccessError } = await supabase
+              .from('crossword_access')
+              .select('crossword_id')
+              .eq('user_id', user.id);
+
+            if (crosswordAccessError) throw crosswordAccessError;
+            crosswordAccess = crosswordAccessData || [];
+
+            renderTextbooks();
+            renderCrosswords();
+            showContent();
+
+          } catch (error) {
+            console.error('Ошибка загрузки материалов:', error);
+            showError('❌ Ошибка загрузки материалов: ' + error.message);
           }
-          backgroundLoading.style.display = 'none';
-          return;
         }
 
-        if (background && background.image_url) {
-          console.log('✅ Найден активный фон:', background.file_name);
-          
-          const img = new Image();
-          img.onload = function() {
-            materialsBody.style.backgroundImage = `url('${background.image_url}')`;
-            backgroundLoading.style.display = 'none';
-          };
-          
-          img.onerror = function() {
-            console.error('❌ Ошибка загрузки изображения фона');
-            backgroundLoading.style.display = 'none';
-          };
-          
-          img.src = background.image_url;
-          
-          // Таймаут на случай проблем с загрузкой
-          setTimeout(() => {
-            if (backgroundLoading.style.display !== 'none') {
-              console.log('⏰ Таймаут загрузки фона');
-              backgroundLoading.style.display = 'none';
-            }
-          }, 8000);
-        } else {
-          console.log('ℹ️ Активный фон не найден');
-          backgroundLoading.style.display = 'none';
-        }
-      } catch (error) {
-        console.error('❌ Ошибка загрузки фона:', error);
-        backgroundLoading.style.display = 'none';
-      }
-    }
-    
-    // ОСНОВНАЯ ЛОГИКА СТРАНИЦЫ
-    function initPageSpecificLogic(supabase, user) {
-      console.log('🚀 Инициализация материалов для пользователя:', user.email);
-      
-      let textbooks = [];
-      let crosswords = [];
-      let userProgress = [];
-      let textbookAccess = [];
-      let crosswordAccess = [];
-      let assignments = [];
-      
-      // Загружаем все данные
-      async function loadMaterials() {
-        try {
-          console.log('📥 Загружаем данные...');
-          
-          // Параллельная загрузка всех данных для скорости
-          const [
-            { data: textbooksData, error: textbooksError },
-            { data: crosswordsData, error: crosswordsError },
-            { data: assignmentsData, error: assignmentsError },
-            { data: progressData, error: progressError },
-            { data: textbookAccessData, error: textbookAccessError },
-            { data: crosswordAccessData, error: crosswordAccessError }
-          ] = await Promise.all([
-            supabase.from('textbooks').select('*').eq('is_active', true).order('order_index'),
-            supabase.from('crosswords').select('*').eq('is_active', true).order('order_index'),
-            supabase.from('assignments').select('*'),
-            supabase.from('user_progress').select('*').eq('user_id', user.id),
-            supabase.from('textbook_access').select('textbook_id').eq('user_id', user.id),
-            supabase.from('crossword_access').select('crossword_id').eq('user_id', user.id)
-          ]);
-          
-          if (textbooksError) throw textbooksError;
-          if (crosswordsError) throw crosswordsError;
-          if (assignmentsError) throw assignmentsError;
-          if (progressError) throw progressError;
-          if (textbookAccessError) throw textbookAccessError;
-          if (crosswordAccessError) throw crosswordAccessError;
-          
-          textbooks = textbooksData || [];
-          crosswords = crosswordsData || [];
-          assignments = assignmentsData || [];
-          userProgress = progressData || [];
-          textbookAccess = textbookAccessData || [];
-          crosswordAccess = crosswordAccessData || [];
-          
-          console.log('✅ Данные загружены:', {
-            учебники: textbooks.length,
-            кроссворды: crosswords.length,
-            задания: assignments.length
+        function renderTextbooks() {
+          const grid = document.getElementById('textbooksGrid');
+          grid.innerHTML = '';
+
+          // ИСПРАВЛЕННАЯ ЛОГИКА ДОСТУПА К УЧЕБНИКАМ
+          const availableTextbooks = textbooks.filter(textbook => {
+            // Учебник доступен если:
+            // 1. Он помечен как доступный для всех (is_available = true), ИЛИ
+            // 2. У пользователя есть явный доступ в textbook_access
+            return textbook.is_available || textbookAccess.some(access => access.textbook_id === textbook.id);
           });
-          
-          renderTextbooks();
-          renderCrosswords();
-          showContent();
-          
-        } catch (error) {
-          console.error('❌ Ошибка загрузки материалов:', error);
-          showError('❌ Ошибка загрузки материалов: ' + error.message);
-        }
-      }
-      
-      // Рендер учебников
-      function renderTextbooks() {
-        const grid = document.getElementById('textbooksGrid');
-        grid.innerHTML = '';
-        
-        // Фильтруем доступные учебники
-        const availableTextbooks = textbooks.filter(textbook => {
-          return textbook.is_available || textbookAccess.some(access => access.textbook_id === textbook.id);
-        });
-        
-        if (availableTextbooks.length === 0) {
-          grid.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-state-icon">📚</div>
-              <h3>Учебники пока не доступны</h3>
-              <p class="small-muted">Ожидайте, когда администратор предоставит доступ к учебным материалам</p>
-              <button class="btn" onclick="location.href='/requests.html'" style="margin-top: 16px;">
-                📝 Запросить доступ
-              </button>
-            </div>
-          `;
-          return;
-        }
-        
-        availableTextbooks.forEach(textbook => {
-          // Считаем прогресс
-          const textbookAssignments = assignments.filter(a => a.textbook_id === textbook.id);
-          const completedAssignments = userProgress.filter(up => 
-            up.is_completed && textbookAssignments.some(a => a.id === up.assignment_id)
-          ).length;
-          
-          const totalCount = textbookAssignments.length;
-          const progress = totalCount > 0 ? (completedAssignments / totalCount) * 100 : 0;
-          
-          const card = document.createElement('div');
-          card.className = 'material-card';
-          
-          card.onclick = () => {
-            window.location.href = `/textbook.html?id=${textbook.id}`;
-          };
-          
-          card.innerHTML = `
-            <div class="material-cover">
-              ${textbook.cover_image_url ? 
-                `<img src="${textbook.cover_image_url}" alt="${textbook.title}" 
-                     onerror="this.style.display='none'; this.parentElement.innerHTML='📚';">` : 
-                '📚'
-              }
-            </div>
-            <div class="material-title">${textbook.title}</div>
-            <div class="material-description">${textbook.description || 'Учебные материалы и задания'}</div>
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: ${progress}%"></div>
-            </div>
-            <div class="material-stats">
-              <span>${completedAssignments}/${totalCount} заданий</span>
-              <span>${Math.round(progress)}%</span>
-            </div>
-          `;
-          
-          grid.appendChild(card);
-        });
-        
-        // Показываем заблокированные учебники (если есть)
-        const lockedTextbooks = textbooks.filter(textbook => 
-          !textbook.is_available && !textbookAccess.some(access => access.textbook_id === textbook.id)
-        );
-        
-        if (lockedTextbooks.length > 0) {
-          lockedTextbooks.forEach(textbook => {
-            const card = document.createElement('div');
-            card.className = 'material-card locked';
+
+          if (availableTextbooks.length === 0) {
+            grid.innerHTML = `
+              <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #666;">
+                <p>📚 Учебники пока не доступны</p>
+                <p class="small-muted">Ожидайте, когда администратор предоставит доступ</p>
+              </div>
+            `;
+            return;
+          }
+
+          availableTextbooks.forEach(textbook => {
+            // Считаем прогресс для учебника
+            const textbookAssignments = assignments.filter(a => a.textbook_id === textbook.id);
+            const completedAssignments = userProgress.filter(up => 
+              up.is_completed && textbookAssignments.some(a => a.id === up.assignment_id)
+            ).length;
             
+            const totalCount = textbookAssignments.length;
+            const progress = totalCount > 0 ? (completedAssignments / totalCount) * 100 : 0;
+
+            const card = document.createElement('div');
+            card.className = 'material-card';
+            
+            card.onclick = () => {
+              window.location.href = `/textbook.html?id=${textbook.id}`;
+            };
+
             card.innerHTML = `
-              <div class="material-cover" style="filter: grayscale(100%);">
+              <div class="material-cover">
                 ${textbook.cover_image_url ? 
-                  `<img src="${textbook.cover_image_url}" alt="${textbook.title}">` : 
+                  `<img src="${textbook.cover_image_url}" alt="${textbook.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" 
+                       onerror="this.style.display='none'; this.parentElement.innerHTML='📚';">` : 
                   '📚'
                 }
               </div>
-              <div class="material-title" style="color: #999;">${textbook.title}</div>
-              <div class="material-description" style="color: #999;">${textbook.description || 'Учебные материалы и задания'}</div>
-              <div class="locked-overlay">
-                <div class="lock-icon">🔒</div>
-                <div>Недоступно</div>
-                <div class="small-muted" style="font-size: 12px; font-weight: normal;">Запросите доступ</div>
+              <div class="material-title">${textbook.title}</div>
+              <div class="material-description">${textbook.description || 'Учебные материалы и задания'}</div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${progress}%"></div>
+              </div>
+              <div class="material-stats">
+                <span>${completedAssignments}/${totalCount} заданий</span>
+                <span>${Math.round(progress)}%</span>
               </div>
             `;
-            
-            card.onclick = () => {
-              showLockedNotification();
-            };
-            
+
             grid.appendChild(card);
           });
+
+          // Показываем заблокированные учебники для информации
+          const lockedTextbooks = textbooks.filter(textbook => 
+            !textbook.is_available && !textbookAccess.some(access => access.textbook_id === textbook.id)
+          );
+
+          if (lockedTextbooks.length > 0) {
+            lockedTextbooks.forEach(textbook => {
+              const card = document.createElement('div');
+              card.className = 'material-card locked';
+              
+              card.innerHTML = `
+                <div class="material-cover" style="filter: grayscale(100%); opacity: 0.6;">
+                  ${textbook.cover_image_url ? 
+                    `<img src="${textbook.cover_image_url}" alt="${textbook.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">` : 
+                    '📚'
+                  }
+                </div>
+                <div class="material-title" style="color: #999;">${textbook.title}</div>
+                <div class="material-description" style="color: #999;">${textbook.description || 'Учебные материалы и задания'}</div>
+                <div class="locked-overlay">
+                  🔒 Недоступен
+                </div>
+              `;
+
+              grid.appendChild(card);
+            });
+          }
         }
-      }
-      
-      // Рендер кроссвордов
-      function renderCrosswords() {
-        const grid = document.getElementById('crosswordsGrid');
-        grid.innerHTML = '';
-        
-        // Фильтруем доступные кроссворды
-        const availableCrosswords = crosswords.filter(crossword => {
-          return crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id);
-        });
-        
-        if (availableCrosswords.length === 0) {
-          grid.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-state-icon">🧩</div>
-              <h3>Кроссворды пока не доступны</h3>
-              <p class="small-muted">Ожидайте, когда администратор предоставит доступ к кроссвордам</p>
-              <button class="btn" onclick="location.href='/requests.html'" style="margin-top: 16px;">
-                📝 Запросить доступ
-              </button>
-            </div>
-          `;
-          return;
-        }
-        
-        availableCrosswords.forEach(crossword => {
-          // Считаем прогресс
-          const crosswordAssignments = assignments.filter(a => a.crossword_id === crossword.id);
-          const completedAssignments = userProgress.filter(up => 
-            up.is_completed && crosswordAssignments.some(a => a.id === up.assignment_id)
-          ).length;
-          
-          const totalCount = crosswordAssignments.length;
-          const progress = totalCount > 0 ? (completedAssignments / totalCount) * 100 : 0;
-          
-          const card = document.createElement('div');
-          card.className = 'material-card';
-          
-          card.onclick = () => {
-            window.location.href = `/crossword.html?id=${crossword.id}`;
-          };
-          
-          card.innerHTML = `
-            <div class="material-cover">
-              ${crossword.cover_image_url ? 
-                `<img src="${crossword.cover_image_url}" alt="${crossword.title}" 
-                     onerror="this.style.display='none'; this.parentElement.innerHTML='🧩';">` : 
-                '🧩'
-              }
-            </div>
-            <div class="material-title">${crossword.title}</div>
-            <div class="material-description">${crossword.description || 'Разгадайте кроссворд'}</div>
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: ${progress}%"></div>
-            </div>
-            <div class="material-stats">
-              <span>${completedAssignments}/${totalCount} слов</span>
-              <span>${Math.round(progress)}%</span>
-            </div>
-          `;
-          
-          grid.appendChild(card);
-        });
-        
-        // Показываем заблокированные кроссворды (если есть)
-        const lockedCrosswords = crosswords.filter(crossword => 
-          !crossword.is_available && !crosswordAccess.some(access => access.crossword_id === crossword.id)
-        );
-        
-        if (lockedCrosswords.length > 0) {
-          lockedCrosswords.forEach(crossword => {
-            const card = document.createElement('div');
-            card.className = 'material-card locked';
+
+        function renderCrosswords() {
+          const grid = document.getElementById('crosswordsGrid');
+          grid.innerHTML = '';
+
+          // ИСПРАВЛЕННАЯ ЛОГИКА ДОСТУПА К КРОССВОРДАМ
+          const availableCrosswords = crosswords.filter(crossword => {
+            // Кроссворд доступен если:
+            // 1. Он помечен как доступный для всех (is_available = true), ИЛИ
+            // 2. У пользователя есть явный доступ в crossword_access
+            return crossword.is_available || crosswordAccess.some(access => access.crossword_id === crossword.id);
+          });
+
+          if (availableCrosswords.length === 0) {
+            grid.innerHTML = `
+              <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #666;">
+                <p>🧩 Кроссворды пока не доступны</p>
+                <p class="small-muted">Ожидайте, когда администратор предоставит доступ</p>
+              </div>
+            `;
+            return;
+          }
+
+          availableCrosswords.forEach(crossword => {
+            // Считаем прогресс для кроссворда
+            const crosswordAssignments = assignments.filter(a => a.crossword_id === crossword.id);
+            const completedAssignments = userProgress.filter(up => 
+              up.is_completed && crosswordAssignments.some(a => a.id === up.assignment_id)
+            ).length;
             
+            const totalCount = crosswordAssignments.length;
+            const progress = totalCount > 0 ? (completedAssignments / totalCount) * 100 : 0;
+
+            const card = document.createElement('div');
+            card.className = 'material-card';
+            
+            card.onclick = () => {
+              window.location.href = `/crossword.html?id=${crossword.id}`;
+            };
+
             card.innerHTML = `
-              <div class="material-cover" style="filter: grayscale(100%);">
+              <div class="material-cover">
                 ${crossword.cover_image_url ? 
-                  `<img src="${crossword.cover_image_url}" alt="${crossword.title}">` : 
+                  `<img src="${crossword.cover_image_url}" alt="${crossword.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;"
+                       onerror="this.style.display='none'; this.parentElement.innerHTML='🧩';">` : 
                   '🧩'
                 }
               </div>
-              <div class="material-title" style="color: #999;">${crossword.title}</div>
-              <div class="material-description" style="color: #999;">${crossword.description || 'Разгадайте кроссворд'}</div>
-              <div class="locked-overlay">
-                <div class="lock-icon">🔒</div>
-                <div>Недоступно</div>
-                <div class="small-muted" style="font-size: 12px; font-weight: normal;">Запросите доступ</div>
+              <div class="material-title">${crossword.title}</div>
+              <div class="material-description">${crossword.description || 'Разгадайте кроссворд'}</div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${progress}%"></div>
+              </div>
+              <div class="material-stats">
+                <span>${completedAssignments}/${totalCount} слов</span>
+                <span>${Math.round(progress)}%</span>
               </div>
             `;
-            
-            card.onclick = () => {
-              showLockedNotification();
-            };
-            
+
             grid.appendChild(card);
           });
-        }
-      }
-      
-      // Показ уведомления о заблокированном материале
-      function showLockedNotification() {
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #ff9800;
-          color: white;
-          padding: 15px 20px;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          z-index: 10001;
-          max-width: 300px;
-          animation: slideInRight 0.3s ease-out;
-        `;
-        notification.innerHTML = `
-          <div style="font-weight: 600; margin-bottom: 5px;">🔒 Материал недоступен</div>
-          <div style="font-size: 14px;">Перейдите в раздел "Заявки" для запроса доступа</div>
-        `;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-          notification.style.animation = 'slideOutRight 0.3s ease-in';
-          setTimeout(() => {
-            if (notification.parentNode) {
-              notification.parentNode.removeChild(notification);
-            }
-          }, 300);
-        }, 3000);
-      }
-      
-      // Добавляем CSS анимации для уведомлений
-      const style = document.createElement('style');
-      style.textContent = `
-        @keyframes slideInRight {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
+
+          // Показываем заблокированные кроссворды для информации
+          const lockedCrosswords = crosswords.filter(crossword => 
+            !crossword.is_available && !crosswordAccess.some(access => access.crossword_id === crossword.id)
+          );
+
+          if (lockedCrosswords.length > 0) {
+            lockedCrosswords.forEach(crossword => {
+              const card = document.createElement('div');
+              card.className = 'material-card locked';
+              
+              card.innerHTML = `
+                <div class="material-cover" style="filter: grayscale(100%); opacity: 0.6;">
+                  ${crossword.cover_image_url ? 
+                    `<img src="${crossword.cover_image_url}" alt="${crossword.title}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">` : 
+                    '🧩'
+                  }
+                </div>
+                <div class="material-title" style="color: #999;">${crossword.title}</div>
+                <div class="material-description" style="color: #999;">${crossword.description || 'Разгадайте кроссворд'}</div>
+                <div class="locked-overlay">
+                  🔒 Недоступен
+                </div>
+              `;
+
+              grid.appendChild(card);
+            });
           }
         }
-        @keyframes slideOutRight {
-          from {
-            transform: translateX(0);
-            opacity: 1;
-          }
-          to {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-        }
-      `;
-      document.head.appendChild(style);
-      
-      // Инициализация вкладок
-      function initTabs() {
+
+        // Обработчики вкладок
         document.querySelectorAll('.material-tab').forEach(tab => {
           tab.addEventListener('click', () => {
             const tabName = tab.getAttribute('data-tab');
@@ -751,72 +531,45 @@
             document.getElementById(`${tabName}-section`).classList.add('active');
           });
         });
-      }
-      
-      // Выход из системы
-      document.getElementById('logoutBtn').addEventListener('click', async () => {
-        if (confirm('Вы уверены, что хотите выйти?')) {
-          await supabase.auth.signOut();
-          window.location.href = '/login.html';
-        }
-      });
-      
-      // Запускаем всё
-      initTabs();
-      loadMaterials();
-    }
-    
-    // ФУНКЦИЯ ПРОВЕРКИ АВТОРИЗАЦИИ
-    async function checkAuth(supabase) {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error) throw error;
-        if (!user) {
-          window.location.href = '/login.html';
-          return null;
-        }
-        return user;
+
+        // Выход из системы
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+          if (confirm('Вы уверены, что хотите выйти?')) {
+            await supabase.auth.signOut();
+            window.location.href = '/login.html';
+          }
+        });
+
+        await loadMaterials();
+        return true;
+        
       } catch (error) {
-        console.error('❌ Ошибка проверки авторизации:', error);
-        window.location.href = '/login.html';
-        return null;
-      }
-    }
-    
-    // ОСНОВНАЯ ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ
-    function initApp(supabase) {
-      console.log('🚀 Инициализация страницы материалов...');
-      
-      checkAuth(supabase).then(user => {
-        if (user) {
-          console.log('✅ Пользователь авторизован:', user.email);
-          
-          // Загружаем фон
-          loadBackground(supabase);
-          
-          // Инициализируем логику страницы
-          initPageSpecificLogic(supabase, user);
-        }
-      }).catch(error => {
-        console.error('❌ Ошибка инициализации:', error);
         showError('❌ Ошибка инициализации: ' + error.message);
-      });
+        console.error('Materials init error:', error);
+        return false;
+      }
     }
     
-    // ЗАПУСК ПРИ ЗАГРУЗКЕ SUPABASE
-    console.log('🔄 Ожидаем загрузку Supabase...');
-    
-    window.waitForSupabase(function(supabase) {
-      console.log('✅ Supabase готов для материалов');
-      initApp(supabase);
-    });
-    
-    // ТАЙМАУТ НА СЛУЧАЙ ПРОБЛЕМ
-    setTimeout(function() {
-      if (document.getElementById('loading').style.display !== 'none') {
-        showError('❌ Supabase не загрузился. Обновите страницу.');
-      }
-    }, 10000);
+    // Используем глобальный загрузчик Supabase
+    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      showError('❌ Конфигурация не загружена');
+      console.error('Supabase config not loaded');
+    } else {
+      console.log('✅ Конфигурация загружена, ждем Supabase...');
+      
+      // Ждем когда Supabase загрузится
+      window.waitForSupabase(function(supabase) {
+        console.log('✅ Supabase готов для материалов');
+        initApp(supabase);
+      });
+      
+      // Таймаут на случай если Supabase не загрузится
+      setTimeout(function() {
+        if (document.getElementById('loading').style.display !== 'none') {
+          showError('❌ Supabase не загрузился. Обновите страницу.');
+        }
+      }, 10000);
+    }
   </script>
 </body>
 </html>
