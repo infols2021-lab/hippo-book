@@ -5,6 +5,11 @@
   <title>Кроссворд — Edu Keys</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
+  
+  <!-- ГЛОБАЛЬНАЯ ЗАГРУЗКА SUPABASE -->
+  <script src="/load-config.js"></script>
+  <script src="/supabase-global.js"></script>
+  
   <style>
     .crossword-container {
       width: 95%;
@@ -192,8 +197,6 @@
       }
     }
   </style>
-  
-  <script src="/load-config.js"></script>
 </head>
 <body>
   <div class="crossword-container">
@@ -242,7 +245,7 @@
     </div>
   </div>
 
-  <script type="module">
+  <script>
     document.getElementById('loading').style.display = 'block';
     
     function showError(message) {
@@ -257,16 +260,8 @@
       document.getElementById('errorMessage').style.display = 'none';
     }
     
-    async function initApp() {
-      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
-        return false;
-      }
-      
+    async function initApp(supabase) {
       try {
-        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-        const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-        
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           window.location.href = '/login.html';
@@ -326,14 +321,17 @@
             assignments = assignmentsData || [];
 
             // Загружаем прогресс пользователя
-            const { data: progressData, error: progressError } = await supabase
-              .from('user_progress')
-              .select('*')
-              .eq('user_id', user.id)
-              .in('assignment_id', assignments.map(a => a.id));
+            if (assignments.length > 0) {
+              const assignmentIds = assignments.map(a => a.id);
+              const { data: progressData, error: progressError } = await supabase
+                .from('user_progress')
+                .select('*')
+                .eq('user_id', user.id)
+                .in('assignment_id', assignmentIds);
 
-            if (progressError) throw progressError;
-            userProgress = progressData || [];
+              if (progressError) throw progressError;
+              userProgress = progressData || [];
+            }
 
             renderCrossword();
             renderAssignments();
@@ -404,15 +402,37 @@
         return true;
         
       } catch (error) {
-        showError('❌ Ошибка инициализации: ' + error.message);
+        console.error('❌ Ошибка инициализации:', error);
+        showError('Ошибка инициализации: ' + error.message);
         return false;
       }
     }
     
-    if (window.SUPABASE_URL) {
-      initApp();
+    // Используем глобальный загрузчик Supabase
+    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      showError('❌ Конфигурация не загружена. Пожалуйста, обновите страницу.');
+      
+      // Ждем загрузки конфигурации
+      window.addEventListener('configLoaded', function() {
+        if (document.getElementById('loading').style.display !== 'none') {
+          document.getElementById('errorMessage').style.display = 'none';
+        }
+      });
     } else {
-      window.addEventListener('configLoaded', initApp);
+      console.log('✅ Конфигурация загружена, ждем Supabase...');
+      
+      // Ждем когда Supabase загрузится
+      window.waitForSupabase(function(supabase) {
+        console.log('✅ Supabase готов для кроссворда');
+        initApp(supabase);
+      });
+      
+      // Таймаут на случай если Supabase не загрузится
+      setTimeout(function() {
+        if (document.getElementById('loading').style.display !== 'none') {
+          showError('❌ Supabase не загрузился. Обновите страницу.');
+        }
+      }, 10000);
     }
   </script>
 </body>

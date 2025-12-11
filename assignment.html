@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Задание - Edu Keys</title>
     <link rel="stylesheet" href="css/style.css">
+    
+    <!-- ГЛОБАЛЬНАЯ ЗАГРУЗКА SUPABASE -->
     <script src="/load-config.js"></script>
+    <script src="/supabase-global.js"></script>
+    
     <style>
         /* Все существующие стили остаются без изменений */
         .assignment-container {
@@ -974,7 +978,7 @@
         </div>
     </div>
 
-    <script type="module">
+    <script>
         // Глобальные переменные для управления состоянием
         let currentState = {
             assignment: null,
@@ -995,6 +999,15 @@
         const ZOOM_STEP = 0.25;
         const MIN_ZOOM = 0.5;
         const MAX_ZOOM = 3;
+
+        // Функция для показа ошибок
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            console.error('Ошибка:', message);
+        }
 
         // ============ ФУНКЦИИ ДЛЯ МОДАЛЬНОГО ОКНА ИЗОБРАЖЕНИЙ ============
         function initImageModal() {
@@ -1162,7 +1175,7 @@
             let normalized = String(text).toLowerCase().trim();
             
             // Заменяем все виды апострофов на стандартный '
-            normalized = normalized.replace(/[’‘ʼ`´]/g, "'");
+            normalized = normalized.replace(/[''`´]/g, "'");
             
             // Убираем пробелы непосредственно перед и после апострофа
             normalized = normalized.replace(/\s*'\s*/g, "'");
@@ -1197,15 +1210,6 @@
             }
             
             return false;
-        }
-
-        // Простая функция для показа ошибок
-        function showError(message) {
-            document.getElementById('loading').style.display = 'none';
-            const errorEl = document.getElementById('errorMessage');
-            errorEl.textContent = message;
-            errorEl.style.display = 'block';
-            console.error('Ошибка:', message);
         }
 
         // Функция показа временной ошибки
@@ -1256,9 +1260,11 @@
         }
 
         // Основная функция инициализации
-        async function initAssignment() {
+        async function initAssignment(supabase) {
             try {
                 console.log('🚀 Начинаем загрузку задания...');
+
+                currentState.supabase = supabase;
 
                 // Инициализируем модальное окно для изображений
                 initImageModal();
@@ -1266,19 +1272,8 @@
                 // Настраиваем кнопки навигации
                 setupNavigationButtons();
 
-                // Ждем конфигурацию если нужно
-                if (!window.SUPABASE_URL) {
-                    console.log('⏳ Ожидаем конфигурацию...');
-                    await window.CONFIG_READY;
-                }
-
-                // Импортируем Supabase
-                const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-                currentState.supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-                console.log('✅ Supabase подключен');
-
                 // Проверяем авторизацию
-                const { data: { user }, error: authError } = await currentState.supabase.auth.getUser();
+                const { data: { user }, error: authError } = await supabase.auth.getUser();
                 if (authError || !user) {
                     window.location.href = '/login.html';
                     return;
@@ -1298,7 +1293,7 @@
                 console.log('📝 Загружаем задание ID:', assignmentId);
 
                 // Загружаем задание
-                const { data: assignment, error: assignmentError } = await currentState.supabase
+                const { data: assignment, error: assignmentError } = await supabase
                     .from('assignments')
                     .select('*')
                     .eq('id', assignmentId)
@@ -1321,7 +1316,7 @@
                 }
 
                 // Загружаем прогресс пользователя
-                const { data: progress } = await currentState.supabase
+                const { data: progress } = await supabase
                     .from('user_progress')
                     .select('*')
                     .eq('user_id', currentState.user.id)
@@ -2466,8 +2461,27 @@
         // Инициализация навигации
         setupNavigation();
 
-        // Запускаем инициализацию
-        initAssignment();
+        // Запускаем инициализацию через глобальный загрузчик Supabase
+        document.getElementById('loading').style.display = 'block';
+        
+        if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+            showError('❌ Конфигурация не загружена. Пожалуйста, обновите страницу.');
+        } else {
+            console.log('✅ Конфигурация загружена, ждем Supabase...');
+            
+            // Ждем когда Supabase загрузится
+            window.waitForSupabase(function(supabase) {
+                console.log('✅ Supabase готов для задания');
+                initAssignment(supabase);
+            });
+            
+            // Таймаут на случай если Supabase не загрузится
+            setTimeout(function() {
+                if (document.getElementById('loading').style.display !== 'none') {
+                    showError('❌ Supabase не загрузился. Обновите страницу.');
+                }
+            }, 10000);
+        }
     </script>
 </body>
 </html>

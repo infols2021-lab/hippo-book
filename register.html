@@ -5,6 +5,11 @@
   <title>Регистрация — Edu Keys</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
+  
+  <!-- ГЛОБАЛЬНАЯ ЗАГРУЗКА SUPABASE -->
+  <script src="/load-config.js"></script>
+  <script src="/supabase-global.js"></script>
+  
   <style>
     body {
       display: flex;
@@ -225,8 +230,6 @@
       }
     }
   </style>
-  
-  <script src="/load-config.js"></script>
 </head>
 <body>
   <div class="register-container">
@@ -323,7 +326,7 @@
     </div>
   </div>
 
-  <script type="module">
+  <script>
     // Расширенный список разрешенных почтовых доменов
     const ALLOWED_DOMAINS = [
       'gmail.com', 'yandex.ru', 'mail.ru', 'ya.ru', 'yandex.com',
@@ -491,213 +494,214 @@
       registerBtn.disabled = !(formatValid && matchValid && passwordValid && domainValid && phoneValid && regionValid);
     }
     
-    function initApp() {
-      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        showError('❌ Ошибка конфигурации системы');
-        return;
-      }
-      
+    async function initApp(supabase) {
       document.getElementById('registerForm').style.display = 'block';
       document.getElementById('loading').style.display = 'none';
       
-      import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm')
-        .then(({ createClient }) => {
-          const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+      // Обработчики ввода для валидации
+      document.getElementById('fullname').addEventListener('input', updateValidation);
+      document.getElementById('phone').addEventListener('input', updateValidation);
+      document.getElementById('region').addEventListener('change', updateValidation);
+      document.getElementById('email').addEventListener('input', updateValidation);
+      document.getElementById('confirmEmail').addEventListener('input', updateValidation);
+      document.getElementById('password').addEventListener('input', updateValidation);
+      
+      document.getElementById('registerBtn').addEventListener('click', async () => {
+        const fullname = document.getElementById('fullname').value.trim();
+        const phone = document.getElementById('phone').value.trim();
+        const region = document.getElementById('region').value;
+        const email = document.getElementById('email').value.trim();
+        const confirmEmail = document.getElementById('confirmEmail').value.trim();
+        const password = document.getElementById('password').value;
+
+        // Базовая валидация
+        if (!fullname || !phone || !region || !email || !confirmEmail || !password) {
+          showError('Заполните все поля');
+          return;
+        }
+
+        if (password.length < 6) {
+          showError('Пароль должен быть не менее 6 символов');
+          return;
+        }
+
+        if (email !== confirmEmail) {
+          showError('Email адреса не совпадают');
+          return;
+        }
+
+        // Расширенная валидация email
+        if (!validateEmail(email)) {
+          showError('Неверный формат email');
+          return;
+        }
+
+        const domainCheck = validateDomain(email);
+        if (!domainCheck.valid) {
+          showError(domainCheck.message);
+          return;
+        }
+
+        // Проверка ограничения регистраций
+        const rateLimit = checkRateLimit();
+        if (!rateLimit.allowed) {
+          showError(rateLimit.message);
+          return;
+        }
+
+        try {
+          document.getElementById('registerBtn').disabled = true;
+          document.getElementById('registerBtn').textContent = 'Создаем аккаунт...';
           
-          // Обработчики ввода для валидации
-          document.getElementById('fullname').addEventListener('input', updateValidation);
-          document.getElementById('phone').addEventListener('input', updateValidation);
-          document.getElementById('region').addEventListener('change', updateValidation);
-          document.getElementById('email').addEventListener('input', updateValidation);
-          document.getElementById('confirmEmail').addEventListener('input', updateValidation);
-          document.getElementById('password').addEventListener('input', updateValidation);
-          
-          document.getElementById('registerBtn').addEventListener('click', async () => {
-            const fullname = document.getElementById('fullname').value.trim();
-            const phone = document.getElementById('phone').value.trim();
-            const region = document.getElementById('region').value;
-            const email = document.getElementById('email').value.trim();
-            const confirmEmail = document.getElementById('confirmEmail').value.trim();
-            const password = document.getElementById('password').value;
+          showWarning('🔄 Создаем ваш аккаунт...');
 
-            // Базовая валидация
-            if (!fullname || !phone || !region || !email || !confirmEmail || !password) {
-              showError('Заполните все поля');
-              return;
+          // Прямая регистрация без предварительной проверки существования
+          const redirectUrl = `${window.location.origin}/login.html`;
+          console.log('Redirect URL:', redirectUrl);
+
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { 
+              data: { 
+                full_name: fullname,
+                contact_phone: phone,
+                region: region
+              },
+              emailRedirectTo: redirectUrl
             }
+          });
 
-            if (password.length < 6) {
-              showError('Пароль должен быть не менее 6 символов');
-              return;
+          if (error) {
+            console.error('Registration error details:', error);
+            
+            // Улучшенная обработка ошибок
+            if (error.message?.includes('already registered') || 
+                error.message?.includes('already exists') || 
+                error.message?.includes('user already exists') ||
+                error.code === 'user_already_exists' ||
+                error.status === 400) {
+              showError('❌ Пользователь с таким email уже зарегистрирован. Используйте другой email или войдите в существующий аккаунт.');
+            } else if (error.message?.includes('rate limit') || error.code === 'rate_limit_exceeded') {
+              showError('❌ Слишком много попыток регистрации. Попробуйте через час.');
+            } else if (error.message?.includes('email sending is disabled')) {
+              showError('❌ Временно недоступна отправка email. Попробуйте позже или свяжитесь с администратором.');
+            } else if (error.message?.includes('Invalid email')) {
+              showError('❌ Неверный формат email адреса.');
+            } else if (error.message?.includes('Password should be at least')) {
+              showError('❌ Пароль слишком короткий. Минимум 6 символов.');
+            } else {
+              showError('❌ Ошибка регистрации: ' + (error.message || 'Неизвестная ошибка'));
             }
+            
+            document.getElementById('registerBtn').disabled = false;
+            document.getElementById('registerBtn').textContent = 'Создать аккаунт';
+            return;
+          }
 
-            if (email !== confirmEmail) {
-              showError('Email адреса не совпадают');
-              return;
-            }
-
-            // Расширенная валидация email
-            if (!validateEmail(email)) {
-              showError('Неверный формат email');
-              return;
-            }
-
-            const domainCheck = validateDomain(email);
-            if (!domainCheck.valid) {
-              showError(domainCheck.message);
-              return;
-            }
-
-            // Проверка ограничения регистраций
-            const rateLimit = checkRateLimit();
-            if (!rateLimit.allowed) {
-              showError(rateLimit.message);
-              return;
-            }
-
+          // УСПЕШНАЯ РЕГИСТРАЦИЯ
+          if (data.user) {
+            console.log('User created successfully:', data.user.id);
+            
+            // ОБНОВЛЯЕМ ПРОФИЛЬ СРАЗУ ПОСЛЕ РЕГИСТРАЦИИ - ЭТО ИСПРАВЛЕНИЕ!
             try {
-              document.getElementById('registerBtn').disabled = true;
-              document.getElementById('registerBtn').textContent = 'Создаем аккаунт...';
-              
-              showWarning('🔄 Создаем ваш аккаунт...');
+              const { error: profileError } = await supabase
+                .from('profiles')
+                .update({
+                  full_name: fullname,
+                  contact_phone: phone,
+                  region: region
+                })
+                .eq('id', data.user.id);
 
-              // Прямая регистрация без предварительной проверки существования
-              const redirectUrl = `${window.location.origin}/login.html`;
-              console.log('Redirect URL:', redirectUrl);
-
-              const { data, error } = await supabase.auth.signUp({
-                email,
-                password,
-                options: { 
-                  data: { 
-                    full_name: fullname,
-                    contact_phone: phone,
-                    region: region
-                  },
-                  emailRedirectTo: redirectUrl
-                }
-              });
-
-              if (error) {
-                console.error('Registration error details:', error);
-                
-                // Улучшенная обработка ошибок
-                if (error.message?.includes('already registered') || 
-                    error.message?.includes('already exists') || 
-                    error.message?.includes('user already exists') ||
-                    error.code === 'user_already_exists' ||
-                    error.status === 400) {
-                  showError('❌ Пользователь с таким email уже зарегистрирован. Используйте другой email или войдите в существующий аккаунт.');
-                } else if (error.message?.includes('rate limit') || error.code === 'rate_limit_exceeded') {
-                  showError('❌ Слишком много попыток регистрации. Попробуйте через час.');
-                } else if (error.message?.includes('email sending is disabled')) {
-                  showError('❌ Временно недоступна отправка email. Попробуйте позже или свяжитесь с администратором.');
-                } else if (error.message?.includes('Invalid email')) {
-                  showError('❌ Неверный формат email адреса.');
-                } else if (error.message?.includes('Password should be at least')) {
-                  showError('❌ Пароль слишком короткий. Минимум 6 символов.');
-                } else {
-                  showError('❌ Ошибка регистрации: ' + (error.message || 'Неизвестная ошибка'));
-                }
-                
-                document.getElementById('registerBtn').disabled = false;
-                document.getElementById('registerBtn').textContent = 'Создать аккаунт';
-                return;
-              }
-
-              // УСПЕШНАЯ РЕГИСТРАЦИЯ
-              if (data.user) {
-                console.log('User created successfully:', data.user.id);
-                
-                // ОБНОВЛЯЕМ ПРОФИЛЬ СРАЗУ ПОСЛЕ РЕГИСТРАЦИИ - ЭТО ИСПРАВЛЕНИЕ!
-                try {
-                  const { error: profileError } = await supabase
-                    .from('profiles')
-                    .update({
-                      full_name: fullname,
-                      contact_phone: phone,
-                      region: region
-                    })
-                    .eq('id', data.user.id);
-
-                  if (profileError) {
-                    console.error('Ошибка обновления профиля:', profileError);
-                  } else {
-                    console.log('✅ Профиль успешно обновлен с данными:', { fullname, phone, region });
-                  }
-                } catch (profileError) {
-                  console.error('Ошибка при обновлении профиля:', profileError);
-                }
-                
-                showSuccess('✅ Регистрация успешна! Проверьте вашу почту для подтверждения email. Без подтверждения вход невозможен.');
-                document.getElementById('registerBtn').style.display = 'none';
-                
-                // Добавляем блок с информацией
-                const helpDiv = document.createElement('div');
-                helpDiv.className = 'existing-account-help';
-                helpDiv.innerHTML = `
-                  <strong>📧 Что делать дальше?</strong><br>
-                  • Проверьте папку "Входящие" и "Спам" в вашей почте<br>
-                  • Нажмите на ссылку подтверждения в письме<br>
-                  • После подтверждения войдите в систему
-                `;
-                document.getElementById('registerForm').appendChild(helpDiv);
-                
-                // Очищаем форму
-                document.getElementById('fullname').value = '';
-                document.getElementById('phone').value = '';
-                document.getElementById('region').value = '';
-                document.getElementById('email').value = '';
-                document.getElementById('confirmEmail').value = '';
-                document.getElementById('password').value = '';
-                
-                // Автоматический переход через 8 секунд
-                setTimeout(() => {
-                  window.location.href = '/login.html?message=check_email';
-                }, 8000);
+              if (profileError) {
+                console.error('Ошибка обновления профиля:', profileError);
               } else {
-                // Это не должно происходить, но на всякий случай
-                showError('❌ Неизвестная ошибка при создании пользователя');
-                document.getElementById('registerBtn').disabled = false;
-                document.getElementById('registerBtn').textContent = 'Создать аккаунт';
+                console.log('✅ Профиль успешно обновлен с данными:', { fullname, phone, region });
               }
-            } catch (error) {
-              console.error('Unexpected registration error:', error);
-              showError('❌ Неожиданная ошибка: ' + error.message);
-              document.getElementById('registerBtn').disabled = false;
-              document.getElementById('registerBtn').textContent = 'Создать аккаунт';
+            } catch (profileError) {
+              console.error('Ошибка при обновлении профиля:', profileError);
             }
-          });
+            
+            showSuccess('✅ Регистрация успешна! Проверьте вашу почту для подтверждения email. Без подтверждения вход невозможен.');
+            document.getElementById('registerBtn').style.display = 'none';
+            
+            // Добавляем блок с информацией
+            const helpDiv = document.createElement('div');
+            helpDiv.className = 'existing-account-help';
+            helpDiv.innerHTML = `
+              <strong>📧 Что делать дальше?</strong><br>
+              • Проверьте папку "Входящие" и "Спам" в вашей почте<br>
+              • Нажмите на ссылку подтверждения в письме<br>
+              • После подтверждения войдите в систему
+            `;
+            document.getElementById('registerForm').appendChild(helpDiv);
+            
+            // Очищаем форму
+            document.getElementById('fullname').value = '';
+            document.getElementById('phone').value = '';
+            document.getElementById('region').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('confirmEmail').value = '';
+            document.getElementById('password').value = '';
+            
+            // Автоматический переход через 8 секунд
+            setTimeout(() => {
+              window.location.href = '/login.html?message=check_email';
+            }, 8000);
+          } else {
+            // Это не должно происходить, но на всякий случай
+            showError('❌ Неизвестная ошибка при создании пользователя');
+            document.getElementById('registerBtn').disabled = false;
+            document.getElementById('registerBtn').textContent = 'Создать аккаунт';
+          }
+        } catch (error) {
+          console.error('Unexpected registration error:', error);
+          showError('❌ Неожиданная ошибка: ' + error.message);
+          document.getElementById('registerBtn').disabled = false;
+          document.getElementById('registerBtn').textContent = 'Создать аккаунт';
+        }
+      });
 
-          // Поддержка Enter для формы
-          const inputs = document.querySelectorAll('input');
-          inputs.forEach(input => {
-            input.addEventListener('keypress', (e) => {
-              if (e.key === 'Enter') {
-                document.getElementById('registerBtn').click();
-              }
-            });
-          });
-
-          // Инициализация валидации
-          updateValidation();
-        })
-        .catch(error => {
-          showError('❌ Ошибка загрузки системы: ' + error.message);
+      // Поддержка Enter для формы
+      const inputs = document.querySelectorAll('input');
+      inputs.forEach(input => {
+        input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            document.getElementById('registerBtn').click();
+          }
         });
+      });
+
+      // Инициализация валидации
+      updateValidation();
     }
     
-    if (window.SUPABASE_URL) {
-      initApp();
-    } else {
-      const timeout = setTimeout(() => {
-        showError('❌ Таймаут загрузки конфигурации');
-      }, 1000);
+    // Используем глобальный загрузчик Supabase
+    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      showError('❌ Конфигурация не загружена. Пожалуйста, обновите страницу.');
       
-      window.addEventListener('configLoaded', () => {
-        clearTimeout(timeout);
-        initApp();
+      // Ждем загрузки конфигурации
+      window.addEventListener('configLoaded', function() {
+        if (document.getElementById('loading').style.display !== 'none') {
+          document.getElementById('errorMessage').style.display = 'none';
+        }
       });
+    } else {
+      console.log('✅ Конфигурация загружена, ждем Supabase...');
+      
+      // Ждем когда Supabase загрузится
+      window.waitForSupabase(function(supabase) {
+        console.log('✅ Supabase готов для регистрации');
+        initApp(supabase);
+      });
+      
+      // Таймаут на случай если Supabase не загрузится
+      setTimeout(function() {
+        if (document.getElementById('loading').style.display !== 'none') {
+          showError('❌ Supabase не загрузился. Обновите страницу.');
+        }
+      }, 10000);
     }
   </script>
 </body>
