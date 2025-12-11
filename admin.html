@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <title>Админ — Edu Keys</title>
   <link rel="stylesheet" href="css/style.css">
+  
+  <!-- ГЛОБАЛЬНАЯ ЗАГРУЗКА SUPABASE -->
+  <script src="/load-config.js"></script>
+  <script src="/supabase-global.js"></script>
+  
   <style>
     .admin-container { width:95%; max-width:1400px; margin:20px auto; }
     .admin-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding:15px; background:var(--card); border-radius:16px; box-shadow:0 8px 26px rgba(0,0,0,0.08); }
@@ -847,8 +852,6 @@
       .pagination-btn { padding: 6px 8px; font-size: 12px; }
     }
   </style>
-
-  <script src="/load-config.js"></script>
 </head>
 <body>
   <div id="configLoading" class="config-loading">
@@ -1298,7 +1301,7 @@
           </div>
         </div>
       </div>
-          </div>
+    </div>
   </div>
 
   <div class="modal-backdrop" id="modal" style="display: none;">
@@ -1311,7 +1314,7 @@
     </div>
   </div>
 
-  <script type="module">
+  <script>
     // ============ БАЗОВЫЕ UI ХЕЛПЕРЫ ============
     document.getElementById('configLoading').style.display = 'block';
 
@@ -2664,986 +2667,176 @@
     }
 
     // ============ ОСНОВНОЕ ПРИЛОЖЕНИЕ ============
-    async function initApp() {
+        async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
         return;
       }
 
-      try {
-        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-        const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-        window.supabase = supabase;
-
-        console.log('🔄 Начинаем инициализацию админ-панели...');
+      console.log('🔄 Начинаем инициализацию админ-панели...');
+      
+      // Используем глобальный загрузчик Supabase
+      window.waitForSupabase(async function(supabase) {
+        console.log('✅ Supabase готов для админ-панели');
         
-        const user = await checkAdmin(supabase);
-        if (!user) {
-          console.log('❌ Проверка прав администратора не пройдена');
-          return;
-        }
-
-        console.log('✅ Админ-панель инициализирована для пользователя:', user.email);
-
-        // Инициализация пагинации
-        usersPagination.init();
-
-        // Проверяем необработанные заявки
-        await checkPendingRequests(supabase);
-
-        // Инициализация множественного выбора классов
-        initClassLevelSelectors();
-
-        document.getElementById('modalOk').addEventListener('click', () => {
-          document.getElementById('modal').style.display = 'none';
-        });
-
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-          if (confirm('Выйти из аккаунта?')) {
-            await supabase.auth.signOut();
-            window.location.href = '/login.html';
-          }
-        });
-
-        document.querySelectorAll('.admin-tab').forEach(tab => {
-          tab.addEventListener('click', () => {
-            const tabName = tab.getAttribute('data-tab');
-            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
-            tab.classList.add('active');
-            document.getElementById(`${tabName}-section`).classList.add('active');
-
-            if (tabName === 'textbooks') loadTextbooks();
-            if (tabName === 'crosswords') loadCrosswords();
-            if (tabName === 'assignments') { loadMaterialsForAssignments(); loadAssignments(); }
-            if (tabName === 'users') loadUsers();
-          });
-        });
-
-        // Инициализация загрузки изображений
-        initImageUpload({
-          uploadAreaId: 'textbookUploadArea',
-          fileInputId: 'textbookCoverInput',
-          progressId: 'textbookCoverProgress',
-          progressBarId: 'textbookCoverProgressBar',
-          previewId: 'textbookCoverPreview',
-          urlInputId: 'textbookCoverUrl',
-          removeBtnId: 'removeTextbookCoverBtn',
-          bucket: 'covers',
-          supabase
-        });
-        initImageUpload({
-          uploadAreaId: 'crosswordUploadArea',
-          fileInputId: 'crosswordCoverInput',
-          progressId: 'crosswordCoverProgress',
-          progressBarId: 'crosswordCoverProgressBar',
-          previewId: 'crosswordCoverPreview',
-          urlInputId: 'crosswordCoverUrl',
-          removeBtnId: 'removeCrosswordCoverBtn',
-          bucket: 'covers',
-          supabase
-        });
-
-        // ===== Статистика
-        async function loadStats() {
-          try {
-            const [{ data: t }, { data: c }, { data: a }, { data: u }] = await Promise.all([
-              supabase.from('textbooks').select('id'),
-              supabase.from('crosswords').select('id'),
-              supabase.from('assignments').select('id'),
-              supabase.from('profiles').select('id')
-            ]);
-            document.getElementById('totalTextbooks').textContent = t?.length || 0;
-            document.getElementById('totalCrosswords').textContent = c?.length || 0;
-            document.getElementById('totalAssignments').textContent = a?.length || 0;
-            document.getElementById('totalUsers').textContent = u?.length || 0;
-          } catch (e) {
-            console.warn('Stats load error', e);
-          }
-        }
-
-        // ===== Учебники
-        let editingTextbookId = null;
-
-        function showTextbookForm() {
-          editingTextbookId = null;
-          document.getElementById('textbookForm').classList.add('active');
-          document.getElementById('textbookFormTitle').textContent = 'Создать учебник';
-          document.getElementById('textbookTitle').value = '';
-          document.getElementById('textbookDescription').value = '';
-          setSelectedClassLevels(document.getElementById('textbookClassLevel'), []);
-          document.getElementById('textbookOrder').value = '0';
-          document.getElementById('textbookIsAvailable').checked = false;
-          document.getElementById('textbookCoverUrl').value = '';
-          document.getElementById('textbookCoverPreview').style.display = 'none';
-          document.getElementById('removeTextbookCoverBtn').style.display = 'none';
-        }
-        function hideTextbookForm(){ document.getElementById('textbookForm').classList.remove('active'); }
-
-        async function saveTextbook() {
-          const title = document.getElementById('textbookTitle').value.trim();
-          const description = document.getElementById('textbookDescription').value.trim();
-          const classLevels = getSelectedClassLevels(document.getElementById('textbookClassLevel'));
-          const orderIndex = parseInt(document.getElementById('textbookOrder').value || '0',10);
-          const isAvailable = document.getElementById('textbookIsAvailable').checked;
-          const coverUrl = document.getElementById('textbookCoverUrl').value;
-
-          if (!title) return showModal('Ошибка', 'Введите название учебника');
-          if (classLevels.length === 0) return showModal('Ошибка', 'Выберите хотя бы один класс');
-
-          const payload = {
-            title,
-            description,
-            class_level: classLevels,
-            order_index: orderIndex,
-            is_available: isAvailable,
-            is_active: true,
-            created_by: user.id
-          };
-          if (coverUrl) payload.cover_image_url = coverUrl;
-
-          let res;
-          if (editingTextbookId) {
-            res = await supabase.from('textbooks').update(payload).eq('id', editingTextbookId);
-          } else {
-            res = await supabase.from('textbooks').insert(payload);
-          }
-          if (res.error) return showModal('Ошибка', res.error.message);
-
-          showModal('Готово', editingTextbookId ? 'Учебник обновлён' : 'Учебник создан');
-          hideTextbookForm(); loadTextbooks(); loadStats();
-        }
-
-        async function loadTextbooks() {
-          const tbody = document.querySelector('#textbooksTable tbody');
-          tbody.innerHTML = '<tr><td colspan="7" style="padding:14px;">Загрузка...</td></tr>';
-
-          const { data: textbooks, error } = await supabase.from('textbooks').select('*').order('order_index');
-          if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
-
-          const { data: ass } = await supabase.from('assignments').select('id,textbook_id');
-          const counts = {};
-          (ass||[]).forEach(a => { if (a.textbook_id) counts[a.textbook_id]=(counts[a.textbook_id]||0)+1; });
-
-          tbody.innerHTML = '';
-          if (!textbooks?.length) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;">Учебники не найдены</td></tr>';
+        try {
+          const user = await checkAdmin(supabase);
+          if (!user) {
+            console.log('❌ Проверка прав администратора не пройдена');
             return;
           }
 
-          const classMap = {
-            '1-2': '1-2 класс',
-            '3-4': '3-4 класс',
-            '5-6': '5-6 класс',
-            '7': '7 класс',
-            '8-9': '8-9 класс',
-            '10-11': '10-11 класс',
-            '12': '12 класс'
-          };
+          console.log('✅ Админ-панель инициализирована для пользователя:', user.email);
 
-          textbooks.forEach(tb => {
-            const tr = document.createElement('tr');
-            const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
-            const classDisplay = classLevels.length > 0 
-              ? classLevels.map(cls => classMap[cls] || cls).join(', ')
-              : '—';
-            
-            tr.innerHTML = `
-              <td>${tb.title}</td>
-              <td>${tb.description || '—'}</td>
-              <td>${classDisplay}</td>
-              <td>${counts[tb.id] || 0}</td>
-              <td>${tb.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
-              <td>${tb.is_active ? '✅ Активен' : '❌ Неактивен'}</td>
-              <td>
-                <button class="btn btn-small" data-edit-textbook="${tb.id}">✏️ Редактировать</button>
-                <button class="btn btn-small btn-danger" data-del-textbook="${tb.id}" data-title="${tb.title}">🗑️ Удалить</button>
-              </td>
-            `;
-            tbody.appendChild(tr);
+          // Инициализация пагинации
+          usersPagination.init();
+
+          // Проверяем необработанные заявки
+          await checkPendingRequests(supabase);
+
+          // Инициализация множественного выбора классов
+          initClassLevelSelectors();
+
+          document.getElementById('modalOk').addEventListener('click', () => {
+            document.getElementById('modal').style.display = 'none';
           });
 
-          tbody.querySelectorAll('[data-edit-textbook]').forEach(btn=>{
-            btn.addEventListener('click', async ()=>{
-              const id = btn.getAttribute('data-edit-textbook');
-              const { data, error } = await supabase.from('textbooks').select('*').eq('id', id).single();
-              if (error) return showModal('Ошибка', error.message);
-              editingTextbookId = id;
-              document.getElementById('textbookForm').classList.add('active');
-              document.getElementById('textbookFormTitle').textContent = 'Редактировать учебник';
-              document.getElementById('textbookTitle').value = data.title || '';
-              document.getElementById('textbookDescription').value = data.description || '';
-              setSelectedClassLevels(document.getElementById('textbookClassLevel'), data.class_level || []);
-              document.getElementById('textbookOrder').value = data.order_index || 0;
-              document.getElementById('textbookIsAvailable').checked = !!data.is_available;
-              document.getElementById('textbookCoverUrl').value = data.cover_image_url || '';
-              const prev = document.getElementById('textbookCoverPreview');
-              const removeBtn = document.getElementById('removeTextbookCoverBtn');
-              if (data.cover_image_url) { 
-                prev.src = data.cover_image_url; 
-                prev.style.display='block'; 
-                removeBtn.style.display='block';
-              } else { 
-                prev.style.display='none'; 
-                removeBtn.style.display='none';
+          document.getElementById('logoutBtn').addEventListener('click', async () => {
+            if (confirm('Выйти из аккаунта?')) {
+              await supabase.auth.signOut();
+              window.location.href = '/login.html';
+            }
+          });
+
+          document.querySelectorAll('.admin-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+              const tabName = tab.getAttribute('data-tab');
+              document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+              document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+              tab.classList.add('active');
+              document.getElementById(`${tabName}-section`).classList.add('active');
+
+              if (tabName === 'textbooks') loadTextbooks(supabase);
+              if (tabName === 'crosswords') loadCrosswords(supabase);
+              if (tabName === 'assignments') { 
+                loadMaterialsForAssignments(supabase); 
+                loadAssignments(supabase); 
               }
+              if (tabName === 'users') loadUsers(supabase);
             });
           });
 
-          tbody.querySelectorAll('[data-del-textbook]').forEach(btn=>{
-            btn.addEventListener('click', async ()=>{
-              const id = btn.getAttribute('data-del-textbook');
-              const title = btn.getAttribute('data-title') || '';
-              if (!confirm(`Удалить учебник "${title}"? Связанные задания также будут удалены.`)) return;
-              const { error } = await supabase.from('textbooks').delete().eq('id', id);
-              if (error) return showModal('Ошибка', error.message);
-              showModal('Готово', 'Учебник удалён'); loadTextbooks(); loadStats();
-            });
+          // Инициализация загрузки изображений
+          initImageUpload({
+            uploadAreaId: 'textbookUploadArea',
+            fileInputId: 'textbookCoverInput',
+            progressId: 'textbookCoverProgress',
+            progressBarId: 'textbookCoverProgressBar',
+            previewId: 'textbookCoverPreview',
+            urlInputId: 'textbookCoverUrl',
+            removeBtnId: 'removeTextbookCoverBtn',
+            bucket: 'covers',
+            supabase
           });
-        }
-
-        document.getElementById('createTextbookBtn').addEventListener('click', showTextbookForm);
-        document.getElementById('cancelTextbookBtn').addEventListener('click', hideTextbookForm);
-        document.getElementById('saveTextbookBtn').addEventListener('click', saveTextbook);
-
-        // ===== КРОССВОРДЫ
-        let editingCrosswordId = null;
-
-        function showCrosswordForm() {
-          editingCrosswordId = null;
-          document.getElementById('crosswordForm').classList.add('active');
-          document.getElementById('crosswordFormTitle').textContent = 'Создать кроссворд';
-          document.getElementById('crosswordTitle').value = '';
-          document.getElementById('crosswordDescription').value = '';
-          setSelectedClassLevels(document.getElementById('crosswordClassLevel'), []);
-          document.getElementById('crosswordOrder').value = '0';
-          document.getElementById('crosswordIsAvailable').checked = false;
-          document.getElementById('crosswordCoverUrl').value = '';
-          document.getElementById('crosswordCoverPreview').style.display = 'none';
-          document.getElementById('removeCrosswordCoverBtn').style.display = 'none';
-        }
-        function hideCrosswordForm(){ document.getElementById('crosswordForm').classList.remove('active'); }
-
-        async function saveCrossword() {
-          const title = document.getElementById('crosswordTitle').value.trim();
-          const description = document.getElementById('crosswordDescription').value.trim();
-          const classLevels = getSelectedClassLevels(document.getElementById('crosswordClassLevel'));
-          const orderIndex = parseInt(document.getElementById('crosswordOrder').value || '0',10);
-          const isAvailable = document.getElementById('crosswordIsAvailable').checked;
-          const coverUrl = document.getElementById('crosswordCoverUrl').value;
-
-          if (!title) return showModal('Ошибка', 'Введите название кроссворда');
-          if (classLevels.length === 0) return showModal('Ошибка', 'Выберите хотя бы один класс');
-
-          const payload = {
-            title,
-            description,
-            class_level: classLevels,
-            order_index: orderIndex,
-            is_available: isAvailable,
-            is_active: true,
-            created_by: user.id
-          };
-          if (coverUrl) payload.cover_image_url = coverUrl;
-
-          let res;
-          if (editingCrosswordId) {
-            res = await supabase.from('crosswords').update(payload).eq('id', editingCrosswordId);
-          } else {
-            res = await supabase.from('crosswords').insert(payload);
-          }
-          if (res.error) return showModal('Ошибка', res.error.message);
-
-          showModal('Готово', editingCrosswordId ? 'Кроссворд обновлён' : 'Кроссворд создан');
-          hideCrosswordForm(); loadCrosswords(); loadStats();
-        }
-
-        async function loadCrosswords() {
-          const tbody = document.querySelector('#crosswordsTable tbody');
-          tbody.innerHTML = '<tr><td colspan="6" style="padding:14px;">Загрузка...</td></tr>';
-
-          const { data: crosswords, error } = await supabase.from('crosswords').select('*').order('order_index');
-          if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
-
-          const { data: ass } = await supabase.from('assignments').select('id,crossword_id');
-          const counts = {};
-          (ass||[]).forEach(a => { if (a.crossword_id) counts[a.crossword_id]=(counts[a.crossword_id]||0)+1; });
-
-          tbody.innerHTML = '';
-          if (!crosswords?.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Кроссворды не найдены</td></tr>';
-            return;
-          }
-
-          const classMap = {
-            '1-2': '1-2 класс',
-            '3-4': '3-4 класс',
-            '5-6': '5-6 класс',
-            '7': '7 класс',
-            '8-9': '8-9 класс',
-            '10-11': '10-11 класс',
-            '12': '12 класс'
-          };
-
-          crosswords.forEach(cw => {
-            const tr = document.createElement('tr');
-            const classLevels = Array.isArray(cw.class_level) ? cw.class_level : [];
-            const classDisplay = classLevels.length > 0 
-              ? classLevels.map(cls => classMap[cls] || cls).join(', ')
-              : '—';
-            
-            tr.innerHTML = `
-              <td>${cw.title}</td>
-              <td>${cw.description || '—'}</td>
-              <td>${classDisplay}</td>
-              <td>${counts[cw.id] || 0}</td>
-              <td>${cw.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
-              <td>
-                <button class="btn btn-small" data-edit-crossword="${cw.id}">✏️ Редактировать</button>
-                <button class="btn btn-small btn-danger" data-del-crossword="${cw.id}" data-title="${cw.title}">🗑️ Удалить</button>
-              </td>
-            `;
-            tbody.appendChild(tr);
+          initImageUpload({
+            uploadAreaId: 'crosswordUploadArea',
+            fileInputId: 'crosswordCoverInput',
+            progressId: 'crosswordCoverProgress',
+            progressBarId: 'crosswordCoverProgressBar',
+            previewId: 'crosswordCoverPreview',
+            urlInputId: 'crosswordCoverUrl',
+            removeBtnId: 'removeCrosswordCoverBtn',
+            bucket: 'covers',
+            supabase
           });
 
-          tbody.querySelectorAll('[data-edit-crossword]').forEach(btn=>{
-            btn.addEventListener('click', async ()=>{
-              const id = btn.getAttribute('data-edit-crossword');
-              const { data, error } = await supabase.from('crosswords').select('*').eq('id', id).single();
-              if (error) return showModal('Ошибка', error.message);
-              editingCrosswordId = id;
-              document.getElementById('crosswordForm').classList.add('active');
-              document.getElementById('crosswordFormTitle').textContent = 'Редактировать кроссворд';
-              document.getElementById('crosswordTitle').value = data.title || '';
-              document.getElementById('crosswordDescription').value = data.description || '';
-              setSelectedClassLevels(document.getElementById('crosswordClassLevel'), data.class_level || []);
-              document.getElementById('crosswordOrder').value = data.order_index || 0;
-              document.getElementById('crosswordIsAvailable').checked = !!data.is_available;
-              document.getElementById('crosswordCoverUrl').value = data.cover_image_url || '';
-              const prev = document.getElementById('crosswordCoverPreview');
-              const removeBtn = document.getElementById('removeCrosswordCoverBtn');
-              if (data.cover_image_url) { 
-                prev.src = data.cover_image_url; 
-                prev.style.display='block'; 
-                removeBtn.style.display='block';
-              } else { 
-                prev.style.display='none'; 
-                removeBtn.style.display='none';
-              }
-            });
-          });
-
-          tbody.querySelectorAll('[data-del-crossword]').forEach(btn=>{
-            btn.addEventListener('click', async ()=>{
-              const id = btn.getAttribute('data-del-crossword');
-              const title = btn.getAttribute('data-title') || '';
-              if (!confirm(`Удалить кроссворд "${title}"? Связанные задания также будут удалены.`)) return;
-              const { error } = await supabase.from('crosswords').delete().eq('id', id);
-              if (error) return showModal('Ошибка', error.message);
-              showModal('Готово', 'Кроссворд удалён'); loadCrosswords(); loadStats();
-            });
-          });
-        }
-
-        document.getElementById('createCrosswordBtn').addEventListener('click', showCrosswordForm);
-        document.getElementById('cancelCrosswordBtn').addEventListener('click', hideCrosswordForm);
-        document.getElementById('saveCrosswordBtn').addEventListener('click', saveCrossword);
-
-        // ===== ЗАДАНИЯ
-        let selectedMaterialId = '';
-        let editingAssignmentId = null;
-        let currentQuestionType = 'test';
-
-        document.querySelectorAll('.type-btn').forEach(btn => {
-          btn.addEventListener('click', () => {
-            document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentQuestionType = btn.getAttribute('data-type');
-          });
-        });
-
-        document.getElementById('materialSelect').addEventListener('change', function () {
-          selectedMaterialId = this.value;
-          document.getElementById('createAssignmentBtn').disabled = !selectedMaterialId;
-          loadAssignments();
-        });
-
-        document.getElementById('createAssignmentBtn').addEventListener('click', showAssignmentForm);
-        document.getElementById('cancelAssignmentBtn').addEventListener('click', hideAssignmentForm);
-        document.getElementById('saveAssignmentBtn').addEventListener('click', saveAssignment);
-        document.getElementById('addQuestionBtn').addEventListener('click', () => addQuestion());
-
-        async function loadMaterialsForAssignments() {
-          const select = document.getElementById('materialSelect');
-          select.innerHTML = '<option value="">-- Выберите учебник или кроссворд --</option>';
-
-          const [{ data: textbooks }, { data: crosswords }] = await Promise.all([
-            supabase.from('textbooks').select('id,title,is_active,class_level').order('order_index'),
-            supabase.from('crosswords').select('id,title,is_active,class_level').order('order_index')
-          ]);
-
-          if (textbooks?.length) {
-            const og = document.createElement('optgroup');
-            og.label = '📚 Учебники';
-            textbooks.filter(t=>t.is_active!==false).forEach(t=>{
-              const classLevels = Array.isArray(t.class_level) ? t.class_level : [];
-              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
-              const opt = document.createElement('option');
-              opt.value = `textbook_${t.id}`;
-              opt.textContent = `${t.title} (${classDisplay})`;
-              og.appendChild(opt);
-            });
-            select.appendChild(og);
-          }
-
-          if (crosswords?.length) {
-            const og = document.createElement('optgroup');
-            og.label = '🧩 Кроссворды';
-            crosswords.filter(c=>c.is_active!==false).forEach(c=>{
-              const classLevels = Array.isArray(c.class_level) ? c.class_level : [];
-              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
-              const opt = document.createElement('option');
-              opt.value = `crossword_${c.id}`;
-              opt.textContent = `${c.title} (${classDisplay})`;
-              og.appendChild(opt);
-            });
-            select.appendChild(og);
-          }
-
-          if (selectedMaterialId) {
-            const has = Array.from(select.options).some(o=>o.value===selectedMaterialId);
-            if (has) select.value = selectedMaterialId;
-          }
-        }
-
-        function showAssignmentForm() {
-          editingAssignmentId = null;
-          document.getElementById('assignmentForm').classList.add('active');
-          document.getElementById('assignmentFormTitle').textContent = 'Создать задание';
-          document.getElementById('assignmentTitle').value = '';
-          document.getElementById('assignmentOrder').value = '0';
-          document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
-          document.querySelector('.type-btn[data-type="test"]').classList.add('active');
-          currentQuestionType = 'test';
-
-          const cont = document.getElementById('questionsContainer');
-          cont.innerHTML = '';
-          addQuestion();
-        }
-
-        function hideAssignmentForm() {
-          document.getElementById('assignmentForm').classList.remove('active');
-        }
-
-        function addQuestion(prefill) {
-          const container = document.getElementById('questionsContainer');
-          const qid = generateQuestionId();
-          const qType = prefill?.type || currentQuestionType;
-
-          const wrap = document.createElement('div');
-          wrap.className = 'subtask-item';
-          wrap.setAttribute('data-id', qid);
-          wrap.setAttribute('data-type', qType);
-
-          const imageUploadBlock = `
-            <div class="form-group question-image-upload">
-              <label>Изображение для вопроса (опционально):</label>
-              <div class="upload-area" id="questionUploadArea_${qid}">
-                <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
-                <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. 5MB)</p>
-                <input type="file" id="questionImageInput_${qid}" style="display:none" accept="image/*">
-              </div>
-              <div class="upload-progress" id="questionImageProgress_${qid}">
-                <div class="upload-progress-bar" id="questionImageProgressBar_${qid}"></div>
-              </div>
-              <input type="hidden" id="questionImageUrl_${qid}" value="${prefill?.image || ''}">
-              <img class="question-image-preview" id="questionImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
-              <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeQuestionImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
-            </div>
-          `;
-
-          const questionEditor = `
-            <div class="form-group">
-              <label>Текст вопроса:</label>
-              <textarea class="question-textarea" id="questionText_${qid}" placeholder="Введите текст вопроса. Используйте Enter для переноса строк">${prefill?.q ? String(prefill.q) : ''}</textarea>
-              <div class="format-hint">
-                💡 Используйте Enter для переноса строк
-              </div>
-            </div>
-          `;
-
-          let inner = questionEditor;
-
-          if (qType === 'test') {
-            inner += `
-              ${imageUploadBlock}
-              <div class="form-group">
-                <label>Варианты ответов (каждый с новой строки):</label>
-                <textarea class="input test-options" rows="4">${(prefill?.options || []).join('\n')}</textarea>
-              </div>
-              <div class="form-group">
-                <label>Правильный ответ (номер варианта, начиная с 1):</label>
-                <input type="number" class="input test-correct" min="1" value="${(typeof prefill?.correct === 'number' ? prefill.correct+1 : 1)}">
-              </div>
-            `;
-          } else if (qType === 'fill') {
-            inner += `
-              ${imageUploadBlock}
-              <div class="form-group">
-                <label>Правильные ответы:</label>
-                <div class="fill-inputs-container" id="fill-inputs-container_${qid}">
-                </div>
-                <button type="button" class="add-input-btn" id="add-fill-input_${qid}">
-                  ➕ Добавить ответ
-                </button>
-                <div class="input-count" id="fill-input-count_${qid}">Количество ответов: 0</div>
-                <div class="small-muted">
-                  Для каждого ответа можно указать несколько вариантов через точку с запятой (например: ежик;кошка). 
-                  Каждое поле - отдельный ответ с номером.
-                </div>
-              </div>
-            `;
-          } else if (qType === 'sentence') {
-            const sentence = prefill?.sentence || '';
-            const previewHtml = sentence
-              ? sentence.replace(/___/g,'<span style="border-bottom:2px dashed #666; padding:0 10px; margin:0 2px;">[?]</span>')
-              : 'Введите предложение ниже';
-            inner += `
-              ${imageUploadBlock}
-              <div class="form-group">
-                <label>Предложение с пропусками:</label>
-                <div class="sentence-builder">
-                  <div class="sentence-preview" id="sentencePreview_${qid}">${previewHtml}</div>
-                  <textarea class="sentence-input" id="sentenceInput_${qid}" rows="4" placeholder="Используйте ___ для пропусков. Например: Я ___ яблоко.">${sentence}</textarea>
-                  <button type="button" class="btn btn-small add-gap-btn" onclick="window.updateSentencePreview('${qid}')">Обновить предпросмотр</button>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Правильные ответы для пропусков (каждый с новой строки, по порядку пропусков, несколько вариантов через ;):</label>
-                <textarea class="input sentence-answers" rows="4" placeholder="яблоко;груша;апельсин&#10;утром;вечером">${formatMultipleAnswers(prefill?.answers || [])}</textarea>
-                <div class="small-muted">Каждая строка соответствует одному пропуску. Для каждого пропуска можно указать несколько вариантов через точку с запятой.</div>
-              </div>
-            `;
-            setTimeout(()=>{
-              const si = document.getElementById(`sentenceInput_${qid}`);
-              si?.addEventListener('input', ()=>window.updateSentencePreview(qid));
-              window.updateSentencePreview(qid);
-            },0);
-          } else if (qType === 'crossword') {
-            inner = `
-              <div class="crossword-advanced-builder" id="crosswordAdvancedBuilder_${qid}">
-                <div class="crossword-advanced-help">
-                  <h4>🧩 Конструктор кроссворда</h4>
-                  <p><strong>Режим работы:</strong></p>
-                  <ul>
-                    <li><strong>Размещение слов:</strong> Введите слово, выберите направление и номер, затем кликните на стартовую клетку</li>
-                    <li><strong>Блокировка клеток:</strong> Двойной клик по клетке чтобы заблокировать/разблокировать (черные клетки)</li>
-                    <li><strong>Удаление слов:</strong> Нажмите кнопку "Удалить слово" и кликните на слово для удаления</li>
-                  </ul>
-                  <p><strong>Особенности:</strong></p>
-                  <ul>
-                    <li>Ручное указание номера слова</li>
-                    <li>Если в клетке уже есть номер - используется существующий</li>
-                    <li>Один номер для горизонтального и вертикального слова в одной клетке</li>
-                    <li>Проверка пересечений слов</li>
-                    <li>Управление списком слов</li>
-                    <li>Предпросмотр для ученика (только клетки для ввода)</li>
-                  </ul>
-                </div>
-
-                <div class="word-management-panel">
-                  <h4>📝 Управление словами</h4>
-                  
-                  <div class="word-input-section">
-                    <div class="form-group">
-                      <label>Новое слово:</label>
-                      <input type="text" id="wordInput_${qid}" placeholder="Введите слово" style="text-transform: uppercase">
-                    </div>
-                    <div class="form-group">
-                      <label>Направление:</label>
-                      <select id="wordDirection_${qid}">
-                        <option value="across">→ По горизонтали</option>
-                        <option value="down">↓ По вертикали</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label>Номер слова:</label>
-                      <input type="number" id="wordNumberInput_${qid}" min="1" value="${prefill?.metadata?.nextWordNumber || 1}">
-                    </div>
-                    <div class="form-group">
-                      <button class="btn" id="placeWordBtn_${qid}">Разместить слово</button>
-                    </div>
-                    <div class="form-group">
-                      <button class="btn delete-word-btn" id="deleteWordBtn_${qid}">
-                        🗑️ Удалить слово
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="word-list">
-                    <h5>Размещенные слова:</h5>
-                    <div id="wordList_${qid}"></div>
-                  </div>
-                </div>
-
-                <div class="crossword-advanced-controls">
-                  <div class="form-group">
-                    <label>Количество строк:</label>
-                    <input type="number" id="crosswordAdvancedRows_${qid}" value="${prefill?.metadata?.rows || 15}" min="5" max="30">
-                  </div>
-                  <div class="form-group">
-                    <label>Количество столбцов:</label>
-                    <input type="number" id="crosswordAdvancedCols_${qid}" value="${prefill?.metadata?.cols || 15}" min="5" max="30">
-                  </div>
-                  <div class="form-group">
-                    <button class="btn" id="createAdvancedGridBtn_${qid}">Создать сетку</button>
-                  </div>
-                </div>
-
-                <div class="crossword-advanced-actions">
-                  <button class="btn btn-small" id="clearAdvancedGridBtn_${qid}">🗑️ Очистить сетку</button>
-                </div>
-
-                <div class="form-group">
-                  <label>Сетка кроссворда (для администратора):</label>
-                  <div id="crosswordAdvancedGridContainer_${qid}" class="crossword-advanced-grid-container"></div>
-                </div>
-
-                <div class="form-group">
-                  <label>Изображение для кроссворда (опционально):</label>
-                  <div class="upload-area" id="crosswordAdvancedUploadArea_${qid}">
-                    <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
-                    <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. 5MB)</p>
-                    <input type="file" id="crosswordAdvancedImageInput_${qid}" style="display:none" accept="image/*">
-                  </div>
-                  <div class="upload-progress" id="crosswordAdvancedImageProgress_${qid}">
-                    <div class="upload-progress-bar" id="crosswordAdvancedImageProgressBar_${qid}"></div>
-                  </div>
-                  <input type="hidden" id="crosswordAdvancedImageUrl_${qid}" value="${prefill?.image || ''}">
-                  <img class="image-preview" id="crosswordAdvancedImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
-                  <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeCrosswordImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
-                </div>
-
-                ${questionEditor}
-              </div>
-            `;
-          }
-
-          inner += `<button class="btn btn-small btn-danger remove-question" type="button">🗑️ Удалить вопрос</button>`;
-          
-          wrap.innerHTML = `
-            <div class="question-number">1</div>
-            ${inner}
-          `;
-          container.appendChild(wrap);
-
-          if (qType === 'fill') {
-            initFillInputs(qid, prefill?.answers || []);
-            
-            const addBtn = document.getElementById(`add-fill-input_${qid}`);
-            if (addBtn) {
-              addBtn.addEventListener('click', () => {
-                addFillInput(qid);
-              });
+          // ===== Статистика
+          async function loadStats() {
+            try {
+              const [{ data: t }, { data: c }, { data: a }, { data: u }] = await Promise.all([
+                supabase.from('textbooks').select('id'),
+                supabase.from('crosswords').select('id'),
+                supabase.from('assignments').select('id'),
+                supabase.from('profiles').select('id')
+              ]);
+              document.getElementById('totalTextbooks').textContent = t?.length || 0;
+              document.getElementById('totalCrosswords').textContent = c?.length || 0;
+              document.getElementById('totalAssignments').textContent = a?.length || 0;
+              document.getElementById('totalUsers').textContent = u?.length || 0;
+            } catch (e) {
+              console.warn('Stats load error', e);
             }
           }
 
-          if (qType !== 'crossword') {
-            initQuestionImageUpload(qid, supabase);
-          } else {
-            if (prefill && prefill.grid) {
-              crosswordData[qid] = {
-                grid: prefill.grid,
-                words: prefill.words || [],
-                blocks: prefill.blocks || [],
-                rows: prefill.metadata?.rows || 15,
-                cols: prefill.metadata?.cols || 15,
-                nextWordNumber: prefill.metadata?.nextWordNumber || (prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1),
-                deleteMode: false,
-                cellNumbers: prefill.cellNumbers || {}
-              };
+          // ===== Учебники
+          let editingTextbookId = null;
+
+          function showTextbookForm() {
+            editingTextbookId = null;
+            document.getElementById('textbookForm').classList.add('active');
+            document.getElementById('textbookFormTitle').textContent = 'Создать учебник';
+            document.getElementById('textbookTitle').value = '';
+            document.getElementById('textbookDescription').value = '';
+            setSelectedClassLevels(document.getElementById('textbookClassLevel'), []);
+            document.getElementById('textbookOrder').value = '0';
+            document.getElementById('textbookIsAvailable').checked = false;
+            document.getElementById('textbookCoverUrl').value = '';
+            document.getElementById('textbookCoverPreview').style.display = 'none';
+            document.getElementById('removeTextbookCoverBtn').style.display = 'none';
+          }
+          function hideTextbookForm(){ document.getElementById('textbookForm').classList.remove('active'); }
+
+          async function saveTextbook() {
+            const title = document.getElementById('textbookTitle').value.trim();
+            const description = document.getElementById('textbookDescription').value.trim();
+            const classLevels = getSelectedClassLevels(document.getElementById('textbookClassLevel'));
+            const orderIndex = parseInt(document.getElementById('textbookOrder').value || '0',10);
+            const isAvailable = document.getElementById('textbookIsAvailable').checked;
+            const coverUrl = document.getElementById('textbookCoverUrl').value;
+
+            if (!title) return showModal('Ошибка', 'Введите название учебника');
+            if (classLevels.length === 0) return showModal('Ошибка', 'Выберите хотя бы один класс');
+
+            const payload = {
+              title,
+              description,
+              class_level: classLevels,
+              order_index: orderIndex,
+              is_available: isAvailable,
+              is_active: true,
+              created_by: user.id
+            };
+            if (coverUrl) payload.cover_image_url = coverUrl;
+
+            let res;
+            if (editingTextbookId) {
+              res = await supabase.from('textbooks').update(payload).eq('id', editingTextbookId);
             } else {
-              createCrosswordData(qid);
+              res = await supabase.from('textbooks').insert(payload);
             }
-            
-            setTimeout(() => {
-              initAdvancedCrosswordBuilder(qid);
-              renderAdvancedGrid(qid);
-              updateAdvancedCrosswordStats(qid);
-              updateWordList(qid);
-              updateStudentPreview(qid);
-            }, 100);
+            if (res.error) return showModal('Ошибка', res.error.message);
+
+            showModal('Готово', editingTextbookId ? 'Учебник обновлён' : 'Учебник создан');
+            hideTextbookForm(); loadTextbooks(supabase); loadStats();
           }
 
-          wrap.querySelector('.remove-question').addEventListener('click', () => {
-            const all = document.querySelectorAll('.subtask-item');
-            if (all.length > 1) {
-              if (qType === 'crossword' && crosswordData[qid]) {
-                delete crosswordData[qid];
-              }
-              wrap.remove();
-              renumberQuestions();
-            } else {
-              alert('Должен остаться хотя бы один вопрос.');
-            }
-          });
+          async function loadTextbooks(supabaseClient) {
+            const tbody = document.querySelector('#textbooksTable tbody');
+            tbody.innerHTML = '<tr><td colspan="7" style="padding:14px;">Загрузка...</td></tr>';
 
-          renumberQuestions();
-        }
+            const { data: textbooks, error } = await supabaseClient.from('textbooks').select('*').order('order_index');
+            if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
 
-        async function saveAssignment() {
-          const title = document.getElementById('assignmentTitle').value.trim();
-          const orderIndex = parseInt(document.getElementById('assignmentOrder').value || '0', 10);
-          if (!selectedMaterialId) return showModal('Ошибка', 'Выберите учебник или кроссворд');
-          if (!title) return showModal('Ошибка', 'Введите название задания');
+            const { data: ass } = await supabaseClient.from('assignments').select('id,textbook_id');
+            const counts = {};
+            (ass||[]).forEach(a => { if (a.textbook_id) counts[a.textbook_id]=(counts[a.textbook_id]||0)+1; });
 
-          const [kind, matId] = selectedMaterialId.split('_');
-          const qs = Array.from(document.querySelectorAll('.subtask-item'));
-          if (!qs.length) return showModal('Ошибка', 'Добавьте хотя бы один вопрос');
-
-          const questions = [];
-          for (let i=0;i<qs.length;i++) {
-            const el = qs[i];
-            const type = el.getAttribute('data-type') || 'test';
-            const qid = el.getAttribute('data-id');
-            let q = el.querySelector('.question-textarea')?.value?.trim() || '';
-            
-            if (type !== 'crossword' && !q) return showModal('Ошибка', `Заполните текст вопроса ${i+1}`);
-
-            let qData = { type };
-
-            if (type === 'test') {
-              const optionsText = el.querySelector('.test-options')?.value || '';
-              const options = optionsText.split('\n').map(s=>s.trim()).filter(Boolean);
-              const correct = parseInt(el.querySelector('.test-correct')?.value || '1',10) - 1;
-              if (!options.length) return showModal('Ошибка', `Добавьте варианты ответа в вопросе ${i+1}`);
-              if (correct < 0 || correct >= options.length) return showModal('Ошибка', `Номер правильного ответа в вопросе ${i+1} должен соответствовать одному из вариантов`);
-              qData.q = q;
-              qData.options = options;
-              qData.correct = correct;
-              
-              const imgUrl = el.querySelector(`#questionImageUrl_${qid}`)?.value || '';
-              if (imgUrl) qData.image = imgUrl;
-              
-            } else if (type === 'fill') {
-              const answers = getFillAnswers(qid);
-              
-              if (!answers.length) return showModal('Ошибка', `Добавьте хотя бы один правильный ответ в вопросе ${i+1}`);
-              
-              qData.q = q;
-              qData.answers = answers;
-              
-              const imgUrl = el.querySelector(`#questionImageUrl_${qid}`)?.value || '';
-              if (imgUrl) qData.image = imgUrl;
-              
-            } else if (type === 'sentence') {
-              const sentence = el.querySelector('.sentence-input')?.value?.trim() || '';
-              const answersText = el.querySelector('.sentence-answers')?.value || '';
-              const answersLines = answersText.split('\n').map(s=>s.trim()).filter(Boolean);
-              
-              if (!sentence) return showModal('Ошибка', `Введите предложение с пропусками в вопросе ${i+1}`);
-              
-              const gaps = (sentence.match(/___/g) || []).length;
-              
-              const answers = answersLines.map(line => parseMultipleAnswers(line));
-              
-              if (!answers.length || answers.length !== gaps) {
-                return showModal('Ошибка', `Количество ответов (${answers.length}) должно совпадать с количеством пропусков (${gaps}) в вопросе ${i+1}`);
-              }
-              
-              qData.q = q;
-              qData.sentence = sentence;
-              qData.answers = answers;
-              
-              const imgUrl = el.querySelector(`#questionImageUrl_${qid}`)?.value || '';
-              if (imgUrl) qData.image = imgUrl;
-              
-            } else if (type === 'crossword') {
-              const validation = validateAdvancedCrossword(qid);
-              if (!validation.valid) {
-                return showModal('❌ Ошибка', validation.message);
-              }
-
-              const crosswordData = getAdvancedCrosswordData(qid);
-              if (!crosswordData) {
-                return showModal('❌ Ошибка', 'Не удалось получить данные кроссворда');
-              }
-              qData = crosswordData;
+            tbody.innerHTML = '';
+            if (!textbooks?.length) {
+              tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;">Учебники не найдены</td></tr>';
+              return;
             }
 
-            questions.push(qData);
-          }
-
-          const payload = {
-            title,
-            order_index: orderIndex,
-            content: { questions },
-            created_by: user.id
-          };
-          if (kind === 'textbook') payload.textbook_id = matId;
-          if (kind === 'crossword') payload.crossword_id = matId;
-
-          let res;
-          if (editingAssignmentId) {
-            res = await supabase.from('assignments').update(payload).eq('id', editingAssignmentId);
-          } else {
-            res = await supabase.from('assignments').insert(payload);
-          }
-          if (res.error) return showModal('Ошибка', res.error.message);
-
-          showModal('Готово', editingAssignmentId ? 'Задание обновлено' : 'Задание создано');
-          hideAssignmentForm(); loadAssignments(); loadStats();
-        }
-
-        async function loadAssignments() {
-          if (!selectedMaterialId) return;
-          const [kind, matId] = selectedMaterialId.split('_');
-
-          let q = supabase.from('assignments').select('*').order('order_index');
-          if (kind === 'textbook') q = q.eq('textbook_id', matId);
-          if (kind === 'crossword') q = q.eq('crossword_id', matId);
-
-          const { data: rows, error } = await q;
-          const tbody = document.querySelector('#assignmentsTable tbody');
-          if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
-
-          let materialName = 'Материал';
-          if (kind === 'textbook') {
-            const { data } = await supabase.from('textbooks').select('title').eq('id', matId).single();
-            materialName = data?.title || 'Учебник';
-          } else {
-            const { data } = await supabase.from('crosswords').select('title').eq('id', matId).single();
-            materialName = data?.title || 'Кроссворд';
-          }
-
-          tbody.innerHTML = '';
-          if (!rows?.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Задания не найдены</td></tr>';
-            return;
-          }
-
-          rows.forEach((a, index) => {
-            const qs = a.content?.questions || [];
-            let typeText = '📝 Тест';
-            const types = new Set(qs.map(q=>q.type));
-            if (types.has('crossword')) typeText = '🧩 Кроссворд';
-            else if (types.has('sentence')) typeText = '📝 Предложение';
-            else if (types.has('fill')) typeText = '✍️ Ввод';
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td><strong>${index + 1}</strong></td>
-              <td>${a.title}</td>
-              <td>${materialName}</td>
-              <td>${typeText}</td>
-              <td>${qs.length}</td>
-              <td>
-                <button class="btn btn-small" data-edit-assignment="${a.id}">✏️ Редактировать</button>
-                <button class="btn btn-small btn-danger" data-del-assignment="${a.id}" data-title="${a.title}">🗑️ Удалить</button>
-              </td>
-            `;
-            tbody.appendChild(tr);
-          });
-
-          tbody.querySelectorAll('[data-edit-assignment]').forEach(btn=>{
-            btn.addEventListener('click', async ()=>{
-              const id = btn.getAttribute('data-edit-assignment');
-              const { data, error } = await supabase.from('assignments').select('*').eq('id', id).single();
-              if (error) return showModal('Ошибка', error.message);
-
-              if (data.textbook_id) selectedMaterialId = `textbook_${data.textbook_id}`;
-              else if (data.crossword_id) selectedMaterialId = `crossword_${data.crossword_id}`;
-              document.getElementById('materialSelect').value = selectedMaterialId;
-              document.getElementById('createAssignmentBtn').disabled = false;
-
-              editingAssignmentId = id;
-              document.getElementById('assignmentForm').classList.add('active');
-              document.getElementById('assignmentFormTitle').textContent = 'Редактировать задание';
-              document.getElementById('assignmentTitle').value = data.title || '';
-              document.getElementById('assignmentOrder').value = data.order_index || 0;
-
-              const cont = document.getElementById('questionsContainer');
-              cont.innerHTML = '';
-              const qs = data.content?.questions || [];
-              if (!qs.length) addQuestion(); else qs.forEach(q => addQuestion(q));
-            });
-          });
-
-          tbody.querySelectorAll('[data-del-assignment]').forEach(btn=>{
-            btn.addEventListener('click', async ()=>{
-              const id = btn.getAttribute('data-del-assignment');
-              const title = btn.getAttribute('data-title') || '';
-              if (!confirm(`Удалить задание "${title}"?`)) return;
-              const { error } = await supabase.from('assignments').delete().eq('id', id);
-              if (error) return showModal('Ошибка', error.message);
-              showModal('Готово', 'Задание удалено');
-              loadAssignments(); loadStats();
-            });
-          });
-        }
-
-        // ===== ИСПРАВЛЕННАЯ СИСТЕМА ПОЛЬЗОВАТЕЛЕЙ ============
-        let currentEditingUserId = null;
-        let searchTimeout = null;
-
-        async function checkPendingRequests(supabase) {
-          try {
-            const { data: requests, error } = await supabase
-              .from('purchase_requests')
-              .select('id')
-              .eq('is_processed', false);
-
-            if (!error) {
-              const pendingCount = requests?.length || 0;
-              const badge = document.getElementById('requestsBadge');
-              const button = document.getElementById('manageRequestsBtn');
-              
-              if (pendingCount > 0) {
-                badge.style.display = 'flex';
-                badge.textContent = pendingCount;
-                button.classList.add('has-pending');
-                button.classList.remove('no-pending');
-              } else {
-                badge.style.display = 'none';
-                button.classList.remove('has-pending');
-                button.classList.add('no-pending');
-              }
-            }
-          } catch (e) {
-            console.log('Не удалось проверить заявки:', e);
-          }
-        }
-
-        function initClassLevelSelectors() {
-          const textbookSelect = document.getElementById('textbookClassLevel');
-          const textbookPreview = document.getElementById('textbookClassPreview');
-          
-          if (textbookSelect && textbookPreview) {
-            textbookSelect.addEventListener('change', function() {
-              updateClassPreview(this, textbookPreview);
-            });
-            
-            updateClassPreview(textbookSelect, textbookPreview);
-          }
-
-          const crosswordSelect = document.getElementById('crosswordClassLevel');
-          const crosswordPreview = document.getElementById('crosswordClassPreview');
-          
-          if (crosswordSelect && crosswordPreview) {
-            crosswordSelect.addEventListener('change', function() {
-              updateClassPreview(this, crosswordPreview);
-            });
-            
-            updateClassPreview(crosswordSelect, crosswordPreview);
-          }
-        }
-
-        function updateClassPreview(selectElement, previewContainer) {
-          const selectedOptions = Array.from(selectElement.selectedOptions).map(option => option.value);
-          
-          if (selectedOptions.length === 0) {
-            previewContainer.innerHTML = '<span class="class-badge">Ничего не выбрано</span>';
-          } else {
             const classMap = {
               '1-2': '1-2 класс',
               '3-4': '3-4 класс',
@@ -3653,365 +2846,1194 @@
               '10-11': '10-11 класс',
               '12': '12 класс'
             };
-            
-            previewContainer.innerHTML = selectedOptions.map(option => 
-              `<span class="class-badge">${classMap[option] || option}</span>`
-            ).join('');
+
+            textbooks.forEach(tb => {
+              const tr = document.createElement('tr');
+              const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
+              const classDisplay = classLevels.length > 0 
+                ? classLevels.map(cls => classMap[cls] || cls).join(', ')
+                : '—';
+              
+              tr.innerHTML = `
+                <td>${tb.title}</td>
+                <td>${tb.description || '—'}</td>
+                <td>${classDisplay}</td>
+                <td>${counts[tb.id] || 0}</td>
+                <td>${tb.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
+                <td>${tb.is_active ? '✅ Активен' : '❌ Неактивен'}</td>
+                <td>
+                  <button class="btn btn-small" data-edit-textbook="${tb.id}">✏️ Редактировать</button>
+                  <button class="btn btn-small btn-danger" data-del-textbook="${tb.id}" data-title="${tb.title}">🗑️ Удалить</button>
+                </td>
+              `;
+              tbody.appendChild(tr);
+            });
+
+            tbody.querySelectorAll('[data-edit-textbook]').forEach(btn=>{
+              btn.addEventListener('click', async ()=>{
+                const id = btn.getAttribute('data-edit-textbook');
+                const { data, error } = await supabaseClient.from('textbooks').select('*').eq('id', id).single();
+                if (error) return showModal('Ошибка', error.message);
+                editingTextbookId = id;
+                document.getElementById('textbookForm').classList.add('active');
+                document.getElementById('textbookFormTitle').textContent = 'Редактировать учебник';
+                document.getElementById('textbookTitle').value = data.title || '';
+                document.getElementById('textbookDescription').value = data.description || '';
+                setSelectedClassLevels(document.getElementById('textbookClassLevel'), data.class_level || []);
+                document.getElementById('textbookOrder').value = data.order_index || 0;
+                document.getElementById('textbookIsAvailable').checked = !!data.is_available;
+                document.getElementById('textbookCoverUrl').value = data.cover_image_url || '';
+                const prev = document.getElementById('textbookCoverPreview');
+                const removeBtn = document.getElementById('removeTextbookCoverBtn');
+                if (data.cover_image_url) { 
+                  prev.src = data.cover_image_url; 
+                  prev.style.display='block'; 
+                  removeBtn.style.display='block';
+                } else { 
+                  prev.style.display='none'; 
+                  removeBtn.style.display='none';
+                }
+              });
+            });
+
+            tbody.querySelectorAll('[data-del-textbook]').forEach(btn=>{
+              btn.addEventListener('click', async ()=>{
+                const id = btn.getAttribute('data-del-textbook');
+                const title = btn.getAttribute('data-title') || '';
+                if (!confirm(`Удалить учебник "${title}"? Связанные задания также будут удалены.`)) return;
+                const { error } = await supabaseClient.from('textbooks').delete().eq('id', id);
+                if (error) return showModal('Ошибка', error.message);
+                showModal('Готово', 'Учебник удалён'); loadTextbooks(supabaseClient); loadStats();
+              });
+            });
           }
-        }
 
-        function getSelectedClassLevels(selectElement) {
-          return Array.from(selectElement.selectedOptions).map(option => option.value);
-        }
+          document.getElementById('createTextbookBtn').addEventListener('click', showTextbookForm);
+          document.getElementById('cancelTextbookBtn').addEventListener('click', hideTextbookForm);
+          document.getElementById('saveTextbookBtn').addEventListener('click', saveTextbook);
 
-        function setSelectedClassLevels(selectElement, classLevels) {
-          if (!classLevels || !Array.isArray(classLevels)) return;
-          
-          Array.from(selectElement.options).forEach(option => {
-            option.selected = false;
+          // ===== КРОССВОРДЫ
+          let editingCrosswordId = null;
+
+          function showCrosswordForm() {
+            editingCrosswordId = null;
+            document.getElementById('crosswordForm').classList.add('active');
+            document.getElementById('crosswordFormTitle').textContent = 'Создать кроссворд';
+            document.getElementById('crosswordTitle').value = '';
+            document.getElementById('crosswordDescription').value = '';
+            setSelectedClassLevels(document.getElementById('crosswordClassLevel'), []);
+            document.getElementById('crosswordOrder').value = '0';
+            document.getElementById('crosswordIsAvailable').checked = false;
+            document.getElementById('crosswordCoverUrl').value = '';
+            document.getElementById('crosswordCoverPreview').style.display = 'none';
+            document.getElementById('removeCrosswordCoverBtn').style.display = 'none';
+          }
+          function hideCrosswordForm(){ document.getElementById('crosswordForm').classList.remove('active'); }
+
+          async function saveCrossword() {
+            const title = document.getElementById('crosswordTitle').value.trim();
+            const description = document.getElementById('crosswordDescription').value.trim();
+            const classLevels = getSelectedClassLevels(document.getElementById('crosswordClassLevel'));
+            const orderIndex = parseInt(document.getElementById('crosswordOrder').value || '0',10);
+            const isAvailable = document.getElementById('crosswordIsAvailable').checked;
+            const coverUrl = document.getElementById('crosswordCoverUrl').value;
+
+            if (!title) return showModal('Ошибка', 'Введите название кроссворда');
+            if (classLevels.length === 0) return showModal('Ошибка', 'Выберите хотя бы один класс');
+
+            const payload = {
+              title,
+              description,
+              class_level: classLevels,
+              order_index: orderIndex,
+              is_available: isAvailable,
+              is_active: true,
+              created_by: user.id
+            };
+            if (coverUrl) payload.cover_image_url = coverUrl;
+
+            let res;
+            if (editingCrosswordId) {
+              res = await supabase.from('crosswords').update(payload).eq('id', editingCrosswordId);
+            } else {
+              res = await supabase.from('crosswords').insert(payload);
+            }
+            if (res.error) return showModal('Ошибка', res.error.message);
+
+            showModal('Готово', editingCrosswordId ? 'Кроссворд обновлён' : 'Кроссворд создан');
+            hideCrosswordForm(); loadCrosswords(supabase); loadStats();
+          }
+
+          async function loadCrosswords(supabaseClient) {
+            const tbody = document.querySelector('#crosswordsTable tbody');
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:14px;">Загрузка...</td></tr>';
+
+            const { data: crosswords, error } = await supabaseClient.from('crosswords').select('*').order('order_index');
+            if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
+
+            const { data: ass } = await supabaseClient.from('assignments').select('id,crossword_id');
+            const counts = {};
+            (ass||[]).forEach(a => { if (a.crossword_id) counts[a.crossword_id]=(counts[a.crossword_id]||0)+1; });
+
+            tbody.innerHTML = '';
+            if (!crosswords?.length) {
+              tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Кроссворды не найдены</td></tr>';
+              return;
+            }
+
+            const classMap = {
+              '1-2': '1-2 класс',
+              '3-4': '3-4 класс',
+              '5-6': '5-6 класс',
+              '7': '7 класс',
+              '8-9': '8-9 класс',
+              '10-11': '10-11 класс',
+              '12': '12 класс'
+            };
+
+            crosswords.forEach(cw => {
+              const tr = document.createElement('tr');
+              const classLevels = Array.isArray(cw.class_level) ? cw.class_level : [];
+              const classDisplay = classLevels.length > 0 
+                ? classLevels.map(cls => classMap[cls] || cls).join(', ')
+                : '—';
+              
+              tr.innerHTML = `
+                <td>${cw.title}</td>
+                <td>${cw.description || '—'}</td>
+                <td>${classDisplay}</td>
+                <td>${counts[cw.id] || 0}</td>
+                <td>${cw.is_available ? '🌍 Для всех' : '🔒 По доступу'}</td>
+                <td>
+                  <button class="btn btn-small" data-edit-crossword="${cw.id}">✏️ Редактировать</button>
+                  <button class="btn btn-small btn-danger" data-del-crossword="${cw.id}" data-title="${cw.title}">🗑️ Удалить</button>
+                </td>
+              `;
+              tbody.appendChild(tr);
+            });
+
+            tbody.querySelectorAll('[data-edit-crossword]').forEach(btn=>{
+              btn.addEventListener('click', async ()=>{
+                const id = btn.getAttribute('data-edit-crossword');
+                const { data, error } = await supabaseClient.from('crosswords').select('*').eq('id', id).single();
+                if (error) return showModal('Ошибка', error.message);
+                editingCrosswordId = id;
+                document.getElementById('crosswordForm').classList.add('active');
+                document.getElementById('crosswordFormTitle').textContent = 'Редактировать кроссворд';
+                document.getElementById('crosswordTitle').value = data.title || '';
+                document.getElementById('crosswordDescription').value = data.description || '';
+                setSelectedClassLevels(document.getElementById('crosswordClassLevel'), data.class_level || []);
+                document.getElementById('crosswordOrder').value = data.order_index || 0;
+                document.getElementById('crosswordIsAvailable').checked = !!data.is_available;
+                document.getElementById('crosswordCoverUrl').value = data.cover_image_url || '';
+                const prev = document.getElementById('crosswordCoverPreview');
+                const removeBtn = document.getElementById('removeCrosswordCoverBtn');
+                if (data.cover_image_url) { 
+                  prev.src = data.cover_image_url; 
+                  prev.style.display='block'; 
+                  removeBtn.style.display='block';
+                } else { 
+                  prev.style.display='none'; 
+                  removeBtn.style.display='none';
+                }
+              });
+            });
+
+            tbody.querySelectorAll('[data-del-crossword]').forEach(btn=>{
+              btn.addEventListener('click', async ()=>{
+                const id = btn.getAttribute('data-del-crossword');
+                const title = btn.getAttribute('data-title') || '';
+                if (!confirm(`Удалить кроссворд "${title}"? Связанные задания также будут удалены.`)) return;
+                const { error } = await supabaseClient.from('crosswords').delete().eq('id', id);
+                if (error) return showModal('Ошибка', error.message);
+                showModal('Готово', 'Кроссворд удалён'); loadCrosswords(supabaseClient); loadStats();
+              });
+            });
+          }
+
+          document.getElementById('createCrosswordBtn').addEventListener('click', showCrosswordForm);
+          document.getElementById('cancelCrosswordBtn').addEventListener('click', hideCrosswordForm);
+          document.getElementById('saveCrosswordBtn').addEventListener('click', saveCrossword);
+
+          // ===== ЗАДАНИЯ
+          let selectedMaterialId = '';
+          let editingAssignmentId = null;
+          let currentQuestionType = 'test';
+
+          document.querySelectorAll('.type-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              currentQuestionType = btn.getAttribute('data-type');
+            });
           });
-          
-          classLevels.forEach(level => {
-            const option = Array.from(selectElement.options).find(opt => opt.value === level);
-            if (option) {
-              option.selected = true;
-            }
+
+          document.getElementById('materialSelect').addEventListener('change', function () {
+            selectedMaterialId = this.value;
+            document.getElementById('createAssignmentBtn').disabled = !selectedMaterialId;
+            loadAssignments(supabase);
           });
-          
-          const previewId = selectElement.id === 'textbookClassLevel' ? 'textbookClassPreview' : 'crosswordClassPreview';
-          const previewContainer = document.getElementById(previewId);
-          if (previewContainer) {
-            updateClassPreview(selectElement, previewContainer);
-          }
-        }
 
-        // ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ПОЛЬЗОВАТЕЛЕЙ
-        async function loadUsers() {
-          if (usersPagination.isLoading) return;
-          
-          usersPagination.setLoading(true);
-          
-          const searchQuery = document.getElementById('userSearch').value.trim();
-          const regionFilter = document.getElementById('regionFilter').value;
-          const materialStatusFilter = document.getElementById('materialStatusFilter').value;
+          document.getElementById('createAssignmentBtn').addEventListener('click', showAssignmentForm);
+          document.getElementById('cancelAssignmentBtn').addEventListener('click', hideAssignmentForm);
+          document.getElementById('saveAssignmentBtn').addEventListener('click', saveAssignment);
+          document.getElementById('addQuestionBtn').addEventListener('click', () => addQuestion());
 
-          document.getElementById('usersTableBody').innerHTML = '';
-          document.getElementById('usersSkeleton').style.display = 'block';
-          document.getElementById('usersEmptyState').style.display = 'none';
-          document.getElementById('usersPagination').style.display = 'none';
+          async function loadMaterialsForAssignments(supabaseClient) {
+            const select = document.getElementById('materialSelect');
+            select.innerHTML = '<option value="">-- Выберите учебник или кроссворд --</option>';
 
-          try {
-            let query = supabase
-              .from('profiles')
-              .select('*')
-              .order('created_at', { ascending: false });
-
-            if (searchQuery) {
-              query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
-            }
-
-            if (regionFilter) {
-              query = query.eq('region', regionFilter);
-            }
-
-            const { data: allUsers, error } = await query;
-
-            if (error) throw error;
-
-            const usersWithMaterials = await enrichUsersWithMaterials(allUsers || []);
-
-            let filteredUsers = usersWithMaterials;
-            if (materialStatusFilter === 'has_materials') {
-              filteredUsers = usersWithMaterials.filter(user => user.hasMaterials);
-            } else if (materialStatusFilter === 'no_materials') {
-              filteredUsers = usersWithMaterials.filter(user => !user.hasMaterials);
-            }
-
-            usersPagination.totalUsers = filteredUsers.length;
-            usersPagination.totalPages = Math.ceil(usersPagination.totalUsers / usersPagination.pageSize);
-            usersPagination.filteredUsers = filteredUsers;
-
-            const totalInFilters = filteredUsers.length;
-            const withMaterialsInFilters = filteredUsers.filter(user => user.hasMaterials).length;
-
-            document.getElementById('totalUsersCount').textContent = totalInFilters;
-            document.getElementById('usersWithMaterialsCount').textContent = withMaterialsInFilters;
-
-            renderUsersPage();
-
-          } catch (error) {
-            document.getElementById('usersSkeleton').style.display = 'none';
-            showError('Ошибка загрузки пользователей: ' + error.message);
-          } finally {
-            usersPagination.setLoading(false);
-          }
-        }
-
-        async function enrichUsersWithMaterials(users) {
-          if (!users || users.length === 0) return [];
-
-          const userIds = users.map(user => user.id);
-          
-          try {
-            const [textbookAccess, crosswordAccess] = await Promise.all([
-              supabase
-                .from('textbook_access')
-                .select('user_id')
-                .in('user_id', userIds),
-              supabase
-                .from('crossword_access')
-                .select('user_id')
-                .in('user_id', userIds)
+            const [{ data: textbooks }, { data: crosswords }] = await Promise.all([
+              supabaseClient.from('textbooks').select('id,title,is_active,class_level').order('order_index'),
+              supabaseClient.from('crosswords').select('id,title,is_active,class_level').order('order_index')
             ]);
 
-            const usersWithMaterialsSet = new Set();
-            
-            if (textbookAccess.data) {
-              textbookAccess.data.forEach(access => {
-                usersWithMaterialsSet.add(access.user_id);
+            if (textbooks?.length) {
+              const og = document.createElement('optgroup');
+              og.label = '📚 Учебники';
+              textbooks.filter(t=>t.is_active!==false).forEach(t=>{
+                const classLevels = Array.isArray(t.class_level) ? t.class_level : [];
+                const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
+                const opt = document.createElement('option');
+                opt.value = `textbook_${t.id}`;
+                opt.textContent = `${t.title} (${classDisplay})`;
+                og.appendChild(opt);
               });
+              select.appendChild(og);
             }
 
-            if (crosswordAccess.data) {
-              crosswordAccess.data.forEach(access => {
-                usersWithMaterialsSet.add(access.user_id);
+            if (crosswords?.length) {
+              const og = document.createElement('optgroup');
+              og.label = '🧩 Кроссворды';
+              crosswords.filter(c=>c.is_active!==false).forEach(c=>{
+                const classLevels = Array.isArray(c.class_level) ? c.class_level : [];
+                const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
+                const opt = document.createElement('option');
+                opt.value = `crossword_${c.id}`;
+                opt.textContent = `${c.title} (${classDisplay})`;
+                og.appendChild(opt);
               });
+              select.appendChild(og);
             }
 
-            return users.map(user => ({
-              ...user,
-              hasMaterials: usersWithMaterialsSet.has(user.id),
-              materials: []
-            }));
-
-          } catch (error) {
-            console.error('Ошибка обогащения данных пользователей:', error);
-            return users.map(user => ({
-              ...user,
-              hasMaterials: false,
-              materials: []
-            }));
-          }
-        }
-
-        // ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТРИСОВКИ ПОЛЬЗОВАТЕЛЕЙ
-        function renderUsersPage() {
-          const tbody = document.getElementById('usersTableBody');
-          document.getElementById('usersSkeleton').style.display = 'none';
-
-          const pageUsers = usersPagination.getCurrentPageUsers();
-          
-          tbody.innerHTML = '';
-
-          if (!pageUsers || pageUsers.length === 0) {
-            document.getElementById('usersEmptyState').style.display = 'block';
-            document.getElementById('usersPagination').style.display = 'none';
-            return;
+            if (selectedMaterialId) {
+              const has = Array.from(select.options).some(o=>o.value===selectedMaterialId);
+              if (has) select.value = selectedMaterialId;
+            }
           }
 
-          document.getElementById('usersEmptyState').style.display = 'none';
+          function showAssignmentForm() {
+            editingAssignmentId = null;
+            document.getElementById('assignmentForm').classList.add('active');
+            document.getElementById('assignmentFormTitle').textContent = 'Создать задание';
+            document.getElementById('assignmentTitle').value = '';
+            document.getElementById('assignmentOrder').value = '0';
+            document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
+            document.querySelector('.type-btn[data-type="test"]').classList.add('active');
+            currentQuestionType = 'test';
 
-          pageUsers.forEach((user, index) => {
-            const globalIndex = ((usersPagination.currentPage - 1) * usersPagination.pageSize) + index + 1;
-            
-            const tr = document.createElement('tr');
-            
-            const userDate = new Date(user.created_at);
-            const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-            if (userDate > weekAgo) {
-              tr.classList.add('user-row-new');
-            }
+            const cont = document.getElementById('questionsContainer');
+            cont.innerHTML = '';
+            addQuestion();
+          }
 
-            // ИСПРАВЛЕННЫЙ HTML - УБРАН СТОЛБЕЦ ПРОГРЕСС
-            tr.innerHTML = `
-              <td><strong>${globalIndex}</strong></td>
-              <td>
-                <div><strong>${user.full_name || 'Не указано'}</strong></div>
-                <div class="user-stats"><span class="stat-badge">ID: ${user.id.slice(0,8)}...</span></div>
-              </td>
-              <td>${user.email || '—'}</td>
-              <td>${user.contact_phone || '—'}</td>
-              <td>${user.region || '—'}</td>
-              <td>
-                <div class="materials-info">
-                  <div class="materials-list" id="materials_${user.id}">
-                    ${user.hasMaterials 
-                      ? '<div class="material-badge">✅ Есть материалы</div>'
-                      : '<div class="material-badge">❌ Нет материалов</div>'
-                    }
+          function hideAssignmentForm() {
+            document.getElementById('assignmentForm').classList.remove('active');
+          }
+
+          function addQuestion(prefill) {
+            const container = document.getElementById('questionsContainer');
+            const qid = generateQuestionId();
+            const qType = prefill?.type || currentQuestionType;
+
+            const wrap = document.createElement('div');
+            wrap.className = 'subtask-item';
+            wrap.setAttribute('data-id', qid);
+            wrap.setAttribute('data-type', qType);
+
+            const imageUploadBlock = `
+              <div class="form-group question-image-upload">
+                <label>Изображение для вопроса (опционально):</label>
+                <div class="upload-area" id="questionUploadArea_${qid}">
+                  <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
+                  <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. 5MB)</p>
+                  <input type="file" id="questionImageInput_${qid}" style="display:none" accept="image/*">
+                </div>
+                <div class="upload-progress" id="questionImageProgress_${qid}">
+                  <div class="upload-progress-bar" id="questionImageProgressBar_${qid}"></div>
+                </div>
+                <input type="hidden" id="questionImageUrl_${qid}" value="${prefill?.image || ''}">
+                <img class="question-image-preview" id="questionImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
+                <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeQuestionImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
+              </div>
+            `;
+
+            const questionEditor = `
+              <div class="form-group">
+                <label>Текст вопроса:</label>
+                <textarea class="question-textarea" id="questionText_${qid}" placeholder="Введите текст вопроса. Используйте Enter для переноса строк">${prefill?.q ? String(prefill.q) : ''}</textarea>
+                <div class="format-hint">
+                  💡 Используйте Enter для переноса строк
+                </div>
+              </div>
+            `;
+
+            let inner = questionEditor;
+
+            if (qType === 'test') {
+              inner += `
+                ${imageUploadBlock}
+                <div class="form-group">
+                  <label>Варианты ответов (каждый с новой строки):</label>
+                  <textarea class="input test-options" rows="4">${(prefill?.options || []).join('\n')}</textarea>
+                </div>
+                <div class="form-group">
+                  <label>Правильный ответ (номер варианта, начиная с 1):</label>
+                  <input type="number" class="input test-correct" min="1" value="${(typeof prefill?.correct === 'number' ? prefill.correct+1 : 1)}">
+                </div>
+              `;
+            } else if (qType === 'fill') {
+              inner += `
+                ${imageUploadBlock}
+                <div class="form-group">
+                  <label>Правильные ответы:</label>
+                  <div class="fill-inputs-container" id="fill-inputs-container_${qid}">
+                  </div>
+                  <button type="button" class="add-input-btn" id="add-fill-input_${qid}">
+                    ➕ Добавить ответ
+                  </button>
+                  <div class="input-count" id="fill-input-count_${qid}">Количество ответов: 0</div>
+                  <div class="small-muted">
+                    Для каждого ответа можно указать несколько вариантов через точку с запятой (например: ежик;кошка). 
+                    Каждое поле - отдельный ответ с номером.
                   </div>
                 </div>
-              </td>
-              <td>${user.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
-              <td>
-                <div class="user-actions">
-                  <button class="btn btn-small ${user.is_admin ? 'secondary' : ''}" 
-                          data-toggle-admin="${user.id}" 
-                          data-make="${!user.is_admin}">
-                    ${user.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}
-                  </button>
-                  <button class="btn btn-small" 
-                          data-access="${user.id}" 
-                          data-name="${user.full_name || user.email}">
-                    🔐 Управление доступом
-                  </button>
+              `;
+            } else if (qType === 'sentence') {
+              const sentence = prefill?.sentence || '';
+              const previewHtml = sentence
+                ? sentence.replace(/___/g,'<span style="border-bottom:2px dashed #666; padding:0 10px; margin:0 2px;">[?]</span>')
+                : 'Введите предложение ниже';
+              inner += `
+                ${imageUploadBlock}
+                <div class="form-group">
+                  <label>Предложение с пропусками:</label>
+                  <div class="sentence-builder">
+                    <div class="sentence-preview" id="sentencePreview_${qid}">${previewHtml}</div>
+                    <textarea class="sentence-input" id="sentenceInput_${qid}" rows="4" placeholder="Используйте ___ для пропусков. Например: Я ___ яблоко.">${sentence}</textarea>
+                    <button type="button" class="btn btn-small add-gap-btn" onclick="window.updateSentencePreview('${qid}')">Обновить предпросмотр</button>
+                  </div>
                 </div>
-              </td>
+                <div class="form-group">
+                  <label>Правильные ответы для пропусков (каждый с новой строки, по порядку пропусков, несколько вариантов через ;):</label>
+                  <textarea class="input sentence-answers" rows="4" placeholder="яблоко;груша;апельсин&#10;утром;вечером">${formatMultipleAnswers(prefill?.answers || [])}</textarea>
+                  <div class="small-muted">Каждая строка соответствует одному пропуску. Для каждого пропуска можно указать несколько вариантов через точку с запятой.</div>
+                </div>
+              `;
+              setTimeout(()=>{
+                const si = document.getElementById(`sentenceInput_${qid}`);
+                si?.addEventListener('input', ()=>window.updateSentencePreview(qid));
+                window.updateSentencePreview(qid);
+              },0);
+            } else if (qType === 'crossword') {
+              inner = `
+                <div class="crossword-advanced-builder" id="crosswordAdvancedBuilder_${qid}">
+                  <div class="crossword-advanced-help">
+                    <h4>🧩 Конструктор кроссворда</h4>
+                    <p><strong>Режим работы:</strong></p>
+                    <ul>
+                      <li><strong>Размещение слов:</strong> Введите слово, выберите направление и номер, затем кликните на стартовую клетку</li>
+                      <li><strong>Блокировка клеток:</strong> Двойной клик по клетке чтобы заблокировать/разблокировать (черные клетки)</li>
+                      <li><strong>Удаление слов:</strong> Нажмите кнопку "Удалить слово" и кликните на слово для удаления</li>
+                    </ul>
+                    <p><strong>Особенности:</strong></p>
+                    <ul>
+                      <li>Ручное указание номера слова</li>
+                      <li>Если в клетке уже есть номер - используется существующий</li>
+                      <li>Один номер для горизонтального и вертикального слова в одной клетке</li>
+                      <li>Проверка пересечений слов</li>
+                      <li>Управление списком слов</li>
+                      <li>Предпросмотр для ученика (только клетки для ввода)</li>
+                    </ul>
+                  </div>
+
+                  <div class="word-management-panel">
+                    <h4>📝 Управление словами</h4>
+                    
+                    <div class="word-input-section">
+                      <div class="form-group">
+                        <label>Новое слово:</label>
+                        <input type="text" id="wordInput_${qid}" placeholder="Введите слово" style="text-transform: uppercase">
+                      </div>
+                      <div class="form-group">
+                        <label>Направление:</label>
+                        <select id="wordDirection_${qid}">
+                          <option value="across">→ По горизонтали</option>
+                          <option value="down">↓ По вертикали</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>Номер слова:</label>
+                        <input type="number" id="wordNumberInput_${qid}" min="1" value="${prefill?.metadata?.nextWordNumber || 1}">
+                      </div>
+                      <div class="form-group">
+                        <button class="btn" id="placeWordBtn_${qid}">Разместить слово</button>
+                      </div>
+                      <div class="form-group">
+                        <button class="btn delete-word-btn" id="deleteWordBtn_${qid}">
+                          🗑️ Удалить слово
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="word-list">
+                      <h5>Размещенные слова:</h5>
+                      <div id="wordList_${qid}"></div>
+                    </div>
+                  </div>
+
+                  <div class="crossword-advanced-controls">
+                    <div class="form-group">
+                      <label>Количество строк:</label>
+                      <input type="number" id="crosswordAdvancedRows_${qid}" value="${prefill?.metadata?.rows || 15}" min="5" max="30">
+                    </div>
+                    <div class="form-group">
+                      <label>Количество столбцов:</label>
+                      <input type="number" id="crosswordAdvancedCols_${qid}" value="${prefill?.metadata?.cols || 15}" min="5" max="30">
+                    </div>
+                    <div class="form-group">
+                      <button class="btn" id="createAdvancedGridBtn_${qid}">Создать сетку</button>
+                    </div>
+                  </div>
+
+                  <div class="crossword-advanced-actions">
+                    <button class="btn btn-small" id="clearAdvancedGridBtn_${qid}">🗑️ Очистить сетку</button>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Сетка кроссворда (для администратора):</label>
+                    <div id="crosswordAdvancedGridContainer_${qid}" class="crossword-advanced-grid-container"></div>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Изображение для кроссворда (опционально):</label>
+                    <div class="upload-area" id="crosswordAdvancedUploadArea_${qid}">
+                      <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
+                      <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. 5MB)</p>
+                      <input type="file" id="crosswordAdvancedImageInput_${qid}" style="display:none" accept="image/*">
+                    </div>
+                    <div class="upload-progress" id="crosswordAdvancedImageProgress_${qid}">
+                      <div class="upload-progress-bar" id="crosswordAdvancedImageProgressBar_${qid}"></div>
+                    </div>
+                    <input type="hidden" id="crosswordAdvancedImageUrl_${qid}" value="${prefill?.image || ''}">
+                    <img class="image-preview" id="crosswordAdvancedImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
+                    <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeCrosswordImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
+                  </div>
+
+                  ${questionEditor}
+                </div>
+              `;
+            }
+
+            inner += `<button class="btn btn-small btn-danger remove-question" type="button">🗑️ Удалить вопрос</button>`;
+            
+            wrap.innerHTML = `
+              <div class="question-number">1</div>
+              ${inner}
             `;
-            tbody.appendChild(tr);
-          });
+            container.appendChild(wrap);
 
-          usersPagination.updatePaginationInfo();
+            if (qType === 'fill') {
+              initFillInputs(qid, prefill?.answers || []);
+              
+              const addBtn = document.getElementById(`add-fill-input_${qid}`);
+              if (addBtn) {
+                addBtn.addEventListener('click', () => {
+                  addFillInput(qid);
+                });
+              }
+            }
 
-          tbody.querySelectorAll('[data-toggle-admin]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-              const uid = btn.getAttribute('data-toggle-admin');
-              const make = btn.getAttribute('data-make') === 'true';
-              if (!confirm(`Вы уверены, что хотите ${make ? 'назначить' : 'снять'} права администратора?`)) return;
-              const { error } = await supabase.from('profiles').update({ is_admin: make }).eq('id', uid);
-              if (error) return showModal('Ошибка', error.message);
-              showModal('Готово', make ? 'Права администратора выданы' : 'Права администратора сняты');
-              loadUsers();
+            if (qType !== 'crossword') {
+              initQuestionImageUpload(qid, supabase);
+            } else {
+              if (prefill && prefill.grid) {
+                crosswordData[qid] = {
+                  grid: prefill.grid,
+                  words: prefill.words || [],
+                  blocks: prefill.blocks || [],
+                  rows: prefill.metadata?.rows || 15,
+                  cols: prefill.metadata?.cols || 15,
+                  nextWordNumber: prefill.metadata?.nextWordNumber || (prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1),
+                  deleteMode: false,
+                  cellNumbers: prefill.cellNumbers || {}
+                };
+              } else {
+                createCrosswordData(qid);
+              }
+              
+              setTimeout(() => {
+                initAdvancedCrosswordBuilder(qid);
+                renderAdvancedGrid(qid);
+                updateAdvancedCrosswordStats(qid);
+                updateWordList(qid);
+                updateStudentPreview(qid);
+              }, 100);
+            }
+
+            wrap.querySelector('.remove-question').addEventListener('click', () => {
+              const all = document.querySelectorAll('.subtask-item');
+              if (all.length > 1) {
+                if (qType === 'crossword' && crosswordData[qid]) {
+                  delete crosswordData[qid];
+                }
+                wrap.remove();
+                renumberQuestions();
+              } else {
+                alert('Должен остаться хотя бы один вопрос.');
+              }
             });
-          });
 
-          tbody.querySelectorAll('[data-access]').forEach(btn => {
-            btn.addEventListener('click', () => 
-              openUserAccessModal(btn.getAttribute('data-access'), btn.getAttribute('data-name')));
-          });
-        }
+            renumberQuestions();
+          }
 
-        function setupUsersFilters() {
-          document.getElementById('userSearch').addEventListener('input', () => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
+          async function saveAssignment() {
+            const title = document.getElementById('assignmentTitle').value.trim();
+            const orderIndex = parseInt(document.getElementById('assignmentOrder').value || '0', 10);
+            if (!selectedMaterialId) return showModal('Ошибка', 'Выберите учебник или кроссворд');
+            if (!title) return showModal('Ошибка', 'Введите название задания');
+
+            const [kind, matId] = selectedMaterialId.split('_');
+            const qs = Array.from(document.querySelectorAll('.subtask-item'));
+            if (!qs.length) return showModal('Ошибка', 'Добавьте хотя бы один вопрос');
+
+            const questions = [];
+            for (let i=0;i<qs.length;i++) {
+              const el = qs[i];
+              const type = el.getAttribute('data-type') || 'test';
+              const qid = el.getAttribute('data-id');
+              let q = el.querySelector('.question-textarea')?.value?.trim() || '';
+              
+              if (type !== 'crossword' && !q) return showModal('Ошибка', `Заполните текст вопроса ${i+1}`);
+
+              let qData = { type };
+
+              if (type === 'test') {
+                const optionsText = el.querySelector('.test-options')?.value || '';
+                const options = optionsText.split('\n').map(s=>s.trim()).filter(Boolean);
+                const correct = parseInt(el.querySelector('.test-correct')?.value || '1',10) - 1;
+                if (!options.length) return showModal('Ошибка', `Добавьте варианты ответа в вопросе ${i+1}`);
+                if (correct < 0 || correct >= options.length) return showModal('Ошибка', `Номер правильного ответа в вопросе ${i+1} должен соответствовать одному из вариантов`);
+                qData.q = q;
+                qData.options = options;
+                qData.correct = correct;
+                
+                const imgUrl = el.querySelector(`#questionImageUrl_${qid}`)?.value || '';
+                if (imgUrl) qData.image = imgUrl;
+                
+              } else if (type === 'fill') {
+                const answers = getFillAnswers(qid);
+                
+                if (!answers.length) return showModal('Ошибка', `Добавьте хотя бы один правильный ответ в вопросе ${i+1}`);
+                
+                qData.q = q;
+                qData.answers = answers;
+                
+                const imgUrl = el.querySelector(`#questionImageUrl_${qid}`)?.value || '';
+                if (imgUrl) qData.image = imgUrl;
+                
+              } else if (type === 'sentence') {
+                const sentence = el.querySelector('.sentence-input')?.value?.trim() || '';
+                const answersText = el.querySelector('.sentence-answers')?.value || '';
+                const answersLines = answersText.split('\n').map(s=>s.trim()).filter(Boolean);
+                
+                if (!sentence) return showModal('Ошибка', `Введите предложение с пропусками в вопросе ${i+1}`);
+                
+                const gaps = (sentence.match(/___/g) || []).length;
+                
+                const answers = answersLines.map(line => parseMultipleAnswers(line));
+                
+                if (!answers.length || answers.length !== gaps) {
+                  return showModal('Ошибка', `Количество ответов (${answers.length}) должно совпадать с количеством пропусков (${gaps}) в вопросе ${i+1}`);
+                }
+                
+                qData.q = q;
+                qData.sentence = sentence;
+                qData.answers = answers;
+                
+                const imgUrl = el.querySelector(`#questionImageUrl_${qid}`)?.value || '';
+                if (imgUrl) qData.image = imgUrl;
+                
+              } else if (type === 'crossword') {
+                const validation = validateAdvancedCrossword(qid);
+                if (!validation.valid) {
+                  return showModal('❌ Ошибка', validation.message);
+                }
+
+                const crosswordData = getAdvancedCrosswordData(qid);
+                if (!crosswordData) {
+                  return showModal('❌ Ошибка', 'Не удалось получить данные кроссворда');
+                }
+                qData = crosswordData;
+              }
+
+              questions.push(qData);
+            }
+
+            const payload = {
+              title,
+              order_index: orderIndex,
+              content: { questions },
+              created_by: user.id
+            };
+            if (kind === 'textbook') payload.textbook_id = matId;
+            if (kind === 'crossword') payload.crossword_id = matId;
+
+            let res;
+            if (editingAssignmentId) {
+              res = await supabase.from('assignments').update(payload).eq('id', editingAssignmentId);
+            } else {
+              res = await supabase.from('assignments').insert(payload);
+            }
+            if (res.error) return showModal('Ошибка', res.error.message);
+
+            showModal('Готово', editingAssignmentId ? 'Задание обновлено' : 'Задание создано');
+            hideAssignmentForm(); loadAssignments(supabase); loadStats();
+          }
+
+          async function loadAssignments(supabaseClient) {
+            if (!selectedMaterialId) return;
+            const [kind, matId] = selectedMaterialId.split('_');
+
+            let q = supabaseClient.from('assignments').select('*').order('order_index');
+            if (kind === 'textbook') q = q.eq('textbook_id', matId);
+            if (kind === 'crossword') q = q.eq('crossword_id', matId);
+
+            const { data: rows, error } = await q;
+            const tbody = document.querySelector('#assignmentsTable tbody');
+            if (error) { tbody.innerHTML = ''; return showModal('Ошибка', error.message); }
+
+            let materialName = 'Материал';
+            if (kind === 'textbook') {
+              const { data } = await supabaseClient.from('textbooks').select('title').eq('id', matId).single();
+              materialName = data?.title || 'Учебник';
+            } else {
+              const { data } = await supabaseClient.from('crosswords').select('title').eq('id', matId).single();
+              materialName = data?.title || 'Кроссворд';
+            }
+
+            tbody.innerHTML = '';
+            if (!rows?.length) {
+              tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Задания не найдены</td></tr>';
+              return;
+            }
+
+            rows.forEach((a, index) => {
+              const qs = a.content?.questions || [];
+              let typeText = '📝 Тест';
+              const types = new Set(qs.map(q=>q.type));
+              if (types.has('crossword')) typeText = '🧩 Кроссворд';
+              else if (types.has('sentence')) typeText = '📝 Предложение';
+              else if (types.has('fill')) typeText = '✍️ Ввод';
+
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td><strong>${index + 1}</strong></td>
+                <td>${a.title}</td>
+                <td>${materialName}</td>
+                <td>${typeText}</td>
+                <td>${qs.length}</td>
+                <td>
+                  <button class="btn btn-small" data-edit-assignment="${a.id}">✏️ Редактировать</button>
+                  <button class="btn btn-small btn-danger" data-del-assignment="${a.id}" data-title="${a.title}">🗑️ Удалить</button>
+                </td>
+              `;
+              tbody.appendChild(tr);
+            });
+
+            tbody.querySelectorAll('[data-edit-assignment]').forEach(btn=>{
+              btn.addEventListener('click', async ()=>{
+                const id = btn.getAttribute('data-edit-assignment');
+                const { data, error } = await supabaseClient.from('assignments').select('*').eq('id', id).single();
+                if (error) return showModal('Ошибка', error.message);
+
+                if (data.textbook_id) selectedMaterialId = `textbook_${data.textbook_id}`;
+                else if (data.crossword_id) selectedMaterialId = `crossword_${data.crossword_id}`;
+                document.getElementById('materialSelect').value = selectedMaterialId;
+                document.getElementById('createAssignmentBtn').disabled = false;
+
+                editingAssignmentId = id;
+                document.getElementById('assignmentForm').classList.add('active');
+                document.getElementById('assignmentFormTitle').textContent = 'Редактировать задание';
+                document.getElementById('assignmentTitle').value = data.title || '';
+                document.getElementById('assignmentOrder').value = data.order_index || 0;
+
+                const cont = document.getElementById('questionsContainer');
+                cont.innerHTML = '';
+                const qs = data.content?.questions || [];
+                if (!qs.length) addQuestion(); else qs.forEach(q => addQuestion(q));
+              });
+            });
+
+            tbody.querySelectorAll('[data-del-assignment]').forEach(btn=>{
+              btn.addEventListener('click', async ()=>{
+                const id = btn.getAttribute('data-del-assignment');
+                const title = btn.getAttribute('data-title') || '';
+                if (!confirm(`Удалить задание "${title}"?`)) return;
+                const { error } = await supabaseClient.from('assignments').delete().eq('id', id);
+                if (error) return showModal('Ошибка', error.message);
+                showModal('Готово', 'Задание удалено');
+                loadAssignments(supabaseClient); loadStats();
+              });
+            });
+          }
+
+          // ===== ИСПРАВЛЕННАЯ СИСТЕМА ПОЛЬЗОВАТЕЛЕЙ ============
+          let currentEditingUserId = null;
+          let searchTimeout = null;
+
+          async function checkPendingRequests(supabaseClient) {
+            try {
+              const { data: requests, error } = await supabaseClient
+                .from('purchase_requests')
+                .select('id')
+                .eq('is_processed', false);
+
+              if (!error) {
+                const pendingCount = requests?.length || 0;
+                const badge = document.getElementById('requestsBadge');
+                const button = document.getElementById('manageRequestsBtn');
+                
+                if (pendingCount > 0) {
+                  badge.style.display = 'flex';
+                  badge.textContent = pendingCount;
+                  button.classList.add('has-pending');
+                  button.classList.remove('no-pending');
+                } else {
+                  badge.style.display = 'none';
+                  button.classList.remove('has-pending');
+                  button.classList.add('no-pending');
+                }
+              }
+            } catch (e) {
+              console.log('Не удалось проверить заявки:', e);
+            }
+          }
+
+          function initClassLevelSelectors() {
+            const textbookSelect = document.getElementById('textbookClassLevel');
+            const textbookPreview = document.getElementById('textbookClassPreview');
+            
+            if (textbookSelect && textbookPreview) {
+              textbookSelect.addEventListener('change', function() {
+                updateClassPreview(this, textbookPreview);
+              });
+              
+              updateClassPreview(textbookSelect, textbookPreview);
+            }
+
+            const crosswordSelect = document.getElementById('crosswordClassLevel');
+            const crosswordPreview = document.getElementById('crosswordClassPreview');
+            
+            if (crosswordSelect && crosswordPreview) {
+              crosswordSelect.addEventListener('change', function() {
+                updateClassPreview(this, crosswordPreview);
+              });
+              
+              updateClassPreview(crosswordSelect, crosswordPreview);
+            }
+          }
+
+          function updateClassPreview(selectElement, previewContainer) {
+            const selectedOptions = Array.from(selectElement.selectedOptions).map(option => option.value);
+            
+            if (selectedOptions.length === 0) {
+              previewContainer.innerHTML = '<span class="class-badge">Ничего не выбрано</span>';
+            } else {
+              const classMap = {
+                '1-2': '1-2 класс',
+                '3-4': '3-4 класс',
+                '5-6': '5-6 класс',
+                '7': '7 класс',
+                '8-9': '8-9 класс',
+                '10-11': '10-11 класс',
+                '12': '12 класс'
+              };
+              
+              previewContainer.innerHTML = selectedOptions.map(option => 
+                `<span class="class-badge">${classMap[option] || option}</span>`
+              ).join('');
+            }
+          }
+
+          function getSelectedClassLevels(selectElement) {
+            return Array.from(selectElement.selectedOptions).map(option => option.value);
+          }
+
+          function setSelectedClassLevels(selectElement, classLevels) {
+            if (!classLevels || !Array.isArray(classLevels)) return;
+            
+            Array.from(selectElement.options).forEach(option => {
+              option.selected = false;
+            });
+            
+            classLevels.forEach(level => {
+              const option = Array.from(selectElement.options).find(opt => opt.value === level);
+              if (option) {
+                option.selected = true;
+              }
+            });
+            
+            const previewId = selectElement.id === 'textbookClassLevel' ? 'textbookClassPreview' : 'crosswordClassPreview';
+            const previewContainer = document.getElementById(previewId);
+            if (previewContainer) {
+              updateClassPreview(selectElement, previewContainer);
+            }
+          }
+
+          // ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ПОЛЬЗОВАТЕЛЕЙ
+          async function loadUsers(supabaseClient) {
+            if (usersPagination.isLoading) return;
+            
+            usersPagination.setLoading(true);
+            
+            const searchQuery = document.getElementById('userSearch').value.trim();
+            const regionFilter = document.getElementById('regionFilter').value;
+            const materialStatusFilter = document.getElementById('materialStatusFilter').value;
+
+            document.getElementById('usersTableBody').innerHTML = '';
+            document.getElementById('usersSkeleton').style.display = 'block';
+            document.getElementById('usersEmptyState').style.display = 'none';
+            document.getElementById('usersPagination').style.display = 'none';
+
+            try {
+              let query = supabaseClient
+                .from('profiles')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+              if (searchQuery) {
+                query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
+              }
+
+              if (regionFilter) {
+                query = query.eq('region', regionFilter);
+              }
+
+              const { data: allUsers, error } = await query;
+
+              if (error) throw error;
+
+              const usersWithMaterials = await enrichUsersWithMaterials(allUsers || [], supabaseClient);
+
+              let filteredUsers = usersWithMaterials;
+              if (materialStatusFilter === 'has_materials') {
+                filteredUsers = usersWithMaterials.filter(user => user.hasMaterials);
+              } else if (materialStatusFilter === 'no_materials') {
+                filteredUsers = usersWithMaterials.filter(user => !user.hasMaterials);
+              }
+
+              usersPagination.totalUsers = filteredUsers.length;
+              usersPagination.totalPages = Math.ceil(usersPagination.totalUsers / usersPagination.pageSize);
+              usersPagination.filteredUsers = filteredUsers;
+
+              const totalInFilters = filteredUsers.length;
+              const withMaterialsInFilters = filteredUsers.filter(user => user.hasMaterials).length;
+
+              document.getElementById('totalUsersCount').textContent = totalInFilters;
+              document.getElementById('usersWithMaterialsCount').textContent = withMaterialsInFilters;
+
+              renderUsersPage();
+
+            } catch (error) {
+              document.getElementById('usersSkeleton').style.display = 'none';
+              showError('Ошибка загрузки пользователей: ' + error.message);
+            } finally {
+              usersPagination.setLoading(false);
+            }
+          }
+
+          async function enrichUsersWithMaterials(users, supabaseClient) {
+            if (!users || users.length === 0) return [];
+
+            const userIds = users.map(user => user.id);
+            
+            try {
+              const [textbookAccess, crosswordAccess] = await Promise.all([
+                supabaseClient
+                  .from('textbook_access')
+                  .select('user_id')
+                  .in('user_id', userIds),
+                supabaseClient
+                  .from('crossword_access')
+                  .select('user_id')
+                  .in('user_id', userIds)
+              ]);
+
+              const usersWithMaterialsSet = new Set();
+              
+              if (textbookAccess.data) {
+                textbookAccess.data.forEach(access => {
+                  usersWithMaterialsSet.add(access.user_id);
+                });
+              }
+
+              if (crosswordAccess.data) {
+                crosswordAccess.data.forEach(access => {
+                  usersWithMaterialsSet.add(access.user_id);
+                });
+              }
+
+              return users.map(user => ({
+                ...user,
+                hasMaterials: usersWithMaterialsSet.has(user.id),
+                materials: []
+              }));
+
+            } catch (error) {
+              console.error('Ошибка обогащения данных пользователей:', error);
+              return users.map(user => ({
+                ...user,
+                hasMaterials: false,
+                materials: []
+              }));
+            }
+          }
+
+          // ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТРИСОВКИ ПОЛЬЗОВАТЕЛЕЙ
+          function renderUsersPage() {
+            const tbody = document.getElementById('usersTableBody');
+            document.getElementById('usersSkeleton').style.display = 'none';
+
+            const pageUsers = usersPagination.getCurrentPageUsers();
+            
+            tbody.innerHTML = '';
+
+            if (!pageUsers || pageUsers.length === 0) {
+              document.getElementById('usersEmptyState').style.display = 'block';
+              document.getElementById('usersPagination').style.display = 'none';
+              return;
+            }
+
+            document.getElementById('usersEmptyState').style.display = 'none';
+
+            pageUsers.forEach((user, index) => {
+              const globalIndex = ((usersPagination.currentPage - 1) * usersPagination.pageSize) + index + 1;
+              
+              const tr = document.createElement('tr');
+              
+              const userDate = new Date(user.created_at);
+              const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+              if (userDate > weekAgo) {
+                tr.classList.add('user-row-new');
+              }
+
+              // ИСПРАВЛЕННЫЙ HTML - УБРАН СТОЛБЕЦ ПРОГРЕСС
+              tr.innerHTML = `
+                <td><strong>${globalIndex}</strong></td>
+                <td>
+                  <div><strong>${user.full_name || 'Не указано'}</strong></div>
+                  <div class="user-stats"><span class="stat-badge">ID: ${user.id.slice(0,8)}...</span></div>
+                </td>
+                <td>${user.email || '—'}</td>
+                <td>${user.contact_phone || '—'}</td>
+                <td>${user.region || '—'}</td>
+                <td>
+                  <div class="materials-info">
+                    <div class="materials-list" id="materials_${user.id}">
+                      ${user.hasMaterials 
+                        ? '<div class="material-badge">✅ Есть материалы</div>'
+                        : '<div class="material-badge">❌ Нет материалов</div>'
+                      }
+                    </div>
+                  </div>
+                </td>
+                <td>${user.is_admin ? '👑 Админ' : '👤 Пользователь'}</td>
+                <td>
+                  <div class="user-actions">
+                    <button class="btn btn-small ${user.is_admin ? 'secondary' : ''}" 
+                            data-toggle-admin="${user.id}" 
+                            data-make="${!user.is_admin}">
+                      ${user.is_admin ? '❌ Убрать админку' : '👑 Сделать админом'}
+                    </button>
+                    <button class="btn btn-small" 
+                            data-access="${user.id}" 
+                            data-name="${user.full_name || user.email}">
+                      🔐 Управление доступом
+                    </button>
+                  </div>
+                </td>
+              `;
+              tbody.appendChild(tr);
+            });
+
+            usersPagination.updatePaginationInfo();
+
+            tbody.querySelectorAll('[data-toggle-admin]').forEach(btn => {
+              btn.addEventListener('click', async () => {
+                const uid = btn.getAttribute('data-toggle-admin');
+                const make = btn.getAttribute('data-make') === 'true';
+                if (!confirm(`Вы уверены, что хотите ${make ? 'назначить' : 'снять'} права администратора?`)) return;
+                const { error } = await supabase.from('profiles').update({ is_admin: make }).eq('id', uid);
+                if (error) return showModal('Ошибка', error.message);
+                showModal('Готово', make ? 'Права администратора выданы' : 'Права администратора сняты');
+                loadUsers(supabase);
+              });
+            });
+
+            tbody.querySelectorAll('[data-access]').forEach(btn => {
+              btn.addEventListener('click', () => 
+                openUserAccessModal(supabase, btn.getAttribute('data-access'), btn.getAttribute('data-name')));
+            });
+          }
+
+          function setupUsersFilters() {
+            document.getElementById('userSearch').addEventListener('input', () => {
+              clearTimeout(searchTimeout);
+              searchTimeout = setTimeout(() => {
+                usersPagination.currentPage = 1;
+                loadUsers(supabase);
+              }, 500);
+            });
+
+            document.getElementById('regionFilter').addEventListener('change', () => {
               usersPagination.currentPage = 1;
-              loadUsers();
-            }, 500);
-          });
-
-          document.getElementById('regionFilter').addEventListener('change', () => {
-            usersPagination.currentPage = 1;
-            loadUsers();
-          });
-
-          document.getElementById('materialStatusFilter').addEventListener('change', () => {
-            usersPagination.currentPage = 1;
-            loadUsers();
-          });
-        }
-
-        // ===== УПРАВЛЕНИЕ ДОСТУПАМИ
-        document.getElementById('closeUserAccessModal').addEventListener('click', ()=>{
-          document.getElementById('userAccessModal').style.display='none';
-        });
-        document.getElementById('saveUserAccessBtn').addEventListener('click', saveUserAccess);
-
-        async function openUserAccessModal(userId, userName) {
-          currentEditingUserId = userId;
-          document.getElementById('userAccessInfo').innerHTML = `
-            <p><strong>Пользователь:</strong> ${userName}</p>
-            <p class="small-muted">Отметьте учебники и кроссворды, к которым пользователь должен иметь доступ</p>
-          `;
-
-          const [t, c, ta, ca] = await Promise.all([
-            supabase.from('textbooks').select('id,title,class_level').eq('is_active', true).order('order_index'),
-            supabase.from('crosswords').select('id,title,class_level').eq('is_active', true).order('order_index'),
-            supabase.from('textbook_access').select('textbook_id').eq('user_id', userId),
-            supabase.from('crossword_access').select('crossword_id').eq('user_id', userId)
-          ]);
-
-          const tSet = new Set((ta.data||[]).map(x=>String(x.textbook_id)));
-          const cSet = new Set((ca.data||[]).map(x=>String(x.crossword_id)));
-
-          const tList = document.getElementById('textbookAccessList');
-          tList.innerHTML = '';
-          if (t.data?.length) {
-            t.data.forEach(tb=>{
-              const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
-              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
-              const item = document.createElement('div');
-              item.className = 'access-item';
-              const id = `textbook_${tb.id}`;
-              item.innerHTML = `<input type="checkbox" id="${id}" ${tSet.has(String(tb.id))?'checked':''}>
-                                <label for="${id}">${tb.title} (${classDisplay})</label>`;
-              tList.appendChild(item);
+              loadUsers(supabase);
             });
-          } else {
-            tList.innerHTML = '<p class="small-muted">Нет доступных учебников</p>';
-          }
 
-          const cList = document.getElementById('crosswordAccessList');
-          cList.innerHTML = '';
-          if (c.data?.length) {
-            c.data.forEach(cr=>{
-              const classLevels = Array.isArray(cr.class_level) ? cr.class_level : [];
-              const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
-              const item = document.createElement('div');
-              item.className = 'access-item';
-              const id = `crossword_${cr.id}`;
-              item.innerHTML = `<input type="checkbox" id="${id}" ${cSet.has(String(cr.id))?'checked':''}>
-                                <label for="${id}">${cr.title} (${classDisplay})</label>`;
-              cList.appendChild(item);
+            document.getElementById('materialStatusFilter').addEventListener('change', () => {
+              usersPagination.currentPage = 1;
+              loadUsers(supabase);
             });
-          } else {
-            cList.innerHTML = '<p class="small-muted">Нет доступных кроссвордов</p>';
           }
 
-          document.getElementById('userAccessModal').style.display='flex';
+          // ===== УПРАВЛЕНИЕ ДОСТУПАМИ
+          document.getElementById('closeUserAccessModal').addEventListener('click', ()=>{
+            document.getElementById('userAccessModal').style.display='none';
+          });
+          document.getElementById('saveUserAccessBtn').addEventListener('click', () => saveUserAccess(supabase));
+
+          async function openUserAccessModal(supabaseClient, userId, userName) {
+            currentEditingUserId = userId;
+            document.getElementById('userAccessInfo').innerHTML = `
+              <p><strong>Пользователь:</strong> ${userName}</p>
+              <p class="small-muted">Отметьте учебники и кроссворды, к которым пользователь должен иметь доступ</p>
+            `;
+
+            const [t, c, ta, ca] = await Promise.all([
+              supabaseClient.from('textbooks').select('id,title,class_level').eq('is_active', true).order('order_index'),
+              supabaseClient.from('crosswords').select('id,title,class_level').eq('is_active', true).order('order_index'),
+              supabaseClient.from('textbook_access').select('textbook_id').eq('user_id', userId),
+              supabaseClient.from('crossword_access').select('crossword_id').eq('user_id', userId)
+            ]);
+
+            const tSet = new Set((ta.data||[]).map(x=>String(x.textbook_id)));
+            const cSet = new Set((ca.data||[]).map(x=>String(x.crossword_id)));
+
+            const tList = document.getElementById('textbookAccessList');
+            tList.innerHTML = '';
+            if (t.data?.length) {
+              t.data.forEach(tb=>{
+                const classLevels = Array.isArray(tb.class_level) ? tb.class_level : [];
+                const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
+                const item = document.createElement('div');
+                item.className = 'access-item';
+                const id = `textbook_${tb.id}`;
+                item.innerHTML = `<input type="checkbox" id="${id}" ${tSet.has(String(tb.id))?'checked':''}>
+                                  <label for="${id}">${tb.title} (${classDisplay})</label>`;
+                tList.appendChild(item);
+              });
+            } else {
+              tList.innerHTML = '<p class="small-muted">Нет доступных учебников</p>';
+            }
+
+            const cList = document.getElementById('crosswordAccessList');
+            cList.innerHTML = '';
+            if (c.data?.length) {
+              c.data.forEach(cr=>{
+                const classLevels = Array.isArray(cr.class_level) ? cr.class_level : [];
+                const classDisplay = classLevels.length > 0 ? classLevels.join(', ') : 'без класса';
+                const item = document.createElement('div');
+                item.className = 'access-item';
+                const id = `crossword_${cr.id}`;
+                item.innerHTML = `<input type="checkbox" id="${id}" ${cSet.has(String(cr.id))?'checked':''}>
+                                  <label for="${id}">${cr.title} (${classDisplay})</label>`;
+                cList.appendChild(item);
+              });
+            } else {
+              cList.innerHTML = '<p class="small-muted">Нет доступных кроссвордов</p>';
+            }
+
+            document.getElementById('userAccessModal').style.display='flex';
+          }
+
+          async function saveUserAccess(supabaseClient) {
+            if (!currentEditingUserId) return;
+
+            const textSelected = Array.from(document.querySelectorAll('#textbookAccessList input[type="checkbox"]:checked'))
+              .map(cb => cb.id.replace('textbook_',''));
+            const crossSelected = Array.from(document.querySelectorAll('#crosswordAccessList input[type="checkbox"]:checked'))
+              .map(cb => cb.id.replace('crossword_',''));
+
+            const ops = [];
+            ops.push(supabaseClient.from('textbook_access').delete().eq('user_id', currentEditingUserId));
+            ops.push(supabaseClient.from('crossword_access').delete().eq('user_id', currentEditingUserId));
+            await Promise.all(ops);
+
+            if (textSelected.length) {
+              await supabaseClient.from('textbook_access').insert(
+                textSelected.map(id=>({ user_id: currentEditingUserId, textbook_id: id }))
+              );
+            }
+            if (crossSelected.length) {
+              await supabaseClient.from('crossword_access').insert(
+                crossSelected.map(id=>({ user_id: currentEditingUserId, crossword_id: id }))
+              );
+            }
+
+            showModal('Готово','Доступы обновлены');
+            document.getElementById('userAccessModal').style.display='none';
+            loadUsers(supabaseClient);
+          }
+
+          // Кнопка управления заявками
+          document.getElementById('manageRequestsBtn').addEventListener('click', () => {
+            window.location.href = '/requests.html';
+          });
+
+          // Инициализация фильтров пользователей
+          setupUsersFilters();
+
+          // ===== СТАРТОВАЯ ИНИЦИАЛИЗАЦИЯ
+          await loadStats();
+          await loadTextbooks(supabase);
+          await loadCrosswords(supabase);
+          await loadMaterialsForAssignments(supabase);
+          await loadUsers(supabase);
+
+          showContent();
+          
+        } catch (e) {
+          showError('❌ Ошибка инициализации админ-панели: ' + (e?.message || e));
         }
-
-        async function saveUserAccess() {
-          if (!currentEditingUserId) return;
-
-          const textSelected = Array.from(document.querySelectorAll('#textbookAccessList input[type="checkbox"]:checked'))
-            .map(cb => cb.id.replace('textbook_',''));
-          const crossSelected = Array.from(document.querySelectorAll('#crosswordAccessList input[type="checkbox"]:checked'))
-            .map(cb => cb.id.replace('crossword_',''));
-
-          const ops = [];
-          ops.push(supabase.from('textbook_access').delete().eq('user_id', currentEditingUserId));
-          ops.push(supabase.from('crossword_access').delete().eq('user_id', currentEditingUserId));
-          await Promise.all(ops);
-
-          if (textSelected.length) {
-            await supabase.from('textbook_access').insert(
-              textSelected.map(id=>({ user_id: currentEditingUserId, textbook_id: id }))
-            );
-          }
-          if (crossSelected.length) {
-            await supabase.from('crossword_access').insert(
-              crossSelected.map(id=>({ user_id: currentEditingUserId, crossword_id: id }))
-            );
-          }
-
-          showModal('Готово','Доступы обновлены');
-          document.getElementById('userAccessModal').style.display='none';
-          loadUsers();
-        }
-
-        // Инициализация фильтров пользователей
-        setupUsersFilters();
-
-        // ===== СТАРТОВАЯ ИНИЦИАЛИЗАЦИЯ
-        await loadStats();
-        await loadTextbooks();
-        await loadCrosswords();
-        await loadMaterialsForAssignments();
-        await loadUsers();
-
-        showContent();
-      } catch (e) {
-        showError('❌ Ошибка инициализации админ-панели: ' + (e?.message || e));
-      }
+      });
     }
 
-    // запуск по конфигу
-    if (window.SUPABASE_URL) {
-      initApp();
+    // Запуск инициализации при загрузке конфигурации
+    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      showError('❌ Конфигурация не загружена');
+      console.error('Supabase config not loaded');
     } else {
-      const timeout = setTimeout(()=> showError('❌ Таймаут загрузки конфигурации'), 1000);
-      window.addEventListener('configLoaded', () => { clearTimeout(timeout); initApp(); });
+      console.log('✅ Конфигурация загружена, ждем Supabase...');
+      
+      initApp();
+      
+      // Таймаут на случай если Supabase не загрузится
+      setTimeout(function() {
+        if (document.getElementById('configLoading').style.display !== 'none') {
+          showError('❌ Supabase не загрузился. Обновите страницу.');
+        }
+      }, 10000);
     }
   </script>
 </body>
