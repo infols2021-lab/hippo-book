@@ -5,6 +5,11 @@
   <title>Управление заявками — Админ-панель</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
+  
+  <!-- ГЛОБАЛЬНАЯ ЗАГРУЗКА SUPABASE -->
+  <script src="/load-config.js"></script>
+  <script src="/supabase-global.js"></script>
+  
   <style>
     body {
       margin: 0;
@@ -462,8 +467,6 @@
       }
     }
   </style>
-  
-  <script src="/load-config.js"></script>
 </head>
 <body>
   <!-- ИНДИКАТОР ЗАГРУЗКИ -->
@@ -651,7 +654,7 @@
     </div>
   </div>
 
-  <script type="module">
+  <script>
     document.getElementById('loading').style.display = 'block';
     
     let currentUser = null;
@@ -665,6 +668,96 @@
     let pollingInterval = null;
     let isPollingActive = true;
     let lastUpdateTime = null;
+
+    function showError(message) {
+      const errorElement = document.getElementById('errorMessage');
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+    function showContent() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('errorMessage').style.display = 'none';
+    }
+
+    // Инициализация приложения после загрузки Supabase
+    window.waitForSupabase(async function(supabase) {
+      console.log('✅ Supabase готов для админки заявок');
+      supabaseClient = supabase;
+      
+      try {
+        // Проверяем права администратора
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (!user) {
+          window.location.href = '/login.html';
+          return;
+        }
+
+        currentUser = user;
+
+        // Проверяем, является ли пользователь администратором
+        const { data: profile, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (profileError) {
+          console.error('❌ Ошибка загрузки профиля:', profileError);
+          showError('Ошибка загрузки профиля');
+          return;
+        }
+
+        if (profile.role !== 'admin') {
+          showError('❌ Доступ запрещен. Требуются права администратора.');
+          setTimeout(() => {
+            window.location.href = '/profile.html';
+          }, 2000);
+          return;
+        }
+
+        // Инициализация вкладок
+        initTabs();
+
+        // Инициализация массовых операций
+        initBulkActions();
+
+        // Обработчики событий
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+          if (confirm('Вы уверены, что хотите выйти?')) {
+            stopAutoRefresh();
+            await supabaseClient.auth.signOut();
+            location.href = '/login.html';
+          }
+        });
+
+        document.getElementById('clearSearchBtn').addEventListener('click', () => {
+          document.getElementById('searchName').value = '';
+          document.getElementById('searchEmail').value = '';
+          filterRequests();
+        });
+
+        // Обработчики поиска
+        document.getElementById('searchName').addEventListener('input', () => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(filterRequests, 350);
+        });
+
+        document.getElementById('searchEmail').addEventListener('input', () => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(filterRequests, 350);
+        });
+
+        // Загружаем заявки
+        await loadAllRequests();
+        showContent();
+        
+      } catch (error) {
+        console.error('❌ Ошибка инициализации:', error);
+        showError('Ошибка инициализации: ' + error.message);
+      }
+    });
 
     // НОВАЯ ФУНКЦИЯ: Запуск автообновления
     function startAutoRefresh() {
@@ -715,44 +808,10 @@
           filterRequests();
           updateStats();
           lastUpdateTime = new Date();
-          
-          // Показываем временное уведомление об обновлении
-          showTempNotification('Данные обновлены');
         }
       } catch (error) {
         console.error('Ошибка при автообновлении:', error);
       }
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Временное уведомление
-    function showTempNotification(message) {
-      const notification = document.createElement('div');
-      notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--accent2);
-        color: white;
-        padding: 8px 16px;
-        border-radius: 20px;
-        font-size: 14px;
-        font-weight: 600;
-        z-index: 10000;
-        opacity: 0;
-        transition: opacity 0.3s;
-      `;
-      notification.textContent = message;
-      document.body.appendChild(notification);
-
-      // Показываем
-      setTimeout(() => notification.style.opacity = '1', 10);
-      
-      // Убираем через 2 секунды
-      setTimeout(() => {
-        notification.style.opacity = '0';
-        setTimeout(() => notification.remove(), 300);
-      }, 2000);
     }
 
     // НОВАЯ ФУНКЦИЯ: Показать индикатор загрузки
@@ -776,17 +835,6 @@
         button.disabled = false;
         button.classList.remove('btn-loading');
       }
-    }
-
-    function showError(message) {
-      document.getElementById('errorMessage').textContent = message;
-      document.getElementById('errorMessage').style.display = 'block';
-      document.getElementById('loading').style.display = 'none';
-    }
-    
-    function showContent() {
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('errorMessage').style.display = 'none';
     }
 
     function showEmptyState(section) {
@@ -1464,39 +1512,6 @@
       }
     }
 
-    // Проверка прав администратора
-    async function checkAdmin(supabase) {
-      try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError) throw authError;
-        
-        if (!user) {
-          window.location.href = '/login.html';
-          return false;
-        }
-
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('id', user.id)
-          .single();
-
-        if (profileError) throw profileError;
-
-        if (!profile?.is_admin) {
-          showModal('Доступ запрещен', 'Нужны права администратора.');
-          setTimeout(() => { window.location.href = '/profile.html'; }, 2000);
-          return false;
-        }
-
-        return user;
-      } catch (e) {
-        showError('Ошибка проверки прав: ' + (e?.message || e));
-        setTimeout(() => { window.location.href = '/login.html'; }, 2000);
-        return false;
-      }
-    }
-
     // Инициализация вкладок
     function initTabs() {
       document.querySelectorAll('.requests-tab').forEach(tab => {
@@ -1565,78 +1580,6 @@
       });
     }
 
-    async function initApp() {
-      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
-        return false;
-      }
-      
-      try {
-        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-        supabaseClient = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-        
-        const user = await checkAdmin(supabaseClient);
-        if (!user) return false;
-
-        currentUser = user;
-
-        // Инициализация вкладок
-        initTabs();
-
-        // Инициализация массовых операций
-        initBulkActions();
-
-        // Обработчики событий
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-          if (confirm('Вы уверены, что хотите выйти?')) {
-            // Останавливаем автообновление при выходе
-            stopAutoRefresh();
-            await supabaseClient.auth.signOut();
-            location.href = '/login.html';
-          }
-        });
-
-        document.getElementById('clearSearchBtn').addEventListener('click', () => {
-          document.getElementById('searchName').value = '';
-          document.getElementById('searchEmail').value = '';
-          filterRequests();
-        });
-
-        // Обработчики поиска
-        document.getElementById('searchName').addEventListener('input', () => {
-          clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(filterRequests, 350);
-        });
-
-        document.getElementById('searchEmail').addEventListener('input', () => {
-          clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(filterRequests, 350);
-        });
-
-        // Загружаем заявки
-        await loadAllRequests();
-        showContent();
-        return true;
-        
-      } catch (error) {
-        showError('❌ Ошибка инициализации: ' + error.message);
-        return false;
-      }
-    }
-    
-    if (window.SUPABASE_URL) {
-      initApp();
-    } else {
-      const timeout = setTimeout(() => {
-        showError('❌ Таймаут загрузки конфигурации');
-      }, 1000);
-      
-      window.addEventListener('configLoaded', () => {
-        clearTimeout(timeout);
-        initApp();
-      });
-    }
-
     // Вспомогательная функция для показа модального окна
     function showModal(title, text) {
       alert(`${title}\n\n${text}`);
@@ -1646,6 +1589,19 @@
     window.addEventListener('beforeunload', () => {
       stopAutoRefresh();
     });
+
+    // Обработка ошибок конфигурации
+    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      console.error('❌ Конфигурация Supabase не загружена');
+      showError('Ошибка конфигурации. Пожалуйста, обновите страницу.');
+      
+      // Ждем загрузки конфигурации
+      window.addEventListener('configLoaded', function() {
+        if (document.getElementById('loading').style.display !== 'none') {
+          document.getElementById('errorMessage').style.display = 'none';
+        }
+      });
+    }
   </script>
 </body>
 </html>
