@@ -5,6 +5,11 @@
   <title>Профиль — Edu Keys</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
+  
+  <!-- ГЛОБАЛЬНАЯ ЗАГРУЗКА SUPABASE -->
+  <script src="/load-config.js"></script>
+  <script src="/supabase-global.js"></script>
+  
   <style>
     body {
       margin: 0;
@@ -514,8 +519,6 @@
       }
     }
   </style>
-  
-  <script src="/load-config.js"></script>
 </head>
 <body id="profileBody">
   <!-- Модальное окно редактирования профиля -->
@@ -672,7 +675,7 @@
     </div>
   </div>
 
-  <script type="module">
+  <script>
     document.getElementById('loading').style.display = 'block';
     
     let currentUser = null;
@@ -692,7 +695,6 @@
     
     // Функция для показа уведомления
     function showNotification(message, type = 'success') {
-      // Создаем элемент уведомления
       const notification = document.createElement('div');
       notification.style.cssText = `
         position: fixed;
@@ -711,7 +713,6 @@
       
       document.body.appendChild(notification);
       
-      // Автоматически удаляем через 4 секунды
       setTimeout(() => {
         notification.style.animation = 'slideOutRight 0.3s ease-in';
         setTimeout(() => {
@@ -807,13 +808,11 @@
     
     // Функция для открытия модального окна редактирования
     function openEditProfileModal() {
-      // Заполняем форму текущими данными
       document.getElementById('editFullName').value = currentProfile?.full_name || '';
       document.getElementById('editPhone').value = currentProfile?.contact_phone || '';
       document.getElementById('editRegion').value = currentProfile?.region || '';
       document.getElementById('editEmail').value = currentUser?.email || '';
       
-      // Показываем модальное окно
       document.getElementById('editProfileModal').style.display = 'flex';
       document.body.style.overflow = 'hidden';
     }
@@ -849,18 +848,13 @@
       document.getElementById('regionText').textContent = currentProfile?.region || 'Не указана';
     }
     
-    async function initApp() {
-      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
-        return false;
-      }
+    async function initApp(supabase) {
+      console.log('🚀 Инициализация профиля...');
       
       try {
-        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-        const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-        
         const { data: { user } } = await supabase.auth.getUser();
         if(!user) { 
+          console.log('❌ Пользователь не авторизован');
           location.href = '/login.html'; 
           return; 
         }
@@ -1128,7 +1122,6 @@
             return;
           }
           
-          // Показываем загрузку
           document.getElementById('saveProfileBtn').disabled = true;
           document.getElementById('saveProfileBtn').textContent = 'Сохранение...';
           
@@ -1142,7 +1135,6 @@
             const result = await updateProfile(supabase, updateData);
             
             if (result.success) {
-              // Обновляем текущий профиль
               currentProfile = { ...currentProfile, ...updateData };
               updateProfileDisplay();
               
@@ -1154,20 +1146,17 @@
           } catch (error) {
             showNotification('❌ Ошибка обновления профиля: ' + error.message, 'error');
           } finally {
-            // Восстанавливаем кнопку
             document.getElementById('saveProfileBtn').disabled = false;
             document.getElementById('saveProfileBtn').textContent = '💾 Сохранить изменения';
           }
         });
         
-        // Закрытие модального окна по клику на фон
         document.getElementById('editProfileModal').addEventListener('click', (e) => {
           if (e.target === document.getElementById('editProfileModal')) {
             closeEditProfileModal();
           }
         });
         
-        // Закрытие по Escape
         document.addEventListener('keydown', (e) => {
           if (e.key === 'Escape' && document.getElementById('editProfileModal').style.display === 'flex') {
             closeEditProfileModal();
@@ -1188,21 +1177,30 @@
         
       } catch (error) {
         showError('❌ Ошибка инициализации: ' + error.message);
+        console.error('Profile init error:', error);
         return false;
       }
     }
     
-    if (window.SUPABASE_URL) {
-      initApp();
+    // Используем глобальный загрузчик Supabase
+    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      showError('❌ Конфигурация не загружена');
+      console.error('Supabase config not loaded');
     } else {
-      const timeout = setTimeout(() => {
-        showError('❌ Таймаут загрузки конфигурации');
-      }, 1000);
+      console.log('✅ Конфигурация загружена, ждем Supabase...');
       
-      window.addEventListener('configLoaded', () => {
-        clearTimeout(timeout);
-        initApp();
+      // Ждем когда Supabase загрузится
+      window.waitForSupabase(function(supabase) {
+        console.log('✅ Supabase готов для профиля');
+        initApp(supabase);
       });
+      
+      // Таймаут на случай если Supabase не загрузится
+      setTimeout(function() {
+        if (document.getElementById('loading').style.display !== 'none') {
+          showError('❌ Supabase не загрузился. Обновите страницу.');
+        }
+      }, 10000);
     }
   </script>
 </body>
