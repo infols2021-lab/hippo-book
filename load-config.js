@@ -9,11 +9,10 @@
   const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 часа
   const now = Date.now();
 
-  // ---- Значения по умолчанию (резерв) ----
+  // ---- АКТУАЛЬНЫЕ ЗНАЧЕНИЯ (обновлено 2025) ----
   const FALLBACK_CONFIG = {
     SUPABASE_URL: 'https://zjvedphdbpuzqzvznqex.supabase.co',
-    SUPABASE_ANON_KEY:
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqdmVkcGhkYnB1enF6dnpucWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNDMxMDgsImV4cCI6MjA3NTkxOTEwOH0.rfIdcmTx9q-UZyQp0QKjBdGQGbDpMuy0R3_3P_DOV7I',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqdmVkcGhkYnB1enF6dnpucWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNDMxMDgsImV4cCI6MjA3NTkxOTEwOH0.rfIdcmTx9q-UZyQp0QKjBdGQGbDpMuy0R3_3P_DOV7I',
   };
 
   // ---- Утилиты ----
