@@ -31,24 +31,33 @@
       z-index: 2;
     }
 
+    /* СТИЛИ ДЛЯ ЗАГРУЗКИ КОНФИГУРАЦИИ */
+    .config-loading {
+      text-align: center;
+      padding: 40px;
+    }
+
+    .config-loading .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--accent2);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 2s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
     .loading { 
       text-align: center; 
       padding: 40px; 
       display: none;
     }
-    .spinner { 
-      border: 4px solid #f3f3f3; 
-      border-top: 4px solid var(--accent2); 
-      border-radius: 50%; 
-      width: 40px; 
-      height: 40px; 
-      animation: spin 2s linear infinite; 
-      margin: 0 auto 20px; 
-    }
-    @keyframes spin { 
-      0% { transform: rotate(0deg); } 
-      100% { transform: rotate(360deg); } 
-    }
+
     .error { 
       background: #ffebee; 
       color: #c62828; 
@@ -386,6 +395,39 @@
       animation: spin 1s linear infinite;
     }
 
+    /* Стили для модального окна */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    }
+
+    .modal-body {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 500px;
+      width: 90%;
+    }
+
+    .modal-body h3 {
+      margin: 0 0 15px 0;
+      color: #333;
+    }
+
+    .modal-body p {
+      margin: 0 0 20px 0;
+      color: #666;
+      line-height: 1.5;
+    }
+
     @media (max-width: 768px) {
       .container {
         width: 100%;
@@ -469,6 +511,24 @@
   </style>
 </head>
 <body>
+  <!-- Индикатор загрузки конфигурации -->
+  <div id="configLoading" class="config-loading">
+    <div class="spinner"></div>
+    <p>🔄 Загружаем конфигурацию админ-панели...</p>
+  </div>
+  <div id="errorMessage" class="error"></div>
+
+  <!-- Модальное окно -->
+  <div class="modal-backdrop" id="modal" style="display: none;">
+    <div class="modal-body card">
+      <h3 id="modalTitle"></h3>
+      <p id="modalText" style="white-space: pre-line;"></p>
+      <div style="margin-top: 12px; text-align: center;">
+        <button class="btn" id="modalOk">ОК</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ИНДИКАТОР ЗАГРУЗКИ -->
   <div class="processing-overlay" id="processingOverlay">
     <div class="processing-content">
@@ -484,179 +544,200 @@
     <span>Автообновление включено</span>
   </div>
 
-  <div class="container">
-    <div class="header">
-      <div class="logo">
-        <div class="mark" style="background: linear-gradient(135deg, var(--accent2), #6dd3c0);">EK</div>
-        <div>
-          <h3 style="background: linear-gradient(135deg, var(--accent2), #6dd3c0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0;">Edu Keys</h3>
-          <div class="small-muted">🎓 Панель управления заявками</div>
+  <div id="mainContent" style="display: none;">
+    <div class="container">
+      <div class="header">
+        <div class="logo">
+          <div class="mark" style="background: linear-gradient(135deg, var(--accent2), #6dd3c0);">EK</div>
+          <div>
+            <h3 style="background: linear-gradient(135deg, var(--accent2), #6dd3c0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0;">Edu Keys</h3>
+            <div class="small-muted">🎓 Панель управления заявками</div>
+          </div>
         </div>
-      </div>
-      <div class="nav">
-        <button class="btn secondary" onclick="location.href='/admin.html'">⬅️ Назад в админку</button>
-        <button class="btn secondary" id="logoutBtn">🚪 Выйти</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2 style="color: var(--accent2); margin-bottom: 20px;">📋 Управление заявками на учебники</h2>
-
-      <div class="stats-bar">
-        <div class="stat-card">
-          <div class="stat-number" id="totalRequests">0</div>
-          <div class="stat-label">Всего заявок</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-number" id="pendingRequests">0</div>
-          <div class="stat-label">Ожидают обработки</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-number" id="processedRequests">0</div>
-          <div class="stat-label">Обработано</div>
+        <div class="nav">
+          <button class="btn secondary" onclick="location.href='/admin.html'">⬅️ Назад в админку</button>
+          <button class="btn secondary" id="logoutBtn">🚪 Выйти</button>
         </div>
       </div>
 
-      <!-- НОВЫЕ ВКЛАДКИ -->
-      <div class="requests-tabs">
-        <div class="requests-tab active" data-tab="all">📋 Все заявки</div>
-        <div class="requests-tab" data-tab="pending">⏳ Ожидающие</div>
-        <div class="requests-tab" data-tab="processed">✅ Обработанные</div>
-      </div>
+      <div class="card">
+        <h2 style="color: var(--accent2); margin-bottom: 20px;">📋 Управление заявками на учебники</h2>
 
-      <!-- ПАНЕЛЬ МАССОВЫХ ОПЕРАЦИЙ -->
-      <div class="bulk-actions" id="bulkActions">
-        <div class="bulk-info">
-          Выбрано: <span id="selectedCount">0</span> заявок
+        <div class="stats-bar">
+          <div class="stat-card">
+            <div class="stat-number" id="totalRequests">0</div>
+            <div class="stat-label">Всего заявок</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="pendingRequests">0</div>
+            <div class="stat-label">Ожидают обработки</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="processedRequests">0</div>
+            <div class="stat-label">Обработано</div>
+          </div>
         </div>
-        <div class="bulk-buttons">
-          <button class="btn" id="processSelectedBtn">✅ Обработать выбранные</button>
-          <button class="btn btn-warning" id="unprocessSelectedBtn">↩️ Вернуть выбранные в ожидание</button>
-          <button class="btn secondary" id="clearSelectionBtn">❌ Снять выделение</button>
-        </div>
-      </div>
 
-      <div class="search-container">
-        <div class="form-group">
-          <label>Поиск по ФИО:</label>
-          <input type="text" id="searchName" placeholder="Введите ФИО ученика..." class="input">
+        <!-- НОВЫЕ ВКЛАДКИ -->
+        <div class="requests-tabs">
+          <div class="requests-tab active" data-tab="all">📋 Все заявки</div>
+          <div class="requests-tab" data-tab="pending">⏳ Ожидающие</div>
+          <div class="requests-tab" data-tab="processed">✅ Обработанные</div>
         </div>
-        <div class="form-group">
-          <label>Поиск по email:</label>
-          <input type="text" id="searchEmail" placeholder="Введите email..." class="input">
-        </div>
-        <div class="form-group">
-          <button class="btn" id="clearSearchBtn">🗑️ Очистить поиск</button>
-        </div>
-      </div>
 
-      <div id="loading" class="loading">
-        <div class="spinner"></div>
-        <p>🔄 Загружаем заявки...</p>
-      </div>
-      
-      <div id="errorMessage" class="error"></div>
+        <!-- ПАНЕЛЬ МАССОВЫХ ОПЕРАЦИЙ -->
+        <div class="bulk-actions" id="bulkActions">
+          <div class="bulk-info">
+            Выбрано: <span id="selectedCount">0</span> заявок
+          </div>
+          <div class="bulk-buttons">
+            <button class="btn" id="processSelectedBtn">✅ Обработать выбранные</button>
+            <button class="btn btn-warning" id="unprocessSelectedBtn">↩️ Вернуть выбранные в ожидание</button>
+            <button class="btn secondary" id="clearSelectionBtn">❌ Снять выделение</button>
+          </div>
+        </div>
 
-      <!-- Секция всех заявок -->
-      <div class="requests-section active" id="all-section">
-        <div style="overflow-x: auto;">
-          <table class="requests-table" id="allRequestsTable">
-            <thead>
-              <tr>
-                <th class="select-all-cell">
-                  <input type="checkbox" id="selectAllAll">
-                </th>
-                <th>№</th>
-                <th>Номер заявки</th>
-                <th>Дата и время создания</th>
-                <th>Классы</th>
-                <th>Типы материалов</th>
-                <th>Email</th>
-                <th>ФИО ученика</th>
-                <th>Статус</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody id="allRequestsTableBody">
-              <!-- Заявки будут загружаться сюда -->
-            </tbody>
-          </table>
+        <div class="search-container">
+          <div class="form-group">
+            <label>Поиск по имени:</label>
+            <input type="text" id="searchName" placeholder="Введите ФИО ученика..." class="input">
+          </div>
+          <div class="form-group">
+            <label>Поиск по email:</label>
+            <input type="text" id="searchEmail" placeholder="Введите email..." class="input">
+          </div>
+          <div class="form-group">
+            <button class="btn" id="clearSearchBtn">🗑️ Очистить поиск</button>
+          </div>
         </div>
-        
-        <div id="allEmptyState" class="empty-state" style="display: none;">
-          <h3>📭 Заявок пока нет</h3>
-          <p>Заявки от пользователей будут отображаться здесь</p>
-        </div>
-      </div>
 
-      <!-- Секция ожидающих заявок -->
-      <div class="requests-section" id="pending-section">
-        <div style="overflow-x: auto;">
-          <table class="requests-table" id="pendingRequestsTable">
-            <thead>
-              <tr>
-                <th class="select-all-cell">
-                  <input type="checkbox" id="selectAllPending">
-                </th>
-                <th>№</th>
-                <th>Номер заявки</th>
-                <th>Дата и время создания</th>
-                <th>Классы</th>
-                <th>Типы материалов</th>
-                <th>Email</th>
-                <th>ФИО ученика</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody id="pendingRequestsTableBody">
-              <!-- Ожидающие заявки будут загружаться сюда -->
-            </tbody>
-          </table>
+        <div id="loading" class="loading">
+          <div class="spinner"></div>
+          <p>🔄 Загружаем заявки...</p>
         </div>
-        
-        <div id="pendingEmptyState" class="empty-state" style="display: none;">
-          <h3>✅ Все заявки обработаны</h3>
-          <p>Новых заявок, ожидающих обработки, нет</p>
-        </div>
-      </div>
 
-      <!-- Секция обработанных заявок -->
-      <div class="requests-section" id="processed-section">
-        <div style="overflow-x: auto;">
-          <table class="requests-table" id="processedRequestsTable">
-            <thead>
-              <tr>
-                <th class="select-all-cell">
-                  <input type="checkbox" id="selectAllProcessed">
-                </th>
-                <th>№</th>
-                <th>Номер заявки</th>
-                <th>Дата обработки</th>
-                <th>Классы</th>
-                <th>Типы материалов</th>
-                <th>Email</th>
-                <th>ФИО ученика</th>
-                <th>Выданные материалы</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody id="processedRequestsTableBody">
-              <!-- Обработанные заявки будут загружаться сюда -->
-            </tbody>
-          </table>
+        <!-- Секция всех заявок -->
+        <div class="requests-section active" id="all-section">
+          <div style="overflow-x: auto;">
+            <table class="requests-table" id="allRequestsTable">
+              <thead>
+                <tr>
+                  <th class="select-all-cell">
+                    <input type="checkbox" id="selectAllAll">
+                  </th>
+                  <th>№</th>
+                  <th>Номер заявки</th>
+                  <th>Дата и время создания</th>
+                  <th>Классы</th>
+                  <th>Типы материалов</th>
+                  <th>Email</th>
+                  <th>ФИО ученика</th>
+                  <th>Статус</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody id="allRequestsTableBody">
+                <!-- Заявки будут загружаться сюда -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div id="allEmptyState" class="empty-state" style="display: none;">
+            <h3>📭 Заявок пока нет</h3>
+            <p>Заявки от пользователей будут отображаться здесь</p>
+          </div>
         </div>
-        
-        <div id="processedEmptyState" class="empty-state" style="display: none;">
-          <h3>📭 Обработанных заявок нет</h3>
-          <p>Обработанные заявки будут отображаться здесь</p>
+
+        <!-- Секция ожидающих заявок -->
+        <div class="requests-section" id="pending-section">
+          <div style="overflow-x: auto;">
+            <table class="requests-table" id="pendingRequestsTable">
+              <thead>
+                <tr>
+                  <th class="select-all-cell">
+                    <input type="checkbox" id="selectAllPending">
+                  </th>
+                  <th>№</th>
+                  <th>Номер заявки</th>
+                  <th>Дата и время создания</th>
+                  <th>Классы</th>
+                  <th>Типы материалов</th>
+                  <th>Email</th>
+                  <th>ФИО ученика</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody id="pendingRequestsTableBody">
+                <!-- Ожидающие заявки будут загружаться сюда -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div id="pendingEmptyState" class="empty-state" style="display: none;">
+            <h3>✅ Все заявки обработаны</h3>
+            <p>Новых заявок, ожидающих обработки, нет</p>
+          </div>
+        </div>
+
+        <!-- Секция обработанных заявок -->
+        <div class="requests-section" id="processed-section">
+          <div style="overflow-x: auto;">
+            <table class="requests-table" id="processedRequestsTable">
+              <thead>
+                <tr>
+                  <th class="select-all-cell">
+                    <input type="checkbox" id="selectAllProcessed">
+                  </th>
+                  <th>№</th>
+                  <th>Номер заявки</th>
+                  <th>Дата обработки</th>
+                  <th>Классы</th>
+                  <th>Типы материалов</th>
+                  <th>Email</th>
+                  <th>ФИО ученика</th>
+                  <th>Выданные материалы</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody id="processedRequestsTableBody">
+                <!-- Обработанные заявки будут загружаться сюда -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div id="processedEmptyState" class="empty-state" style="display: none;">
+            <h3>📭 Обработанных заявок нет</h3>
+            <p>Обработанные заявки будут отображаться здесь</p>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    document.getElementById('loading').style.display = 'block';
-    
+    // ============ БАЗОВЫЕ UI ХЕЛПЕРЫ ============
+    document.getElementById('configLoading').style.display = 'block';
+
+    function showError(message) {
+      const el = document.getElementById('errorMessage');
+      el.textContent = message;
+      el.style.display = 'block';
+      document.getElementById('configLoading').style.display = 'none';
+    }
+
+    function showContent() {
+      document.getElementById('mainContent').style.display = 'block';
+      document.getElementById('configLoading').style.display = 'none';
+      document.getElementById('errorMessage').style.display = 'none';
+    }
+
+    function showModal(title, text) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalText').textContent = text;
+      document.getElementById('modal').style.display = 'flex';
+    }
+
+    // ============ ПЕРЕМЕННЫЕ ============
     let currentUser = null;
     let supabaseClient = null;
     let allRequests = [];
@@ -669,149 +750,131 @@
     let isPollingActive = true;
     let lastUpdateTime = null;
 
-    function showError(message) {
-      const errorElement = document.getElementById('errorMessage');
-      errorElement.textContent = message;
-      errorElement.style.display = 'block';
-      document.getElementById('loading').style.display = 'none';
-    }
-    
-    function showContent() {
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('errorMessage').style.display = 'none';
-    }
-
-    // Инициализация приложения после загрузки Supabase
-    window.waitForSupabase(async function(supabase) {
-      console.log('✅ Supabase готов для админки заявок');
-      supabaseClient = supabase;
-      
+    // ============ ПРОВЕРКА АДМИНИСТРАТОРА ============
+    async function checkAdmin(supabase) {
       try {
-        // Проверяем права администратора
-        const { data: { user } } = await supabaseClient.auth.getUser();
+        console.log('🔄 Начинаем проверку прав администратора...');
+        
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError) {
+          console.error('Ошибка аутентификации:', authError);
+          throw authError;
+        }
+        
         if (!user) {
+          console.log('❌ Пользователь не авторизован');
           window.location.href = '/login.html';
-          return;
+          return false;
         }
 
-        currentUser = user;
+        console.log('✅ Пользователь авторизован:', user.email);
 
-        // Проверяем, является ли пользователь администратором
-        const { data: profile, error: profileError } = await supabaseClient
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('role')
+          .select('is_admin, full_name, email')
           .eq('id', user.id)
           .single();
 
         if (profileError) {
           console.error('❌ Ошибка загрузки профиля:', profileError);
-          showError('Ошибка загрузки профиля');
-          return;
-        }
+          
+          if (profileError.code === 'PGRST116') {
+            console.log('📝 Профиль не найден, создаем новый...');
+            
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name || '',
+                is_admin: false,
+                created_at: new Date().toISOString()
+              });
 
-        if (profile.role !== 'admin') {
-          showError('❌ Доступ запрещен. Требуются права администратора.');
-          setTimeout(() => {
-            window.location.href = '/profile.html';
-          }, 2000);
-          return;
-        }
+            if (insertError) {
+              console.error('❌ Ошибка создания профиля:', insertError);
+              throw new Error('Не удалось создать профиль: ' + insertError.message);
+            }
 
-        // Инициализация вкладок
-        initTabs();
-
-        // Инициализация массовых операций
-        initBulkActions();
-
-        // Обработчики событий
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-          if (confirm('Вы уверены, что хотите выйти?')) {
-            stopAutoRefresh();
-            await supabaseClient.auth.signOut();
-            location.href = '/login.html';
+            showModal('Доступ запрещен', 'Профиль создан, но прав администратора нет. Обратитесь к администратору.');
+            setTimeout(() => { window.location.href = '/profile.html'; }, 2500);
+            return false;
           }
-        });
-
-        document.getElementById('clearSearchBtn').addEventListener('click', () => {
-          document.getElementById('searchName').value = '';
-          document.getElementById('searchEmail').value = '';
-          filterRequests();
-        });
-
-        // Обработчики поиска
-        document.getElementById('searchName').addEventListener('input', () => {
-          clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(filterRequests, 350);
-        });
-
-        document.getElementById('searchEmail').addEventListener('input', () => {
-          clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(filterRequests, 350);
-        });
-
-        // Загружаем заявки
-        await loadAllRequests();
-        showContent();
-        
-      } catch (error) {
-        console.error('❌ Ошибка инициализации:', error);
-        showError('Ошибка инициализации: ' + error.message);
-      }
-    });
-
-    // НОВАЯ ФУНКЦИЯ: Запуск автообновления
-    function startAutoRefresh() {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-      
-      pollingInterval = setInterval(async () => {
-        if (!isPollingActive) return;
-        
-        try {
-          await refreshData();
-        } catch (error) {
-          console.log('Ошибка автообновления:', error);
+          
+          throw new Error('Ошибка загрузки профиля: ' + profileError.message);
         }
-      }, 5000); // Обновление каждые 5 секунд
-      
-      console.log('🔄 Автообновление запущено (каждые 5 секунд)');
+
+        console.log('📊 Профиль загружен:', profile);
+
+        if (!profile?.is_admin) {
+          console.log('❌ У пользователя нет прав администратора');
+          showModal('Доступ запрещен', 'Нужны права администратора.');
+          setTimeout(() => { window.location.href = '/profile.html'; }, 2000);
+          return false;
+        }
+
+        console.log('✅ Права администратора подтверждены');
+        return user;
+      } catch (e) {
+        console.error('❌ Ошибка проверки прав:', e);
+        showModal('Ошибка доступа', 'Не удалось проверить права: ' + (e?.message || e) + '\n\nКод ошибки: ' + (e?.code || 'неизвестно'));
+        setTimeout(() => { window.location.href = '/login.html'; }, 2000);
+        return false;
+      }
     }
 
-    // НОВАЯ ФУНКЦИЯ: Остановка автообновления
-    function stopAutoRefresh() {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-        pollingInterval = null;
-      }
-      console.log('⏸️ Автообновление остановлено');
+    // ============ УТИЛИТЫ ============
+    function formatDateTime(dateString) {
+      return new Date(dateString).toLocaleString('ru-RU', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
     }
 
-    // НОВАЯ ФУНКЦИЯ: Обновление данных
-    async function refreshData() {
-      if (!supabaseClient) return;
+    function formatTextbookTypes(types) {
+      if (!types || !Array.isArray(types)) return '';
       
-      try {
-        const { data: requests, error } = await supabaseClient
-          .from('purchase_requests')
-          .select('*')
-          .order('created_at', { ascending: false });
+      const typeMap = {
+        'учебник': '📚 Учебник',
+        'кроссворд': '🧩 Кроссворд'
+      };
+      
+      return types.map(type => typeMap[type] || type).join(', ');
+    }
 
-        if (error) throw error;
-
-        // Проверяем, изменились ли данные
-        const hasChanges = JSON.stringify(requests) !== JSON.stringify(allRequests);
-        
-        if (hasChanges) {
-          console.log('🔄 Обнаружены изменения в данных, обновляю...');
-          allRequests = requests || [];
-          filterRequests();
-          updateStats();
-          lastUpdateTime = new Date();
-        }
-      } catch (error) {
-        console.error('Ошибка при автообновлении:', error);
+    function renderClassLevels(classLevel) {
+      const classMap = {
+        '1-2': '1-2 класс',
+        '3-4': '3-4 класс',
+        '5-6': '5-6 класс',
+        '7': '7 класс',
+        '8-9': '8-9 класс',
+        '10-11': '10-11 класс',
+        '12': '12 класс'
+      };
+      
+      let classLevels = [];
+      
+      if (Array.isArray(classLevel)) {
+        classLevels = classLevel;
+      } else if (classLevel) {
+        classLevels = [classLevel];
       }
+      
+      if (classLevels.length === 0) {
+        return '<span style="color: #999;">—</span>';
+      }
+      
+      return `
+        <div class="class-levels">
+          ${classLevels.map(cls => 
+            `<span class="class-badge">${classMap[cls] || cls}</span>`
+          ).join('')}
+        </div>
+      `;
     }
 
     // НОВАЯ ФУНКЦИЯ: Показать индикатор загрузки
@@ -847,101 +910,98 @@
       document.getElementById(`${section}RequestsTable`).style.display = 'table';
     }
 
-    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Форматирование отображения классов (массив)
-    function formatClassLevel(classLevel) {
-      const classMap = {
-        '1-2': '1-2 класс',
-        '3-4': '3-4 класс',
-        '5-6': '5-6 класс',
-        '7': '7 класс',
-        '8-9': '8-9 класс',
-        '10-11': '10-11 класс',
-        '12': '12 класс'
-      };
-      
-      // Обрабатываем как массив (новая структура)
-      if (Array.isArray(classLevel)) {
-        return classLevel.map(cls => classMap[cls] || cls).join(', ');
+    // ============ АВТООБНОВЛЕНИЕ ============
+    function startAutoRefresh() {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
       }
       
-      // Обрабатываем как строку (старая структура для обратной совместимости)
-      return classMap[classLevel] || classLevel;
+      pollingInterval = setInterval(async () => {
+        if (!isPollingActive) return;
+        
+        try {
+          await refreshData();
+        } catch (error) {
+          console.log('Ошибка автообновления:', error);
+        }
+      }, 5000);
+      
+      console.log('🔄 Автообновление запущено (каждые 5 секунд)');
     }
 
-    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Отображение классов в виде бейджей
-    function renderClassLevels(classLevel) {
-      const classMap = {
-        '1-2': '1-2 класс',
-        '3-4': '3-4 класс',
-        '5-6': '5-6 класс',
-        '7': '7 класс',
-        '8-9': '8-9 класс',
-        '10-11': '10-11 класс',
-        '12': '12 класс'
-      };
-      
-      let classLevels = [];
-      
-      // Обрабатываем как массив (новая структура)
-      if (Array.isArray(classLevel)) {
-        classLevels = classLevel;
-      } 
-      // Обрабатываем как строку (старая структура)
-      else if (classLevel) {
-        classLevels = [classLevel];
+    function stopAutoRefresh() {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
       }
+      console.log('⏸️ Автообновление остановлено');
+    }
+
+    async function refreshData() {
+      if (!supabaseClient) return;
       
-      if (classLevels.length === 0) {
-        return '<span style="color: #999;">—</span>';
+      try {
+        const { data: requests, error } = await supabaseClient
+          .from('purchase_requests')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const hasChanges = JSON.stringify(requests) !== JSON.stringify(allRequests);
+        
+        if (hasChanges) {
+          console.log('🔄 Обнаружены изменения в данных, обновляю...');
+          allRequests = requests || [];
+          filterRequests();
+          updateStats();
+          lastUpdateTime = new Date();
+        }
+      } catch (error) {
+        console.error('Ошибка при автообновлении:', error);
       }
-      
-      return `
-        <div class="class-levels">
-          ${classLevels.map(cls => 
-            `<span class="class-badge">${classMap[cls] || cls}</span>`
-          ).join('')}
-        </div>
-      `;
     }
 
-    // Форматирование типов учебников
-    function formatTextbookTypes(types) {
-      if (!types || !Array.isArray(types)) return '';
+    // ============ МАССОВЫЕ ОПЕРАЦИИ ============
+    function updateBulkActions() {
+      const selectedCount = selectedRequests.size;
+      document.getElementById('selectedCount').textContent = selectedCount;
       
-      const typeMap = {
-        'учебник': '📚 Учебник',
-        'кроссворд': '🧩 Кроссворд'
-      };
-      
-      return types.map(type => typeMap[type] || type).join(', ');
+      if (selectedCount > 0) {
+        document.getElementById('bulkActions').classList.add('active');
+      } else {
+        document.getElementById('bulkActions').classList.remove('active');
+      }
     }
 
-    // Форматирование даты и времени
-    function formatDateTime(dateString) {
-      return new Date(dateString).toLocaleString('ru-RU', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
+    function handleCheckboxChange(requestId, isChecked) {
+      if (isChecked) {
+        selectedRequests.add(requestId);
+      } else {
+        selectedRequests.delete(requestId);
+      }
+      updateBulkActions();
+    }
+
+    function handleSelectAll(checked) {
+      const currentSection = document.getElementById(`${currentTab}-section`);
+      const checkboxes = currentSection.querySelectorAll('.request-checkbox');
+      
+      checkboxes.forEach(checkbox => {
+        const requestId = checkbox.getAttribute('data-request-id');
+        checkbox.checked = checked;
+        
+        if (checked) {
+          selectedRequests.add(requestId);
+        } else {
+          selectedRequests.delete(requestId);
+        }
       });
+      
+      updateBulkActions();
     }
 
-    // Обновление статистики
-    function updateStats() {
-      const total = allRequests.length;
-      const pending = allRequests.filter(req => !req.is_processed).length;
-      const processed = allRequests.filter(req => req.is_processed).length;
-
-      document.getElementById('totalRequests').textContent = total;
-      document.getElementById('pendingRequests').textContent = pending;
-      document.getElementById('processedRequests').textContent = processed;
-
-      // Обновляем кнопку в админке (если мы на этой странице, то просто обновляем localStorage)
-      localStorage.setItem('pendingRequestsCount', pending);
-    }
-
-    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Автоматическая выдача доступа к материалам
+    // ============ ОБРАБОТКА ЗАЯВОК ============
     async function grantAccessToMaterials(userId, classLevels, textbookTypes) {
       try {
         console.log('🔄 Выдача доступа пользователю:', userId);
@@ -950,27 +1010,23 @@
 
         const grantedMaterials = [];
 
-        // Обрабатываем classLevels как массив (новая структура)
         let classLevelArray = [];
         if (Array.isArray(classLevels)) {
           classLevelArray = classLevels;
         } else if (classLevels) {
-          // Для обратной совместимости со старыми заявками
           classLevelArray = [classLevels];
         }
 
-        // Если выбран учебник - ищем учебники подходящих классов
         if (textbookTypes.includes('учебник')) {
           const { data: textbooks, error: textbooksError } = await supabaseClient
             .from('textbooks')
             .select('id, title, class_level')
             .eq('is_active', true)
-            .overlaps('class_level', classLevelArray); // Ищем пересечение массивов
+            .overlaps('class_level', classLevelArray);
 
           if (textbooksError) {
             console.error('Ошибка поиска учебников:', textbooksError);
           } else if (textbooks && textbooks.length > 0) {
-            // Выдаем доступ к найденным учебникам
             for (const textbook of textbooks) {
               const { error: accessError } = await supabaseClient
                 .from('textbook_access')
@@ -995,18 +1051,16 @@
           }
         }
 
-        // Если выбран кроссворд - ищем кроссворды подходящих классов
         if (textbookTypes.includes('кроссворд')) {
           const { data: crosswords, error: crosswordsError } = await supabaseClient
             .from('crosswords')
             .select('id, title, class_level')
             .eq('is_active', true)
-            .overlaps('class_level', classLevelArray); // Ищем пересечение массивов
+            .overlaps('class_level', classLevelArray);
 
           if (crosswordsError) {
             console.error('Ошибка поиска кроссвордов:', crosswordsError);
           } else if (crosswords && crosswords.length > 0) {
-            // Выдаем доступ к найденным кроссвордам
             for (const crossword of crosswords) {
               const { error: accessError } = await supabaseClient
                 .from('crossword_access')
@@ -1040,55 +1094,11 @@
       }
     }
 
-    // НОВАЯ ФУНКЦИЯ: Обновление панели массовых операций
-    function updateBulkActions() {
-      const selectedCount = selectedRequests.size;
-      document.getElementById('selectedCount').textContent = selectedCount;
-      
-      if (selectedCount > 0) {
-        document.getElementById('bulkActions').classList.add('active');
-      } else {
-        document.getElementById('bulkActions').classList.remove('active');
-      }
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Обработка чекбоксов
-    function handleCheckboxChange(requestId, isChecked) {
-      if (isChecked) {
-        selectedRequests.add(requestId);
-      } else {
-        selectedRequests.delete(requestId);
-      }
-      updateBulkActions();
-    }
-
-    // НОВАЯ ФУНКЦИЯ: Выделение всех чекбоксов в текущей таблице
-    function handleSelectAll(checked) {
-      const currentSection = document.getElementById(`${currentTab}-section`);
-      const checkboxes = currentSection.querySelectorAll('.request-checkbox');
-      
-      checkboxes.forEach(checkbox => {
-        const requestId = checkbox.getAttribute('data-request-id');
-        checkbox.checked = checked;
-        
-        if (checked) {
-          selectedRequests.add(requestId);
-        } else {
-          selectedRequests.delete(requestId);
-        }
-      });
-      
-      updateBulkActions();
-    }
-
-    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Массовая обработка заявок с индикатором
     async function processMultipleRequests(isProcessed) {
       if (selectedRequests.size === 0) return;
       
-      // Временно отключаем автообновление на время обработки
       isPollingActive = false;
       
-      // Блокируем кнопки массовых операций
       const processBtn = document.getElementById('processSelectedBtn');
       const unprocessBtn = document.getElementById('unprocessSelectedBtn');
       const clearBtn = document.getElementById('clearSelectionBtn');
@@ -1111,11 +1121,9 @@
           const request = allRequests.find(req => req.id === requestId);
           if (!request) continue;
 
-          // Обновляем детали процесса
           document.getElementById('processingDetails').textContent = 
             `Обрабатывается заявка ${processedCount + 1} из ${requestsToProcess.length}`;
 
-          // Если обрабатываем заявку - выдаем доступ к материалам
           if (isProcessed) {
             const materials = await grantAccessToMaterials(
               request.user_id, 
@@ -1124,7 +1132,6 @@
             );
             grantedMaterials = grantedMaterials.concat(materials);
           } else {
-            // Если возвращаем в ожидание - удаляем доступы, выданные этой заявкой
             await supabaseClient
               .from('textbook_access')
               .delete()
@@ -1138,7 +1145,6 @@
               .eq('granted_by', currentUser.id);
           }
 
-          // Обновляем статус заявки
           const { error } = await supabaseClient
             .from('purchase_requests')
             .update({ 
@@ -1149,7 +1155,6 @@
 
           if (error) throw error;
 
-          // Обновляем локальные данные
           const requestIndex = allRequests.findIndex(req => req.id === requestId);
           if (requestIndex !== -1) {
             allRequests[requestIndex].is_processed = isProcessed;
@@ -1159,15 +1164,12 @@
           processedCount++;
         }
 
-        // Очищаем выделение
         selectedRequests.clear();
         updateBulkActions();
 
-        // Перерисовываем таблицы
         filterRequests();
         updateStats();
 
-        // Показываем уведомление
         let message = isProcessed ? 
           `✅ Обработано ${processedCount} заявок` : 
           `↩️ Возвращено в ожидание ${processedCount} заявок`;
@@ -1181,18 +1183,86 @@
       } catch (error) {
         showError('Ошибка при массовой обработке заявок: ' + error.message);
       } finally {
-        // Разблокируем кнопки
         setButtonLoading(processBtn, false);
         setButtonLoading(unprocessBtn, false);
         setButtonLoading(clearBtn, false);
         hideProcessing();
         
-        // Включаем автообновление обратно
         isPollingActive = true;
       }
     }
 
-    // Фильтрация заявок для текущей вкладки
+    async function processRequest(requestId, isProcessed) {
+      isPollingActive = false;
+      
+      showProcessing(
+        isProcessed ? 'Обрабатываем заявку...' : 'Возвращаем заявку в ожидание...',
+        'Пожалуйста, подождите'
+      );
+
+      try {
+        const request = allRequests.find(req => req.id === requestId);
+        if (!request) return;
+
+        let grantedMaterials = [];
+
+        if (isProcessed) {
+          grantedMaterials = await grantAccessToMaterials(
+            request.user_id, 
+            request.class_level, 
+            request.textbook_types
+          );
+        } else {
+          await supabaseClient
+            .from('textbook_access')
+            .delete()
+            .eq('user_id', request.user_id)
+            .eq('granted_by', currentUser.id);
+
+          await supabaseClient
+            .from('crossword_access')
+            .delete()
+            .eq('user_id', request.user_id)
+            .eq('granted_by', currentUser.id);
+        }
+
+        const { error } = await supabaseClient
+          .from('purchase_requests')
+          .update({ 
+            is_processed: isProcessed,
+            processed_at: isProcessed ? new Date().toISOString() : null
+          })
+          .eq('id', requestId);
+
+        if (error) throw error;
+
+        const requestIndex = allRequests.findIndex(req => req.id === requestId);
+        if (requestIndex !== -1) {
+          allRequests[requestIndex].is_processed = isProcessed;
+          allRequests[requestIndex].processed_at = isProcessed ? new Date().toISOString() : null;
+        }
+
+        filterRequests();
+        updateStats();
+
+        if (isProcessed) {
+          let message = '✅ Заявка обработана';
+          if (grantedMaterials.length > 0) {
+            message += `\n\n🎁 Выданы материалы:\n${grantedMaterials.join('\n')}`;
+          }
+          showNotification(message);
+        } else {
+          showNotification('↩️ Заявка возвращена в ожидание');
+        }
+      } catch (error) {
+        showError('Ошибка при обновлении заявки: ' + error.message);
+      } finally {
+        hideProcessing();
+        isPollingActive = true;
+      }
+    }
+
+    // ============ ФИЛЬТРАЦИЯ И ОТОБРАЖЕНИЕ ============
     function filterRequests() {
       const nameFilter = document.getElementById('searchName').value.toLowerCase();
       const emailFilter = document.getElementById('searchEmail').value.toLowerCase();
@@ -1206,7 +1276,6 @@
         return matchesName && matchesEmail;
       });
 
-      // Дополнительная фильтрация по вкладкам
       if (currentTab === 'pending') {
         filtered = filtered.filter(request => !request.is_processed);
       } else if (currentTab === 'processed') {
@@ -1216,7 +1285,6 @@
       renderRequests(filtered, currentTab);
     }
 
-    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Отрисовка заявок для конкретной вкладки
     function renderRequests(requests, section) {
       const tbody = document.getElementById(`${section}RequestsTableBody`);
       if (!tbody) return;
@@ -1228,7 +1296,6 @@
         return;
       }
 
-      // Сбрасываем выделение при перерисовке
       selectedRequests.clear();
       updateBulkActions();
 
@@ -1236,7 +1303,6 @@
         const row = document.createElement('tr');
         const isSelected = selectedRequests.has(request.id);
         
-        // Базовые колонки для всех таблиц
         let rowContent = `
           <td class="checkbox-cell">
             <input type="checkbox" class="request-checkbox" data-request-id="${request.id}" ${isSelected ? 'checked' : ''}>
@@ -1250,7 +1316,6 @@
           <td>${request.full_name}</td>
         `;
 
-        // Дополнительные колонки в зависимости от вкладки
         if (section === 'all') {
           rowContent += `
             <td>
@@ -1292,7 +1357,6 @@
         tbody.appendChild(row);
       });
 
-      // Добавляем обработчики событий для чекбоксов
       tbody.querySelectorAll('.request-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', (e) => {
           const requestId = e.target.getAttribute('data-request-id');
@@ -1300,14 +1364,11 @@
         });
       });
 
-      // Добавляем обработчики событий для кнопок
       tbody.querySelectorAll('[data-process]').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           const requestId = e.target.getAttribute('data-process');
-          // Блокируем кнопку
           setButtonLoading(e.target, true);
           await processRequest(requestId, true);
-          // Разблокируем кнопку
           setButtonLoading(e.target, false);
         });
       });
@@ -1315,15 +1376,12 @@
       tbody.querySelectorAll('[data-unprocess]').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           const requestId = e.target.getAttribute('data-unprocess');
-          // Блокируем кнопку
           setButtonLoading(e.target, true);
           await processRequest(requestId, false);
-          // Разблокируем кнопку
           setButtonLoading(e.target, false);
         });
       });
 
-      // Для обработанных заявок загружаем информацию о выданных материалах
       if (section === 'processed') {
         loadGrantedMaterials(requests);
       }
@@ -1331,7 +1389,6 @@
       showTable(section);
     }
 
-    // Загрузка информации о выданных материалах
     async function loadGrantedMaterials(requests) {
       for (const request of requests) {
         if (!request.is_processed) continue;
@@ -1340,7 +1397,6 @@
         if (!container) continue;
 
         try {
-          // Получаем доступы пользователя
           const [textbookAccess, crosswordAccess] = await Promise.all([
             supabaseClient
               .from('textbook_access')
@@ -1386,86 +1442,19 @@
       }
     }
 
-    // ОБНОВЛЕННАЯ ФУНКЦИЯ: Обработка заявки с индикатором
-    async function processRequest(requestId, isProcessed) {
-      // Временно отключаем автообновление на время обработки
-      isPollingActive = false;
-      
-      showProcessing(
-        isProcessed ? 'Обрабатываем заявку...' : 'Возвращаем заявку в ожидание...',
-        'Пожалуйста, подождите'
-      );
+    function updateStats() {
+      const total = allRequests.length;
+      const pending = allRequests.filter(req => !req.is_processed).length;
+      const processed = allRequests.filter(req => req.is_processed).length;
 
-      try {
-        const request = allRequests.find(req => req.id === requestId);
-        if (!request) return;
+      document.getElementById('totalRequests').textContent = total;
+      document.getElementById('pendingRequests').textContent = pending;
+      document.getElementById('processedRequests').textContent = processed;
 
-        let grantedMaterials = [];
-
-        // Если обрабатываем заявку - выдаем доступ к материалам
-        if (isProcessed) {
-          grantedMaterials = await grantAccessToMaterials(
-            request.user_id, 
-            request.class_level, 
-            request.textbook_types
-          );
-        } else {
-          // Если возвращаем в ожидание - удаляем доступы, выданные этой заявкой
-          await supabaseClient
-            .from('textbook_access')
-            .delete()
-            .eq('user_id', request.user_id)
-            .eq('granted_by', currentUser.id);
-
-          await supabaseClient
-            .from('crossword_access')
-            .delete()
-            .eq('user_id', request.user_id)
-            .eq('granted_by', currentUser.id);
-        }
-
-        // Обновляем статус заявки
-        const { error } = await supabaseClient
-          .from('purchase_requests')
-          .update({ 
-            is_processed: isProcessed,
-            processed_at: isProcessed ? new Date().toISOString() : null
-          })
-          .eq('id', requestId);
-
-        if (error) throw error;
-
-        // Обновляем локальные данные
-        const requestIndex = allRequests.findIndex(req => req.id === requestId);
-        if (requestIndex !== -1) {
-          allRequests[requestIndex].is_processed = isProcessed;
-          allRequests[requestIndex].processed_at = isProcessed ? new Date().toISOString() : null;
-        }
-
-        // Перерисовываем таблицы
-        filterRequests();
-        updateStats();
-
-        // Показываем уведомление
-        if (isProcessed) {
-          let message = '✅ Заявка обработана';
-          if (grantedMaterials.length > 0) {
-            message += `\n\n🎁 Выданы материалы:\n${grantedMaterials.join('\n')}`;
-          }
-          showNotification(message);
-        } else {
-          showNotification('↩️ Заявка возвращена в ожидание');
-        }
-      } catch (error) {
-        showError('Ошибка при обновлении заявки: ' + error.message);
-      } finally {
-        hideProcessing();
-        // Включаем автообновление обратно
-        isPollingActive = true;
-      }
+      localStorage.setItem('pendingRequestsCount', pending);
     }
 
-    // Уведомление
+    // ============ УВЕДОМЛЕНИЯ ============
     function showNotification(message) {
       const notification = document.createElement('div');
       notification.style.cssText = `
@@ -1490,35 +1479,12 @@
       }, 5000);
     }
 
-    // Загрузка всех заявок
-    async function loadAllRequests() {
-      try {
-        const { data: requests, error } = await supabaseClient
-          .from('purchase_requests')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        allRequests = requests || [];
-        filterRequests();
-        updateStats();
-        
-        // Запускаем автообновление после успешной загрузки
-        startAutoRefresh();
-        
-      } catch (error) {
-        showError('Ошибка загрузки заявок: ' + error.message);
-      }
-    }
-
-    // Инициализация вкладок
+    // ============ ИНИЦИАЛИЗАЦИЯ ============
     function initTabs() {
       document.querySelectorAll('.requests-tab').forEach(tab => {
         tab.addEventListener('click', () => {
           const tabName = tab.getAttribute('data-tab');
           
-          // Обновляем активную вкладку
           document.querySelectorAll('.requests-tab').forEach(t => t.classList.remove('active'));
           document.querySelectorAll('.requests-section').forEach(s => s.classList.remove('active'));
           
@@ -1527,7 +1493,6 @@
           
           currentTab = tabName;
           
-          // Сбрасываем выделение при смене вкладки
           selectedRequests.clear();
           updateBulkActions();
           
@@ -1536,9 +1501,7 @@
       });
     }
 
-    // НОВАЯ ФУНКЦИЯ: Инициализация массовых операций
     function initBulkActions() {
-      // Обработчики для кнопок массовых операций
       document.getElementById('processSelectedBtn').addEventListener('click', () => {
         if (selectedRequests.size > 0) {
           processMultipleRequests(true);
@@ -1555,18 +1518,15 @@
         selectedRequests.clear();
         updateBulkActions();
         
-        // Снимаем выделение со всех чекбоксов
         document.querySelectorAll('.request-checkbox').forEach(checkbox => {
           checkbox.checked = false;
         });
         
-        // Снимаем выделение с "Выделить все"
         document.querySelectorAll('th input[type="checkbox"]').forEach(checkbox => {
           checkbox.checked = false;
         });
       });
 
-      // Обработчики для чекбоксов "Выделить все"
       document.getElementById('selectAllAll').addEventListener('change', (e) => {
         handleSelectAll(e.target.checked);
       });
@@ -1580,28 +1540,110 @@
       });
     }
 
-    // Вспомогательная функция для показа модального окна
-    function showModal(title, text) {
-      alert(`${title}\n\n${text}`);
+    async function loadAllRequests() {
+      try {
+        const { data: requests, error } = await supabaseClient
+          .from('purchase_requests')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        allRequests = requests || [];
+        filterRequests();
+        updateStats();
+        
+        startAutoRefresh();
+        
+      } catch (error) {
+        showError('Ошибка загрузки заявок: ' + error.message);
+      }
+    }
+
+    // ============ ОСНОВНАЯ ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ============
+    async function initApp() {
+      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
+        return;
+      }
+
+      console.log('🔄 Начинаем инициализацию админки заявок...');
+      
+      window.waitForSupabase(async function(supabase) {
+        console.log('✅ Supabase готов для админки заявок');
+        supabaseClient = supabase;
+        
+        try {
+          const user = await checkAdmin(supabaseClient);
+          if (!user) {
+            console.log('❌ Проверка прав администратора не пройдена');
+            return;
+          }
+
+          currentUser = user;
+
+          console.log('✅ Админка заявок инициализирована для пользователя:', user.email);
+
+          document.getElementById('modalOk').addEventListener('click', () => {
+            document.getElementById('modal').style.display = 'none';
+          });
+
+          document.getElementById('logoutBtn').addEventListener('click', async () => {
+            if (confirm('Вы уверены, что хотите выйти?')) {
+              stopAutoRefresh();
+              await supabaseClient.auth.signOut();
+              location.href = '/login.html';
+            }
+          });
+
+          document.getElementById('clearSearchBtn').addEventListener('click', () => {
+            document.getElementById('searchName').value = '';
+            document.getElementById('searchEmail').value = '';
+            filterRequests();
+          });
+
+          document.getElementById('searchName').addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(filterRequests, 350);
+          });
+
+          document.getElementById('searchEmail').addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(filterRequests, 350);
+          });
+
+          initTabs();
+          initBulkActions();
+          await loadAllRequests();
+          showContent();
+          
+        } catch (error) {
+          console.error('❌ Ошибка инициализации:', error);
+          showError('Ошибка инициализации: ' + error.message);
+        }
+      });
+    }
+
+    // Запуск инициализации
+    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      showError('❌ Конфигурация не загружена');
+      console.error('Supabase config not loaded');
+    } else {
+      console.log('✅ Конфигурация загружена, ждем Supabase...');
+      
+      initApp();
+      
+      setTimeout(function() {
+        if (document.getElementById('configLoading').style.display !== 'none') {
+          showError('❌ Supabase не загрузился. Обновите страницу.');
+        }
+      }, 10000);
     }
 
     // Останавливаем автообновление при закрытии страницы
     window.addEventListener('beforeunload', () => {
       stopAutoRefresh();
     });
-
-    // Обработка ошибок конфигурации
-    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-      console.error('❌ Конфигурация Supabase не загружена');
-      showError('Ошибка конфигурации. Пожалуйста, обновите страницу.');
-      
-      // Ждем загрузки конфигурации
-      window.addEventListener('configLoaded', function() {
-        if (document.getElementById('loading').style.display !== 'none') {
-          document.getElementById('errorMessage').style.display = 'none';
-        }
-      });
-    }
   </script>
 </body>
 </html>
