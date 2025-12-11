@@ -5,6 +5,9 @@
   <title>Учебник — Edu Keys</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
+  <!-- ГЛОБАЛЬНАЯ ЗАГРУЗКА SUPABASE -->
+  <script src="/load-config.js"></script>
+  <script src="/supabase-global.js"></script>
   <style>
     .textbook-container {
       width: 95%;
@@ -224,9 +227,6 @@
       .assignment-item { padding: 15px; }
     }
   </style>
-  
-  <!-- ВАЖНО: корректное имя файла конфигурации -->
-  <script src="/load-config.js"></script>
 </head>
 <body>
   <div class="textbook-container">
@@ -262,7 +262,7 @@
               <div class="stat-label">Всего заданий</div>
             </div>
             <div class="stat-item">
-              <div class="stat-number" id="progressPercent">0%</</div>
+              <div class="stat-number" id="progressPercent">0%</div>
               <div class="stat-label">Прогресс</div>
             </div>
           </div>
@@ -278,7 +278,7 @@
     </div>
   </div>
 
-  <script type="module">
+  <script>
     // ===== Хелперы для стабильной загрузки изображений из Supabase Storage =====
     function isHttpUrl(v) {
       return typeof v === 'string' && /^https?:\/\//i.test(v);
@@ -326,18 +326,13 @@
 
     document.getElementById('loading').style.display = 'block';
     
-    async function initApp() {
-      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
-        return false;
-      }
+    async function initApp(supabase) {
+      console.log('🚀 Инициализация учебника...');
       
       try {
-        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-        const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-        
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
+          console.log('❌ Пользователь не авторизован');
           window.location.href = '/login.html';
           return;
         }
@@ -373,7 +368,7 @@
               .select('*')
               .eq('user_id', user.id)
               .eq('textbook_id', textbookId)
-              .maybeSingle(); // безопаснее, чем single() если нет строки
+              .maybeSingle();
 
             textbookAccess = accessData;
 
@@ -395,21 +390,26 @@
             assignments = assignmentsData || [];
 
             // 4) Прогресс пользователя
-            const { data: progressData, error: progressError } = await supabase
-              .from('user_progress')
-              .select('assignment_id,is_completed')
-              .eq('user_id', user.id)
-              .in('assignment_id', assignments.map(a => a.id));
+            const assignmentIds = assignments.map(a => a.id);
+            let progressData = [];
+            if (assignmentIds.length > 0) {
+              const { data: progress, error: progressError } = await supabase
+                .from('user_progress')
+                .select('assignment_id,is_completed')
+                .eq('user_id', user.id)
+                .in('assignment_id', assignmentIds);
 
-            if (progressError) throw progressError;
-            userProgress = progressData || [];
+              if (progressError) throw progressError;
+              progressData = progress || [];
+            }
+            userProgress = progressData;
 
             renderTextbook();
             renderAssignments();
             showContent();
 
           } catch (error) {
-            console.error('Ошибка загрузки учебника:', error);
+            console.error('❌ Ошибка загрузки учебника:', error);
             showError('❌ Ошибка загрузки учебника: ' + error.message);
           }
         }
@@ -495,18 +495,35 @@
         }
 
         await loadTextbook();
+        console.log('✅ Учебник загружен');
         return true;
         
       } catch (error) {
+        console.error('❌ Ошибка инициализации:', error);
         showError('❌ Ошибка инициализации: ' + error.message);
         return false;
       }
     }
     
-    if (window.SUPABASE_URL) {
-      initApp();
+    // Используем глобальный загрузчик Supabase
+    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      showError('❌ Конфигурация не загружена');
+      console.error('Supabase config not loaded');
     } else {
-      window.addEventListener('configLoaded', initApp);
+      console.log('✅ Конфигурация загружена, ждем Supabase...');
+      
+      // Ждем когда Supabase загрузится
+      window.waitForSupabase(function(supabase) {
+        console.log('✅ Supabase готов для учебника');
+        initApp(supabase);
+      });
+      
+      // Таймаут на случай если Supabase не загрузится
+      setTimeout(function() {
+        if (document.getElementById('loading').style.display !== 'none') {
+          showError('❌ Supabase не загрузился. Обновите страницу.');
+        }
+      }, 10000);
     }
   </script>
 </body>

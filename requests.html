@@ -5,6 +5,9 @@
   <title>Мои заявки — Edu Keys</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
+  <!-- ГЛОБАЛЬНАЯ ЗАГРУЗКА SUPABASE -->
+  <script src="/load-config.js"></script>
+  <script src="/supabase-global.js"></script>
   <style>
     body {
       margin: 0;
@@ -429,8 +432,6 @@
       }
     }
   </style>
-  
-  <script src="/load-config.js"></script>
 </head>
 <body>
   <!-- Модальное окно для создания/редактирования заявки -->
@@ -603,13 +604,12 @@
     </div>
   </div>
 
-  <script type="module">
+  <script>
     document.getElementById('loading').style.display = 'block';
     
     let currentUser = null;
     let currentProfile = null;
     let currentEditingRequestId = null;
-    let supabaseClient = null;
     let selectedTypes = [];
 
     function showError(message) {
@@ -798,7 +798,7 @@
       document.getElementById('paymentModal').style.display = 'flex';
     }
 
-    // Закрытие модального окна оплаты
+    // Закрытие модального окна оплата
     function closePaymentModal() {
       document.getElementById('paymentModal').style.display = 'none';
     }
@@ -860,10 +860,10 @@
     }
 
     // Загрузка заявок пользователя
-    async function loadRequests() {
+    async function loadRequests(supabase) {
       try {
         // ВСЕГДА загружаем только заявки текущего пользователя
-        const { data: requests, error } = await supabaseClient
+        const { data: requests, error } = await supabase
           .from('purchase_requests')
           .select('*')
           .eq('user_id', currentUser.id)
@@ -923,7 +923,7 @@
             
             if (confirm(`Вы уверены, что хотите удалить заявку ${request.request_number}?`)) {
               try {
-                const { error } = await supabaseClient
+                const { error } = await supabase
                   .from('purchase_requests')
                   .delete()
                   .eq('id', requestId)
@@ -932,7 +932,7 @@
                 if (error) throw error;
                 
                 showNotification('✅ Заявка успешно удалена');
-                loadRequests(); // Перезагружаем список
+                loadRequests(supabase); // Перезагружаем список
               } catch (error) {
                 showNotification('Ошибка при удалении заявки: ' + error.message, 'error');
               }
@@ -947,7 +947,7 @@
     }
 
     // Сохранение заявки
-    async function saveRequest() {
+    async function saveRequest(supabase) {
       const requestNumber = document.getElementById('requestNumber').value;
       const requestDateTime = document.getElementById('requestDateTime').value;
       const classLevel = document.getElementById('requestClass').value;
@@ -972,18 +972,19 @@
       try {
         const requestData = {
           request_number: requestNumber,
-          request_date: requestDateTime.split('T')[0],
+          created_at: requestDateTime + ':00Z', // Добавляем секунды и часовой пояс UTC
           class_level: classLevel,
           textbook_types: textbookTypes,
           email: email,
           full_name: fullName,
-          user_id: currentUser.id
+          user_id: currentUser.id,
+          is_processed: false
         };
 
         let error;
         if (currentEditingRequestId) {
           // Редактирование существующей заявки - проверяем принадлежность
-          const { data: existingRequest } = await supabaseClient
+          const { data: existingRequest } = await supabase
             .from('purchase_requests')
             .select('user_id')
             .eq('id', currentEditingRequestId)
@@ -994,14 +995,14 @@
             return;
           }
 
-          ({ error } = await supabaseClient
+          ({ error } = await supabase
             .from('purchase_requests')
             .update(requestData)
             .eq('id', currentEditingRequestId)
             .eq('user_id', currentUser.id));
         } else {
           // Создание новой заявки
-          ({ error } = await supabaseClient
+          ({ error } = await supabase
             .from('purchase_requests')
             .insert([requestData]));
         }
@@ -1018,24 +1019,19 @@
           showNotification('✅ Заявка успешно обновлена');
         }
         
-        loadRequests();
+        loadRequests(supabase);
       } catch (error) {
         showNotification('❌ Ошибка при сохранении заявки: ' + error.message, 'error');
       }
     }
 
-    async function initApp() {
-      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
-        return false;
-      }
+    async function initApp(supabase) {
+      console.log('🚀 Инициализация страницы заявок...');
       
       try {
-        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
-        supabaseClient = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-        
-        const { data: { user } } = await supabaseClient.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
         if(!user) { 
+          console.log('❌ Пользователь не авторизован');
           location.href = '/login.html'; 
           return; 
         }
@@ -1043,13 +1039,13 @@
         currentUser = user;
 
         // Загружаем профиль пользователя
-        const { data: profileData } = await supabaseClient
+        const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
         
-        currentProfile = profileData;
+        currentProfile = profileData || {};
 
         // Инициализация чекбоксов
         initCheckboxes();
@@ -1063,16 +1059,14 @@
         document.getElementById('closePaymentModal').addEventListener('click', closePaymentModal);
         document.getElementById('closePaymentBtn').addEventListener('click', closePaymentModal);
         
-        // Обработчики для чекбоксов уже установлены в initCheckboxes()
-        
         document.getElementById('requestForm').addEventListener('submit', (e) => {
           e.preventDefault();
-          saveRequest();
+          saveRequest(supabase);
         });
 
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           if (confirm('Вы уверены, что хотите выйти?')) {
-            await supabaseClient.auth.signOut();
+            await supabase.auth.signOut();
             location.href = '/login.html';
           }
         });
@@ -1103,26 +1097,36 @@
         });
 
         // Загружаем заявки
-        await loadRequests();
+        await loadRequests(supabase);
+        console.log('✅ Страница заявок инициализирована');
         return true;
         
       } catch (error) {
+        console.error('❌ Ошибка инициализации:', error);
         showError('❌ Ошибка инициализации: ' + error.message);
         return false;
       }
     }
     
-    if (window.SUPABASE_URL) {
-      initApp();
+    // Используем глобальный загрузчик Supabase
+    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      showError('❌ Конфигурация не загружена');
+      console.error('Supabase config not loaded');
     } else {
-      const timeout = setTimeout(() => {
-        showError('❌ Таймаут загрузки конфигурации');
-      }, 1000);
+      console.log('✅ Конфигурация загружена, ждем Supabase...');
       
-      window.addEventListener('configLoaded', () => {
-        clearTimeout(timeout);
-        initApp();
+      // Ждем когда Supabase загрузится
+      window.waitForSupabase(function(supabase) {
+        console.log('✅ Supabase готов для заявок');
+        initApp(supabase);
       });
+      
+      // Таймаут на случай если Supabase не загрузится
+      setTimeout(function() {
+        if (document.getElementById('loading').style.display !== 'none') {
+          showError('❌ Supabase не загрузился. Обновите страницу.');
+        }
+      }, 10000);
     }
   </script>
 </body>
