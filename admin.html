@@ -661,74 +661,6 @@
         border: 1px solid #c8e6c9;
     }
 
-    /* НОВЫЕ СТИЛИ ДЛЯ ПАГИНАЦИИ */
-    .pagination-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 20px;
-        padding: 15px;
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .pagination-info {
-        font-size: 14px;
-        color: #666;
-        font-weight: 600;
-    }
-
-    .pagination-controls {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        flex-wrap: wrap;
-    }
-
-    .pagination-btn {
-        padding: 8px 12px;
-        border: 1px solid #ddd;
-        background: white;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: all 0.2s;
-    }
-
-    .pagination-btn:hover:not(:disabled) {
-        background: var(--accent2);
-        color: white;
-        border-color: var(--accent2);
-    }
-
-    .pagination-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    .pagination-page {
-        padding: 8px 12px;
-        border: 1px solid #ddd;
-        background: white;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: all 0.2s;
-    }
-
-    .pagination-page.active {
-        background: var(--accent2);
-        color: white;
-        border-color: var(--accent2);
-    }
-
-    .pagination-page:hover:not(.active) {
-        background: #f8f9fa;
-    }
-
     /* СТИЛИ ДЛЯ ОПТИМИЗАЦИИ ЗАГРУЗКИ */
     .loading-row {
         text-align: center;
@@ -834,7 +766,6 @@
       .filters-container select,
       .filters-container input { min-width: 100%; }
       .class-level-select { min-height: 100px; }
-      .pagination-container { flex-direction: column; gap: 15px; }
     }
 
     @media (max-width: 768px) {
@@ -865,9 +796,6 @@
       .crossword-cell { width: 25px; height: 25px; font-size: 10px; }
       .fill-input-number { width: 24px; height: 24px; font-size: 12px; }
       .remove-input-btn { width: 32px; height: 32px; }
-      .pagination-controls { justify-content: center; }
-      .pagination-page { padding: 6px 8px; font-size: 12px; }
-      .pagination-btn { padding: 6px 8px; font-size: 12px; }
     }
   </style>
 </head>
@@ -1370,21 +1298,7 @@
             <p>🔄 Загружаем пользователей...</p>
           </div>
 
-          <!-- Пагинация -->
-          <div class="pagination-container" id="usersPagination" style="display: none;">
-            <div class="pagination-info" id="paginationInfo">
-              Показано <span id="currentRange">0-0</span> из <span id="totalFilteredUsers">0</span>
-            </div>
-            <div class="pagination-controls">
-              <button class="pagination-btn" id="firstPageBtn" disabled>⏮️</button>
-              <button class="pagination-btn" id="prevPageBtn" disabled>◀️</button>
-              
-              <div id="pageNumbers"></div>
-              
-              <button class="pagination-btn" id="nextPageBtn" disabled>▶️</button>
-              <button class="pagination-btn" id="lastPageBtn" disabled>⏭️</button>
-            </div>
-          </div>
+          <!-- ИСПРАВЛЕНИЕ: УБИРАЕМ ПАГИНАЦИЮ -->
 
           <div style="overflow-x: auto;">
             <table class="admin-table" id="usersTable">
@@ -1402,7 +1316,7 @@
                 </tr>
               </thead>
               <tbody id="usersTableBody">
-                <!-- Данные будут загружаться через пагинацию -->
+                <!-- Данные будут загружаться без пагинации -->
               </tbody>
             </table>
           </div>
@@ -1436,7 +1350,7 @@
   </div>
 
   <script>
-    // ============ БАЗОВЫЕ UI ХЕЛПЕРЫ ============
+        // ============ БАЗОВЫЕ UI ХЕЛПЕРЫ ============
     document.getElementById('configLoading').style.display = 'block';
 
     function showError(message) {
@@ -1457,99 +1371,6 @@
       document.getElementById('modalText').textContent = text;
       document.getElementById('modal').style.display = 'flex';
     }
-
-    // ============ ИСПРАВЛЕННАЯ СИСТЕМА ПАГИНАЦИИ ============
-    const usersPagination = {
-      currentPage: 1,
-      pageSize: 15,
-      totalUsers: 0,
-      totalPages: 0,
-      filteredUsers: [],
-      isLoading: false,
-      
-      init() {        
-        document.getElementById('firstPageBtn').addEventListener('click', () => {
-          this.goToPage(1);
-        });
-        
-        document.getElementById('prevPageBtn').addEventListener('click', () => {
-          this.goToPage(this.currentPage - 1);
-        });
-        
-        document.getElementById('nextPageBtn').addEventListener('click', () => {
-          this.goToPage(this.currentPage + 1);
-        });
-        
-        document.getElementById('lastPageBtn').addEventListener('click', () => {
-          this.goToPage(this.totalPages);
-        });
-      },
-      
-      goToPage(page) {
-        if (page >= 1 && page <= this.totalPages && page !== this.currentPage && !this.isLoading) {
-          this.currentPage = page;
-          renderUsersPage();
-        }
-      },
-      
-      updatePaginationInfo() {
-        const start = ((this.currentPage - 1) * this.pageSize) + 1;
-        const end = Math.min(this.currentPage * this.pageSize, this.totalUsers);
-        
-        document.getElementById('currentRange').textContent = `${start}-${end}`;
-        document.getElementById('totalFilteredUsers').textContent = this.totalUsers;
-        
-        // Обновляем кнопки
-        document.getElementById('firstPageBtn').disabled = this.currentPage === 1;
-        document.getElementById('prevPageBtn').disabled = this.currentPage === 1;
-        document.getElementById('nextPageBtn').disabled = this.currentPage === this.totalPages;
-        document.getElementById('lastPageBtn').disabled = this.currentPage === this.totalPages;
-        
-        // Обновляем номера страниц
-        this.renderPageNumbers();
-        
-        // Показываем/скрываем пагинацию
-        const paginationContainer = document.getElementById('usersPagination');
-        paginationContainer.style.display = this.totalUsers > 0 ? 'flex' : 'none';
-      },
-      
-      renderPageNumbers() {
-        const container = document.getElementById('pageNumbers');
-        container.innerHTML = '';
-        
-        const maxVisiblePages = 5;
-        let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(this.totalPages, startPage + maxVisiblePages - 1);
-        
-        if (endPage - startPage + 1 < maxVisiblePages) {
-          startPage = Math.max(1, endPage - maxVisiblePages + 1);
-        }
-        
-        for (let i = startPage; i <= endPage; i++) {
-          const pageBtn = document.createElement('button');
-          pageBtn.className = `pagination-page ${i === this.currentPage ? 'active' : ''}`;
-          pageBtn.textContent = i;
-          pageBtn.addEventListener('click', () => this.goToPage(i));
-          container.appendChild(pageBtn);
-        }
-      },
-      
-      getCurrentPageUsers() {
-        const startIndex = (this.currentPage - 1) * this.pageSize;
-        const endIndex = startIndex + this.pageSize;
-        return this.filteredUsers.slice(startIndex, endIndex);
-      },
-
-      setLoading(loading) {
-        this.isLoading = loading;
-        const loadingElement = document.getElementById('usersLoading');
-        if (loading) {
-          loadingElement.classList.add('active');
-        } else {
-          loadingElement.classList.remove('active');
-        }
-      }
-    };
 
     // ============ УЛУЧШЕННАЯ ПРОВЕРКА АДМИНА ============
     async function checkAdmin(supabase) {
@@ -1628,6 +1449,7 @@
     function generateQuestionId() {
       return 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
     }
+    
     function safeName(name) {
       return name.replace(/[^a-zA-Z0-9._-]/g, '_');
     }
@@ -1651,7 +1473,13 @@
       }
     }
 
+    // ИСПРАВЛЕНИЕ: Добавляем параметр supabase в функцию загрузки изображений
     async function uploadImageToSupabase({ supabase, file, bucket }) {
+      // Проверяем, что supabase передан
+      if (!supabase || !supabase.storage) {
+        throw new Error('Supabase не инициализирован для загрузки изображений');
+      }
+      
       const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
       const allowed = ['jpg','jpeg','png','gif','webp','avif'];
       if (!allowed.includes(ext)) throw new Error('Поддерживаются только JPG, PNG, GIF, WebP, AVIF');
@@ -1686,6 +1514,12 @@
       const preview = document.getElementById(previewId);
       const urlInput = document.getElementById(urlInputId);
       const removeBtn = document.getElementById(removeBtnId);
+
+      // Проверяем, что supabase передан
+      if (!supabase) {
+        console.error('Supabase не передан в initImageUpload');
+        return;
+      }
 
       function resetProgress() {
         barWrap.style.display = 'none';
@@ -2125,6 +1959,7 @@
         deleteWordBtn.addEventListener('click', () => toggleDeleteWordMode(qid));
       }
 
+      // ИСПРАВЛЕНИЕ: Передаем supabase в initImageUpload
       initImageUpload({
         uploadAreaId: `crosswordAdvancedUploadArea_${qid}`,
         fileInputId: `crosswordAdvancedImageInput_${qid}`,
@@ -3231,6 +3066,7 @@
       }
 
       if (qType !== 'crossword') {
+        // ИСПРАВЛЕНИЕ: Передаем supabase в initQuestionImageUpload
         initQuestionImageUpload(qid, window.supabase);
       } else {
         if (prefill && prefill.grid) {
@@ -3272,7 +3108,8 @@
 
       renumberQuestions();
     }
-            // ============ ОСНОВНОЕ ПРИЛОЖЕНИЕ ============
+
+    // ============ ОСНОВНОЕ ПРИЛОЖЕНИЕ ============
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
@@ -3293,9 +3130,6 @@
           }
 
           console.log('✅ Админ-панель инициализирована для пользователя:', user.email);
-
-          // Инициализация пагинации
-          usersPagination.init();
 
           // Инициализация JSON редактора
           initJsonEditor();
@@ -3336,6 +3170,7 @@
           });
 
           // Инициализация загрузки изображений
+          // ИСПРАВЛЕНИЕ: Передаем supabase в initImageUpload
           initImageUpload({
             uploadAreaId: 'textbookUploadArea',
             fileInputId: 'textbookCoverInput',
@@ -3347,6 +3182,7 @@
             bucket: 'covers',
             supabase
           });
+          
           initImageUpload({
             uploadAreaId: 'crosswordUploadArea',
             fileInputId: 'crosswordCoverInput',
@@ -3393,7 +3229,10 @@
             document.getElementById('textbookCoverPreview').style.display = 'none';
             document.getElementById('removeTextbookCoverBtn').style.display = 'none';
           }
-          function hideTextbookForm(){ document.getElementById('textbookForm').classList.remove('active'); }
+          
+          function hideTextbookForm(){ 
+            document.getElementById('textbookForm').classList.remove('active'); 
+          }
 
           async function saveTextbook() {
             const title = document.getElementById('textbookTitle').value.trim();
@@ -3537,7 +3376,10 @@
             document.getElementById('crosswordCoverPreview').style.display = 'none';
             document.getElementById('removeCrosswordCoverBtn').style.display = 'none';
           }
-          function hideCrosswordForm(){ document.getElementById('crosswordForm').classList.remove('active'); }
+          
+          function hideCrosswordForm(){ 
+            document.getElementById('crosswordForm').classList.remove('active'); 
+          }
 
           async function saveCrossword() {
             const title = document.getElementById('crosswordTitle').value.trim();
@@ -3816,7 +3658,7 @@
                 const answers = answersLines.map(line => parseMultipleAnswers(line));
                 
                 if (!answers.length || answers.length !== gaps) {
-                  return showModal('Ошибка', `Количество ответов (${answers.length}) должно совпадать с количеством пропусков (${gaps}) в вопросе ${i+1}`);
+                  return showModal('Ошибка', `Количество ответов (${answers.length}) должно совпадать с количество пропусков (${gaps}) в вопросе ${i+1}`);
                 }
                 
                 qData.q = q;
@@ -3950,7 +3792,7 @@
             });
           }
 
-          // ===== ИСПРАВЛЕННАЯ СИСТЕМА ПОЛЬЗОВАТЕЛЕЙ ============
+          // ===== ИСПРАВЛЕННАЯ СИСТЕМА ПОЛЬЗОВАТЕЛЕЙ (БЕЗ ПАГИНАЦИИ) ============
           let currentEditingUserId = null;
           let searchTimeout = null;
 
@@ -4053,26 +3895,22 @@
             }
           }
 
-          // ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ПОЛЬЗОВАТЕЛЕЙ
+          // ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ПОЛЬЗОВАТЕЛЕЙ (БЕЗ ПАГИНАЦИИ)
           async function loadUsers(supabaseClient) {
-            if (usersPagination.isLoading) return;
-            
-            usersPagination.setLoading(true);
-            
             const searchQuery = document.getElementById('userSearch').value.trim();
             const regionFilter = document.getElementById('regionFilter').value;
             const materialStatusFilter = document.getElementById('materialStatusFilter').value;
 
             document.getElementById('usersTableBody').innerHTML = '';
+            document.getElementById('usersLoading').classList.add('active');
             document.getElementById('usersSkeleton').style.display = 'block';
             document.getElementById('usersEmptyState').style.display = 'none';
-            document.getElementById('usersPagination').style.display = 'none';
 
             try {
               let query = supabaseClient
                 .from('profiles')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false }); // Сначала новые
 
               if (searchQuery) {
                 query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,contact_phone.ilike.%${searchQuery}%`);
@@ -4095,23 +3933,22 @@
                 filteredUsers = usersWithMaterials.filter(user => !user.hasMaterials);
               }
 
-              usersPagination.totalUsers = filteredUsers.length;
-              usersPagination.totalPages = Math.ceil(usersPagination.totalUsers / usersPagination.pageSize);
-              usersPagination.filteredUsers = filteredUsers;
-
               const totalInFilters = filteredUsers.length;
               const withMaterialsInFilters = filteredUsers.filter(user => user.hasMaterials).length;
 
               document.getElementById('totalUsersCount').textContent = totalInFilters;
               document.getElementById('usersWithMaterialsCount').textContent = withMaterialsInFilters;
 
-              renderUsersPage();
+              // Отрисовываем всех пользователей
+              renderUsersList(filteredUsers);
 
             } catch (error) {
               document.getElementById('usersSkeleton').style.display = 'none';
+              document.getElementById('usersLoading').classList.remove('active');
               showError('Ошибка загрузки пользователей: ' + error.message);
             } finally {
-              usersPagination.setLoading(false);
+              document.getElementById('usersLoading').classList.remove('active');
+              document.getElementById('usersSkeleton').style.display = 'none';
             }
           }
 
@@ -4162,25 +3999,25 @@
             }
           }
 
-          // ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТРИСОВКИ ПОЛЬЗОВАТЕЛЕЙ
-          function renderUsersPage() {
+          // ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТРИСОВКИ ПОЛЬЗОВАТЕЛЕЙ С ОБРАТНОЙ НУМЕРАЦИЕЙ
+          function renderUsersList(users) {
             const tbody = document.getElementById('usersTableBody');
-            document.getElementById('usersSkeleton').style.display = 'none';
-
-            const pageUsers = usersPagination.getCurrentPageUsers();
             
             tbody.innerHTML = '';
 
-            if (!pageUsers || pageUsers.length === 0) {
+            if (!users || users.length === 0) {
               document.getElementById('usersEmptyState').style.display = 'block';
-              document.getElementById('usersPagination').style.display = 'none';
               return;
             }
 
             document.getElementById('usersEmptyState').style.display = 'none';
 
-            pageUsers.forEach((user, index) => {
-              const globalIndex = ((usersPagination.currentPage - 1) * usersPagination.pageSize) + index + 1;
+            // Нумерация снизу вверх: последний (старый) пользователь = 1, первый (новый) = N
+            const totalUsers = users.length;
+            
+            users.forEach((user, index) => {
+              // Обратная нумерация: сверху новый пользователь с номером totalUsers - index
+              const reverseIndex = totalUsers - index;
               
               const tr = document.createElement('tr');
               
@@ -4190,9 +4027,8 @@
                 tr.classList.add('user-row-new');
               }
 
-              // ИСПРАВЛЕННЫЙ HTML - УБРАН СТОЛБЕЦ ПРОГРЕСС
               tr.innerHTML = `
-                <td><strong>${globalIndex}</strong></td>
+                <td><strong>${reverseIndex}</strong></td>
                 <td>
                   <div><strong>${user.full_name || 'Не указано'}</strong></div>
                   <div class="user-stats"><span class="stat-badge">ID: ${user.id.slice(0,8)}...</span></div>
@@ -4229,8 +4065,6 @@
               tbody.appendChild(tr);
             });
 
-            usersPagination.updatePaginationInfo();
-
             tbody.querySelectorAll('[data-toggle-admin]').forEach(btn => {
               btn.addEventListener('click', async () => {
                 const uid = btn.getAttribute('data-toggle-admin');
@@ -4253,18 +4087,15 @@
             document.getElementById('userSearch').addEventListener('input', () => {
               clearTimeout(searchTimeout);
               searchTimeout = setTimeout(() => {
-                usersPagination.currentPage = 1;
                 loadUsers(supabase);
               }, 500);
             });
 
             document.getElementById('regionFilter').addEventListener('change', () => {
-              usersPagination.currentPage = 1;
               loadUsers(supabase);
             });
 
             document.getElementById('materialStatusFilter').addEventListener('change', () => {
-              usersPagination.currentPage = 1;
               loadUsers(supabase);
             });
           }
@@ -4273,6 +4104,7 @@
           document.getElementById('closeUserAccessModal').addEventListener('click', ()=>{
             document.getElementById('userAccessModal').style.display='none';
           });
+          
           document.getElementById('saveUserAccessBtn').addEventListener('click', () => saveUserAccess(supabase));
 
           async function openUserAccessModal(supabaseClient, userId, userName) {
