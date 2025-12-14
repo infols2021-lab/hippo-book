@@ -803,6 +803,21 @@
         display: block;
     }
 
+    /* Стили для JSON редактора */
+    .question-type-content {
+        transition: all 0.3s ease;
+    }
+
+    .json-help {
+        transition: all 0.3s ease;
+    }
+
+    .json-help pre {
+        margin: 5px 0;
+        overflow-x: auto;
+        font-family: 'Courier New', monospace;
+    }
+
     @media (max-width: 1024px) {
       .admin-container { width: 98%; margin: 15px auto; }
       .admin-table { font-size: 14px; }
@@ -841,6 +856,9 @@
       .users-stats { flex-direction: column; gap: 10px; }
       .materials-list { flex-direction: column; }
       .material-badge { width: fit-content; }
+      .json-help div {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 480px) {
@@ -1154,15 +1172,115 @@
             <div id="assignmentContent">
               <h3>Вопросы задания</h3>
 
-              <div class="question-type-selector">
-                <div class="type-btn active" data-type="test">📝 Тестовый вопрос</div>
-                <div class="type-btn" data-type="fill">✍️ Вписать ответ</div>
-                <div class="type-btn" data-type="sentence">📝 Заполнить предложение</div>
-                <div class="type-btn" data-type="crossword">🧩 Кроссворд</div>
+              <!-- ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМОВ -->
+              <div class="question-type-selector" style="margin-bottom: 20px;">
+                <div class="type-btn active" data-editor-mode="graphical">🎨 Графический редактор</div>
+                <div class="type-btn" data-editor-mode="json">📄 JSON редактор</div>
               </div>
 
-              <div id="questionsContainer"><!-- динамика --></div>
-              <button class="btn" id="addQuestionBtn">➕ Добавить вопрос</button>
+              <!-- ГРАФИЧЕСКИЙ РЕДАКТОР -->
+              <div id="graphicalEditor" class="question-type-content">
+                <div class="question-type-selector">
+                  <div class="type-btn active" data-question-type="test">📝 Тестовый вопрос</div>
+                  <div class="type-btn" data-question-type="fill">✍️ Вписать ответ</div>
+                  <div class="type-btn" data-question-type="sentence">📝 Заполнить предложение</div>
+                  <div class="type-btn" data-question-type="crossword">🧩 Кроссворд</div>
+                </div>
+
+                <div id="questionsContainer"><!-- динамика --></div>
+                <button class="btn" id="addQuestionBtn">➕ Добавить вопрос</button>
+              </div>
+
+              <!-- JSON РЕДАКТОР -->
+              <div id="jsonEditor" class="question-type-content" style="display: none;">
+                <div class="form-group">
+                  <label>📋 Вставьте JSON структуру задания:</label>
+                  <textarea id="jsonInput" class="input" rows="15" placeholder='Пример JSON:
+{
+  "questions": [
+    {
+      "type": "test",
+      "q": "Сколько будет 2+2?",
+      "options": ["3", "4", "5", "6"],
+      "correct": 1,
+      "image": "https://example.com/image.jpg"
+    },
+    {
+      "type": "fill",
+      "q": "Столица России",
+      "answers": [["москва", "мск"]],
+      "image": ""
+    }
+  ]
+}'></textarea>
+                </div>
+
+                <div class="form-group">
+                  <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                    <button class="btn" id="validateJsonBtn">✅ Проверить JSON</button>
+                    <button class="btn" id="importJsonBtn">📥 Импортировать в графический редактор</button>
+                  </div>
+                  
+                  <div class="small-muted">
+                    💡 Поддерживаются типы вопросов: "test", "fill", "sentence".<br>
+                    💡 Поле "image" — URL изображения (опционально). Загрузите изображения через обычный интерфейс, скопируйте URL и вставьте сюда.
+                  </div>
+                </div>
+
+                <div id="jsonValidationResult" style="display: none; margin: 15px 0; padding: 12px; border-radius: 8px;"></div>
+              </div>
+
+              <!-- ПОДСКАЗКА ПО JSON ФОРМАТУ -->
+              <div class="json-help" style="background: #f0f7ff; border: 1px solid #c2dfff; border-radius: 8px; padding: 15px; margin: 20px 0; display: none;">
+                <h4 style="margin-top: 0; color: #0066cc;">📚 Формат JSON для разных типов вопросов:</h4>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+                  <!-- Тестовый вопрос -->
+                  <div style="background: white; padding: 12px; border-radius: 6px;">
+                    <strong>📝 Тестовый вопрос:</strong>
+                    <pre style="background: #f5f5f5; padding: 8px; border-radius: 4px; font-size: 12px; margin: 5px 0;">
+{
+  "type": "test",
+  "q": "Вопрос?",
+  "options": ["Вариант 1", "Вариант 2"],
+  "correct": 0,
+  "image": "URL или пустая строка"
+}</pre>
+                  </div>
+
+                  <!-- Вписать ответ -->
+                  <div style="background: white; padding: 12px; border-radius: 6px;">
+                    <strong>✍️ Вписать ответ:</strong>
+                    <pre style="background: #f5f5f5; padding: 8px; border-radius: 4px; font-size: 12px; margin: 5px 0;">
+{
+  "type": "fill",
+  "q": "Вопрос?",
+  "answers": [["вариант1", "вариант2"]],
+  "image": "URL или пустая строка"
+}</pre>
+                  </div>
+
+                  <!-- Заполнить предложение -->
+                  <div style="background: white; padding: 12px; border-radius: 6px;">
+                    <strong>📝 Заполнить предложение:</strong>
+                    <pre style="background: #f5f5f5; padding: 8px; border-radius: 4px; font-size: 12px; margin: 5px 0;">
+{
+  "type": "sentence",
+  "q": "Задание",
+  "sentence": "Предложение с ___ пропусками",
+  "answers": [["вариант1"], ["вариант2"]],
+  "image": "URL или пустая строка"
+}</pre>
+                  </div>
+                </div>
+
+                <button class="btn btn-small" id="hideJsonHelp" style="margin-top: 10px;">Скрыть подсказку</button>
+              </div>
+
+              <!-- КНОПКА ПОКАЗА ПОДСКАЗКИ -->
+              <div style="text-align: center; margin: 15px 0;">
+                <button class="btn btn-small" id="showJsonHelp">📘 Показать формат JSON</button>
+              </div>
             </div>
 
             <!-- ИСПРАВЛЕНИЕ: Кнопки перенесены в центр -->
@@ -2666,8 +2784,471 @@
       };
     }
 
-    // ============ ОСНОВНОЕ ПРИЛОЖЕНИЕ ============
-        async function initApp() {
+    // ============ НОВЫЕ ФУНКЦИИ ДЛЯ JSON РЕДАКТОРА ============
+    function initJsonEditor() {
+      // Переключение режимов редактора
+      const editorModeButtons = document.querySelectorAll('[data-editor-mode]');
+      editorModeButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+          const mode = this.getAttribute('data-editor-mode');
+          
+          // Обновляем активные кнопки
+          editorModeButtons.forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          
+          // Показываем соответствующий редактор
+          if (mode === 'graphical') {
+            document.getElementById('graphicalEditor').style.display = 'block';
+            document.getElementById('jsonEditor').style.display = 'none';
+          } else {
+            document.getElementById('graphicalEditor').style.display = 'none';
+            document.getElementById('jsonEditor').style.display = 'block';
+          }
+        });
+      });
+
+      // Кнопка проверки JSON
+      document.getElementById('validateJsonBtn').addEventListener('click', validateJson);
+
+      // Кнопка импорта JSON
+      document.getElementById('importJsonBtn').addEventListener('click', importJson);
+
+      // Показать/скрыть подсказку по формату
+      document.getElementById('showJsonHelp').addEventListener('click', function() {
+        document.querySelector('.json-help').style.display = 'block';
+        this.style.display = 'none';
+      });
+
+      document.getElementById('hideJsonHelp').addEventListener('click', function() {
+        document.querySelector('.json-help').style.display = 'none';
+        document.getElementById('showJsonHelp').style.display = 'block';
+      });
+    }
+
+    function validateJson() {
+      const jsonInput = document.getElementById('jsonInput').value.trim();
+      const resultDiv = document.getElementById('jsonValidationResult');
+      
+      if (!jsonInput) {
+        resultDiv.innerHTML = '<div class="validation-message warning">⚠️ Введите JSON для проверки</div>';
+        resultDiv.style.display = 'block';
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(jsonInput);
+        
+        // Проверяем базовую структуру
+        if (!parsed.questions || !Array.isArray(parsed.questions)) {
+          throw new Error('JSON должен содержать массив "questions"');
+        }
+
+        let isValid = true;
+        let warnings = [];
+        let errors = [];
+
+        parsed.questions.forEach((question, index) => {
+          // Проверяем обязательные поля
+          if (!question.type) {
+            errors.push(`Вопрос ${index + 1}: отсутствует поле "type"`);
+            isValid = false;
+          }
+
+          if (!question.q && question.type !== 'crossword') {
+            errors.push(`Вопрос ${index + 1}: отсутствует поле "q" (текст вопроса)`);
+            isValid = false;
+          }
+
+          // Проверяем типы вопросов
+          const validTypes = ['test', 'fill', 'sentence', 'crossword'];
+          if (!validTypes.includes(question.type)) {
+            errors.push(`Вопрос ${index + 1}: неверный тип "${question.type}". Допустимые: ${validTypes.join(', ')}`);
+            isValid = false;
+          }
+
+          // Проверяем специфичные поля для каждого типа
+          if (question.type === 'test') {
+            if (!question.options || !Array.isArray(question.options) || question.options.length === 0) {
+              errors.push(`Вопрос ${index + 1} (тестовый): отсутствует или пустой массив "options"`);
+              isValid = false;
+            }
+            
+            if (typeof question.correct !== 'number') {
+              errors.push(`Вопрос ${index + 1} (тестовый): поле "correct" должно быть числом (индекс правильного ответа, начиная с 0)`);
+              isValid = false;
+            } else if (question.correct < 0 || question.correct >= question.options.length) {
+              errors.push(`Вопрос ${index + 1} (тестовый): индекс правильного ответа ${question.correct} выходит за пределы массива вариантов (0-${question.options.length - 1})`);
+              isValid = false;
+            }
+          }
+
+          if (question.type === 'fill') {
+            if (!question.answers || !Array.isArray(question.answers) || question.answers.length === 0) {
+              errors.push(`Вопрос ${index + 1} (вписать ответ): отсутствует или пустой массив "answers"`);
+              isValid = false;
+            }
+            
+            question.answers.forEach((answerGroup, ansIndex) => {
+              if (!Array.isArray(answerGroup)) {
+                errors.push(`Вопрос ${index + 1}, ответ ${ansIndex + 1}: должен быть массивом вариантов`);
+                isValid = false;
+              }
+            });
+          }
+
+          if (question.type === 'sentence') {
+            if (!question.sentence) {
+              errors.push(`Вопрос ${index + 1} (предложение): отсутствует поле "sentence"`);
+              isValid = false;
+            }
+            
+            if (!question.answers || !Array.isArray(question.answers)) {
+              errors.push(`Вопрос ${index + 1} (предложение): отсутствует массив "answers"`);
+              isValid = false;
+            }
+            
+            // Проверяем соответствие количества ответов количеству пропусков
+            const gapsCount = (question.sentence.match(/___/g) || []).length;
+            if (question.answers.length !== gapsCount) {
+              warnings.push(`Вопрос ${index + 1}: количество ответов (${question.answers.length}) не совпадает с количеством пропусков (${gapsCount})`);
+            }
+          }
+
+          // Проверяем поле image (опционально)
+          if (question.image && typeof question.image !== 'string') {
+            warnings.push(`Вопрос ${index + 1}: поле "image" должно быть строкой (URL изображения)`);
+          }
+        });
+
+        if (!isValid) {
+          resultDiv.innerHTML = `
+            <div class="validation-message error">
+              <strong>❌ Ошибки в JSON:</strong><br>
+              ${errors.map(err => `• ${err}`).join('<br>')}
+              ${warnings.length > 0 ? `<br><br><strong>⚠️ Предупреждения:</strong><br>${warnings.map(warn => `• ${warn}`).join('<br>')}` : ''}
+            </div>
+          `;
+        } else {
+          resultDiv.innerHTML = `
+            <div class="validation-message success">
+              <strong>✅ JSON валиден!</strong><br>
+              Найдено вопросов: ${parsed.questions.length}<br>
+              ${warnings.length > 0 ? `<br><strong>⚠️ Предупреждения:</strong><br>${warnings.map(warn => `• ${warn}`).join('<br>')}` : ''}
+            </div>
+          `;
+        }
+
+        resultDiv.style.display = 'block';
+
+      } catch (e) {
+        resultDiv.innerHTML = `<div class="validation-message error"><strong>❌ Ошибка парсинга JSON:</strong><br>${e.message}</div>`;
+        resultDiv.style.display = 'block';
+      }
+    }
+
+    function importJson() {
+      const jsonInput = document.getElementById('jsonInput').value.trim();
+      
+      if (!jsonInput) {
+        showModal('❌ Ошибка', 'Введите JSON для импорта');
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(jsonInput);
+        
+        if (!parsed.questions || !Array.isArray(parsed.questions)) {
+          throw new Error('JSON должен содержать массив "questions"');
+        }
+
+        // Очищаем текущие вопросы
+        const container = document.getElementById('questionsContainer');
+        container.innerHTML = '';
+        
+        // Добавляем вопросы из JSON
+        parsed.questions.forEach(question => {
+          addQuestion(question);
+        });
+
+        // Переключаемся на графический редактор
+        document.querySelector('[data-editor-mode="graphical"]').click();
+        
+        showModal('✅ Успех', `Импортировано ${parsed.questions.length} вопросов`);
+
+      } catch (e) {
+        showModal('❌ Ошибка', `Ошибка импорта JSON: ${e.message}`);
+      }
+    }
+
+    // Модифицируем функцию addQuestion для поддержки импорта из JSON
+    function addQuestion(prefill) {
+      const container = document.getElementById('questionsContainer');
+      const qid = generateQuestionId();
+      
+      // Определяем тип вопроса
+      let qType = 'test';
+      if (prefill && prefill.type) {
+        qType = prefill.type;
+      } else {
+        // Используем текущий выбранный тип в графическом редакторе
+        const activeTypeBtn = document.querySelector('.question-type-selector [data-question-type].active');
+        if (activeTypeBtn) {
+          qType = activeTypeBtn.getAttribute('data-question-type');
+        }
+      }
+
+      const wrap = document.createElement('div');
+      wrap.className = 'subtask-item';
+      wrap.setAttribute('data-id', qid);
+      wrap.setAttribute('data-type', qType);
+
+      const imageUploadBlock = `
+        <div class="form-group question-image-upload">
+          <label>Изображение для вопроса (опционально):</label>
+          <div class="upload-area" id="questionUploadArea_${qid}">
+            <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
+            <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. 5MB)</p>
+            <input type="file" id="questionImageInput_${qid}" style="display:none" accept="image/*">
+          </div>
+          <div class="upload-progress" id="questionImageProgress_${qid}">
+            <div class="upload-progress-bar" id="questionImageProgressBar_${qid}"></div>
+          </div>
+          <input type="hidden" id="questionImageUrl_${qid}" value="${prefill?.image || ''}">
+          <img class="question-image-preview" id="questionImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
+          <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeQuestionImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
+        </div>
+      `;
+
+      const questionEditor = `
+        <div class="form-group">
+          <label>Текст вопроса:</label>
+          <textarea class="question-textarea" id="questionText_${qid}" placeholder="Введите текст вопроса. Используйте Enter для переноса строк">${prefill?.q ? String(prefill.q) : ''}</textarea>
+          <div class="format-hint">
+            💡 Используйте Enter для переноса строк
+          </div>
+        </div>
+      `;
+
+      let inner = questionEditor;
+
+      if (qType === 'test') {
+        inner += `
+          ${imageUploadBlock}
+          <div class="form-group">
+            <label>Варианты ответов (каждый с новой строки):</label>
+            <textarea class="input test-options" rows="4">${(prefill?.options || []).join('\n')}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Правильный ответ (номер варианта, начиная с 1):</label>
+            <input type="number" class="input test-correct" min="1" value="${(typeof prefill?.correct === 'number' ? prefill.correct + 1 : 1)}">
+          </div>
+        `;
+      } else if (qType === 'fill') {
+        inner += `
+          ${imageUploadBlock}
+          <div class="form-group">
+            <label>Правильные ответы:</label>
+            <div class="fill-inputs-container" id="fill-inputs-container_${qid}">
+            </div>
+            <button type="button" class="add-input-btn" id="add-fill-input_${qid}">
+              ➕ Добавить ответ
+            </button>
+            <div class="input-count" id="fill-input-count_${qid}">Количество ответов: 0</div>
+            <div class="small-muted">
+              Для каждого ответа можно указать несколько вариантов через точку с запятой (например: ежик;кошка). 
+              Каждое поле - отдельный ответ с номером.
+            </div>
+          </div>
+        `;
+      } else if (qType === 'sentence') {
+        const sentence = prefill?.sentence || '';
+        const previewHtml = sentence
+          ? sentence.replace(/___/g,'<span style="border-bottom:2px dashed #666; padding:0 10px; margin:0 2px;">[?]</span>')
+          : 'Введите предложение ниже';
+        inner += `
+          ${imageUploadBlock}
+          <div class="form-group">
+            <label>Предложение с пропусками:</label>
+            <div class="sentence-builder">
+              <div class="sentence-preview" id="sentencePreview_${qid}">${previewHtml}</div>
+              <textarea class="sentence-input" id="sentenceInput_${qid}" rows="4" placeholder="Используйте ___ для пропусков. Например: Я ___ яблоко.">${sentence}</textarea>
+              <button type="button" class="btn btn-small add-gap-btn" onclick="window.updateSentencePreview('${qid}')">Обновить предпросмотр</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Правильные ответы для пропусков (каждый с новой строки, по порядку пропусков, несколько вариантов через ;):</label>
+            <textarea class="input sentence-answers" rows="4" placeholder="яблоко;груша;апельсин&#10;утром;вечером">${formatMultipleAnswers(prefill?.answers || [])}</textarea>
+            <div class="small-muted">Каждая строка соответствует одному пропуску. Для каждого пропуска можно указать несколько вариантов через точку с запятой.</div>
+          </div>
+        `;
+        setTimeout(()=>{
+          const si = document.getElementById(`sentenceInput_${qid}`);
+          si?.addEventListener('input', ()=>window.updateSentencePreview(qid));
+          window.updateSentencePreview(qid);
+        },0);
+      } else if (qType === 'crossword') {
+        inner = `
+          <div class="crossword-advanced-builder" id="crosswordAdvancedBuilder_${qid}">
+            <div class="crossword-advanced-help">
+              <h4>🧩 Конструктор кроссворда</h4>
+              <p><strong>Режим работы:</strong></p>
+              <ul>
+                <li><strong>Размещение слов:</strong> Введите слово, выберите направление и номер, затем кликните на стартовую клетку</li>
+                <li><strong>Блокировка клеток:</strong> Двойной клик по клетке чтобы заблокировать/разблокировать (черные клетки)</li>
+                <li><strong>Удаление слов:</strong> Нажмите кнопку "Удалить слово" и кликните на слово для удаления</li>
+              </ul>
+              <p><strong>Особенности:</strong></p>
+              <ul>
+                <li>Ручное указание номера слова</li>
+                <li>Если в клетке уже есть номер - используется существующий</li>
+                <li>Один номер для горизонтального и вертикального слова в одной клетке</li>
+                <li>Проверка пересечений слов</li>
+                <li>Управление списком слов</li>
+                <li>Предпросмотр для ученика (только клетки для ввода)</li>
+              </ul>
+            </div>
+
+            <div class="word-management-panel">
+              <h4>📝 Управление словами</h4>
+              
+              <div class="word-input-section">
+                <div class="form-group">
+                  <label>Новое слово:</label>
+                  <input type="text" id="wordInput_${qid}" placeholder="Введите слово" style="text-transform: uppercase">
+                </div>
+                <div class="form-group">
+                  <label>Направление:</label>
+                  <select id="wordDirection_${qid}">
+                    <option value="across">→ По горизонтали</option>
+                    <option value="down">↓ По вертикали</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Номер слова:</label>
+                  <input type="number" id="wordNumberInput_${qid}" min="1" value="${prefill?.metadata?.nextWordNumber || 1}">
+                </div>
+                <div class="form-group">
+                  <button class="btn" id="placeWordBtn_${qid}">Разместить слово</button>
+                </div>
+                <div class="form-group">
+                  <button class="btn delete-word-btn" id="deleteWordBtn_${qid}">
+                    🗑️ Удалить слово
+                  </button>
+                </div>
+              </div>
+
+              <div class="word-list">
+                <h5>Размещенные слова:</h5>
+                <div id="wordList_${qid}"></div>
+              </div>
+            </div>
+
+            <div class="crossword-advanced-controls">
+              <div class="form-group">
+                <label>Количество строк:</label>
+                <input type="number" id="crosswordAdvancedRows_${qid}" value="${prefill?.metadata?.rows || 15}" min="5" max="30">
+              </div>
+              <div class="form-group">
+                <label>Количество столбцов:</label>
+                <input type="number" id="crosswordAdvancedCols_${qid}" value="${prefill?.metadata?.cols || 15}" min="5" max="30">
+              </div>
+              <div class="form-group">
+                <button class="btn" id="createAdvancedGridBtn_${qid}">Создать сетку</button>
+              </div>
+            </div>
+
+            <div class="crossword-advanced-actions">
+              <button class="btn btn-small" id="clearAdvancedGridBtn_${qid}">🗑️ Очистить сетку</button>
+            </div>
+
+            <div class="form-group">
+              <label>Сетка кроссворда (для администратора):</label>
+              <div id="crosswordAdvancedGridContainer_${qid}" class="crossword-advanced-grid-container"></div>
+            </div>
+
+            <div class="form-group">
+              <label>Изображение для кроссворда (опционально):</label>
+              <div class="upload-area" id="crosswordAdvancedUploadArea_${qid}">
+                <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
+                <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. 5MB)</p>
+                <input type="file" id="crosswordAdvancedImageInput_${qid}" style="display:none" accept="image/*">
+              </div>
+              <div class="upload-progress" id="crosswordAdvancedImageProgress_${qid}">
+                <div class="upload-progress-bar" id="crosswordAdvancedImageProgressBar_${qid}"></div>
+              </div>
+              <input type="hidden" id="crosswordAdvancedImageUrl_${qid}" value="${prefill?.image || ''}">
+              <img class="image-preview" id="crosswordAdvancedImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
+              <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeCrosswordImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
+            </div>
+
+            ${questionEditor}
+          </div>
+        `;
+      }
+
+      inner += `<button class="btn btn-small btn-danger remove-question" type="button">🗑️ Удалить вопрос</button>`;
+      
+      wrap.innerHTML = `
+        <div class="question-number">1</div>
+        ${inner}
+      `;
+      container.appendChild(wrap);
+
+      if (qType === 'fill') {
+        initFillInputs(qid, prefill?.answers || []);
+        
+        const addBtn = document.getElementById(`add-fill-input_${qid}`);
+        if (addBtn) {
+          addBtn.addEventListener('click', () => {
+            addFillInput(qid);
+          });
+        }
+      }
+
+      if (qType !== 'crossword') {
+        initQuestionImageUpload(qid, window.supabase);
+      } else {
+        if (prefill && prefill.grid) {
+          crosswordData[qid] = {
+            grid: prefill.grid,
+            words: prefill.words || [],
+            blocks: prefill.blocks || [],
+            rows: prefill.metadata?.rows || 15,
+            cols: prefill.metadata?.cols || 15,
+            nextWordNumber: prefill.metadata?.nextWordNumber || (prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1),
+            deleteMode: false,
+            cellNumbers: prefill.cellNumbers || {}
+          };
+        } else {
+          createCrosswordData(qid);
+        }
+        
+        setTimeout(() => {
+          initAdvancedCrosswordBuilder(qid);
+          renderAdvancedGrid(qid);
+          updateAdvancedCrosswordStats(qid);
+          updateWordList(qid);
+          updateStudentPreview(qid);
+        }, 100);
+      }
+
+      wrap.querySelector('.remove-question').addEventListener('click', () => {
+        const all = document.querySelectorAll('.subtask-item');
+        if (all.length > 1) {
+          if (qType === 'crossword' && crosswordData[qid]) {
+            delete crosswordData[qid];
+          }
+          wrap.remove();
+          renumberQuestions();
+        } else {
+          alert('Должен остаться хотя бы один вопрос.');
+        }
+      });
+
+      renumberQuestions();
+    }
+        // ============ ОСНОВНОЕ ПРИЛОЖЕНИЕ ============
+    async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
         return;
@@ -2690,6 +3271,9 @@
 
           // Инициализация пагинации
           usersPagination.init();
+
+          // Инициализация JSON редактора
+          initJsonEditor();
 
           // Проверяем необработанные заявки
           await checkPendingRequests(supabase);
@@ -3058,13 +3642,11 @@
           // ===== ЗАДАНИЯ
           let selectedMaterialId = '';
           let editingAssignmentId = null;
-          let currentQuestionType = 'test';
 
-          document.querySelectorAll('.type-btn').forEach(btn => {
+          document.querySelectorAll('.type-btn[data-question-type]').forEach(btn => {
             btn.addEventListener('click', () => {
-              document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+              document.querySelectorAll('.type-btn[data-question-type]').forEach(b => b.classList.remove('active'));
               btn.classList.add('active');
-              currentQuestionType = btn.getAttribute('data-type');
             });
           });
 
@@ -3128,9 +3710,20 @@
             document.getElementById('assignmentFormTitle').textContent = 'Создать задание';
             document.getElementById('assignmentTitle').value = '';
             document.getElementById('assignmentOrder').value = '0';
-            document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
-            document.querySelector('.type-btn[data-type="test"]').classList.add('active');
-            currentQuestionType = 'test';
+            
+            // Сбрасываем JSON редактор
+            document.getElementById('jsonInput').value = '';
+            document.getElementById('jsonValidationResult').style.display = 'none';
+            
+            // Сбрасываем графический редактор
+            document.querySelectorAll('.type-btn[data-question-type]').forEach(b=>b.classList.remove('active'));
+            document.querySelector('.type-btn[data-question-type="test"]').classList.add('active');
+            
+            // Сбрасываем режим редактора на графический
+            document.querySelectorAll('[data-editor-mode]').forEach(b=>b.classList.remove('active'));
+            document.querySelector('[data-editor-mode="graphical"]').classList.add('active');
+            document.getElementById('graphicalEditor').style.display = 'block';
+            document.getElementById('jsonEditor').style.display = 'none';
 
             const cont = document.getElementById('questionsContainer');
             cont.innerHTML = '';
@@ -3139,262 +3732,6 @@
 
           function hideAssignmentForm() {
             document.getElementById('assignmentForm').classList.remove('active');
-          }
-
-          function addQuestion(prefill) {
-            const container = document.getElementById('questionsContainer');
-            const qid = generateQuestionId();
-            const qType = prefill?.type || currentQuestionType;
-
-            const wrap = document.createElement('div');
-            wrap.className = 'subtask-item';
-            wrap.setAttribute('data-id', qid);
-            wrap.setAttribute('data-type', qType);
-
-            const imageUploadBlock = `
-              <div class="form-group question-image-upload">
-                <label>Изображение для вопроса (опционально):</label>
-                <div class="upload-area" id="questionUploadArea_${qid}">
-                  <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
-                  <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. 5MB)</p>
-                  <input type="file" id="questionImageInput_${qid}" style="display:none" accept="image/*">
-                </div>
-                <div class="upload-progress" id="questionImageProgress_${qid}">
-                  <div class="upload-progress-bar" id="questionImageProgressBar_${qid}"></div>
-                </div>
-                <input type="hidden" id="questionImageUrl_${qid}" value="${prefill?.image || ''}">
-                <img class="question-image-preview" id="questionImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
-                <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeQuestionImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
-              </div>
-            `;
-
-            const questionEditor = `
-              <div class="form-group">
-                <label>Текст вопроса:</label>
-                <textarea class="question-textarea" id="questionText_${qid}" placeholder="Введите текст вопроса. Используйте Enter для переноса строк">${prefill?.q ? String(prefill.q) : ''}</textarea>
-                <div class="format-hint">
-                  💡 Используйте Enter для переноса строк
-                </div>
-              </div>
-            `;
-
-            let inner = questionEditor;
-
-            if (qType === 'test') {
-              inner += `
-                ${imageUploadBlock}
-                <div class="form-group">
-                  <label>Варианты ответов (каждый с новой строки):</label>
-                  <textarea class="input test-options" rows="4">${(prefill?.options || []).join('\n')}</textarea>
-                </div>
-                <div class="form-group">
-                  <label>Правильный ответ (номер варианта, начиная с 1):</label>
-                  <input type="number" class="input test-correct" min="1" value="${(typeof prefill?.correct === 'number' ? prefill.correct+1 : 1)}">
-                </div>
-              `;
-            } else if (qType === 'fill') {
-              inner += `
-                ${imageUploadBlock}
-                <div class="form-group">
-                  <label>Правильные ответы:</label>
-                  <div class="fill-inputs-container" id="fill-inputs-container_${qid}">
-                  </div>
-                  <button type="button" class="add-input-btn" id="add-fill-input_${qid}">
-                    ➕ Добавить ответ
-                  </button>
-                  <div class="input-count" id="fill-input-count_${qid}">Количество ответов: 0</div>
-                  <div class="small-muted">
-                    Для каждого ответа можно указать несколько вариантов через точку с запятой (например: ежик;кошка). 
-                    Каждое поле - отдельный ответ с номером.
-                  </div>
-                </div>
-              `;
-            } else if (qType === 'sentence') {
-              const sentence = prefill?.sentence || '';
-              const previewHtml = sentence
-                ? sentence.replace(/___/g,'<span style="border-bottom:2px dashed #666; padding:0 10px; margin:0 2px;">[?]</span>')
-                : 'Введите предложение ниже';
-              inner += `
-                ${imageUploadBlock}
-                <div class="form-group">
-                  <label>Предложение с пропусками:</label>
-                  <div class="sentence-builder">
-                    <div class="sentence-preview" id="sentencePreview_${qid}">${previewHtml}</div>
-                    <textarea class="sentence-input" id="sentenceInput_${qid}" rows="4" placeholder="Используйте ___ для пропусков. Например: Я ___ яблоко.">${sentence}</textarea>
-                    <button type="button" class="btn btn-small add-gap-btn" onclick="window.updateSentencePreview('${qid}')">Обновить предпросмотр</button>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label>Правильные ответы для пропусков (каждый с новой строки, по порядку пропусков, несколько вариантов через ;):</label>
-                  <textarea class="input sentence-answers" rows="4" placeholder="яблоко;груша;апельсин&#10;утром;вечером">${formatMultipleAnswers(prefill?.answers || [])}</textarea>
-                  <div class="small-muted">Каждая строка соответствует одному пропуску. Для каждого пропуска можно указать несколько вариантов через точку с запятой.</div>
-                </div>
-              `;
-              setTimeout(()=>{
-                const si = document.getElementById(`sentenceInput_${qid}`);
-                si?.addEventListener('input', ()=>window.updateSentencePreview(qid));
-                window.updateSentencePreview(qid);
-              },0);
-            } else if (qType === 'crossword') {
-              inner = `
-                <div class="crossword-advanced-builder" id="crosswordAdvancedBuilder_${qid}">
-                  <div class="crossword-advanced-help">
-                    <h4>🧩 Конструктор кроссворда</h4>
-                    <p><strong>Режим работы:</strong></p>
-                    <ul>
-                      <li><strong>Размещение слов:</strong> Введите слово, выберите направление и номер, затем кликните на стартовую клетку</li>
-                      <li><strong>Блокировка клеток:</strong> Двойной клик по клетке чтобы заблокировать/разблокировать (черные клетки)</li>
-                      <li><strong>Удаление слов:</strong> Нажмите кнопку "Удалить слово" и кликните на слово для удаления</li>
-                    </ul>
-                    <p><strong>Особенности:</strong></p>
-                    <ul>
-                      <li>Ручное указание номера слова</li>
-                      <li>Если в клетке уже есть номер - используется существующий</li>
-                      <li>Один номер для горизонтального и вертикального слова в одной клетке</li>
-                      <li>Проверка пересечений слов</li>
-                      <li>Управление списком слов</li>
-                      <li>Предпросмотр для ученика (только клетки для ввода)</li>
-                    </ul>
-                  </div>
-
-                  <div class="word-management-panel">
-                    <h4>📝 Управление словами</h4>
-                    
-                    <div class="word-input-section">
-                      <div class="form-group">
-                        <label>Новое слово:</label>
-                        <input type="text" id="wordInput_${qid}" placeholder="Введите слово" style="text-transform: uppercase">
-                      </div>
-                      <div class="form-group">
-                        <label>Направление:</label>
-                        <select id="wordDirection_${qid}">
-                          <option value="across">→ По горизонтали</option>
-                          <option value="down">↓ По вертикали</option>
-                        </select>
-                      </div>
-                      <div class="form-group">
-                        <label>Номер слова:</label>
-                        <input type="number" id="wordNumberInput_${qid}" min="1" value="${prefill?.metadata?.nextWordNumber || 1}">
-                      </div>
-                      <div class="form-group">
-                        <button class="btn" id="placeWordBtn_${qid}">Разместить слово</button>
-                      </div>
-                      <div class="form-group">
-                        <button class="btn delete-word-btn" id="deleteWordBtn_${qid}">
-                          🗑️ Удалить слово
-                        </button>
-                      </div>
-                    </div>
-
-                    <div class="word-list">
-                      <h5>Размещенные слова:</h5>
-                      <div id="wordList_${qid}"></div>
-                    </div>
-                  </div>
-
-                  <div class="crossword-advanced-controls">
-                    <div class="form-group">
-                      <label>Количество строк:</label>
-                      <input type="number" id="crosswordAdvancedRows_${qid}" value="${prefill?.metadata?.rows || 15}" min="5" max="30">
-                    </div>
-                    <div class="form-group">
-                      <label>Количество столбцов:</label>
-                      <input type="number" id="crosswordAdvancedCols_${qid}" value="${prefill?.metadata?.cols || 15}" min="5" max="30">
-                    </div>
-                    <div class="form-group">
-                      <button class="btn" id="createAdvancedGridBtn_${qid}">Создать сетку</button>
-                    </div>
-                  </div>
-
-                  <div class="crossword-advanced-actions">
-                    <button class="btn btn-small" id="clearAdvancedGridBtn_${qid}">🗑️ Очистить сетку</button>
-                  </div>
-
-                  <div class="form-group">
-                    <label>Сетка кроссворда (для администратора):</label>
-                    <div id="crosswordAdvancedGridContainer_${qid}" class="crossword-advanced-grid-container"></div>
-                  </div>
-
-                  <div class="form-group">
-                    <label>Изображение для кроссворда (опционально):</label>
-                    <div class="upload-area" id="crosswordAdvancedUploadArea_${qid}">
-                      <p>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
-                      <p class="small-muted">Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. 5MB)</p>
-                      <input type="file" id="crosswordAdvancedImageInput_${qid}" style="display:none" accept="image/*">
-                    </div>
-                    <div class="upload-progress" id="crosswordAdvancedImageProgress_${qid}">
-                      <div class="upload-progress-bar" id="crosswordAdvancedImageProgressBar_${qid}"></div>
-                    </div>
-                    <input type="hidden" id="crosswordAdvancedImageUrl_${qid}" value="${prefill?.image || ''}">
-                    <img class="image-preview" id="crosswordAdvancedImagePreview_${qid}" alt="Предпросмотр изображения" style="${prefill?.image ? 'display:block' : 'display:none'}" ${prefill?.image ? `src="${prefill.image}"` : ''}>
-                    <button type="button" class="btn btn-small btn-danger remove-image-btn" id="removeCrosswordImageBtn_${qid}" style="display: ${prefill?.image ? 'block' : 'none'}; margin-top: 5px;">🗑️ Удалить изображение</button>
-                  </div>
-
-                  ${questionEditor}
-                </div>
-              `;
-            }
-
-            inner += `<button class="btn btn-small btn-danger remove-question" type="button">🗑️ Удалить вопрос</button>`;
-            
-            wrap.innerHTML = `
-              <div class="question-number">1</div>
-              ${inner}
-            `;
-            container.appendChild(wrap);
-
-            if (qType === 'fill') {
-              initFillInputs(qid, prefill?.answers || []);
-              
-              const addBtn = document.getElementById(`add-fill-input_${qid}`);
-              if (addBtn) {
-                addBtn.addEventListener('click', () => {
-                  addFillInput(qid);
-                });
-              }
-            }
-
-            if (qType !== 'crossword') {
-              initQuestionImageUpload(qid, supabase);
-            } else {
-              if (prefill && prefill.grid) {
-                crosswordData[qid] = {
-                  grid: prefill.grid,
-                  words: prefill.words || [],
-                  blocks: prefill.blocks || [],
-                  rows: prefill.metadata?.rows || 15,
-                  cols: prefill.metadata?.cols || 15,
-                  nextWordNumber: prefill.metadata?.nextWordNumber || (prefill.words ? Math.max(...prefill.words.map(w => w.number)) + 1 : 1),
-                  deleteMode: false,
-                  cellNumbers: prefill.cellNumbers || {}
-                };
-              } else {
-                createCrosswordData(qid);
-              }
-              
-              setTimeout(() => {
-                initAdvancedCrosswordBuilder(qid);
-                renderAdvancedGrid(qid);
-                updateAdvancedCrosswordStats(qid);
-                updateWordList(qid);
-                updateStudentPreview(qid);
-              }, 100);
-            }
-
-            wrap.querySelector('.remove-question').addEventListener('click', () => {
-              const all = document.querySelectorAll('.subtask-item');
-              if (all.length > 1) {
-                if (qType === 'crossword' && crosswordData[qid]) {
-                  delete crosswordData[qid];
-                }
-                wrap.remove();
-                renumberQuestions();
-              } else {
-                alert('Должен остаться хотя бы один вопрос.');
-              }
-            });
-
-            renumberQuestions();
           }
 
           async function saveAssignment() {
