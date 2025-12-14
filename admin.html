@@ -1219,11 +1219,14 @@
                   <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
                     <button class="btn" id="validateJsonBtn">✅ Проверить JSON</button>
                     <button class="btn" id="importJsonBtn">📥 Импортировать в графический редактор</button>
+                    <button class="btn secondary" id="appendJsonBtn">📥 Добавить к существующим</button>
                   </div>
                   
                   <div class="small-muted">
                     💡 Поддерживаются типы вопросов: "test", "fill", "sentence".<br>
-                    💡 Поле "image" — URL изображения (опционально). Загрузите изображения через обычный интерфейс, скопируйте URL и вставьте сюда.
+                    💡 Поле "image" — URL изображения (опционально). Загрузите изображения через обычный интерфейс, скопируйте URL и вставьте сюда.<br>
+                    💡 <strong>"Импортировать"</strong> — заменит все текущие вопросы<br>
+                    💡 <strong>"Добавить к существующим"</strong> — добавит вопросы к текущим
                   </div>
                 </div>
 
@@ -2785,6 +2788,8 @@
     }
 
     // ============ НОВЫЕ ФУНКЦИИ ДЛЯ JSON РЕДАКТОРА ============
+    let isImportingJson = false; // Флаг для защиты от дублирования
+
     function initJsonEditor() {
       // Переключение режимов редактора
       const editorModeButtons = document.querySelectorAll('[data-editor-mode]');
@@ -2810,8 +2815,11 @@
       // Кнопка проверки JSON
       document.getElementById('validateJsonBtn').addEventListener('click', validateJson);
 
-      // Кнопка импорта JSON
-      document.getElementById('importJsonBtn').addEventListener('click', importJson);
+      // Кнопка импорта JSON (заменяет все вопросы)
+      document.getElementById('importJsonBtn').addEventListener('click', () => importJson(false));
+
+      // Кнопка добавления JSON (добавляет к существующим)
+      document.getElementById('appendJsonBtn').addEventListener('click', () => importJson(true));
 
       // Показать/скрыть подсказку по формату
       document.getElementById('showJsonHelp').addEventListener('click', function() {
@@ -2946,11 +2954,19 @@
       }
     }
 
-    function importJson() {
+    function importJson(appendMode = false) {
+      if (isImportingJson) {
+        showModal('⚠️ Внимание', 'Идет импорт JSON. Подождите...');
+        return;
+      }
+      
+      isImportingJson = true;
+      
       const jsonInput = document.getElementById('jsonInput').value.trim();
       
       if (!jsonInput) {
         showModal('❌ Ошибка', 'Введите JSON для импорта');
+        isImportingJson = false;
         return;
       }
 
@@ -2961,9 +2977,16 @@
           throw new Error('JSON должен содержать массив "questions"');
         }
 
-        // Очищаем текущие вопросы
-        const container = document.getElementById('questionsContainer');
-        container.innerHTML = '';
+        // Если не режим добавления, очищаем текущие вопросы
+        if (!appendMode) {
+          const container = document.getElementById('questionsContainer');
+          container.innerHTML = '';
+          
+          // Если были кроссворды, очищаем их данные
+          Object.keys(crosswordData).forEach(key => {
+            delete crosswordData[key];
+          });
+        }
         
         // Добавляем вопросы из JSON
         parsed.questions.forEach(question => {
@@ -2973,10 +2996,12 @@
         // Переключаемся на графический редактор
         document.querySelector('[data-editor-mode="graphical"]').click();
         
-        showModal('✅ Успех', `Импортировано ${parsed.questions.length} вопросов`);
+        showModal('✅ Успех', `${appendMode ? 'Добавлено' : 'Импортировано'} ${parsed.questions.length} вопросов`);
 
       } catch (e) {
         showModal('❌ Ошибка', `Ошибка импорта JSON: ${e.message}`);
+      } finally {
+        isImportingJson = false;
       }
     }
 
@@ -3247,7 +3272,7 @@
 
       renumberQuestions();
     }
-        // ============ ОСНОВНОЕ ПРИЛОЖЕНИЕ ============
+            // ============ ОСНОВНОЕ ПРИЛОЖЕНИЕ ============
     async function initApp() {
       if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
         showError('❌ Ошибка конфигурации. Переменные Supabase не загружены.');
