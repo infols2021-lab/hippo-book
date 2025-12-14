@@ -1372,6 +1372,9 @@
       document.getElementById('modal').style.display = 'flex';
     }
 
+    // Глобальная переменная для хранения supabase клиента
+    let adminSupabaseClient = null;
+
     // ============ УЛУЧШЕННАЯ ПРОВЕРКА АДМИНА ============
     async function checkAdmin(supabase) {
       try {
@@ -1473,10 +1476,10 @@
       }
     }
 
-    // ИСПРАВЛЕНИЕ: Добавляем параметр supabase в функцию загрузки изображений
-    async function uploadImageToSupabase({ supabase, file, bucket }) {
+    // ИСПРАВЛЕНИЕ: Используем глобальный adminSupabaseClient
+    async function uploadImageToSupabase({ file, bucket }) {
       // Проверяем, что supabase передан
-      if (!supabase || !supabase.storage) {
+      if (!adminSupabaseClient || !adminSupabaseClient.storage) {
         throw new Error('Supabase не инициализирован для загрузки изображений');
       }
       
@@ -1488,7 +1491,7 @@
       const filename = `${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
       const path = safeName(filename);
 
-      const { error } = await supabase.storage.from(bucket).upload(path, file, {
+      const { error } = await adminSupabaseClient.storage.from(bucket).upload(path, file, {
         cacheControl: '3600',
         upsert: false,
         contentType: file.type || 'application/octet-stream'
@@ -1502,11 +1505,11 @@
         throw error;
       }
 
-      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+      const { data: pub } = adminSupabaseClient.storage.from(bucket).getPublicUrl(path);
       return pub.publicUrl;
     }
 
-    function initImageUpload({ uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId, removeBtnId, bucket, supabase }) {
+    function initImageUpload({ uploadAreaId, fileInputId, progressId, progressBarId, previewId, urlInputId, removeBtnId, bucket }) {
       const area = document.getElementById(uploadAreaId);
       const input = document.getElementById(fileInputId);
       const barWrap = document.getElementById(progressId);
@@ -1516,8 +1519,8 @@
       const removeBtn = document.getElementById(removeBtnId);
 
       // Проверяем, что supabase передан
-      if (!supabase) {
-        console.error('Supabase не передан в initImageUpload');
+      if (!adminSupabaseClient) {
+        console.error('Supabase не инициализирован для загрузки изображений');
         return;
       }
 
@@ -1536,7 +1539,7 @@
           if (removeBtn) removeBtn.style.display = 'block';
 
           bar.style.width = '65%';
-          const publicUrl = await uploadImageToSupabase({ supabase, file, bucket });
+          const publicUrl = await uploadImageToSupabase({ file, bucket });
           bar.style.width = '100%';
           urlInput.value = publicUrl;
           setTimeout(resetProgress, 400);
@@ -1565,7 +1568,7 @@
       }
     }
 
-    function initQuestionImageUpload(questionId, supabase) {
+    function initQuestionImageUpload(questionId) {
       initImageUpload({
         uploadAreaId: `questionUploadArea_${questionId}`,
         fileInputId: `questionImageInput_${questionId}`,
@@ -1574,8 +1577,7 @@
         previewId: `questionImagePreview_${questionId}`,
         urlInputId: `questionImageUrl_${questionId}`,
         removeBtnId: `removeQuestionImageBtn_${questionId}`,
-        bucket: 'question-images',
-        supabase
+        bucket: 'question-images'
       });
     }
 
@@ -1959,7 +1961,7 @@
         deleteWordBtn.addEventListener('click', () => toggleDeleteWordMode(qid));
       }
 
-      // ИСПРАВЛЕНИЕ: Передаем supabase в initImageUpload
+      // ИСПРАВЛЕНИЕ: Убрали supabase параметр, используем глобальную переменную
       initImageUpload({
         uploadAreaId: `crosswordAdvancedUploadArea_${qid}`,
         fileInputId: `crosswordAdvancedImageInput_${qid}`,
@@ -1968,8 +1970,7 @@
         previewId: `crosswordAdvancedImagePreview_${qid}`,
         urlInputId: `crosswordAdvancedImageUrl_${qid}`,
         removeBtnId: `removeCrosswordImageBtn_${qid}`,
-        bucket: 'question-images',
-        supabase: window.supabase
+        bucket: 'question-images'
       });
 
       initWordManagement(qid);
@@ -3066,8 +3067,8 @@
       }
 
       if (qType !== 'crossword') {
-        // ИСПРАВЛЕНИЕ: Передаем supabase в initQuestionImageUpload
-        initQuestionImageUpload(qid, window.supabase);
+        // ИСПРАВЛЕНИЕ: Используем глобальную переменную adminSupabaseClient
+        initQuestionImageUpload(qid);
       } else {
         if (prefill && prefill.grid) {
           crosswordData[qid] = {
@@ -3123,6 +3124,9 @@
         console.log('✅ Supabase готов для админ-панели');
         
         try {
+          // Сохраняем supabase клиент в глобальную переменную
+          adminSupabaseClient = supabase;
+          
           const user = await checkAdmin(supabase);
           if (!user) {
             console.log('❌ Проверка прав администратора не пройдена');
@@ -3170,7 +3174,7 @@
           });
 
           // Инициализация загрузки изображений
-          // ИСПРАВЛЕНИЕ: Передаем supabase в initImageUpload
+          // ИСПРАВЛЕНИЕ: Передаем supabase клиент локально, но функции используют глобальную переменную
           initImageUpload({
             uploadAreaId: 'textbookUploadArea',
             fileInputId: 'textbookCoverInput',
@@ -3179,8 +3183,7 @@
             previewId: 'textbookCoverPreview',
             urlInputId: 'textbookCoverUrl',
             removeBtnId: 'removeTextbookCoverBtn',
-            bucket: 'covers',
-            supabase
+            bucket: 'covers'
           });
           
           initImageUpload({
@@ -3191,8 +3194,7 @@
             previewId: 'crosswordCoverPreview',
             urlInputId: 'crosswordCoverUrl',
             removeBtnId: 'removeCrosswordCoverBtn',
-            bucket: 'covers',
-            supabase
+            bucket: 'covers'
           });
 
           // ===== Статистика
