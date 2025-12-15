@@ -969,7 +969,7 @@
         <img class="image-modal-content" id="modalImage">
         <div class="image-modal-controls">
             <button class="image-modal-btn" id="zoomOutBtn">−</button>
-            <div class="image-modal-zoom-info" id="zoomInfo">100%</div>
+            <div class="image-modal-zoom-info" id="zoomInfo">100%</button>
             <button class="image-modal-btn" id="zoomInBtn">+</button>
             <button class="image-modal-btn" id="resetZoomBtn">⟲</button>
         </div>
@@ -999,6 +999,38 @@
         const ZOOM_STEP = 0.25;
         const MIN_ZOOM = 0.5;
         const MAX_ZOOM = 3;
+
+        // Функция для преобразования пути изображения в полный URL
+        function getImageUrl(imagePath) {
+            if (!imagePath) return '';
+            
+            // Если уже полный URL, возвращаем как есть
+            if (imagePath.startsWith('http://') || 
+                imagePath.startsWith('https://') || 
+                imagePath.startsWith('data:')) {
+                return imagePath;
+            }
+            
+            // Если начинается с /, убираем первый слеш
+            if (imagePath.startsWith('/')) {
+                imagePath = imagePath.substring(1);
+            }
+            
+            // Извлекаем project ID из SUPABASE_URL
+            let projectId = '';
+            try {
+                const url = new URL(window.SUPABASE_URL);
+                projectId = url.hostname.split('.')[0];
+            } catch (error) {
+                console.error('Не удалось извлечь project ID из SUPABASE_URL:', error);
+                return imagePath;
+            }
+            
+            // Формируем полный URL для Supabase Storage
+            // Бакет по умолчанию - 'assignments', но можно переопределить через window.STORAGE_BUCKET
+            const bucketName = window.STORAGE_BUCKET || 'assignments';
+            return `https://${projectId}.supabase.co/storage/v1/object/public/${bucketName}/${imagePath}`;
+        }
 
         // Функция для показа ошибок
         function showError(message) {
@@ -1167,7 +1199,7 @@
             modal.style.cursor = 'grab';
         }
 
-        // ============ НОВАЯ ФУНКЦИЯ: Нормализация текста для сравнения ============
+        // ============ ФУНКЦИЯ: Нормализация текста для сравнения ============
         function normalizeText(text) {
             if (!text) return '';
             
@@ -1186,7 +1218,7 @@
             return normalized;
         }
 
-        // ============ НОВАЯ ФУНКЦИЯ: Сравнение ответов с учетом нормализации ============
+        // ============ ФУНКЦИЯ: Сравнение ответов с учетом нормализации ============
         function compareAnswers(userAnswer, correctAnswer) {
             if (!userAnswer && !correctAnswer) return true;
             if (!userAnswer || !correctAnswer) return false;
@@ -1197,7 +1229,7 @@
             return normalizedUser === normalizedCorrect;
         }
 
-        // ============ НОВАЯ ФУНКЦИЯ: Проверка ответа на соответствие любому из вариантов ============
+        // ============ ФУНКЦИЯ: Проверка ответа на соответствие любому из вариантов ============
         function checkAnswerAgainstVariants(userAnswer, correctVariants) {
             if (!userAnswer) return false;
             
@@ -1442,6 +1474,24 @@
                 <div class="question-text">${question.q || 'Вопрос без текста'}</div>
             `;
             
+            // Показываем изображение вопроса, если оно есть (для всех типов вопросов)
+            if (question.image) {
+                const imageUrl = getImageUrl(question.image);
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.alt = 'Изображение к вопросу';
+                img.className = 'question-image';
+                img.onerror = function() {
+                    console.warn('Не удалось загрузить изображение:', imageUrl);
+                    this.style.display = 'none';
+                };
+                img.onload = function() {
+                    console.log('✅ Изображение загружено:', imageUrl);
+                };
+                img.addEventListener('click', () => openImageModal(imageUrl));
+                questionCard.appendChild(img);
+            }
+            
             // Обработка разных типов вопросов
             if (question.type === 'test' && question.options) {
                 renderTestQuestion(question, index, questionCard);
@@ -1655,16 +1705,23 @@
 
             // Изображение кроссворда - теперь только одно и по центру
             if (question.image) {
+                const imageUrl = getImageUrl(question.image);
                 const imageContainer = document.createElement('div');
                 imageContainer.className = 'crossword-image-container';
                 
                 const img = document.createElement('img');
-                img.src = question.image;
+                img.src = imageUrl;
                 img.alt = 'Изображение кроссворда';
                 img.className = 'crossword-image';
-                img.onerror = () => img.style.display = 'none';
+                img.onerror = () => {
+                    console.warn('Не удалось загрузить изображение кроссворда:', imageUrl);
+                    img.style.display = 'none';
+                };
+                img.onload = () => {
+                    console.log('✅ Изображение кроссворда загружено:', imageUrl);
+                };
                 // Добавляем обработчик для открытия в модальном окне
-                img.addEventListener('click', () => openImageModal(question.image));
+                img.addEventListener('click', () => openImageModal(imageUrl));
                 
                 const hint = document.createElement('div');
                 hint.className = 'image-hint';
