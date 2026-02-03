@@ -1,13 +1,42 @@
 import AssignmentClient from "../AssignmentClient";
 
+type MaybePromise<T> = T | Promise<T>;
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function first(v: string | string[] | undefined): string | undefined {
+  if (Array.isArray(v)) return v[0];
+  return v;
+}
+
+function normStr(v: string | undefined) {
+  const s = (v ?? "").trim();
+  return s.length ? s : undefined;
+}
+
+function normSource(v: string | undefined) {
+  const s = (v ?? "").trim().toLowerCase();
+  if (!s) return undefined;
+
+  // ✅ разрешаем только то, что реально используем в навигации
+  const allowed = new Set(["textbook", "crossword", "materials", "login", "profile"]);
+  return allowed.has(s) ? s : undefined;
+}
+
 export default async function AssignmentByIdPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
-  searchParams?: Promise<{ source?: string; sourceId?: string }>;
+  params: MaybePromise<{ id: string }>;
+  searchParams?: MaybePromise<SearchParams>;
 }) {
-  const { id } = await params;
+  // ✅ await безопасен и для Promise, и для обычного объекта
+  const p = await params;
   const sp = (await searchParams) ?? {};
-  return <AssignmentClient assignmentId={id} source={sp.source ?? ""} sourceId={sp.sourceId ?? ""} />;
+
+  const assignmentId = String(p?.id ?? "").trim();
+
+  const source = normSource(first(sp["source"]));
+  const sourceId = normStr(first(sp["sourceId"]));
+
+  return <AssignmentClient assignmentId={assignmentId} source={source} sourceId={sourceId} />;
 }

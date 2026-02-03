@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import BackToSourceButton from "@/components/BackToSourceButton";
+import { useRouter } from "next/navigation";
 import QuestionCrossword from "./components/QuestionCrossword";
 import ReviewPanel from "./components/ReviewPanel";
 import { getImageUrl } from "./lib/image";
@@ -148,7 +148,27 @@ function buildCrosswordWordReview(question: any, userGrid?: string[][]) {
 }
 
 // ===================== COMPONENT =====================
-export default function AssignmentClient({ assignmentId }: Props) {
+export default function AssignmentClient({ assignmentId, source, sourceId }: Props) {
+  const router = useRouter();
+
+  // ✅ ЖЁСТКАЯ навигация "назад в источник"
+  const back = useMemo(() => {
+    const s = String(source ?? "").trim().toLowerCase();
+    const id = String(sourceId ?? "").trim();
+
+    if (s === "textbook" && id) {
+      const href = `/textbook/${encodeURIComponent(id)}`;
+      return { href, headerLabel: "← Назад в учебник", actionLabel: "Вернуться в учебник" };
+    }
+
+    if (s === "crossword" && id) {
+      const href = `/crossword/${encodeURIComponent(id)}`;
+      return { href, headerLabel: "← Назад в кроссворд", actionLabel: "Вернуться в кроссворд" };
+    }
+
+    return { href: "/materials", headerLabel: "← Назад к материалам", actionLabel: "Вернуться к материалам" };
+  }, [source, sourceId]);
+
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -684,7 +704,11 @@ export default function AssignmentClient({ assignmentId }: Props) {
     <div className="container">
       <header className="header">
         <div className="header-buttons">
-          <BackToSourceButton className="btn secondary" label="← К материалам" fallbackHref="/materials" />
+          {/* ✅ вместо BackToSourceButton: жёстко уходим в источник */}
+          <button className="btn secondary" type="button" onClick={() => router.push(back.href)}>
+            {back.headerLabel}
+          </button>
+
           <button
             className="mode-switch-btn"
             onClick={switchMode}
@@ -704,11 +728,7 @@ export default function AssignmentClient({ assignmentId }: Props) {
         </div>
       ) : null}
 
-      {err ? (
-        <div id="errorMessage" className="error-message">
-          {err}
-        </div>
-      ) : null}
+      {err ? <div id="errorMessage" className="error-message">{err}</div> : null}
 
       {!loading && !err && assignment ? (
         <>
@@ -785,9 +805,11 @@ export default function AssignmentClient({ assignmentId }: Props) {
                 {showReview ? <ReviewPanel items={reviewItems} /> : null}
 
                 <div style={{ marginTop: 30 }}>
-                  <button className="btn" onClick={() => (location.href = "/materials")} type="button">
-                    Вернуться к материалам
+                  {/* ✅ возвращаемся в источник */}
+                  <button className="btn" onClick={() => router.push(back.href)} type="button">
+                    {back.actionLabel}
                   </button>
+
                   <button
                     className="btn secondary"
                     onClick={() => location.reload()}
