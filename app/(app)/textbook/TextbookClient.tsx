@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import BackToSourceButton from "@/components/BackToSourceButton";
 
 type UserProgress = { assignment_id: string; is_completed: boolean; score?: number | null };
 
@@ -34,10 +33,7 @@ function resolvePublicUrl(raw: any, bucket: string) {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!base) return null;
 
-  const key = String(raw)
-    .replace(/^\/+/, "")
-    .replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
-
+  const key = String(raw).replace(/^\/+/, "").replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
   return `${base}/storage/v1/object/public/${bucket}/${encodeURIComponent(key)}?v=${Date.now()}`;
 }
 
@@ -112,7 +108,7 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
 
   const completedSet = useMemo(
     () => new Set(userProgress.filter((x) => x.is_completed).map((x) => x.assignment_id)),
-    [userProgress]
+    [userProgress],
   );
 
   const scoreById = useMemo(() => {
@@ -139,8 +135,11 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
         ]}
       />
 
+      {/* ✅ железобетонно назад в материалы */}
       <div className="back-button">
-        <BackToSourceButton className="btn secondary" label="← Назад" fallbackHref="/materials" />
+        <button className="btn secondary" type="button" onClick={() => router.push("/materials")}>
+          ← Назад
+        </button>
       </div>
 
       {loading ? (
