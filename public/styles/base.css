@@ -20,14 +20,14 @@
     linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 45%, #e9fbff 100%);
 }
 
-/* ===== Hard reset (фикс “полоски” и странных отступов) ===== */
+/* ===== Hard reset (фикс “полосок” и лагов) ===== */
 *{ box-sizing:border-box }
 
 html, body {
   height: 100%;
   margin: 0 !important;
   padding: 0 !important;
-  background: var(--app-bg-gradient);
+  background: #eaf6ff; /* базовый */
 }
 
 body{
@@ -37,8 +37,24 @@ body{
   font-family: 'Poppins', "Comic Sans MS", sans-serif;
   color:#1f2937;
 
+  /* фон рисуем отдельным слоем (без background-attachment: fixed) */
+  background: transparent;
+  position: relative;
+  isolation: isolate;
+}
+
+/* Фиксированный слой фона — не “рвётся” на длинных страницах */
+body::before{
+  content:"";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+
   background: var(--app-bg-gradient);
-  background-attachment: fixed;
+
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 /* Контейнеры */
@@ -82,10 +98,20 @@ body{
   box-shadow:0 14px 34px rgba(15,23,42,0.10);
 }
 
+/* Blur только на больших экранах (иначе лаги на длинных списках) */
 @supports ((-webkit-backdrop-filter: blur(10px)) or (backdrop-filter: blur(10px))) {
+  @media (min-width: 1024px) {
+    .card {
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+  }
+}
+
+/* На мобилках/узких экранах делаем карточки более “плотными” */
+@media (max-width: 1023px) {
   .card {
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
+    background: rgba(255,255,255,0.92);
   }
 }
 
@@ -205,7 +231,7 @@ body{
 }
 
 /* =========================================================
-   MODAL (НЕПРОЗРАЧНАЯ, СКРОЛЛ ВНУТРИ, НЕ ЛОМАЕТ СТАРОЕ)
+   MODAL (НЕПРОЗРАЧНАЯ, СО СКРОЛЛОМ, И НОВЫЕ/СТАРЫЕ КЛАССЫ)
    ========================================================= */
 
 /* overlay (новое имя) */
@@ -243,8 +269,7 @@ body{
   width: 100%;
   border-radius: 22px;
 
-  /* ✅ НЕПРОЗРАЧНО */
-  background: #ffffff;
+  background: #ffffff; /* НЕПРОЗРАЧНО */
   border: 1px solid rgba(15, 23, 42, 0.14);
 
   box-shadow:
@@ -258,8 +283,7 @@ body{
 /* content/body (старые имена) */
 .modal-content,
 .modal-body{
-  /* ✅ НЕПРОЗРАЧНО */
-  background: #ffffff !important;
+  background: #ffffff !important; /* НЕПРОЗРАЧНО */
 }
 
 /* если где-то используется .modal-body как контейнер модалки */
@@ -282,27 +306,8 @@ body{
 
   padding: 14px 14px;
 
-  /* ✅ НЕПРОЗРАЧНО */
-  background: #f3f6fb;
+  background: #f3f6fb; /* НЕПРОЗРАЧНО */
   border-bottom: 1px solid rgba(44, 62, 80, 0.10);
-}
-
-.modal-title-wrap{
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.modal-icon{
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-
-  background: rgba(110, 190, 255, 0.18);
-  border: 1px solid rgba(110, 190, 255, 0.20);
 }
 
 .modal-title{
@@ -334,15 +339,14 @@ body{
 .modal-close:hover { transform: translateY(-2px); filter: brightness(1.03); }
 .modal-close:active { transform: translateY(0px); filter: brightness(0.98); }
 
-/* ✅ главное: скролл внутри ЛЮБОЙ модалки */
+/* главное: скролл внутри ЛЮБОЙ модалки */
 .modal-body{
   padding: 16px;
   max-height: min(78vh, 720px);
   overflow: auto;
 }
 
-/* Если твой React-Modal НЕ оборачивает children в .modal-body,
-   тогда children лежат прямо внутри .modal-content -> тоже дадим скролл */
+/* Если children лежат прямо внутри .modal-content — тоже дадим скролл */
 .modal-content{
   padding: 0;
   max-height: min(78vh, 720px);
@@ -404,9 +408,7 @@ body{
     text-align: center;
   }
 
-  .logo {
-    justify-content: center;
-  }
+  .logo { justify-content: center; }
 
   .nav {
     justify-content: center;
