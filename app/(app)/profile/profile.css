@@ -1,597 +1,500 @@
 /* app/(app)/profile/profile.css */
-/* Apple-ish light blue profile, keeps existing functionality */
+/* ВАЖНО: этот файл импортируется только на /profile, поэтому можно безопасно
+   делать reset html/body + переопределять .btn внутри #profileBody */
 
-:root {
-  --pf-bg1: #eaf6ff;
-  --pf-bg2: #f4fbff;
-  --pf-glass: rgba(255, 255, 255, 0.72);
-  --pf-glass-strong: rgba(255, 255, 255, 0.86);
-  --pf-stroke: rgba(15, 23, 42, 0.08);
-  --pf-shadow: 0 18px 55px rgba(15, 23, 42, 0.10);
-  --pf-shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.08);
-  --pf-radius: 22px;
-  --pf-radius-sm: 16px;
-  --pf-text: #0f172a;
-  --pf-muted: rgba(15, 23, 42, 0.62);
-
-  /* Используем твои акцентные переменные проекта */
-  /* --accent, --accent2 уже есть */
-}
-
-/* ====== PAGE WRAP ====== */
-#profileBody {
+html, body {
   margin: 0;
   padding: 0;
-  min-height: 100vh;
-  color: var(--pf-text);
+  background: #eaf6ff; /* убирает верхнюю "полосу" другого цвета */
+}
+
+* { box-sizing: border-box; }
+
+#profileBody {
+  position: relative;
+  min-height: 100dvh;
+  width: 100%;
+  color: #0f172a;
   font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 
-  /* базовый мягкий голубой фон */
-  background: radial-gradient(1200px 800px at 20% 10%, rgba(78, 205, 196, 0.22), transparent 55%),
-              radial-gradient(900px 700px at 80% 0%, rgba(78, 205, 196, 0.18), transparent 50%),
-              radial-gradient(900px 700px at 20% 90%, rgba(59, 130, 246, 0.12), transparent 55%),
-              linear-gradient(180deg, var(--pf-bg1), var(--pf-bg2));
+  /* базовый фон (когда нет картинки) */
+  background:
+    radial-gradient(900px 650px at 15% 10%, rgba(78, 205, 196, 0.22), transparent 55%),
+    radial-gradient(850px 600px at 85% 0%, rgba(125, 211, 252, 0.22), transparent 50%),
+    radial-gradient(850px 600px at 20% 90%, rgba(59, 130, 246, 0.12), transparent 55%),
+    linear-gradient(180deg, #eaf6ff, #f7fcff);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
 }
 
-/* Если фон-картинка задан (из props), будет подставляться inline-style в ProfileClient */
-#profileBody.has-bg {
+/* когда есть backgroundUrl — он ставится inline как backgroundImage */
+#profileBody.pf-hasBg {
   background-attachment: fixed;
 }
 
-.container {
-  width: 95%;
-  max-width: 1200px;
-  margin: 16px auto 40px;
+/* мягкий "оверлей", чтобы даже фон-картинка выглядела в одном стиле */
+#profileBody::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1000px 700px at 15% 10%, rgba(255, 255, 255, 0.50), transparent 60%),
+    linear-gradient(180deg, rgba(234, 246, 255, 0.85), rgba(247, 252, 255, 0.92));
+  z-index: 0;
+}
+
+.pf-shell {
   position: relative;
-  z-index: 2;
+  z-index: 1;
+  width: min(1200px, 95%);
+  margin: 14px auto 36px;
 }
 
-#mainContent {
-  animation: pfFadeUp 0.7s ease-out both;
+/* ===== Buttons (приводим в порядок всё, что рисует AppHeader и профиль) ===== */
+#profileBody .btn,
+#profileBody a.btn,
+#profileBody button.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  cursor: pointer;
+  text-decoration: none;
+
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: -0.1px;
+
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
 }
 
-@keyframes pfFadeUp {
-  from { opacity: 0; transform: translateY(18px); }
-  to   { opacity: 1; transform: translateY(0); }
+#profileBody .btn:active {
+  transform: translateY(1px);
 }
 
-/* ====== TOP HERO ====== */
-.profile-hero {
-  margin-top: 12px;
-  padding: 18px;
-  border-radius: var(--pf-radius);
-  background: var(--pf-glass);
-  border: 1px solid var(--pf-stroke);
-  box-shadow: var(--pf-shadow-soft);
-  backdrop-filter: blur(12px);
+#profileBody .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.profile-hero-inner {
+/* primary */
+#profileBody .btn:not(.secondary) {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--accent2, #4ecdc4), #7dd3fc);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 14px 35px rgba(59, 130, 246, 0.20);
+}
+#profileBody .btn:not(.secondary):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 45px rgba(59, 130, 246, 0.26);
+}
+
+/* secondary (убираем красноту/конфликт) */
+#profileBody .btn.secondary {
+  color: rgba(15, 23, 42, 0.90);
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(15, 23, 42, 0.10);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+#profileBody .btn.secondary:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.10);
+}
+
+/* ===== Top utilities ===== */
+.pf-background-loading {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 1000;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 10px 12px;
+  border-radius: 999px;
+
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 12px;
+  box-shadow: 0 18px 55px rgba(0,0,0,0.22);
+}
+
+.pf-spinner {
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top: 2px solid #fff;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  animation: pfSpin 1s linear infinite;
+}
+
+@keyframes pfSpin { to { transform: rotate(360deg); } }
+
+.pf-toast {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 10001;
+
+  max-width: 360px;
+  padding: 14px 16px;
+  border-radius: 16px;
+
+  color: #fff;
+  font-weight: 800;
+
+  box-shadow: 0 18px 55px rgba(0,0,0,0.20);
+  animation: pfToastIn 0.18s ease-out both;
+}
+
+@keyframes pfToastIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ===== Layout ===== */
+.pf-main {
+  margin-top: 14px;
   display: grid;
-  grid-template-columns: 1.05fr 1.4fr;
+  grid-template-columns: 420px 1fr;
   gap: 16px;
-  align-items: stretch;
+  align-items: start;
 }
 
-.card {
-  background: var(--pf-glass);
-  border: 1px solid var(--pf-stroke);
-  border-radius: var(--pf-radius);
-  box-shadow: var(--pf-shadow-soft);
+.pf-card {
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 22px;
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.10);
   backdrop-filter: blur(12px);
 }
 
-.card-inner {
+.pf-card-inner {
   padding: 18px;
 }
 
-.card-title {
+.pf-title {
   margin: 0 0 10px;
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -0.2px;
 }
 
-.small-muted {
-  color: var(--pf-muted);
+.pf-muted {
+  color: rgba(15, 23, 42, 0.62);
   font-size: 13px;
+  font-weight: 650;
 }
 
-/* ====== AVATAR ====== */
-.profile-card {
-  overflow: hidden;
-}
-
-.profile-top {
+/* ===== Profile left card ===== */
+.pf-profileTop {
   display: grid;
-  grid-template-columns: 104px 1fr;
+  grid-template-columns: 92px 1fr;
   gap: 14px;
   align-items: center;
 }
 
-.profile-avatar {
-  width: 104px;
-  height: 104px;
-  border-radius: 26px;
-  background: radial-gradient(110px 110px at 30% 25%, rgba(255,255,255,0.35), transparent 55%),
-              linear-gradient(135deg, var(--accent2), #6dd3c0);
-  position: relative;
+.pf-avatar {
+  width: 92px;
+  height: 92px;
+  border-radius: 22px;
   display: grid;
   place-items: center;
-  box-shadow: 0 14px 35px rgba(78, 205, 196, 0.25);
-  border: 4px solid rgba(255, 255, 255, 0.9);
+  background:
+    radial-gradient(120px 90px at 30% 25%, rgba(255,255,255,0.45), transparent 55%),
+    linear-gradient(135deg, var(--accent2, #4ecdc4), #7dd3fc);
+  border: 4px solid rgba(255,255,255,0.9);
+  box-shadow: 0 16px 40px rgba(59, 130, 246, 0.22);
 }
 
-.profile-avatar::after {
-  content: "";
-  position: absolute;
-  inset: -20%;
-  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), transparent 55%);
-  transform: rotate(10deg);
-  pointer-events: none;
-}
-
-.profile-avatar-icon {
-  font-size: 44px;
-  color: white;
+.pf-avatarIcon {
+  font-size: 40px;
+  color: #fff;
   text-shadow: 0 10px 22px rgba(0,0,0,0.12);
-  position: relative;
-  z-index: 1;
 }
 
-.profile-name {
+.pf-name {
   margin: 0 0 4px;
-  font-size: 22px;
-  font-weight: 900;
+  font-size: 20px;
+  font-weight: 950;
   letter-spacing: -0.3px;
 }
 
-.profile-email {
-  color: var(--pf-muted);
+.pf-email {
+  margin: 0;
+  color: rgba(15, 23, 42, 0.62);
   font-size: 13px;
-  margin: 0 0 6px;
+  font-weight: 650;
 }
 
-/* ====== INFO GRID ====== */
-.user-info-grid {
+.pf-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.88);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+}
+
+.pf-infoGrid {
+  margin-top: 14px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin: 14px 0 6px;
 }
 
-.info-item {
-  background: var(--pf-glass-strong);
-  padding: 12px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+.pf-infoItem {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
 }
 
-.info-label {
+.pf-infoLabel {
   font-size: 11px;
-  color: rgba(15, 23, 42, 0.55);
-  font-weight: 800;
-  margin-bottom: 4px;
   letter-spacing: 0.6px;
+  font-weight: 900;
   text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.55);
+  margin-bottom: 4px;
 }
 
-.info-value {
-  font-size: 15px;
-  font-weight: 800;
-  color: rgba(15, 23, 42, 0.92);
-}
-
-/* ====== BADGES ====== */
-.badges-container {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  margin: 10px 0 6px;
-}
-
-.badge {
-  padding: 9px 12px;
-  border-radius: 14px;
-  color: white;
-  font-weight: 800;
-  font-size: 13px;
-  white-space: nowrap;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.10);
-}
-
-/* ====== ACTIONS ====== */
-.profile-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-.edit-profile-btn {
-  background: radial-gradient(120px 120px at 30% 25%, rgba(255,255,255,0.25), transparent 55%),
-              linear-gradient(135deg, var(--accent2), #6dd3c0);
-  color: white;
-  border: none;
-  padding: 12px 14px;
-  border-radius: 16px;
-  cursor: pointer;
+.pf-infoValue {
   font-size: 14px;
-  font-weight: 800;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
-  justify-content: center;
-  min-width: 220px;
+  font-weight: 900;
+  color: rgba(15, 23, 42, 0.90);
 }
 
-.edit-profile-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 40px rgba(78, 205, 196, 0.28);
-  filter: saturate(1.08);
-}
-
-.requests-btn {
-  background: radial-gradient(120px 120px at 30% 25%, rgba(255,255,255,0.2), transparent 55%),
-              linear-gradient(135deg, #ff6b6b, #ff8e8e);
-  color: white;
-  border: none;
-  padding: 12px 14px;
-  border-radius: 16px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 800;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
-  justify-content: center;
-  min-width: 220px;
-}
-
-.requests-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 40px rgba(255, 107, 107, 0.26);
-  filter: saturate(1.06);
-}
-
-.admin-btn-wrap {
-  margin-top: 10px;
-}
-
-/* ====== RIGHT SIDE / STATS ====== */
-.stats-wrap {
+.pf-actions {
+  margin-top: 14px;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 14px;
+  gap: 10px;
 }
 
-.stats-grid {
+.pf-actionsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* ===== Right column ===== */
+.pf-rightStack {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.pf-statsGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(140px, 1fr));
   gap: 12px;
   margin-top: 10px;
 }
 
-.stat-card {
-  background: var(--pf-glass-strong);
-  border: 1px solid rgba(15, 23, 42, 0.06);
+.pf-stat {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 18px;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
-  padding: 14px 14px;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  padding: 14px;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.stat-card:hover {
+.pf-stat:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.10);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
 }
 
-.stat-number {
+.pf-statNum {
   font-size: 28px;
-  font-weight: 900;
-  color: var(--accent2);
+  font-weight: 950;
+  letter-spacing: -0.6px;
+  color: rgba(15, 23, 42, 0.92);
   margin-bottom: 4px;
-  letter-spacing: -0.5px;
 }
 
-.stat-label {
+.pf-statLabel {
   font-size: 12px;
+  font-weight: 850;
   color: rgba(15, 23, 42, 0.62);
-  font-weight: 800;
 }
 
-/* ====== MATERIALS PROGRESS LIST ====== */
-.materials-progress {
+/* ===== Progress list ===== */
+.pf-progressList {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
   margin-top: 10px;
 }
 
-.progress-item {
-  background: var(--pf-glass-strong);
-  padding: 14px 14px;
+.pf-progressItem {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 18px;
-  margin-bottom: 10px;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 14px;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+
   display: grid;
-  grid-template-columns: 1fr 140px 64px;
+  grid-template-columns: 1fr 160px 56px;
   gap: 12px;
   align-items: center;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
-.progress-item:hover {
+.pf-progressItem:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.10);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
 }
 
-.progress-item-info {
-  min-width: 0;
+.pf-progressTitle {
+  font-weight: 950;
+  font-size: 14px;
+  margin: 0 0 4px;
+  color: rgba(15, 23, 42, 0.90);
 }
 
-.progress-item-title {
-  font-weight: 900;
-  margin-bottom: 5px;
-  color: rgba(15, 23, 42, 0.92);
-  font-size: 15px;
-  line-height: 1.2;
-  word-break: break-word;
-}
-
-.progress-item-stats {
-  font-size: 12px;
-  color: rgba(15, 23, 42, 0.62);
-  font-weight: 700;
-}
-
-.progress-bar-mini {
-  width: 140px;
-  height: 10px;
-  background: rgba(15, 23, 42, 0.08);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.progress-fill-mini {
-  height: 100%;
-  background: linear-gradient(135deg, var(--accent2), rgba(78, 205, 196, 0.75));
-  border-radius: 999px;
-  transition: width 0.25s ease;
-}
-
-.progress-percentage {
-  font-weight: 900;
-  color: rgba(15, 23, 42, 0.80);
-  min-width: 50px;
-  text-align: right;
-}
-
-.material-type {
+.pf-tag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 950;
   margin-right: 8px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: rgba(125, 211, 252, 0.18);
+  color: rgba(15, 23, 42, 0.85);
 }
 
-.type-textbook {
-  background: rgba(78, 205, 196, 0.16);
-  color: rgba(15, 23, 42, 0.82);
+.pf-tag.textbook {
+  background: rgba(78, 205, 196, 0.18);
 }
 
-.type-crossword {
-  background: rgba(59, 130, 246, 0.14);
-  color: rgba(15, 23, 42, 0.82);
-}
-
-/* ====== LOADING / ERROR / BG LOADING ====== */
-.loading {
-  text-align: center;
-  padding: 40px;
-}
-
-.spinner {
-  border: 4px solid rgba(15, 23, 42, 0.10);
-  border-top: 4px solid var(--accent2);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: pfSpin 1.2s linear infinite;
-  margin: 0 auto 20px;
-}
-
-@keyframes pfSpin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.error {
-  background: rgba(255, 107, 107, 0.14);
-  color: #b42318;
-  padding: 16px;
-  border-radius: 16px;
-  margin: 12px 0;
-  text-align: center;
-  border: 1px solid rgba(180, 35, 24, 0.22);
-}
-
-.background-loading {
-  position: fixed;
-  top: 18px;
-  right: 18px;
-  background: rgba(15, 23, 42, 0.70);
-  color: white;
-  padding: 10px 12px;
-  border-radius: 999px;
+.pf-progressSub {
+  margin: 0;
   font-size: 12px;
-  z-index: 1000;
-  box-shadow: 0 18px 55px rgba(0,0,0,0.22);
+  font-weight: 750;
+  color: rgba(15, 23, 42, 0.62);
 }
 
-/* ====== MODAL FORM (kept, but softened) ====== */
-.modal-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 18px;
-  justify-content: flex-end;
+.pf-bar {
+  width: 160px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.10);
+  overflow: hidden;
 }
 
-.form-group {
+.pf-barFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent2, #4ecdc4), #7dd3fc);
+  transition: width 0.25s ease;
+}
+
+.pf-percent {
+  text-align: right;
+  font-weight: 950;
+  color: rgba(15, 23, 42, 0.80);
+}
+
+/* ===== Form inside Modal ===== */
+.pf-formGroup {
   margin-bottom: 14px;
 }
-
-.form-group label {
+.pf-formGroup label {
   display: block;
   margin-bottom: 6px;
-  font-weight: 800;
-  color: rgba(15, 23, 42, 0.85);
+  font-weight: 900;
   font-size: 13px;
+  color: rgba(15, 23, 42, 0.85);
 }
-
-.form-group input,
-.form-group select {
+.pf-formGroup input,
+.pf-formGroup select {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.92);
   font-size: 14px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  box-sizing: border-box;
-  font-family: inherit;
-  background: rgba(255,255,255,0.88);
-}
-
-.form-group input:focus,
-.form-group select:focus {
-  border-color: rgba(78, 205, 196, 0.65);
+  font-weight: 700;
   outline: none;
-  box-shadow: 0 0 0 4px rgba(78, 205, 196, 0.16);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.pf-formGroup input:focus,
+.pf-formGroup select:focus {
+  border-color: rgba(125, 211, 252, 0.8);
+  box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.20);
 }
 
-/* ====== NOTIFICATION ====== */
-.pf-notif {
-  position: fixed;
-  top: 18px;
-  right: 18px;
-  color: white;
-  padding: 14px 16px;
-  border-radius: 16px;
-  box-shadow: 0 18px 55px rgba(0,0,0,0.20);
-  z-index: 10001;
-  max-width: 340px;
-  animation: pfToastIn 0.28s ease-out both;
+.pf-modalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 14px;
 }
 
-@keyframes pfToastIn {
-  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-/* ====== GRID WRAP ====== */
-.profile-grid {
-  display: grid;
-  grid-template-columns: 1.05fr 1.4fr;
-  gap: 16px;
-  margin-top: 16px;
-}
-
-/* Info card at bottom right */
-.info-card p {
-  margin: 8px 0;
-  line-height: 1.55;
-  color: rgba(15, 23, 42, 0.68);
-  font-weight: 650;
-}
-
-/* ====== RESPONSIVE ====== */
+/* ===== Responsive ===== */
 @media (max-width: 980px) {
-  .profile-hero-inner,
-  .profile-grid {
+  .pf-main {
     grid-template-columns: 1fr;
   }
-
-  .stats-grid {
+  .pf-statsGrid {
     grid-template-columns: 1fr;
-  }
-
-  .progress-item {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .progress-bar-mini {
-    width: 100%;
-  }
-
-  .progress-percentage {
-    text-align: left;
   }
 }
 
 @media (max-width: 520px) {
-  .container {
-    width: 100%;
-    padding: 10px;
-    margin: 0 auto 28px;
-  }
+  .pf-shell { width: calc(100% - 20px); }
 
-  .profile-top {
-    grid-template-columns: 86px 1fr;
-  }
+  .pf-profileTop { grid-template-columns: 78px 1fr; }
+  .pf-avatar { width: 78px; height: 78px; border-radius: 20px; }
+  .pf-avatarIcon { font-size: 34px; }
 
-  .profile-avatar {
-    width: 86px;
-    height: 86px;
-    border-radius: 22px;
-  }
+  .pf-infoGrid { grid-template-columns: 1fr; }
 
-  .profile-avatar-icon {
-    font-size: 38px;
-  }
+  .pf-actionsRow { grid-template-columns: 1fr; }
 
-  .profile-name {
-    font-size: 20px;
-  }
-
-  .user-info-grid {
+  .pf-progressItem {
     grid-template-columns: 1fr;
   }
+  .pf-bar { width: 100%; }
+  .pf-percent { text-align: left; }
 
-  .badges-container {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .badge {
-    width: 100%;
-    text-align: left;
-  }
-
-  .profile-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .edit-profile-btn,
-  .requests-btn {
-    min-width: unset;
-    width: 100%;
-  }
-
-  .background-loading,
-  .pf-notif {
+  .pf-background-loading,
+  .pf-toast {
+    max-width: calc(100vw - 28px);
     top: 12px;
     right: 12px;
-    max-width: calc(100vw - 24px);
   }
 }
