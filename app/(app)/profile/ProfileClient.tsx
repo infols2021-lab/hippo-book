@@ -45,11 +45,9 @@ type Props = {
 function regionLabel(region: string) {
   return region?.trim() ? region : "Не указана";
 }
-
 function phoneLabel(phone: string) {
   return phone?.trim() ? phone : "Не указан";
 }
-
 function nameLabel(name: string) {
   return name?.trim() ? name : "Ученик";
 }
@@ -194,13 +192,15 @@ export default function ProfileClient({
     }
   }
 
+  const hasBg = Boolean(backgroundUrl && (bgReady || !bgLoading));
+  const bgStyle = hasBg ? { backgroundImage: `url('${backgroundUrl}')` } : undefined;
+
+  // badges values
+  const totalAvail = stats?.totalAvailableAssignments;
+  const doneAvail = stats?.completedAvailableAssignments;
+
   return (
-    <div
-      id="profileBody"
-      style={{
-        backgroundImage: backgroundUrl && (bgReady || !bgLoading) ? `url('${backgroundUrl}')` : undefined,
-      }}
-    >
+    <div id="profileBody" className={hasBg ? "has-bg" : ""} style={bgStyle}>
       {bgLoading ? (
         <div className="background-loading" style={{ display: "block" }}>
           <span
@@ -211,7 +211,8 @@ export default function ProfileClient({
               borderWidth: 2,
               display: "inline-block",
               verticalAlign: "middle",
-              marginRight: 5,
+              marginRight: 6,
+              marginBottom: 0,
             }}
           />
           Загружаем фон...
@@ -220,17 +221,9 @@ export default function ProfileClient({
 
       {notif ? (
         <div
+          className="pf-notif"
           style={{
-            position: "fixed",
-            top: 20,
-            right: 20,
-            background: notif.type === "success" ? "#4caf50" : "#f44336",
-            color: "white",
-            padding: "15px 20px",
-            borderRadius: 8,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-            zIndex: 10001,
-            maxWidth: 320,
+            background: notif.type === "success" ? "rgba(34,197,94,0.95)" : "rgba(239,68,68,0.95)",
           }}
         >
           {notif.text}
@@ -281,8 +274,8 @@ export default function ProfileClient({
 
           <div className="form-group">
             <label>Email:</label>
-            <input type="email" value={userEmail} disabled style={{ backgroundColor: "#f5f5f5", color: "#666" }} />
-            <div className="small-muted" style={{ marginTop: 5 }}>
+            <input type="email" value={userEmail} disabled style={{ backgroundColor: "#f5f8ff", color: "#64748b" }} />
+            <div className="small-muted" style={{ marginTop: 6 }}>
               Email нельзя изменить
             </div>
           </div>
@@ -302,109 +295,136 @@ export default function ProfileClient({
         <div id="mainContent" style={{ display: "block" }}>
           <AppHeader
             nav={[
-              // ✅ Новая кнопка слева от "Материалы"
               { kind: "link", href: "/info", label: "ℹ️ Информация", className: "btn secondary" },
               { kind: "link", href: "/materials", label: "📚 Материалы", className: "btn" },
               { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
             ]}
           />
 
-          <div className="grid-2">
-            <div className="card profile-card">
-              <div className="profile-avatar" role="img" aria-label="Профиль ученика">
-                <div className="profile-avatar-icon">👤</div>
+          {/* HERO */}
+          <div className="profile-hero">
+            <div className="profile-hero-inner">
+              {/* LEFT: profile */}
+              <div className="card profile-card">
+                <div className="card-inner">
+                  <div className="profile-top">
+                    <div className="profile-avatar" role="img" aria-label="Профиль ученика">
+                      <div className="profile-avatar-icon">👤</div>
+                    </div>
+
+                    <div>
+                      <h2 className="profile-name">{nameLabel(profile.full_name)}</h2>
+                      <p className="profile-email">{userEmail || "—"}</p>
+
+                      <div className="badges-container">
+                        <span className="badge" style={{ background: "linear-gradient(135deg, var(--accent2), #6dd3c0)" }}>
+                          📊 Доступных заданий: {typeof totalAvail === "number" ? totalAvail : "—"}
+                        </span>
+                        <span className="badge" style={{ background: "linear-gradient(135deg, var(--accent), #60a5fa)" }}>
+                          ✅ Выполнено: {typeof doneAvail === "number" ? doneAvail : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="user-info-grid">
+                    <div className="info-item">
+                      <div className="info-label">Телефон</div>
+                      <div className="info-value">{phoneLabel(profile.contact_phone)}</div>
+                    </div>
+                    <div className="info-item">
+                      <div className="info-label">Регион</div>
+                      <div className="info-value">{regionLabel(profile.region)}</div>
+                    </div>
+                  </div>
+
+                  <div className="profile-actions">
+                    <button className="edit-profile-btn" onClick={openEdit} type="button">
+                      ✏️ Редактировать профиль
+                    </button>
+
+                    <button className="requests-btn" onClick={() => (window.location.href = "/requests")} type="button">
+                      📝 Перейти к заявкам
+                    </button>
+                  </div>
+
+                  {profile.is_admin ? (
+                    <div className="admin-btn-wrap">
+                      <Link className="btn" href="/admin">
+                        🛠️ Админка
+                      </Link>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
-              <div className="profile-info">
-                <h3 style={{ color: "#2c3e50", marginBottom: 8 }}>{nameLabel(profile.full_name)}</h3>
-                <div className="small-muted" style={{ color: "#7f8c8d" }}>
-                  {userEmail || "—"}
+              {/* RIGHT: quick stats */}
+              <div className="stats-wrap">
+                <div className="card">
+                  <div className="card-inner">
+                    <h3 className="card-title">📊 Статистика по доступным материалам</h3>
+
+                    <div className="stats-grid">
+                      <div className="stat-card">
+                        <div className="stat-number">{stats?.totalMaterials ?? "—"}</div>
+                        <div className="stat-label">Доступных материалов</div>
+                      </div>
+
+                      <div className="stat-card">
+                        <div className="stat-number">{stats?.completedMaterials ?? "—"}</div>
+                        <div className="stat-label">Пройдено материалов</div>
+                      </div>
+
+                      <div className="stat-card">
+                        <div className="stat-number">{stats ? `${stats.successRate}%` : "—"}</div>
+                        <div className="stat-label">Общий прогресс</div>
+                      </div>
+                    </div>
+
+                    {progressLoading ? (
+                      <div style={{ marginTop: 10 }} className="small-muted">
+                        🔄 Подгружаем прогресс...
+                      </div>
+                    ) : null}
+
+                    {progressError ? (
+                      <div className="error" style={{ marginTop: 10 }}>
+                        ❌ Прогресс не загрузился: {progressError}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
-                <div className="user-info-grid">
-                  <div className="info-item">
-                    <div className="info-label">Телефон</div>
-                    <div className="info-value">{phoneLabel(profile.contact_phone)}</div>
-                  </div>
-                  <div className="info-item">
-                    <div className="info-label">Регион</div>
-                    <div className="info-value">{regionLabel(profile.region)}</div>
+                <div className="card info-card">
+                  <div className="card-inner">
+                    <h3 className="card-title">ℹ️ Подсказка</h3>
+                    <p>📈 Здесь отображается ваш прогресс по доступным учебникам и кроссвордам.</p>
+                    <p>📚 Ниже — список всех материалов, которые вам открыты, с прогрессом выполнения.</p>
+                    <p>
+                      <strong>💡 Совет:</strong> лучше проходить понемногу каждый день — так результат растёт быстрее.
+                    </p>
                   </div>
                 </div>
-
-                <div className="badges-container">
-                  <span className="badge" style={{ background: "var(--accent2)" }}>
-                    📊 Доступных заданий: {stats?.totalAvailableAssignments ?? "—"}
-                  </span>
-                  <span className="badge" style={{ background: "var(--accent)" }}>
-                    ✅ Выполнено: {stats?.completedAvailableAssignments ?? "—"}
-                  </span>
-                </div>
-
-                <button className="edit-profile-btn" onClick={openEdit} type="button">
-                  ✏️ Редактировать профиль
-                </button>
-
-                <button className="requests-btn" onClick={() => (window.location.href = "/requests")} type="button">
-                  📝 Перейти к заявкам на покупку
-                </button>
-
-                {profile.is_admin ? (
-                  <div style={{ marginTop: 12 }}>
-                    <Link className="btn" href="/admin">
-                      🛠️ Админка
-                    </Link>
-                  </div>
-                ) : null}
               </div>
             </div>
 
-            <div>
-              <div className="card">
-                <h3 style={{ color: "var(--accent2)", marginBottom: 16 }}>📊 Статистика по доступным материалам</h3>
+            {/* PROGRESS LIST */}
+            <div style={{ height: 14 }} />
 
-                <div className="stats-grid">
-                  <div className="stat-card">
-                    <div className="stat-number">{stats?.totalMaterials ?? "—"}</div>
-                    <div className="stat-label">Доступных материалов</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-number">{stats?.completedMaterials ?? "—"}</div>
-                    <div className="stat-label">Пройдено материалов</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-number">{stats ? `${stats.successRate}%` : "—"}</div>
-                    <div className="stat-label">Общий прогресс</div>
-                  </div>
-                </div>
-
-                {progressLoading ? (
-                  <div style={{ marginTop: 10 }} className="small-muted">
-                    🔄 Подгружаем прогресс...
-                  </div>
-                ) : null}
-
-                {progressError ? (
-                  <div style={{ marginTop: 10, color: "#c62828" }} className="small-muted">
-                    ❌ Прогресс не загрузился: {progressError}
-                  </div>
-                ) : null}
-              </div>
-
-              <div style={{ height: 18 }} />
-
-              <div className="card">
-                <h3 style={{ color: "var(--accent2)", marginBottom: 16 }}>📚 Прогресс по доступным материалам</h3>
-
+            <div className="card">
+              <div className="card-inner">
+                <h3 className="card-title">📚 Прогресс по доступным материалам</h3>
                 <div className="materials-progress">
                   {!materialsProgress ? (
-                    <div style={{ textAlign: "center", padding: 20, color: "#666" }}>
-                      <p>📚 Загрузка материалов...</p>
+                    <div style={{ textAlign: "center", padding: 20 }}>
+                      <div className="small-muted">📚 Загрузка материалов...</div>
                     </div>
                   ) : materialsProgress.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: 20, color: "#666" }}>
-                      <p>📚 Материалы пока не доступны</p>
-                      <p className="small-muted">Обратитесь к администратору для получения доступа к учебным материалам</p>
+                    <div style={{ textAlign: "center", padding: 20 }}>
+                      <p style={{ margin: 0, fontWeight: 800 }}>📚 Материалы пока не доступны</p>
+                      <p className="small-muted" style={{ marginTop: 8 }}>
+                        Обратитесь к администратору для получения доступа к учебным материалам
+                      </p>
                     </div>
                   ) : (
                     materialsProgress.map((m) => (
@@ -413,12 +433,11 @@ export default function ProfileClient({
                         className="progress-item"
                         style={{ cursor: "pointer" }}
                         onClick={() => (window.location.href = m.href)}
+                        role="button"
                       >
                         <div className="progress-item-info">
                           <div className="progress-item-title">
-                            <span
-                              className={`material-type ${m.kind === "textbook" ? "type-textbook" : "type-crossword"}`}
-                            >
+                            <span className={`material-type ${m.kind === "textbook" ? "type-textbook" : "type-crossword"}`}>
                               {m.kind === "textbook" ? "📚 УЧЕБНИК" : "🧩 КРОССВОРД"}
                             </span>
                             {m.title}
@@ -432,29 +451,16 @@ export default function ProfileClient({
                         <div className="progress-bar-mini">
                           <div className="progress-fill-mini" style={{ width: `${m.progressPercent}%` }} />
                         </div>
+
                         <div className="progress-percentage">{m.progressPercent}%</div>
                       </div>
                     ))
                   )}
                 </div>
               </div>
-
-              <div style={{ height: 18 }} />
-
-              <div className="card">
-                <h3 style={{ color: "var(--accent2)", marginBottom: 16 }}>ℹ️ Информация</h3>
-                <p className="small-muted" style={{ color: "#5d4037", lineHeight: 1.5 }}>
-                  📈 На этой странице отображается ваш прогресс по доступным учебникам и кроссвордам.
-                </p>
-                <p className="small-muted" style={{ color: "#5d4037", lineHeight: 1.5 }}>
-                  📚 В разделе "Прогресс по материалам" показаны все учебники и кроссворды, к которым у вас есть доступ.
-                </p>
-                <p className="small-muted" style={{ color: "#5d4037", lineHeight: 1.5 }}>
-                  <strong>💡 Совет:</strong> Регулярно занимайтесь для достижения лучших результатов!
-                </p>
-              </div>
             </div>
           </div>
+          {/* /HERO */}
         </div>
       </div>
     </div>
