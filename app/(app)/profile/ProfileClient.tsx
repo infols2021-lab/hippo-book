@@ -45,9 +45,11 @@ type Props = {
 function regionLabel(region: string) {
   return region?.trim() ? region : "Не указана";
 }
+
 function phoneLabel(phone: string) {
   return phone?.trim() ? phone : "Не указан";
 }
+
 function nameLabel(name: string) {
   return name?.trim() ? name : "Ученик";
 }
@@ -192,23 +194,43 @@ export default function ProfileClient({
     }
   }
 
-  const hasBg = Boolean(backgroundUrl && (bgReady || !bgLoading));
-  const bgStyle = hasBg ? { backgroundImage: `url('${backgroundUrl}')` } : undefined;
-
   return (
-    <div id="profileBody" className={hasBg ? "pf-hasBg" : ""} style={bgStyle}>
+    <div
+      id="profileBody"
+      style={{
+        backgroundImage: backgroundUrl && (bgReady || !bgLoading) ? `url('${backgroundUrl}')` : undefined,
+      }}
+    >
       {bgLoading ? (
-        <div className="pf-background-loading">
-          <span className="pf-spinner" />
+        <div className="background-loading" style={{ display: "block" }}>
+          <span
+            className="spinner"
+            style={{
+              width: 16,
+              height: 16,
+              borderWidth: 2,
+              display: "inline-block",
+              verticalAlign: "middle",
+              marginRight: 5,
+            }}
+          />
           Загружаем фон...
         </div>
       ) : null}
 
       {notif ? (
         <div
-          className="pf-toast"
           style={{
-            background: notif.type === "success" ? "rgba(34,197,94,0.95)" : "rgba(239,68,68,0.95)",
+            position: "fixed",
+            top: 20,
+            right: 20,
+            background: notif.type === "success" ? "#4caf50" : "#f44336",
+            color: "white",
+            padding: "15px 20px",
+            borderRadius: 8,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            zIndex: 10001,
+            maxWidth: 320,
           }}
         >
           {notif.text}
@@ -222,7 +244,7 @@ export default function ProfileClient({
             void saveProfile();
           }}
         >
-          <div className="pf-formGroup">
+          <div className="form-group">
             <label htmlFor="editFullName">ФИО:</label>
             <input
               id="editFullName"
@@ -233,7 +255,7 @@ export default function ProfileClient({
             />
           </div>
 
-          <div className="pf-formGroup">
+          <div className="form-group">
             <label htmlFor="editPhone">Контактный телефон:</label>
             <input
               id="editPhone"
@@ -244,7 +266,7 @@ export default function ProfileClient({
             />
           </div>
 
-          <div className="pf-formGroup">
+          <div className="form-group">
             <label htmlFor="editRegion">Область проживания:</label>
             <select id="editRegion" required value={editRegion} onChange={(e) => setEditRegion(e.target.value)}>
               <option value="">-- Выберите область --</option>
@@ -257,20 +279,15 @@ export default function ProfileClient({
             </select>
           </div>
 
-          <div className="pf-formGroup">
+          <div className="form-group">
             <label>Email:</label>
-            <input
-              type="email"
-              value={userEmail}
-              disabled
-              style={{ backgroundColor: "rgba(245,248,255,0.9)", color: "#64748b" }}
-            />
-            <div className="pf-muted" style={{ marginTop: 6 }}>
+            <input type="email" value={userEmail} disabled style={{ backgroundColor: "#f5f5f5", color: "#666" }} />
+            <div className="small-muted" style={{ marginTop: 5 }}>
               Email нельзя изменить
             </div>
           </div>
 
-          <div className="pf-modalActions">
+          <div className="modal-actions">
             <button type="button" className="btn secondary" onClick={closeEdit}>
               ❌ Отмена
             </button>
@@ -281,168 +298,162 @@ export default function ProfileClient({
         </form>
       </Modal>
 
-      <div className="pf-shell">
-        <AppHeader
-          nav={[
-            { kind: "link", href: "/info", label: "ℹ️ Информация", className: "btn secondary" },
-            { kind: "link", href: "/materials", label: "📚 Материалы", className: "btn" },
-            { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
-          ]}
-        />
+      <div className="container">
+        <div id="mainContent" style={{ display: "block" }}>
+          <AppHeader
+            nav={[
+              // ✅ Новая кнопка слева от "Материалы"
+              { kind: "link", href: "/info", label: "ℹ️ Информация", className: "btn secondary" },
+              { kind: "link", href: "/materials", label: "📚 Материалы", className: "btn" },
+              { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
+            ]}
+          />
 
-        <div className="pf-main">
-          {/* LEFT: PROFILE */}
-          <div className="pf-card">
-            <div className="pf-card-inner">
-              <div className="pf-profileTop">
-                <div className="pf-avatar" role="img" aria-label="Профиль ученика">
-                  <div className="pf-avatarIcon">👤</div>
+          <div className="grid-2">
+            <div className="card profile-card">
+              <div className="profile-avatar" role="img" aria-label="Профиль ученика">
+                <div className="profile-avatar-icon">👤</div>
+              </div>
+
+              <div className="profile-info">
+                <h3 style={{ color: "#2c3e50", marginBottom: 8 }}>{nameLabel(profile.full_name)}</h3>
+                <div className="small-muted" style={{ color: "#7f8c8d" }}>
+                  {userEmail || "—"}
                 </div>
 
-                <div>
-                  <h2 className="pf-name">{nameLabel(profile.full_name)}</h2>
-                  <p className="pf-email">{userEmail || "—"}</p>
-
-                  <div className="pf-pills">
-                    <span className="pf-pill">📊 Доступных заданий: {stats?.totalAvailableAssignments ?? "—"}</span>
-                    <span className="pf-pill">✅ Выполнено: {stats?.completedAvailableAssignments ?? "—"}</span>
+                <div className="user-info-grid">
+                  <div className="info-item">
+                    <div className="info-label">Телефон</div>
+                    <div className="info-value">{phoneLabel(profile.contact_phone)}</div>
+                  </div>
+                  <div className="info-item">
+                    <div className="info-label">Регион</div>
+                    <div className="info-value">{regionLabel(profile.region)}</div>
                   </div>
                 </div>
-              </div>
 
-              <div className="pf-infoGrid">
-                <div className="pf-infoItem">
-                  <div className="pf-infoLabel">Телефон</div>
-                  <div className="pf-infoValue">{phoneLabel(profile.contact_phone)}</div>
+                <div className="badges-container">
+                  <span className="badge" style={{ background: "var(--accent2)" }}>
+                    📊 Доступных заданий: {stats?.totalAvailableAssignments ?? "—"}
+                  </span>
+                  <span className="badge" style={{ background: "var(--accent)" }}>
+                    ✅ Выполнено: {stats?.completedAvailableAssignments ?? "—"}
+                  </span>
                 </div>
-                <div className="pf-infoItem">
-                  <div className="pf-infoLabel">Регион</div>
-                  <div className="pf-infoValue">{regionLabel(profile.region)}</div>
-                </div>
-              </div>
 
-              <div className="pf-actions">
-                <div className="pf-actionsRow">
-                  <button className="btn" onClick={openEdit} type="button">
-                    ✏️ Редактировать
-                  </button>
-                  <button className="btn secondary" onClick={() => (window.location.href = "/requests")} type="button">
-                    📝 Заявки
-                  </button>
-                </div>
+                <button className="edit-profile-btn" onClick={openEdit} type="button">
+                  ✏️ Редактировать профиль
+                </button>
+
+                <button className="requests-btn" onClick={() => (window.location.href = "/requests")} type="button">
+                  📝 Перейти к заявкам на покупку
+                </button>
 
                 {profile.is_admin ? (
-                  <Link className="btn secondary" href="/admin">
-                    🛠️ Админка
-                  </Link>
+                  <div style={{ marginTop: 12 }}>
+                    <Link className="btn" href="/admin">
+                      🛠️ Админка
+                    </Link>
+                  </div>
                 ) : null}
               </div>
             </div>
-          </div>
 
-          {/* RIGHT: STATS + HINT */}
-          <div className="pf-rightStack">
-            <div className="pf-card">
-              <div className="pf-card-inner">
-                <h3 className="pf-title">📊 Статистика по доступным материалам</h3>
+            <div>
+              <div className="card">
+                <h3 style={{ color: "var(--accent2)", marginBottom: 16 }}>📊 Статистика по доступным материалам</h3>
 
-                <div className="pf-statsGrid">
-                  <div className="pf-stat">
-                    <div className="pf-statNum">{stats?.totalMaterials ?? "—"}</div>
-                    <div className="pf-statLabel">Доступных материалов</div>
+                <div className="stats-grid">
+                  <div className="stat-card">
+                    <div className="stat-number">{stats?.totalMaterials ?? "—"}</div>
+                    <div className="stat-label">Доступных материалов</div>
                   </div>
-
-                  <div className="pf-stat">
-                    <div className="pf-statNum">{stats?.completedMaterials ?? "—"}</div>
-                    <div className="pf-statLabel">Пройдено материалов</div>
+                  <div className="stat-card">
+                    <div className="stat-number">{stats?.completedMaterials ?? "—"}</div>
+                    <div className="stat-label">Пройдено материалов</div>
                   </div>
-
-                  <div className="pf-stat">
-                    <div className="pf-statNum">{stats ? `${stats.successRate}%` : "—"}</div>
-                    <div className="pf-statLabel">Общий прогресс</div>
+                  <div className="stat-card">
+                    <div className="stat-number">{stats ? `${stats.successRate}%` : "—"}</div>
+                    <div className="stat-label">Общий прогресс</div>
                   </div>
                 </div>
 
                 {progressLoading ? (
-                  <div className="pf-muted" style={{ marginTop: 10 }}>
+                  <div style={{ marginTop: 10 }} className="small-muted">
                     🔄 Подгружаем прогресс...
                   </div>
                 ) : null}
 
                 {progressError ? (
-                  <div className="pf-muted" style={{ marginTop: 10, color: "#b42318", fontWeight: 850 }}>
+                  <div style={{ marginTop: 10, color: "#c62828" }} className="small-muted">
                     ❌ Прогресс не загрузился: {progressError}
                   </div>
                 ) : null}
               </div>
-            </div>
 
-            <div className="pf-card">
-              <div className="pf-card-inner">
-                <h3 className="pf-title">💡 Подсказка</h3>
-                <div className="pf-muted" style={{ lineHeight: 1.55 }}>
-                  <p style={{ margin: "8px 0" }}>✅ Здесь отображается ваш прогресс по учебникам и кроссвордам.</p>
-                  <p style={{ margin: "8px 0" }}>📚 Ниже — все материалы, которые вам открыты, с прогрессом выполнения.</p>
-                  <p style={{ margin: "8px 0" }}>
-                    🌟 Совет: лучше проходить понемногу каждый день — так результат растёт быстрее.
-                  </p>
+              <div style={{ height: 18 }} />
+
+              <div className="card">
+                <h3 style={{ color: "var(--accent2)", marginBottom: 16 }}>📚 Прогресс по доступным материалам</h3>
+
+                <div className="materials-progress">
+                  {!materialsProgress ? (
+                    <div style={{ textAlign: "center", padding: 20, color: "#666" }}>
+                      <p>📚 Загрузка материалов...</p>
+                    </div>
+                  ) : materialsProgress.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: 20, color: "#666" }}>
+                      <p>📚 Материалы пока не доступны</p>
+                      <p className="small-muted">Обратитесь к администратору для получения доступа к учебным материалам</p>
+                    </div>
+                  ) : (
+                    materialsProgress.map((m) => (
+                      <div
+                        key={`${m.kind}-${m.id}`}
+                        className="progress-item"
+                        style={{ cursor: "pointer" }}
+                        onClick={() => (window.location.href = m.href)}
+                      >
+                        <div className="progress-item-info">
+                          <div className="progress-item-title">
+                            <span
+                              className={`material-type ${m.kind === "textbook" ? "type-textbook" : "type-crossword"}`}
+                            >
+                              {m.kind === "textbook" ? "📚 УЧЕБНИК" : "🧩 КРОССВОРД"}
+                            </span>
+                            {m.title}
+                          </div>
+                          <div className="progress-item-stats">
+                            {m.completed} из {m.total} {m.kind === "textbook" ? "заданий выполнено" : "слов отгадано"}
+                            {m.total === 0 ? " (нет заданий)" : ""}
+                          </div>
+                        </div>
+
+                        <div className="progress-bar-mini">
+                          <div className="progress-fill-mini" style={{ width: `${m.progressPercent}%` }} />
+                        </div>
+                        <div className="progress-percentage">{m.progressPercent}%</div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
+
+              <div style={{ height: 18 }} />
+
+              <div className="card">
+                <h3 style={{ color: "var(--accent2)", marginBottom: 16 }}>ℹ️ Информация</h3>
+                <p className="small-muted" style={{ color: "#5d4037", lineHeight: 1.5 }}>
+                  📈 На этой странице отображается ваш прогресс по доступным учебникам и кроссвордам.
+                </p>
+                <p className="small-muted" style={{ color: "#5d4037", lineHeight: 1.5 }}>
+                  📚 В разделе "Прогресс по материалам" показаны все учебники и кроссворды, к которым у вас есть доступ.
+                </p>
+                <p className="small-muted" style={{ color: "#5d4037", lineHeight: 1.5 }}>
+                  <strong>💡 Совет:</strong> Регулярно занимайтесь для достижения лучших результатов!
+                </p>
+              </div>
             </div>
-          </div>
-        </div>
-
-        {/* PROGRESS LIST */}
-        <div style={{ height: 16 }} />
-
-        <div className="pf-card">
-          <div className="pf-card-inner">
-            <h3 className="pf-title">📚 Прогресс по доступным материалам</h3>
-
-            {!materialsProgress ? (
-              <div className="pf-muted" style={{ padding: 10 }}>
-                📚 Загрузка материалов...
-              </div>
-            ) : materialsProgress.length === 0 ? (
-              <div className="pf-muted" style={{ padding: 10 }}>
-                <p style={{ margin: 0, fontWeight: 900 }}>Материалы пока не доступны</p>
-                <p style={{ margin: "8px 0 0" }}>Обратитесь к администратору для получения доступа</p>
-              </div>
-            ) : (
-              <div className="pf-progressList">
-                {materialsProgress.map((m) => (
-                  <div
-                    key={`${m.kind}-${m.id}`}
-                    className="pf-progressItem"
-                    onClick={() => (window.location.href = m.href)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") window.location.href = m.href;
-                    }}
-                  >
-                    <div>
-                      <p className="pf-progressTitle">
-                        <span className={`pf-tag ${m.kind === "textbook" ? "textbook" : "crossword"}`}>
-                          {m.kind === "textbook" ? "📚 УЧЕБНИК" : "🧩 КРОССВОРД"}
-                        </span>
-                        {m.title}
-                      </p>
-                      <p className="pf-progressSub">
-                        {m.completed} из {m.total} {m.kind === "textbook" ? "заданий выполнено" : "слов отгадано"}
-                        {m.total === 0 ? " (нет заданий)" : ""}
-                      </p>
-                    </div>
-
-                    <div className="pf-bar">
-                      <div className="pf-barFill" style={{ width: `${m.progressPercent}%` }} />
-                    </div>
-
-                    <div className="pf-percent">{m.progressPercent}%</div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
