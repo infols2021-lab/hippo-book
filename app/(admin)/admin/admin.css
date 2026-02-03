@@ -1,0 +1,588 @@
+/* app/(admin)/admin/admin.css */
+
+/* ====== ДОБАВКА: красивый UI админки (не ломает твои задания/кроссворды) ====== */
+
+.admin-container {
+  width: 95%;
+  max-width: 1400px;
+  margin: 20px auto;
+}
+
+/* Tabs */
+.admin-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0 18px;
+}
+
+.admin-tab {
+  border: 0;
+  cursor: pointer;
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+}
+
+.admin-tab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+}
+
+.admin-tab.active {
+  background: linear-gradient(135deg, var(--accent2), #6dd3c0);
+  color: #fff;
+}
+
+/* Dashboard stats (у тебя уже есть admin-stats-grid/admin-stat — оставляем и улучшаем мягко) */
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.admin-stat {
+  background: white;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border-left: 4px solid var(--accent2);
+  text-align: center;
+}
+
+.admin-stat .num {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--accent2);
+}
+
+.admin-stat .lbl {
+  font-size: 13px;
+  color: #666;
+  font-weight: 700;
+}
+
+/* Users controls / filters */
+.users-controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+.users-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stat-badge-large {
+  background: white;
+  padding: 12px 18px;
+  border-radius: 14px;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.08);
+  border-left: 4px solid var(--accent2);
+  font-weight: 800;
+}
+
+.stat-badge-large .number {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--accent2);
+}
+
+/* filters grid */
+.filters-container {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 12px;
+  align-items: end;
+  margin: 10px 0 14px;
+}
+
+@media (max-width: 980px) {
+  .filters-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Admin table (красиво, но не конфликтует с .table из base.css) */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.08);
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-table th {
+  background: var(--bg1);
+  font-weight: 900;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.user-row-new {
+  background: #f8f9fa;
+}
+
+/* badges */
+.material-badge {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 12px;
+  background: rgba(78, 205, 196, 0.16);
+  color: var(--accent2);
+  border: 1px solid rgba(78, 205, 196, 0.25);
+}
+
+/* actions */
+.user-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* access modal list */
+.access-category { margin-top: 12px; }
+
+.access-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.access-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 2px solid rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.9);
+}
+
+.access-item input { margin-top: 3px; }
+
+/* mobile table */
+@media (max-width: 768px) {
+  .admin-container { width: 100%; margin: 10px auto; padding: 0 10px; }
+
+  .admin-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .user-actions { flex-direction: row; flex-wrap: wrap; }
+}
+
+/* ======= ДАЛЬШЕ ТВОЙ CSS (НЕ ТРОГАЛ, ТОЛЬКО ОСТАВИЛ) ======= */
+
+/* ===== ВОПРОСЫ / РЕДАКТОР (как в старом admin.html) ===== */
+.subtask-item {
+  background: var(--bg1);
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  border: 1px solid rgba(0,0,0,0.08);
+  position: relative;
+}
+
+.question-number {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--accent2);
+  color: #fff;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 14px;
+}
+
+/* textarea вопроса */
+.question-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: inherit;
+  resize: vertical;
+  background: #fff;
+}
+
+.question-textarea:focus {
+  border-color: var(--accent2);
+  outline: none;
+}
+
+.format-hint {
+  font-size: 12px;
+  color: #666;
+  margin-top: 6px;
+}
+
+/* ===== Upload (drag & drop зона) ===== */
+.upload-area {
+  border: 2px dashed #cfcfcf;
+  border-radius: 10px;
+  padding: 18px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin: 10px 0;
+  background: rgba(255,255,255,0.7);
+}
+
+.upload-area:hover {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 3px rgba(78,205,196,0.12);
+}
+
+.upload-area.dragover {
+  border-color: var(--accent2);
+  background-color: rgba(78,205,196,0.10);
+}
+
+.upload-progress {
+  width: 100%;
+  height: 4px;
+  background: #f0f0f0;
+  border-radius: 2px;
+  margin: 10px 0;
+  overflow: hidden;
+}
+
+.upload-progress-bar {
+  height: 100%;
+  background: var(--accent2);
+  width: 0%;
+  transition: width 0.25s ease;
+}
+
+.question-image-preview,
+.image-preview {
+  max-width: 240px;
+  max-height: 170px;
+  border-radius: 10px;
+  margin-top: 10px;
+  display: block;
+}
+
+/* ===== Fill styles ===== */
+.fill-inputs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.fill-input-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #e5e5e5;
+}
+
+.fill-input-number {
+  background: var(--accent2);
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.remove-input-btn {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.remove-input-btn:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
+}
+
+.add-input-btn {
+  background: var(--accent2);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  width: fit-content;
+}
+
+.add-input-btn:hover {
+  filter: brightness(0.95);
+}
+
+/* sentence */
+.sentence-preview {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 16px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+/* чуть приятнее таблички */
+.table th {
+  background: var(--bg1);
+}
+
+/* mobile */
+@media (max-width: 768px) {
+  .question-number { width: 28px; height: 28px; font-size: 13px; }
+  .fill-input-item { flex-direction: column; align-items: stretch; }
+  .remove-input-btn { align-self: flex-end; }
+}
+
+/* ===== Пастельные цвета по типам вопросов ===== */
+.subtask-item.qtype-test {
+  background: rgba(59, 130, 246, 0.08);
+  border-left: 4px solid rgba(59, 130, 246, 0.35);
+}
+
+.subtask-item.qtype-fill {
+  background: rgba(16, 185, 129, 0.08);
+  border-left: 4px solid rgba(16, 185, 129, 0.35);
+}
+
+.subtask-item.qtype-sentence {
+  background: rgba(245, 158, 11, 0.10);
+  border-left: 4px solid rgba(245, 158, 11, 0.40);
+}
+
+.subtask-item.qtype-crossword {
+  background: rgba(168, 85, 247, 0.08);
+  border-left: 4px solid rgba(168, 85, 247, 0.35);
+}
+
+/* ===== Crossword grid (Step 1 minimum) ===== */
+.crossword-advanced-grid {
+  display: inline-block;
+  border: 2px solid rgba(0,0,0,0.25);
+  background: #fff;
+  margin-top: 10px;
+}
+
+.crossword-row {
+  display: flex;
+}
+
+.crossword-cell {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(0,0,0,0.2);
+  position: relative;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.crossword-cell.blocked {
+  background: #111;
+  border-color: #111;
+}
+
+.crossword-cell input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  text-align: center;
+  font-weight: 800;
+  font-size: 14px;
+  pointer-events: none;
+  text-transform: uppercase;
+  color: #1f2937;
+}
+
+.crossword-cell.has-number .crossword-number,
+.crossword-cell.start-word .crossword-number {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 10px;
+  font-weight: 900;
+  background: rgba(255,255,255,0.85);
+  padding: 1px 3px;
+  border-radius: 4px;
+  line-height: 1;
+  color: #111;
+}
+
+/* подсветка выбранной клетки */
+.crossword-cell.recently-added {
+  outline: 2px solid rgba(78,205,196,0.9);
+  outline-offset: -2px;
+}
+/* ===== FIX: модалка поверх страницы (для components/Modal.tsx) ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+
+  background: rgba(0, 0, 0, 0.65);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 100000; /* поверх всего */
+  padding: 18px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 18px;
+
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  color: #2c3e50;
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+
+  font-size: 22px;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: 10px;
+
+  color: #333;
+}
+
+.modal-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+/* ===== Modal (универсальная, для components/Modal.tsx) ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 18px;
+}
+
+.modal-content {
+  width: 100%;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  background: linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.00));
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+
+.modal-close:hover {
+  background: rgba(0,0,0,0.06);
+}

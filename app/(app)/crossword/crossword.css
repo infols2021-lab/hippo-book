@@ -1,0 +1,209 @@
+/* app/(app)/crossword/crossword.css */
+
+.crossword-container {
+  width: 95%;
+  max-width: 1000px;
+  margin: 20px auto;
+}
+
+.back-button {
+  margin-bottom: 20px;
+}
+
+/* ✅ 1:1 как учебник, но цвет кроссворда */
+.crossword-header {
+  color: white;
+  padding: 0;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  text-align: center;
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(135deg, #ff6b6b, #ffa726);
+}
+
+/* ✅ обложка как в учебнике */
+.crossword-cover {
+  width: 100%;
+  height: 220px;
+  background: linear-gradient(135deg, #ff6b6b, #ffa726);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  font-size: 48px;
+  font-weight: bold;
+}
+
+.crossword-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.crossword-info {
+  padding: 20px 24px 26px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.15));
+}
+
+.crossword-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.25);
+}
+
+.crossword-description {
+  font-size: 1.05rem;
+  opacity: 0.95;
+  margin-bottom: 18px;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.2);
+}
+
+.progress-stats {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  text-align: center;
+  background: rgba(255,255,255,0.12);
+  padding: 10px 16px;
+  border-radius: 12px;
+  backdrop-filter: blur(2px);
+}
+
+.stat-number {
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  opacity: 0.95;
+}
+
+/* list */
+.assignments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.assignment-item {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border-left: 4px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.assignment-item:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.assignment-item.completed {
+  border-left-color: var(--accent);
+  background: #fff5f5;
+}
+
+.assignment-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  background: #ffeaa7;
+  color: #e17055;
+}
+
+.assignment-content { flex: 1; }
+
+.assignment-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #333;
+}
+
+.assignment-type {
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.assignment-status {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-completed {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.status-pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.locked-message {
+  background: #fff3cd;
+  border: 2px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+}
+
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--accent);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 2s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+.error {
+  background: #ffebee;
+  color: #c62828;
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .crossword-cover { height: 160px; }
+  .crossword-title { font-size: 1.5rem; }
+  .progress-stats { gap: 12px; }
+  .stat-number { font-size: 1.3rem; }
+  .assignment-item { padding: 15px; }
+}

@@ -1,0 +1,451 @@
+/* app/register/register.css */
+/* 1:1 стили из твоего register.html + новые кнопки */
+
+.page-register {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #4dd0e1, #f48fb1);
+  font-family: "Poppins", "Comic Sans MS", cursive, sans-serif;
+  margin: 0;
+  padding: 20px;
+}
+
+/* чтобы не было “разъезда” ширин */
+.page-register,
+.page-register * {
+  box-sizing: border-box;
+}
+
+.page-register .register-container {
+  width: 100%;
+  max-width: 500px;
+}
+
+.page-register .register-card {
+  background: #fff;
+  padding: 25px;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.page-register .register-card h2 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.page-register .form-group {
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.page-register .form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 600;
+  color: #333;
+}
+
+.page-register .register-card input,
+.page-register .register-card select {
+  width: 100%;
+  padding: 12px 15px;
+  border: 2px solid #f0f0f0;
+  border-radius: 12px;
+  font-size: 16px;
+  transition: border-color 0.3s;
+  font-family: inherit;
+  background: #fff;
+}
+
+.page-register .register-card input:focus,
+.page-register .register-card select:focus {
+  border-color: var(--accent2);
+  outline: none;
+}
+
+/* ====== БАЗОВАЯ КНОПКА (как в html) ====== */
+.page-register .btn {
+  border: none;
+  padding: 12px 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  margin-top: 10px;
+  width: 100%;
+  font-size: 16px;
+  font-weight: 600;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s, opacity 0.2s;
+}
+
+/* ====== КРАСИВАЯ КНОПКА "Создать аккаунт" (голубая) ====== */
+.page-register .btn.btn-primary {
+  background: linear-gradient(135deg, #22c1ff, #4facfe);
+  color: #fff;
+  box-shadow: 0 10px 26px rgba(79, 172, 254, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+/* лёгкий “блик” */
+.page-register .btn.btn-primary::before {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: -60%;
+  width: 60%;
+  height: 180%;
+  background: rgba(255, 255, 255, 0.25);
+  transform: rotate(25deg);
+  transition: left 0.5s ease;
+  pointer-events: none;
+}
+
+.page-register .btn.btn-primary:hover:not(:disabled)::before {
+  left: 120%;
+}
+
+.page-register .btn.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px rgba(79, 172, 254, 0.35);
+}
+
+.page-register .btn.btn-primary:active:not(:disabled) {
+  transform: translateY(0px) scale(0.99);
+  box-shadow: 0 8px 18px rgba(79, 172, 254, 0.22);
+}
+
+/* disabled — неприметная */
+.page-register .btn.btn-primary:disabled {
+  background: linear-gradient(
+    135deg,
+    rgba(34, 193, 255, 0.25),
+    rgba(79, 172, 254, 0.25)
+  );
+  color: rgba(255, 255, 255, 0.75);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* небольшая анимация “включения” */
+.page-register .btn.btn-primary:not(:disabled) {
+  animation: btnEnablePop 180ms ease-out;
+}
+
+@keyframes btnEnablePop {
+  from { transform: scale(0.985); }
+  to { transform: scale(1); }
+}
+
+/* ====== СЕРАЯ, НЕПРИМЕТНАЯ "Перезагрузить капчу" ====== */
+.page-register .btn.btn-captcha-reload {
+  background: rgba(120, 120, 120, 0.12);
+  color: rgba(40, 40, 40, 0.75);
+  border: 1px solid rgba(120, 120, 120, 0.18);
+  box-shadow: none;
+  font-weight: 600;
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.page-register .btn.btn-captcha-reload:hover:not(:disabled) {
+  background: rgba(120, 120, 120, 0.16);
+  border-color: rgba(120, 120, 120, 0.25);
+  transform: translateY(-1px);
+}
+
+.page-register .btn.btn-captcha-reload:active:not(:disabled) {
+  transform: translateY(0px) scale(0.99);
+}
+
+.page-register .btn.btn-captcha-reload:disabled {
+  background: rgba(120, 120, 120, 0.08);
+  color: rgba(40, 40, 40, 0.45);
+  border-color: rgba(120, 120, 120, 0.12);
+  cursor: not-allowed;
+}
+
+/* ====== ССЫЛКИ ====== */
+.page-register .link {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #666;
+}
+
+.page-register .link a {
+  color: var(--accent2);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.page-register .link a:hover {
+  text-decoration: underline;
+}
+
+/* ====== СООБЩЕНИЯ (в React они рендерятся только когда есть текст) ====== */
+.page-register .error-message,
+.page-register .success,
+.page-register .warning {
+  padding: 12px;
+  border-radius: 8px;
+  margin: 15px 0;
+  display: block; /* важно для React-баннеров */
+  font-size: 14px;
+  white-space: pre-line;
+}
+
+.page-register .error-message {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ffcdd2;
+}
+
+.page-register .success {
+  background: #e8f5e8;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.page-register .warning {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+/* ====== БЛОКИ ====== */
+.page-register .rate-limit {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 10px 0;
+  font-size: 13px;
+  text-align: left;
+}
+
+.page-register .info-box {
+  background: #e3f2fd;
+  border: 1px solid #bbdefb;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 10px 0;
+  font-size: 13px;
+  text-align: left;
+}
+
+.page-register .existing-account-help {
+  background: #e8f5e8;
+  border: 1px solid #c8e6c9;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 10px 0;
+  font-size: 13px;
+  text-align: left;
+}
+
+.page-register .consent-text {
+  margin-top: 15px;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.page-register .consent-text a {
+  color: var(--accent2);
+  text-decoration: none;
+}
+
+.page-register .consent-text a:hover {
+  text-decoration: underline;
+}
+
+/* ====== ВАЛИДАЦИЯ ====== */
+.page-register .email-validation {
+  text-align: left;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.page-register .validation-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 0;
+  color: #666;
+}
+
+.page-register .validation-item.valid {
+  color: #4caf50;
+}
+
+.page-register .validation-item.invalid {
+  color: #f44336;
+}
+
+.page-register .validation-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+/* ====== МОБИЛЬНЫЕ ====== */
+@media (max-width: 480px) {
+  .page-register {
+    padding: 15px;
+  }
+
+  .page-register .register-container {
+    max-width: 100%;
+  }
+
+  .page-register .register-card {
+    padding: 20px;
+    border-radius: 16px;
+  }
+
+  .page-register .register-card h2 {
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+  }
+
+  .page-register .register-card input,
+  .page-register .register-card select {
+    padding: 14px 16px;
+    font-size: 16px;
+  }
+
+  .page-register .btn {
+    padding: 14px 20px;
+    font-size: 16px;
+  }
+}
+/* ===== MODAL NOTICE ===== */
+.modal-notice-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 25, 0.45);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 9999;
+}
+
+.modal-notice {
+  width: 100%;
+  max-width: 520px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 14px 50px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  transform: translateY(6px);
+  animation: modalPop 180ms ease-out;
+}
+
+@keyframes modalPop {
+  from { transform: translateY(14px) scale(0.985); opacity: 0; }
+  to { transform: translateY(6px) scale(1); opacity: 1; }
+}
+
+.modal-notice-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.modal-notice-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  background: rgba(79, 172, 254, 0.14);
+}
+
+.modal-error .modal-notice-icon { background: rgba(244, 67, 54, 0.12); }
+.modal-warning .modal-notice-icon { background: rgba(255, 193, 7, 0.16); }
+.modal-success .modal-notice-icon { background: rgba(76, 175, 80, 0.14); }
+
+.modal-notice-title {
+  font-weight: 800;
+  color: #2b2b2b;
+  font-size: 16px;
+  flex: 1;
+}
+
+.modal-notice-x {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  opacity: 0.55;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+.modal-notice-x:hover { opacity: 0.85; background: rgba(0,0,0,0.05); }
+
+.modal-notice-body {
+  padding: 14px 16px 6px 16px;
+  color: #3a3a3a;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.modal-notice-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 12px 16px 16px 16px;
+}
+
+.modal-notice-btn {
+  border: none;
+  cursor: pointer;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 700;
+  font-size: 14px;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.modal-notice-btn.primary {
+  background: linear-gradient(135deg, #22c1ff, #4facfe);
+  color: white;
+  box-shadow: 0 10px 26px rgba(79, 172, 254, 0.25);
+}
+.modal-notice-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 14px 34px rgba(79, 172, 254, 0.35); }
+
+.modal-notice-btn.secondary {
+  background: rgba(120,120,120,0.12);
+  color: rgba(40,40,40,0.8);
+  border: 1px solid rgba(120,120,120,0.18);
+}
+.modal-notice-btn.secondary:hover { transform: translateY(-1px); background: rgba(120,120,120,0.16); }
+
+/* ===== CAPTCHA HELP BLOCK ===== */
+.captcha-help {
+  margin: 10px 0 8px;
+  text-align: left;
+  font-size: 13px;
+  color: rgba(40, 40, 40, 0.78);
+  background: rgba(120, 120, 120, 0.08);
+  border: 1px solid rgba(120, 120, 120, 0.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  line-height: 1.35;
+}
+
+.captcha-help strong { color: rgba(25,25,25,0.9); }
+
+.captcha-help .hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(60,60,60,0.72);
+}
