@@ -4,12 +4,27 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type Props = {
-  className?: string; // например "btn secondary"
-  label?: string; // текст кнопки
-  fallbackHref?: string; // если нет source
+  className?: string;
+  label?: string;
+  fallbackHref?: string;
 };
 
 const INFO_STORAGE_KEY = "infoBackTarget:v1";
+const LAST_SAFE_BACK_KEY = "lastSafeBackTarget:v1";
+
+function safeSet(key: string, value: string) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {}
+}
+
+function safeGet(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
 
 export default function BackToSourceButton({
   className = "btn secondary",
@@ -23,30 +38,66 @@ export default function BackToSourceButton({
   const isInfoSection = pathname === "/info" || pathname.startsWith("/info/");
 
   const [infoPersistedTarget, setInfoPersistedTarget] = useState<string | null>(null);
+  const [lastSafeTarget, setLastSafeTarget] = useState<string | null>(null);
 
-  // ✅ Для /info сохраняем "куда возвращаться" (login/profile) и используем потом,
-  // чтобы "Назад" не прыгал по history на /info/pricing и т.д.
+  // ✅ запоминаем "безопасную" точку возврата
+  // логика:
+  // - если есть source/sourceId — строим родителя и сохраняем
+  // - если мы на /materials — тоже сохраняем /materials
+  // - для /info сохраняем только login/profile (как у тебя)
   useEffect(() => {
-    if (!isInfoSection) return;
+    // 1) /info — отдельная логика (как у тебя)
+    if (isInfoSection) {
+      const source = (sp.get("source") || "").trim().toLowerCase();
+      const next =
+        source === "login"
+          ? "/login"
+          : source === "profile"
+            ? "/profile"
+            : null;
 
-    const source = (sp.get("source") || "").trim().toLowerCase();
-    const next =
-      source === "login" ? "/login" :
-      source === "profile" ? "/profile" :
-      null;
-
-    try {
       if (next) {
-        sessionStorage.setItem(INFO_STORAGE_KEY, next);
+        safeSet(INFO_STORAGE_KEY, next);
         setInfoPersistedTarget(next);
       } else {
-        const saved = sessionStorage.getItem(INFO_STORAGE_KEY);
-        setInfoPersistedTarget(saved || null);
+        setInfoPersistedTarget(safeGet(INFO_STORAGE_KEY));
       }
-    } catch {
-      setInfoPersistedTarget(null);
+      return;
     }
-  }, [isInfoSection, sp]);
+
+    // 2) если /materials — это идеальная safe точка
+    if (pathname === "/materials") {
+      safeSet(LAST_SAFE_BACK_KEY, "/materials");
+      setLastSafeTarget("/materials");
+      return;
+    }
+
+    // 3) если есть явный source — сохраняем родителя
+    const source = (sp.get("source") || "").trim().toLowerCase();
+    const sourceId = (sp.get("sourceId") || "").trim();
+
+    const target =
+      source === "materials"
+        ? "/materials"
+        : source === "login"
+          ? "/login"
+          : source === "profile"
+            ? "/profile"
+            : source === "textbook" && sourceId
+              ? `/textbook/${encodeURIComponent(sourceId)}`
+              : source === "crossword" && sourceId
+                ? `/crossword/${encodeURIComponent(sourceId)}`
+                : null;
+
+    if (target) {
+      safeSet(LAST_SAFE_BACK_KEY, target);
+      setLastSafeTarget(target);
+      return;
+    }
+
+    // 4) если ничего не пришло — просто читаем что было сохранено
+    setLastSafeTarget(safeGet(LAST_SAFE_BACK_KEY));
+  }, [isInfoSection, pathname, sp]);
 
   const explicitTarget = useMemo(() => {
     const source = (sp.get("source") || "").trim().toLowerCase();
@@ -56,7 +107,10 @@ export default function BackToSourceButton({
     if (source === "login") return "/login";
     if (source === "profile") return "/profile";
 
-    // существующая логика
+    // ✅ материалы как source (если где-то будешь прокидывать)
+    if (source === "materials") return "/materials";
+
+    // ✅ существующая логика
     if (source === "textbook" && sourceId) return `/textbook/${encodeURIComponent(sourceId)}`;
     if (source === "crossword" && sourceId) return `/crossword/${encodeURIComponent(sourceId)}`;
 
@@ -73,18 +127,19 @@ export default function BackToSourceButton({
       return;
     }
 
-    // 2) для /info: НЕ делаем router.back(), чтобы не возвращало на /info/pricing и т.д.
+    // 2) для /info: НЕ делаем router.back()
     if (isInfoSection) {
       router.push(fallbackHref);
       return;
     }
 
-    // 3) для остальных страниц — оставляем старое поведение
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      router.back();
+    // 3) если нет source — идём в последний сохранённый “родитель”
+    if (lastSafeTarget) {
+      router.push(lastSafeTarget);
       return;
     }
 
+    // 4) иначе — fallback
     router.push(fallbackHref);
   }
 
