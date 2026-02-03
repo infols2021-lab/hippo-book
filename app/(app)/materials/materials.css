@@ -1,35 +1,109 @@
-/* app/materials/materials.css */
-/* Inline CSS from materials.html */
+/* app/(app)/materials/materials.css */
+
+/* фон страницы как в профиле/логине */
+.materials-page {
+  min-height: 100vh;
+  padding: 22px 0;
+
+  background-color: #eaf7ff;
+  background-image:
+    radial-gradient(1200px 700px at 15% 10%, rgba(78, 205, 196, 0.18), transparent 60%),
+    radial-gradient(1100px 700px at 85% 20%, rgba(110, 190, 255, 0.22), transparent 62%),
+    linear-gradient(180deg, #f5fbff 0%, #d7eefc 58%, #f0fbff 100%);
+  background-attachment: fixed;
+
+  color: #1f2937;
+}
+
+.materials-page::after{
+  content:"";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(900px 520px at 50% 35%, rgba(0, 0, 0, 0.03), transparent 60%);
+}
 
 .materials-container {
   width: 95%;
   max-width: 1200px;
-  margin: 20px auto;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
+/* Заголовок секции (h3) приятнее */
+.materials-title {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+  font-weight: 1000;
+  color: rgba(44, 62, 80, 0.86);
+}
+
+.materials-subtitle {
+  margin: 0 0 14px 0;
+  font-size: 13px;
+  font-weight: 850;
+  color: rgba(44, 62, 80, 0.60);
+}
+
+/* “Стеклянная” плашка под табами */
+.materials-panel {
+  background: rgba(255,255,255,0.62);
+  border: 1px solid rgba(255,255,255,0.75);
+  box-shadow: 0 20px 60px rgba(15, 65, 95, 0.14);
+  backdrop-filter: blur(14px);
+  border-radius: 22px;
+  padding: 14px;
+  margin-top: 14px;
+}
+
+/* Tabs */
 .materials-tabs {
   display: flex;
   gap: 10px;
-  margin-bottom: 20px;
-  border-bottom: 2px solid #f0f0f0;
   flex-wrap: wrap;
+  padding: 8px;
+
+  background: rgba(255,255,255,0.60);
+  border: 1px solid rgba(255,255,255,0.75);
+  backdrop-filter: blur(14px);
+  border-radius: 999px;
+
+  box-shadow: 0 16px 40px rgba(15, 65, 95, 0.12);
+  margin: 14px 0 16px;
 }
 
 .material-tab {
-  padding: 12px 24px;
-  background: none;
-  border: none;
-  font-size: 16px;
-  font-weight: 600;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
   cursor: pointer;
-  border-radius: 8px 8px 0 0;
-  transition: all 0.3s ease;
-  color: #666;
+
+  font-size: 14px;
+  font-weight: 1000;
+  color: rgba(44, 62, 80, 0.70);
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(110,190,255,0.18);
+
+  transition: transform .12s ease, filter .12s ease, background .12s ease;
+  box-shadow: 0 14px 26px rgba(15,65,95,0.10);
+}
+
+.material-tab:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.02);
+}
+
+.material-tab:active {
+  transform: translateY(0px);
+  filter: brightness(0.98);
 }
 
 .material-tab.active {
-  background: var(--accent2);
   color: white;
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.95), rgba(110, 190, 255, 0.92));
+  border-color: transparent;
+  box-shadow: 0 18px 36px rgba(78,205,196,0.18);
 }
 
 .materials-section {
@@ -40,151 +114,179 @@
   display: block;
 }
 
+/* Grid */
 .materials-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-  margin-top: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 18px;
+  margin-top: 14px;
 }
 
+/* Card */
 .material-card {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  cursor: pointer;
-  border: 2px solid transparent;
   position: relative;
+  cursor: pointer;
+
+  border-radius: 18px;
+  padding: 16px;
+
+  background: rgba(255,255,255,0.70);
+  border: 1px solid rgba(255,255,255,0.80);
+  backdrop-filter: blur(14px);
+
+  box-shadow: 0 16px 46px rgba(15, 65, 95, 0.14);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, filter .12s ease;
 }
 
 .material-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-  border-color: var(--accent2);
+  box-shadow: 0 24px 68px rgba(15, 65, 95, 0.18);
+  border-color: rgba(78, 205, 196, 0.45);
+  filter: brightness(1.01);
 }
 
 .material-cover {
   width: 100%;
   height: 160px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border-radius: 8px;
-  margin-bottom: 15px;
+  border-radius: 14px;
+  margin-bottom: 12px;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   color: white;
-  font-size: 48px;
-  font-weight: bold;
+  font-size: 46px;
+  font-weight: 1000;
+
   overflow: hidden;
+  background: linear-gradient(135deg, rgba(110, 190, 255, 0.92), rgba(78, 205, 196, 0.92));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+}
+
+.material-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 14px;
 }
 
 .material-title {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: #333;
+  font-size: 16px;
+  font-weight: 1000;
+  margin-bottom: 6px;
+  color: rgba(44, 62, 80, 0.86);
 }
 
 .material-description {
-  color: #666;
-  font-size: 14px;
-  margin-bottom: 12px;
-  line-height: 1.4;
+  color: rgba(44, 62, 80, 0.62);
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 10px;
+  line-height: 1.35;
+}
+
+/* Progress */
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(44, 62, 80, 0.10);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 10px 0 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.95), rgba(110, 190, 255, 0.92));
+  border-radius: 999px;
+  transition: width 0.3s ease;
 }
 
 .material-stats {
   display: flex;
   justify-content: space-between;
   align-items: center;
+
   font-size: 12px;
-  color: #888;
+  font-weight: 900;
+  color: rgba(44, 62, 80, 0.55);
 }
 
-.progress-bar {
-  width: 100%;
-  height: 6px;
-  background: #f0f0f0;
-  border-radius: 3px;
-  margin: 8px 0;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: var(--accent2);
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
-
-.locked-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.7);
-  border-radius: 12px;
-  display: flex;
+.material-stats .pct {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 16px;
+  padding: 4px 10px;
+  border-radius: 999px;
+
+  background: rgba(78, 205, 196, 0.14);
+  border: 1px solid rgba(78, 205, 196, 0.22);
+  color: rgba(44, 62, 80, 0.78);
 }
 
+/* Locked */
 .material-card.locked {
   cursor: not-allowed;
+  filter: grayscale(1) saturate(0.6);
+  opacity: 0.85;
 }
 
 .material-card.locked:hover {
   transform: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  border-color: transparent;
+  box-shadow: 0 16px 46px rgba(15, 65, 95, 0.14);
+  border-color: rgba(255,255,255,0.80);
 }
 
-.loading {
+.locked-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: white;
+  font-weight: 1000;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+}
+
+/* Empty state */
+.materials-empty {
+  grid-column: 1 / -1;
   text-align: center;
-  padding: 40px;
+  padding: 34px 16px;
+  border-radius: 18px;
+
+  background: rgba(255,255,255,0.60);
+  border: 1px solid rgba(255,255,255,0.75);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 16px 40px rgba(15,65,95,0.10);
+
+  color: rgba(44, 62, 80, 0.70);
+  font-weight: 900;
 }
 
-.spinner {
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid var(--accent2);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 2s linear infinite;
-  margin: 0 auto 20px;
+.materials-empty p {
+  margin: 8px 0;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.error {
-  background: #ffebee;
-  color: #c62828;
-  padding: 20px;
-  border-radius: 8px;
-  margin: 20px;
-  text-align: center;
-}
-
+/* Mobile */
 @media (max-width: 768px) {
-  .materials-grid {
-    grid-template-columns: 1fr;
-    gap: 15px;
-  }
-
-  .material-tab {
-    padding: 10px 16px;
-    font-size: 14px;
-  }
-
   .materials-container {
     width: 100%;
     padding: 0 10px;
+  }
+  .materials-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .material-tab {
+    padding: 10px 14px;
+    font-size: 13px;
   }
 }

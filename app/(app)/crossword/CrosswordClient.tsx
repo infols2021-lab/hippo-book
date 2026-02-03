@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import AppHeader from "@/components/AppHeader";
 
 type UserProgress = { assignment_id: string; is_completed: boolean };
 
@@ -33,12 +34,8 @@ function resolvePublicUrl(raw: any, bucket: string) {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!base) return null;
 
-  const key = String(raw)
-    .replace(/^\/+/, "")
-    .replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
-
-  const v = Date.now();
-  return `${base}/storage/v1/object/public/${bucket}/${encodeURIComponent(key)}?v=${v}`;
+  const key = String(raw).replace(/^\/+/, "").replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
+  return `${base}/storage/v1/object/public/${bucket}/${encodeURIComponent(key)}?v=${Date.now()}`;
 }
 
 export default function CrosswordClient({ crosswordId, initialData }: Props) {
@@ -103,56 +100,60 @@ export default function CrosswordClient({ crosswordId, initialData }: Props) {
 
   const completedSet = useMemo(
     () => new Set(userProgress.filter((x) => x.is_completed).map((x) => x.assignment_id)),
-    [userProgress]
+    [userProgress],
   );
 
   const completedCount = userProgress.filter((x) => x.is_completed).length;
   const totalCount = assignments.length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  // ✅ cover как у учебника (но bucket отдельный)
-  // Если у тебя cover лежит в другом бакете — поменяй "covers" на нужный.
   const coverUrl = resolvePublicUrl(crossword?.cover_image_url, "covers");
 
   return (
     <div className="crossword-container">
-      {/* ✅ как в учебниках */}
+      <AppHeader
+        nav={[
+          { kind: "link", href: "/materials", label: "📚 Материалы", className: "btn" },
+          { kind: "link", href: "/profile", label: "👤 Профиль", className: "btn" },
+          { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
+        ]}
+      />
+
       <div className="back-button">
         <Link className="btn secondary" href="/materials">
-          ← Назад к материалам
+          ← Назад
         </Link>
       </div>
 
       {loading ? (
-        <div id="loading" className="loading" style={{ display: "block" }}>
+        <div className="loading" style={{ display: "block" }}>
           <div className="spinner"></div>
           <p>Загружаем кроссворд...</p>
         </div>
       ) : null}
 
       {error ? (
-        <div id="errorMessage" className="error" style={{ display: "block" }}>
+        <div className="error" style={{ display: "block" }}>
           ❌ {error}
           <div style={{ height: 10 }} />
-          <button className="btn" onClick={() => location.reload()}>
+          <button className="btn" onClick={() => location.reload()} type="button">
             🔄 Повторить
           </button>
         </div>
       ) : null}
 
       {!loading && !error ? (
-        <div id="crosswordContent" style={{ display: "block" }}>
+        <div style={{ display: "block" }}>
           {data?.locked ? (
-            <div id="lockedMessage" className="locked-message" style={{ display: "block" }}>
+            <div className="locked-message" style={{ display: "block" }}>
               <h3>🔒 Кроссворд недоступен</h3>
               <p>Для доступа к этому кроссворду обратитесь к администратору.</p>
             </div>
           ) : null}
 
           {!data?.locked && crossword ? (
-            <div className="crossword-header" id="crosswordHeader" style={{ display: "block" }}>
-              {/* ✅ обложка как в учебнике */}
-              <div className="crossword-cover" id="crosswordCover">
+            <div className="crossword-header" style={{ display: "block" }}>
+              <div className="crossword-cover">
                 {coverUrl ? (
                   <img
                     src={coverUrl}
@@ -171,32 +172,20 @@ export default function CrosswordClient({ crosswordId, initialData }: Props) {
               </div>
 
               <div className="crossword-info">
-                <div className="crossword-title" id="crosswordTitle">
-                  {crossword.title}
-                </div>
-                <div className="crossword-description" id="crosswordDescription">
-                  {crossword.description || "Разгадайте кроссворд"}
-                </div>
+                <div className="crossword-title">{crossword.title}</div>
+                <div className="crossword-description">{crossword.description || "Разгадайте кроссворд"}</div>
 
                 <div className="progress-stats">
                   <div className="stat-item">
-                    <div className="stat-number" id="completedCount">
-                      {completedCount}
-                    </div>
+                    <div className="stat-number">{completedCount}</div>
                     <div className="stat-label">Разгадано</div>
                   </div>
-
                   <div className="stat-item">
-                    <div className="stat-number" id="totalCount">
-                      {totalCount}
-                    </div>
+                    <div className="stat-number">{totalCount}</div>
                     <div className="stat-label">Всего слов</div>
                   </div>
-
                   <div className="stat-item">
-                    <div className="stat-number" id="progressPercent">
-                      {progressPercent}%
-                    </div>
+                    <div className="stat-number">{progressPercent}%</div>
                     <div className="stat-label">Прогресс</div>
                   </div>
                 </div>
@@ -205,11 +194,11 @@ export default function CrosswordClient({ crosswordId, initialData }: Props) {
           ) : null}
 
           {!data?.locked && crossword ? (
-            <div className="card" id="assignmentsCard" style={{ display: "block" }}>
+            <div className="card" style={{ display: "block" }}>
               <h3>Слова кроссворда</h3>
               <p className="small-muted">Нажмите на слово, чтобы перейти к заданию.</p>
 
-              <div className="assignments-list" id="assignmentsList">
+              <div className="assignments-list">
                 {assignments.length === 0 ? (
                   <div style={{ textAlign: "center", padding: 40, color: "#666" }}>
                     <p>🧩 Слова пока не добавлены</p>

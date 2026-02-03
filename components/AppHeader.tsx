@@ -15,7 +15,7 @@ type Props = {
 
 export default function AppHeader({
   markText = "EK",
-  title = "Edu Keys",
+  title = "Учебники Хиппоши",
   subtitle = "🎓 Образовательная платформа",
   nav = [
     { kind: "link", href: "/materials", label: "📚 Материалы", className: "btn" },

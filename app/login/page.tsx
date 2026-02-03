@@ -18,10 +18,8 @@ function buildHelpImageUrl(imageName: string, cacheBust?: string) {
   return `${base}/storage/v1/object/public/help-images/${imageName}?v=${cacheBust}`;
 }
 
-// ✅ Detect "VPN / blocked network" style errors (TypeError: Failed to fetch, NetworkError, etc.)
 function looksLikeNetworkError(err: unknown) {
   const msg = String((err as any)?.message ?? err ?? "").toLowerCase().trim();
-
   return (
     msg.includes("failed to fetch") ||
     msg.includes("fetch failed") ||
@@ -48,14 +46,11 @@ export default function LoginPage() {
   const [bannerText, setBannerText] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // ✅ if last failure looks like VPN/network issue
   const [networkIssue, setNetworkIssue] = useState(false);
 
-  // Help modal
   const [helpOpen, setHelpOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"registration" | "rules">("registration");
 
-  // preload indicator
   const [preloadVisible, setPreloadVisible] = useState(false);
   const [preloadCount, setPreloadCount] = useState(0);
   const totalToPreload = 2;
@@ -82,7 +77,6 @@ export default function LoginPage() {
     showBanner("error", extra ? `${base}\n\nДетали: ${extra}` : base);
   }
 
-  // preload help images
   useEffect(() => {
     let cancelled = false;
 
@@ -122,7 +116,6 @@ export default function LoginPage() {
     };
   }, []);
 
-  // banner from query params
   useEffect(() => {
     if (!msgParam) return;
 
@@ -141,7 +134,6 @@ export default function LoginPage() {
     }
   }, [msgParam]);
 
-  // If already logged in -> redirect (and don't explode on VPN)
   useEffect(() => {
     let cancelled = false;
 
@@ -154,10 +146,7 @@ export default function LoginPage() {
         }
       } catch (e: any) {
         if (cancelled) return;
-        if (looksLikeNetworkError(e)) {
-          showNetworkBanner(String(e?.message || e));
-        }
-        // иначе молча — чтобы не мешать странице
+        if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
       }
     }
 
@@ -170,24 +159,12 @@ export default function LoginPage() {
 
   async function checkUserRoleAndRedirect(userId: string) {
     try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_admin")
-        .eq("id", userId)
-        .single();
-
-      if (profile?.is_admin) {
-        window.location.href = "/admin";
-      } else {
-        window.location.href = "/profile";
-      }
+      const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", userId).single();
+      if (profile?.is_admin) window.location.href = "/admin";
+      else window.location.href = "/profile";
     } catch (e: any) {
-      // если внезапно сетевое — покажем норм баннер
-      if (looksLikeNetworkError(e)) {
-        showNetworkBanner(String(e?.message || e));
-      } else {
-        showBanner("error", "❌ Ошибка загрузки профиля. Обновите страницу и попробуйте снова.");
-      }
+      if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
+      else showBanner("error", "❌ Ошибка загрузки профиля. Обновите страницу и попробуйте снова.");
     }
   }
 
@@ -231,7 +208,6 @@ export default function LoginPage() {
         const msg = error.message || "Неизвестная ошибка";
         const code = (error as any).code as string | undefined;
 
-        // ✅ иногда "fetch" прилетает и сюда
         if (looksLikeNetworkError(error) || looksLikeNetworkError(msg)) {
           showNetworkBanner(String(msg));
           setBusy(false);
@@ -246,15 +222,9 @@ export default function LoginPage() {
           const resend = window.confirm("Отправить письмо с подтверждением повторно?");
           if (resend) {
             try {
-              const { error: resendError } = await supabase.auth.resend({
-                type: "signup",
-                email: e,
-              });
-              if (!resendError) {
-                showBanner("success", "📧 Письмо с подтверждением отправлено повторно. Проверьте вашу почту.");
-              } else if (looksLikeNetworkError(resendError)) {
-                showNetworkBanner(String((resendError as any)?.message || resendError));
-              }
+              const { error: resendError } = await supabase.auth.resend({ type: "signup", email: e });
+              if (!resendError) showBanner("success", "📧 Письмо с подтверждением отправлено повторно. Проверьте почту.");
+              else if (looksLikeNetworkError(resendError)) showNetworkBanner(String((resendError as any)?.message || resendError));
             } catch (re: any) {
               if (looksLikeNetworkError(re)) showNetworkBanner(String(re?.message || re));
             }
@@ -279,15 +249,9 @@ export default function LoginPage() {
       }
 
       if (isAdmin) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("is_admin")
-          .eq("id", data.user.id)
-          .single();
-
-        if (profile?.is_admin) {
-          window.location.href = "/admin";
-        } else {
+        const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", data.user.id).single();
+        if (profile?.is_admin) window.location.href = "/admin";
+        else {
           showBanner("error", "❌ У вас нет прав администратора");
           await supabase.auth.signOut();
           setBusy(false);
@@ -296,16 +260,12 @@ export default function LoginPage() {
         window.location.href = "/profile";
       }
     } catch (err: any) {
-      if (looksLikeNetworkError(err)) {
-        showNetworkBanner(String(err?.message || err));
-      } else {
-        showBanner("error", "❌ Неожиданная ошибка: " + (err?.message || String(err)));
-      }
+      if (looksLikeNetworkError(err)) showNetworkBanner(String(err?.message || err));
+      else showBanner("error", "❌ Неожиданная ошибка: " + (err?.message || String(err)));
       setBusy(false);
     }
   }
 
-  // close help on escape
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && helpOpen) {
@@ -330,23 +290,18 @@ export default function LoginPage() {
   function renderBanner() {
     if (!bannerType) return null;
     const cls = bannerType === "error" ? "error" : bannerType === "success" ? "success" : "warning";
-    return (
-      <div className={cls} style={{ display: "block", whiteSpace: "pre-line" }}>
-        {bannerText}
-      </div>
-    );
+    return <div className={cls} style={{ display: "block" }}>{bannerText}</div>;
   }
 
   function renderNetworkActions() {
     if (!networkIssue) return null;
-
     return (
       <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button className="btn" type="button" onClick={() => window.location.reload()}>
+        <button className="btn student" type="button" onClick={() => window.location.reload()}>
           🔄 Обновить страницу
         </button>
         <Link className="btn info" href="/info">
-          ℹ️ Информация
+          📄 Информация
         </Link>
       </div>
     );
@@ -367,10 +322,7 @@ export default function LoginPage() {
     const cached = preloaded.current[tab];
     const file = tab === "registration" ? "registration-help.png" : "rules-help.png";
     const alt = tab === "registration" ? "Инструкция по регистрации" : "Правила платформы";
-
-    if (cached) {
-      return <img className="help-image" src={buildHelpImageUrl(file, cacheBust || undefined)} alt={alt} />;
-    }
+    if (cached) return <img className="help-image" src={buildHelpImageUrl(file, cacheBust || undefined)} alt={alt} />;
     return <img className="help-image" src={buildHelpImageUrl(file)} alt={alt} />;
   }
 
@@ -400,7 +352,7 @@ export default function LoginPage() {
       >
         <div className="help-modal-content">
           <div className="help-modal-header">
-            <h3 style={{ margin: 0, color: "#333" }}>📚 Помощь по платформе</h3>
+            <h3 style={{ margin: 0, color: "#2c3e50", fontWeight: 1000 }}>📚 Помощь</h3>
             <button className="help-close" onClick={closeHelp} type="button">
               ✕
             </button>
@@ -435,79 +387,80 @@ export default function LoginPage() {
 
       <div className="login-container">
         <div className="login-card">
-          <h2>Вход в Edu Keys</h2>
+          {/* ✅ Новый бренд */}
+          <div className="brand">
+            <div className="brand-mark">HH</div>
+            <div>
+              <div className="brand-title">Учебники Хиппоши</div>
+              <div className="brand-subtitle">🎓 Образовательная платформа</div>
+            </div>
+          </div>
+
+          <h2>Вход в аккаунт</h2>
 
           <div className="loading" style={{ display: busy ? "block" : "none" }}>
             <div className="spinner" />
-            <p>Проверяем данные...</p>
+            Проверяем данные...
           </div>
 
           {renderBanner()}
           {renderNetworkActions()}
 
-          <div style={{ display: "block" }}>
-            {renderExistingAccountHelp()}
+          {renderExistingAccountHelp()}
 
-            <div className="form-group">
-              <label htmlFor="email">Email:</label>
-              <input
-                type="email"
-                id="email"
-                placeholder="example@gmail.com"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    (document.getElementById("password") as HTMLInputElement | null)?.focus();
-                  }
-                }}
-              />
-            </div>
+          <div className="form-group">
+            <label htmlFor="email">Email:</label>
+            <input
+              type="email"
+              id="email"
+              placeholder="example@gmail.com"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (document.getElementById("password") as HTMLInputElement | null)?.focus();
+              }}
+            />
+          </div>
 
-            <div className="form-group">
-              <label htmlFor="password">Пароль:</label>
-              <input
-                type="password"
-                id="password"
-                placeholder="Введите ваш пароль"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void doLogin(false);
-                }}
-              />
-            </div>
+          <div className="form-group">
+            <label htmlFor="password">Пароль:</label>
+            <input
+              type="password"
+              id="password"
+              placeholder="Введите ваш пароль"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void doLogin(false);
+              }}
+            />
+          </div>
 
-            <button className="btn" onClick={() => void doLogin(false)} disabled={busy}>
-              Войти как ученик
+          <button className="btn student" onClick={() => void doLogin(false)} disabled={busy}>
+            👨‍🎓 Войти как ученик
+          </button>
+
+          <button className="btn admin" onClick={() => void doLogin(true)} disabled={busy}>
+            🛠️ Войти как администратор
+          </button>
+
+          <div className="link">
+            <p>
+              Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
+            </p>
+            <p>
+              <Link href="/reset">Забыли пароль?</Link>
+            </p>
+
+            <Link className="btn info" href="/info">
+              📄 Информация
+            </Link>
+
+            <button className="btn help" onClick={openHelp} type="button">
+              ❓ Помощь
             </button>
-
-            <button className="btn admin" onClick={() => void doLogin(true)} disabled={busy}>
-              Войти как администратор
-            </button>
-
-            <div className="link">
-              <p>
-                Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
-              </p>
-
-              {/* ✅ ИЗМЕНЕНИЕ ТОЛЬКО ТУТ: вместо /reset -> /update-password */}
-              <p>
-                <Link href="/reset">Забыли пароль?</Link>
-              </p>
-
-              {/* ✅ Информация (выше помощи) */}
-              <Link className="btn info" href="/info">
-                ℹ️ Информация
-              </Link>
-
-              {/* ✅ Помощь по платформе (ниже информации) */}
-              <button className="btn help" onClick={openHelp} type="button">
-                ❓ Помощь по платформе
-              </button>
-            </div>
           </div>
         </div>
       </div>

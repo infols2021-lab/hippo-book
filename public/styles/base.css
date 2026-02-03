@@ -1,21 +1,47 @@
-/* css/style.css */
+/* public/styles/base.css */
+
 :root{
-  --bg1: #fff7e6;
-  --accent: #ff6b6b;
-  --accent2: #4ecdc4;
-  --card: #ffffff;
-  --muted:#6b6b6b;
+  /* Базовая палитра (единая на всех страницах) */
+  --bg1: #eaf6ff;
+  --bg2: #d8f2ff;
+
+  --accent: #ff6b6b;   /* красный (опасное/выйти) */
+  --accent2: #4ecdc4;  /* бирюза (главные действия) */
+  --accent3: #74b9ff;  /* голубой (инфо) */
+
+  --card: rgba(255,255,255,0.78);
+  --card-border: rgba(255,255,255,0.65);
+  --muted:#6b7280;
+
+  /* Единый фон приложения */
+  --app-bg-gradient:
+    radial-gradient(1200px 800px at 15% 10%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 55%),
+    radial-gradient(900px 600px at 85% 15%, rgba(116,185,255,0.25) 0%, rgba(116,185,255,0) 60%),
+    linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 45%, #e9fbff 100%);
 }
 
-*{box-sizing:border-box}
+/* ===== Hard reset (фикс “полоски” и странных отступов) ===== */
+*{ box-sizing:border-box }
+
+html, body {
+  height: 100%;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: var(--app-bg-gradient);
+}
+
 body{
-  margin:0;
-  font-family: 'Poppins', "Comic Sans MS", sans-serif;
-  background: linear-gradient(135deg,#fffaf0,#ffd6a5);
   min-height:100vh;
+  overflow-x: hidden;
+
+  font-family: 'Poppins', "Comic Sans MS", sans-serif;
   color:#1f2937;
+
+  background: var(--app-bg-gradient);
+  background-attachment: fixed;
 }
 
+/* Контейнеры */
 .container {
   width:95%;
   max-width:1100px;
@@ -30,42 +56,76 @@ body{
   gap:12px;
   margin-bottom:18px;
 }
+
 .logo {
   display:flex;
   gap:12px;
   align-items:center;
 }
+
 .logo .mark {
   width:56px;height:56px;border-radius:12px;
-  background:linear-gradient(135deg,var(--accent2),#6dd3c0);
-  display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:20px;
-  box-shadow:0 6px 18px rgba(0,0,0,0.08);
+  background:linear-gradient(135deg,var(--accent3), rgba(116,185,255,0.55));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;color:#fff;font-size:20px;
+  box-shadow:0 10px 24px rgba(15,23,42,0.10);
 }
+
 .header .nav { display:flex; gap:8px; align-items:center; }
 
-/* Cards */
+/* Cards (glass-like) */
 .card {
-  background:var(--card);
+  background: var(--card);
   border-radius:16px;
   padding:18px;
-  box-shadow:0 8px 26px rgba(0,0,0,0.08);
+  border: 1px solid var(--card-border);
+  box-shadow:0 14px 34px rgba(15,23,42,0.10);
+}
+
+@supports ((-webkit-backdrop-filter: blur(10px)) or (backdrop-filter: blur(10px))) {
+  .card {
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
 }
 
 /* Buttons */
 .btn {
-  background:var(--accent2);
+  background: linear-gradient(135deg, var(--accent2), #6dd3c0);
   color:#fff;
   border:0;
   padding:10px 16px;
   border-radius:12px;
-  font-weight:700;
+  font-weight:800;
   cursor:pointer;
-  transition: transform .12s ease, box-shadow .12s;
-  box-shadow:0 6px 12px rgba(78,205,196,0.18);
+  transition: transform .12s ease, box-shadow .12s, filter .12s ease;
+  box-shadow:0 10px 18px rgba(78,205,196,0.18);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .btn:hover{ transform:translateY(-3px) }
-.btn.secondary { background: var(--accent); box-shadow:0 6px 12px rgba(255,107,107,0.18) }
-.btn.ghost { background:transparent; color:var(--accent2); border:2px solid rgba(78,205,196,0.18) }
+.btn:active{ transform:translateY(-1px) }
+
+.btn.secondary {
+  background: linear-gradient(135deg, var(--accent), #ff8e8e);
+  box-shadow:0 10px 18px rgba(255,107,107,0.16);
+}
+
+.btn.info {
+  background: linear-gradient(135deg, var(--accent3), rgba(116,185,255,0.55));
+  box-shadow:0 10px 18px rgba(116,185,255,0.16);
+}
+
+.btn.ghost {
+  background: rgba(255,255,255,0.55);
+  color: var(--accent2);
+  border: 2px solid rgba(78,205,196,0.25);
+  box-shadow: none;
+}
+
 .btn.small { padding:6px 10px; font-size:13px; border-radius:10px }
 
 /* Layout for main pages */
@@ -81,7 +141,7 @@ body{
   }
 }
 
-/* Profile */
+/* Profile (общие стили, если где-то используются) */
 .profile-card {
   display:flex;
   flex-direction:column;
@@ -89,12 +149,16 @@ body{
   gap:12px;
   text-align:center;
 }
+
 .profile-avatar {
-  width:220px;height:220px;border-radius:20px;background:linear-gradient(135deg,#fff,#fff8e6);
-  position:relative; display:flex;align-items:center;justify-content:center;
-  box-shadow:0 10px 24px rgba(0,0,0,0.08);
-  border:6px solid #fff6d8;
+  width:220px;height:220px;border-radius:20px;
+  background:linear-gradient(135deg, rgba(255,255,255,0.85), rgba(255,255,255,0.55));
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 12px 28px rgba(15,23,42,0.10);
+  border:6px solid rgba(255,255,255,0.75);
 }
+
 /* SVG decorative image container */
 .profile-avatar svg { width:100%; height:100%; border-radius:14px; }
 
@@ -121,35 +185,208 @@ body{
 
 /* Profile info */
 .profile-info { width:100%; }
-.badge { display:inline-block; padding:6px 10px; border-radius:999px; background:var(--accent2); color:#fff; font-weight:700; }
-
-/* Tasks list */
-.month-row { margin-bottom:12px; }
-.month-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-.tasks-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
-
-/* each task card */
-.task-card {
-  padding:12px;border-radius:12px;background:linear-gradient(180deg,#fff,#fff8ef);
-  box-shadow:0 6px 14px rgba(0,0,0,0.06); text-align:left;
+.badge {
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  background:var(--accent2);
+  color:#fff;
+  font-weight:800;
 }
-.task-card h4{ margin:0 0 8px 0; font-size:16px }
-.task-card p{ margin:0; color:var(--muted) }
-.task-card .meta { margin-top:10px; display:flex; gap:8px; align-items:center; justify-content:space-between }
 
 /* Admin: controls & lists */
 .admin-controls { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
 .table { width:100%; border-collapse:collapse; margin-top:8px;}
-.table th,.table td{ padding:10px; border-bottom:1px solid #f1f1f1; text-align:left; background:#fffef8 }
+.table th,.table td{
+  padding:10px;
+  border-bottom:1px solid rgba(15,23,42,0.06);
+  text-align:left;
+  background: rgba(255,255,255,0.55);
+}
 
-/* Modal */
-.modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.45); display:none; align-items:center; justify-content:center; z-index:999 }
-.modal-body{ background:#fff; padding:18px; border-radius:12px; width:90%; max-width:760px }
+/* =========================================================
+   MODAL (НЕПРОЗРАЧНАЯ, СКРОЛЛ ВНУТРИ, НЕ ЛОМАЕТ СТАРОЕ)
+   ========================================================= */
+
+/* overlay (новое имя) */
+.modal-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 18px;
+
+  background: rgba(12, 25, 35, 0.55);
+}
+
+/* overlay (старое имя) */
+.modal-backdrop{
+  position:fixed;
+  inset:0;
+  z-index: 20000;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  padding: 18px;
+
+  background: rgba(12, 25, 35, 0.55);
+}
+
+/* panel (новое имя) */
+.modal-panel{
+  width: 100%;
+  border-radius: 22px;
+
+  /* ✅ НЕПРОЗРАЧНО */
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.35),
+    0 2px 0 rgba(15,23,42,0.04);
+
+  overflow: hidden;
+  outline: none;
+}
+
+/* content/body (старые имена) */
+.modal-content,
+.modal-body{
+  /* ✅ НЕПРОЗРАЧНО */
+  background: #ffffff !important;
+}
+
+/* если где-то используется .modal-body как контейнер модалки */
+.modal-body{
+  width: 100%;
+  border-radius: 22px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.35),
+    0 2px 0 rgba(15,23,42,0.04);
+  overflow: hidden;
+}
+
+/* header */
+.modal-header{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 14px 14px;
+
+  /* ✅ НЕПРОЗРАЧНО */
+  background: #f3f6fb;
+  border-bottom: 1px solid rgba(44, 62, 80, 0.10);
+}
+
+.modal-title-wrap{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.modal-icon{
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+
+  background: rgba(110, 190, 255, 0.18);
+  border: 1px solid rgba(110, 190, 255, 0.20);
+}
+
+.modal-title{
+  margin: 0;
+  font-size: 16px;
+  font-weight: 1000;
+  color: rgba(44, 62, 80, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* close */
+.modal-close{
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 1px solid rgba(15,23,42,0.10);
+  cursor: pointer;
+
+  background: #ffffff;
+  color: rgba(44, 62, 80, 0.80);
+  font-size: 18px;
+  font-weight: 1000;
+
+  box-shadow: 0 12px 28px rgba(15, 65, 95, 0.12);
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+.modal-close:hover { transform: translateY(-2px); filter: brightness(1.03); }
+.modal-close:active { transform: translateY(0px); filter: brightness(0.98); }
+
+/* ✅ главное: скролл внутри ЛЮБОЙ модалки */
+.modal-body{
+  padding: 16px;
+  max-height: min(78vh, 720px);
+  overflow: auto;
+}
+
+/* Если твой React-Modal НЕ оборачивает children в .modal-body,
+   тогда children лежат прямо внутри .modal-content -> тоже дадим скролл */
+.modal-content{
+  padding: 0;
+  max-height: min(78vh, 720px);
+  overflow: hidden;
+}
+
+/* всё что внутри (кроме шапки) пусть скроллится */
+.modal-content > *:not(.modal-header){
+  max-height: min(78vh, 720px);
+  overflow: auto;
+  padding: 16px;
+}
+
+/* приятный скроллбар */
+.modal-body::-webkit-scrollbar,
+.modal-content > *:not(.modal-header)::-webkit-scrollbar { width: 10px; }
+
+.modal-body::-webkit-scrollbar-thumb,
+.modal-content > *:not(.modal-header)::-webkit-scrollbar-thumb {
+  background: rgba(44, 62, 80, 0.18);
+  border-radius: 999px;
+  border: 3px solid #fff;
+}
+.modal-body::-webkit-scrollbar-track,
+.modal-content > *:not(.modal-header)::-webkit-scrollbar-track { background: transparent; }
+
+@media (max-width: 640px) {
+  .modal-overlay,
+  .modal-backdrop { padding: 12px; }
+
+  .modal-body { max-height: 82vh; }
+  .modal-content > *:not(.modal-header){ max-height: 82vh; }
+}
 
 /* small helpers */
 .row{ display:flex; gap:8px; align-items:center }
 .col{ display:flex; flex-direction:column; gap:8px }
-.input, textarea, select { padding:8px 10px; border-radius:8px; border:2px solid rgba(0,0,0,0.06); font-size:15px; width:100% }
+.input, textarea, select {
+  padding:8px 10px;
+  border-radius:8px;
+  border:2px solid rgba(0,0,0,0.06);
+  font-size:15px;
+  width:100%;
+}
 .small-muted{ font-size:13px; color:#666 }
 
 /* Mobile optimizations */
@@ -189,17 +426,6 @@ body{
   .btn {
     padding: 12px 16px;
     font-size: 14px;
-  }
-
-  .tasks-grid {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  .month-title {
-    flex-direction: column;
-    gap: 8px;
-    text-align: center;
   }
 
   .key-circle {
@@ -245,6 +471,7 @@ body.with-fixed-timer {
     padding-top: 100px;
   }
 }
+
 /* ===== Score pill (процент рядом со статусом) ===== */
 .assignment-status{
   display:flex;
@@ -259,7 +486,7 @@ body.with-fixed-timer {
   min-width:48px;
   padding:4px 10px;
   border-radius:999px;
-  font-weight:800;
+  font-weight:900;
   font-size:12px;
   line-height:1;
   background: rgba(78, 205, 196, 0.18);

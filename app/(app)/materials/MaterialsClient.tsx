@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -30,7 +29,7 @@ function computeProgress(
   kind: "textbook" | "crossword",
   id: string,
   assignments: Assignment[],
-  completedSet: Set<string>
+  completedSet: Set<string>,
 ) {
   const ids =
     kind === "textbook"
@@ -46,7 +45,7 @@ function computeProgress(
 
 export default function MaterialsClient({ initialData }: Props) {
   const router = useRouter();
-  useMemo(() => getSupabaseBrowserClient(), []); // оставлено чтобы не терять паттерн, но тут не нужно
+  useMemo(() => getSupabaseBrowserClient(), []); // паттерн оставлен
 
   const [tab, setTab] = useState<"textbooks" | "crosswords">("textbooks");
 
@@ -97,242 +96,226 @@ export default function MaterialsClient({ initialData }: Props) {
     }
   }, []);
 
+  const completedSet = new Set((data?.userProgress || []).filter((x) => x.is_completed).map((x) => x.assignment_id));
+  const textbookAccess = new Set((data?.textbookAccess || []).map((x) => x.textbook_id));
+  const crosswordAccess = new Set((data?.crosswordAccess || []).map((x) => x.crossword_id));
+
   return (
-    <div className="materials-container">
-      <AppHeader
-  nav={[
-    { kind: "link", href: "/profile", label: "Профиль", className: "btn" },
-    { kind: "logout", label: "Выйти", className: "btn secondary" },
-  ]}
-      />
+    <div className="materials-page">
+      <div className="materials-container">
+        <AppHeader
+          nav={[
+            { kind: "link", href: "/profile", label: "Профиль", className: "btn" },
+            { kind: "logout", label: "Выйти", className: "btn secondary" },
+          ]}
+        />
 
-      <div className="materials-tabs">
-        <button
-          className={`material-tab ${tab === "textbooks" ? "active" : ""}`}
-          onClick={() => setTab("textbooks")}
-          type="button"
-        >
-          📚 Учебники
-        </button>
-        <button
-          className={`material-tab ${tab === "crosswords" ? "active" : ""}`}
-          onClick={() => setTab("crosswords")}
-          type="button"
-        >
-          🧩 Кроссворды
-        </button>
+        <div className="materials-tabs" role="tablist" aria-label="Материалы">
+          <button
+            className={`material-tab ${tab === "textbooks" ? "active" : ""}`}
+            onClick={() => setTab("textbooks")}
+            type="button"
+            role="tab"
+            aria-selected={tab === "textbooks"}
+          >
+            📚 Учебники
+          </button>
+          <button
+            className={`material-tab ${tab === "crosswords" ? "active" : ""}`}
+            onClick={() => setTab("crosswords")}
+            type="button"
+            role="tab"
+            aria-selected={tab === "crosswords"}
+          >
+            🧩 Кроссворды
+          </button>
+        </div>
+
+        {loading ? <LoadingBlock text="Загружаем материалы..." /> : null}
+        {error ? <ErrorBox message={error} /> : null}
+
+        {!loading && !error && data ? (
+          <>
+            <div className={`materials-section ${tab === "textbooks" ? "active" : ""}`} id="textbooks-section">
+              <div className="materials-panel">
+                <h3 className="materials-title">Доступные учебники</h3>
+                <p className="materials-subtitle">Выберите учебник для изучения материалов и выполнения заданий</p>
+
+                <div className="materials-grid">
+                  {(() => {
+                    const available = (data.textbooks || []).filter((t: any) => t.is_available || textbookAccess.has(t.id));
+                    const locked = (data.textbooks || []).filter((t: any) => !t.is_available && !textbookAccess.has(t.id));
+
+                    if (available.length === 0) {
+                      return (
+                        <div className="materials-empty">
+                          <p>📚 Учебники пока не доступны</p>
+                          <p className="materials-subtitle" style={{ margin: 0 }}>
+                            Ожидайте, когда администратор предоставит доступ
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <>
+                        {available.map((t: any) => {
+                          const { total, completed, progress } = computeProgress("textbook", t.id, data.assignments, completedSet);
+                          const pct = Math.round(progress);
+
+                          return (
+                            <div
+                              key={t.id}
+                              id={`textbook-${t.id}`}
+                              className="material-card"
+                              onClick={() => router.push(`/textbook/${t.id}`)}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") router.push(`/textbook/${t.id}`);
+                              }}
+                            >
+                              <div className="material-cover">
+                                {t.cover_image_url ? (
+                                  <img
+                                    src={t.cover_image_url}
+                                    alt={t.title}
+                                    onError={(e) => {
+                                      const img = e.currentTarget;
+                                      img.style.display = "none";
+                                      (img.parentElement as HTMLElement).innerHTML = "📚";
+                                    }}
+                                  />
+                                ) : (
+                                  "📚"
+                                )}
+                              </div>
+
+                              <div className="material-title">{t.title}</div>
+                              <div className="material-description">{t.description || "Учебные материалы и задания"}</div>
+
+                              <div className="progress-bar">
+                                <div className="progress-fill" style={{ width: `${progress}%` }} />
+                              </div>
+
+                              <div className="material-stats">
+                                <span>
+                                  {completed}/{total} заданий
+                                </span>
+                                <span className="pct">{pct}%</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {locked.map((t: any) => (
+                          <div key={t.id} className="material-card locked" role="group" aria-label="Недоступный учебник">
+                            <div className="material-cover">
+                              {t.cover_image_url ? <img src={t.cover_image_url} alt={t.title} /> : "📚"}
+                            </div>
+                            <div className="material-title">{t.title}</div>
+                            <div className="material-description">{t.description || "Учебные материалы и задания"}</div>
+                            <div className="locked-overlay">🔒 Недоступен</div>
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            <div className={`materials-section ${tab === "crosswords" ? "active" : ""}`} id="crosswords-section">
+              <div className="materials-panel">
+                <h3 className="materials-title">Доступные кроссворды</h3>
+                <p className="materials-subtitle">Разгадывайте кроссворды для закрепления знаний</p>
+
+                <div className="materials-grid">
+                  {(() => {
+                    const available = (data.crosswords || []).filter((c: any) => c.is_available || crosswordAccess.has(c.id));
+                    const locked = (data.crosswords || []).filter((c: any) => !c.is_available && !crosswordAccess.has(c.id));
+
+                    if (available.length === 0) {
+                      return (
+                        <div className="materials-empty">
+                          <p>🧩 Кроссворды пока не доступны</p>
+                          <p className="materials-subtitle" style={{ margin: 0 }}>
+                            Ожидайте, когда администратор предоставит доступ
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <>
+                        {available.map((c: any) => {
+                          const { total, completed, progress } = computeProgress("crossword", c.id, data.assignments, completedSet);
+                          const pct = Math.round(progress);
+
+                          return (
+                            <div
+                              key={c.id}
+                              id={`crossword-${c.id}`}
+                              className="material-card"
+                              onClick={() => router.push(`/crossword/${c.id}`)}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") router.push(`/crossword/${c.id}`);
+                              }}
+                            >
+                              <div className="material-cover">
+                                {c.cover_image_url ? (
+                                  <img
+                                    src={c.cover_image_url}
+                                    alt={c.title}
+                                    onError={(e) => {
+                                      const img = e.currentTarget;
+                                      img.style.display = "none";
+                                      (img.parentElement as HTMLElement).innerHTML = "🧩";
+                                    }}
+                                  />
+                                ) : (
+                                  "🧩"
+                                )}
+                              </div>
+
+                              <div className="material-title">{c.title}</div>
+                              <div className="material-description">{c.description || "Разгадайте кроссворд"}</div>
+
+                              <div className="progress-bar">
+                                <div className="progress-fill" style={{ width: `${progress}%` }} />
+                              </div>
+
+                              <div className="material-stats">
+                                <span>
+                                  {completed}/{total} слов
+                                </span>
+                                <span className="pct">{pct}%</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {locked.map((c: any) => (
+                          <div key={c.id} className="material-card locked" role="group" aria-label="Недоступный кроссворд">
+                            <div className="material-cover">
+                              {c.cover_image_url ? <img src={c.cover_image_url} alt={c.title} /> : "🧩"}
+                            </div>
+                            <div className="material-title">{c.title}</div>
+                            <div className="material-description">{c.description || "Разгадайте кроссворд"}</div>
+                            <div className="locked-overlay">🔒 Недоступен</div>
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
-
-      {loading ? <LoadingBlock text="Загружаем материалы..." /> : null}
-      {error ? <ErrorBox message={error} /> : null}
-
-      {!loading && !error && data ? (
-        <>
-          <div className={`materials-section ${tab === "textbooks" ? "active" : ""}`} id="textbooks-section">
-            <h3>Доступные учебники</h3>
-            <p className="small-muted">Выберите учебник для изучения материалов и выполнения заданий</p>
-
-            <div className="materials-grid">
-              {(() => {
-                const completedSet = new Set(
-                  (data.userProgress || []).filter((x) => x.is_completed).map((x) => x.assignment_id)
-                );
-                const access = new Set((data.textbookAccess || []).map((x) => x.textbook_id));
-                const available = (data.textbooks || []).filter((t: any) => t.is_available || access.has(t.id));
-                const locked = (data.textbooks || []).filter((t: any) => !t.is_available && !access.has(t.id));
-
-                if (available.length === 0) {
-                  return (
-                    <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 40, color: "#666" }}>
-                      <p>📚 Учебники пока не доступны</p>
-                      <p className="small-muted">Ожидайте, когда администратор предоставит доступ</p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <>
-                    {available.map((t: any) => {
-                      const { total, completed, progress } = computeProgress(
-                        "textbook",
-                        t.id,
-                        data.assignments,
-                        completedSet
-                      );
-
-                      return (
-                        <div
-                          key={t.id}
-                          id={`textbook-${t.id}`}
-                          className="material-card"
-                          onClick={() => router.push(`/textbook/${t.id}`)}
-                          role="button"
-                        >
-                          <div className="material-cover">
-                            {t.cover_image_url ? (
-                              <img
-                                src={t.cover_image_url}
-                                alt={t.title}
-                                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
-                                onError={(e) => {
-                                  const img = e.currentTarget;
-                                  img.style.display = "none";
-                                  (img.parentElement as HTMLElement).innerHTML = "📚";
-                                }}
-                              />
-                            ) : (
-                              "📚"
-                            )}
-                          </div>
-
-                          <div className="material-title">{t.title}</div>
-                          <div className="material-description">{t.description || "Учебные материалы и задания"}</div>
-
-                          <div className="progress-bar">
-                            <div className="progress-fill" style={{ width: `${progress}%` }} />
-                          </div>
-
-                          <div className="material-stats">
-                            <span>
-                              {completed}/{total} заданий
-                            </span>
-                            <span>{Math.round(progress)}%</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {locked.map((t: any) => (
-                      <div key={t.id} className="material-card locked">
-                        <div className="material-cover" style={{ filter: "grayscale(100%)", opacity: 0.6 }}>
-                          {t.cover_image_url ? (
-                            <img
-                              src={t.cover_image_url}
-                              alt={t.title}
-                              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
-                            />
-                          ) : (
-                            "📚"
-                          )}
-                        </div>
-                        <div className="material-title" style={{ color: "#999" }}>
-                          {t.title}
-                        </div>
-                        <div className="material-description" style={{ color: "#999" }}>
-                          {t.description || "Учебные материалы и задания"}
-                        </div>
-                        <div className="locked-overlay">🔒 Недоступен</div>
-                      </div>
-                    ))}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-
-          <div className={`materials-section ${tab === "crosswords" ? "active" : ""}`} id="crosswords-section">
-            <h3>Доступные кроссворды</h3>
-            <p className="small-muted">Разгадывайте кроссворды для закрепления знаний</p>
-
-            <div className="materials-grid">
-              {(() => {
-                const completedSet = new Set(
-                  (data.userProgress || []).filter((x) => x.is_completed).map((x) => x.assignment_id)
-                );
-                const access = new Set((data.crosswordAccess || []).map((x) => x.crossword_id));
-                const available = (data.crosswords || []).filter((c: any) => c.is_available || access.has(c.id));
-                const locked = (data.crosswords || []).filter((c: any) => !c.is_available && !access.has(c.id));
-
-                if (available.length === 0) {
-                  return (
-                    <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 40, color: "#666" }}>
-                      <p>🧩 Кроссворды пока не доступны</p>
-                      <p className="small-muted">Ожидайте, когда администратор предоставит доступ</p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <>
-                    {available.map((c: any) => {
-                      const { total, completed, progress } = computeProgress(
-                        "crossword",
-                        c.id,
-                        data.assignments,
-                        completedSet
-                      );
-
-                      return (
-                        <div
-                          key={c.id}
-                          id={`crossword-${c.id}`}
-                          className="material-card"
-                          onClick={() => router.push(`/crossword/${c.id}`)}
-                          role="button"
-                        >
-                          <div className="material-cover">
-                            {c.cover_image_url ? (
-                              <img
-                                src={c.cover_image_url}
-                                alt={c.title}
-                                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
-                                onError={(e) => {
-                                  const img = e.currentTarget;
-                                  img.style.display = "none";
-                                  (img.parentElement as HTMLElement).innerHTML = "🧩";
-                                }}
-                              />
-                            ) : (
-                              "🧩"
-                            )}
-                          </div>
-
-                          <div className="material-title">{c.title}</div>
-                          <div className="material-description">{c.description || "Разгадайте кроссворд"}</div>
-
-                          <div className="progress-bar">
-                            <div className="progress-fill" style={{ width: `${progress}%` }} />
-                          </div>
-
-                          <div className="material-stats">
-                            <span>
-                              {completed}/{total} слов
-                            </span>
-                            <span>{Math.round(progress)}%</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {locked.map((c: any) => (
-                      <div key={c.id} className="material-card locked">
-                        <div className="material-cover" style={{ filter: "grayscale(100%)", opacity: 0.6 }}>
-                          {c.cover_image_url ? (
-                            <img
-                              src={c.cover_image_url}
-                              alt={c.title}
-                              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
-                            />
-                          ) : (
-                            "🧩"
-                          )}
-                        </div>
-                        <div className="material-title" style={{ color: "#999" }}>
-                          {c.title}
-                        </div>
-                        <div className="material-description" style={{ color: "#999" }}>
-                          {c.description || "Разгадайте кроссворд"}
-                        </div>
-                        <div className="locked-overlay">🔒 Недоступен</div>
-                      </div>
-                    ))}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        </>
-      ) : null}
     </div>
   );
 }

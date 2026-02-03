@@ -1,209 +1,275 @@
 /* app/(app)/crossword/crossword.css */
+/* То же самое, но акцент кроссворда: красно-оранжевый */
 
-.crossword-container {
+.crossword-container{
   width: 95%;
-  max-width: 1000px;
+  max-width: 1100px;
   margin: 20px auto;
 }
 
-.back-button {
-  margin-bottom: 20px;
+.back-button{
+  margin: 14px 0 16px;
 }
 
-/* ✅ 1:1 как учебник, но цвет кроссворда */
-.crossword-header {
-  color: white;
+/* header */
+.crossword-header{
+  color: #ffffff;
   padding: 0;
-  border-radius: 16px;
-  margin-bottom: 20px;
+  border-radius: 22px;
+  margin-bottom: 18px;
   text-align: center;
   overflow: hidden;
   position: relative;
-  background: linear-gradient(135deg, #ff6b6b, #ffa726);
+
+  background: linear-gradient(135deg,
+    rgba(255, 107, 107, 0.88),
+    rgba(255, 167, 38, 0.58)
+  );
+
+  border: 1px solid rgba(255,255,255,0.55);
+  box-shadow: 0 14px 40px rgba(120, 30, 30, 0.16);
 }
 
-/* ✅ обложка как в учебнике */
-.crossword-cover {
+.crossword-header::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(1200px 400px at 20% 0%, rgba(255,255,255,0.26), transparent 60%),
+    radial-gradient(900px 360px at 80% 10%, rgba(255,255,255,0.16), transparent 60%);
+  pointer-events:none;
+}
+
+.crossword-cover{
   width: 100%;
   height: 220px;
-  background: linear-gradient(135deg, #ff6b6b, #ffa726);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  user-select: none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+  overflow:hidden;
+  user-select:none;
   font-size: 48px;
-  font-weight: bold;
+  font-weight: 900;
+
+  background: linear-gradient(135deg,
+    rgba(255, 107, 107, 0.96),
+    rgba(255, 193, 7, 0.52)
+  );
+  border-bottom: 1px solid rgba(255,255,255,0.35);
 }
 
-.crossword-cover img {
-  width: 100%;
-  height: 100%;
+.crossword-cover img{
+  width:100%;
+  height:100%;
   object-fit: cover;
-  display: block;
+  display:block;
 }
 
-.crossword-info {
-  padding: 20px 24px 26px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.15));
+.crossword-info{
+  position: relative;
+  padding: 18px 22px 22px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.00), rgba(0,0,0,0.20));
 }
 
-.crossword-title {
+.crossword-title{
   font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 10px;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  font-weight: 900;
+  margin-bottom: 8px;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.24);
 }
 
-.crossword-description {
+.crossword-description{
   font-size: 1.05rem;
   opacity: 0.95;
-  margin-bottom: 18px;
-  text-shadow: 0 1px 6px rgba(0,0,0,0.2);
+  margin-bottom: 16px;
+  text-shadow: 0 1px 10px rgba(0,0,0,0.18);
 }
 
-.progress-stats {
-  display: flex;
-  justify-content: center;
-  gap: 30px;
+.progress-stats{
+  display:flex;
+  justify-content:center;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
-.stat-item {
-  text-align: center;
-  background: rgba(255,255,255,0.12);
-  padding: 10px 16px;
-  border-radius: 12px;
-  backdrop-filter: blur(2px);
+.stat-item{
+  text-align:center;
+  padding: 10px 14px;
+  border-radius: 14px;
+
+  background: rgba(255,255,255,0.16);
+  border: 1px solid rgba(255,255,255,0.28);
+  backdrop-filter: blur(6px);
 }
 
-.stat-number {
-  font-size: 1.6rem;
-  font-weight: 800;
+.stat-number{
+  font-size: 1.55rem;
+  font-weight: 900;
 }
 
-.stat-label {
+.stat-label{
   font-size: 0.85rem;
   opacity: 0.95;
 }
 
-/* list */
-.assignments-list {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+.assignments-list{
+  display:flex;
+  flex-direction:column;
+  gap: 12px;
 }
 
-.assignment-item {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  transition: all 0.3s ease;
-  cursor: pointer;
-  border-left: 4px solid #f0f0f0;
-  display: flex;
-  align-items: center;
-  gap: 15px;
+.assignment-item{
+  background: rgba(255,255,255,0.92);
+  border-radius: 16px;
+  padding: 16px 16px;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.08);
+  cursor:pointer;
+
+  border: 1px solid rgba(255, 107, 107, 0.14);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  display:flex;
+  align-items:center;
+  gap: 14px;
 }
 
-.assignment-item:hover {
-  transform: translateX(5px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+.assignment-item:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px rgba(0,0,0,0.12);
+  border-color: rgba(255, 107, 107, 0.32);
 }
 
-.assignment-item.completed {
-  border-left-color: var(--accent);
-  background: #fff5f5;
+.assignment-item.completed{
+  background: linear-gradient(180deg, #ffffff, rgba(255,107,107,0.08));
+  border-color: rgba(255, 107, 107, 0.38);
 }
 
-.assignment-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.assignment-icon{
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   font-size: 18px;
-  font-weight: bold;
-  background: #ffeaa7;
-  color: #e17055;
+  font-weight: 900;
+
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.22), rgba(255, 107, 107, 0.12));
+  color: #c0392b;
+
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
 }
 
-.assignment-content { flex: 1; }
+.assignment-content{ flex: 1; }
 
-.assignment-title {
+.assignment-title{
   font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 5px;
-  color: #333;
+  font-weight: 800;
+  margin-bottom: 4px;
+  color:#223;
 }
 
-.assignment-type {
+.assignment-type{
   font-size: 12px;
-  color: #666;
+  color:#667;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
 }
 
-.assignment-status {
+.assignment-status{
   padding: 6px 12px;
-  border-radius: 20px;
+  border-radius: 999px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 800;
   white-space: nowrap;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.75);
 }
 
-.status-completed {
-  background: #e8f5e8;
+.status-completed{
+  background: rgba(46, 125, 50, 0.12);
   color: #2e7d32;
+  border-color: rgba(46, 125, 50, 0.22);
 }
 
-.status-pending {
-  background: #fff3cd;
+.status-pending{
+  background: rgba(255, 193, 7, 0.16);
   color: #856404;
+  border-color: rgba(255, 193, 7, 0.22);
 }
 
-.locked-message {
-  background: #fff3cd;
-  border: 2px solid #ffeaa7;
-  border-radius: 8px;
-  padding: 20px;
-  text-align: center;
-  margin-bottom: 20px;
+.locked-message{
+  background: rgba(255, 243, 205, 0.75);
+  border: 1px solid rgba(255, 234, 167, 0.95);
+  border-radius: 16px;
+  padding: 18px;
+  text-align:center;
+  margin-bottom: 18px;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.08);
 }
 
-.loading {
-  text-align: center;
+.loading{
+  text-align:center;
   padding: 40px;
 }
 
-.spinner {
-  border: 4px solid #f3f3f3;
+.spinner{
+  border: 4px solid rgba(255,255,255,0.8);
   border-top: 4px solid var(--accent);
   border-radius: 50%;
   width: 40px;
   height: 40px;
-  animation: spin 2s linear infinite;
-  margin: 0 auto 20px;
+  animation: spin 1.4s linear infinite;
+  margin: 0 auto 18px;
 }
 
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes spin{ 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
 
-.error {
-  background: #ffebee;
+.error{
+  background: rgba(255, 235, 238, 0.9);
   color: #c62828;
-  padding: 20px;
-  border-radius: 8px;
-  margin: 20px;
-  text-align: center;
+  padding: 18px;
+  border-radius: 16px;
+  margin: 18px 0;
+  text-align:center;
+  border: 1px solid rgba(198,40,40,0.18);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.08);
 }
 
-@media (max-width: 768px) {
-  .crossword-cover { height: 160px; }
-  .crossword-title { font-size: 1.5rem; }
-  .progress-stats { gap: 12px; }
-  .stat-number { font-size: 1.3rem; }
-  .assignment-item { padding: 15px; }
+@media (max-width: 768px){
+  .crossword-cover{ height: 160px; }
+  .crossword-title{ font-size: 1.5rem; }
+  .assignment-item{ padding: 14px; }
+}
+/* --- FIX: почему контент прижался влево --- */
+/* Жёстко центрируем основной контейнер, даже если родитель flex */
+.crossword-container{
+  width: min(1100px, calc(100% - 40px)) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* На всякий — если где-то есть text-align или flex-выравнивание */
+.crossword-container{
+  align-self: center;
+}
+
+/* Мобильная подстройка */
+@media (max-width: 768px){
+  .crossword-container{
+    width: calc(100% - 20px) !important;
+  }
+}
+/* --- align back button like in textbooks (left) --- */
+.crossword-container .back-button{
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  /* если хочешь "чуть левее" не вплотную: */
+  padding-left: 6px;
+}
+
+.crossword-container .back-button .btn{
+  width: auto;
 }
