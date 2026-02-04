@@ -1,3 +1,4 @@
+// app/api/admin/requests/route.ts
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
 import type { NextRequest } from "next/server";
@@ -280,6 +281,7 @@ export async function PATCH(req: NextRequest) {
           granted = grantedLabels;
         } else {
           // ✅ ВОЗВРАТ: снимаем доступ ТОЛЬКО по выданному в ЭТОЙ заявке
+          // ✅ ВАЖНО: НЕ фильтруем по granted_by, иначе другой админ не сможет корректно вернуть
           const targets = await getTargetsForUnprocess(supabase, r);
 
           for (const t of targets) {
@@ -287,27 +289,26 @@ export async function PATCH(req: NextRequest) {
             const keep = await existsOtherProcessedGrant(supabase, r.id, r.user_id, t.kind, t.item_id);
             if (keep) continue;
 
-            // снимаем доступ только выданный ТЕКУЩИМ админом (как у тебя задумано)
             if (t.kind === "textbook") {
               const del = await supabase
                 .from("textbook_access")
                 .delete()
                 .eq("user_id", r.user_id)
-                .eq("textbook_id", t.item_id)
-                .eq("granted_by", user.id);
+                .eq("textbook_id", t.item_id);
+
               if (del.error) throw new Error(del.error.message);
             } else {
               const del = await supabase
                 .from("crossword_access")
                 .delete()
                 .eq("user_id", r.user_id)
-                .eq("crossword_id", t.item_id)
-                .eq("granted_by", user.id);
+                .eq("crossword_id", t.item_id);
+
               if (del.error) throw new Error(del.error.message);
             }
           }
 
-          // чистим историю выдачи этой заявки
+          // чистим историю выдачи этой заявки (важно делать ПОСЛЕ удаления access)
           await supabase.from("purchase_request_grants").delete().eq("request_id", r.id);
         }
 

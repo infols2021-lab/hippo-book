@@ -64,10 +64,26 @@ function formatDateTime(dateString: string) {
   });
 }
 
+function calcAmountFromTypes(types: string[] | null) {
+  const count = Array.isArray(types) ? types.length : 0;
+  return count * 1000;
+}
+
 function getPaymentQRUrl(seed?: number) {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const t = seed ?? Date.now(); // ✅ seed позволяет форс-обновить URL
+  const t = seed ?? Date.now();
   return `${base}/storage/v1/object/public/help-images/oplata.png?t=${t}`;
+}
+
+async function safeReadJson(res: Response) {
+  const t = await res.text();
+  let json: any = null;
+  try {
+    json = t ? JSON.parse(t) : null;
+  } catch {
+    json = null;
+  }
+  return { text: t, json };
 }
 
 export default function RequestsClient({ userId, userEmail, userFullName, initialRequests }: Props) {
@@ -82,7 +98,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [requestNumber, setRequestNumber] = useState("");
-  const [requestDateTime, setRequestDateTime] = useState(""); // datetime-local string
+  const [requestDateTime, setRequestDateTime] = useState("");
   const [classLevel, setClassLevel] = useState("");
 
   const [typeTextbook, setTypeTextbook] = useState(false);
@@ -90,17 +106,16 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
 
   const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
 
-  // ✅ QR state (loader + retry)
+  // QR state
   const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState(false);
-
   const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
 
   function resetQrStateAndRefresh() {
     setQrError(false);
     setQrLoading(true);
-    setQrSeed(Date.now()); // меняем querystring -> браузер точно перезагрузит
+    setQrSeed(Date.now());
   }
 
   function showNotification(text: string, type: "success" | "error" = "success") {
@@ -133,6 +148,15 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
     return arr;
   }
 
+  const lastPendingRequest = useMemo(() => {
+    // requests уже отсортированы desc, так что берём первую непроцессед
+    return requests.find((r) => !r.is_processed) ?? null;
+  }, [requests]);
+
+  const lastPendingAmount = useMemo(() => {
+    return lastPendingRequest ? calcAmountFromTypes(lastPendingRequest.textbook_types) : 0;
+  }, [lastPendingRequest]);
+
   function openCreate() {
     setEditingId(null);
     setRequestNumber(generateRequestNumber());
@@ -149,6 +173,11 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
   }
 
   function openEdit(r: PurchaseRequest) {
+    if (r.is_processed) {
+      showNotification("🔒 Обработанную заявку нельзя редактировать", "error");
+      return;
+    }
+
     setEditingId(r.id);
     setRequestNumber(r.request_number);
 
@@ -178,6 +207,16 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
       return;
     }
 
+    // если вдруг каким-то образом открыли редактирование обработанной (страховка)
+    if (editingId) {
+      const cur = requests.find((x) => x.id === editingId);
+      if (cur?.is_processed) {
+        showNotification("🔒 Обработанную заявку нельзя редактировать", "error");
+        setRequestModalOpen(false);
+        return;
+      }
+    }
+
     const payload = {
       request_number: requestNumber,
       created_at: requestDateTime + ":00Z",
@@ -190,22 +229,40 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
     };
 
     try {
+      // ✅ РЕДАКТИРОВАНИЕ через серверный API (чтобы сразу синкать Google Sheets)
       if (editingId) {
-        const { error } = await supabase
-          .from("purchase_requests")
-          .update(payload)
-          .eq("id", editingId)
-          .eq("user_id", userId);
+        const res = await fetch("/api/requests/update", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            id: editingId,
+            request_number: payload.request_number,
+            created_at: payload.created_at,
+            class_level: payload.class_level,
+            textbook_types: payload.textbook_types,
+            email: payload.email,
+            full_name: payload.full_name,
+          }),
+        });
 
-        if (error) throw error;
+        const { json } = await safeReadJson(res);
+
+        if (!res.ok || !json?.ok) {
+          throw new Error(json?.error || `HTTP ${res.status}`);
+        }
 
         setRequestModalOpen(false);
         showNotification("✅ Заявка успешно обновлена");
+
+        if (json?.sheet && json.sheet.ok === false) {
+          showNotification("⚠️ Заявка обновлена, но синк в таблицу временно не удался. Админ досинхронизирует позже.", "error");
+        }
+
         await reloadRequests();
         return;
       }
 
-      // ✅ ВАЖНО: создание заявки теперь через серверный API
+      // ✅ СОЗДАНИЕ через серверный API (как и было)
       const res = await fetch("/api/requests/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -219,13 +276,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
         }),
       });
 
-      const t = await res.text();
-      let json: any = null;
-      try {
-        json = t ? JSON.parse(t) : null;
-      } catch {
-        json = null;
-      }
+      const { json } = await safeReadJson(res);
 
       if (!res.ok || !json?.ok) {
         throw new Error(json?.error || `HTTP ${res.status}`);
@@ -236,13 +287,11 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
       const totalAmount = types.length * 1000;
       setPaymentTotalAmount(totalAmount);
 
-      // ✅ когда открываем оплату — сразу показываем лоадер и обновляем URL
       setPaymentModalOpen(true);
       setQrLoading(true);
       setQrError(false);
       setQrSeed(Date.now());
 
-      // если Sheets не записался — покажем мягкое предупреждение (заявка всё равно создана)
       if (json?.sheet && json.sheet.ok === false) {
         showNotification("⚠️ Заявка создана, но запись в таблицу временно не удалась. Админ досинхронизирует позже.", "error");
       }
@@ -258,18 +307,37 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
       showNotification("❌ Вы можете удалять только свои заявки", "error");
       return;
     }
-
-    const ok = window.confirm(`Вы уверены, что хотите удалить заявку ${r.request_number}?`);
-    if (!ok) return;
-
-    const { error } = await supabase.from("purchase_requests").delete().eq("id", r.id).eq("user_id", userId);
-    if (error) {
-      showNotification("Ошибка при удалении заявки: " + error.message, "error");
+    if (r.is_processed) {
+      showNotification("🔒 Обработанную заявку нельзя удалить", "error");
       return;
     }
 
-    showNotification("✅ Заявка успешно удалена");
-    await reloadRequests();
+    const okConfirm = window.confirm(`Вы уверены, что хотите удалить заявку ${r.request_number}?`);
+    if (!okConfirm) return;
+
+    try {
+      // ✅ УДАЛЕНИЕ через серверный API (чтобы сразу удалить строку в Google Sheets)
+      const res = await fetch("/api/requests/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: r.id }),
+      });
+
+      const { json } = await safeReadJson(res);
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+
+      if (json?.sheet && json.sheet.ok === false) {
+        showNotification("⚠️ Заявка удалена, но строку в таблице не удалось удалить сразу — админский синк подчистит.", "error");
+      }
+
+      showNotification("✅ Заявка успешно удалена");
+      await reloadRequests();
+    } catch (e: any) {
+      showNotification("Ошибка при удалении заявки: " + (e?.message || String(e)), "error");
+    }
   }
 
   const totalAmount = totalTypesSelected() * 1000;
@@ -315,7 +383,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
           </div>
 
           <div className="form-group">
-            <label>Тип учебника (стоимость каждого учебника 1000р):</label>
+            <label>Тип учебника (стоимость каждого материала 1000р):</label>
             <div className="checkbox-group">
               <div className={`checkbox-item ${typeTextbook ? "checked" : ""}`} onClick={() => setTypeTextbook((v) => !v)}>
                 <input type="checkbox" checked={typeTextbook} readOnly />
@@ -359,35 +427,29 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
         </form>
       </Modal>
 
-      <Modal
-        open={paymentModalOpen}
-        onClose={() => setPaymentModalOpen(false)}
-        title="✅ Заявка создана успешно!"
-        maxWidth={520}
-      >
+      <Modal open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="✅ Заявка" maxWidth={520}>
         <div className="success-message">
-          <h4>📋 Информация о заявке</h4>
+          <h4>📋 Информация</h4>
           <p>
-            <strong>Доступ к выбранным материалам будет открыт через некоторое время после оплаты.</strong>
+            <strong>Доступ к выбранным материалам будет открыт после подтверждения оплаты.</strong>
           </p>
-          <p>Оплатить можно по QR-коду ниже:</p>
+          <p>Оплатить можно по QR-коду ниже.</p>
         </div>
 
-        <div className="total-amount">
-          <h4>💰 Сумма к оплате:</h4>
-          <div className="amount">{paymentTotalAmount} руб.</div>
-        </div>
+        {paymentTotalAmount > 0 ? (
+          <div className="total-amount">
+            <h4>💰 Сумма к оплате:</h4>
+            <div className="amount">{paymentTotalAmount} руб.</div>
+          </div>
+        ) : (
+          <div className="small-muted" style={{ marginTop: 8 }}>
+            {lastPendingRequest ? "Сумма к оплате не определена." : "Нет необработанных заявок — сумма зависит от вашей последней созданной заявки."}
+          </div>
+        )}
 
-        {/* ✅ QR area with loader + refresh */}
         <div className="qr-head">
           <div className="qr-title">QR-код для оплаты</div>
-          <button
-            type="button"
-            className="qr-refresh"
-            onClick={resetQrStateAndRefresh}
-            title="Обновить QR"
-            aria-label="Обновить QR"
-          >
+          <button type="button" className="qr-refresh" onClick={resetQrStateAndRefresh} title="Обновить QR" aria-label="Обновить QR">
             ↻
           </button>
         </div>
@@ -455,8 +517,8 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
           <div className="payment-info">
             <h4>💰 Информация об оплате</h4>
             <p>
-              Оплата материалов происходит по QR-коду после создания заявки или по кнопке ниже "Показать qr". Стоимость каждого
-              учебника или кроссворда — 1000 рублей. После подтверждения оплаты доступ к материалам будет открыт в течение 24 часов.
+              Стоимость каждого учебника или кроссворда — 1000 рублей. После подтверждения оплаты доступ к материалам будет открыт
+              в течение 24 часов.
             </p>
           </div>
 
@@ -469,11 +531,18 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
               className="btn ghost qr-open"
               type="button"
               onClick={() => {
-                setPaymentTotalAmount(0);
+                // ✅ показываем сумму по последней НЕобработанной заявке
+                const amount = lastPendingAmount;
+                setPaymentTotalAmount(amount);
+
                 setPaymentModalOpen(true);
                 setQrLoading(true);
                 setQrError(false);
                 setQrSeed(Date.now());
+
+                if (!lastPendingRequest) {
+                  showNotification("ℹ️ Не найдено необработанных заявок. Если вы уже оплатили — дождитесь подтверждения.", "error");
+                }
               }}
               title="Показать QR"
             >
@@ -504,31 +573,46 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
                 </tr>
               </thead>
               <tbody>
-                {requests.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <strong>{r.request_number}</strong>
-                    </td>
-                    <td>{formatDateTime(r.created_at)}</td>
-                    <td>{formatClassLevel(r.class_level)}</td>
-                    <td>{formatTextbookTypes(r.textbook_types)}</td>
-                    <td>{r.email}</td>
-                    <td>{r.full_name}</td>
-                    <td>
-                      <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
-                        {r.is_processed ? "✅ Обработана" : "⏳ Ожидает"}
-                      </span>
-                    </td>
-                    <td>
-                      <button className="btn btn-small" onClick={() => openEdit(r)} type="button">
-                        ✏️ Редактировать
-                      </button>{" "}
-                      <button className="btn btn-small" onClick={() => void deleteRequest(r)} type="button">
-                        🗑️ Удалить
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {requests.map((r) => {
+                  const locked = r.is_processed;
+                  return (
+                    <tr key={r.id}>
+                      <td>
+                        <strong>{r.request_number}</strong>
+                      </td>
+                      <td>{formatDateTime(r.created_at)}</td>
+                      <td>{formatClassLevel(r.class_level)}</td>
+                      <td>{formatTextbookTypes(r.textbook_types)}</td>
+                      <td>{r.email}</td>
+                      <td>{r.full_name}</td>
+                      <td>
+                        <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
+                          {r.is_processed ? "✅ Обработана" : "⏳ Ожидает"}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className={`btn btn-small ${locked ? "disabled" : ""}`}
+                          onClick={() => openEdit(r)}
+                          type="button"
+                          disabled={locked}
+                          title={locked ? "Обработанную заявку нельзя редактировать" : "Редактировать"}
+                        >
+                          ✏️ Редактировать
+                        </button>{" "}
+                        <button
+                          className={`btn btn-small ${locked ? "disabled" : ""}`}
+                          onClick={() => void deleteRequest(r)}
+                          type="button"
+                          disabled={locked}
+                          title={locked ? "Обработанную заявку нельзя удалить" : "Удалить"}
+                        >
+                          🗑️ Удалить
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
