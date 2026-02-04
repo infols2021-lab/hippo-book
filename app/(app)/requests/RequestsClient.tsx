@@ -1,3 +1,4 @@
+/* app/(app)/requests/RequestsClient.tsx */
 "use client";
 
 import Link from "next/link";
@@ -63,9 +64,9 @@ function formatDateTime(dateString: string) {
   });
 }
 
-function getPaymentQRUrl() {
+function getPaymentQRUrl(seed?: number) {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const t = Date.now();
+  const t = seed ?? Date.now();
   return `${base}/storage/v1/object/public/help-images/oplata.png?t=${t}`;
 }
 
@@ -88,6 +89,19 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
   const [typeCrossword, setTypeCrossword] = useState(false);
 
   const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
+
+  // ✅ QR state (loader + retry)
+  const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState(false);
+
+  const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
+
+  function resetQrStateAndRefresh() {
+    setQrError(false);
+    setQrLoading(true);
+    setQrSeed(Date.now());
+  }
 
   function showNotification(text: string, type: "success" | "error" = "success") {
     setNotif({ type, text });
@@ -135,6 +149,11 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
   }
 
   function openEdit(r: PurchaseRequest) {
+    if (r.is_processed) {
+      showNotification("🔒 Эта заявка уже обработана — редактирование недоступно.", "error");
+      return;
+    }
+
     setEditingId(r.id);
     setRequestNumber(r.request_number);
 
@@ -177,6 +196,13 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
 
     try {
       if (editingId) {
+        const current = requests.find((x) => x.id === editingId);
+        if (current?.is_processed) {
+          showNotification("🔒 Эта заявка уже обработана — редактирование недоступно.", "error");
+          setRequestModalOpen(false);
+          return;
+        }
+
         const { error } = await supabase
           .from("purchase_requests")
           .update(payload)
@@ -198,7 +224,11 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
 
       const totalAmount = types.length * 1000;
       setPaymentTotalAmount(totalAmount);
+
       setPaymentModalOpen(true);
+      setQrLoading(true);
+      setQrError(false);
+      setQrSeed(Date.now());
 
       await reloadRequests();
     } catch (e: any) {
@@ -209,6 +239,11 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
   async function deleteRequest(r: PurchaseRequest) {
     if (r.user_id !== userId) {
       showNotification("❌ Вы можете удалять только свои заявки", "error");
+      return;
+    }
+
+    if (r.is_processed) {
+      showNotification("🔒 Эта заявка уже обработана — удаление недоступно.", "error");
       return;
     }
 
@@ -312,7 +347,12 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
         </form>
       </Modal>
 
-      <Modal open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="✅ Заявка создана успешно!" maxWidth={520}>
+      <Modal
+        open={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        title="✅ Заявка создана успешно!"
+        maxWidth={520}
+      >
         <div className="success-message">
           <h4>📋 Информация о заявке</h4>
           <p>
@@ -321,13 +361,62 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
           <p>Оплатить можно по QR-коду ниже:</p>
         </div>
 
-        <div className="total-amount">
-          <h4>💰 Сумма к оплате:</h4>
-          <div className="amount">{paymentTotalAmount} руб.</div>
+        {/* ✅ СУММУ ПОКАЗЫВАЕМ ТОЛЬКО если она реально есть (когда создали заявку) */}
+        {paymentTotalAmount > 0 ? (
+          <div className="total-amount">
+            <h4>💰 Сумма к оплате:</h4>
+            <div className="amount">{paymentTotalAmount} руб.</div>
+          </div>
+        ) : null}
+
+        <div className="qr-head">
+          <div className="qr-title">QR-код для оплаты</div>
+          <button
+            type="button"
+            className="qr-refresh"
+            onClick={resetQrStateAndRefresh}
+            title="Обновить QR"
+            aria-label="Обновить QR"
+          >
+            ↻
+          </button>
         </div>
 
-        <div className="payment-qr">
-          <img src={getPaymentQRUrl()} alt="QR-код для оплаты" />
+        <div className="payment-qr payment-qr--smart">
+          {qrLoading ? (
+            <div className="qr-loader" role="status" aria-live="polite">
+              <span className="qr-spinner" />
+              <div className="qr-loader-text">Загружаю QR-код…</div>
+            </div>
+          ) : null}
+
+          {qrError ? (
+            <div className="qr-error" role="alert">
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Не удалось загрузить QR-код</div>
+              <div className="small-muted" style={{ marginBottom: 10 }}>
+                Нажмите “↻”, чтобы обновить и попробовать снова.
+              </div>
+              <button type="button" className="btn" onClick={resetQrStateAndRefresh}>
+                ↻ Обновить QR
+              </button>
+            </div>
+          ) : null}
+
+          <img
+            key={qrUrl}
+            src={qrUrl}
+            alt=""
+            aria-hidden="true"
+            className={`qr-img ${qrLoading || qrError ? "is-hidden" : ""}`}
+            onLoad={() => {
+              setQrLoading(false);
+              setQrError(false);
+            }}
+            onError={() => {
+              setQrLoading(false);
+              setQrError(true);
+            }}
+          />
         </div>
 
         <div style={{ textAlign: "center", marginTop: 15 }}>
@@ -343,11 +432,11 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
 
       <div className="container">
         <AppHeader
-  nav={[
-    { kind: "link", href: "/materials", label: "📚 Материалы", className: "btn" },
-    { kind: "link", href: "/profile", label: "👤 Профиль", className: "btn" },
-    { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
-  ]}
+          nav={[
+            { kind: "link", href: "/materials", label: "📚 Материалы", className: "btn" },
+            { kind: "link", href: "/profile", label: "👤 Профиль", className: "btn" },
+            { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
+          ]}
         />
 
         <div className="card">
@@ -356,14 +445,29 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
           <div className="payment-info">
             <h4>💰 Информация об оплате</h4>
             <p>
-              Оплата материалов происходит по QR-коду после создания заявки. Стоимость каждого учебника или кроссворда — 1000 рублей.
-              После подтверждения оплаты доступ к материалам будет открыт в течение 24 часов.
+              Оплата материалов происходит по QR-коду после создания заявки или по кнопке ниже "Показать qr". Стоимость каждого
+              учебника или кроссворда — 1000 рублей. После подтверждения оплаты доступ к материалам будет открыт в течение 24 часов.
             </p>
           </div>
 
-          <div style={{ marginBottom: 20 }}>
+          <div className="requests-actions">
             <button className="btn" onClick={openCreate} type="button">
               ➕ Создать новую заявку
+            </button>
+
+            <button
+              className="btn ghost qr-open"
+              type="button"
+              onClick={() => {
+                setPaymentTotalAmount(0); // ✅ чтобы сумма не показывалась
+                setPaymentModalOpen(true);
+                setQrLoading(true);
+                setQrError(false);
+                setQrSeed(Date.now());
+              }}
+              title="Показать QR"
+            >
+              📷 Показать qr
             </button>
           </div>
 
@@ -390,31 +494,56 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
                 </tr>
               </thead>
               <tbody>
-                {requests.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <strong>{r.request_number}</strong>
-                    </td>
-                    <td>{formatDateTime(r.created_at)}</td>
-                    <td>{formatClassLevel(r.class_level)}</td>
-                    <td>{formatTextbookTypes(r.textbook_types)}</td>
-                    <td>{r.email}</td>
-                    <td>{r.full_name}</td>
-                    <td>
-                      <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
-                        {r.is_processed ? "✅ Обработана" : "⏳ Ожидает"}
-                      </span>
-                    </td>
-                    <td>
-                      <button className="btn btn-small" onClick={() => openEdit(r)} type="button">
-                        ✏️ Редактировать
-                      </button>{" "}
-                      <button className="btn btn-small" onClick={() => void deleteRequest(r)} type="button">
-                        🗑️ Удалить
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {requests.map((r) => {
+                  const locked = !!r.is_processed;
+
+                  return (
+                    <tr key={r.id} className={locked ? "processed-row" : ""}>
+                      <td>
+                        <strong>{r.request_number}</strong>
+                      </td>
+                      <td>{formatDateTime(r.created_at)}</td>
+                      <td>{formatClassLevel(r.class_level)}</td>
+                      <td>{formatTextbookTypes(r.textbook_types)}</td>
+                      <td>{r.email}</td>
+                      <td>{r.full_name}</td>
+                      <td>
+                        <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
+                          {r.is_processed ? "✅ Обработана" : "⏳ Ожидает"}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-small"
+                          onClick={() => openEdit(r)}
+                          type="button"
+                          disabled={locked}
+                          aria-disabled={locked}
+                          title={locked ? "Заявка уже обработана — редактирование недоступно" : "Редактировать"}
+                        >
+                          ✏️ Редактировать
+                        </button>{" "}
+                        <button
+                          className="btn btn-small danger"
+                          onClick={() => void deleteRequest(r)}
+                          type="button"
+                          disabled={locked}
+                          aria-disabled={locked}
+                          title={locked ? "Заявка уже обработана — удаление недоступно" : "Удалить"}
+                        >
+                          🗑️ Удалить
+                        </button>
+
+                        {/* ✅ Явно пишем почему нельзя (не двигаем кнопки, просто подпись ниже) */}
+                        {locked ? (
+                          <div className="locked-hint">
+                            🔒 Нельзя редактировать или удалять, потому что заявка уже обработана.
+                          </div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

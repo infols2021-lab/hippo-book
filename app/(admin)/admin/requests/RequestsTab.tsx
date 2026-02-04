@@ -20,7 +20,7 @@ type RequestRow = {
 
 type Stats = { total: number; pending: number; processed: number };
 
-type ApiOkList = { ok: true; requests: RequestRow[]; materialsByUser: Record<string, string[]> };
+type ApiOkList = { ok: true; requests: RequestRow[]; materialsByRequest: Record<string, string[]> };
 type ApiOkStats = { ok: true; stats: Stats };
 type ApiErr = { ok: false; error: string; code?: string };
 
@@ -111,7 +111,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
   const [err, setErr] = useState<string | null>(null);
 
   const [rows, setRows] = useState<RequestRow[]>([]);
-  const [materialsByUser, setMaterialsByUser] = useState<Record<string, string[]>>({});
+  const [materialsByRequest, setMaterialsByRequest] = useState<Record<string, string[]>>({});
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -120,7 +120,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
   const selectionRef = useRef(selected);
   selectionRef.current = selected;
 
-  // ✅ модалка процесса (обработка/возврат)
   const [processingOpen, setProcessingOpen] = useState(false);
   const [processingMode, setProcessingMode] = useState<"process" | "unprocess">("process");
 
@@ -171,12 +170,12 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       if (!json.ok) throw new Error((json as ApiErr).error || "Не удалось загрузить заявки");
 
       setRows(json.requests ?? []);
-      setMaterialsByUser(json.materialsByUser ?? {});
+      setMaterialsByRequest(json.materialsByRequest ?? {});
       setSelected(new Set());
     } catch (e: any) {
       setErr(e?.message || String(e));
       setRows([]);
-      setMaterialsByUser({});
+      setMaterialsByRequest({});
       setSelected(new Set());
     } finally {
       setLoading(false);
@@ -187,15 +186,14 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
     if (!ids.length) return;
 
     if (confirmBulk) {
-      const ok = window.confirm(
+      const okk = window.confirm(
         is_processed
           ? `Обработать выбранные заявки: ${ids.length}? (выдаст доступы)`
-          : `Вернуть выбранные заявки в ожидание: ${ids.length}? (откатит доступы, выданные вами)`
+          : `Вернуть выбранные заявки в ожидание: ${ids.length}? (заберёт доступы ТОЛЬКО по этим заявкам)`
       );
-      if (!ok) return;
+      if (!okk) return;
     }
 
-    // ✅ показываем модалку процесса
     setProcessingMode(is_processed ? "process" : "unprocess");
     setProcessingOpen(true);
 
@@ -218,17 +216,14 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       setErr(e?.message || String(e));
     } finally {
       setLoading(false);
-      // ✅ скрываем модалку процесса ТОЛЬКО после завершения
       setProcessingOpen(false);
     }
   }
 
-  // single action: БЕЗ доп-меню/confirm
   async function oneUpdate(id: string, is_processed: boolean) {
     await patchRequests([id], is_processed, false);
   }
 
-  // bulk actions (confirm оставляем)
   async function bulkProcess() {
     const ids = Array.from(selectionRef.current);
     await patchRequests(ids, true, true);
@@ -249,7 +244,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  // debounce
   useEffect(() => {
     const t = setTimeout(() => void loadList(), 350);
     return () => clearTimeout(t);
@@ -275,7 +269,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
   const allChecked = rows.length > 0 && selected.size === rows.length;
 
-  // bulk bar buttons by tab
   const showBulkProcess = tab === "all" || tab === "pending";
   const showBulkUnprocess = tab === "all" || tab === "processed";
 
@@ -336,7 +329,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
       <div style={{ height: 14 }} />
 
-      {/* bulk bar */}
       {selected.size ? (
         <div
           className="card"
@@ -375,7 +367,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
         </div>
       ) : null}
 
-      {/* filters */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
         <div className="form-group" style={{ marginBottom: 0, flex: "1 1 260px" }}>
           <label>Поиск по имени</label>
@@ -428,10 +419,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={tab === "processed" ? 11 : tab === "all" ? 11 : 10}
-                    style={{ padding: 16, textAlign: "center" }}
-                  >
+                  <td colSpan={tab === "processed" ? 11 : tab === "all" ? 11 : 10} style={{ padding: 16, textAlign: "center" }}>
                     <div className="small-muted" style={{ fontWeight: 800 }}>
                       Заявок не найдено
                     </div>
@@ -463,8 +451,8 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
                       {tab === "processed" ? (
                         <td>
                           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            {(materialsByUser?.[r.user_id] ?? []).length ? (
-                              (materialsByUser[r.user_id] ?? []).map((m, i) => (
+                            {(materialsByRequest?.[r.id] ?? []).length ? (
+                              (materialsByRequest[r.id] ?? []).map((m, i) => (
                                 <div key={i} className="small-muted" style={{ fontWeight: 800 }}>
                                   {m}
                                 </div>
@@ -487,21 +475,11 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
                       <td>
                         {!status ? (
-                          <button
-                            className="btn small"
-                            type="button"
-                            onClick={() => void oneUpdate(r.id, true)}
-                            disabled={loading}
-                          >
+                          <button className="btn small" type="button" onClick={() => void oneUpdate(r.id, true)} disabled={loading}>
                             ✅ Обработать
                           </button>
                         ) : (
-                          <button
-                            className="btn small"
-                            type="button"
-                            onClick={() => void oneUpdate(r.id, false)}
-                            disabled={loading}
-                          >
+                          <button className="btn small" type="button" onClick={() => void oneUpdate(r.id, false)} disabled={loading}>
                             ↩️ Вернуть
                           </button>
                         )}
@@ -515,7 +493,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
         </div>
       ) : null}
 
-      {/* ✅ Модалка процесса (поверх всего, без закрытия) */}
       <ProcessingModal open={processingOpen} mode={processingMode} />
     </div>
   );

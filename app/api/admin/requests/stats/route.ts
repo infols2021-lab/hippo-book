@@ -1,3 +1,4 @@
+// app/api/admin/requests/stats/route.ts
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
 
@@ -8,10 +9,7 @@ export async function GET() {
   const { supabase } = auth;
 
   try {
-    const { data, error } = await supabase
-      .from("purchase_requests")
-      .select("id,is_processed");
-
+    const { data, error } = await supabase.from("purchase_requests").select("id,is_processed");
     if (error) return fail(error.message, 500, "DB_ERROR");
 
     const rows = data ?? [];

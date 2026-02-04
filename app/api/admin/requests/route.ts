@@ -21,56 +21,63 @@ function toArr(v: any): string[] {
   return [String(v)];
 }
 
-async function buildGrantedMaterialsMap(supabase: any, adminId: string, userIds: string[]) {
+function uniq<T>(arr: T[]) {
+  return Array.from(new Set(arr));
+}
+
+function fmtLabel(kind: "textbook" | "crossword", title: string) {
+  return `${kind === "textbook" ? "📚" : "🧩"} ${title}`;
+}
+
+/** материалы для ТАБА "обработанные" — показываем именно по заявке */
+async function buildGrantedMaterialsByRequestMap(supabase: any, requestIds: string[]) {
   const map = new Map<string, string[]>();
-  userIds.forEach((id) => map.set(id, []));
+  requestIds.forEach((id) => map.set(id, []));
 
-  if (!userIds.length) return map;
+  if (!requestIds.length) return map;
 
-  const [tRes, cRes] = await Promise.all([
-    supabase
-      .from("textbook_access")
-      .select("user_id, textbooks(title)")
-      .eq("granted_by", adminId)
-      .in("user_id", userIds),
-    supabase
-      .from("crossword_access")
-      .select("user_id, crosswords(title)")
-      .eq("granted_by", adminId)
-      .in("user_id", userIds),
-  ]);
+  const { data, error } = await supabase
+    .from("purchase_request_grants")
+    .select("request_id,kind,title")
+    .in("request_id", requestIds);
 
-  if (!tRes.error && tRes.data) {
-    for (const row of tRes.data as any[]) {
-      const title = row?.textbooks?.title;
-      if (!title) continue;
-      map.get(row.user_id)?.push(`📚 ${title}`);
-    }
+  if (error || !data) return map;
+
+  for (const row of data as any[]) {
+    const request_id = String(row.request_id || "");
+    const kind = String(row.kind || "") as "textbook" | "crossword";
+    const title = String(row.title || "");
+    if (!request_id || !title) continue;
+    if (kind !== "textbook" && kind !== "crossword") continue;
+
+    map.get(request_id)?.push(fmtLabel(kind, title));
   }
 
-  if (!cRes.error && cRes.data) {
-    for (const row of cRes.data as any[]) {
-      const title = row?.crosswords?.title;
-      if (!title) continue;
-      map.get(row.user_id)?.push(`🧩 ${title}`);
-    }
-  }
-
-  // уникализируем
   for (const [k, v] of map.entries()) {
-    map.set(k, Array.from(new Set(v)));
+    map.set(k, uniq(v));
   }
-
   return map;
 }
 
+/** выдаём доступы и готовим строки для purchase_request_grants */
 async function grantAccessForRequest(supabase: any, adminId: string, r: ReqRow) {
   const classLevels = toArr(r.class_level);
-  const types = toArr(r.textbook_types).map((x) => x.toLowerCase());
+  const types = toArr(r.textbook_types).map((x) => String(x).toLowerCase());
 
-  const granted: string[] = [];
+  const nowISO = new Date().toISOString();
 
-  if (!classLevels.length) return granted;
+  const grantedLabels: string[] = [];
+  const grantsToStore: Array<{
+    request_id: string;
+    user_id: string;
+    kind: "textbook" | "crossword";
+    item_id: string;
+    title: string;
+    granted_by: string;
+    granted_at: string;
+  }> = [];
+
+  if (!classLevels.length) return { grantedLabels: [], grantsToStore: [] };
 
   // учебники
   if (types.includes("учебник") || types.includes("textbook")) {
@@ -88,11 +95,23 @@ async function grantAccessForRequest(supabase: any, adminId: string, r: ReqRow) 
           user_id: r.user_id,
           textbook_id: tb.id,
           granted_by: adminId,
-          granted_at: new Date().toISOString(),
+          granted_at: nowISO,
         },
         { onConflict: "user_id,textbook_id" }
       );
-      if (!up.error) granted.push(`📚 ${tb.title}`);
+
+      if (!up.error) {
+        grantedLabels.push(`📚 ${tb.title}`);
+        grantsToStore.push({
+          request_id: r.id,
+          user_id: r.user_id,
+          kind: "textbook",
+          item_id: tb.id,
+          title: tb.title,
+          granted_by: adminId,
+          granted_at: nowISO,
+        });
+      }
     }
   }
 
@@ -112,22 +131,74 @@ async function grantAccessForRequest(supabase: any, adminId: string, r: ReqRow) 
           user_id: r.user_id,
           crossword_id: cw.id,
           granted_by: adminId,
-          granted_at: new Date().toISOString(),
+          granted_at: nowISO,
         },
         { onConflict: "user_id,crossword_id" }
       );
-      if (!up.error) granted.push(`🧩 ${cw.title}`);
+
+      if (!up.error) {
+        grantedLabels.push(`🧩 ${cw.title}`);
+        grantsToStore.push({
+          request_id: r.id,
+          user_id: r.user_id,
+          kind: "crossword",
+          item_id: cw.id,
+          title: cw.title,
+          granted_by: adminId,
+          granted_at: nowISO,
+        });
+      }
     }
   }
 
-  return Array.from(new Set(granted));
+  return { grantedLabels: uniq(grantedLabels), grantsToStore };
+}
+
+/** есть ли другая обработанная заявка, которая тоже “держит” этот материал */
+async function existsOtherProcessedGrant(
+  supabase: any,
+  requestId: string,
+  userId: string,
+  kind: "textbook" | "crossword",
+  itemId: string
+) {
+  const { data, error } = await supabase
+    .from("purchase_request_grants")
+    .select("request_id, purchase_requests!inner(is_processed)")
+    .eq("user_id", userId)
+    .eq("kind", kind)
+    .eq("item_id", itemId)
+    .neq("request_id", requestId)
+    .eq("purchase_requests.is_processed", true)
+    .limit(1);
+
+  if (error) return false;
+  return (data ?? []).length > 0;
+}
+
+/** для возврата: какие материалы были выданы по этой заявке */
+async function getTargetsForUnprocess(supabase: any, r: ReqRow) {
+  const { data, error } = await supabase
+    .from("purchase_request_grants")
+    .select("kind,item_id,title,granted_by")
+    .eq("request_id", r.id);
+
+  if (error) throw new Error(error.message);
+
+  const rows = (data ?? []) as any[];
+  return rows.map((x) => ({
+    kind: String(x.kind) as "textbook" | "crossword",
+    item_id: String(x.item_id),
+    title: String(x.title),
+    granted_by: String(x.granted_by || ""),
+  }));
 }
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
 
-  const { supabase, user } = auth;
+  const { supabase } = auth;
 
   try {
     const sp = req.nextUrl.searchParams;
@@ -136,10 +207,12 @@ export async function GET(req: NextRequest) {
     const email = (sp.get("email") || "").trim();
     const includeMaterials = sp.get("includeMaterials") === "1";
 
-    let q = supabase.from("purchase_requests").select("*").order("created_at", { ascending: false });
+    let q = supabase.from("purchase_requests").select("*");
 
-    if (status === "pending") q = q.eq("is_processed", false);
-    if (status === "processed") q = q.eq("is_processed", true);
+    if (status === "pending") q = q.eq("is_processed", false).order("created_at", { ascending: false });
+    else if (status === "processed")
+      q = q.eq("is_processed", true).order("processed_at", { ascending: false }).order("created_at", { ascending: false });
+    else q = q.order("created_at", { ascending: false });
 
     if (name) q = q.ilike("full_name", `%${name}%`);
     if (email) q = q.ilike("email", `%${email}%`);
@@ -149,14 +222,14 @@ export async function GET(req: NextRequest) {
 
     const rows = (data ?? []) as ReqRow[];
 
-    let materialsByUser: Record<string, string[]> = {};
+    let materialsByRequest: Record<string, string[]> = {};
     if (includeMaterials && rows.length) {
-      const userIds = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean)));
-      const map = await buildGrantedMaterialsMap(supabase, user.id, userIds);
-      materialsByUser = Object.fromEntries(map.entries());
+      const requestIds = rows.map((r) => r.id).filter(Boolean);
+      const map = await buildGrantedMaterialsByRequestMap(supabase, requestIds);
+      materialsByRequest = Object.fromEntries(map.entries());
     }
 
-    return ok({ requests: rows, materialsByUser });
+    return ok({ requests: rows, materialsByRequest });
   } catch (e: any) {
     return fail(e?.message || "Server error", 500, "SERVER_ERROR");
   }
@@ -181,12 +254,7 @@ export async function PATCH(req: NextRequest) {
   if (!ids.length) return fail("ids required", 400, "VALIDATION");
 
   try {
-    // грузим заявки
-    const { data: reqs, error: rErr } = await supabase
-      .from("purchase_requests")
-      .select("*")
-      .in("id", ids);
-
+    const { data: reqs, error: rErr } = await supabase.from("purchase_requests").select("*").in("id", ids);
     if (rErr) return fail(rErr.message, 500, "DB_ERROR");
 
     const rows = (reqs ?? []) as ReqRow[];
@@ -198,13 +266,52 @@ export async function PATCH(req: NextRequest) {
         let granted: string[] = [];
 
         if (is_processed) {
-          granted = await grantAccessForRequest(supabase, user.id, r);
+          // 1) выдаём доступы
+          const { grantedLabels, grantsToStore } = await grantAccessForRequest(supabase, user.id, r);
+
+          // 2) обновляем “что выдано по этой заявке”
+          await supabase.from("purchase_request_grants").delete().eq("request_id", r.id);
+
+          if (grantsToStore.length) {
+            const ins = await supabase.from("purchase_request_grants").insert(grantsToStore);
+            if (ins.error) throw new Error(ins.error.message);
+          }
+
+          granted = grantedLabels;
         } else {
-          // откат: удаляем доступы, выданные этим админом (как в старом html)
-          await supabase.from("textbook_access").delete().eq("user_id", r.user_id).eq("granted_by", user.id);
-          await supabase.from("crossword_access").delete().eq("user_id", r.user_id).eq("granted_by", user.id);
+          // ✅ ВОЗВРАТ: снимаем доступ ТОЛЬКО по выданному в ЭТОЙ заявке
+          const targets = await getTargetsForUnprocess(supabase, r);
+
+          for (const t of targets) {
+            // если этот материал всё ещё “нужен” другой обработанной заявке — НЕ трогаем
+            const keep = await existsOtherProcessedGrant(supabase, r.id, r.user_id, t.kind, t.item_id);
+            if (keep) continue;
+
+            // снимаем доступ только выданный ТЕКУЩИМ админом (как у тебя задумано)
+            if (t.kind === "textbook") {
+              const del = await supabase
+                .from("textbook_access")
+                .delete()
+                .eq("user_id", r.user_id)
+                .eq("textbook_id", t.item_id)
+                .eq("granted_by", user.id);
+              if (del.error) throw new Error(del.error.message);
+            } else {
+              const del = await supabase
+                .from("crossword_access")
+                .delete()
+                .eq("user_id", r.user_id)
+                .eq("crossword_id", t.item_id)
+                .eq("granted_by", user.id);
+              if (del.error) throw new Error(del.error.message);
+            }
+          }
+
+          // чистим историю выдачи этой заявки
+          await supabase.from("purchase_request_grants").delete().eq("request_id", r.id);
         }
 
+        // обновляем статус заявки
         const upd = await supabase
           .from("purchase_requests")
           .update({
