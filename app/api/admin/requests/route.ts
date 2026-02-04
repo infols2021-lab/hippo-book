@@ -2,6 +2,7 @@
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
 import type { NextRequest } from "next/server";
+import { upsertRequestRowByNumber } from "@/lib/integrations/googleSheets";
 
 type ReqRow = {
   id: string;
@@ -28,6 +29,42 @@ function uniq<T>(arr: T[]) {
 
 function fmtLabel(kind: "textbook" | "crossword", title: string) {
   return `${kind === "textbook" ? "📚" : "🧩"} ${title}`;
+}
+
+function formatClassLevel(classLevel: string) {
+  const classMap: Record<string, string> = {
+    "1-2": "1-2 класс",
+    "3-4": "3-4 класс",
+    "5-6": "5-6 класс",
+    "7": "7 класс",
+    "8-9": "8-9 класс",
+    "10-11": "10-11 класс (Техникум, колледж - 1й курс)",
+    "12": "12 класс (Техникум, колледж)",
+  };
+  return classMap[classLevel] || classLevel;
+}
+
+function formatTextbookTypes(types: any) {
+  const arr = Array.isArray(types) ? types : types ? [types] : [];
+  const typeMap: Record<string, string> = { учебник: "📚 Учебник", кроссворд: "🧩 Кроссворд" };
+  return arr.map((t: any) => typeMap[String(t).toLowerCase()] || String(t)).join(", ");
+}
+
+function formatDateTimeRU(dateString: string) {
+  return new Date(dateString).toLocaleString("ru-RU", {
+    timeZone: "Europe/Moscow",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatStatus(isProcessed: boolean, processedAt?: string | null) {
+  if (!isProcessed) return "⏳ Ожидает";
+  if (processedAt) return `✅ Обработана · ${formatDateTimeRU(processedAt)}`;
+  return "✅ Обработана";
 }
 
 /** материалы для ТАБА "обработанные" — показываем именно по заявке */
@@ -80,7 +117,6 @@ async function grantAccessForRequest(supabase: any, adminId: string, r: ReqRow) 
 
   if (!classLevels.length) return { grantedLabels: [], grantsToStore: [] };
 
-  // учебники
   if (types.includes("учебник") || types.includes("textbook")) {
     const { data: textbooks, error } = await supabase
       .from("textbooks")
@@ -116,7 +152,6 @@ async function grantAccessForRequest(supabase: any, adminId: string, r: ReqRow) 
     }
   }
 
-  // кроссворды
   if (types.includes("кроссворд") || types.includes("crossword")) {
     const { data: crosswords, error } = await supabase
       .from("crosswords")
@@ -203,7 +238,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const sp = req.nextUrl.searchParams;
-    const status = (sp.get("status") || "all").trim(); // all | pending | processed
+    const status = (sp.get("status") || "all").trim();
     const name = (sp.get("name") || "").trim();
     const email = (sp.get("email") || "").trim();
     const includeMaterials = sp.get("includeMaterials") === "1";
@@ -251,7 +286,6 @@ export async function PATCH(req: NextRequest) {
 
   const ids: string[] = Array.isArray(body?.ids) ? body.ids.map(String) : [];
   const is_processed = Boolean(body?.is_processed);
-
   if (!ids.length) return fail("ids required", 400, "VALIDATION");
 
   try {
@@ -259,71 +293,93 @@ export async function PATCH(req: NextRequest) {
     if (rErr) return fail(rErr.message, 500, "DB_ERROR");
 
     const rows = (reqs ?? []) as ReqRow[];
-
-    const results: Record<string, { ok: boolean; granted?: string[]; error?: string }> = {};
+    const results: Record<string, { ok: boolean; granted?: string[]; error?: string; sheet?: any }> = {};
 
     for (const r of rows) {
       try {
         let granted: string[] = [];
 
         if (is_processed) {
-          // 1) выдаём доступы
           const { grantedLabels, grantsToStore } = await grantAccessForRequest(supabase, user.id, r);
 
-          // 2) обновляем “что выдано по этой заявке”
           await supabase.from("purchase_request_grants").delete().eq("request_id", r.id);
-
           if (grantsToStore.length) {
             const ins = await supabase.from("purchase_request_grants").insert(grantsToStore);
             if (ins.error) throw new Error(ins.error.message);
           }
-
           granted = grantedLabels;
         } else {
-          // ✅ ВОЗВРАТ: снимаем доступ ТОЛЬКО по выданному в ЭТОЙ заявке
-          // ✅ ВАЖНО: НЕ фильтруем по granted_by, иначе другой админ не сможет корректно вернуть
           const targets = await getTargetsForUnprocess(supabase, r);
 
           for (const t of targets) {
-            // если этот материал всё ещё “нужен” другой обработанной заявке — НЕ трогаем
             const keep = await existsOtherProcessedGrant(supabase, r.id, r.user_id, t.kind, t.item_id);
             if (keep) continue;
 
             if (t.kind === "textbook") {
-              const del = await supabase
-                .from("textbook_access")
-                .delete()
-                .eq("user_id", r.user_id)
-                .eq("textbook_id", t.item_id);
-
+              const del = await supabase.from("textbook_access").delete().eq("user_id", r.user_id).eq("textbook_id", t.item_id);
               if (del.error) throw new Error(del.error.message);
             } else {
-              const del = await supabase
-                .from("crossword_access")
-                .delete()
-                .eq("user_id", r.user_id)
-                .eq("crossword_id", t.item_id);
-
+              const del = await supabase.from("crossword_access").delete().eq("user_id", r.user_id).eq("crossword_id", t.item_id);
               if (del.error) throw new Error(del.error.message);
             }
           }
 
-          // чистим историю выдачи этой заявки (важно делать ПОСЛЕ удаления access)
           await supabase.from("purchase_request_grants").delete().eq("request_id", r.id);
         }
 
-        // обновляем статус заявки
+        const processed_at = is_processed ? new Date().toISOString() : null;
+
         const upd = await supabase
           .from("purchase_requests")
           .update({
             is_processed,
-            processed_at: is_processed ? new Date().toISOString() : null,
+            processed_at,
           })
-          .eq("id", r.id);
+          .eq("id", r.id)
+          .select("*")
+          .single();
 
         if (upd.error) throw new Error(upd.error.message);
 
-        results[r.id] = { ok: true, granted };
+        const updatedRow = upd.data as any;
+
+        // ✅ СИНК В SHEETS (A:G) сразу после смены статуса
+        const sheetValues = [
+          String(updatedRow.request_number || ""),
+          formatDateTimeRU(String(updatedRow.created_at)),
+          formatClassLevel(String(updatedRow.class_level)),
+          formatTextbookTypes(updatedRow.textbook_types),
+          String(updatedRow.email || ""),
+          String(updatedRow.full_name || ""),
+          formatStatus(Boolean(updatedRow.is_processed), updatedRow.processed_at ?? null),
+        ];
+
+        try {
+          const sres = await upsertRequestRowByNumber(sheetValues);
+
+          await supabase
+            .from("purchase_requests")
+            .update({
+              sheet_synced_at: new Date().toISOString(),
+              sheet_row: sres.rowNumber ?? null,
+              sheet_sync_error: null,
+            })
+            .eq("id", updatedRow.id);
+
+          results[r.id] = { ok: true, granted, sheet: { ok: true, action: sres.action, row: sres.rowNumber ?? null } };
+        } catch (e: any) {
+          const msg = String(e?.message || e || "Sheets sync error").slice(0, 500);
+          await supabase
+            .from("purchase_requests")
+            .update({
+              sheet_synced_at: null,
+              sheet_row: null,
+              sheet_sync_error: msg,
+            })
+            .eq("id", updatedRow.id);
+
+          results[r.id] = { ok: true, granted, sheet: { ok: false, error: msg } };
+        }
       } catch (e: any) {
         results[r.id] = { ok: false, error: e?.message || String(e) };
       }

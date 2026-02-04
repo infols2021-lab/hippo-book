@@ -2,11 +2,7 @@
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
-import {
-  appendAccountingRow,
-  getSheetRequestRowMap,
-  updateAccountingRow,
-} from "@/lib/integrations/googleSheets";
+import { upsertRequestRowByNumber } from "@/lib/integrations/googleSheets";
 
 export const runtime = "nodejs";
 
@@ -38,6 +34,12 @@ function formatDateTimeRU(dateString: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatStatus(isProcessed: boolean, processedAt?: string | null) {
+  if (!isProcessed) return "⏳ Ожидает";
+  if (processedAt) return `✅ Обработана · ${formatDateTimeRU(processedAt)}`;
+  return "✅ Обработана";
 }
 
 async function safeJson(req: NextRequest) {
@@ -72,18 +74,15 @@ export async function POST(req: NextRequest) {
   if (!email || !full_name) return fail("Missing profile data (email/full_name)", 400, "PROFILE_MISSING");
 
   try {
-    // 1) Обновляем в БД (только свои + только не обработанные)
     const upd = await supabase
       .from("purchase_requests")
       .update({
-        request_number, // можно оставить (у тебя он readOnly)
+        request_number,
         created_at,
         class_level,
         textbook_types,
         email,
         full_name,
-        user_id: user.id,
-        is_processed: false,
       })
       .eq("id", id)
       .eq("user_id", user.id)
@@ -94,7 +93,6 @@ export async function POST(req: NextRequest) {
     if (upd.error) return fail(upd.error.message, 500, "DB_ERROR");
     const row = upd.data as any;
 
-    // 2) Пытаемся синкнуть Sheets сразу
     const sheetValues = [
       String(row.request_number),
       formatDateTimeRU(String(row.created_at)),
@@ -102,22 +100,15 @@ export async function POST(req: NextRequest) {
       formatTextbookTypes(row.textbook_types),
       String(row.email || ""),
       String(row.full_name || ""),
+      formatStatus(Boolean(row.is_processed), row.processed_at ?? null),
     ];
 
     let sheetOk = true;
     let sheetRow: number | null = null;
 
     try {
-      const map = await getSheetRequestRowMap();
-      const found = map.get(String(row.request_number));
-
-      if (found) {
-        await updateAccountingRow(found.rowNumber, sheetValues);
-        sheetRow = found.rowNumber;
-      } else {
-        const res = await appendAccountingRow(sheetValues);
-        sheetRow = res.rowNumber ?? null;
-      }
+      const res = await upsertRequestRowByNumber(sheetValues);
+      sheetRow = res.rowNumber ?? null;
 
       await supabase
         .from("purchase_requests")

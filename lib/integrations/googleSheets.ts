@@ -8,7 +8,6 @@ function mustEnv(name: string) {
 }
 
 function getPrivateKey() {
-  // В Vercel ключ часто хранится как строка с \n
   return mustEnv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(/\\n/g, "\n");
 }
 
@@ -20,7 +19,7 @@ export function getSpreadsheetConfig() {
 }
 
 function parseRowNumber(updatedRange?: string | null): number | null {
-  // Пример: "Учёт!A12:F12"
+  // Пример: "Учёт!A12:G12"
   if (!updatedRange) return null;
   const m = updatedRange.match(/![A-Z]+(\d+):/);
   if (!m) return null;
@@ -43,7 +42,6 @@ function norm(v: any) {
 }
 
 function isLikelyRequestNumber(v: string) {
-  // В твоём проекте номера генерятся как PR-YYYYMMDD-XXXX
   return /^PR-/i.test(v);
 }
 
@@ -57,18 +55,17 @@ async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
   if (sheetId === undefined || sheetId === null) {
     throw new Error(`Google Sheets tab not found: "${tab}"`);
   }
-
   return sheetId;
 }
 
-/** append в самый низ (как у тебя и было) */
+/** append в самый низ (A:G) */
 export async function appendAccountingRow(values: (string | number)[]) {
   const sheets = getSheetsClient();
   const { spreadsheetId, tab } = getSpreadsheetConfig();
 
   const res = await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${tab}!A:F`,
+    range: `${tab}!A:G`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: [values] },
@@ -76,11 +73,10 @@ export async function appendAccountingRow(values: (string | number)[]) {
 
   const updatedRange = res.data.updates?.updatedRange ?? null;
   const rowNumber = parseRowNumber(updatedRange);
-
   return { updatedRange, rowNumber };
 }
 
-/** читает колонку A (как у тебя и было) */
+/** читает колонку A */
 export async function getExistingRequestNumbersSet() {
   const sheets = getSheetsClient();
   const { spreadsheetId, tab } = getSpreadsheetConfig();
@@ -92,18 +88,16 @@ export async function getExistingRequestNumbersSet() {
 
   const rows = res.data.values ?? [];
   const set = new Set<string>();
-
   for (const r of rows) {
     const v = norm(r?.[0]);
     if (v) set.add(v);
   }
-
   return set;
 }
 
 /**
- * Мапа request_number -> { rowNumber, values[0..5] }
- * Читает A:F и находит строки по колонке A.
+ * Мапа request_number -> { rowNumber, values[0..6] }
+ * Читает A:G и находит строки по колонке A.
  */
 export async function getSheetRequestRowMap() {
   const sheets = getSheetsClient();
@@ -111,20 +105,27 @@ export async function getSheetRequestRowMap() {
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${tab}!A:F`,
+    range: `${tab}!A:G`,
   });
 
   const rows = res.data.values ?? [];
   const map = new Map<string, { rowNumber: number; values: string[] }>();
 
-  // rows[0] обычно заголовки, но мы просто фильтруем по формату PR-
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i] ?? [];
     const rn = norm(row[0]);
     if (!rn) continue;
     if (!isLikelyRequestNumber(rn)) continue;
 
-    const values = [norm(row[0]), norm(row[1]), norm(row[2]), norm(row[3]), norm(row[4]), norm(row[5])];
+    const values = [
+      norm(row[0]),
+      norm(row[1]),
+      norm(row[2]),
+      norm(row[3]),
+      norm(row[4]),
+      norm(row[5]),
+      norm(row[6]),
+    ];
 
     map.set(rn, { rowNumber: i + 1, values });
   }
@@ -132,14 +133,14 @@ export async function getSheetRequestRowMap() {
   return map;
 }
 
-/** Обновить конкретную строку A:F по номеру строки */
+/** Обновить конкретную строку A:G по номеру строки */
 export async function updateAccountingRow(rowNumber: number, values: (string | number)[]) {
   const sheets = getSheetsClient();
   const { spreadsheetId, tab } = getSpreadsheetConfig();
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${tab}!A${rowNumber}:F${rowNumber}`,
+    range: `${tab}!A${rowNumber}:G${rowNumber}`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [values] },
   });
@@ -167,8 +168,8 @@ export async function deleteAccountingRows(rowNumbers: number[]) {
       range: {
         sheetId,
         dimension: "ROWS",
-        startIndex: n - 1, // 0-based inclusive
-        endIndex: n, // exclusive
+        startIndex: n - 1,
+        endIndex: n,
       },
     },
   }));
@@ -181,52 +182,33 @@ export async function deleteAccountingRows(rowNumbers: number[]) {
   return { deleted: nums.length };
 }
 
-/* ------------------------------------------------------------------ */
-/* ✅ НОВОЕ: удобные функции "как при создании" для update/delete       */
-/* ------------------------------------------------------------------ */
-
-/**
- * Найти строку в Sheets по request_number (колонка A).
- * Возвращает rowNumber (1-based) или null если не найдено.
- */
+/** Найти строку по request_number */
 export async function findRowNumberByRequestNumber(requestNumber: string) {
   const rn = norm(requestNumber);
   if (!rn) return null;
-
   const map = await getSheetRequestRowMap();
   const found = map.get(rn);
   return found?.rowNumber ?? null;
 }
 
-/**
- * ✅ UPSERT по номеру заявки:
- * - если строка с таким request_number есть — UPDATE A:F
- * - если нет — APPEND в конец
- *
- * Возвращает { action, rowNumber }
- */
-export async function upsertRequestRowByNumber(valuesAtoF: (string | number)[]) {
-  const rn = norm(valuesAtoF?.[0]);
+/** UPSERT по request_number (A:G) */
+export async function upsertRequestRowByNumber(valuesAtoG: (string | number)[]) {
+  const rn = norm(valuesAtoG?.[0]);
   if (!rn) throw new Error("Missing request_number in values[0]");
 
-  // читаем map A:F и ищем строку
   const map = await getSheetRequestRowMap();
   const found = map.get(rn);
 
   if (found) {
-    await updateAccountingRow(found.rowNumber, valuesAtoF);
+    await updateAccountingRow(found.rowNumber, valuesAtoG);
     return { action: "updated" as const, rowNumber: found.rowNumber };
   }
 
-  const res = await appendAccountingRow(valuesAtoF);
+  const res = await appendAccountingRow(valuesAtoG);
   return { action: "inserted" as const, rowNumber: res.rowNumber ?? null };
 }
 
-/**
- * ✅ DELETE по номеру заявки:
- * - находит строку по request_number в колонке A
- * - удаляет строку (если найдена)
- */
+/** DELETE по request_number */
 export async function deleteRequestRowByNumber(requestNumber: string) {
   const rowNumber = await findRowNumberByRequestNumber(requestNumber);
   if (!rowNumber) return { ok: true, deleted: 0, rowNumber: null as number | null };

@@ -36,6 +36,12 @@ function formatDateTimeRU(dateString: string) {
   });
 }
 
+function formatStatus(isProcessed: boolean, processedAt?: string | null) {
+  if (!isProcessed) return "⏳ Ожидает";
+  if (processedAt) return `✅ Обработана · ${formatDateTimeRU(processedAt)}`;
+  return "✅ Обработана";
+}
+
 async function safeJson(req: NextRequest) {
   try {
     return await req.json();
@@ -48,14 +54,13 @@ export async function POST(req: NextRequest) {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
 
-  // requireUser в твоём проекте обычно возвращает { supabase, user, profile }
   const { supabase, user, profile } = auth as any;
 
   const body = await safeJson(req);
   if (!body) return fail("Bad JSON", 400, "BAD_JSON");
 
   const request_number = String(body.request_number || "").trim();
-  const created_at = String(body.created_at || "").trim(); // можно передать как раньше
+  const created_at = String(body.created_at || "").trim();
   const class_level = String(body.class_level || "").trim();
   const textbook_types = Array.isArray(body.textbook_types) ? body.textbook_types.map(String) : [];
 
@@ -71,7 +76,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 1) создаём заявку в БД
     const payload: any = {
       user_id: user.id,
       request_number,
@@ -80,6 +84,7 @@ export async function POST(req: NextRequest) {
       email,
       full_name,
       is_processed: false,
+      processed_at: null,
     };
 
     if (created_at) payload.created_at = created_at;
@@ -89,7 +94,6 @@ export async function POST(req: NextRequest) {
 
     const row = ins.data as any;
 
-    // 2) пишем строку в Google Sheets (append в самый низ)
     const sheetValues = [
       String(row.request_number),
       formatDateTimeRU(String(row.created_at)),
@@ -97,6 +101,7 @@ export async function POST(req: NextRequest) {
       formatTextbookTypes(row.textbook_types),
       String(row.email),
       String(row.full_name),
+      formatStatus(Boolean(row.is_processed), row.processed_at ?? null),
     ];
 
     let sheetOk = true;
@@ -106,7 +111,6 @@ export async function POST(req: NextRequest) {
       const res = await appendAccountingRow(sheetValues);
       sheetRow = res.rowNumber ?? null;
 
-      // 3) фиксируем успешный синк в БД
       await supabase
         .from("purchase_requests")
         .update({
@@ -118,8 +122,6 @@ export async function POST(req: NextRequest) {
         .eq("user_id", user.id);
     } catch (e: any) {
       sheetOk = false;
-
-      // заявка создана, но sheets не записался — сохраняем ошибку
       await supabase
         .from("purchase_requests")
         .update({

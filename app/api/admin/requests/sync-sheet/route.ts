@@ -10,6 +10,8 @@ import {
 } from "@/lib/integrations/googleSheets";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function formatClassLevel(classLevel: string) {
   const classMap: Record<string, string> = {
@@ -41,13 +43,18 @@ function formatDateTimeRU(dateString: string) {
   });
 }
 
+function formatStatus(isProcessed: boolean, processedAt?: string | null) {
+  if (!isProcessed) return "⏳ Ожидает";
+  if (processedAt) return `✅ Обработана · ${formatDateTimeRU(processedAt)}`;
+  return "✅ Обработана";
+}
+
 function norm(v: any) {
   return String(v ?? "").trim();
 }
 
-function equalAtoF(a: (string | number)[], b: string[]) {
-  // сравнение 6 колонок A..F
-  for (let i = 0; i < 6; i++) {
+function equalAtoG(a: (string | number)[], b: string[]) {
+  for (let i = 0; i < 7; i++) {
     const av = norm(a[i]);
     const bv = norm(b[i]);
     if (av !== bv) return false;
@@ -65,13 +72,13 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(Number(sp.get("limit") || 500), 2000);
 
   try {
-    // 1) читаем Sheets (A:F) -> map request_number -> {rowNumber, values}
     const sheetMap = await getSheetRequestRowMap();
 
-    // 2) читаем БД
     const { data, error } = await supabase
       .from("purchase_requests")
-      .select("id,request_number,created_at,class_level,textbook_types,email,full_name,sheet_synced_at,sheet_row")
+      .select(
+        "id,request_number,created_at,class_level,textbook_types,email,full_name,is_processed,processed_at,sheet_synced_at,sheet_row"
+      )
       .order("created_at", { ascending: true });
 
     if (error) return fail(error.message, 500, "DB_ERROR");
@@ -93,7 +100,6 @@ export async function GET(req: NextRequest) {
 
     let ops = 0;
 
-    // 3) upsert/update: БД -> Sheets
     for (const r of rows) {
       if (ops >= limit) break;
 
@@ -110,17 +116,16 @@ export async function GET(req: NextRequest) {
         formatTextbookTypes(r.textbook_types),
         String(r.email || ""),
         String(r.full_name || ""),
+        formatStatus(Boolean(r.is_processed), r.processed_at ?? null),
       ];
 
       const existing = sheetMap.get(rn);
 
       try {
         if (!existing) {
-          // нет в Sheets -> append
           const res = await appendAccountingRow(sheetValues);
           const rowNumber = res.rowNumber ?? null;
 
-          // фиксируем в БД (не обязательно, но полезно)
           await supabase
             .from("purchase_requests")
             .update({
@@ -132,13 +137,12 @@ export async function GET(req: NextRequest) {
 
           inserted++;
           ops++;
-          // обновим локальную map, чтобы не считать как "лишнюю" при delete
+
           if (rowNumber) {
             sheetMap.set(rn, { rowNumber, values: sheetValues.map((x) => norm(x)) as any });
           }
         } else {
-          // есть в Sheets -> сравниваем и обновляем при отличиях
-          if (!equalAtoF(sheetValues, existing.values)) {
+          if (!equalAtoG(sheetValues, existing.values)) {
             await updateAccountingRow(existing.rowNumber, sheetValues);
 
             await supabase
@@ -153,7 +157,6 @@ export async function GET(req: NextRequest) {
             updated++;
             ops++;
           } else {
-            // если в БД не было отметки синка — поставим (чисто косметика)
             if (!r.sheet_synced_at || r.sheet_row !== existing.rowNumber) {
               await supabase
                 .from("purchase_requests")
@@ -180,17 +183,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 4) delete: если в Sheets есть заявка, но в БД её уже нет -> удалить строку
     if (ops < limit) {
       const toDelete: number[] = [];
-
       for (const [rn, info] of sheetMap.entries()) {
-        if (!dbSet.has(rn)) {
-          toDelete.push(info.rowNumber);
-        }
+        if (!dbSet.has(rn)) toDelete.push(info.rowNumber);
       }
 
-      // удаляем снизу вверх и не больше лимита по операциям
       toDelete.sort((a, b) => b - a);
       const canDelete = Math.max(0, limit - ops);
       const slice = toDelete.slice(0, canDelete);

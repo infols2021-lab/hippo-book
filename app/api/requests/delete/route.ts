@@ -2,7 +2,7 @@
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
-import { deleteAccountingRows, getSheetRequestRowMap } from "@/lib/integrations/googleSheets";
+import { deleteRequestRowByNumber } from "@/lib/integrations/googleSheets";
 
 export const runtime = "nodejs";
 
@@ -27,7 +27,6 @@ export async function POST(req: NextRequest) {
   if (!id) return fail("Missing id", 400, "VALIDATION");
 
   try {
-    // 1) берём заявку (чтобы знать request_number)
     const get = await supabase
       .from("purchase_requests")
       .select("id,request_number,is_processed,user_id")
@@ -41,7 +40,6 @@ export async function POST(req: NextRequest) {
 
     const request_number = String(get.data.request_number || "").trim();
 
-    // 2) удаляем в БД (основное)
     const del = await supabase
       .from("purchase_requests")
       .delete()
@@ -51,22 +49,16 @@ export async function POST(req: NextRequest) {
 
     if (del.error) return fail(del.error.message, 500, "DB_ERROR");
 
-    // 3) best-effort: удаляем из Sheets по номеру заявки
     let sheetOk = true;
     let deletedRows = 0;
 
     try {
       if (request_number) {
-        const map = await getSheetRequestRowMap();
-        const found = map.get(request_number);
-        if (found) {
-          const res = await deleteAccountingRows([found.rowNumber]);
-          deletedRows = res.deleted;
-        }
+        const res = await deleteRequestRowByNumber(request_number);
+        deletedRows = res.deleted;
       }
-    } catch (e) {
+    } catch {
       sheetOk = false;
-      // БД уже удалена — если Sheets не получилось, админский reconcile потом подчистит.
     }
 
     return ok({ deleted: true, request_number, sheet: { ok: sheetOk, deletedRows } });
