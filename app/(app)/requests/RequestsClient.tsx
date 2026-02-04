@@ -66,7 +66,7 @@ function formatDateTime(dateString: string) {
 
 function getPaymentQRUrl(seed?: number) {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const t = seed ?? Date.now();
+  const t = seed ?? Date.now(); // ✅ seed позволяет форс-обновить URL
   return `${base}/storage/v1/object/public/help-images/oplata.png?t=${t}`;
 }
 
@@ -100,7 +100,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
   function resetQrStateAndRefresh() {
     setQrError(false);
     setQrLoading(true);
-    setQrSeed(Date.now());
+    setQrSeed(Date.now()); // меняем querystring -> браузер точно перезагрузит
   }
 
   function showNotification(text: string, type: "success" | "error" = "success") {
@@ -149,11 +149,6 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
   }
 
   function openEdit(r: PurchaseRequest) {
-    if (r.is_processed) {
-      showNotification("🔒 Эта заявка уже обработана — редактирование недоступно.", "error");
-      return;
-    }
-
     setEditingId(r.id);
     setRequestNumber(r.request_number);
 
@@ -196,13 +191,6 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
 
     try {
       if (editingId) {
-        const current = requests.find((x) => x.id === editingId);
-        if (current?.is_processed) {
-          showNotification("🔒 Эта заявка уже обработана — редактирование недоступно.", "error");
-          setRequestModalOpen(false);
-          return;
-        }
-
         const { error } = await supabase
           .from("purchase_requests")
           .update(payload)
@@ -217,18 +205,47 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
         return;
       }
 
-      const { error } = await supabase.from("purchase_requests").insert([payload]);
-      if (error) throw error;
+      // ✅ ВАЖНО: создание заявки теперь через серверный API
+      const res = await fetch("/api/requests/create", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          request_number: payload.request_number,
+          created_at: payload.created_at,
+          class_level: payload.class_level,
+          textbook_types: payload.textbook_types,
+          email: payload.email,
+          full_name: payload.full_name,
+        }),
+      });
+
+      const t = await res.text();
+      let json: any = null;
+      try {
+        json = t ? JSON.parse(t) : null;
+      } catch {
+        json = null;
+      }
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
 
       setRequestModalOpen(false);
 
       const totalAmount = types.length * 1000;
       setPaymentTotalAmount(totalAmount);
 
+      // ✅ когда открываем оплату — сразу показываем лоадер и обновляем URL
       setPaymentModalOpen(true);
       setQrLoading(true);
       setQrError(false);
       setQrSeed(Date.now());
+
+      // если Sheets не записался — покажем мягкое предупреждение (заявка всё равно создана)
+      if (json?.sheet && json.sheet.ok === false) {
+        showNotification("⚠️ Заявка создана, но запись в таблицу временно не удалась. Админ досинхронизирует позже.", "error");
+      }
 
       await reloadRequests();
     } catch (e: any) {
@@ -239,11 +256,6 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
   async function deleteRequest(r: PurchaseRequest) {
     if (r.user_id !== userId) {
       showNotification("❌ Вы можете удалять только свои заявки", "error");
-      return;
-    }
-
-    if (r.is_processed) {
-      showNotification("🔒 Эта заявка уже обработана — удаление недоступно.", "error");
       return;
     }
 
@@ -361,14 +373,12 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
           <p>Оплатить можно по QR-коду ниже:</p>
         </div>
 
-        {/* ✅ СУММУ ПОКАЗЫВАЕМ ТОЛЬКО если она реально есть (когда создали заявку) */}
-        {paymentTotalAmount > 0 ? (
-          <div className="total-amount">
-            <h4>💰 Сумма к оплате:</h4>
-            <div className="amount">{paymentTotalAmount} руб.</div>
-          </div>
-        ) : null}
+        <div className="total-amount">
+          <h4>💰 Сумма к оплате:</h4>
+          <div className="amount">{paymentTotalAmount} руб.</div>
+        </div>
 
+        {/* ✅ QR area with loader + refresh */}
         <div className="qr-head">
           <div className="qr-title">QR-код для оплаты</div>
           <button
@@ -459,7 +469,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
               className="btn ghost qr-open"
               type="button"
               onClick={() => {
-                setPaymentTotalAmount(0); // ✅ чтобы сумма не показывалась
+                setPaymentTotalAmount(0);
                 setPaymentModalOpen(true);
                 setQrLoading(true);
                 setQrError(false);
@@ -494,56 +504,31 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
                 </tr>
               </thead>
               <tbody>
-                {requests.map((r) => {
-                  const locked = !!r.is_processed;
-
-                  return (
-                    <tr key={r.id} className={locked ? "processed-row" : ""}>
-                      <td>
-                        <strong>{r.request_number}</strong>
-                      </td>
-                      <td>{formatDateTime(r.created_at)}</td>
-                      <td>{formatClassLevel(r.class_level)}</td>
-                      <td>{formatTextbookTypes(r.textbook_types)}</td>
-                      <td>{r.email}</td>
-                      <td>{r.full_name}</td>
-                      <td>
-                        <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
-                          {r.is_processed ? "✅ Обработана" : "⏳ Ожидает"}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          className="btn btn-small"
-                          onClick={() => openEdit(r)}
-                          type="button"
-                          disabled={locked}
-                          aria-disabled={locked}
-                          title={locked ? "Заявка уже обработана — редактирование недоступно" : "Редактировать"}
-                        >
-                          ✏️ Редактировать
-                        </button>{" "}
-                        <button
-                          className="btn btn-small danger"
-                          onClick={() => void deleteRequest(r)}
-                          type="button"
-                          disabled={locked}
-                          aria-disabled={locked}
-                          title={locked ? "Заявка уже обработана — удаление недоступно" : "Удалить"}
-                        >
-                          🗑️ Удалить
-                        </button>
-
-                        {/* ✅ Явно пишем почему нельзя (не двигаем кнопки, просто подпись ниже) */}
-                        {locked ? (
-                          <div className="locked-hint">
-                            🔒 Нельзя редактировать или удалять, потому что заявка уже обработана.
-                          </div>
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {requests.map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      <strong>{r.request_number}</strong>
+                    </td>
+                    <td>{formatDateTime(r.created_at)}</td>
+                    <td>{formatClassLevel(r.class_level)}</td>
+                    <td>{formatTextbookTypes(r.textbook_types)}</td>
+                    <td>{r.email}</td>
+                    <td>{r.full_name}</td>
+                    <td>
+                      <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
+                        {r.is_processed ? "✅ Обработана" : "⏳ Ожидает"}
+                      </span>
+                    </td>
+                    <td>
+                      <button className="btn btn-small" onClick={() => openEdit(r)} type="button">
+                        ✏️ Редактировать
+                      </button>{" "}
+                      <button className="btn btn-small" onClick={() => void deleteRequest(r)} type="button">
+                        🗑️ Удалить
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
