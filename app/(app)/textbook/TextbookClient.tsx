@@ -170,13 +170,20 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
 
           {!data?.locked && textbook ? (
             <div className="textbook-header" id="textbookHeader" style={{ display: "block" }}>
-              <div className="textbook-cover" id="textbookCover">
+              <div
+                className="textbook-cover"
+                id="textbookCover"
+                // ✅ FIX: 16:9 и без странной обрезки
+                style={{ aspectRatio: "16 / 9", height: "auto" }}
+              >
                 {coverUrl ? (
                   <img
                     src={coverUrl}
                     alt="Обложка учебника"
                     loading="lazy"
                     decoding="async"
+                    // ✅ FIX: показываем обложку целиком
+                    style={{ objectFit: "contain", objectPosition: "center" }}
                     onError={(e) => {
                       const img = e.currentTarget;
                       img.style.display = "none";
