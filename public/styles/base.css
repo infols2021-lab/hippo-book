@@ -23,6 +23,12 @@
 /* ===== Hard reset (фикс “полосок” и лагов) ===== */
 *{ box-sizing:border-box }
 
+/* iOS/Android: не даём браузеру самовольно “масштабить” текст */
+html{
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 html, body {
   height: 100%;
   margin: 0 !important;
@@ -34,13 +40,23 @@ body{
   min-height:100vh;
   overflow-x: hidden;
 
-  font-family: 'Poppins', "Comic Sans MS", sans-serif;
+  /* ✅ нормальный глобальный шрифт (Poppins из next/font + безопасный фоллбек) */
+  font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-style: normal;
+
   color:#1f2937;
 
   /* фон рисуем отдельным слоем (без background-attachment: fixed) */
   background: transparent;
   position: relative;
   isolation: isolate;
+}
+
+/* Формы на мобилках иногда не наследуют шрифт корректно */
+button, input, optgroup, select, textarea {
+  font-family: inherit;
+  font-style: inherit;
 }
 
 /* Фиксированный слой фона — не “рвётся” на длинных страницах */
@@ -313,7 +329,7 @@ body::before{
 .modal-title{
   margin: 0;
   font-size: 16px;
-  font-weight: 1000;
+  font-weight: 900;
   color: rgba(44, 62, 80, 0.85);
   white-space: nowrap;
   overflow: hidden;
@@ -331,7 +347,7 @@ body::before{
   background: #ffffff;
   color: rgba(44, 62, 80, 0.80);
   font-size: 18px;
-  font-weight: 1000;
+  font-weight: 900;
 
   box-shadow: 0 12px 28px rgba(15, 65, 95, 0.12);
   transition: transform 0.12s ease, filter 0.12s ease;

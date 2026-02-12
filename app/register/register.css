@@ -7,7 +7,12 @@
   align-items: center;
   min-height: 100vh;
   background: linear-gradient(135deg, #4dd0e1, #f48fb1);
-  font-family: "Poppins", "Comic Sans MS", cursive, sans-serif;
+
+  /* ✅ ВАЖНО: убрали Comic Sans / cursive, чтобы не было “волнистого” шрифта на мобилках */
+  font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-style: normal;
+
   margin: 0;
   padding: 20px;
 }
@@ -58,6 +63,7 @@
   font-size: 16px;
   transition: border-color 0.3s;
   font-family: inherit;
+  font-style: inherit;
   background: #fff;
 }
 
@@ -78,6 +84,9 @@
   font-size: 16px;
   font-weight: 600;
   transition: transform 0.2s, box-shadow 0.2s, background 0.2s, opacity 0.2s;
+
+  font-family: inherit;
+  font-style: inherit;
 }
 
 /* ====== КРАСИВАЯ КНОПКА "Создать аккаунт" (голубая) ====== */
@@ -322,6 +331,7 @@
     font-size: 16px;
   }
 }
+
 /* ===== MODAL NOTICE ===== */
 .modal-notice-overlay {
   position: fixed;
