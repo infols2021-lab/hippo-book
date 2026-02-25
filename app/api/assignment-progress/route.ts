@@ -62,5 +62,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: res.error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true }, { status: 200 });
+  // ✅ Записываем completion для стрика (идемпотентно: максимум 1 раз в день)
+  // Если RPC упадёт — НЕ ломаем сохранение прогресса
+  let streak: any = null;
+  const { data: streakData, error: streakErr } = await supabase.rpc("record_streak_completion", {
+    _assignment_id: body.assignmentId,
+  });
+
+  if (!streakErr) {
+    streak = streakData ?? null;
+  } else {
+    console.error("record_streak_completion RPC error:", streakErr.message);
+  }
+
+  return NextResponse.json({ ok: true, streak }, { status: 200 });
 }

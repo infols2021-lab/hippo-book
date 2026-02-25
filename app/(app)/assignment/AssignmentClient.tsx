@@ -299,12 +299,31 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     setReviewItems([]);
   }
 
+  function notifyProfileStreakRefresh(payload?: unknown) {
+    try {
+      if (typeof window === "undefined") return;
+
+      // флаг "после выполнения задания обнови стрик"
+      sessionStorage.setItem("profile-streak-dirty", "1");
+
+      // опционально сохраним snapshot/ответ (если есть) — на будущее
+      if (payload !== undefined) {
+        sessionStorage.setItem("profile-streak-last-save-response", JSON.stringify(payload));
+      }
+
+      // событие для страниц/компонентов, которые уже открыты и слушают обновление
+      window.dispatchEvent(new Event("profile-streak-refresh"));
+    } catch {
+      // ничего не ломаем, это только UI-синхронизация
+    }
+  }
+
   async function saveCompletedProgress(score: number) {
     if (saveBusyRef.current) return;
     saveBusyRef.current = true;
 
     try {
-      await fetch("/api/assignment-progress", {
+      const res = await fetch("/api/assignment-progress", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -314,6 +333,18 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           score,
         }),
       });
+
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
+      }
+
+      // ✅ если сохранение прошло — триггерим обновление стрика в профиле
+      if (res.ok && json?.ok) {
+        notifyProfileStreakRefresh(json?.streak ?? json);
+      }
     } finally {
       saveBusyRef.current = false;
     }

@@ -4,6 +4,16 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import Modal from "@/components/Modal";
+import StreakRoadmapModal from "@/components/streak/StreakRoadmapModal";
+import TitlePickerModal, { type TitlePickerChoice } from "@/components/profile/TitlePickerModal";
+import {
+  getIconVariant,
+  getResolvedSelectedIconCode,
+  getTierCodeByStreak,
+  getUnlockedIconCodesByLongest,
+  normalizeIconCode,
+  type StreakIconCode,
+} from "@/lib/streaks/roadmap";
 
 type ProfileData = {
   full_name: string;
@@ -30,6 +40,83 @@ export type MaterialProgressItem = {
   href: string;
 };
 
+export type StreakSnapshot = {
+  today: string;
+  raw_current_streak: number;
+  display_current_streak: number;
+  longest_streak: number;
+  last_completed_date: string | null;
+  done_today: boolean;
+  can_save_today: boolean;
+  tier_code:
+    | "none"
+    | "bronze"
+    | "silver"
+    | "gold"
+    | "platinum"
+    | "diamond"
+    | "legendary"
+    | string;
+};
+
+type ProfileStreakApiResponse = {
+  ok?: boolean;
+  error?: string;
+  streak?: unknown | null;
+
+  equippedTitle?:
+    | {
+        // старый/новый варианты полей
+        code?: string | null;
+        titleCode?: string | null;
+        label?: string | null;
+        unlockedAt?: string | null;
+        sourceType?: string | null;
+        sourceValue?: number | null;
+      }
+    | null;
+
+  // на будущее/совместимость (если route начнет отдавать отдельный selectedTitle)
+  selectedTitle?:
+    | {
+        code?: string | null;
+        titleCode?: string | null;
+        label?: string | null;
+        unlockAt?: number | null;
+        description?: string | null;
+      }
+    | null;
+
+  // новые поля API (иконки)
+  unlockedIconCodes?: string[] | null;
+  selectedIconCode?: string | null;
+  effectiveIconCode?: string | null;
+};
+
+type SaveStreakIconApiResponse = {
+  ok?: boolean;
+  error?: string;
+  selectedIconCode?: string | null;
+  selectedIconDbCode?: string | null;
+  effectiveIconCode?: string | null;
+  unlockedIconCodes?: string[] | null;
+};
+
+type SaveStreakTitleApiResponse = {
+  ok?: boolean;
+  error?: string;
+  cleared?: boolean;
+  selectedTitleCode?: string | null;
+  selectedTitleDbCode?: string | null;
+  longestForUnlocks?: number | null;
+  selectedTitle?: {
+    code?: string | null;
+    label?: string | null;
+    unlockAt?: number | null;
+    description?: string | null;
+  } | null;
+};
+
 type Props = {
   userId: string;
   userEmail: string;
@@ -44,7 +131,22 @@ type Props = {
   // допускаем null/undefined для ленивой загрузки
   stats?: Stats | null;
   materialsProgress?: MaterialProgressItem[] | null;
+
+  // опционально: сервер может передать snapshot стрика (пока ок и без него)
+  streak?: StreakSnapshot | null;
+
+  // на будущее: экипированный титул (перманентный, не сгорает)
+  equippedTitleLabel?: string | null;
 };
+
+/**
+ * Bucket c иконками стрика.
+ * ✅ По умолчанию "streak-icons" (боевой bucket)
+ */
+const STREAK_ICON_BUCKET =
+  process.env.NEXT_PUBLIC_STREAK_ICONS_BUCKET ||
+  process.env.NEXT_PUBLIC_STREAK_ICON_ASSETS_BUCKET ||
+  "streak-icons";
 
 function regionLabel(region: string) {
   return region?.trim() ? region : "Не указана";
@@ -56,6 +158,294 @@ function nameLabel(name: string) {
   return name?.trim() ? name : "Ученик";
 }
 
+function asInt(value: unknown, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : fallback;
+}
+
+function asBool(value: unknown, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const s = value.trim().toLowerCase();
+    if (["1", "true", "yes", "y"].includes(s)) return true;
+    if (["0", "false", "no", "n"].includes(s)) return false;
+  }
+  return fallback;
+}
+
+function asStringOrNull(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const s = value.trim();
+  return s ? s : null;
+}
+
+function pick(obj: Record<string, any>, keys: string[]) {
+  for (const k of keys) {
+    if (obj[k] !== undefined) return obj[k];
+  }
+  return undefined;
+}
+
+/**
+ * ✅ Нормализация ответа /api/profile-streak в UI-формат StreakSnapshot
+ * Поддерживает и snake_case, и camelCase (новый backend).
+ */
+function normalizeStreakSnapshotFromApi(rawInput: unknown): StreakSnapshot | null {
+  if (!rawInput || typeof rawInput !== "object") return null;
+  const raw = rawInput as Record<string, any>;
+
+  const rawCurrent = asInt(
+    pick(raw, ["raw_current_streak", "rawCurrentStreak", "current_streak", "currentStreak", "current", "streak"]),
+    0
+  );
+
+  const displayCurrent = asInt(
+    pick(raw, ["display_current_streak", "displayCurrentStreak", "current_streak", "currentStreak"]),
+    rawCurrent
+  );
+
+  const longest = asInt(
+    pick(raw, ["longest_streak", "longestStreak", "display_longest_streak", "displayLongestStreak"]),
+    displayCurrent
+  );
+
+  const doneToday = asBool(
+    pick(raw, ["done_today", "today_completed", "todayCompleted", "is_today_completed", "isTodayCompleted"]),
+    false
+  );
+
+  const canSaveToday = asBool(
+    pick(raw, ["can_save_today", "canSaveToday"]),
+    !doneToday
+  );
+
+  const tierCode =
+    asStringOrNull(pick(raw, ["tier_code", "tierCode"])) ?? getTierCodeByStreak(displayCurrent);
+
+  const today =
+    asStringOrNull(pick(raw, ["today", "today_date", "todayDate"])) ??
+    new Date().toISOString().slice(0, 10);
+
+  const lastCompletedDate =
+    asStringOrNull(
+      pick(raw, ["last_completed_date", "lastCompletedDate", "activity_date", "lastActivityDate"])
+    ) ?? null;
+
+  return {
+    today,
+    raw_current_streak: rawCurrent,
+    display_current_streak: displayCurrent,
+    longest_streak: longest,
+    last_completed_date: lastCompletedDate,
+    done_today: doneToday,
+    can_save_today: canSaveToday,
+    tier_code: tierCode,
+  };
+}
+
+function getStreakTierUi(tierCode?: string, streakValue?: number) {
+  const v = Math.max(0, Number(streakValue || 0));
+
+  switch (tierCode) {
+    case "legendary":
+      return {
+        icon: "👑",
+        label: "Легендарный",
+        className: "streak-chip--legendary",
+        ringClassName: "streak-mini-badge--legendary",
+      };
+    case "diamond":
+      return {
+        icon: "💎",
+        label: "Алмазный",
+        className: "streak-chip--diamond",
+        ringClassName: "streak-mini-badge--diamond",
+      };
+    case "platinum":
+      return {
+        icon: "🌌",
+        label: "Платиновый",
+        className: "streak-chip--platinum",
+        ringClassName: "streak-mini-badge--platinum",
+      };
+    case "gold":
+      return {
+        icon: "🥇",
+        label: "Золотой",
+        className: "streak-chip--gold",
+        ringClassName: "streak-mini-badge--gold",
+      };
+    case "silver":
+      return {
+        icon: "🥈",
+        label: "Серебряный",
+        className: "streak-chip--silver",
+        ringClassName: "streak-mini-badge--silver",
+      };
+    case "bronze":
+      return {
+        icon: "🥉",
+        label: "Бронзовый",
+        className: "streak-chip--bronze",
+        ringClassName: "streak-mini-badge--bronze",
+      };
+    default:
+      return {
+        icon: v > 0 ? "🔥" : "✨",
+        label: v > 0 ? "Серия" : "Нет серии",
+        className: "streak-chip--none",
+        ringClassName: "streak-mini-badge--none",
+      };
+  }
+}
+
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === "string" && v.trim().length > 0;
+}
+
+function uniqStrings(values: (string | null | undefined)[]): string[] {
+  const set = new Set<string>();
+  for (const v of values) {
+    if (typeof v !== "string") continue;
+    const s = v.trim();
+    if (!s) continue;
+    set.add(s);
+  }
+  return Array.from(set);
+}
+
+function maybePublicUrlFromStoragePath(bucket: string, path: string | null | undefined): string | null {
+  if (!isNonEmptyString(path)) return null;
+
+  const raw = path.trim();
+
+  // Уже абсолютный URL / data URI
+  if (/^https?:\/\//i.test(raw) || raw.startsWith("data:")) return raw;
+
+  const cleanPath = raw.replace(/^\/+/, "");
+
+  try {
+    const supabase = getSupabaseBrowserClient();
+    const { data } = supabase.storage.from(bucket).getPublicUrl(cleanPath);
+    return data?.publicUrl || null;
+  } catch {
+    return null;
+  }
+}
+
+function extractPathsFromVariant(variant: unknown): string[] {
+  if (!variant || typeof variant !== "object") return [];
+
+  const v = variant as Record<string, unknown>;
+  const meta =
+    (v.meta && typeof v.meta === "object" ? v.meta : null) as Record<string, unknown> | null;
+
+  return uniqStrings([
+    // прямые поля
+    isNonEmptyString(v.webpPath) ? v.webpPath : null,
+    isNonEmptyString(v.pngPath) ? v.pngPath : null,
+    isNonEmptyString(v.imagePath) ? v.imagePath : null,
+
+    // snake_case варианты
+    isNonEmptyString(v.webp_path) ? (v.webp_path as string) : null,
+    isNonEmptyString(v.png_path) ? (v.png_path as string) : null,
+
+    // meta.*
+    meta && isNonEmptyString(meta.webpPath) ? (meta.webpPath as string) : null,
+    meta && isNonEmptyString(meta.pngPath) ? (meta.pngPath as string) : null,
+    meta && isNonEmptyString(meta.webp_path) ? (meta.webp_path as string) : null,
+    meta && isNonEmptyString(meta.png_path) ? (meta.png_path as string) : null,
+  ]);
+}
+
+function buildFallbackStoragePathsByCode(iconCode: string | null): string[] {
+  if (!isNonEmptyString(iconCode)) return [];
+  const code = iconCode.trim();
+
+  return uniqStrings([
+    `${code}.webp`,
+    `${code}.png`,
+    `v1/defaults/${code}.webp`,
+    `v1/defaults/${code}.png`,
+    `streak-icons/${code}.webp`,
+    `streak-icons/${code}.png`,
+    `icons/streak/${code}.webp`,
+    `icons/streak/${code}.png`,
+  ]);
+}
+
+function resolveIconCandidateUrls(params: {
+  iconCode: string | null;
+  variant?: unknown;
+  bucket?: string;
+}): string[] {
+  const bucket = params.bucket || STREAK_ICON_BUCKET;
+  const fromVariantPaths = extractPathsFromVariant(params.variant);
+  const fromCodePaths = buildFallbackStoragePathsByCode(params.iconCode);
+
+  const storagePaths = uniqStrings([...fromVariantPaths, ...fromCodePaths]);
+  return uniqStrings(storagePaths.map((p) => maybePublicUrlFromStoragePath(bucket, p)));
+}
+
+function joinClasses(...parts: Array<string | null | undefined | false>) {
+  return parts.filter(Boolean).join(" ");
+}
+
+type StreakIconVisualProps = {
+  iconCode: string | null;
+  variant?: unknown;
+  emojiFallback: string;
+  alt: string;
+  wrapperClassName?: string;
+  imgClassName?: string;
+  emojiClassName?: string;
+};
+
+function StreakIconVisual({
+  iconCode,
+  variant,
+  emojiFallback,
+  alt,
+  wrapperClassName,
+  imgClassName,
+  emojiClassName,
+}: StreakIconVisualProps) {
+  const candidateUrls = useMemo(
+    () => resolveIconCandidateUrls({ iconCode, variant, bucket: STREAK_ICON_BUCKET }),
+    [iconCode, variant]
+  );
+
+  const [imgIndex, setImgIndex] = useState(0);
+
+  useEffect(() => {
+    setImgIndex(0);
+  }, [candidateUrls.join("|")]);
+
+  const currentSrc = candidateUrls[imgIndex] ?? null;
+  const hasImage = Boolean(currentSrc);
+
+  return (
+    <span className={joinClasses("streak-visual", wrapperClassName)} aria-hidden="true">
+      {hasImage ? (
+        <img
+          className={joinClasses("streak-visual__img", imgClassName)}
+          src={currentSrc}
+          alt={alt}
+          loading="eager"
+          decoding="async"
+          draggable={false}
+          onError={() => {
+            setImgIndex((prev) => prev + 1);
+          }}
+        />
+      ) : (
+        <span className={joinClasses("streak-visual__emoji", emojiClassName)}>{emojiFallback}</span>
+      )}
+    </span>
+  );
+}
+
 export default function ProfileClient({
   userId,
   userEmail,
@@ -63,6 +453,8 @@ export default function ProfileClient({
   backgroundUrl,
   stats: statsProp,
   materialsProgress: progressProp,
+  streak: streakProp,
+  equippedTitleLabel = null,
 }: Props) {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
@@ -82,15 +474,131 @@ export default function ProfileClient({
   const [editRegion, setEditRegion] = useState(profile.region ?? "");
   const [saving, setSaving] = useState(false);
 
+  // streak modal
+  const [streakModalOpen, setStreakModalOpen] = useState(false);
+
+  // title modal
+  const [titleModalOpen, setTitleModalOpen] = useState(false);
+
   // ленивый прогресс
   const [stats, setStats] = useState<Stats | null>(statsProp ?? null);
-  const [materialsProgress, setMaterialsProgress] = useState<MaterialProgressItem[] | null>(progressProp ?? null);
+  const [materialsProgress, setMaterialsProgress] = useState<MaterialProgressItem[] | null>(
+    progressProp ?? null
+  );
   const [progressLoading, setProgressLoading] = useState<boolean>(!statsProp || !progressProp);
   const [progressError, setProgressError] = useState<string | null>(null);
+
+  // стрик (быстрый snapshot)
+  const [streak, setStreak] = useState<StreakSnapshot | null>(streakProp ?? null);
+  const [streakLoading, setStreakLoading] = useState<boolean>(!streakProp);
+  const [streakError, setStreakError] = useState<string | null>(null);
+
+  // выбранный титул с сервера (теперь храним в profiles.selected_streak_title_code)
+  const [equippedTitleLabelState, setEquippedTitleLabelState] = useState<string | null>(
+    equippedTitleLabel ?? null
+  );
+  const [equippedTitleCodeState, setEquippedTitleCodeState] = useState<string | null>(null);
+  const [savingTitle, setSavingTitle] = useState(false);
+
+  // ✅ оптимистичный выбор иконки до ответа сервера
+  const [selectedStreakIconCodeLocal, setSelectedStreakIconCodeLocal] =
+    useState<StreakIconCode | null>(null);
+
+  // серверный выбранный/дефолтный
+  const [selectedStreakIconCodeServer, setSelectedStreakIconCodeServer] =
+    useState<StreakIconCode | null>(null);
+
+  // флаг сохранения иконки
+  const [savingStreakIcon, setSavingStreakIcon] = useState(false);
 
   function showNotification(text: string, type: "success" | "error" = "success") {
     setNotif({ type, text });
     setTimeout(() => setNotif(null), 4000);
+  }
+
+  function openStreakModal() {
+    setStreakModalOpen(true);
+  }
+
+  function closeStreakModal() {
+    setStreakModalOpen(false);
+  }
+
+  function openTitleModal() {
+    setTitleModalOpen(true);
+  }
+
+  function closeTitleModal() {
+    setTitleModalOpen(false);
+  }
+
+  async function refreshStreakFromApi(options?: { silent?: boolean }) {
+    const silent = Boolean(options?.silent);
+
+    try {
+      if (!silent) setStreakLoading(true);
+      setStreakError(null);
+
+      const res = await fetch("/api/profile-streak", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      let json: ProfileStreakApiResponse | null = null;
+      try {
+        json = (await res.json()) as ProfileStreakApiResponse;
+      } catch {
+        json = null;
+      }
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Не удалось загрузить стрик");
+      }
+
+      const normalizedStreak = normalizeStreakSnapshotFromApi(json.streak ?? null);
+      setStreak(normalizedStreak);
+
+      // Поддерживаем и equippedTitle, и selectedTitle (если backend позже переименуется)
+      const rawTitleObj = (json?.selectedTitle ?? json?.equippedTitle ?? null) as
+        | Record<string, unknown>
+        | null;
+
+      const apiTitleLabel =
+        rawTitleObj && typeof rawTitleObj.label === "string" ? rawTitleObj.label : null;
+
+      const apiTitleCode =
+        (rawTitleObj && typeof rawTitleObj.titleCode === "string" && rawTitleObj.titleCode) ||
+        (rawTitleObj && typeof rawTitleObj.code === "string" && rawTitleObj.code) ||
+        null;
+
+      setEquippedTitleLabelState(apiTitleLabel ?? null);
+      setEquippedTitleCodeState(apiTitleCode ?? null);
+
+      // серверный selected/effective код (нормализуем)
+      const apiSelected = normalizeIconCode(json?.selectedIconCode ?? null);
+      const apiEffective = normalizeIconCode(json?.effectiveIconCode ?? null);
+
+      setSelectedStreakIconCodeServer(apiSelected ?? apiEffective ?? null);
+
+      // если оптимистичное состояние совпало с сервером — очищаем локалку
+      setSelectedStreakIconCodeLocal((prev) => {
+        if (!prev) return prev;
+        const compareWith = apiSelected ?? apiEffective ?? null;
+        if (compareWith && prev === compareWith) return null;
+        return prev;
+      });
+
+      try {
+        sessionStorage.removeItem("profile-streak-dirty");
+      } catch {
+        // ignore
+      }
+
+      if (!silent) setStreakLoading(false);
+    } catch (e: any) {
+      if (!silent) setStreakLoading(false);
+      setStreakError(e?.message || String(e));
+    }
   }
 
   // preload background image
@@ -150,11 +658,81 @@ export default function ProfileClient({
       }
     }
 
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
   }, [statsProp, progressProp]);
+
+  // ✅ Загрузка/обновление стрика через /api/profile-streak
+  useEffect(() => {
+    let cancelled = false;
+
+    async function safeRefresh(options?: { silent?: boolean }) {
+      if (cancelled) return;
+      await refreshStreakFromApi(options);
+    }
+
+    if (streakProp) {
+      setStreakLoading(false);
+    } else {
+      void safeRefresh();
+    }
+
+    // если пришли на профиль после выполнения задания — обновим стрик сразу
+    try {
+      const dirty = sessionStorage.getItem("profile-streak-dirty") === "1";
+      if (dirty) {
+        sessionStorage.removeItem("profile-streak-dirty");
+        void safeRefresh({ silent: false });
+      }
+    } catch {
+      // ignore
+    }
+
+    const onFocus = () => {
+      void safeRefresh({ silent: true });
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void safeRefresh({ silent: true });
+      }
+    };
+
+    const onCustomRefresh = () => {
+      void safeRefresh();
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("profile-streak-refresh", onCustomRefresh as EventListener);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("profile-streak-refresh", onCustomRefresh as EventListener);
+    };
+  }, [streakProp]);
+
+  // чистим старый временный localStorage ключ иконки (если был)
+  useEffect(() => {
+    try {
+      localStorage.removeItem("profile-selected-streak-icon");
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // чистим старый localStorage ключ титула (если раньше использовался)
+  useEffect(() => {
+    try {
+      localStorage.removeItem("profile-selected-title-v1");
+    } catch {
+      // ignore
+    }
+  }, []);
 
   function openEdit() {
     setEditFullName(profile.full_name || "");
@@ -180,7 +758,11 @@ export default function ProfileClient({
     try {
       setSaving(true);
 
-      const { error } = await supabase.from("profiles").update({ full_name: fullName, contact_phone: phone, region }).eq("id", userId);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ full_name: fullName, contact_phone: phone, region })
+        .eq("id", userId);
+
       if (error) throw error;
 
       setProfile((p) => ({ ...p, full_name: fullName, contact_phone: phone, region }));
@@ -201,14 +783,234 @@ export default function ProfileClient({
     }
   }
 
-  const overlayCss =
-    backgroundUrl && (bgReady || !bgLoading) ? `url('${backgroundUrl}')` : "none";
+  async function handleSelectStreakIcon(iconCodeRaw: string) {
+    const normalized = normalizeIconCode(iconCodeRaw);
+
+    // защита от мусорного значения
+    const variant = getIconVariant(normalized);
+    if (!normalized || !variant) {
+      showNotification("❌ Неизвестная иконка серии", "error");
+      return;
+    }
+
+    if (savingStreakIcon) return;
+
+    const prevLocal = selectedStreakIconCodeLocal;
+    const prevServer = selectedStreakIconCodeServer;
+
+    try {
+      // оптимистично показываем сразу
+      setSelectedStreakIconCodeLocal(normalized);
+      setSavingStreakIcon(true);
+
+      const res = await fetch("/api/profile-streak-icon", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ iconCode: normalized }),
+      });
+
+      let json: SaveStreakIconApiResponse | null = null;
+      try {
+        json = (await res.json()) as SaveStreakIconApiResponse;
+      } catch {
+        json = null;
+      }
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Не удалось сохранить иконку серии");
+      }
+
+      const resolvedSelected = normalizeIconCode(json.selectedIconCode ?? normalized);
+      const resolvedEffective = normalizeIconCode(json.effectiveIconCode ?? null);
+
+      // фиксируем серверный выбор
+      setSelectedStreakIconCodeServer(resolvedSelected ?? resolvedEffective ?? normalized);
+
+      // снимаем оптимистичное состояние
+      setSelectedStreakIconCodeLocal(null);
+
+      showNotification("✅ Иконка серии сохранена");
+    } catch (e: any) {
+      // откат
+      setSelectedStreakIconCodeLocal(prevLocal);
+      setSelectedStreakIconCodeServer(prevServer);
+      showNotification("❌ Не удалось сохранить выбор иконки: " + (e?.message || String(e)), "error");
+    } finally {
+      setSavingStreakIcon(false);
+    }
+  }
+
+  async function handleSelectTitle(choice: TitlePickerChoice) {
+    if (savingTitle) return;
+
+    const prevCode = equippedTitleCodeState;
+    const prevLabel = equippedTitleLabelState;
+
+    try {
+      setSavingTitle(true);
+
+      // оптимистично показываем сразу
+      setEquippedTitleCodeState(choice.code);
+      setEquippedTitleLabelState(choice.label);
+
+      const res = await fetch("/api/profile-streak-title", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ titleCode: choice.code }),
+      });
+
+      let json: SaveStreakTitleApiResponse | null = null;
+      try {
+        json = (await res.json()) as SaveStreakTitleApiResponse;
+      } catch {
+        json = null;
+      }
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Не удалось сохранить титул");
+      }
+
+      const savedCode =
+        (typeof json.selectedTitle?.code === "string" && json.selectedTitle.code) ||
+        (typeof json.selectedTitleCode === "string" && json.selectedTitleCode) ||
+        choice.code;
+
+      const savedLabel =
+        (typeof json.selectedTitle?.label === "string" && json.selectedTitle.label) || choice.label;
+
+      setEquippedTitleCodeState(savedCode);
+      setEquippedTitleLabelState(savedLabel);
+
+      showNotification("✅ Титул сохранён");
+      closeTitleModal();
+
+      // мягкая синхронизация (если сервер возвращает ещё что-то важное)
+      void refreshStreakFromApi({ silent: true });
+    } catch (e: any) {
+      // откат
+      setEquippedTitleCodeState(prevCode);
+      setEquippedTitleLabelState(prevLabel);
+      showNotification("❌ Не удалось сохранить выбор титула: " + (e?.message || String(e)), "error");
+    } finally {
+      setSavingTitle(false);
+    }
+  }
+
+  async function handleClearSelectedTitle() {
+    if (savingTitle) return;
+
+    const prevCode = equippedTitleCodeState;
+    const prevLabel = equippedTitleLabelState;
+
+    try {
+      setSavingTitle(true);
+
+      // оптимистично очищаем
+      setEquippedTitleCodeState(null);
+      setEquippedTitleLabelState(null);
+
+      const res = await fetch("/api/profile-streak-title", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reset: true }),
+      });
+
+      let json: SaveStreakTitleApiResponse | null = null;
+      try {
+        json = (await res.json()) as SaveStreakTitleApiResponse;
+      } catch {
+        json = null;
+      }
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Не удалось сбросить титул");
+      }
+
+      setEquippedTitleCodeState(null);
+      setEquippedTitleLabelState(null);
+
+      showNotification("✅ Титул сброшен");
+      closeTitleModal();
+
+      void refreshStreakFromApi({ silent: true });
+    } catch (e: any) {
+      // откат
+      setEquippedTitleCodeState(prevCode);
+      setEquippedTitleLabelState(prevLabel);
+      showNotification("❌ Не удалось сбросить титул: " + (e?.message || String(e)), "error");
+    } finally {
+      setSavingTitle(false);
+    }
+  }
+
+  const overlayCss = backgroundUrl && (bgReady || !bgLoading) ? `url('${backgroundUrl}')` : "none";
+
+  const streakDisplay = Math.max(0, Number(streak?.display_current_streak ?? 0));
+  const longestStreakDisplay = Math.max(0, Number(streak?.longest_streak ?? 0));
+
+  const unlockedIconCodesByLongest = useMemo(
+    () => getUnlockedIconCodesByLongest(longestStreakDisplay),
+    [longestStreakDisplay]
+  );
+
+  // ✅ Единый источник правды:
+  // оптимистичный локальный -> серверный selected/default -> fallback по longest
+  const effectiveSelectedStreakIconCode = useMemo(() => {
+    return getResolvedSelectedIconCode(
+      selectedStreakIconCodeLocal ?? selectedStreakIconCodeServer,
+      longestStreakDisplay
+    );
+  }, [selectedStreakIconCodeLocal, selectedStreakIconCodeServer, longestStreakDisplay]);
+
+  const selectedIconVariant = useMemo(
+    () => getIconVariant(effectiveSelectedStreakIconCode),
+    [effectiveSelectedStreakIconCode]
+  );
+
+  // ✅ UI tier определяем от выбранной иконки / дорожки, а не слепо от RPC tier_code
+  const resolvedUiTierCode = selectedIconVariant?.tierCode ?? getTierCodeByStreak(streakDisplay);
+
+  const streakUiBase = getStreakTierUi(resolvedUiTierCode, streakDisplay);
+  const streakUi = selectedIconVariant
+    ? { ...streakUiBase, icon: selectedIconVariant.emoji }
+    : streakUiBase;
+
+  const effectiveTitleCodeForUi = equippedTitleCodeState ?? null;
+  const effectiveTitleLabelForUi = equippedTitleLabelState ?? null;
+
+  const titleText =
+    effectiveTitleLabelForUi?.trim() || (streakDisplay >= 1 ? "Без титула (пока не выбран)" : "Без титула");
+
+  const streakChipTitle = streakLoading
+    ? "Загружаем стрик..."
+    : streakError
+      ? `Стрик временно недоступен: ${streakError}`
+      : streak
+        ? `Серия: ${streakDisplay} дн. • Рекорд: ${streak.longest_streak} дн.`
+        : "Серия пока не началась";
+
+  const streakChipSub = streakLoading
+    ? "серия"
+    : streak?.done_today
+      ? "сегодня ✅"
+      : streakDisplay > 0
+        ? "сохранить сегодня"
+        : "начни серию";
+
+  const avatarEmojiFallback = selectedIconVariant?.emoji || streakUi.icon || "✨";
+  const chipEmojiFallback = selectedIconVariant?.emoji || streakUi.icon || "✨";
+  const badgeEmojiFallback = selectedIconVariant?.emoji || streakUi.icon || "✨";
 
   return (
     <div
       id="profileBody"
       style={{
-        // PNG кладём поверх базового голубого фона (через CSS var)
         ["--profile-overlay" as any]: overlayCss,
       }}
     >
@@ -239,6 +1041,7 @@ export default function ProfileClient({
         </div>
       ) : null}
 
+      {/* Модалка редактирования */}
       <Modal open={editOpen} onClose={closeEdit} title="✏️ Редактирование профиля" maxWidth={520}>
         <form
           onSubmit={(e) => {
@@ -300,8 +1103,33 @@ export default function ProfileClient({
         </form>
       </Modal>
 
+      {/* Модалка выбора титула */}
+      <TitlePickerModal
+        open={titleModalOpen}
+        onClose={closeTitleModal}
+        longestStreak={longestStreakDisplay}
+        currentTitleCode={effectiveTitleCodeForUi}
+        currentTitleLabel={effectiveTitleLabelForUi}
+        onSelectTitle={(choice) => void handleSelectTitle(choice)}
+        onClearLocalTitle={() => void handleClearSelectedTitle()}
+        loading={streakLoading || savingTitle}
+      />
+
+      {/* ✅ Модалка дорожки стрика */}
+      <StreakRoadmapModal
+        open={streakModalOpen}
+        onClose={closeStreakModal}
+        streak={streak}
+        loading={streakLoading}
+        error={streakError}
+        equippedTitleLabel={effectiveTitleLabelForUi}
+        unlockedIconCodes={unlockedIconCodesByLongest}
+        selectedIconCode={effectiveSelectedStreakIconCode}
+        onSelectIconCode={savingStreakIcon ? undefined : handleSelectStreakIcon}
+      />
+
       <div className="container">
-        {/* ===== Topbar like on screenshot ===== */}
+        {/* ===== Topbar ===== */}
         <div className="profile-topbar">
           <div className="brand">
             <div className="brand-mark">EK</div>
@@ -312,14 +1140,42 @@ export default function ProfileClient({
           </div>
 
           <div className="top-actions">
+            {/* Крупный стрик-чип */}
+            <button
+              type="button"
+              className={`streak-chip streak-chip--button ${streakUi.className} ${streakLoading ? "streak-chip--loading" : ""}`}
+              title={streakChipTitle}
+              aria-label="Открыть информацию о серии"
+              onClick={openStreakModal}
+            >
+              <span className="streak-chip-icon" aria-hidden="true">
+                <StreakIconVisual
+                  iconCode={effectiveSelectedStreakIconCode ?? null}
+                  variant={selectedIconVariant}
+                  emojiFallback={chipEmojiFallback}
+                  alt="Иконка серии"
+                  wrapperClassName="streak-visual--chip"
+                  imgClassName="streak-visual__img--chip"
+                  emojiClassName="streak-visual__emoji--chip"
+                />
+              </span>
+              <span className="streak-chip-main">
+                <span className="streak-chip-value">{streakLoading ? "…" : streakDisplay}</span>
+                <span className="streak-chip-unit">дн.</span>
+              </span>
+              <span className="streak-chip-sub">{streakChipSub}</span>
+            </button>
+
             <Link className="nav-pill nav-pill--info" href="/info">
               <span>📄</span>
               Информация
             </Link>
+
             <Link className="nav-pill nav-pill--materials" href="/materials">
               <span>📚</span>
               Материалы
             </Link>
+
             <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}>
               <span>⏻</span>
               Выйти
@@ -332,13 +1188,141 @@ export default function ProfileClient({
           {/* LEFT */}
           <aside className="panel">
             <div className="profile-card">
-              <div className="avatar-circle" role="img" aria-label="Профиль ученика">
+              <div className="avatar-circle" role="img" aria-label="Иконка награды профиля">
                 <div className="avatar-inner">
-                  <div className="avatar-icon">👤</div>
+                  {/* Иконка награды */}
+                  <div className="avatar-icon" aria-hidden="true">
+                    <span className="avatar-icon-bg" />
+                    <StreakIconVisual
+                      iconCode={effectiveSelectedStreakIconCode ?? null}
+                      variant={selectedIconVariant}
+                      emojiFallback={avatarEmojiFallback}
+                      alt="Иконка награды"
+                      wrapperClassName="streak-visual--avatar"
+                      imgClassName="streak-visual__img--avatar"
+                      emojiClassName="streak-visual__emoji--avatar"
+                    />
+                  </div>
+
+                  {/* Бейдж стрика */}
+                  <button
+                    type="button"
+                    className={`streak-mini-badge ${streakUi.ringClassName}`}
+                    title={`Стрик: ${streakLoading ? "…" : streakDisplay} дн. Нажмите для подробностей`}
+                    aria-label="Открыть серию активности"
+                    onClick={openStreakModal}
+                  >
+                    <span className="streak-mini-badge-icon" aria-hidden="true">
+                      <StreakIconVisual
+                        iconCode={effectiveSelectedStreakIconCode ?? null}
+                        variant={selectedIconVariant}
+                        emojiFallback={badgeEmojiFallback}
+                        alt="Иконка серии"
+                        wrapperClassName="streak-visual--badge"
+                        imgClassName="streak-visual__img--badge"
+                        emojiClassName="streak-visual__emoji--badge"
+                      />
+                    </span>
+                    <b>{streakLoading ? "…" : streakDisplay}</b>
+                  </button>
                 </div>
               </div>
 
               <div className="profile-name">{nameLabel(profile.full_name)}</div>
+
+              {/* Титул */}
+              <button
+                type="button"
+                onClick={openTitleModal}
+                title="Выбрать титул"
+                aria-label="Открыть выбор титула"
+                style={{
+                  all: "unset",
+                  width: "100%",
+                  display: "block",
+                  cursor: "pointer",
+                }}
+              >
+                <div
+                  className="profile-title-slot"
+                  style={{
+                    position: "relative",
+                    minHeight: 44,
+                    paddingTop: 8,
+                    paddingBottom: 8,
+                    paddingLeft: 12,
+                    paddingRight: 12,
+                    borderRadius: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span
+                    className="profile-title-slot-icon"
+                    style={{
+                      fontSize: 16,
+                      lineHeight: 1,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    🏷️
+                  </span>
+
+                  <span
+                    className="profile-title-slot-text"
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 900,
+                      lineHeight: 1.15,
+                      letterSpacing: "0.01em",
+                      color: "#4f6276",
+                    }}
+                  >
+                    {titleText}
+                  </span>
+
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      marginLeft: "auto",
+                      opacity: 0.9,
+                      fontWeight: 900,
+                      fontSize: 16,
+                      paddingLeft: 10,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {savingTitle ? "⏳" : "✨"}
+                  </span>
+                </div>
+              </button>
+
+              {/* Стрик / рекорд */}
+              <div className="streak-summary-card">
+                <button
+                  type="button"
+                  className="streak-summary-row streak-summary-row--button"
+                  onClick={openStreakModal}
+                  title="Открыть подробности серии"
+                >
+                  <span className="streak-summary-key">🔥 Текущая серия</span>
+                  <span className="streak-summary-value">{streakLoading ? "…" : `${streakDisplay} дн.`}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="streak-summary-row streak-summary-row--button"
+                  onClick={openStreakModal}
+                  title="Открыть подробности серии"
+                >
+                  <span className="streak-summary-key">🏆 Рекорд</span>
+                  <span className="streak-summary-value">{streakLoading ? "…" : `${longestStreakDisplay} дн.`}</span>
+                </button>
+              </div>
+
               <div className="profile-email">{userEmail || "—"}</div>
 
               <div className="profile-mini">
@@ -373,7 +1357,6 @@ export default function ProfileClient({
                 <span>✏️</span> Редактировать профиль
               </button>
 
-              {/* Заявки на покупку (оставил, но в аккуратном стиле) */}
               <button
                 className="action-btn action-btn--dangerSoft"
                 onClick={() => (window.location.href = "/requests")}
@@ -448,11 +1431,7 @@ export default function ProfileClient({
               ) : (
                 <div className="progress-list">
                   {materialsProgress.map((m) => (
-                    <div
-                      key={`${m.kind}-${m.id}`}
-                      className="progress-row"
-                      onClick={() => (window.location.href = m.href)}
-                    >
+                    <div key={`${m.kind}-${m.id}`} className="progress-row" onClick={() => (window.location.href = m.href)}>
                       <div className="progress-left">
                         <div
                           className={
