@@ -1124,7 +1124,7 @@ export default function ProfileClient({
 
   const avatarEmojiFallback = selectedIconVariant?.emoji || streakUi.icon || "✨";
   const chipEmojiFallback = selectedIconVariant?.emoji || streakUi.icon || "✨";
-  const badgeEmojiFallback = selectedIconVariant?.emoji || streakUi.icon || "✨";
+ 
 
   const titleSavingNow =
     customUpdateDialog.open &&
@@ -1424,26 +1424,15 @@ export default function ProfileClient({
                   </div>
 
                   {/* Бейдж стрика */}
-                  <button
-                    type="button"
-                    className={`streak-mini-badge ${streakUi.ringClassName}`}
-                    title={`Стрик: ${streakLoading ? "…" : streakDisplay} дн. Нажмите для подробностей`}
-                    aria-label="Открыть серию активности"
-                    onClick={openStreakModal}
-                  >
-                    <span className="streak-mini-badge-icon" aria-hidden="true">
-                      <StreakIconVisual
-                        iconCode={effectiveSelectedStreakIconCode ?? null}
-                        variant={selectedIconVariant}
-                        emojiFallback={badgeEmojiFallback}
-                        alt="Иконка серии"
-                        wrapperClassName="streak-visual--badge"
-                        imgClassName="streak-visual__img--badge"
-                        emojiClassName="streak-visual__emoji--badge"
-                      />
-                    </span>
-                    <b>{streakLoading ? "…" : streakDisplay}</b>
-                  </button>
+                 <button
+  type="button"
+  className={`streak-mini-badge ${streakUi.ringClassName}`}
+  title={`Стрик: ${streakLoading ? "…" : streakDisplay} дн. Нажмите для подробностей`}
+  aria-label="Открыть серию активности"
+  onClick={openStreakModal}
+>
+  <b>{streakLoading ? "…" : streakDisplay}</b>
+</button>
                 </div>
               </div>
 

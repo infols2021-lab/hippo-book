@@ -332,6 +332,11 @@ body {
   place-items: center;
   position: relative;
   user-select: none;
+
+  /* Важно: круглая маска для содержимого */
+  border-radius: 999px;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .avatar-icon-bg {
@@ -436,20 +441,34 @@ body {
   z-index: 1;
   width: 100%;
   height: 100%;
+
+  /* Круглая область отображения */
+  border-radius: 999px;
+  overflow: hidden;
+
+  display: grid;
+  place-items: center;
 }
 
 .streak-visual__img--avatar {
-  width: 86%;
-  height: 86%;
+  /* Вписываем картинку внутрь "безопасной зоны" круга:
+     14% + 14% padding ≈ 72% полезной области (квадрат 1:1 не торчит за круг) */
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 14%;
+
   object-fit: contain;
+  object-position: center center;
+
   filter: drop-shadow(0 8px 22px rgba(45, 80, 120, 0.18));
-  transform: translateY(-2px);
+  transform: none; /* убираем сдвиг вверх, чтобы было ровно по центру */
 }
 
 .streak-visual__emoji--avatar {
-  font-size: 74px;
+  font-size: 64px;
   text-shadow: 0 8px 22px rgba(45, 80, 120, 0.18);
-  transform: translateY(-2px);
+  transform: none; /* тоже без сдвига */
 }
 
 /* top chip version */
@@ -503,15 +522,16 @@ body {
   bottom: -14px;
   transform: translateX(-50%);
 
-  min-width: 82px;
+  /* Иконку убираем => делаем компактнее и по центру */
+  min-width: 64px;
   height: 36px;
   border-radius: 999px;
-  padding: 5px 12px;
+  padding: 5px 14px;
 
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 0;
 
   border: 2px solid rgba(255, 255, 255, 0.95);
   box-shadow: 0 10px 22px rgba(15, 65, 95, 0.18);
@@ -542,7 +562,7 @@ body {
 }
 
 .streak-mini-badge b {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 1000;
   letter-spacing: 0.2px;
 }
@@ -1213,12 +1233,14 @@ body {
     width: 100%;
   }
 
-  .streak-visual__img--avatar {
-    width: 82%;
-    height: 82%;
-  }
+.streak-visual__img--avatar {
+  width: 100%;
+  height: 100%;
+  padding: 16%;
+}
+
 
   .streak-visual__emoji--avatar {
-    font-size: 66px;
-  }
+  font-size: 58px;
+}
 }
