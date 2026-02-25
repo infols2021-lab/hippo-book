@@ -14,14 +14,19 @@ export type TitlePickerChoice = {
 export type TitleCatalogItem = {
   code: string;
   label: string;
+
   unlockAt?: number;
   unlock_at?: number;
   day?: number;
+
   description?: string | null;
+
   sortOrder?: number;
   sort_order?: number;
+
   isActive?: boolean;
   is_active?: boolean;
+
   version?: string | null;
 };
 
@@ -38,32 +43,36 @@ type Props = {
 
   loading?: boolean;
 
-  /** Новый проп: каталог титулов из API/БД (streak_title_catalog) */
+  /** Каталог титулов из API/БД (streak_title_catalog) */
   titleCatalog?: TitleCatalogItem[] | null;
 };
 
-type NormalizedTitleMilestone = {
+type NormalizedTitle = {
   code: string;
   label: string;
   day: number;
   description?: string;
-  sortOrder?: number;
+  sortOrder: number;
 };
 
-const FALLBACK_TITLE_MILESTONES: NormalizedTitleMilestone[] = [
-  { code: "streak_3_just_joined", label: "Я только зашёл", day: 3, description: "Первый титул за серию" },
-  { code: "streak_7_focused", label: "Целеустремлённый", day: 7, description: "7 дней подряд" },
-  { code: "streak_14_knowledge", label: "Идущий к знаниям", day: 14, description: "14 дней подряд" },
-  { code: "streak_21_discipline", label: "Железная дисциплина", day: 21, description: "3 недели подряд" },
-  { code: "streak_30_habit_master", label: "Мастер привычки", day: 30, description: "30 дней подряд" },
-  { code: "streak_60_unstoppable", label: "Неостановимый", day: 60, description: "60 дней подряд" },
-  { code: "streak_100_progress_legend", label: "Легенда прогресса", day: 100, description: "100 дней подряд" },
-  { code: "streak_300_hipposha_legend", label: "Легенда Хиппоши", day: 300, description: "Особый рубеж" },
+const FALLBACK_TITLE_MILESTONES: NormalizedTitle[] = [
+  { code: "streak_3_just_joined", label: "Я только зашёл", day: 3, description: "Первый титул за серию", sortOrder: 0 },
+  { code: "streak_7_focused", label: "Целеустремлённый", day: 7, description: "7 дней подряд", sortOrder: 0 },
+  { code: "streak_14_knowledge", label: "Идущий к знаниям", day: 14, description: "14 дней подряд", sortOrder: 0 },
+  { code: "streak_21_discipline", label: "Железная дисциплина", day: 21, description: "3 недели подряд", sortOrder: 0 },
+  { code: "streak_30_habit_master", label: "Мастер привычки", day: 30, description: "30 дней подряд", sortOrder: 0 },
+  { code: "streak_60_unstoppable", label: "Неостановимый", day: 60, description: "60 дней подряд", sortOrder: 0 },
+  { code: "streak_100_progress_legend", label: "Легенда прогресса", day: 100, description: "100 дней подряд", sortOrder: 0 },
+  { code: "streak_300_hipposha_legend", label: "Легенда Хиппоши", day: 300, description: "Особый рубеж", sortOrder: 0 },
 ];
 
 function num(v: unknown, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function str(v: unknown) {
+  return typeof v === "string" ? v.trim() : "";
 }
 
 function titleCaseFromCode(code: string) {
@@ -73,10 +82,19 @@ function titleCaseFromCode(code: string) {
     .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-function tryNormalizeTitleMilestone(row: any, idx: number): NormalizedTitleMilestone | null {
-  if (!row || typeof row !== "object") return null;
+function isActiveRow(row: any) {
+  // если флагов нет — считаем активным
+  if (row?.is_active === undefined && row?.isActive === undefined) return true;
+  return Boolean(row?.is_active ?? row?.isActive);
+}
 
-  // поддержка DB каталога + старых форматов
+function normalizeAnyTitleRow(row: any, idx: number): NormalizedTitle | null {
+  if (!row || typeof row !== "object") return null;
+  if (!isActiveRow(row)) return null;
+
+  const code = str(row.code ?? row.title_code ?? row.titleCode ?? row.id ?? `title_${idx + 1}`);
+  if (!code) return null;
+
   const day = num(
     row.day ??
       row.unlockAt ??
@@ -89,68 +107,57 @@ function tryNormalizeTitleMilestone(row: any, idx: number): NormalizedTitleMiles
   );
   if (day <= 0) return null;
 
-  const isActive =
-    row.is_active === undefined && row.isActive === undefined
-      ? true
-      : Boolean(row.is_active ?? row.isActive);
-  if (!isActive) return null;
-
-  const code = String(
-    row.code ?? row.title_code ?? row.titleCode ?? row.id ?? `title_${idx + 1}`
-  ).trim();
-  if (!code) return null;
-
-  const labelRaw =
+  const label = str(
     row.label ??
-    row.title ??
-    row.titleLabel ??
-    row.name ??
-    row.display_name ??
-    row.displayName ??
-    titleCaseFromCode(code);
+      row.title ??
+      row.titleLabel ??
+      row.name ??
+      row.display_name ??
+      row.displayName
+  ) || titleCaseFromCode(code);
 
-  const label = String(labelRaw || code).trim();
-  if (!label) return null;
+  const description = str(row.description ?? row.desc ?? row.subtitle ?? row.note) || undefined;
 
-  const description =
-    String(row.description ?? row.desc ?? row.subtitle ?? row.note ?? "").trim() || undefined;
-
-  const sortOrder = num(row.sort_order ?? row.sortOrder, 0);
+  const sortOrder = Math.max(
+    0,
+    Math.floor(num(row.sortOrder ?? row.sort_order, 0))
+  );
 
   return { code, label, day, description, sortOrder };
 }
 
-function dedupeTitles(rows: NormalizedTitleMilestone[]): NormalizedTitleMilestone[] {
-  const out: NormalizedTitleMilestone[] = [];
+function dedupeAndSort(rows: NormalizedTitle[]) {
   const seen = new Set<string>();
+  const out: NormalizedTitle[] = [];
 
-  for (const row of rows) {
-    const key = row.code.trim().toLowerCase();
+  for (const r of rows) {
+    const key = r.code.trim().toLowerCase();
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    out.push(row);
+    out.push(r);
   }
+
+  out.sort((a, b) => {
+    if (a.day !== b.day) return a.day - b.day;
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+    return a.label.localeCompare(b.label, "ru");
+  });
 
   return out;
 }
 
-function pickTitleRoadmap(externalCatalog?: TitleCatalogItem[] | null): NormalizedTitleMilestone[] {
-  // 1) Приоритет — БД каталог, если передали
-  const extRows = Array.isArray(externalCatalog)
-    ? externalCatalog.map(tryNormalizeTitleMilestone).filter(Boolean)
-    : [];
+function pickTitlesSource(titleCatalog?: TitleCatalogItem[] | null): NormalizedTitle[] {
+  // 1) приоритет: БД каталог
+  if (Array.isArray(titleCatalog) && titleCatalog.length) {
+    const fromDb = titleCatalog
+      .map((r, i) => normalizeAnyTitleRow(r, i))
+      .filter(Boolean) as NormalizedTitle[];
 
-  if (extRows.length) {
-    return dedupeTitles(extRows as NormalizedTitleMilestone[]).sort((a, b) => {
-      if (a.day !== b.day) return a.day - b.day;
-      if ((a.sortOrder ?? 0) !== (b.sortOrder ?? 0)) return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
-      return a.label.localeCompare(b.label, "ru");
-    });
+    if (fromDb.length) return dedupeAndSort(fromDb);
   }
 
-  // 2) Фолбэк — roadmap exports (старый режим)
+  // 2) fallback: roadmap exports (если где-то ещё используется)
   const r: any = Roadmap as any;
-
   const rawTitles =
     r.STREAK_TITLE_MILESTONES ??
     r.STREAK_TITLE_REWARDS ??
@@ -159,17 +166,16 @@ function pickTitleRoadmap(externalCatalog?: TitleCatalogItem[] | null): Normaliz
     r.STREAK_TITLES ??
     null;
 
-  const titleRows = Array.isArray(rawTitles)
-    ? rawTitles.map(tryNormalizeTitleMilestone).filter(Boolean)
-    : [];
+  if (Array.isArray(rawTitles) && rawTitles.length) {
+    const fromRoadmap = rawTitles
+      .map((x: any, i: number) => normalizeAnyTitleRow(x, i))
+      .filter(Boolean) as NormalizedTitle[];
 
-  const titles = (titleRows.length ? titleRows : FALLBACK_TITLE_MILESTONES) as NormalizedTitleMilestone[];
+    if (fromRoadmap.length) return dedupeAndSort(fromRoadmap);
+  }
 
-  return dedupeTitles(titles).sort((a, b) => {
-    if (a.day !== b.day) return a.day - b.day;
-    if ((a.sortOrder ?? 0) !== (b.sortOrder ?? 0)) return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
-    return a.label.localeCompare(b.label, "ru");
-  });
+  // 3) последний fallback
+  return dedupeAndSort(FALLBACK_TITLE_MILESTONES);
 }
 
 export default function TitlePickerModal({
@@ -183,21 +189,27 @@ export default function TitlePickerModal({
   loading = false,
   titleCatalog = null,
 }: Props) {
-  const safeLongest = Math.max(0, num(longestStreak));
+  const safeLongest = Math.max(0, Math.floor(num(longestStreak, 0)));
 
-  const titles = useMemo(() => pickTitleRoadmap(titleCatalog), [titleCatalog]);
+  const titles = useMemo(() => pickTitlesSource(titleCatalog), [titleCatalog]);
   const unlockedTitles = useMemo(() => titles.filter((t) => t.day <= safeLongest), [titles, safeLongest]);
   const lockedTitles = useMemo(() => titles.filter((t) => t.day > safeLongest), [titles, safeLongest]);
 
-  const selectedKey = (currentTitleCode || "").trim().toLowerCase();
-  const selectedLabelKey = (currentTitleLabel || "").trim().toLowerCase();
+  const selectedKey = str(currentTitleCode).toLowerCase();
+  const selectedLabelKey = str(currentTitleLabel).toLowerCase();
 
   const currentTitleResolved = useMemo(() => {
-    const byCode = titles.find((t) => t.code.toLowerCase() === selectedKey);
-    if (byCode) return byCode;
+    if (!titles.length) return null;
 
-    const byLabel = titles.find((t) => t.label.trim().toLowerCase() === selectedLabelKey);
-    if (byLabel) return byLabel;
+    if (selectedKey) {
+      const byCode = titles.find((t) => t.code.toLowerCase() === selectedKey);
+      if (byCode) return byCode;
+    }
+
+    if (selectedLabelKey) {
+      const byLabel = titles.find((t) => t.label.trim().toLowerCase() === selectedLabelKey);
+      if (byLabel) return byLabel;
+    }
 
     return null;
   }, [titles, selectedKey, selectedLabelKey]);
@@ -256,7 +268,7 @@ export default function TitlePickerModal({
 
             {onClearLocalTitle ? (
               <button type="button" className="tpm-clear-btn" onClick={onClearLocalTitle}>
-                Сбросить локальный выбор
+                Сбросить выбор
               </button>
             ) : null}
           </div>
@@ -264,7 +276,7 @@ export default function TitlePickerModal({
           <div className="tpm-current-row">
             <div className="tpm-current-pill">
               <span>🏷️</span>
-              <b>{currentTitleLabel?.trim() || "Без титула"}</b>
+              <b>{str(currentTitleLabel) || "Без титула"}</b>
             </div>
 
             {nextLockedTitle ? (
@@ -295,9 +307,8 @@ export default function TitlePickerModal({
             <div className="tpm-list">
               {unlockedTitles.map((t) => {
                 const isSelected =
-                  (currentTitleCode && t.code === currentTitleCode) ||
-                  (!currentTitleCode &&
-                    currentTitleLabel?.trim().toLowerCase() === t.label.trim().toLowerCase());
+                  (selectedKey && t.code.toLowerCase() === selectedKey) ||
+                  (!selectedKey && selectedLabelKey && t.label.trim().toLowerCase() === selectedLabelKey);
 
                 return (
                   <button
@@ -381,6 +392,7 @@ export default function TitlePickerModal({
         </section>
       </div>
 
+      {/* Стили оставляю как у тебя (без изменений), чтобы визуал не поплыл */}
       <style jsx>{`
         .title-picker-modal {
           display: flex;

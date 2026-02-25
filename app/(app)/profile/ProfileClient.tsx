@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import Modal from "@/components/Modal";
 import StreakRoadmapModal from "@/components/streak/StreakRoadmapModal";
-import TitlePickerModal, { type TitlePickerChoice } from "@/components/profile/TitlePickerModal";
+import TitlePickerModal, {
+  type TitlePickerChoice,
+  type TitleCatalogItem,
+} from "@/components/profile/TitlePickerModal";
 import {
   getIconVariant,
   getResolvedSelectedIconCode,
@@ -64,9 +67,9 @@ type ProfileStreakApiResponse = {
   error?: string;
   streak?: unknown | null;
 
+  // старое поле (у тебя ещё используется как fallback в коде)
   equippedTitle?:
     | {
-        // старый/новый варианты полей
         code?: string | null;
         titleCode?: string | null;
         label?: string | null;
@@ -76,7 +79,7 @@ type ProfileStreakApiResponse = {
       }
     | null;
 
-  // на будущее/совместимость (если route начнет отдавать отдельный selectedTitle)
+  // новое поле из БД /api/profile-streak (мы его приоритетно читаем)
   selectedTitle?:
     | {
         code?: string | null;
@@ -87,7 +90,10 @@ type ProfileStreakApiResponse = {
       }
     | null;
 
-  // новые поля API (иконки)
+  // каталог титулов (streak_title_catalog) — чтобы модалка обновлялась без деплоя
+  titleCatalog?: TitleCatalogItem[] | null;
+
+  // иконки
   unlockedIconCodes?: string[] | null;
   selectedIconCode?: string | null;
   effectiveIconCode?: string | null;
@@ -135,32 +141,43 @@ type Props = {
   userId: string;
   userEmail: string;
   initialProfile: ProfileData;
-
-  /**
-   * Это PNG/JPG фон профиля (на будущее — награды).
-   * Если PNG прозрачный — под ним будет виден голубой базовый фон.
-   */
   backgroundUrl: string | null;
 
-  // допускаем null/undefined для ленивой загрузки
   stats?: Stats | null;
   materialsProgress?: MaterialProgressItem[] | null;
-
-  // опционально: сервер может передать snapshot стрика (пока ок и без него)
   streak?: StreakSnapshot | null;
 
-  // на будущее: экипированный титул (перманентный, не сгорает)
   equippedTitleLabel?: string | null;
 };
 
 /**
  * Bucket c иконками стрика.
- * ✅ По умолчанию "streak-icons" (боевой bucket)
  */
 const STREAK_ICON_BUCKET =
   process.env.NEXT_PUBLIC_STREAK_ICONS_BUCKET ||
   process.env.NEXT_PUBLIC_STREAK_ICON_ASSETS_BUCKET ||
   "streak-icons";
+
+/** Кэш, чтобы профиль "вставал" моментально */
+const STREAK_CACHE_KEY = "ek_profile_streak_cache_v1";
+const PROGRESS_CACHE_KEY = "ek_profile_progress_cache_v1";
+const STREAK_CACHE_TTL_MS = 60_000; // 1 мин (быстро обновляется, но даёт мгновенную отрисовку)
+const PROGRESS_CACHE_TTL_MS = 5 * 60_000; // 5 мин
+
+type StreakClientCache = {
+  ts: number;
+  streak: StreakSnapshot | null;
+  selectedIconServer: StreakIconCode | null;
+  titleCode: string | null;
+  titleLabel: string | null;
+  titleCatalog: TitleCatalogItem[] | null;
+};
+
+type ProgressClientCache = {
+  ts: number;
+  stats: Stats | null;
+  materialsProgress: MaterialProgressItem[] | null;
+};
 
 function getClosedCustomUpdateDialog(): CustomUpdateDialogState {
   return {
@@ -212,6 +229,59 @@ function pick(obj: Record<string, any>, keys: string[]) {
   return undefined;
 }
 
+function safeJsonParse<T>(raw: string | null): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function readStreakCache(): StreakClientCache | null {
+  if (typeof window === "undefined") return null;
+  const cached = safeJsonParse<StreakClientCache>(sessionStorage.getItem(STREAK_CACHE_KEY));
+  if (!cached?.ts) return null;
+  if (Date.now() - cached.ts > STREAK_CACHE_TTL_MS) return null;
+  return cached;
+}
+
+function writeStreakCache(payload: StreakClientCache) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(STREAK_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore
+  }
+}
+
+function readProgressCache(): ProgressClientCache | null {
+  if (typeof window === "undefined") return null;
+  const cached = safeJsonParse<ProgressClientCache>(sessionStorage.getItem(PROGRESS_CACHE_KEY));
+  if (!cached?.ts) return null;
+  if (Date.now() - cached.ts > PROGRESS_CACHE_TTL_MS) return null;
+  return cached;
+}
+
+function writeProgressCache(payload: ProgressClientCache) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(PROGRESS_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore
+  }
+}
+
+function runWhenIdle(fn: () => void, timeout = 900) {
+  if (typeof window === "undefined") return;
+  const w = window as any;
+  if (typeof w.requestIdleCallback === "function") {
+    w.requestIdleCallback(fn, { timeout });
+  } else {
+    setTimeout(fn, 50);
+  }
+}
+
 function normalizeUiErrorMessage(error: unknown, fallback = "Произошла ошибка") {
   const raw =
     error instanceof Error
@@ -239,8 +309,7 @@ function normalizeUiErrorMessage(error: unknown, fallback = "Произошла 
 }
 
 /**
- * ✅ Нормализация ответа /api/profile-streak в UI-формат StreakSnapshot
- * Поддерживает и snake_case, и camelCase (новый backend).
+ * Нормализация /api/profile-streak -> StreakSnapshot
  */
 function normalizeStreakSnapshotFromApi(rawInput: unknown): StreakSnapshot | null {
   if (!rawInput || typeof rawInput !== "object") return null;
@@ -279,9 +348,8 @@ function normalizeStreakSnapshotFromApi(rawInput: unknown): StreakSnapshot | nul
     new Date().toISOString().slice(0, 10);
 
   const lastCompletedDate =
-    asStringOrNull(
-      pick(raw, ["last_completed_date", "lastCompletedDate", "activity_date", "lastActivityDate"])
-    ) ?? null;
+    asStringOrNull(pick(raw, ["last_completed_date", "lastCompletedDate", "activity_date", "lastActivityDate"])) ??
+    null;
 
   return {
     today,
@@ -370,8 +438,6 @@ function maybePublicUrlFromStoragePath(bucket: string, path: string | null | und
   if (!isNonEmptyString(path)) return null;
 
   const raw = path.trim();
-
-  // Уже абсолютный URL / data URI
   if (/^https?:\/\//i.test(raw) || raw.startsWith("data:")) return raw;
 
   const cleanPath = raw.replace(/^\/+/, "");
@@ -389,20 +455,14 @@ function extractPathsFromVariant(variant: unknown): string[] {
   if (!variant || typeof variant !== "object") return [];
 
   const v = variant as Record<string, unknown>;
-  const meta =
-    (v.meta && typeof v.meta === "object" ? v.meta : null) as Record<string, unknown> | null;
+  const meta = (v.meta && typeof v.meta === "object" ? v.meta : null) as Record<string, unknown> | null;
 
   return uniqStrings([
-    // прямые поля
     isNonEmptyString(v.webpPath) ? v.webpPath : null,
     isNonEmptyString(v.pngPath) ? v.pngPath : null,
     isNonEmptyString(v.imagePath) ? v.imagePath : null,
-
-    // snake_case варианты
     isNonEmptyString(v.webp_path) ? (v.webp_path as string) : null,
     isNonEmptyString(v.png_path) ? (v.png_path as string) : null,
-
-    // meta.*
     meta && isNonEmptyString(meta.webpPath) ? (meta.webpPath as string) : null,
     meta && isNonEmptyString(meta.pngPath) ? (meta.pngPath as string) : null,
     meta && isNonEmptyString(meta.webp_path) ? (meta.webp_path as string) : null,
@@ -426,15 +486,10 @@ function buildFallbackStoragePathsByCode(iconCode: string | null): string[] {
   ]);
 }
 
-function resolveIconCandidateUrls(params: {
-  iconCode: string | null;
-  variant?: unknown;
-  bucket?: string;
-}): string[] {
+function resolveIconCandidateUrls(params: { iconCode: string | null; variant?: unknown; bucket?: string }): string[] {
   const bucket = params.bucket || STREAK_ICON_BUCKET;
   const fromVariantPaths = extractPathsFromVariant(params.variant);
   const fromCodePaths = buildFallbackStoragePathsByCode(params.iconCode);
-
   const storagePaths = uniqStrings([...fromVariantPaths, ...fromCodePaths]);
   return uniqStrings(storagePaths.map((p) => maybePublicUrlFromStoragePath(bucket, p)));
 }
@@ -486,9 +541,7 @@ function StreakIconVisual({
           loading="eager"
           decoding="async"
           draggable={false}
-          onError={() => {
-            setImgIndex((prev) => prev + 1);
-          }}
+          onError={() => setImgIndex((prev) => prev + 1)}
         />
       ) : (
         <span className={joinClasses("streak-visual__emoji", emojiClassName)}>{emojiFallback}</span>
@@ -509,9 +562,13 @@ export default function ProfileClient({
 }: Props) {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
+  // ---- instant cache bootstrap (не трогаем window на сервере) ----
+  const cachedStreak = typeof window !== "undefined" ? readStreakCache() : null;
+  const cachedProgress = typeof window !== "undefined" ? readProgressCache() : null;
+
   const [profile, setProfile] = useState<ProfileData>(initialProfile);
 
-  // background loading indicator
+  // background
   const [bgLoading, setBgLoading] = useState<boolean>(Boolean(backgroundUrl));
   const [bgReady, setBgReady] = useState<boolean>(false);
 
@@ -532,46 +589,51 @@ export default function ProfileClient({
   const [titleModalOpen, setTitleModalOpen] = useState(false);
 
   // окно обновления (иконка/титул)
-  const [customUpdateDialog, setCustomUpdateDialog] = useState<CustomUpdateDialogState>(
-    getClosedCustomUpdateDialog()
-  );
+  const [customUpdateDialog, setCustomUpdateDialog] = useState<CustomUpdateDialogState>(getClosedCustomUpdateDialog());
 
-  // ленивый прогресс
-  const [stats, setStats] = useState<Stats | null>(statsProp ?? null);
+  // progress (сначала из props/кэша -> потом тихо обновим)
+  const [stats, setStats] = useState<Stats | null>(statsProp ?? cachedProgress?.stats ?? null);
   const [materialsProgress, setMaterialsProgress] = useState<MaterialProgressItem[] | null>(
-    progressProp ?? null
+    progressProp ?? cachedProgress?.materialsProgress ?? null
   );
-  const [progressLoading, setProgressLoading] = useState<boolean>(!statsProp || !progressProp);
+  const [progressLoading, setProgressLoading] = useState<boolean>(
+    Boolean(!statsProp && !progressProp && !(cachedProgress?.stats && cachedProgress?.materialsProgress))
+  );
   const [progressError, setProgressError] = useState<string | null>(null);
 
-  // стрик (быстрый snapshot)
-  const [streak, setStreak] = useState<StreakSnapshot | null>(streakProp ?? null);
-  const [streakLoading, setStreakLoading] = useState<boolean>(!streakProp);
+  // streak snapshot (сначала из props/кэша -> потом тихо обновим)
+  const [streak, setStreak] = useState<StreakSnapshot | null>(streakProp ?? cachedStreak?.streak ?? null);
+  const [streakLoading, setStreakLoading] = useState<boolean>(Boolean(!streakProp && !cachedStreak?.streak));
   const [streakError, setStreakError] = useState<string | null>(null);
 
-  // выбранный титул с сервера (теперь храним в profiles.selected_streak_title_code)
+  // title from server (selected)
   const [equippedTitleLabelState, setEquippedTitleLabelState] = useState<string | null>(
-    equippedTitleLabel ?? null
+    cachedStreak?.titleLabel ?? equippedTitleLabel ?? null
   );
-  const [equippedTitleCodeState, setEquippedTitleCodeState] = useState<string | null>(null);
+  const [equippedTitleCodeState, setEquippedTitleCodeState] = useState<string | null>(cachedStreak?.titleCode ?? null);
+
+  // title catalog for modal
+  const [titleCatalogState, setTitleCatalogState] = useState<TitleCatalogItem[] | null>(cachedStreak?.titleCatalog ?? null);
+
   const [savingTitle, setSavingTitle] = useState(false);
 
-  // ✅ оптимистичный выбор иконки до ответа сервера
-  const [selectedStreakIconCodeLocal, setSelectedStreakIconCodeLocal] =
-    useState<StreakIconCode | null>(null);
-
-  // серверный выбранный/дефолтный
-  const [selectedStreakIconCodeServer, setSelectedStreakIconCodeServer] =
-    useState<StreakIconCode | null>(null);
-
-  // флаг сохранения иконки
+  // icon selection
+  const [selectedStreakIconCodeLocal, setSelectedStreakIconCodeLocal] = useState<StreakIconCode | null>(null);
+  const [selectedStreakIconCodeServer, setSelectedStreakIconCodeServer] = useState<StreakIconCode | null>(
+    cachedStreak?.selectedIconServer ?? null
+  );
   const [savingStreakIcon, setSavingStreakIcon] = useState(false);
+
+  // throttle/abort to avoid piling requests
+  const lastStreakFetchAtRef = useRef<number>(0);
+  const streakAbortRef = useRef<AbortController | null>(null);
+  const progressAbortRef = useRef<AbortController | null>(null);
 
   const isCustomizationUpdateLocked = customUpdateDialog.open || savingTitle || savingStreakIcon;
 
   function showNotification(text: string, type: "success" | "error" = "success") {
     setNotif({ type, text });
-    setTimeout(() => setNotif(null), 4000);
+    setTimeout(() => setNotif(null), 3500);
   }
 
   function openUpdateLoading(scope: "icon" | "title") {
@@ -580,10 +642,7 @@ export default function ProfileClient({
       mode: "loading",
       scope,
       title: scope === "icon" ? "Обновляем иконку" : "Обновляем титул",
-      message:
-        scope === "icon"
-          ? "Сохраняем выбранную иконку серии..."
-          : "Сохраняем выбранный титул...",
+      message: scope === "icon" ? "Сохраняем выбранную иконку серии..." : "Сохраняем выбранный титул...",
       retryAction: null,
     });
   }
@@ -633,19 +692,81 @@ export default function ProfileClient({
       await handleSelectStreakIcon(action.iconCode, { force: true });
       return;
     }
-
     if (action.type === "title-select") {
       await handleSelectTitle(action.choice, { force: true });
       return;
     }
-
     if (action.type === "title-clear") {
       await handleClearSelectedTitle({ force: true });
     }
   }
 
-  async function refreshStreakFromApi(options?: { silent?: boolean }) {
+  function applyStreakResponseToState(json: ProfileStreakApiResponse, opts?: { fromCache?: boolean }) {
+    const normalizedStreak = normalizeStreakSnapshotFromApi(json.streak ?? null);
+    if (normalizedStreak) setStreak(normalizedStreak);
+
+    // титул: приоритет selectedTitle (из БД), потом equippedTitle (старое)
+    const rawTitleObj = (json.selectedTitle ?? json.equippedTitle ?? null) as Record<string, any> | null;
+
+    const apiTitleLabel = rawTitleObj && typeof rawTitleObj.label === "string" ? rawTitleObj.label : null;
+    const apiTitleCode =
+      (rawTitleObj && typeof rawTitleObj.titleCode === "string" && rawTitleObj.titleCode) ||
+      (rawTitleObj && typeof rawTitleObj.code === "string" && rawTitleObj.code) ||
+      null;
+
+    setEquippedTitleLabelState(apiTitleLabel ?? null);
+    setEquippedTitleCodeState(apiTitleCode ?? null);
+
+    // каталог титулов
+    if (Array.isArray(json.titleCatalog)) {
+      setTitleCatalogState(json.titleCatalog as TitleCatalogItem[]);
+    }
+
+    // иконки
+    const apiSelected = normalizeIconCode(json.selectedIconCode ?? null);
+    const apiEffective = normalizeIconCode(json.effectiveIconCode ?? null);
+    setSelectedStreakIconCodeServer(apiSelected ?? apiEffective ?? null);
+
+    // если оптимистичное состояние совпало с сервером — очищаем локалку
+    setSelectedStreakIconCodeLocal((prev) => {
+      if (!prev) return prev;
+      const compareWith = apiSelected ?? apiEffective ?? null;
+      if (compareWith && prev === compareWith) return null;
+      return prev;
+    });
+
+    // кэшируем (чтобы следующий заход был мгновенный)
+    const cachePayload: StreakClientCache = {
+      ts: Date.now(),
+      streak: normalizedStreak,
+      selectedIconServer: (apiSelected ?? apiEffective ?? null) as StreakIconCode | null,
+      titleCode: apiTitleCode ?? null,
+      titleLabel: apiTitleLabel ?? null,
+      titleCatalog: Array.isArray(json.titleCatalog) ? (json.titleCatalog as TitleCatalogItem[]) : titleCatalogState ?? null,
+    };
+    writeStreakCache(cachePayload);
+
+    if (!opts?.fromCache) {
+      try {
+        sessionStorage.removeItem("profile-streak-dirty");
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  async function refreshStreakFromApi(options?: { silent?: boolean; force?: boolean }) {
     const silent = Boolean(options?.silent);
+
+    // throttle: чтобы не лупить /api/profile-streak каждые 100мс (focus/visibility)
+    const now = Date.now();
+    if (!options?.force && now - lastStreakFetchAtRef.current < 12_000) return;
+    lastStreakFetchAtRef.current = now;
+
+    // abort previous
+    streakAbortRef.current?.abort();
+    const controller = new AbortController();
+    streakAbortRef.current = controller;
 
     try {
       if (!silent) setStreakLoading(true);
@@ -654,6 +775,7 @@ export default function ProfileClient({
       const res = await fetch("/api/profile-streak", {
         method: "GET",
         cache: "no-store",
+        signal: controller.signal,
       });
 
       let json: ProfileStreakApiResponse | null = null;
@@ -667,53 +789,17 @@ export default function ProfileClient({
         throw new Error(json?.error || "Не удалось загрузить стрик");
       }
 
-      const normalizedStreak = normalizeStreakSnapshotFromApi(json.streak ?? null);
-      setStreak(normalizedStreak);
-
-      // Поддерживаем и equippedTitle, и selectedTitle (если backend позже переименуется)
-      const rawTitleObj = (json?.selectedTitle ?? json?.equippedTitle ?? null) as
-        | Record<string, unknown>
-        | null;
-
-      const apiTitleLabel =
-        rawTitleObj && typeof rawTitleObj.label === "string" ? rawTitleObj.label : null;
-
-      const apiTitleCode =
-        (rawTitleObj && typeof rawTitleObj.titleCode === "string" && rawTitleObj.titleCode) ||
-        (rawTitleObj && typeof rawTitleObj.code === "string" && rawTitleObj.code) ||
-        null;
-
-      setEquippedTitleLabelState(apiTitleLabel ?? null);
-      setEquippedTitleCodeState(apiTitleCode ?? null);
-
-      // серверный selected/effective код (нормализуем)
-      const apiSelected = normalizeIconCode(json?.selectedIconCode ?? null);
-      const apiEffective = normalizeIconCode(json?.effectiveIconCode ?? null);
-
-      setSelectedStreakIconCodeServer(apiSelected ?? apiEffective ?? null);
-
-      // если оптимистичное состояние совпало с сервером — очищаем локалку
-      setSelectedStreakIconCodeLocal((prev) => {
-        if (!prev) return prev;
-        const compareWith = apiSelected ?? apiEffective ?? null;
-        if (compareWith && prev === compareWith) return null;
-        return prev;
-      });
-
-      try {
-        sessionStorage.removeItem("profile-streak-dirty");
-      } catch {
-        // ignore
-      }
+      applyStreakResponseToState(json);
 
       if (!silent) setStreakLoading(false);
     } catch (e: any) {
+      if (e?.name === "AbortError") return;
       if (!silent) setStreakLoading(false);
       setStreakError(normalizeUiErrorMessage(e, "Не удалось загрузить стрик"));
     }
   }
 
-  // preload background image
+  // preload background image (не мешает отрисовке, просто улучшает UX)
   useEffect(() => {
     if (!backgroundUrl) {
       setBgLoading(false);
@@ -733,25 +819,30 @@ export default function ProfileClient({
     };
     img.src = backgroundUrl;
 
-    const t = setTimeout(() => setBgLoading(false), 10000);
+    const t = setTimeout(() => setBgLoading(false), 6000);
     return () => clearTimeout(t);
   }, [backgroundUrl]);
 
-  // ленивая загрузка прогресса (через API route)
+  // прогресс: сначала показываем кэш/props, потом тихо обновляем "в idle"
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
+    async function loadProgress() {
       if (statsProp && progressProp) {
         setProgressLoading(false);
         return;
       }
 
+      // abort previous
+      progressAbortRef.current?.abort();
+      const controller = new AbortController();
+      progressAbortRef.current = controller;
+
       try {
         setProgressLoading(true);
         setProgressError(null);
 
-        const res = await fetch("/api/profile-progress", { method: "GET", cache: "no-store" });
+        const res = await fetch("/api/profile-progress", { method: "GET", cache: "no-store", signal: controller.signal });
         const json = await res.json();
 
         if (!res.ok || !json?.ok) {
@@ -763,58 +854,60 @@ export default function ProfileClient({
         setStats(json.stats as Stats);
         setMaterialsProgress(json.materialsProgress as MaterialProgressItem[]);
         setProgressLoading(false);
+
+        writeProgressCache({
+          ts: Date.now(),
+          stats: json.stats as Stats,
+          materialsProgress: json.materialsProgress as MaterialProgressItem[],
+        });
       } catch (e: any) {
+        if (e?.name === "AbortError") return;
         if (cancelled) return;
         setProgressLoading(false);
         setProgressError(normalizeUiErrorMessage(e, "Не удалось загрузить прогресс"));
       }
     }
 
-    void load();
+    // если уже есть данные (props или кэш), не тормозим — догружаем позже
+    runWhenIdle(() => void loadProgress(), 1200);
+
     return () => {
       cancelled = true;
+      progressAbortRef.current?.abort();
     };
   }, [statsProp, progressProp]);
 
-  // ✅ Загрузка/обновление стрика через /api/profile-streak
+  // стрик: сразу показываем кэш/props, а обновление — тихо и не сразу (idle)
   useEffect(() => {
     let cancelled = false;
 
-    async function safeRefresh(options?: { silent?: boolean }) {
-      if (cancelled) return;
-      await refreshStreakFromApi(options);
-    }
+    const dirty =
+      typeof window !== "undefined" ? sessionStorage.getItem("profile-streak-dirty") === "1" : false;
 
-    if (streakProp) {
+    const hasFreshCache = Boolean(cachedStreak?.streak && Date.now() - (cachedStreak?.ts ?? 0) < STREAK_CACHE_TTL_MS);
+
+    if (streakProp || cachedStreak?.streak) {
       setStreakLoading(false);
+    }
+
+    const doFetch = async () => {
+      if (cancelled) return;
+      await refreshStreakFromApi({ silent: true, force: dirty || !hasFreshCache });
+    };
+
+    if (dirty || !hasFreshCache) {
+      // если после выполнения задания / нет свежего кэша — обновим сразу
+      void doFetch();
     } else {
-      void safeRefresh();
+      // иначе — в idle (быстро, но не блокирует UX)
+      runWhenIdle(() => void doFetch(), 900);
     }
 
-    // если пришли на профиль после выполнения задания — обновим стрик сразу
-    try {
-      const dirty = sessionStorage.getItem("profile-streak-dirty") === "1";
-      if (dirty) {
-        sessionStorage.removeItem("profile-streak-dirty");
-        void safeRefresh({ silent: false });
-      }
-    } catch {
-      // ignore
-    }
-
-    const onFocus = () => {
-      void safeRefresh({ silent: true });
-    };
-
+    const onFocus = () => void refreshStreakFromApi({ silent: true });
     const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        void safeRefresh({ silent: true });
-      }
+      if (document.visibilityState === "visible") void refreshStreakFromApi({ silent: true });
     };
-
-    const onCustomRefresh = () => {
-      void safeRefresh();
-    };
+    const onCustomRefresh = () => void refreshStreakFromApi({ silent: false, force: true });
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
@@ -825,21 +918,15 @@ export default function ProfileClient({
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("profile-streak-refresh", onCustomRefresh as EventListener);
+      streakAbortRef.current?.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streakProp]);
 
-  // чистим старый временный localStorage ключ иконки (если был)
+  // чистим старые ключи
   useEffect(() => {
     try {
       localStorage.removeItem("profile-selected-streak-icon");
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  // чистим старый localStorage ключ титула (если раньше использовался)
-  useEffect(() => {
-    try {
       localStorage.removeItem("profile-selected-title-v1");
     } catch {
       // ignore
@@ -897,9 +984,8 @@ export default function ProfileClient({
 
   async function handleSelectStreakIcon(iconCodeRaw: string, options?: { force?: boolean }) {
     const normalized = normalizeIconCode(iconCodeRaw);
-
-    // защита от мусорного значения
     const variant = getIconVariant(normalized);
+
     if (!normalized || !variant) {
       showNotification("❌ Неизвестная иконка серии", "error");
       return;
@@ -913,15 +999,12 @@ export default function ProfileClient({
     try {
       openUpdateLoading("icon");
 
-      // оптимистично показываем сразу
       setSelectedStreakIconCodeLocal(normalized);
       setSavingStreakIcon(true);
 
       const res = await fetch("/api/profile-streak-icon", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ iconCode: normalized }),
       });
 
@@ -939,16 +1022,12 @@ export default function ProfileClient({
       const resolvedSelected = normalizeIconCode(json.selectedIconCode ?? normalized);
       const resolvedEffective = normalizeIconCode(json.effectiveIconCode ?? null);
 
-      // фиксируем серверный выбор
       setSelectedStreakIconCodeServer(resolvedSelected ?? resolvedEffective ?? normalized);
-
-      // снимаем оптимистичное состояние
       setSelectedStreakIconCodeLocal(null);
 
       setCustomUpdateDialog(getClosedCustomUpdateDialog());
       showNotification("✅ Иконка серии успешно обновлена");
     } catch (e: any) {
-      // откат
       setSelectedStreakIconCodeLocal(prevLocal);
       setSelectedStreakIconCodeServer(prevServer);
       showUpdateError("icon", e, { type: "icon", iconCode: normalized });
@@ -967,15 +1046,13 @@ export default function ProfileClient({
       openUpdateLoading("title");
       setSavingTitle(true);
 
-      // оптимистично показываем сразу
+      // optimistic
       setEquippedTitleCodeState(choice.code);
       setEquippedTitleLabelState(choice.label);
 
       const res = await fetch("/api/profile-streak-title", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ titleCode: choice.code }),
       });
 
@@ -1005,10 +1082,9 @@ export default function ProfileClient({
       showNotification("✅ Титул успешно обновлён");
       closeTitleModal();
 
-      // мягкая синхронизация (если сервер возвращает ещё что-то важное)
-      void refreshStreakFromApi({ silent: true });
+      // тихо подтянем свежий каталог/синхру
+      void refreshStreakFromApi({ silent: true, force: true });
     } catch (e: any) {
-      // откат
       setEquippedTitleCodeState(prevCode);
       setEquippedTitleLabelState(prevLabel);
       showUpdateError("title", e, { type: "title-select", choice });
@@ -1027,15 +1103,13 @@ export default function ProfileClient({
       openUpdateLoading("title");
       setSavingTitle(true);
 
-      // оптимистично очищаем
+      // optimistic clear
       setEquippedTitleCodeState(null);
       setEquippedTitleLabelState(null);
 
       const res = await fetch("/api/profile-streak-title", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reset: true }),
       });
 
@@ -1057,9 +1131,8 @@ export default function ProfileClient({
       showNotification("✅ Титул успешно сброшен");
       closeTitleModal();
 
-      void refreshStreakFromApi({ silent: true });
+      void refreshStreakFromApi({ silent: true, force: true });
     } catch (e: any) {
-      // откат
       setEquippedTitleCodeState(prevCode);
       setEquippedTitleLabelState(prevLabel);
       showUpdateError("title", e, { type: "title-clear" });
@@ -1078,8 +1151,6 @@ export default function ProfileClient({
     [longestStreakDisplay]
   );
 
-  // ✅ Единый источник правды:
-  // оптимистичный локальный -> серверный selected/default -> fallback по longest
   const effectiveSelectedStreakIconCode = useMemo(() => {
     return getResolvedSelectedIconCode(
       selectedStreakIconCodeLocal ?? selectedStreakIconCodeServer,
@@ -1092,13 +1163,9 @@ export default function ProfileClient({
     [effectiveSelectedStreakIconCode]
   );
 
-  // ✅ UI tier определяем от выбранной иконки / дорожки, а не слепо от RPC tier_code
   const resolvedUiTierCode = selectedIconVariant?.tierCode ?? getTierCodeByStreak(streakDisplay);
-
   const streakUiBase = getStreakTierUi(resolvedUiTierCode, streakDisplay);
-  const streakUi = selectedIconVariant
-    ? { ...streakUiBase, icon: selectedIconVariant.emoji }
-    : streakUiBase;
+  const streakUi = selectedIconVariant ? { ...streakUiBase, icon: selectedIconVariant.emoji } : streakUiBase;
 
   const effectiveTitleCodeForUi = equippedTitleCodeState ?? null;
   const effectiveTitleLabelForUi = equippedTitleLabelState ?? null;
@@ -1114,25 +1181,15 @@ export default function ProfileClient({
         ? `Серия: ${streakDisplay} дн. • Рекорд: ${streak.longest_streak} дн.`
         : "Серия пока не началась";
 
-  const streakChipSub = streakLoading
-    ? "серия"
-    : streak?.done_today
-      ? "сегодня ✅"
-      : streakDisplay > 0
-        ? "сохранить сегодня"
-        : "начни серию";
+  const streakChipSub = streakLoading ? "серия" : streak?.done_today ? "сегодня ✅" : streakDisplay > 0 ? "сохранить сегодня" : "начни серию";
 
   const avatarEmojiFallback = selectedIconVariant?.emoji || streakUi.icon || "✨";
   const chipEmojiFallback = selectedIconVariant?.emoji || streakUi.icon || "✨";
- 
 
   const titleSavingNow =
-    customUpdateDialog.open &&
-    customUpdateDialog.scope === "title" &&
-    customUpdateDialog.mode === "loading";
+    customUpdateDialog.open && customUpdateDialog.scope === "title" && customUpdateDialog.mode === "loading";
 
   const titleUpdateDialogOpen = customUpdateDialog.open && customUpdateDialog.scope === "title";
-  const iconUpdateDialogOpen = customUpdateDialog.open && customUpdateDialog.scope === "icon";
 
   return (
     <div
@@ -1178,24 +1235,12 @@ export default function ProfileClient({
         >
           <div className="form-group">
             <label htmlFor="editFullName">ФИО:</label>
-            <input
-              id="editFullName"
-              type="text"
-              required
-              value={editFullName}
-              onChange={(e) => setEditFullName(e.target.value)}
-            />
+            <input id="editFullName" type="text" required value={editFullName} onChange={(e) => setEditFullName(e.target.value)} />
           </div>
 
           <div className="form-group">
             <label htmlFor="editPhone">Контактный телефон:</label>
-            <input
-              id="editPhone"
-              type="tel"
-              required
-              value={editPhone}
-              onChange={(e) => setEditPhone(e.target.value)}
-            />
+            <input id="editPhone" type="tel" required value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
           </div>
 
           <div className="form-group">
@@ -1230,13 +1275,14 @@ export default function ProfileClient({
         </form>
       </Modal>
 
-      {/* Модалка выбора титула */}
+      {/* Модалка выбора титула (теперь получает titleCatalog из БД) */}
       <TitlePickerModal
         open={titleModalOpen}
         onClose={closeTitleModal}
         longestStreak={longestStreakDisplay}
         currentTitleCode={effectiveTitleCodeForUi}
         currentTitleLabel={effectiveTitleLabelForUi}
+        titleCatalog={titleCatalogState}
         onSelectTitle={(choice) => {
           if (isCustomizationUpdateLocked) return;
           void handleSelectTitle(choice);
@@ -1248,7 +1294,7 @@ export default function ProfileClient({
         loading={streakLoading || titleSavingNow}
       />
 
-      {/* ✅ Модалка дорожки стрика */}
+      {/* Модалка дорожки стрика */}
       <StreakRoadmapModal
         open={streakModalOpen}
         onClose={closeStreakModal}
@@ -1261,13 +1307,8 @@ export default function ProfileClient({
         onSelectIconCode={isCustomizationUpdateLocked ? undefined : handleSelectStreakIcon}
       />
 
-      {/* ✅ Общее окно обновления иконки/титула */}
-      <Modal
-        open={customUpdateDialog.open}
-        onClose={closeCustomUpdateDialog}
-        title={customUpdateDialog.title || "Обновление"}
-        maxWidth={460}
-      >
+      {/* Окно обновления иконки/титула */}
+      <Modal open={customUpdateDialog.open} onClose={closeCustomUpdateDialog} title={customUpdateDialog.title || "Обновление"} maxWidth={460}>
         <div style={{ display: "grid", gap: 14 }}>
           {customUpdateDialog.mode === "loading" ? (
             <>
@@ -1327,18 +1368,10 @@ export default function ProfileClient({
               </div>
 
               <div className="modal-actions">
-                <button
-                  type="button"
-                  className="btn secondary"
-                  onClick={closeCustomUpdateDialog}
-                >
+                <button type="button" className="btn secondary" onClick={closeCustomUpdateDialog}>
                   ✖ Закрыть
                 </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => void retryCustomUpdateDialogAction()}
-                >
+                <button type="button" className="btn" onClick={() => void retryCustomUpdateDialogAction()}>
                   🔄 Повторить
                 </button>
               </div>
@@ -1359,7 +1392,7 @@ export default function ProfileClient({
           </div>
 
           <div className="top-actions">
-            {/* Крупный стрик-чип */}
+            {/* Streak chip */}
             <button
               type="button"
               className={`streak-chip streak-chip--button ${streakUi.className} ${streakLoading ? "streak-chip--loading" : ""}`}
@@ -1423,16 +1456,16 @@ export default function ProfileClient({
                     />
                   </div>
 
-                  {/* Бейдж стрика */}
-                 <button
-  type="button"
-  className={`streak-mini-badge ${streakUi.ringClassName}`}
-  title={`Стрик: ${streakLoading ? "…" : streakDisplay} дн. Нажмите для подробностей`}
-  aria-label="Открыть серию активности"
-  onClick={openStreakModal}
->
-  <b>{streakLoading ? "…" : streakDisplay}</b>
-</button>
+                  {/* Бейдж стрика (без иконки — только число) */}
+                  <button
+                    type="button"
+                    className={`streak-mini-badge ${streakUi.ringClassName}`}
+                    title={`Стрик: ${streakLoading ? "…" : streakDisplay} дн. Нажмите для подробностей`}
+                    aria-label="Открыть серию активности"
+                    onClick={openStreakModal}
+                  >
+                    <b>{streakLoading ? "…" : streakDisplay}</b>
+                  </button>
                 </div>
               </div>
 
@@ -1566,11 +1599,7 @@ export default function ProfileClient({
                 <span>✏️</span> Редактировать профиль
               </button>
 
-              <button
-                className="action-btn action-btn--dangerSoft"
-                onClick={() => (window.location.href = "/requests")}
-                type="button"
-              >
+              <button className="action-btn action-btn--dangerSoft" onClick={() => (window.location.href = "/requests")} type="button">
                 <span>📝</span> Заявки на покупку
               </button>
 
@@ -1633,29 +1662,20 @@ export default function ProfileClient({
               ) : materialsProgress.length === 0 ? (
                 <div style={{ fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>
                   📚 Материалы пока не доступны
-                  <div style={{ marginTop: 6, fontWeight: 700 }}>
-                    Обратитесь к администратору для получения доступа
-                  </div>
+                  <div style={{ marginTop: 6, fontWeight: 700 }}>Обратитесь к администратору для получения доступа</div>
                 </div>
               ) : (
                 <div className="progress-list">
                   {materialsProgress.map((m) => (
                     <div key={`${m.kind}-${m.id}`} className="progress-row" onClick={() => (window.location.href = m.href)}>
                       <div className="progress-left">
-                        <div
-                          className={
-                            "progress-type " +
-                            (m.kind === "textbook" ? "progress-type--textbook" : "progress-type--crossword")
-                          }
-                        >
+                        <div className={"progress-type " + (m.kind === "textbook" ? "progress-type--textbook" : "progress-type--crossword")}>
                           {m.kind === "textbook" ? "📗 УЧЕБНИК" : "🧩 КРОССВОРД"}
                         </div>
 
                         <div className="progress-title">{m.title}</div>
                         <div className="progress-sub">
-                          {m.kind === "textbook"
-                            ? `${m.completed} из ${m.total} заданий выполнено`
-                            : `${m.completed} из ${m.total} слов отгадано`}
+                          {m.kind === "textbook" ? `${m.completed} из ${m.total} заданий выполнено` : `${m.completed} из ${m.total} слов отгадано`}
                           {m.total === 0 ? " (нет заданий)" : ""}
                         </div>
                       </div>
