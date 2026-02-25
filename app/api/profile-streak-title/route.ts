@@ -1,4 +1,7 @@
 // app/api/profile-streak-title/route.ts
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { requireUser } from "@/lib/api/auth";
 import { fail, ok } from "@/lib/api/response";
 import { normalizeRpcStreakSnapshot } from "@/lib/streaks/roadmap";
@@ -43,14 +46,8 @@ function parseRequestedTitleCode(body: RequestBody): { titleCode: string | null;
     return { titleCode: null, explicitReset };
   }
 
-  const raw =
-    body.titleCode ??
-    body.selectedTitleCode ??
-    body.code ??
-    null;
-
-  // null / "" => сброс
-  const titleCode = toTrimmedStringOrNull(raw);
+  const raw = body.titleCode ?? body.selectedTitleCode ?? body.code ?? null;
+  const titleCode = toTrimmedStringOrNull(raw); // null/"" => сброс
   return { titleCode, explicitReset };
 }
 
@@ -70,43 +67,37 @@ export async function POST(req: Request) {
   const { titleCode, explicitReset } = parseRequestedTitleCode(body);
   const shouldClear = explicitReset || titleCode === null;
 
-  // 1) Snapshot streak — источник истины для разблокировок
+  // 1) Snapshot streak
   const { data: rpcData, error: rpcErr } = await supabase.rpc("get_my_streak_snapshot");
-  if (rpcErr) {
-    return fail(rpcErr.message, 500, "STREAK_SNAPSHOT_FAILED");
-  }
+  if (rpcErr) return fail(rpcErr.message, 500, "STREAK_SNAPSHOT_FAILED");
 
-  const normalizedSnapshot = normalizeRpcStreakSnapshot(
-    (rpcData ?? null) as Record<string, any> | null
-  );
-
+  const normalizedSnapshot = normalizeRpcStreakSnapshot((rpcData ?? null) as Record<string, any> | null);
   const longestForUnlocks = Math.max(
     toNonNegativeInt(normalizedSnapshot.longestStreak, 0),
     toNonNegativeInt(normalizedSnapshot.displayLongestStreak, 0)
   );
 
-  // 2) Сброс выбранного титула
+  // 2) Clear
   if (shouldClear) {
     const { error: updateErr } = await supabase
       .from("profiles")
       .update({ selected_streak_title_code: null })
       .eq("id", user.id);
 
-    if (updateErr) {
-      return fail(updateErr.message, 500, "PROFILE_TITLE_CLEAR_FAILED");
-    }
+    if (updateErr) return fail(updateErr.message, 500, "PROFILE_TITLE_CLEAR_FAILED");
 
-    return ok({
-      success: true,
+    const res = ok({
       cleared: true,
       selectedTitleCode: null,
       selectedTitleDbCode: null,
       longestForUnlocks,
       serverTs: new Date().toISOString(),
     });
+    res.headers.set("Cache-Control", "no-store, max-age=0");
+    return res;
   }
 
-  // 3) Проверяем титул в каталоге
+  // 3) Fetch title row
   const normalizedCode = titleCode!;
 
   const { data: titleRow, error: titleErr } = await supabase
@@ -115,49 +106,31 @@ export async function POST(req: Request) {
     .eq("code", normalizedCode)
     .maybeSingle<TitleCatalogRow>();
 
-  if (titleErr) {
-    return fail(titleErr.message, 500, "TITLE_CATALOG_FETCH_FAILED");
-  }
-
-  if (!titleRow || !titleRow.code) {
-    return fail("Титул не найден в streak_title_catalog", 404, "TITLE_NOT_FOUND");
-  }
-
-  if (!titleRow.is_active) {
-    return fail("Титул отключён и недоступен для выбора", 400, "TITLE_INACTIVE");
-  }
+  if (titleErr) return fail(titleErr.message, 500, "TITLE_CATALOG_FETCH_FAILED");
+  if (!titleRow || !titleRow.code) return fail("Титул не найден в streak_title_catalog", 404, "TITLE_NOT_FOUND");
+  if (!titleRow.is_active) return fail("Титул отключён и недоступен для выбора", 400, "TITLE_INACTIVE");
 
   const unlockAt = toNonNegativeInt(titleRow.unlock_at, 0);
-  if (unlockAt <= 0) {
-    return fail("У титула не указан корректный unlock_at", 400, "TITLE_BAD_UNLOCK_AT");
-  }
-
+  if (unlockAt <= 0) return fail("У титула не указан корректный unlock_at", 400, "TITLE_BAD_UNLOCK_AT");
   if (unlockAt > longestForUnlocks) {
     return fail(
-      `Титул ещё не разблокирован. Нужно ${unlockAt} дн., сейчас доступно по рекорду: ${longestForUnlocks} дн.`,
+      `Титул ещё не разблокирован. Нужно ${unlockAt} дн., доступно по рекорду: ${longestForUnlocks} дн.`,
       403,
       "TITLE_LOCKED"
     );
   }
 
-  // 4) Сохраняем выбранный титул в profiles
+  // 4) Save in profiles
   const { error: updateErr } = await supabase
     .from("profiles")
     .update({ selected_streak_title_code: titleRow.code })
     .eq("id", user.id);
 
-  if (updateErr) {
-    return fail(updateErr.message, 500, "PROFILE_TITLE_SAVE_FAILED");
-  }
+  if (updateErr) return fail(updateErr.message, 500, "PROFILE_TITLE_SAVE_FAILED");
 
-  return ok({
-    success: true,
+  const res = ok({
     cleared: false,
-
-    // что лежит в БД
     selectedTitleDbCode: titleRow.code,
-
-    // валидный выбранный титул для UI
     selectedTitleCode: titleRow.code,
     selectedTitle: {
       code: titleRow.code,
@@ -165,8 +138,9 @@ export async function POST(req: Request) {
       unlockAt,
       description: toTrimmedStringOrNull(titleRow.description),
     },
-
     longestForUnlocks,
     serverTs: new Date().toISOString(),
   });
+  res.headers.set("Cache-Control", "no-store, max-age=0");
+  return res;
 }

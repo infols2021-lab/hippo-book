@@ -1,4 +1,7 @@
 // app/api/profile-streak/route.ts
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { requireUser } from "@/lib/api/auth";
 import { fail, ok } from "@/lib/api/response";
 import {
@@ -7,7 +10,6 @@ import {
   getIconVariant,
   getResolvedSelectedIconCode,
   getRoadmapCodeFromDbIconAsset,
-  getTitleLabelByCode,
   getUnlockedIconCodesByLongest,
   normalizeIconCode,
   normalizeRpcStreakSnapshot,
@@ -42,8 +44,8 @@ type StreakTitleCatalogRow = {
 };
 
 type IconVisualPayload = {
-  code: StreakIconCode; // roadmap code (UI-stable)
-  dbCode: string | null; // actual DB code stored in profiles
+  code: StreakIconCode;
+  dbCode: string | null;
   unlockAt: number;
   tierCode: string;
   shortLabel: string;
@@ -92,6 +94,10 @@ function toInt(v: unknown, fallback = 0) {
   return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : fallback;
 }
 
+/**
+ * Важно: label берём ТОЛЬКО из БД.
+ * Если label пустой — показываем code (чтобы сразу было видно, что в каталоге дырка).
+ */
 function normalizeTitleCatalogRows(rows: StreakTitleCatalogRow[] | null | undefined): TitleVisualPayload[] {
   const out: TitleVisualPayload[] = [];
   const seen = new Set<string>();
@@ -103,10 +109,7 @@ function normalizeTitleCatalogRows(rows: StreakTitleCatalogRow[] | null | undefi
     const unlockAt = toInt(row?.unlock_at, 0);
     if (unlockAt <= 0) continue;
 
-    const label =
-      toTrimmedStringOrNull(row?.label) ||
-      getTitleLabelByCode(code) ||
-      code;
+    const label = toTrimmedStringOrNull(row?.label) || code;
 
     out.push({
       code,
@@ -136,9 +139,7 @@ function buildIconVisualPayload(
   dbRow: StreakIconAssetRow | null
 ): IconVisualPayload {
   const variant = getIconVariant(roadmapCode);
-  if (!variant) {
-    throw new Error(`Unknown roadmap icon code: ${roadmapCode}`);
-  }
+  if (!variant) throw new Error(`Unknown roadmap icon code: ${roadmapCode}`);
 
   const dbWebp = toTrimmedStringOrNull(dbRow?.webp_path);
   const dbPng = toTrimmedStringOrNull(dbRow?.png_path);
@@ -148,7 +149,6 @@ function buildIconVisualPayload(
     candidatePaths.map((p) => supabase.storage.from(bucket).getPublicUrl(p).data.publicUrl)
   );
 
-  // Предпочитаем реальный path из DB, иначе roadmap fallback
   const preferredPath = dbWebp || dbPng || variant.webpPath || variant.pngPath || null;
   const publicUrl = preferredPath
     ? supabase.storage.from(bucket).getPublicUrl(preferredPath).data.publicUrl || null
@@ -180,24 +180,16 @@ export async function GET() {
   const { supabase, user } = auth;
   const bucket = process.env.NEXT_PUBLIC_STREAK_ICONS_BUCKET || STREAK_ICONS_BUCKET_DEFAULT;
 
-  // 1) Snapshot streak (источник истины)
+  // 1) Snapshot streak
   const { data: rpcData, error: rpcErr } = await supabase.rpc("get_my_streak_snapshot");
-  if (rpcErr) {
-    return fail(rpcErr.message, 500, "STREAK_SNAPSHOT_FAILED");
-  }
+  if (rpcErr) return fail(rpcErr.message, 500, "STREAK_SNAPSHOT_FAILED");
 
-  const normalizedSnapshot = normalizeRpcStreakSnapshot(
-    (rpcData ?? null) as Record<string, any> | null
-  );
+  const normalizedSnapshot = normalizeRpcStreakSnapshot((rpcData ?? null) as Record<string, any> | null);
   const streak = toCompatStreakSnapshotPayload(normalizedSnapshot);
 
-  // Разблокировка по рекорду (перманентно)
-  const longestForUnlocks = Math.max(
-    normalizedSnapshot.longestStreak,
-    normalizedSnapshot.displayLongestStreak
-  );
+  const longestForUnlocks = Math.max(normalizedSnapshot.longestStreak, normalizedSnapshot.displayLongestStreak);
 
-  // 2) Параллельно грузим профиль, ассеты иконок, каталог титулов
+  // 2) Параллельно: профиль, ассеты, каталог
   const [profileRes, assetsRes, titlesRes] = await Promise.all([
     supabase
       .from("profiles")
@@ -207,9 +199,7 @@ export async function GET() {
 
     supabase
       .from("streak_icon_assets")
-      .select(
-        "code,label,tier_code,webp_path,png_path,emoji_fallback,version,is_active,is_default_for_tier,sort_order,meta"
-      )
+      .select("code,label,tier_code,webp_path,png_path,emoji_fallback,version,is_active,is_default_for_tier,sort_order,meta")
       .eq("is_active", true)
       .order("sort_order", { ascending: true })
       .order("code", { ascending: true }),
@@ -231,18 +221,12 @@ export async function GET() {
   const titleCatalog = normalizeTitleCatalogRows((titlesRes.data ?? []) as StreakTitleCatalogRow[]);
 
   const profileSelectedDbCode =
-    typeof profileRes.data?.selected_streak_icon_code === "string"
-      ? profileRes.data.selected_streak_icon_code
-      : null;
+    typeof profileRes.data?.selected_streak_icon_code === "string" ? profileRes.data.selected_streak_icon_code : null;
 
   const profileSelectedTitleCode =
-    typeof profileRes.data?.selected_streak_title_code === "string"
-      ? profileRes.data.selected_streak_title_code
-      : null;
+    typeof profileRes.data?.selected_streak_title_code === "string" ? profileRes.data.selected_streak_title_code : null;
 
-  // -----------------------------
-  // ИКОНКИ
-  // -----------------------------
+  // ------------------ ICONS ------------------
   const unlockedIconCodes = getUnlockedIconCodesByLongest(longestForUnlocks);
 
   const selectedAssetRow = profileSelectedDbCode
@@ -250,14 +234,10 @@ export async function GET() {
     : null;
 
   const selectedIconCodeRaw =
-    (selectedAssetRow ? getRoadmapCodeFromDbIconAsset(selectedAssetRow) : null) ||
-    normalizeIconCode(profileSelectedDbCode);
+    (selectedAssetRow ? getRoadmapCodeFromDbIconAsset(selectedAssetRow) : null) || normalizeIconCode(profileSelectedDbCode);
 
-  // Если иконка в профиле больше невалидна/неразблокирована — в UI не считаем её выбранной
   const selectedIconCode =
-    selectedIconCodeRaw && unlockedIconCodes.includes(selectedIconCodeRaw)
-      ? selectedIconCodeRaw
-      : null;
+    selectedIconCodeRaw && unlockedIconCodes.includes(selectedIconCodeRaw) ? selectedIconCodeRaw : null;
 
   const effectiveIconCode = getResolvedSelectedIconCode(selectedIconCode, longestForUnlocks);
 
@@ -276,29 +256,19 @@ export async function GET() {
   const selectedIcon = selectedIconCode ? (iconByCode[selectedIconCode] ?? null) : null;
   const effectiveIcon = effectiveIconCode ? (iconByCode[effectiveIconCode] ?? null) : null;
 
-  // -----------------------------
-  // ТИТУЛЫ (новая схема: catalog + profiles.selected_streak_title_code)
-  // -----------------------------
+  // ------------------ TITLES ------------------
   const unlockedTitles = titleCatalog.filter((t) => t.unlockAt <= longestForUnlocks);
   const lockedTitles = titleCatalog.filter((t) => t.unlockAt > longestForUnlocks);
-
   const unlockedTitleCodes = unlockedTitles.map((t) => t.code);
 
   const selectedTitleRaw = profileSelectedTitleCode
     ? titleCatalog.find((t) => t.code === profileSelectedTitleCode) ?? null
     : null;
 
-  // если титул выбран в профиле, но недоступен по рекорду / выключен — не считаем выбранным
-  const selectedTitle =
-    selectedTitleRaw && selectedTitleRaw.unlockAt <= longestForUnlocks
-      ? selectedTitleRaw
-      : null;
-
-  // Фолбэк только для отображения (DB не трогаем)
+  const selectedTitle = selectedTitleRaw && selectedTitleRaw.unlockAt <= longestForUnlocks ? selectedTitleRaw : null;
   const effectiveTitle = selectedTitle ?? (unlockedTitles[unlockedTitles.length - 1] ?? null);
 
-  // Совместимость со старым UI-полем
-  // Важно: "equippedTitle" = реально выбранный (если есть), а не фолбэк
+  // Совместимость: “equippedTitle” = реально выбранный (без фолбэка)
   const equippedTitle = selectedTitle
     ? {
         titleCode: selectedTitle.code,
@@ -308,19 +278,16 @@ export async function GET() {
       }
     : null;
 
-  return ok({
+  const payload = {
     streak,
-
-    // старое поле (оставляем, чтобы ничего не сломать)
     equippedTitle,
 
-    // unlock info
     longestForUnlocks,
 
-    // ---------------- ИКОНКИ ----------------
+    // ICONS
     unlockedIconCodes,
-    selectedIconCode: selectedIconCode ?? null, // roadmap code (UI)
-    selectedIconDbCode: profileSelectedDbCode,  // реальный код в profiles
+    selectedIconCode: selectedIconCode ?? null,
+    selectedIconDbCode: profileSelectedDbCode,
     effectiveIconCode: effectiveIconCode ?? null,
     selectedIcon,
     effectiveIcon,
@@ -329,21 +296,25 @@ export async function GET() {
     appliedIconCode: (selectedIconCode ?? effectiveIconCode) ?? null,
     appliedIcon: selectedIcon ?? effectiveIcon ?? null,
 
-    // ---------------- ТИТУЛЫ ----------------
-    titleCatalog, // весь активный каталог (для UI без деплоя)
+    // TITLES
+    titleCatalog,
     unlockedTitles,
     lockedTitles,
     unlockedTitleCodes,
 
-    selectedTitleCode: selectedTitle?.code ?? null,         // валидный выбранный
-    selectedTitleDbCode: profileSelectedTitleCode ?? null,  // что лежит в profiles
-    effectiveTitleCode: effectiveTitle?.code ?? null,       // фолбэк для отображения
+    selectedTitleCode: selectedTitle?.code ?? null,
+    selectedTitleDbCode: profileSelectedTitleCode ?? null,
+    effectiveTitleCode: effectiveTitle?.code ?? null,
     selectedTitle,
     effectiveTitle,
     appliedTitleCode: selectedTitle?.code ?? effectiveTitle?.code ?? null,
     appliedTitle: selectedTitle ?? effectiveTitle ?? null,
 
-    // timestamp (помогает клиенту отсеивать устаревшие ответы)
     serverTs: new Date().toISOString(),
-  });
+  };
+
+  const res = ok(payload);
+  // важно: не даём браузеру/прокси кешировать
+  res.headers.set("Cache-Control", "no-store, max-age=0");
+  return res;
 }
