@@ -117,6 +117,20 @@ type SaveStreakTitleApiResponse = {
   } | null;
 };
 
+type CustomUpdateRetryAction =
+  | { type: "icon"; iconCode: string }
+  | { type: "title-select"; choice: TitlePickerChoice }
+  | { type: "title-clear" };
+
+type CustomUpdateDialogState = {
+  open: boolean;
+  mode: "loading" | "error";
+  scope: "icon" | "title";
+  title: string;
+  message: string;
+  retryAction: CustomUpdateRetryAction | null;
+};
+
 type Props = {
   userId: string;
   userEmail: string;
@@ -147,6 +161,17 @@ const STREAK_ICON_BUCKET =
   process.env.NEXT_PUBLIC_STREAK_ICONS_BUCKET ||
   process.env.NEXT_PUBLIC_STREAK_ICON_ASSETS_BUCKET ||
   "streak-icons";
+
+function getClosedCustomUpdateDialog(): CustomUpdateDialogState {
+  return {
+    open: false,
+    mode: "loading",
+    scope: "icon",
+    title: "",
+    message: "",
+    retryAction: null,
+  };
+}
 
 function regionLabel(region: string) {
   return region?.trim() ? region : "Не указана";
@@ -185,6 +210,32 @@ function pick(obj: Record<string, any>, keys: string[]) {
     if (obj[k] !== undefined) return obj[k];
   }
   return undefined;
+}
+
+function normalizeUiErrorMessage(error: unknown, fallback = "Произошла ошибка") {
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : error == null
+          ? ""
+          : String(error);
+
+  const msg = raw.trim();
+  if (!msg) return fallback;
+
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network request failed") ||
+    lower.includes("load failed")
+  ) {
+    return "Ошибка соединения с сервером";
+  }
+
+  return msg;
 }
 
 /**
@@ -480,6 +531,11 @@ export default function ProfileClient({
   // title modal
   const [titleModalOpen, setTitleModalOpen] = useState(false);
 
+  // окно обновления (иконка/титул)
+  const [customUpdateDialog, setCustomUpdateDialog] = useState<CustomUpdateDialogState>(
+    getClosedCustomUpdateDialog()
+  );
+
   // ленивый прогресс
   const [stats, setStats] = useState<Stats | null>(statsProp ?? null);
   const [materialsProgress, setMaterialsProgress] = useState<MaterialProgressItem[] | null>(
@@ -511,12 +567,48 @@ export default function ProfileClient({
   // флаг сохранения иконки
   const [savingStreakIcon, setSavingStreakIcon] = useState(false);
 
+  const isCustomizationUpdateLocked = customUpdateDialog.open || savingTitle || savingStreakIcon;
+
   function showNotification(text: string, type: "success" | "error" = "success") {
     setNotif({ type, text });
     setTimeout(() => setNotif(null), 4000);
   }
 
+  function openUpdateLoading(scope: "icon" | "title") {
+    setCustomUpdateDialog({
+      open: true,
+      mode: "loading",
+      scope,
+      title: scope === "icon" ? "Обновляем иконку" : "Обновляем титул",
+      message:
+        scope === "icon"
+          ? "Сохраняем выбранную иконку серии..."
+          : "Сохраняем выбранный титул...",
+      retryAction: null,
+    });
+  }
+
+  function showUpdateError(scope: "icon" | "title", error: unknown, retryAction: CustomUpdateRetryAction) {
+    setCustomUpdateDialog({
+      open: true,
+      mode: "error",
+      scope,
+      title: scope === "icon" ? "Ошибка обновления иконки" : "Ошибка обновления титула",
+      message: normalizeUiErrorMessage(error, "Ошибка соединения с сервером"),
+      retryAction,
+    });
+  }
+
+  function closeCustomUpdateDialog() {
+    setCustomUpdateDialog((prev) => {
+      if (!prev.open) return prev;
+      if (prev.mode === "loading") return prev; // во время загрузки не закрываем
+      return getClosedCustomUpdateDialog();
+    });
+  }
+
   function openStreakModal() {
+    if (customUpdateDialog.open) return;
     setStreakModalOpen(true);
   }
 
@@ -525,11 +617,31 @@ export default function ProfileClient({
   }
 
   function openTitleModal() {
+    if (customUpdateDialog.open) return;
     setTitleModalOpen(true);
   }
 
   function closeTitleModal() {
     setTitleModalOpen(false);
+  }
+
+  async function retryCustomUpdateDialogAction() {
+    const action = customUpdateDialog.retryAction;
+    if (!action) return;
+
+    if (action.type === "icon") {
+      await handleSelectStreakIcon(action.iconCode, { force: true });
+      return;
+    }
+
+    if (action.type === "title-select") {
+      await handleSelectTitle(action.choice, { force: true });
+      return;
+    }
+
+    if (action.type === "title-clear") {
+      await handleClearSelectedTitle({ force: true });
+    }
   }
 
   async function refreshStreakFromApi(options?: { silent?: boolean }) {
@@ -597,7 +709,7 @@ export default function ProfileClient({
       if (!silent) setStreakLoading(false);
     } catch (e: any) {
       if (!silent) setStreakLoading(false);
-      setStreakError(e?.message || String(e));
+      setStreakError(normalizeUiErrorMessage(e, "Не удалось загрузить стрик"));
     }
   }
 
@@ -654,7 +766,7 @@ export default function ProfileClient({
       } catch (e: any) {
         if (cancelled) return;
         setProgressLoading(false);
-        setProgressError(e?.message || String(e));
+        setProgressError(normalizeUiErrorMessage(e, "Не удалось загрузить прогресс"));
       }
     }
 
@@ -769,7 +881,7 @@ export default function ProfileClient({
       showNotification("✅ Профиль успешно обновлен!");
       closeEdit();
     } catch (e: any) {
-      showNotification("❌ Ошибка обновления профиля: " + (e?.message || String(e)), "error");
+      showNotification("❌ Ошибка обновления профиля: " + normalizeUiErrorMessage(e), "error");
     } finally {
       setSaving(false);
     }
@@ -783,7 +895,7 @@ export default function ProfileClient({
     }
   }
 
-  async function handleSelectStreakIcon(iconCodeRaw: string) {
+  async function handleSelectStreakIcon(iconCodeRaw: string, options?: { force?: boolean }) {
     const normalized = normalizeIconCode(iconCodeRaw);
 
     // защита от мусорного значения
@@ -793,12 +905,14 @@ export default function ProfileClient({
       return;
     }
 
-    if (savingStreakIcon) return;
+    if (!options?.force && (savingStreakIcon || savingTitle || customUpdateDialog.open)) return;
 
     const prevLocal = selectedStreakIconCodeLocal;
     const prevServer = selectedStreakIconCodeServer;
 
     try {
+      openUpdateLoading("icon");
+
       // оптимистично показываем сразу
       setSelectedStreakIconCodeLocal(normalized);
       setSavingStreakIcon(true);
@@ -831,24 +945,26 @@ export default function ProfileClient({
       // снимаем оптимистичное состояние
       setSelectedStreakIconCodeLocal(null);
 
-      showNotification("✅ Иконка серии сохранена");
+      setCustomUpdateDialog(getClosedCustomUpdateDialog());
+      showNotification("✅ Иконка серии успешно обновлена");
     } catch (e: any) {
       // откат
       setSelectedStreakIconCodeLocal(prevLocal);
       setSelectedStreakIconCodeServer(prevServer);
-      showNotification("❌ Не удалось сохранить выбор иконки: " + (e?.message || String(e)), "error");
+      showUpdateError("icon", e, { type: "icon", iconCode: normalized });
     } finally {
       setSavingStreakIcon(false);
     }
   }
 
-  async function handleSelectTitle(choice: TitlePickerChoice) {
-    if (savingTitle) return;
+  async function handleSelectTitle(choice: TitlePickerChoice, options?: { force?: boolean }) {
+    if (!options?.force && (savingTitle || savingStreakIcon || customUpdateDialog.open)) return;
 
     const prevCode = equippedTitleCodeState;
     const prevLabel = equippedTitleLabelState;
 
     try {
+      openUpdateLoading("title");
       setSavingTitle(true);
 
       // оптимистично показываем сразу
@@ -885,7 +1001,8 @@ export default function ProfileClient({
       setEquippedTitleCodeState(savedCode);
       setEquippedTitleLabelState(savedLabel);
 
-      showNotification("✅ Титул сохранён");
+      setCustomUpdateDialog(getClosedCustomUpdateDialog());
+      showNotification("✅ Титул успешно обновлён");
       closeTitleModal();
 
       // мягкая синхронизация (если сервер возвращает ещё что-то важное)
@@ -894,19 +1011,20 @@ export default function ProfileClient({
       // откат
       setEquippedTitleCodeState(prevCode);
       setEquippedTitleLabelState(prevLabel);
-      showNotification("❌ Не удалось сохранить выбор титула: " + (e?.message || String(e)), "error");
+      showUpdateError("title", e, { type: "title-select", choice });
     } finally {
       setSavingTitle(false);
     }
   }
 
-  async function handleClearSelectedTitle() {
-    if (savingTitle) return;
+  async function handleClearSelectedTitle(options?: { force?: boolean }) {
+    if (!options?.force && (savingTitle || savingStreakIcon || customUpdateDialog.open)) return;
 
     const prevCode = equippedTitleCodeState;
     const prevLabel = equippedTitleLabelState;
 
     try {
+      openUpdateLoading("title");
       setSavingTitle(true);
 
       // оптимистично очищаем
@@ -935,7 +1053,8 @@ export default function ProfileClient({
       setEquippedTitleCodeState(null);
       setEquippedTitleLabelState(null);
 
-      showNotification("✅ Титул сброшен");
+      setCustomUpdateDialog(getClosedCustomUpdateDialog());
+      showNotification("✅ Титул успешно сброшен");
       closeTitleModal();
 
       void refreshStreakFromApi({ silent: true });
@@ -943,7 +1062,7 @@ export default function ProfileClient({
       // откат
       setEquippedTitleCodeState(prevCode);
       setEquippedTitleLabelState(prevLabel);
-      showNotification("❌ Не удалось сбросить титул: " + (e?.message || String(e)), "error");
+      showUpdateError("title", e, { type: "title-clear" });
     } finally {
       setSavingTitle(false);
     }
@@ -1006,6 +1125,14 @@ export default function ProfileClient({
   const avatarEmojiFallback = selectedIconVariant?.emoji || streakUi.icon || "✨";
   const chipEmojiFallback = selectedIconVariant?.emoji || streakUi.icon || "✨";
   const badgeEmojiFallback = selectedIconVariant?.emoji || streakUi.icon || "✨";
+
+  const titleSavingNow =
+    customUpdateDialog.open &&
+    customUpdateDialog.scope === "title" &&
+    customUpdateDialog.mode === "loading";
+
+  const titleUpdateDialogOpen = customUpdateDialog.open && customUpdateDialog.scope === "title";
+  const iconUpdateDialogOpen = customUpdateDialog.open && customUpdateDialog.scope === "icon";
 
   return (
     <div
@@ -1110,9 +1237,15 @@ export default function ProfileClient({
         longestStreak={longestStreakDisplay}
         currentTitleCode={effectiveTitleCodeForUi}
         currentTitleLabel={effectiveTitleLabelForUi}
-        onSelectTitle={(choice) => void handleSelectTitle(choice)}
-        onClearLocalTitle={() => void handleClearSelectedTitle()}
-        loading={streakLoading || savingTitle}
+        onSelectTitle={(choice) => {
+          if (isCustomizationUpdateLocked) return;
+          void handleSelectTitle(choice);
+        }}
+        onClearLocalTitle={() => {
+          if (isCustomizationUpdateLocked) return;
+          void handleClearSelectedTitle();
+        }}
+        loading={streakLoading || titleSavingNow}
       />
 
       {/* ✅ Модалка дорожки стрика */}
@@ -1125,8 +1258,94 @@ export default function ProfileClient({
         equippedTitleLabel={effectiveTitleLabelForUi}
         unlockedIconCodes={unlockedIconCodesByLongest}
         selectedIconCode={effectiveSelectedStreakIconCode}
-        onSelectIconCode={savingStreakIcon ? undefined : handleSelectStreakIcon}
+        onSelectIconCode={isCustomizationUpdateLocked ? undefined : handleSelectStreakIcon}
       />
+
+      {/* ✅ Общее окно обновления иконки/титула */}
+      <Modal
+        open={customUpdateDialog.open}
+        onClose={closeCustomUpdateDialog}
+        title={customUpdateDialog.title || "Обновление"}
+        maxWidth={460}
+      >
+        <div style={{ display: "grid", gap: 14 }}>
+          {customUpdateDialog.mode === "loading" ? (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "6px 2px",
+                  fontWeight: 800,
+                  color: "#324a5f",
+                }}
+              >
+                <span className="spinner" />
+                <span>{customUpdateDialog.message || "Обновляем..."}</span>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.4,
+                  color: "rgba(50,74,95,0.78)",
+                  background: "rgba(255,255,255,0.55)",
+                  borderRadius: 12,
+                  padding: "10px 12px",
+                }}
+              >
+                Пожалуйста, дождитесь завершения. Пока окно открыто, выбор новой иконки/титула временно заблокирован.
+              </div>
+
+              <div className="modal-actions" style={{ justifyContent: "flex-end" }}>
+                <button type="button" className="btn secondary" disabled>
+                  ⏳ Обновление...
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  background: "rgba(244,67,54,0.08)",
+                  border: "1px solid rgba(244,67,54,0.18)",
+                  borderRadius: 14,
+                  padding: "12px 14px",
+                }}
+              >
+                <span style={{ fontSize: 20, lineHeight: 1 }}>❌</span>
+                <div style={{ display: "grid", gap: 4 }}>
+                  <div style={{ fontWeight: 900, color: "#b71c1c" }}>Не удалось обновить</div>
+                  <div style={{ color: "#7f1d1d", fontWeight: 700, lineHeight: 1.35 }}>
+                    {customUpdateDialog.message || "Ошибка соединения с сервером"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={closeCustomUpdateDialog}
+                >
+                  ✖ Закрыть
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => void retryCustomUpdateDialogAction()}
+                >
+                  🔄 Повторить
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
 
       <div className="container">
         {/* ===== Topbar ===== */}
@@ -1240,7 +1459,8 @@ export default function ProfileClient({
                   all: "unset",
                   width: "100%",
                   display: "block",
-                  cursor: "pointer",
+                  cursor: customUpdateDialog.open ? "not-allowed" : "pointer",
+                  opacity: customUpdateDialog.open && !titleUpdateDialogOpen ? 0.88 : 1,
                 }}
               >
                 <div
@@ -1295,7 +1515,7 @@ export default function ProfileClient({
                       lineHeight: 1,
                     }}
                   >
-                    {savingTitle ? "⏳" : "✨"}
+                    {titleSavingNow ? "⏳" : "✨"}
                   </span>
                 </div>
               </button>
