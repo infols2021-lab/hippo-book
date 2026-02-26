@@ -18,7 +18,26 @@ body {
   padding: 0;
   min-height: 100vh;
 
-  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  /* ✅ НОВЫЕ ШРИФТЫ (читабельно на мобиле и ПК) */
+  font-family:
+    "Inter",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    "Noto Sans",
+    "Helvetica Neue",
+    sans-serif;
+
+  font-size: 16px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 
   /* ✅ текст ещё темнее */
   color: #07172e;
@@ -44,6 +63,28 @@ body {
   pointer-events: none;
   background: radial-gradient(900px 520px at 50% 35%, rgba(0, 0, 0, 0.008), transparent 64%);
   z-index: 0;
+}
+
+/* ✅ анти-слипание мелкого текста */
+.brand-subtitle,
+.streak-chip-sub,
+.profile-email,
+.mini-cap,
+.mini-stat-label,
+.progress-sub,
+.info-li,
+.section-title,
+.streak-summary-key {
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+
+/* ✅ основной текст — мягче трекинг */
+.progress-title,
+.mini-val,
+.brand-title,
+.profile-name {
+  letter-spacing: 0.005em;
 }
 
 /* ===== Container ===== */
@@ -1377,5 +1418,17 @@ body {
 
   .avatar-icon-bg {
     inset: 20px;
+  }
+
+  /* ✅ на очень узких — чуть крупнее мелкие подписи */
+  @media (max-width: 420px) {
+    .brand-subtitle,
+    .mini-cap,
+    .mini-stat-label,
+    .progress-sub,
+    .info-li,
+    .streak-chip-sub {
+      font-size: 12.5px;
+    }
   }
 }
