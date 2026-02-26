@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import * as Roadmap from "@/lib/streaks/roadmap";
 
 type StreakSnapshotLike =
@@ -61,6 +62,62 @@ type Props = {
   selectedIconCode?: string | null;
   onSelectIconCode?: (code: string) => void;
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Roadmap background (Storage)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ROADMAP_BG_BUCKET =
+  process.env.NEXT_PUBLIC_STREAK_ROADMAP_BG_BUCKET ||
+  process.env.NEXT_PUBLIC_STREAK_ROADMAP_BG_BUCKET_NAME ||
+  "streak-roadmap-bg";
+
+const ROADMAP_BG_WEBP_PATH = "v1/defaults/roadmap-bg(1).webp";
+const ROADMAP_BG_PNG_PATH = "v1/defaults/roadmap-bg(1).png";
+
+// simple module cache so we don't re-probe every open
+let ROADMAP_BG_CACHED_URL: string | null | undefined = undefined; // undefined = not tried, null = tried but failed, string = ok
+
+function tryLoadImage(url: string) {
+  return new Promise<boolean>((resolve) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+    // just in case browser already has it cached:
+    if (img.complete && img.naturalWidth > 0) resolve(true);
+  });
+}
+
+async function resolveRoadmapBgUrl(): Promise<string | null> {
+  if (ROADMAP_BG_CACHED_URL !== undefined) return ROADMAP_BG_CACHED_URL ?? null;
+
+  const supabase = getSupabaseBrowserClient();
+
+  const webp = supabase.storage.from(ROADMAP_BG_BUCKET).getPublicUrl(ROADMAP_BG_WEBP_PATH).data.publicUrl || "";
+  const png = supabase.storage.from(ROADMAP_BG_BUCKET).getPublicUrl(ROADMAP_BG_PNG_PATH).data.publicUrl || "";
+
+  // Try webp first, then png
+  if (webp) {
+    const ok = await tryLoadImage(webp);
+    if (ok) {
+      ROADMAP_BG_CACHED_URL = webp;
+      return webp;
+    }
+  }
+
+  if (png) {
+    const ok = await tryLoadImage(png);
+    if (ok) {
+      ROADMAP_BG_CACHED_URL = png;
+      return png;
+    }
+  }
+
+  ROADMAP_BG_CACHED_URL = null;
+  return null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // utils
@@ -434,9 +491,23 @@ export default function StreakRoadmapModal({
   const [dbIconsRaw, setDbIconsRaw] = useState<any[] | null>(null);
   const [dbTitlesRaw, setDbTitlesRaw] = useState<any[] | null>(null);
 
+  // ✅ Roadmap background url (null => fallback to default css)
+  const [roadmapBgUrl, setRoadmapBgUrl] = useState<string | null>(null);
+
   useEffect(() => {
     let alive = true;
     if (!open) return;
+
+    // background load (silent)
+    resolveRoadmapBgUrl()
+      .then((url) => {
+        if (!alive) return;
+        setRoadmapBgUrl(url);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setRoadmapBgUrl(null);
+      });
 
     setDbError(null);
     setDbLoading(true);
@@ -479,9 +550,7 @@ export default function StreakRoadmapModal({
 
     // ✅ больше НЕ режем иконки по dbCode (теперь оно всегда есть)
     return {
-      icons: dedupeByDayKeepFirst(
-        iconsDb.sort((a, b) => a.day - b.day || a.label.localeCompare(b.label, "ru"))
-      ),
+      icons: dedupeByDayKeepFirst(iconsDb.sort((a, b) => a.day - b.day || a.label.localeCompare(b.label, "ru"))),
       titles: titlesDb.sort((a, b) => a.day - b.day || a.label.localeCompare(b.label, "ru")),
     };
   }, [dbIconsRaw, dbTitlesRaw]);
@@ -528,12 +597,12 @@ export default function StreakRoadmapModal({
     return { ...next, left: Math.max(0, next.day - currentStreak) };
   }, [mergedRoadmap, longestStreak, currentStreak]);
 
-  const lineProgressPercent = useMemo(
-    () => computeRailProgressPercent(currentStreak, roadmapRows),
-    [currentStreak, roadmapRows]
-  );
+  const lineProgressPercent = useMemo(() => computeRailProgressPercent(currentStreak, roadmapRows), [currentStreak, roadmapRows]);
 
   const showAnyError = error || dbError;
+
+  // ✅ CSS var for background: if null => keep default gradients only
+  const roadmapBgCss = roadmapBgUrl ? `url('${roadmapBgUrl}')` : "none";
 
   return (
     <Modal open={open} onClose={onClose} title="🔥 Дорожка серии" maxWidth={1180}>
@@ -619,9 +688,7 @@ export default function StreakRoadmapModal({
           <div className="srm-panel-header">
             <div>
               <div className="srm-panel-title">Иконки серии</div>
-              <div className="srm-panel-subtitle">
-                Дни/названия берутся из БД. Отключённые/удалённые иконки не показываются.
-              </div>
+              <div className="srm-panel-subtitle">Дни/названия берутся из БД. Отключённые/удалённые иконки не показываются.</div>
             </div>
           </div>
 
@@ -645,11 +712,7 @@ export default function StreakRoadmapModal({
                 <button
                   key={`icon-${selectCode}-${m.day}`}
                   type="button"
-                  className={[
-                    "srm-icon-tile",
-                    unlocked ? "is-unlocked" : "is-locked",
-                    selected ? "is-selected" : "",
-                  ]
+                  className={["srm-icon-tile", unlocked ? "is-unlocked" : "is-locked", selected ? "is-selected" : ""]
                     .filter(Boolean)
                     .join(" ")}
                   onClick={() => {
@@ -669,9 +732,7 @@ export default function StreakRoadmapModal({
                   <div className="srm-icon-title">{m.label}</div>
                   <div className="srm-icon-day">{m.day}д</div>
 
-                  <div className="srm-icon-meta">
-                    {selected ? "Выбрано" : unlocked ? "Разблокировано" : "Заблокировано"}
-                  </div>
+                  <div className="srm-icon-meta">{selected ? "Выбрано" : unlocked ? "Разблокировано" : "Заблокировано"}</div>
                 </button>
               );
             })}
@@ -706,7 +767,7 @@ export default function StreakRoadmapModal({
             Дни/названия — из БД.
           </div>
 
-          <div className="srm-roadmap-wrap">
+          <div className="srm-roadmap-wrap" style={{ ["--srm-roadmap-bg" as any]: roadmapBgCss }}>
             <div className="srm-center-rail" aria-hidden="true">
               <div className="srm-center-rail-track" />
               <div className="srm-center-rail-progress" style={{ height: `${lineProgressPercent}%` }} />
@@ -752,9 +813,7 @@ export default function StreakRoadmapModal({
                     </div>
 
                     <div className="srm-road-center">
-                      <div className={`srm-node ${rowReachedByCurrent ? "is-reached" : ""} ${isCurrentTarget ? "is-next" : ""}`}>
-                        {nodeEmoji}
-                      </div>
+                      <div className={`srm-node ${rowReachedByCurrent ? "is-reached" : ""} ${isCurrentTarget ? "is-next" : ""}`}>{nodeEmoji}</div>
                       <div className="srm-node-day">{row.day}д</div>
                     </div>
 
@@ -797,7 +856,7 @@ export default function StreakRoadmapModal({
         </section>
       </div>
 
-      {/* styles unchanged */}
+      {/* styles unchanged (plus bg layer) */}
       <style jsx>{`
         .streak-roadmap-modal {
           display: flex;
@@ -1094,18 +1153,26 @@ export default function StreakRoadmapModal({
           font-weight: 700;
           color: rgba(53,96,122,0.72);
         }
+
+        /* ✅ background: if --srm-roadmap-bg is "none" => only default gradients stay */
         .srm-roadmap-wrap {
           position: relative;
           margin-top: 14px;
-          background:
+          background-image:
+            var(--srm-roadmap-bg, none),
             radial-gradient(circle at 20% 0%, rgba(135, 206, 235, 0.08), transparent 40%),
             radial-gradient(circle at 80% 0%, rgba(161, 193, 255, 0.08), transparent 42%),
             linear-gradient(180deg, rgba(248,252,255,0.86), rgba(243,250,255,0.9));
+          background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+          background-position: center, center, center, center;
+          background-size: 1024px 1024px, cover, cover, cover;
+
           border: 1px solid rgba(136,170,196,0.14);
           border-radius: 22px;
           padding: 18px 14px;
           overflow: hidden;
         }
+
         .srm-center-rail {
           position: absolute;
           left: 50%;
@@ -1308,7 +1375,7 @@ export default function StreakRoadmapModal({
         @media (max-width: 900px) {
           .srm-top-grid { grid-template-columns: 1fr; }
           .srm-icons-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-          .srm-roadmap-wrap { padding-left: 10px; padding-right: 10px; }
+          .srm-roadmap-wrap { padding-left: 10px; padding-right: 10px; background-size: 820px 820px, cover, cover, cover; }
           .srm-road-row {
             grid-template-columns: 1fr;
             gap: 8px;
@@ -1332,6 +1399,7 @@ export default function StreakRoadmapModal({
           .srm-next-card { grid-template-columns: 1fr; align-items: start; }
           .srm-next-badge { justify-self: start; }
           .srm-road-card-top { flex-wrap: wrap; }
+          .srm-roadmap-wrap { background-size: 700px 700px, cover, cover, cover; }
         }
       `}</style>
     </Modal>
