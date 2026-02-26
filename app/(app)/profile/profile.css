@@ -5,7 +5,7 @@ html,
 body {
   margin: 0 !important;
   padding: 0 !important;
-  background: #eaf7ff;
+  background: #c9efff; /* ультра ярче база */
 }
 
 body {
@@ -19,26 +19,30 @@ body {
   min-height: 100vh;
 
   font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  color: #1f2937;
 
-  background-color: #eaf7ff;
+  /* ✅ текст ещё темнее */
+  color: #07172e;
+
+  /* ✅ фон ярче и насыщеннее */
+  background-color: #c9efff;
   background-image:
     var(--profile-overlay, none),
-    radial-gradient(1200px 700px at 15% 10%, rgba(78, 205, 196, 0.18), transparent 60%),
-    radial-gradient(1100px 700px at 85% 20%, rgba(110, 190, 255, 0.22), transparent 62%),
-    linear-gradient(180deg, #f5fbff 0%, #d7eefc 58%, #f0fbff 100%);
+    radial-gradient(1200px 720px at 14% 10%, rgba(0, 180, 255, 0.42), transparent 60%),
+    radial-gradient(1100px 740px at 86% 18%, rgba(0, 255, 205, 0.34), transparent 62%),
+    linear-gradient(180deg, #f9feff 0%, #bfe6ff 54%, #e9fbff 100%);
   background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
   background-position: center, center, center, center;
   background-size: cover, cover, cover, cover;
   background-attachment: fixed, fixed, fixed, fixed;
 }
 
+/* ✅ почти убрали “вуаль” */
 #profileBody::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(900px 520px at 50% 35%, rgba(0, 0, 0, 0.03), transparent 60%);
+  background: radial-gradient(900px 520px at 50% 35%, rgba(0, 0, 0, 0.008), transparent 64%);
   z-index: 0;
 }
 
@@ -60,10 +64,15 @@ body {
 
   padding: 14px 16px;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow: 0 18px 55px rgba(15, 65, 95, 0.18);
-  backdrop-filter: blur(12px);
+
+  /* ✅ больше “чистого белого”, меньше тумана */
+  background: rgba(255, 255, 255, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 55px rgba(6, 30, 58, 0.14);
+
+  /* ✅ меньше blur => чётче */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .brand {
@@ -83,21 +92,23 @@ body {
   font-weight: 900;
   letter-spacing: 0.5px;
   color: white;
-  background: linear-gradient(135deg, rgba(110, 190, 255, 0.95), rgba(78, 205, 196, 0.95));
-  box-shadow: 0 12px 28px rgba(78, 205, 196, 0.2);
+
+  /* ✅ ещё более сочный градиент */
+  background: linear-gradient(135deg, rgba(20, 140, 255, 0.99), rgba(0, 235, 200, 0.99));
+  box-shadow: 0 14px 34px rgba(0, 235, 200, 0.24);
 }
 
 .brand-title {
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 1000;
   line-height: 1.1;
-  color: #2c3e50;
+  color: #07172e;
 }
 
 .brand-subtitle {
   font-size: 12px;
-  font-weight: 700;
-  color: rgba(44, 62, 80, 0.55);
+  font-weight: 900;
+  color: rgba(7, 23, 46, 0.62);
   margin-top: 2px;
 }
 
@@ -119,11 +130,11 @@ body {
   border: 0;
   cursor: pointer;
 
-  font-weight: 800;
+  font-weight: 1000;
   font-size: 14px;
   color: white;
 
-  box-shadow: 0 14px 30px rgba(15, 65, 95, 0.15);
+  box-shadow: 0 14px 30px rgba(6, 30, 58, 0.14);
   transition: transform 0.12s ease, filter 0.12s ease;
   user-select: none;
   text-decoration: none;
@@ -132,7 +143,7 @@ body {
 
 .nav-pill:hover {
   transform: translateY(-2px);
-  filter: brightness(1.03);
+  filter: brightness(1.07);
 }
 
 .nav-pill:active {
@@ -141,15 +152,15 @@ body {
 }
 
 .nav-pill--info {
-  background: linear-gradient(135deg, rgba(110, 190, 255, 0.95), rgba(130, 205, 255, 0.95));
+  background: linear-gradient(135deg, rgba(25, 145, 255, 0.99), rgba(110, 215, 255, 0.99));
 }
 
 .nav-pill--materials {
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.95), rgba(110, 220, 200, 0.95));
+  background: linear-gradient(135deg, rgba(0, 235, 200, 0.99), rgba(60, 255, 230, 0.99));
 }
 
 .nav-pill--logout {
-  background: linear-gradient(135deg, rgba(255, 107, 107, 0.95), rgba(255, 140, 140, 0.95));
+  background: linear-gradient(135deg, rgba(255, 70, 70, 0.99), rgba(255, 140, 140, 0.99));
 }
 
 /* ===== Streak chip in topbar (larger + clickable) ===== */
@@ -170,6 +181,7 @@ body {
   box-shadow: 0 14px 30px rgba(15, 65, 95, 0.14);
   user-select: none;
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .streak-chip--button {
@@ -308,19 +320,23 @@ body {
 
 .panel {
   border-radius: 26px;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow: 0 20px 60px rgba(15, 65, 95, 0.18);
-  backdrop-filter: blur(14px);
+
+  /* ✅ ещё менее “молочное” стекло */
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.97);
+  box-shadow: 0 22px 70px rgba(6, 30, 58, 0.14);
+
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   padding: 16px;
 }
 
 /* ===== Left profile panel ===== */
 .profile-card {
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(110, 190, 255, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow: inset 0 0 0 1px rgba(25, 145, 255, 0.10);
   padding: 18px 16px 16px;
   text-align: center;
 }
@@ -334,74 +350,68 @@ body {
   background: linear-gradient(180deg, rgba(110, 190, 255, 0.25), rgba(78, 205, 196, 0.18));
   display: grid;
   place-items: center;
-  box-shadow: 0 20px 50px rgba(15, 65, 95, 0.12);
-  border: 8px solid rgba(255, 255, 255, 0.88);
+  box-shadow: 0 22px 60px rgba(6, 30, 58, 0.12);
+  border: 8px solid rgba(255, 255, 255, 0.95);
 }
 
 /* ─────────────────────────────────────────────────────────────
    Avatar outer circle theming by tier
-   (нужны классы avatar-circle--bronze/gold/diamond/legendary на div)
    ───────────────────────────────────────────────────────────── */
-/* none — дефолт (ничего не переопределяем) */
 .avatar-circle--none {
   background: inherit;
 }
 
-/* бронза */
 .avatar-circle.avatar-circle--bronze {
   background: radial-gradient(
     circle at 35% 30%,
-    rgba(255, 232, 204, 0.55),
-    rgba(184, 115, 51, 0.22) 55%,
-    rgba(224, 169, 109, 0.18) 100%
+    rgba(255, 232, 204, 0.58),
+    rgba(184, 115, 51, 0.24) 55%,
+    rgba(224, 169, 109, 0.20) 100%
   );
   box-shadow:
-    0 22px 52px rgba(184, 115, 51, 0.16),
+    0 24px 62px rgba(184, 115, 51, 0.16),
     0 0 0 6px rgba(224, 169, 109, 0.10);
 }
 
-/* золото */
 .avatar-circle.avatar-circle--gold {
   background: radial-gradient(
     circle at 35% 30%,
-    rgba(255, 246, 214, 0.55),
-    rgba(245, 158, 11, 0.24) 55%,
-    rgba(255, 215, 102, 0.18) 100%
+    rgba(255, 246, 214, 0.60),
+    rgba(245, 158, 11, 0.26) 55%,
+    rgba(255, 215, 102, 0.20) 100%
   );
   box-shadow:
-    0 22px 52px rgba(245, 158, 11, 0.16),
+    0 24px 62px rgba(245, 158, 11, 0.16),
     0 0 0 6px rgba(255, 215, 102, 0.12);
 }
 
-/* алмаз — glow */
 .avatar-circle.avatar-circle--diamond {
   background: radial-gradient(
     circle at 35% 30%,
-    rgba(219, 255, 255, 0.55),
-    rgba(6, 182, 212, 0.22) 50%,
-    rgba(59, 130, 246, 0.18) 100%
+    rgba(219, 255, 255, 0.60),
+    rgba(6, 182, 212, 0.24) 50%,
+    rgba(59, 130, 246, 0.20) 100%
   );
   box-shadow:
-    0 22px 58px rgba(59, 130, 246, 0.18),
+    0 24px 68px rgba(59, 130, 246, 0.18),
     0 0 0 6px rgba(6, 182, 212, 0.14),
-    0 0 46px rgba(59, 130, 246, 0.16);
+    0 0 50px rgba(59, 130, 246, 0.16);
 }
 
-/* легендарный — rainbow */
 .avatar-circle.avatar-circle--legendary {
   background: linear-gradient(
     135deg,
-    rgba(124, 58, 237, 0.30),
-    rgba(37, 99, 235, 0.26),
-    rgba(6, 182, 212, 0.22),
-    rgba(236, 72, 153, 0.26)
+    rgba(124, 58, 237, 0.32),
+    rgba(37, 99, 235, 0.28),
+    rgba(6, 182, 212, 0.24),
+    rgba(236, 72, 153, 0.28)
   );
   background-size: 220% 220%;
   animation: legendaryShift 6s ease-in-out infinite;
   box-shadow:
-    0 22px 62px rgba(124, 58, 237, 0.18),
+    0 26px 74px rgba(124, 58, 237, 0.18),
     0 0 0 6px rgba(6, 182, 212, 0.14),
-    0 0 54px rgba(236, 72, 153, 0.14);
+    0 0 58px rgba(236, 72, 153, 0.14);
 }
 
 .avatar-inner {
@@ -411,12 +421,12 @@ body {
   background: radial-gradient(
     circle at 40% 30%,
     #ffffff 0%,
-    rgba(255, 255, 255, 0.75) 65%,
-    rgba(255, 255, 255, 0.65) 100%
+    rgba(255, 255, 255, 0.90) 65%,
+    rgba(255, 255, 255, 0.84) 100%
   );
   display: grid;
   place-items: center;
-  border: 1px solid rgba(110, 190, 255, 0.2);
+  border: 1px solid rgba(25, 145, 255, 0.16);
   position: relative;
 }
 
@@ -424,13 +434,9 @@ body {
   width: 100%;
   height: 100%;
   display: grid;
-
-  /* ✅ ВАЖНО: растягиваем контент, чтобы img не схлопывался */
   place-items: stretch;
-
   position: relative;
   user-select: none;
-
   border-radius: 999px;
   overflow: hidden;
   isolation: isolate;
@@ -442,18 +448,18 @@ body {
   border-radius: 999px;
   background: radial-gradient(
     circle at 32% 28%,
-    rgba(255, 255, 255, 0.95),
-    rgba(236, 246, 255, 0.7) 55%,
-    rgba(212, 232, 247, 0.45) 100%
+    rgba(255, 255, 255, 0.98),
+    rgba(225, 250, 255, 0.78) 55%,
+    rgba(190, 235, 255, 0.56) 100%
   );
-  filter: blur(0.2px);
+  filter: blur(0.12px);
   z-index: 0;
 }
 
 .profile-name {
   font-size: 24px;
-  font-weight: 900;
-  color: #2c3e50;
+  font-weight: 1000;
+  color: #07172e;
   margin-top: 8px;
 }
 
@@ -470,9 +476,9 @@ body {
 
   padding: 7px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(110, 190, 255, 0.18);
-  box-shadow: 0 10px 24px rgba(15, 65, 95, 0.08);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(25, 145, 255, 0.22);
+  box-shadow: 0 10px 24px rgba(6, 30, 58, 0.06);
 }
 
 .profile-title-slot-icon {
@@ -481,7 +487,7 @@ body {
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: rgba(110, 190, 255, 0.16);
+  background: rgba(25, 145, 255, 0.16);
   font-size: 11px;
   flex: 0 0 auto;
 }
@@ -490,7 +496,7 @@ body {
   min-width: 0;
   font-size: 12px;
   font-weight: 900;
-  color: rgba(44, 62, 80, 0.72);
+  color: rgba(7, 23, 46, 0.82);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -499,8 +505,8 @@ body {
 .profile-email {
   margin-top: 6px;
   font-size: 13px;
-  font-weight: 700;
-  color: rgba(44, 62, 80, 0.55);
+  font-weight: 900;
+  color: rgba(7, 23, 46, 0.60);
 }
 
 /* ===== Generic visual renderer for streak icon (image -> emoji fallback) ===== */
@@ -537,14 +543,10 @@ body {
   z-index: 1;
   width: 100%;
   height: 100%;
-
   border-radius: 999px;
   overflow: hidden;
-
   display: grid;
   place-items: center;
-
-  /* ✅ если родитель grid центрирует — всё равно растягиваемся */
   justify-self: stretch;
   align-self: stretch;
 }
@@ -555,13 +557,10 @@ body {
   height: 100%;
   box-sizing: border-box;
   padding: 8%;
-
   object-fit: contain;
   object-position: center center;
-
   max-width: none;
   max-height: none;
-
   filter: drop-shadow(0 10px 28px rgba(45, 80, 120, 0.18));
   transform: none;
 }
@@ -657,7 +656,7 @@ body {
 }
 
 .streak-mini-badge:focus-visible {
-  outline: 3px solid rgba(110, 190, 255, 0.45);
+  outline: 3px solid rgba(25, 145, 255, 0.45);
   outline-offset: 2px;
 }
 
@@ -730,15 +729,15 @@ body {
   grid-template-columns: 1fr 1px 1fr;
   align-items: stretch;
 
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.98);
   border-radius: 16px;
-  box-shadow: 0 14px 30px rgba(15, 65, 95, 0.1);
+  box-shadow: 0 14px 30px rgba(6, 30, 58, 0.08);
   overflow: hidden;
 }
 
 .profile-mini-divider {
-  background: rgba(44, 62, 80, 0.08);
+  background: rgba(7, 23, 46, 0.10);
 }
 
 .mini-col {
@@ -754,16 +753,16 @@ body {
   align-items: center;
 
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 1000;
   letter-spacing: 0.6px;
-  color: rgba(44, 62, 80, 0.5);
+  color: rgba(7, 23, 46, 0.56);
   text-transform: uppercase;
 }
 
 .mini-val {
   font-size: 15px;
-  font-weight: 900;
-  color: #2c3e50;
+  font-weight: 1000;
+  color: #07172e;
 }
 
 .mini-ico {
@@ -772,8 +771,8 @@ body {
   display: inline-grid;
   place-items: center;
   border-radius: 6px;
-  background: rgba(110, 190, 255, 0.18);
-  color: rgba(44, 62, 80, 0.78);
+  background: rgba(25, 145, 255, 0.18);
+  color: rgba(7, 23, 46, 0.86);
 }
 
 /* Pills */
@@ -791,20 +790,20 @@ body {
   border-radius: 18px;
   border: 0;
 
-  font-weight: 900;
+  font-weight: 1000;
   font-size: 14px;
   color: white;
 
-  box-shadow: 0 16px 32px rgba(15, 65, 95, 0.12);
+  box-shadow: 0 16px 32px rgba(6, 30, 58, 0.12);
   user-select: none;
 }
 
 .pill--teal {
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.95), rgba(110, 190, 255, 0.9));
+  background: linear-gradient(135deg, rgba(0, 235, 200, 0.99), rgba(25, 145, 255, 0.99));
 }
 
 .pill--red {
-  background: linear-gradient(135deg, rgba(255, 107, 107, 0.95), rgba(255, 160, 160, 0.92));
+  background: linear-gradient(135deg, rgba(255, 70, 70, 0.99), rgba(255, 150, 150, 0.98));
 }
 
 .pill-icon {
@@ -824,9 +823,9 @@ body {
   padding: 8px 10px;
 
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 14px 30px rgba(15, 65, 95, 0.09);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow: 0 14px 30px rgba(6, 30, 58, 0.06);
 }
 
 .streak-summary-row {
@@ -839,7 +838,7 @@ body {
 .streak-summary-row + .streak-summary-row {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid rgba(44, 62, 80, 0.08);
+  border-top: 1px solid rgba(7, 23, 46, 0.10);
 }
 
 .streak-summary-row--button {
@@ -855,7 +854,7 @@ body {
 }
 
 .streak-summary-row--button:hover {
-  background: rgba(110, 190, 255, 0.08);
+  background: rgba(25, 145, 255, 0.12);
 }
 
 .streak-summary-row--button:active {
@@ -863,20 +862,20 @@ body {
 }
 
 .streak-summary-row--button:focus-visible {
-  outline: 2px solid rgba(110, 190, 255, 0.35);
+  outline: 2px solid rgba(25, 145, 255, 0.45);
   outline-offset: 2px;
 }
 
 .streak-summary-key {
   font-size: 12px;
-  font-weight: 900;
-  color: rgba(44, 62, 80, 0.62);
+  font-weight: 1000;
+  color: rgba(7, 23, 46, 0.70);
 }
 
 .streak-summary-value {
   font-size: 13px;
   font-weight: 1000;
-  color: rgba(44, 62, 80, 0.86);
+  color: rgba(7, 23, 46, 0.94);
   white-space: nowrap;
 }
 
@@ -895,7 +894,7 @@ body {
   border-radius: 18px;
   border: 0;
 
-  font-weight: 900;
+  font-weight: 1000;
   font-size: 14px;
   cursor: pointer;
 
@@ -906,7 +905,7 @@ body {
 
 .action-btn:hover {
   transform: translateY(-2px);
-  filter: brightness(1.02);
+  filter: brightness(1.04);
 }
 
 .action-btn:active {
@@ -916,29 +915,29 @@ body {
 
 .action-btn--primary {
   color: white;
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.95), rgba(110, 190, 255, 0.9));
-  box-shadow: 0 18px 40px rgba(78, 205, 196, 0.18);
+  background: linear-gradient(135deg, rgba(0, 235, 200, 0.99), rgba(25, 145, 255, 0.99));
+  box-shadow: 0 18px 40px rgba(0, 235, 200, 0.16);
 }
 
 .action-btn--soft {
-  color: rgba(44, 62, 80, 0.85);
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(110, 190, 255, 0.22);
-  box-shadow: 0 16px 30px rgba(15, 65, 95, 0.1);
+  color: rgba(7, 23, 46, 0.95);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(25, 145, 255, 0.22);
+  box-shadow: 0 16px 30px rgba(6, 30, 58, 0.06);
 }
 
 .action-btn--dangerSoft {
   color: white;
-  background: linear-gradient(135deg, rgba(255, 107, 107, 0.92), rgba(255, 140, 140, 0.92));
-  box-shadow: 0 18px 40px rgba(255, 107, 107, 0.15);
+  background: linear-gradient(135deg, rgba(255, 70, 70, 0.99), rgba(255, 140, 140, 0.99));
+  box-shadow: 0 18px 40px rgba(255, 70, 70, 0.12);
 }
 
 /* ===== Right panel sections ===== */
 .section {
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.74);
-  box-shadow: inset 0 0 0 1px rgba(110, 190, 255, 0.1);
+  background: rgba(255, 255, 255, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow: inset 0 0 0 1px rgba(25, 145, 255, 0.08);
   padding: 16px;
 }
 
@@ -951,20 +950,20 @@ body {
   align-items: center;
   gap: 10px;
 
-  font-weight: 900;
-  color: rgba(44, 62, 80, 0.75);
+  font-weight: 1000;
+  color: rgba(7, 23, 46, 0.92);
   margin: 2px 0 14px;
 }
 
 .section-title b {
-  color: rgba(78, 205, 196, 1);
+  color: rgba(0, 210, 185, 1);
 }
 
 .section-ico {
   width: 22px;
   height: 22px;
   border-radius: 8px;
-  background: rgba(110, 190, 255, 0.18);
+  background: rgba(25, 145, 255, 0.18);
   display: grid;
   place-items: center;
 }
@@ -978,9 +977,9 @@ body {
 
 .mini-stat {
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  box-shadow: 0 14px 30px rgba(15, 65, 95, 0.1);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow: 0 14px 30px rgba(6, 30, 58, 0.06);
   padding: 16px 14px;
   text-align: center;
 }
@@ -988,7 +987,7 @@ body {
 .mini-stat-number {
   font-size: 34px;
   font-weight: 1000;
-  color: rgba(78, 205, 196, 1);
+  color: rgba(0, 210, 185, 1);
   line-height: 1;
   margin-bottom: 6px;
 }
@@ -996,7 +995,7 @@ body {
 .mini-stat-label {
   font-size: 12px;
   font-weight: 900;
-  color: rgba(44, 62, 80, 0.55);
+  color: rgba(7, 23, 46, 0.64);
 }
 
 /* progress list */
@@ -1008,9 +1007,9 @@ body {
 
 .progress-row {
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  box-shadow: 0 14px 28px rgba(15, 65, 95, 0.1);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow: 0 14px 28px rgba(6, 30, 58, 0.06);
   padding: 12px 14px;
 
   display: flex;
@@ -1024,7 +1023,7 @@ body {
 
 .progress-row:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 34px rgba(15, 65, 95, 0.14);
+  box-shadow: 0 18px 34px rgba(6, 30, 58, 0.10);
 }
 
 .progress-left {
@@ -1048,18 +1047,18 @@ body {
 }
 
 .progress-type--textbook {
-  background: rgba(78, 205, 196, 0.18);
-  color: rgba(44, 62, 80, 0.8);
+  background: rgba(0, 235, 200, 0.18);
+  color: rgba(7, 23, 46, 0.92);
 }
 
 .progress-type--crossword {
-  background: rgba(255, 107, 107, 0.18);
-  color: rgba(44, 62, 80, 0.8);
+  background: rgba(255, 70, 70, 0.18);
+  color: rgba(7, 23, 46, 0.92);
 }
 
 .progress-title {
   font-weight: 1000;
-  color: rgba(44, 62, 80, 0.85);
+  color: rgba(7, 23, 46, 0.94);
   font-size: 15px;
   line-height: 1.2;
   margin-bottom: 3px;
@@ -1067,8 +1066,8 @@ body {
 
 .progress-sub {
   font-size: 12px;
-  font-weight: 800;
-  color: rgba(44, 62, 80, 0.55);
+  font-weight: 900;
+  color: rgba(7, 23, 46, 0.66);
 }
 
 .progress-right {
@@ -1081,7 +1080,7 @@ body {
   width: 180px;
   height: 10px;
   border-radius: 999px;
-  background: rgba(44, 62, 80, 0.1);
+  background: rgba(7, 23, 46, 0.12);
   overflow: hidden;
 }
 
@@ -1089,7 +1088,7 @@ body {
   height: 100%;
   border-radius: 999px;
   width: 0%;
-  background: linear-gradient(90deg, rgba(110, 190, 255, 0.95), rgba(78, 205, 196, 0.95));
+  background: linear-gradient(90deg, rgba(25, 145, 255, 0.99), rgba(0, 235, 200, 0.99));
   transition: width 0.35s ease;
 }
 
@@ -1097,7 +1096,7 @@ body {
   min-width: 44px;
   text-align: right;
   font-weight: 1000;
-  color: rgba(78, 205, 196, 1);
+  color: rgba(0, 210, 185, 1);
 }
 
 /* info list */
@@ -1115,8 +1114,8 @@ body {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  color: rgba(44, 62, 80, 0.7);
-  font-weight: 800;
+  color: rgba(7, 23, 46, 0.78);
+  font-weight: 900;
   font-size: 13px;
   line-height: 1.35;
 }
@@ -1125,7 +1124,7 @@ body {
   width: 18px;
   height: 18px;
   border-radius: 6px;
-  background: rgba(110, 190, 255, 0.18);
+  background: rgba(25, 145, 255, 0.18);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -1147,7 +1146,7 @@ body {
 
 .spinner {
   border: 3px solid rgba(255, 255, 255, 0.28);
-  border-top: 3px solid rgba(78, 205, 196, 1);
+  border-top: 3px solid rgba(0, 235, 200, 1);
   border-radius: 50%;
   width: 18px;
   height: 18px;
@@ -1171,9 +1170,9 @@ body {
 #profileBody .form-group label {
   display: block;
   margin-bottom: 6px;
-  font-weight: 900;
+  font-weight: 1000;
   font-size: 13px;
-  color: rgba(44, 62, 80, 0.78);
+  color: rgba(7, 23, 46, 0.86);
 }
 
 #profileBody .form-group input,
@@ -1183,11 +1182,11 @@ body {
   box-sizing: border-box;
   padding: 12px 14px;
   border-radius: 14px;
-  border: 1px solid rgba(110, 190, 255, 0.28);
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
-  font-weight: 800;
-  color: rgba(44, 62, 80, 0.85);
+  border: 1px solid rgba(25, 145, 255, 0.28);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.62);
+  font-weight: 900;
+  color: rgba(7, 23, 46, 0.95);
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -1195,16 +1194,16 @@ body {
 #profileBody .form-group input:focus,
 #profileBody .form-group select:focus,
 #profileBody .form-group textarea:focus {
-  border-color: rgba(78, 205, 196, 0.6);
-  box-shadow: 0 0 0 4px rgba(78, 205, 196, 0.14);
+  border-color: rgba(0, 235, 200, 0.74);
+  box-shadow: 0 0 0 4px rgba(0, 235, 200, 0.16);
 }
 
 #profileBody .form-group input[disabled],
 #profileBody .form-group select[disabled],
 #profileBody .form-group textarea[disabled] {
-  background: rgba(44, 62, 80, 0.06) !important;
-  border-color: rgba(44, 62, 80, 0.12) !important;
-  color: rgba(44, 62, 80, 0.55) !important;
+  background: rgba(7, 23, 46, 0.06) !important;
+  border-color: rgba(7, 23, 46, 0.14) !important;
+  color: rgba(7, 23, 46, 0.55) !important;
   cursor: not-allowed;
 }
 
@@ -1215,7 +1214,7 @@ body {
   margin-top: 16px;
   flex-wrap: wrap;
   padding-top: 12px;
-  border-top: 1px solid rgba(44, 62, 80, 0.1);
+  border-top: 1px solid rgba(7, 23, 46, 0.12);
 }
 
 /* ===== Streak placeholder modal content ===== */
@@ -1278,34 +1277,34 @@ body {
 
 .streak-placeholder-item {
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.84);
-  box-shadow: 0 12px 24px rgba(15, 65, 95, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 24px rgba(6, 30, 58, 0.06);
   padding: 10px 12px;
 }
 
 .streak-placeholder-item-key {
   font-size: 11px;
-  font-weight: 900;
-  color: rgba(44, 62, 80, 0.55);
+  font-weight: 1000;
+  color: rgba(7, 23, 46, 0.58);
 }
 
 .streak-placeholder-item-value {
   margin-top: 4px;
   font-size: 14px;
   font-weight: 1000;
-  color: rgba(44, 62, 80, 0.86);
+  color: rgba(7, 23, 46, 0.95);
   line-height: 1.2;
 }
 
 .streak-placeholder-note {
   border-radius: 14px;
-  background: rgba(110, 190, 255, 0.1);
-  border: 1px dashed rgba(110, 190, 255, 0.28);
+  background: rgba(25, 145, 255, 0.10);
+  border: 1px dashed rgba(25, 145, 255, 0.26);
   padding: 10px 12px;
   font-size: 12px;
-  font-weight: 800;
-  color: rgba(44, 62, 80, 0.7);
+  font-weight: 900;
+  color: rgba(7, 23, 46, 0.80);
   line-height: 1.35;
 }
 
