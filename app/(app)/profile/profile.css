@@ -246,28 +246,56 @@ body {
   background: linear-gradient(135deg, rgba(148, 163, 184, 0.95), rgba(176, 190, 208, 0.95));
 }
 
+/* ✅ BRONZE — жирная бронза */
 .streak-chip--bronze {
-  background: linear-gradient(135deg, rgba(205, 127, 50, 0.95), rgba(230, 154, 86, 0.95));
+  background: linear-gradient(135deg, rgba(184, 115, 51, 0.98), rgba(224, 169, 109, 0.96));
 }
 
+/* silver — как было */
 .streak-chip--silver {
   background: linear-gradient(135deg, rgba(148, 163, 184, 0.95), rgba(203, 213, 225, 0.95));
 }
 
+/* ✅ GOLD — прям золото */
 .streak-chip--gold {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.96), rgba(251, 191, 36, 0.96));
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.98), rgba(255, 215, 102, 0.98));
 }
 
+/* platinum — как было */
 .streak-chip--platinum {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(129, 140, 248, 0.95));
 }
 
+/* ✅ DIAMOND — алмаз, чтобы светилось */
 .streak-chip--diamond {
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.95), rgba(59, 130, 246, 0.95));
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.98), rgba(59, 130, 246, 0.98));
+  box-shadow:
+    0 14px 30px rgba(59, 130, 246, 0.22),
+    0 0 0 3px rgba(6, 182, 212, 0.14),
+    0 0 28px rgba(59, 130, 246, 0.18);
+}
+
+/* ✅ LEGENDARY — разноцветный градиент + свечение */
+@keyframes legendaryShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .streak-chip--legendary {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.95), rgba(236, 72, 153, 0.95));
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.98),
+    rgba(37, 99, 235, 0.98),
+    rgba(6, 182, 212, 0.98),
+    rgba(236, 72, 153, 0.98)
+  );
+  background-size: 220% 220%;
+  animation: legendaryShift 6s ease-in-out infinite;
+  box-shadow:
+    0 16px 34px rgba(124, 58, 237, 0.20),
+    0 0 0 3px rgba(236, 72, 153, 0.12),
+    0 0 34px rgba(37, 99, 235, 0.18);
 }
 
 /* ===== Layout panels ===== */
@@ -297,21 +325,88 @@ body {
   text-align: center;
 }
 
+/* ✅ Bigger avatar circle (как на твоём скрине) */
 .avatar-circle {
-  width: 170px;
-  height: 170px;
+  width: 268px;
+  height: 268px;
   margin: 6px auto 16px;
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(110, 190, 255, 0.25), rgba(78, 205, 196, 0.18));
   display: grid;
   place-items: center;
   box-shadow: 0 20px 50px rgba(15, 65, 95, 0.12);
-  border: 6px solid rgba(255, 255, 255, 0.85);
+  border: 8px solid rgba(255, 255, 255, 0.88);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Avatar outer circle theming by tier
+   (нужны классы avatar-circle--bronze/gold/diamond/legendary на div)
+   ───────────────────────────────────────────────────────────── */
+/* none — дефолт (ничего не переопределяем) */
+.avatar-circle--none {
+  background: inherit;
+}
+
+/* бронза */
+.avatar-circle.avatar-circle--bronze {
+  background: radial-gradient(
+    circle at 35% 30%,
+    rgba(255, 232, 204, 0.55),
+    rgba(184, 115, 51, 0.22) 55%,
+    rgba(224, 169, 109, 0.18) 100%
+  );
+  box-shadow:
+    0 22px 52px rgba(184, 115, 51, 0.16),
+    0 0 0 6px rgba(224, 169, 109, 0.10);
+}
+
+/* золото */
+.avatar-circle.avatar-circle--gold {
+  background: radial-gradient(
+    circle at 35% 30%,
+    rgba(255, 246, 214, 0.55),
+    rgba(245, 158, 11, 0.24) 55%,
+    rgba(255, 215, 102, 0.18) 100%
+  );
+  box-shadow:
+    0 22px 52px rgba(245, 158, 11, 0.16),
+    0 0 0 6px rgba(255, 215, 102, 0.12);
+}
+
+/* алмаз — glow */
+.avatar-circle.avatar-circle--diamond {
+  background: radial-gradient(
+    circle at 35% 30%,
+    rgba(219, 255, 255, 0.55),
+    rgba(6, 182, 212, 0.22) 50%,
+    rgba(59, 130, 246, 0.18) 100%
+  );
+  box-shadow:
+    0 22px 58px rgba(59, 130, 246, 0.18),
+    0 0 0 6px rgba(6, 182, 212, 0.14),
+    0 0 46px rgba(59, 130, 246, 0.16);
+}
+
+/* легендарный — rainbow */
+.avatar-circle.avatar-circle--legendary {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.30),
+    rgba(37, 99, 235, 0.26),
+    rgba(6, 182, 212, 0.22),
+    rgba(236, 72, 153, 0.26)
+  );
+  background-size: 220% 220%;
+  animation: legendaryShift 6s ease-in-out infinite;
+  box-shadow:
+    0 22px 62px rgba(124, 58, 237, 0.18),
+    0 0 0 6px rgba(6, 182, 212, 0.14),
+    0 0 54px rgba(236, 72, 153, 0.14);
 }
 
 .avatar-inner {
-  width: 134px;
-  height: 134px;
+  width: 228px;
+  height: 228px;
   border-radius: 999px;
   background: radial-gradient(
     circle at 40% 30%,
@@ -329,11 +424,13 @@ body {
   width: 100%;
   height: 100%;
   display: grid;
-  place-items: center;
+
+  /* ✅ ВАЖНО: растягиваем контент, чтобы img не схлопывался */
+  place-items: stretch;
+
   position: relative;
   user-select: none;
 
-  /* Важно: круглая маска для содержимого */
   border-radius: 999px;
   overflow: hidden;
   isolation: isolate;
@@ -341,15 +438,14 @@ body {
 
 .avatar-icon-bg {
   position: absolute;
-  inset: 14px;
+  inset: 22px;
   border-radius: 999px;
-  background:
-    radial-gradient(
-      circle at 32% 28%,
-      rgba(255, 255, 255, 0.95),
-      rgba(236, 246, 255, 0.7) 55%,
-      rgba(212, 232, 247, 0.45) 100%
-    );
+  background: radial-gradient(
+    circle at 32% 28%,
+    rgba(255, 255, 255, 0.95),
+    rgba(236, 246, 255, 0.7) 55%,
+    rgba(212, 232, 247, 0.45) 100%
+  );
   filter: blur(0.2px);
   z-index: 0;
 }
@@ -442,33 +538,38 @@ body {
   width: 100%;
   height: 100%;
 
-  /* Круглая область отображения */
   border-radius: 999px;
   overflow: hidden;
 
   display: grid;
   place-items: center;
+
+  /* ✅ если родитель grid центрирует — всё равно растягиваемся */
+  justify-self: stretch;
+  align-self: stretch;
 }
 
-.streak-visual__img--avatar {
-  /* Вписываем картинку внутрь "безопасной зоны" круга:
-     14% + 14% padding ≈ 72% полезной области (квадрат 1:1 не торчит за круг) */
+/* ✅ Тут ключ: меньше padding => картинка реально большая */
+.avatar-icon .streak-visual__img--avatar {
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  padding: 14%;
+  padding: 8%;
 
   object-fit: contain;
   object-position: center center;
 
-  filter: drop-shadow(0 8px 22px rgba(45, 80, 120, 0.18));
-  transform: none; /* убираем сдвиг вверх, чтобы было ровно по центру */
+  max-width: none;
+  max-height: none;
+
+  filter: drop-shadow(0 10px 28px rgba(45, 80, 120, 0.18));
+  transform: none;
 }
 
-.streak-visual__emoji--avatar {
-  font-size: 64px;
-  text-shadow: 0 8px 22px rgba(45, 80, 120, 0.18);
-  transform: none; /* тоже без сдвига */
+.avatar-icon .streak-visual__emoji--avatar {
+  font-size: clamp(74px, 16vw, 124px);
+  text-shadow: 0 10px 28px rgba(45, 80, 120, 0.18);
+  transform: none;
 }
 
 /* top chip version */
@@ -519,14 +620,13 @@ body {
   position: absolute;
   left: 50%;
   right: auto;
-  bottom: -14px;
+  bottom: -16px;
   transform: translateX(-50%);
 
-  /* Иконку убираем => делаем компактнее и по центру */
-  min-width: 64px;
-  height: 36px;
+  min-width: 74px;
+  height: 40px;
   border-radius: 999px;
-  padding: 5px 14px;
+  padding: 6px 16px;
 
   display: inline-flex;
   align-items: center;
@@ -570,23 +670,55 @@ body {
 .streak-mini-badge--none {
   background: linear-gradient(135deg, rgba(148, 163, 184, 0.95), rgba(176, 190, 208, 0.95));
 }
+
+/* ✅ BRONZE */
 .streak-mini-badge--bronze {
-  background: linear-gradient(135deg, rgba(205, 127, 50, 0.95), rgba(230, 154, 86, 0.95));
+  background: linear-gradient(135deg, rgba(184, 115, 51, 0.98), rgba(224, 169, 109, 0.96));
+  box-shadow:
+    0 10px 22px rgba(184, 115, 51, 0.22),
+    0 0 0 4px rgba(224, 169, 109, 0.10);
 }
+
 .streak-mini-badge--silver {
   background: linear-gradient(135deg, rgba(148, 163, 184, 0.95), rgba(203, 213, 225, 0.95));
 }
+
+/* ✅ GOLD */
 .streak-mini-badge--gold {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.96), rgba(251, 191, 36, 0.96));
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.98), rgba(255, 215, 102, 0.98));
+  box-shadow:
+    0 10px 22px rgba(245, 158, 11, 0.22),
+    0 0 0 4px rgba(255, 215, 102, 0.12);
 }
+
 .streak-mini-badge--platinum {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(129, 140, 248, 0.95));
 }
+
+/* ✅ DIAMOND glow */
 .streak-mini-badge--diamond {
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.95), rgba(59, 130, 246, 0.95));
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.98), rgba(59, 130, 246, 0.98));
+  box-shadow:
+    0 12px 26px rgba(59, 130, 246, 0.25),
+    0 0 0 4px rgba(6, 182, 212, 0.16),
+    0 0 30px rgba(59, 130, 246, 0.20);
 }
+
+/* ✅ LEGENDARY rainbow */
 .streak-mini-badge--legendary {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.95), rgba(236, 72, 153, 0.95));
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.98),
+    rgba(37, 99, 235, 0.98),
+    rgba(6, 182, 212, 0.98),
+    rgba(236, 72, 153, 0.98)
+  );
+  background-size: 220% 220%;
+  animation: legendaryShift 6s ease-in-out infinite;
+  box-shadow:
+    0 14px 28px rgba(124, 58, 237, 0.22),
+    0 0 0 4px rgba(6, 182, 212, 0.14),
+    0 0 36px rgba(236, 72, 153, 0.18);
 }
 
 /* phone/region mini card */
@@ -1233,14 +1365,18 @@ body {
     width: 100%;
   }
 
-.streak-visual__img--avatar {
-  width: 100%;
-  height: 100%;
-  padding: 16%;
-}
+  .avatar-circle {
+    width: 238px;
+    height: 238px;
+    border-width: 8px;
+  }
 
+  .avatar-inner {
+    width: 204px;
+    height: 204px;
+  }
 
-  .streak-visual__emoji--avatar {
-  font-size: 58px;
-}
+  .avatar-icon-bg {
+    inset: 20px;
+  }
 }

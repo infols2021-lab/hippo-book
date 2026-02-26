@@ -34,7 +34,12 @@ type Props = {
   open: boolean;
   onClose: () => void;
 
+  /** ✅ рекорд (как и раньше) — для разблокировки титулов */
   longestStreak?: number;
+
+  /** ✅ текущая серия — для “осталось до следующего титула” */
+  currentStreak?: number;
+
   currentTitleCode?: string | null;
   currentTitleLabel?: string | null;
 
@@ -107,21 +112,19 @@ function normalizeAnyTitleRow(row: any, idx: number): NormalizedTitle | null {
   );
   if (day <= 0) return null;
 
-  const label = str(
-    row.label ??
-      row.title ??
-      row.titleLabel ??
-      row.name ??
-      row.display_name ??
-      row.displayName
-  ) || titleCaseFromCode(code);
+  const label =
+    str(
+      row.label ??
+        row.title ??
+        row.titleLabel ??
+        row.name ??
+        row.display_name ??
+        row.displayName
+    ) || titleCaseFromCode(code);
 
   const description = str(row.description ?? row.desc ?? row.subtitle ?? row.note) || undefined;
 
-  const sortOrder = Math.max(
-    0,
-    Math.floor(num(row.sortOrder ?? row.sort_order, 0))
-  );
+  const sortOrder = Math.max(0, Math.floor(num(row.sortOrder ?? row.sort_order, 0)));
 
   return { code, label, day, description, sortOrder };
 }
@@ -178,10 +181,17 @@ function pickTitlesSource(titleCatalog?: TitleCatalogItem[] | null): NormalizedT
   return dedupeAndSort(FALLBACK_TITLE_MILESTONES);
 }
 
+function formatDaysLeft(left: number) {
+  const v = Math.max(0, Math.floor(left));
+  const word = v === 1 ? "день" : v >= 2 && v <= 4 ? "дня" : "дней";
+  return `${v} ${word}`;
+}
+
 export default function TitlePickerModal({
   open,
   onClose,
   longestStreak = 0,
+  currentStreak = 0,
   currentTitleCode = null,
   currentTitleLabel = null,
   onSelectTitle,
@@ -189,9 +199,15 @@ export default function TitlePickerModal({
   loading = false,
   titleCatalog = null,
 }: Props) {
+  // ✅ рекорд — по нему решаем unlocked/locked
   const safeLongest = Math.max(0, Math.floor(num(longestStreak, 0)));
 
+  // ✅ текущая серия — по ней считаем "осталось"
+  const safeCurrent = Math.max(0, Math.floor(num(currentStreak, 0)));
+
   const titles = useMemo(() => pickTitlesSource(titleCatalog), [titleCatalog]);
+
+  // ✅ разблокировка титулов остаётся по рекорду
   const unlockedTitles = useMemo(() => titles.filter((t) => t.day <= safeLongest), [titles, safeLongest]);
   const lockedTitles = useMemo(() => titles.filter((t) => t.day > safeLongest), [titles, safeLongest]);
 
@@ -216,6 +232,9 @@ export default function TitlePickerModal({
 
   const nextLockedTitle = lockedTitles[0] ?? null;
 
+  // ✅ осталось до следующего титула считаем по текущей серии, НЕ по рекорду
+  const nextLeftByCurrent = nextLockedTitle ? Math.max(0, nextLockedTitle.day - safeCurrent) : 0;
+
   return (
     <Modal open={open} onClose={onClose} title="🏷️ Выбор титула" maxWidth={860}>
       <div className="title-picker-modal">
@@ -227,19 +246,29 @@ export default function TitlePickerModal({
             </div>
             <div className="tpm-hero-sub">
               Открытие титулов идёт по <b>рекорду серии</b>, поэтому они не сгорают при сбросе текущей серии.
+              <br />
+              А вот <b>«осталось до следующего»</b> — считается от <b>текущей серии</b>.
             </div>
 
             <div className="tpm-hero-stats">
+              <div className="tpm-hero-pill">
+                <span>🔥</span>
+                <b>{loading ? "…" : `${safeCurrent} дн.`}</b>
+                <small>текущая серия</small>
+              </div>
+
               <div className="tpm-hero-pill">
                 <span>🏆</span>
                 <b>{loading ? "…" : `${safeLongest} дн.`}</b>
                 <small>рекорд</small>
               </div>
+
               <div className="tpm-hero-pill">
                 <span>✅</span>
                 <b>{unlockedTitles.length}</b>
                 <small>доступно</small>
               </div>
+
               <div className="tpm-hero-pill">
                 <span>🔒</span>
                 <b>{lockedTitles.length}</b>
@@ -282,7 +311,8 @@ export default function TitlePickerModal({
             {nextLockedTitle ? (
               <div className="tpm-next-pill">
                 <span>🎯</span>
-                Следующий титул: <b>{nextLockedTitle.label}</b> на <b>{nextLockedTitle.day}</b> дне
+                Следующий титул: <b>{nextLockedTitle.label}</b> на <b>{nextLockedTitle.day}</b> дне • осталось{" "}
+                <b>{formatDaysLeft(nextLeftByCurrent)}</b>
               </div>
             ) : (
               <div className="tpm-next-pill tpm-next-pill--done">
@@ -359,7 +389,8 @@ export default function TitlePickerModal({
           ) : (
             <div className="tpm-list">
               {lockedTitles.map((t) => {
-                const left = Math.max(0, t.day - safeLongest);
+                // ✅ “осталось” теперь от текущей серии
+                const left = Math.max(0, t.day - safeCurrent);
 
                 return (
                   <button
@@ -374,8 +405,7 @@ export default function TitlePickerModal({
                       <span className="tpm-title-texts">
                         <span className="tpm-title-label">{t.label}</span>
                         <span className="tpm-title-desc">
-                          {t.description || "Титул за серию"} • осталось {left}{" "}
-                          {left === 1 ? "день" : left >= 2 && left <= 4 ? "дня" : "дней"}
+                          {t.description || "Титул за серию"} • осталось {formatDaysLeft(left)}
                         </span>
                       </span>
                     </span>
