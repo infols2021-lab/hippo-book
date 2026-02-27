@@ -1431,4 +1431,83 @@ body {
       font-size: 12.5px;
     }
   }
+}/* =======================================================================
+   HIGH-CONTRAST TEXT OVERRIDE (убираем серый/бледно-зелёный, всё читаемо)
+   ВСТАВИТЬ В САМЫЙ КОНЕЦ profile.css
+   ======================================================================= */
+#profileBody{
+  --text-strong: #04162f;  /* самый тёмный */
+  --text-main:   #07224a;  /* основной текст */
+  --text-soft:   #0b3563;  /* подписи/вторичный текст (НЕ серый) */
+
+  --accent-teal: #008a7a;  /* акцент (замена бледно-зелёному) */
+  --accent-blue: #0d63ff;  /* акцент-синий */
+}
+
+/* Базовый цвет текста в контентных блоках */
+.panel,
+.profile-card,
+.section,
+.profile-mini,
+.streak-summary-card,
+.mini-stat,
+.progress-row {
+  color: var(--text-main);
+}
+
+/* Заголовки/основные строки — максимально читаемо */
+.brand-title,
+.profile-name,
+.section-title,
+.progress-title,
+.mini-val,
+.streak-summary-value,
+.info-li b {
+  color: var(--text-strong) !important;
+}
+
+/* Все “мелкие” подписи — НЕ серые, а тёмно-синие */
+.brand-subtitle,
+.profile-email,
+.mini-cap,
+.mini-stat-label,
+.progress-sub,
+.info-li,
+.streak-summary-key,
+.section-title,
+.progress-type,
+.progress-type--textbook,
+.progress-type--crossword {
+  color: var(--text-soft) !important;
+  opacity: 1 !important; /* чтобы не выглядело “в тумане” */
+}
+
+/* Акценты: вместо светло-зелёного — насыщенный тёмный teal */
+.section-title b,
+.mini-stat-number,
+.progress-percent {
+  color: var(--accent-teal) !important;
+}
+
+/* Иконки-квадратики/плашки — чуть контрастнее, но без трогания твоих иконок */
+.section-ico,
+.mini-ico,
+.info-bullet {
+  color: var(--text-strong) !important;
+}
+
+/* Прогресс-бар фон — чуть темнее, чтобы было видно на ярком фоне */
+.progress-bar {
+  background: rgba(4, 22, 47, 0.14) !important;
+}
+
+/* Текст в карточках прогресса — чётче */
+.progress-title { letter-spacing: 0.005em; }
+.progress-sub,
+.mini-cap,
+.brand-subtitle,
+.mini-stat-label,
+.info-li {
+  letter-spacing: 0.015em;
+  line-height: 1.38;
 }
