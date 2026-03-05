@@ -1,3 +1,4 @@
+// app/(app)/profile/ProfileClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -5,6 +6,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import Modal from "@/components/Modal";
 import StreakRoadmapModal from "@/components/streak/StreakRoadmapModal";
+import StreakLeaderboardModal, {
+  type StreakLeaderboardRow,
+} from "@/components/profile/StreakLeaderboardModal";
 import TitlePickerModal, {
   type TitlePickerChoice,
   type TitleCatalogItem,
@@ -134,6 +138,17 @@ type SaveStreakTitleApiResponse = {
   } | null;
 };
 
+type LeaderboardApiResponse = {
+  ok?: boolean;
+  error?: string;
+  top?: unknown;
+  around?: unknown;
+  myPlace?: unknown;
+  myCurrent?: unknown;
+  myLongest?: unknown;
+  serverTs?: unknown;
+};
+
 type CustomUpdateRetryAction =
   | { type: "icon"; iconCode: string }
   | { type: "title-select"; choice: TitlePickerChoice }
@@ -172,6 +187,9 @@ const STREAK_CACHE_KEY = "ek_profile_streak_cache_v3";
 const PROGRESS_CACHE_KEY = "ek_profile_progress_cache_v1";
 const STREAK_CACHE_TTL_MS = 60_000;
 const PROGRESS_CACHE_TTL_MS = 5 * 60_000;
+
+// leaderboard (не кэшируем в storage, просто держим в памяти)
+const LEADERBOARD_MIN_REFRESH_MS = 25_000;
 
 /**
  * ✅ URL cache for loaded icons.
@@ -228,7 +246,14 @@ function uniqStrings(values: (string | null | undefined)[]): string[] {
 }
 
 function getClosedCustomUpdateDialog(): CustomUpdateDialogState {
-  return { open: false, mode: "loading", scope: "icon", title: "", message: "", retryAction: null };
+  return {
+    open: false,
+    mode: "loading",
+    scope: "icon",
+    title: "",
+    message: "",
+    retryAction: null,
+  };
 }
 
 function regionLabel(region: string) {
@@ -281,7 +306,9 @@ function safeJsonParse<T>(raw: string | null): T | null {
 
 function readStreakCache(): StreakClientCache | null {
   if (typeof window === "undefined") return null;
-  const cached = safeJsonParse<StreakClientCache>(sessionStorage.getItem(STREAK_CACHE_KEY));
+  const cached = safeJsonParse<StreakClientCache>(
+    sessionStorage.getItem(STREAK_CACHE_KEY)
+  );
   if (!cached?.ts) return null;
   if (Date.now() - cached.ts > STREAK_CACHE_TTL_MS) return null;
   return cached;
@@ -296,7 +323,9 @@ function writeStreakCache(payload: StreakClientCache) {
 
 function readProgressCache(): ProgressClientCache | null {
   if (typeof window === "undefined") return null;
-  const cached = safeJsonParse<ProgressClientCache>(sessionStorage.getItem(PROGRESS_CACHE_KEY));
+  const cached = safeJsonParse<ProgressClientCache>(
+    sessionStorage.getItem(PROGRESS_CACHE_KEY)
+  );
   if (!cached?.ts) return null;
   if (Date.now() - cached.ts > PROGRESS_CACHE_TTL_MS) return null;
   return cached;
@@ -321,7 +350,13 @@ function runWhenIdle(fn: () => void, timeout = 900) {
 
 function normalizeUiErrorMessage(error: unknown, fallback = "Произошла ошибка") {
   const raw =
-    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+      ? error
+      : error == null
+      ? ""
+      : String(error);
   const msg = raw.trim();
   if (!msg) return fallback;
   const lower = msg.toLowerCase();
@@ -340,26 +375,63 @@ function normalizeStreakSnapshotFromApi(rawInput: unknown): StreakSnapshot | nul
   const raw = rawInput as Record<string, any>;
 
   const rawCurrent = asInt(
-    pick(raw, ["raw_current_streak", "rawCurrentStreak", "current_streak", "currentStreak", "current", "streak"]),
+    pick(raw, [
+      "raw_current_streak",
+      "rawCurrentStreak",
+      "current_streak",
+      "currentStreak",
+      "current",
+      "streak",
+    ]),
     0
   );
   const displayCurrent = asInt(
-    pick(raw, ["display_current_streak", "displayCurrentStreak", "current_streak", "currentStreak"]),
+    pick(raw, [
+      "display_current_streak",
+      "displayCurrentStreak",
+      "current_streak",
+      "currentStreak",
+    ]),
     rawCurrent
   );
   const longest = asInt(
-    pick(raw, ["longest_streak", "longestStreak", "display_longest_streak", "displayLongestStreak"]),
+    pick(raw, [
+      "longest_streak",
+      "longestStreak",
+      "display_longest_streak",
+      "displayLongestStreak",
+    ]),
     displayCurrent
   );
   const doneToday = asBool(
-    pick(raw, ["done_today", "today_completed", "todayCompleted", "is_today_completed", "isTodayCompleted"]),
+    pick(raw, [
+      "done_today",
+      "today_completed",
+      "todayCompleted",
+      "is_today_completed",
+      "isTodayCompleted",
+    ]),
     false
   );
-  const canSaveToday = asBool(pick(raw, ["can_save_today", "canSaveToday"]), !doneToday);
-  const tierCode = asStringOrNull(pick(raw, ["tier_code", "tierCode"])) ?? getTierCodeByStreak(displayCurrent);
-  const today = asStringOrNull(pick(raw, ["today", "today_date", "todayDate"])) ?? new Date().toISOString().slice(0, 10);
+  const canSaveToday = asBool(
+    pick(raw, ["can_save_today", "canSaveToday"]),
+    !doneToday
+  );
+  const tierCode =
+    asStringOrNull(pick(raw, ["tier_code", "tierCode"])) ??
+    getTierCodeByStreak(displayCurrent);
+  const today =
+    asStringOrNull(pick(raw, ["today", "today_date", "todayDate"])) ??
+    new Date().toISOString().slice(0, 10);
   const lastCompletedDate =
-    asStringOrNull(pick(raw, ["last_completed_date", "lastCompletedDate", "activity_date", "lastActivityDate"])) ?? null;
+    asStringOrNull(
+      pick(raw, [
+        "last_completed_date",
+        "lastCompletedDate",
+        "activity_date",
+        "lastActivityDate",
+      ])
+    ) ?? null;
 
   return {
     today,
@@ -384,12 +456,15 @@ function normalizeDbIconCode(input: unknown): string | null {
   s = s.replace(/\\/g, "/");
 
   const base = s.split("/").filter(Boolean).at(-1) ?? s;
-  const noExt = base.replace(/\.(webp|png|jpg|jpeg|svg)$/i, "").trim();
+  const noExt = base
+    .replace(/\.(webp|png|jpg|jpeg|svg)$/i, "")
+    .trim();
 
   if (!noExt) return null;
 
   // если вдруг в кеше остался roadmap-код вида bronze_hop — лучше игнорнуть
-  if (/^[a-z0-9]+(_[a-z0-9]+)+$/i.test(noExt) && !noExt.includes("-")) return null;
+  if (/^[a-z0-9]+(_[a-z0-9]+)+$/i.test(noExt) && !noExt.includes("-"))
+    return null;
 
   return noExt;
 }
@@ -398,24 +473,92 @@ function getStreakTierUi(tierCode?: string, streakValue?: number) {
   const v = Math.max(0, Number(streakValue || 0));
   switch (tierCode) {
     case "legendary":
-      return { icon: "👑", label: "Легендарный", className: "streak-chip--legendary", ringClassName: "streak-mini-badge--legendary" };
+      return {
+        icon: "👑",
+        label: "Легендарный",
+        className: "streak-chip--legendary",
+        ringClassName: "streak-mini-badge--legendary",
+      };
     case "diamond":
-      return { icon: "💎", label: "Алмазный", className: "streak-chip--diamond", ringClassName: "streak-mini-badge--diamond" };
+      return {
+        icon: "💎",
+        label: "Алмазный",
+        className: "streak-chip--diamond",
+        ringClassName: "streak-mini-badge--diamond",
+      };
     case "platinum":
-      return { icon: "🌌", label: "Платиновый", className: "streak-chip--platinum", ringClassName: "streak-mini-badge--platinum" };
+      return {
+        icon: "🌌",
+        label: "Платиновый",
+        className: "streak-chip--platinum",
+        ringClassName: "streak-mini-badge--platinum",
+      };
     case "gold":
-      return { icon: "🥇", label: "Золотой", className: "streak-chip--gold", ringClassName: "streak-mini-badge--gold" };
+      return {
+        icon: "🥇",
+        label: "Золотой",
+        className: "streak-chip--gold",
+        ringClassName: "streak-mini-badge--gold",
+      };
     case "silver":
-      return { icon: "🥈", label: "Серебряный", className: "streak-chip--silver", ringClassName: "streak-mini-badge--silver" };
+      return {
+        icon: "🥈",
+        label: "Серебряный",
+        className: "streak-chip--silver",
+        ringClassName: "streak-mini-badge--silver",
+      };
     case "bronze":
-      return { icon: "🥉", label: "Бронзовый", className: "streak-chip--bronze", ringClassName: "streak-mini-badge--bronze" };
+      return {
+        icon: "🥉",
+        label: "Бронзовый",
+        className: "streak-chip--bronze",
+        ringClassName: "streak-mini-badge--bronze",
+      };
     default:
-      return { icon: v > 0 ? "🔥" : "✨", label: v > 0 ? "Серия" : "Нет серии", className: "streak-chip--none", ringClassName: "streak-mini-badge--none" };
+      return {
+        icon: v > 0 ? "🔥" : "✨",
+        label: v > 0 ? "Серия" : "Нет серии",
+        className: "streak-chip--none",
+        ringClassName: "streak-mini-badge--none",
+      };
   }
 }
 
 function joinClasses(...parts: Array<string | null | undefined | false>) {
   return parts.filter(Boolean).join(" ");
+}
+
+// leaderboard helpers
+function normalizeLeaderboardRows(input: unknown): StreakLeaderboardRow[] {
+  if (!Array.isArray(input)) return [];
+  const out: StreakLeaderboardRow[] = [];
+  const seen = new Set<number>();
+
+  for (const it of input) {
+    if (!it || typeof it !== "object") continue;
+    const r = it as Record<string, any>;
+
+    const place = asInt(r.place, 0);
+    if (place <= 0) continue;
+    if (seen.has(place)) continue;
+
+    out.push({
+      place,
+      current: asInt(r.current, 0),
+      longest: asInt(r.longest, 0),
+      isMe: asBool(r.isMe, false),
+    });
+    seen.add(place);
+  }
+
+  out.sort((a, b) => a.place - b.place);
+  return out;
+}
+
+function asIntOrNull(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -426,7 +569,11 @@ function makeIconCacheKey(bucket: string, iconCode: string, cacheTag?: string | 
   return `${bucket}::${iconCode}::${(cacheTag || "v0").trim() || "v0"}`;
 }
 
-function buildCandidateUrls(params: { preferredUrls?: string[] | null; iconCode: string | null; variant?: unknown }): string[] {
+function buildCandidateUrls(params: {
+  preferredUrls?: string[] | null;
+  iconCode: string | null;
+  variant?: unknown;
+}): string[] {
   const preferred = Array.isArray(params.preferredUrls) ? params.preferredUrls : [];
   const code = params.iconCode?.trim() || null;
 
@@ -450,7 +597,11 @@ function buildCandidateUrls(params: { preferredUrls?: string[] | null; iconCode:
     const raw = p.trim();
     if (!raw) return null;
     if (/^https?:\/\//i.test(raw) || raw.startsWith("data:")) return raw;
-    return supabase.storage.from(STREAK_ICON_BUCKET).getPublicUrl(raw.replace(/^\/+/, "")).data.publicUrl || null;
+    return (
+      supabase.storage
+        .from(STREAK_ICON_BUCKET)
+        .getPublicUrl(raw.replace(/^\/+/, "")).data.publicUrl || null
+    );
   };
 
   return uniqStrings([
@@ -460,7 +611,12 @@ function buildCandidateUrls(params: { preferredUrls?: string[] | null; iconCode:
   ]);
 }
 
-function preloadIconByUrls(params: { iconCode: string | null; cacheTag?: string | null; preferredUrls?: string[] | null; variant?: unknown }) {
+function preloadIconByUrls(params: {
+  iconCode: string | null;
+  cacheTag?: string | null;
+  preferredUrls?: string[] | null;
+  variant?: unknown;
+}) {
   if (!isNonEmptyString(params.iconCode)) return;
 
   const cacheKey = makeIconCacheKey(STREAK_ICON_BUCKET, params.iconCode, params.cacheTag);
@@ -693,7 +849,21 @@ export default function ProfileClient({
   const [streakModalOpen, setStreakModalOpen] = useState(false);
   const [titleModalOpen, setTitleModalOpen] = useState(false);
 
-  const [customUpdateDialog, setCustomUpdateDialog] = useState<CustomUpdateDialogState>(getClosedCustomUpdateDialog());
+  // ✅ leaderboard modal
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const [leaderboardTop, setLeaderboardTop] = useState<StreakLeaderboardRow[] | null>(null);
+  const [leaderboardAround, setLeaderboardAround] = useState<StreakLeaderboardRow[] | null>(null);
+  const [leaderboardMyPlace, setLeaderboardMyPlace] = useState<number | null>(null);
+  const [leaderboardMyCurrent, setLeaderboardMyCurrent] = useState<number | null>(null);
+  const [leaderboardMyLongest, setLeaderboardMyLongest] = useState<number | null>(null);
+  const lastLeaderboardFetchAtRef = useRef<number>(0);
+  const leaderboardAbortRef = useRef<AbortController | null>(null);
+
+  const [customUpdateDialog, setCustomUpdateDialog] = useState<CustomUpdateDialogState>(
+    getClosedCustomUpdateDialog()
+  );
 
   const [stats, setStats] = useState<Stats | null>(statsProp ?? cachedProgress?.stats ?? null);
   const [materialsProgress, setMaterialsProgress] = useState<MaterialProgressItem[] | null>(
@@ -712,7 +882,9 @@ export default function ProfileClient({
     cachedStreak?.titleLabel ?? equippedTitleLabel ?? null
   );
   const [equippedTitleCodeState, setEquippedTitleCodeState] = useState<string | null>(cachedStreak?.titleCode ?? null);
-  const [titleCatalogState, setTitleCatalogState] = useState<TitleCatalogItem[] | null>(cachedStreak?.titleCatalog ?? null);
+  const [titleCatalogState, setTitleCatalogState] = useState<TitleCatalogItem[] | null>(
+    cachedStreak?.titleCatalog ?? null
+  );
   const [savingTitle, setSavingTitle] = useState(false);
 
   // ✅ DB unlocked codes
@@ -723,13 +895,21 @@ export default function ProfileClient({
   // ✅ Applied icon info (DB code + urls + cacheTag + emoji/tier)
   const [appliedIconCodeState, setAppliedIconCodeState] = useState<string | null>(cachedAppliedIconCode ?? null);
   const [appliedIconUrlsState, setAppliedIconUrlsState] = useState<string[]>(cachedStreak?.appliedIconUrls ?? []);
-  const [appliedIconCacheTagState, setAppliedIconCacheTagState] = useState<string | null>(cachedStreak?.appliedIconCacheTag ?? null);
-  const [appliedIconEmojiFallbackState, setAppliedIconEmojiFallbackState] = useState<string | null>(cachedStreak?.appliedIconEmojiFallback ?? null);
-  const [appliedIconTierCodeState, setAppliedIconTierCodeState] = useState<string | null>(cachedStreak?.appliedIconTierCode ?? null);
+  const [appliedIconCacheTagState, setAppliedIconCacheTagState] = useState<string | null>(
+    cachedStreak?.appliedIconCacheTag ?? null
+  );
+  const [appliedIconEmojiFallbackState, setAppliedIconEmojiFallbackState] = useState<string | null>(
+    cachedStreak?.appliedIconEmojiFallback ?? null
+  );
+  const [appliedIconTierCodeState, setAppliedIconTierCodeState] = useState<string | null>(
+    cachedStreak?.appliedIconTierCode ?? null
+  );
 
   // ✅ Local/server selection are DB codes
   const [selectedStreakIconCodeLocal, setSelectedStreakIconCodeLocal] = useState<string | null>(null);
-  const [selectedStreakIconCodeServer, setSelectedStreakIconCodeServer] = useState<string | null>(cachedSelectedIconServer ?? null);
+  const [selectedStreakIconCodeServer, setSelectedStreakIconCodeServer] = useState<string | null>(
+    cachedSelectedIconServer ?? null
+  );
   const [savingStreakIcon, setSavingStreakIcon] = useState(false);
 
   const lastStreakFetchAtRef = useRef<number>(0);
@@ -744,9 +924,7 @@ export default function ProfileClient({
   // ✅ unlocked for UI = DB codes
   const unlockedIconCodesForUi: string[] = useMemo(() => {
     if (Array.isArray(unlockedIconCodesState) && unlockedIconCodesState.length) {
-      return unlockedIconCodesState
-        .map((c) => normalizeDbIconCode(c))
-        .filter(Boolean) as string[];
+      return unlockedIconCodesState.map((c) => normalizeDbIconCode(c)).filter(Boolean) as string[];
     }
     return [];
   }, [unlockedIconCodesState]);
@@ -773,13 +951,7 @@ export default function ProfileClient({
     // fallback: если вдруг tierCode иконки ещё не приехал — красим по tier серии
     const fromStreak = typeof streak?.tier_code === "string" ? streak.tier_code.trim().toLowerCase() : "";
     return fromStreak || getTierCodeByStreak(streakDisplay);
-  }, [
-    effectiveSelectedStreakIconCode,
-    appliedIconCodeState,
-    appliedIconTierCodeState,
-    streak?.tier_code,
-    streakDisplay,
-  ]);
+  }, [effectiveSelectedStreakIconCode, appliedIconCodeState, appliedIconTierCodeState, streak?.tier_code, streakDisplay]);
 
   const streakUiBase = getStreakTierUi(uiTierCodeForColors, streakDisplay);
 
@@ -869,6 +1041,10 @@ export default function ProfileClient({
 
   function openStreakModal() {
     if (!customUpdateDialog.open) setStreakModalOpen(true);
+  }
+
+  function openLeaderboardModal() {
+    if (!customUpdateDialog.open) setLeaderboardOpen(true);
   }
 
   async function retryCustomUpdateDialogAction() {
@@ -962,7 +1138,9 @@ export default function ProfileClient({
       ts: Date.now(),
       streak: normalizedStreak,
       selectedIconServer: resolvedIcon,
-      unlockedIconCodes: Array.isArray(json.unlockedIconCodes) ? (json.unlockedIconCodes as string[]) : unlockedIconCodesState ?? null,
+      unlockedIconCodes: Array.isArray(json.unlockedIconCodes)
+        ? (json.unlockedIconCodes as string[])
+        : unlockedIconCodesState ?? null,
       appliedIconCode: applied.appliedIconCode,
       appliedIconUrls: applied.urls,
       appliedIconCacheTag: applied.cacheTag,
@@ -970,7 +1148,9 @@ export default function ProfileClient({
       appliedIconTierCode: applied.tierCode,
       titleCode: apiTitleCode ?? null,
       titleLabel: apiTitleLabel ?? null,
-      titleCatalog: Array.isArray(json.titleCatalog) ? (json.titleCatalog as TitleCatalogItem[]) : titleCatalogState ?? null,
+      titleCatalog: Array.isArray(json.titleCatalog)
+        ? (json.titleCatalog as TitleCatalogItem[])
+        : titleCatalogState ?? null,
     });
 
     try {
@@ -1012,6 +1192,51 @@ export default function ProfileClient({
     }
   }
 
+  async function refreshLeaderboardFromApi(options?: { force?: boolean }) {
+    const now = Date.now();
+    if (!options?.force && now - lastLeaderboardFetchAtRef.current < LEADERBOARD_MIN_REFRESH_MS) return;
+    lastLeaderboardFetchAtRef.current = now;
+
+    leaderboardAbortRef.current?.abort();
+    const controller = new AbortController();
+    leaderboardAbortRef.current = controller;
+
+    try {
+      setLeaderboardLoading(true);
+      setLeaderboardError(null);
+
+      const res = await fetch("/api/profile-streak-leaderboard", {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+
+      let json: LeaderboardApiResponse | null = null;
+      try {
+        json = (await res.json()) as LeaderboardApiResponse;
+      } catch {
+        json = null;
+      }
+
+      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить рейтинг");
+
+      const top = normalizeLeaderboardRows(json?.top);
+      const around = normalizeLeaderboardRows(json?.around);
+
+      setLeaderboardTop(top);
+      setLeaderboardAround(around);
+      setLeaderboardMyPlace(asIntOrNull(json?.myPlace));
+      setLeaderboardMyCurrent(asIntOrNull(json?.myCurrent));
+      setLeaderboardMyLongest(asIntOrNull(json?.myLongest));
+
+      setLeaderboardLoading(false);
+    } catch (e: any) {
+      if (e?.name === "AbortError") return;
+      setLeaderboardLoading(false);
+      setLeaderboardError(normalizeUiErrorMessage(e, "Не удалось загрузить рейтинг"));
+    }
+  }
+
   useEffect(() => {
     if (!backgroundUrl) {
       setBgLoading(false);
@@ -1020,8 +1245,14 @@ export default function ProfileClient({
     }
     setBgLoading(true);
     const img = new Image();
-    img.onload = () => { setBgLoading(false); setBgReady(true); };
-    img.onerror = () => { setBgLoading(false); setBgReady(false); };
+    img.onload = () => {
+      setBgLoading(false);
+      setBgReady(true);
+    };
+    img.onerror = () => {
+      setBgLoading(false);
+      setBgReady(false);
+    };
     img.src = backgroundUrl;
     const t = setTimeout(() => setBgLoading(false), 6000);
     return () => clearTimeout(t);
@@ -1048,7 +1279,11 @@ export default function ProfileClient({
         setStats(json.stats as Stats);
         setMaterialsProgress(json.materialsProgress as MaterialProgressItem[]);
         setProgressLoading(false);
-        writeProgressCache({ ts: Date.now(), stats: json.stats as Stats, materialsProgress: json.materialsProgress as MaterialProgressItem[] });
+        writeProgressCache({
+          ts: Date.now(),
+          stats: json.stats as Stats,
+          materialsProgress: json.materialsProgress as MaterialProgressItem[],
+        });
       } catch (e: any) {
         if (e?.name === "AbortError" || cancelled) return;
         setProgressLoading(false);
@@ -1056,7 +1291,10 @@ export default function ProfileClient({
       }
     }
     runWhenIdle(() => void loadProgress(), 1200);
-    return () => { cancelled = true; progressAbortRef.current?.abort(); };
+    return () => {
+      cancelled = true;
+      progressAbortRef.current?.abort();
+    };
   }, [statsProp, progressProp]);
 
   useEffect(() => {
@@ -1066,12 +1304,16 @@ export default function ProfileClient({
     const hasFreshCache = Boolean(cachedStreak?.streak && Date.now() - (cachedStreak?.ts ?? 0) < STREAK_CACHE_TTL_MS);
     if (streakProp || cachedStreak?.streak) setStreakLoading(false);
 
-    const doFetch = async () => { if (!cancelled) await refreshStreakFromApi({ silent: true, force: dirty || !hasFreshCache }); };
+    const doFetch = async () => {
+      if (!cancelled) await refreshStreakFromApi({ silent: true, force: dirty || !hasFreshCache });
+    };
     if (dirty || !hasFreshCache) void doFetch();
     else runWhenIdle(() => void doFetch(), 900);
 
     const onFocus = () => void refreshStreakFromApi({ silent: true });
-    const onVisibility = () => { if (document.visibilityState === "visible") void refreshStreakFromApi({ silent: true }); };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void refreshStreakFromApi({ silent: true });
+    };
     const onCustomRefresh = () => void refreshStreakFromApi({ silent: false, force: true });
 
     window.addEventListener("focus", onFocus);
@@ -1095,6 +1337,16 @@ export default function ProfileClient({
     } catch {}
   }, []);
 
+  // fetch leaderboard on open
+  useEffect(() => {
+    if (!leaderboardOpen) return;
+    void refreshLeaderboardFromApi({ force: false });
+    return () => {
+      leaderboardAbortRef.current?.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaderboardOpen]);
+
   function openEdit() {
     setEditFullName(profile.full_name || "");
     setEditPhone(profile.contact_phone || "");
@@ -1115,7 +1367,10 @@ export default function ProfileClient({
     }
     try {
       setSaving(true);
-      const { error } = await supabase.from("profiles").update({ full_name: fullName, contact_phone: phone, region }).eq("id", userId);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ full_name: fullName, contact_phone: phone, region })
+        .eq("id", userId);
       if (error) throw error;
       setProfile((p) => ({ ...p, full_name: fullName, contact_phone: phone, region }));
       showNotification("✅ Профиль успешно обновлен!");
@@ -1167,7 +1422,11 @@ export default function ProfileClient({
       });
 
       let json: SaveStreakIconApiResponse | null = null;
-      try { json = (await res.json()) as SaveStreakIconApiResponse; } catch { json = null; }
+      try {
+        json = (await res.json()) as SaveStreakIconApiResponse;
+      } catch {
+        json = null;
+      }
       if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось сохранить иконку серии");
 
       const resolvedSelected = normalizeDbIconCode(json.selectedIconCode ?? normalized);
@@ -1207,7 +1466,11 @@ export default function ProfileClient({
       });
 
       let json: SaveStreakTitleApiResponse | null = null;
-      try { json = (await res.json()) as SaveStreakTitleApiResponse; } catch { json = null; }
+      try {
+        json = (await res.json()) as SaveStreakTitleApiResponse;
+      } catch {
+        json = null;
+      }
       if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось сохранить титул");
 
       const savedCode =
@@ -1216,8 +1479,7 @@ export default function ProfileClient({
         choice.code;
 
       const savedLabel =
-        (typeof json.selectedTitle?.label === "string" && json.selectedTitle.label) ||
-        choice.label;
+        (typeof json.selectedTitle?.label === "string" && json.selectedTitle.label) || choice.label;
 
       setEquippedTitleCodeState(savedCode);
       setEquippedTitleLabelState(savedLabel);
@@ -1253,7 +1515,11 @@ export default function ProfileClient({
       });
 
       let json: SaveStreakTitleApiResponse | null = null;
-      try { json = (await res.json()) as SaveStreakTitleApiResponse; } catch { json = null; }
+      try {
+        json = (await res.json()) as SaveStreakTitleApiResponse;
+      } catch {
+        json = null;
+      }
       if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось сбросить титул");
 
       setEquippedTitleCodeState(null);
@@ -1275,7 +1541,8 @@ export default function ProfileClient({
 
   const effectiveTitleLabelForUi = equippedTitleLabelState ?? null;
   const effectiveTitleCodeForUi = equippedTitleCodeState ?? null;
-  const titleText = effectiveTitleLabelForUi?.trim() || (streakDisplay >= 1 ? "Без титула (пока не выбран)" : "Без титула");
+  const titleText =
+    effectiveTitleLabelForUi?.trim() || (streakDisplay >= 1 ? "Без титула (пока не выбран)" : "Без титула");
 
   const streakChipTitle = streakLoading
     ? "Загружаем стрик..."
@@ -1285,10 +1552,16 @@ export default function ProfileClient({
     ? `Серия: ${streakDisplay} дн. • Рекорд: ${streak.longest_streak} дн.`
     : "Серия пока не началась";
 
-  const streakChipSub = streakLoading ? "серия" : streak?.done_today ? "сегодня ✅" : streakDisplay > 0 ? "сохранить сегодня" : "начни серию";
+  const streakChipSub = streakLoading
+    ? "серия"
+    : streak?.done_today
+    ? "сегодня ✅"
+    : streakDisplay > 0
+    ? "сохранить сегодня"
+    : "начни серию";
 
-  const titleSavingNow = customUpdateDialog.open && customUpdateDialog.scope === "title" && customUpdateDialog.mode === "loading";
-  const titleUpdateDialogOpen = customUpdateDialog.open && customUpdateDialog.scope === "title";
+  const titleSavingNow =
+    customUpdateDialog.open && customUpdateDialog.scope === "title" && customUpdateDialog.mode === "loading";
 
   return (
     <div id="profileBody" style={{ ["--profile-overlay" as any]: overlayCss }}>
@@ -1300,24 +1573,60 @@ export default function ProfileClient({
       ) : null}
 
       {notif ? (
-        <div style={{ position: "fixed", top: 20, right: 20, background: notif.type === "success" ? "#4caf50" : "#f44336", color: "white", padding: "14px 18px", borderRadius: 12, boxShadow: "0 14px 35px rgba(0,0,0,0.18)", zIndex: 10001, maxWidth: 360, fontWeight: 800 }}>
+        <div
+          style={{
+            position: "fixed",
+            top: 20,
+            right: 20,
+            background: notif.type === "success" ? "#4caf50" : "#f44336",
+            color: "white",
+            padding: "14px 18px",
+            borderRadius: 12,
+            boxShadow: "0 14px 35px rgba(0,0,0,0.18)",
+            zIndex: 10001,
+            maxWidth: 360,
+            fontWeight: 800,
+          }}
+        >
           {notif.text}
         </div>
       ) : null}
 
       <Modal open={editOpen} onClose={closeEdit} title="✏️ Редактирование профиля" maxWidth={520}>
-        <form onSubmit={(e) => { e.preventDefault(); void saveProfile(); }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveProfile();
+          }}
+        >
           <div className="form-group">
             <label htmlFor="editFullName">ФИО:</label>
-            <input id="editFullName" type="text" required value={editFullName} onChange={(e) => setEditFullName(e.target.value)} />
+            <input
+              id="editFullName"
+              type="text"
+              required
+              value={editFullName}
+              onChange={(e) => setEditFullName(e.target.value)}
+            />
           </div>
           <div className="form-group">
             <label htmlFor="editPhone">Контактный телефон:</label>
-            <input id="editPhone" type="tel" required value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+            <input
+              id="editPhone"
+              type="tel"
+              required
+              value={editPhone}
+              onChange={(e) => setEditPhone(e.target.value)}
+            />
           </div>
           <div className="form-group">
             <label htmlFor="editRegion">Область проживания:</label>
-            <select id="editRegion" required value={editRegion} onChange={(e) => setEditRegion(e.target.value)}>
+            <select
+              id="editRegion"
+              required
+              value={editRegion}
+              onChange={(e) => setEditRegion(e.target.value)}
+            >
               <option value="">-- Выберите область --</option>
               <option value="Белгородская">Белгородская область</option>
               <option value="Курская">Курская область</option>
@@ -1330,11 +1639,17 @@ export default function ProfileClient({
           <div className="form-group">
             <label>Email:</label>
             <input type="email" value={userEmail} disabled style={{ backgroundColor: "#f5f5f5", color: "#666" }} />
-            <div className="small-muted" style={{ marginTop: 5 }}>Email нельзя изменить</div>
+            <div className="small-muted" style={{ marginTop: 5 }}>
+              Email нельзя изменить
+            </div>
           </div>
           <div className="modal-actions">
-            <button type="button" className="btn secondary" onClick={closeEdit}>❌ Отмена</button>
-            <button type="submit" className="btn" disabled={saving}>{saving ? "Сохранение..." : "💾 Сохранить изменения"}</button>
+            <button type="button" className="btn secondary" onClick={closeEdit}>
+              ❌ Отмена
+            </button>
+            <button type="submit" className="btn" disabled={saving}>
+              {saving ? "Сохранение..." : "💾 Сохранить изменения"}
+            </button>
           </div>
         </form>
       </Modal>
@@ -1347,8 +1662,14 @@ export default function ProfileClient({
         currentTitleCode={effectiveTitleCodeForUi}
         currentTitleLabel={effectiveTitleLabelForUi}
         titleCatalog={titleCatalogState}
-        onSelectTitle={(choice) => { if (isCustomizationUpdateLocked) return; void handleSelectTitle(choice); }}
-        onClearLocalTitle={() => { if (isCustomizationUpdateLocked) return; void handleClearSelectedTitle(); }}
+        onSelectTitle={(choice) => {
+          if (isCustomizationUpdateLocked) return;
+          void handleSelectTitle(choice);
+        }}
+        onClearLocalTitle={() => {
+          if (isCustomizationUpdateLocked) return;
+          void handleClearSelectedTitle();
+        }}
         loading={streakLoading || titleSavingNow}
       />
 
@@ -1364,33 +1685,90 @@ export default function ProfileClient({
         onSelectIconCode={isCustomizationUpdateLocked ? undefined : handleSelectStreakIcon}
       />
 
-      <Modal open={customUpdateDialog.open} onClose={closeCustomUpdateDialog} title={customUpdateDialog.title || "Обновление"} maxWidth={460}>
+      <StreakLeaderboardModal
+        open={leaderboardOpen}
+        onClose={() => setLeaderboardOpen(false)}
+        loading={leaderboardLoading}
+        error={leaderboardError}
+        top={leaderboardTop}
+        around={leaderboardAround}
+        myPlace={leaderboardMyPlace}
+        myCurrent={leaderboardMyCurrent}
+        myLongest={leaderboardMyLongest}
+        onRetry={() => void refreshLeaderboardFromApi({ force: true })}
+      />
+
+      <Modal
+        open={customUpdateDialog.open}
+        onClose={closeCustomUpdateDialog}
+        title={customUpdateDialog.title || "Обновление"}
+        maxWidth={460}
+      >
         <div style={{ display: "grid", gap: 14 }}>
           {customUpdateDialog.mode === "loading" ? (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 2px", fontWeight: 800, color: "#324a5f" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "6px 2px",
+                  fontWeight: 800,
+                  color: "#324a5f",
+                }}
+              >
                 <span className="spinner" />
                 <span>{customUpdateDialog.message || "Обновляем..."}</span>
               </div>
-              <div style={{ fontSize: 14, lineHeight: 1.4, color: "rgba(50,74,95,0.78)", background: "rgba(255,255,255,0.55)", borderRadius: 12, padding: "10px 12px" }}>
-                Пожалуйста, дождитесь завершения. Пока окно открыто, выбор новой иконки/титула временно заблокирован.
+              <div
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.4,
+                  color: "rgba(50,74,95,0.78)",
+                  background: "rgba(255,255,255,0.55)",
+                  borderRadius: 12,
+                  padding: "10px 12px",
+                }}
+              >
+                Пожалуйста, дождитесь завершения. Пока окно открыто, выбор новой
+                иконки/титула временно заблокирован.
               </div>
               <div className="modal-actions" style={{ justifyContent: "flex-end" }}>
-                <button type="button" className="btn secondary" disabled>⏳ Обновление...</button>
+                <button type="button" className="btn secondary" disabled>
+                  ⏳ Обновление...
+                </button>
               </div>
             </>
           ) : (
             <>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "rgba(244,67,54,0.08)", border: "1px solid rgba(244,67,54,0.18)", borderRadius: 14, padding: "12px 14px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  background: "rgba(244,67,54,0.08)",
+                  border: "1px solid rgba(244,67,54,0.18)",
+                  borderRadius: 14,
+                  padding: "12px 14px",
+                }}
+              >
                 <span style={{ fontSize: 20, lineHeight: 1 }}>❌</span>
                 <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ fontWeight: 900, color: "#b71c1c" }}>Не удалось обновить</div>
-                  <div style={{ color: "#7f1d1d", fontWeight: 700, lineHeight: 1.35 }}>{customUpdateDialog.message || "Ошибка соединения с сервером"}</div>
+                  <div style={{ fontWeight: 900, color: "#b71c1c" }}>
+                    Не удалось обновить
+                  </div>
+                  <div style={{ color: "#7f1d1d", fontWeight: 700, lineHeight: 1.35 }}>
+                    {customUpdateDialog.message || "Ошибка соединения с сервером"}
+                  </div>
                 </div>
               </div>
               <div className="modal-actions">
-                <button type="button" className="btn secondary" onClick={closeCustomUpdateDialog}>✖ Закрыть</button>
-                <button type="button" className="btn" onClick={() => void retryCustomUpdateDialogAction()}>🔄 Повторить</button>
+                <button type="button" className="btn secondary" onClick={closeCustomUpdateDialog}>
+                  ✖ Закрыть
+                </button>
+                <button type="button" className="btn" onClick={() => void retryCustomUpdateDialogAction()}>
+                  🔄 Повторить
+                </button>
               </div>
             </>
           )}
@@ -1410,7 +1788,9 @@ export default function ProfileClient({
           <div className="top-actions">
             <button
               type="button"
-              className={`streak-chip streak-chip--button ${streakUiBase.className} ${streakLoading ? "streak-chip--loading" : ""}`}
+              className={`streak-chip streak-chip--button ${streakUiBase.className} ${
+                streakLoading ? "streak-chip--loading" : ""
+              }`}
               title={streakChipTitle}
               aria-label="Открыть информацию о серии"
               onClick={openStreakModal}
@@ -1435,9 +1815,25 @@ export default function ProfileClient({
               <span className="streak-chip-sub">{streakChipSub}</span>
             </button>
 
-            <Link className="nav-pill nav-pill--info" href="/info"><span>📄</span>Информация</Link>
-            <Link className="nav-pill nav-pill--materials" href="/materials"><span>📚</span>Материалы</Link>
-            <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}><span>⏻</span>Выйти</button>
+            <button
+              type="button"
+              className="nav-pill nav-pill--info"
+              onClick={openLeaderboardModal}
+              title="Открыть топ по сериям"
+              aria-label="Открыть топ по сериям"
+            >
+              <span>🏅</span>Топ
+            </button>
+
+            <Link className="nav-pill nav-pill--info" href="/info">
+              <span>📄</span>Информация
+            </Link>
+            <Link className="nav-pill nav-pill--materials" href="/materials">
+              <span>📚</span>Материалы
+            </Link>
+            <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}>
+              <span>⏻</span>Выйти
+            </button>
           </div>
         </div>
 
@@ -1489,27 +1885,91 @@ export default function ProfileClient({
                 onClick={() => setTitleModalOpen(true)}
                 title="Выбрать титул"
                 aria-label="Открыть выбор титула"
-                style={{ all: "unset", width: "100%", display: "block", cursor: customUpdateDialog.open ? "not-allowed" : "pointer", opacity: customUpdateDialog.open ? 0.88 : 1 }}
+                style={{
+                  all: "unset",
+                  width: "100%",
+                  display: "block",
+                  cursor: customUpdateDialog.open ? "not-allowed" : "pointer",
+                  opacity: customUpdateDialog.open ? 0.88 : 1,
+                }}
               >
-                <div className="profile-title-slot" style={{ position: "relative", minHeight: 44, paddingTop: 8, paddingBottom: 8, paddingLeft: 12, paddingRight: 12, borderRadius: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="profile-title-slot-icon" style={{ fontSize: 16, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>🏷️</span>
-                  <span className="profile-title-slot-text" style={{ fontSize: 16, fontWeight: 900, lineHeight: 1.15, letterSpacing: "0.01em", color: "#4f6276" }}>
+                <div
+                  className="profile-title-slot"
+                  style={{
+                    position: "relative",
+                    minHeight: 44,
+                    paddingTop: 8,
+                    paddingBottom: 8,
+                    paddingLeft: 12,
+                    paddingRight: 12,
+                    borderRadius: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span
+                    className="profile-title-slot-icon"
+                    style={{
+                      fontSize: 16,
+                      lineHeight: 1,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    🏷️
+                  </span>
+                  <span
+                    className="profile-title-slot-text"
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 900,
+                      lineHeight: 1.15,
+                      letterSpacing: "0.01em",
+                      color: "#4f6276",
+                    }}
+                  >
                     {titleText}
                   </span>
-                  <span aria-hidden="true" style={{ marginLeft: "auto", opacity: 0.9, fontWeight: 900, fontSize: 16, paddingLeft: 10, lineHeight: 1 }}>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      marginLeft: "auto",
+                      opacity: 0.9,
+                      fontWeight: 900,
+                      fontSize: 16,
+                      paddingLeft: 10,
+                      lineHeight: 1,
+                    }}
+                  >
                     {titleSavingNow ? "⏳" : "✨"}
                   </span>
                 </div>
               </button>
 
               <div className="streak-summary-card">
-                <button type="button" className="streak-summary-row streak-summary-row--button" onClick={openStreakModal} title="Открыть подробности серии">
+                <button
+                  type="button"
+                  className="streak-summary-row streak-summary-row--button"
+                  onClick={openStreakModal}
+                  title="Открыть подробности серии"
+                >
                   <span className="streak-summary-key">🔥 Текущая серия</span>
-                  <span className="streak-summary-value">{streakLoading ? "…" : `${streakDisplay} дн.`}</span>
+                  <span className="streak-summary-value">
+                    {streakLoading ? "…" : `${streakDisplay} дн.`}
+                  </span>
                 </button>
-                <button type="button" className="streak-summary-row streak-summary-row--button" onClick={openStreakModal} title="Открыть подробности серии">
+                <button
+                  type="button"
+                  className="streak-summary-row streak-summary-row--button"
+                  onClick={openStreakModal}
+                  title="Открыть подробности серии"
+                >
                   <span className="streak-summary-key">🏆 Рекорд</span>
-                  <span className="streak-summary-value">{streakLoading ? "…" : `${longestStreakDisplay} дн.`}</span>
+                  <span className="streak-summary-value">
+                    {streakLoading ? "…" : `${longestStreakDisplay} дн.`}
+                  </span>
                 </button>
               </div>
 
@@ -1517,62 +1977,126 @@ export default function ProfileClient({
 
               <div className="profile-mini">
                 <div className="mini-col">
-                  <div className="mini-cap"><span className="mini-ico">📞</span> ТЕЛЕФОН</div>
+                  <div className="mini-cap">
+                    <span className="mini-ico">📞</span> ТЕЛЕФОН
+                  </div>
                   <div className="mini-val">{phoneLabel(profile.contact_phone)}</div>
                 </div>
                 <div className="profile-mini-divider" />
                 <div className="mini-col">
-                  <div className="mini-cap"><span className="mini-ico">📍</span> РЕГИОН</div>
+                  <div className="mini-cap">
+                    <span className="mini-ico">📍</span> РЕГИОН
+                  </div>
                   <div className="mini-val">{regionLabel(profile.region)}</div>
                 </div>
               </div>
 
-              <div className="pill pill--teal"><span className="pill-icon">📘</span>Доступно заданий: {stats?.totalAvailableAssignments ?? "—"}</div>
-              <div className="pill pill--red"><span className="pill-icon">✅</span>Выполнено: {stats?.completedAvailableAssignments ?? "—"}</div>
+              <div className="pill pill--teal">
+                <span className="pill-icon">📘</span>Доступно заданий:{" "}
+                {stats?.totalAvailableAssignments ?? "—"}
+              </div>
+              <div className="pill pill--red">
+                <span className="pill-icon">✅</span>Выполнено:{" "}
+                {stats?.completedAvailableAssignments ?? "—"}
+              </div>
 
-              <button className="action-btn action-btn--primary" onClick={openEdit} type="button"><span>✏️</span> Редактировать профиль</button>
-              <button className="action-btn action-btn--dangerSoft" onClick={() => (window.location.href = "/requests")} type="button"><span>📝</span> Заявки на покупку</button>
-              {profile.is_admin ? <Link className="action-btn action-btn--soft" href="/admin"><span>⚙️</span> Админка</Link> : null}
+              <button className="action-btn action-btn--primary" onClick={openEdit} type="button">
+                <span>✏️</span> Редактировать профиль
+              </button>
+
+              <button
+                className="action-btn action-btn--soft"
+                onClick={openLeaderboardModal}
+                type="button"
+                title="Открыть топ по сериям"
+                aria-label="Открыть топ по сериям"
+              >
+                <span>🏅</span> Топ по сериям
+              </button>
+
+              <button
+                className="action-btn action-btn--dangerSoft"
+                onClick={() => (window.location.href = "/requests")}
+                type="button"
+              >
+                <span>📝</span> Заявки на покупку
+              </button>
+              {profile.is_admin ? (
+                <Link className="action-btn action-btn--soft" href="/admin">
+                  <span>⚙️</span> Админка
+                </Link>
+              ) : null}
             </div>
           </aside>
 
           <main className="panel">
             <section className="section">
-              <div className="section-title"><span className="section-ico">📊</span>Статистика по доступным <b>материалам</b></div>
-              <div className="mini-stats">
-                <div className="mini-stat"><div className="mini-stat-number">{stats?.totalMaterials ?? "—"}</div><div className="mini-stat-label">Доступных материала</div></div>
-                <div className="mini-stat"><div className="mini-stat-number">{stats?.completedMaterials ?? "—"}</div><div className="mini-stat-label">Пройдено материалов</div></div>
-                <div className="mini-stat"><div className="mini-stat-number">{stats ? `${stats.successRate}%` : "—"}</div><div className="mini-stat-label">Общий прогресс</div></div>
+              <div className="section-title">
+                <span className="section-ico">📊</span>Статистика по доступным <b>материалам</b>
               </div>
-              {progressLoading ? <div style={{ marginTop: 12, fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>🔄 Подгружаем прогресс...</div> : null}
-              {progressError ? <div style={{ marginTop: 12, fontWeight: 900, color: "#c62828" }}>❌ Прогресс не загрузился: {progressError}</div> : null}
+              <div className="mini-stats">
+                <div className="mini-stat">
+                  <div className="mini-stat-number">{stats?.totalMaterials ?? "—"}</div>
+                  <div className="mini-stat-label">Доступных материала</div>
+                </div>
+                <div className="mini-stat">
+                  <div className="mini-stat-number">{stats?.completedMaterials ?? "—"}</div>
+                  <div className="mini-stat-label">Пройдено материалов</div>
+                </div>
+                <div className="mini-stat">
+                  <div className="mini-stat-number">{stats ? `${stats.successRate}%` : "—"}</div>
+                  <div className="mini-stat-label">Общий прогресс</div>
+                </div>
+              </div>
+              {progressLoading ? (
+                <div style={{ marginTop: 12, fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>
+                  🔄 Подгружаем прогресс...
+                </div>
+              ) : null}
+              {progressError ? (
+                <div style={{ marginTop: 12, fontWeight: 900, color: "#c62828" }}>
+                  ❌ Прогресс не загрузился: {progressError}
+                </div>
+              ) : null}
             </section>
 
             <section className="section">
-              <div className="section-title"><span className="section-ico">📁</span>Прогресс по доступным <b>материалам</b></div>
+              <div className="section-title">
+                <span className="section-ico">📁</span>Прогресс по доступным <b>материалам</b>
+              </div>
               {!materialsProgress ? (
                 <div style={{ fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>📚 Загрузка материалов...</div>
               ) : materialsProgress.length === 0 ? (
                 <div style={{ fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>
                   📚 Материалы пока не доступны
-                  <div style={{ marginTop: 6, fontWeight: 700 }}>Обратитесь к администратору для получения доступа</div>
+                  <div style={{ marginTop: 6, fontWeight: 700 }}>
+                    Обратитесь к администратору для получения доступа
+                  </div>
                 </div>
               ) : (
                 <div className="progress-list">
                   {materialsProgress.map((m) => (
-                    <div key={`${m.kind}-${m.id}`} className="progress-row" onClick={() => (window.location.href = m.href)}>
+                    <div
+                      key={`${m.kind}-${m.id}`}
+                      className="progress-row"
+                      onClick={() => (window.location.href = m.href)}
+                    >
                       <div className="progress-left">
                         <div className={"progress-type " + (m.kind === "textbook" ? "progress-type--textbook" : "progress-type--crossword")}>
                           {m.kind === "textbook" ? "📗 УЧЕБНИК" : "🧩 КРОССВОРД"}
                         </div>
                         <div className="progress-title">{m.title}</div>
                         <div className="progress-sub">
-                          {m.kind === "textbook" ? `${m.completed} из ${m.total} заданий выполнено` : `${m.completed} из ${m.total} слов отгадано`}
+                          {m.kind === "textbook"
+                            ? `${m.completed} из ${m.total} заданий выполнено`
+                            : `${m.completed} из ${m.total} слов отгадано`}
                           {m.total === 0 ? " (нет заданий)" : ""}
                         </div>
                       </div>
                       <div className="progress-right">
-                        <div className="progress-bar"><div className="progress-fill" style={{ width: `${m.progressPercent}%` }} /></div>
+                        <div className="progress-bar">
+                          <div className="progress-fill" style={{ width: `${m.progressPercent}%` }} />
+                        </div>
                         <div className="progress-percent">{m.progressPercent}%</div>
                       </div>
                     </div>
@@ -1582,11 +2106,23 @@ export default function ProfileClient({
             </section>
 
             <section className="section">
-              <div className="section-title"><span className="section-ico">💡</span><b>Информация</b></div>
+              <div className="section-title">
+                <span className="section-ico">💡</span>
+                <b>Информация</b>
+              </div>
               <ul className="info-list">
-                <li className="info-li"><span className="info-bullet">▢</span>На этой странице отображается ваш прогресс по доступным учебникам и кроссвордам.</li>
-                <li className="info-li"><span className="info-bullet">▢</span>В разделе "Прогресс по материалам" показаны все учебники и кроссворды, к которым у вас есть доступ.</li>
-                <li className="info-li"><span className="info-bullet">▢</span><span><b>Совет:</b> регулярно занимайтесь для достижения лучших результатов!</span></li>
+                <li className="info-li">
+                  <span className="info-bullet">▢</span>На этой странице отображается ваш прогресс по доступным учебникам и кроссвордам.
+                </li>
+                <li className="info-li">
+                  <span className="info-bullet">▢</span>В разделе "Прогресс по материалам" показаны все учебники и кроссворды, к которым у вас есть доступ.
+                </li>
+                <li className="info-li">
+                  <span className="info-bullet">▢</span>
+                  <span>
+                    <b>Совет:</b> регулярно занимайтесь для достижения лучших результатов!
+                  </span>
+                </li>
               </ul>
             </section>
           </main>
