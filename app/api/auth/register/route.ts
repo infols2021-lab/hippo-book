@@ -4,31 +4,6 @@ import { ok, fail } from "@/lib/api/response";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
 
-const ALLOWED_DOMAINS = [
-  "gmail.com",
-  "yandex.ru",
-  "mail.ru",
-  "ya.ru",
-  "yandex.com",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "yahoo.com",
-  "icloud.com",
-  "me.com",
-  "mac.com",
-  "rambler.ru",
-  "bk.ru",
-  "list.ru",
-  "inbox.ru",
-  "yandex.ua",
-  "mail.ua",
-  "ukr.net",
-  "i.ua",
-  "meta.ua",
-  "email.ua",
-];
-
 const BLOCKED_DOMAINS = [
   "tempmail.com",
   "10minutemail.com",
@@ -61,15 +36,13 @@ function isValidEmail(email: string) {
 }
 
 function validateDomain(email: string) {
-  const domain = email.split("@")[1]?.toLowerCase();
+  const domain = email.split("@")[1]?.toLowerCase().trim();
   if (!domain) return { ok: false as const, message: "Неверный формат email" };
-  if (BLOCKED_DOMAINS.includes(domain)) return { ok: false as const, message: "Временные email адреса запрещены" };
-  if (!ALLOWED_DOMAINS.includes(domain)) {
-    return {
-      ok: false as const,
-      message: "Разрешены только email от популярных сервисов (Gmail, Yandex, Mail.ru, Outlook и др.)",
-    };
+
+  if (BLOCKED_DOMAINS.includes(domain)) {
+    return { ok: false as const, message: "Временные email адреса запрещены" };
   }
+
   return { ok: true as const };
 }
 
@@ -110,21 +83,18 @@ export async function POST(req: Request) {
     const password = String(body.password ?? "");
     const captchaToken = String(body.captchaToken ?? "");
 
-    // ✅ FIX: всегда строка (иначе TS ругается на string | undefined)
     const remoteIp = getRemoteIp(req) ?? "";
 
-    // 1) captcha
     const captcha = await verifyTurnstileToken({
       token: captchaToken,
       expectedAction: "register",
-      remoteIp, // <-- теперь всегда string
+      remoteIp,
     });
 
     if (!captcha.ok) {
       return fail("Капча не пройдена. Перезагрузите и попробуйте снова.", 400, captcha.code);
     }
 
-    // 2) validate
     if (!fullName || fullName.length < 3) return fail("Введите ФИО", 400, "VALIDATION");
     if (!phone) return fail("Введите телефон", 400, "VALIDATION");
     if (!region) return fail("Выберите область", 400, "VALIDATION");
@@ -133,12 +103,18 @@ export async function POST(req: Request) {
     const d = validateDomain(email);
     if (!d.ok) return fail(d.message, 400, "VALIDATION");
 
-    if (!password || password.length < 6) return fail("Пароль должен быть не менее 6 символов", 400, "VALIDATION");
+    if (!password || password.length < 6) {
+      return fail("Пароль должен быть не менее 6 символов", 400, "VALIDATION");
+    }
 
-    // 3) pre-check by profiles.email (service role)
     try {
       const admin = getSupabaseAdminClient();
-      const { data: existing } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
+      const { data: existing } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
       if (existing?.id) {
         return fail(
           "Аккаунт с таким email уже существует. Нажмите «Войти» или «Забыли пароль?»",
@@ -150,7 +126,6 @@ export async function POST(req: Request) {
       // если admin недоступен — не валим, просто идём дальше
     }
 
-    // 4) signUp via anon
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !anon) return fail("Supabase env missing", 500, "ENV_MISSING");
@@ -197,20 +172,17 @@ export async function POST(req: Request) {
 
     if (!data.user?.id) return fail("Не удалось создать пользователя", 500, "NO_USER");
 
-    // 5) profiles upsert — без email (чтобы не ловить unique конфликт)
     try {
       const admin = getSupabaseAdminClient();
-      const { error: pErr } = await admin
-        .from("profiles")
-        .upsert(
-          {
-            id: data.user.id,
-            full_name: fullName,
-            contact_phone: phone,
-            region,
-          } as any,
-          { onConflict: "id" },
-        );
+      const { error: pErr } = await admin.from("profiles").upsert(
+        {
+          id: data.user.id,
+          full_name: fullName,
+          contact_phone: phone,
+          region,
+        } as any,
+        { onConflict: "id" },
+      );
 
       if (pErr) console.error("[register] profile upsert error", pErr);
     } catch (e) {

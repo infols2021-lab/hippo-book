@@ -7,31 +7,6 @@ import "./register.css";
 type BannerType = "error" | "success" | "warning" | null;
 type ModalKind = "error" | "success" | "warning";
 
-const ALLOWED_DOMAINS = [
-  "gmail.com",
-  "yandex.ru",
-  "mail.ru",
-  "ya.ru",
-  "yandex.com",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "yahoo.com",
-  "icloud.com",
-  "me.com",
-  "mac.com",
-  "rambler.ru",
-  "bk.ru",
-  "list.ru",
-  "inbox.ru",
-  "yandex.ua",
-  "mail.ua",
-  "ukr.net",
-  "i.ua",
-  "meta.ua",
-  "email.ua",
-];
-
 const BLOCKED_DOMAINS = [
   "tempmail.com",
   "10minutemail.com",
@@ -70,18 +45,13 @@ function isValidEmail(email: string) {
 }
 
 function validateDomain(email: string) {
-  const domain = email.split("@")[1]?.toLowerCase();
+  const domain = email.split("@")[1]?.toLowerCase().trim();
   if (!domain) return { valid: false, message: "Неверный формат email" };
+
   if (BLOCKED_DOMAINS.includes(domain)) {
     return { valid: false, message: "Временные email адреса запрещены" };
   }
-  if (!ALLOWED_DOMAINS.includes(domain)) {
-    return {
-      valid: false,
-      message:
-        "Разрешены только email от популярных сервисов: Gmail, Yandex, Mail.ru, Outlook и др.",
-    };
-  }
+
   return { valid: true, message: "" };
 }
 
@@ -130,14 +100,12 @@ export default function RegisterPage() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
 
-  // баннер оставляем — но будем использовать только для "warning" (процесс)
   const [bannerType, setBannerType] = useState<BannerType>(null);
   const [bannerText, setBannerText] = useState("");
 
   const [busy, setBusy] = useState(false);
   const [registered, setRegistered] = useState(false);
 
-  // ✅ модалка для успеха/ошибок
   const [modalOpen, setModalOpen] = useState(false);
   const [modalKind, setModalKind] = useState<ModalKind>("success");
   const [modalTitle, setModalTitle] = useState("");
@@ -162,12 +130,10 @@ export default function RegisterPage() {
 
   function closeModal() {
     setModalOpen(false);
-    // ✅ чтобы “создаём аккаунт…” не залипал после закрытия
     setBusy(false);
     clearBanner();
   }
 
-  // ======= Валидации =======
   const formatValid = useMemo(() => isValidEmail(email.trim()), [email]);
 
   const matchValid = useMemo(() => {
@@ -224,7 +190,6 @@ export default function RegisterPage() {
     const code = String(payload?.code || "").toUpperCase();
     const err = String(payload?.error || payload?.message || "").trim();
 
-    // USER_EXISTS / email already exists
     if (code === "USER_EXISTS" || err.toLowerCase().includes("уже существует")) {
       return (
         "Аккаунт с таким email уже существует.\n\n" +
@@ -234,13 +199,15 @@ export default function RegisterPage() {
       );
     }
 
-    // rate limit
     if (code === "RATE_LIMIT" || status === 429) {
       return "Слишком много попыток. Подождите несколько минут и попробуйте снова.";
     }
 
-    // captcha
-    if (code.includes("CAPTCHA") || code.includes("TURNSTILE") || err.toLowerCase().includes("капч")) {
+    if (
+      code.includes("CAPTCHA") ||
+      code.includes("TURNSTILE") ||
+      err.toLowerCase().includes("капч")
+    ) {
       return (
         (err || "Капча не пройдена или не загрузилась.") +
         "\n\nПопробуйте:\n" +
@@ -250,12 +217,10 @@ export default function RegisterPage() {
       );
     }
 
-    // validation
     if (code === "VALIDATION") {
       return err || "Проверьте правильность заполнения полей.";
     }
 
-    // fallback
     if (err) return err;
     return `Ошибка регистрации (${status}). Попробуйте перезагрузить капчу и повторить.`;
   }
@@ -324,7 +289,6 @@ export default function RegisterPage() {
         }),
       });
 
-      // ✅ ВАЖНО: читаем ответ даже при 400
       const text = await res.text();
       let json: any = null;
       try {
@@ -333,7 +297,6 @@ export default function RegisterPage() {
         json = null;
       }
 
-      // ошибка уровня HTTP
       if (!res.ok) {
         const msg = friendlyErrorFromApi(json, res.status);
 
@@ -345,7 +308,6 @@ export default function RegisterPage() {
         return;
       }
 
-      // ok=false внутри 200
       if (!json?.ok) {
         const msg = friendlyErrorFromApi(json, 400);
 
@@ -357,7 +319,6 @@ export default function RegisterPage() {
         return;
       }
 
-      // SUCCESS
       setBusy(false);
       clearBanner();
 
@@ -370,7 +331,6 @@ export default function RegisterPage() {
 
       setRegistered(true);
 
-      // очищаем форму
       setFullName("");
       setPhone("");
       setRegion("");
@@ -396,7 +356,6 @@ export default function RegisterPage() {
     }
   }
 
-  // Enter = submit (только если можно)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Enter" && canSubmit) {
@@ -406,7 +365,7 @@ export default function RegisterPage() {
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [canSubmit]); // ok
+  }, [canSubmit]);
 
   function validationRow(ok: boolean, activeInvalid: boolean, text: string) {
     return (
@@ -417,7 +376,6 @@ export default function RegisterPage() {
     );
   }
 
-  // показываем баннер только для warning (процесс), чтобы не дублировать модалку
   const bannerClass =
     bannerType === "warning"
       ? "warning"
@@ -431,7 +389,6 @@ export default function RegisterPage() {
 
   return (
     <div className="page-register">
-      {/* ✅ MODAL */}
       {modalOpen ? (
         <div
           role="dialog"
@@ -604,7 +561,7 @@ export default function RegisterPage() {
             {validationRow(formatValid, !!email.trim(), "Правильный формат email")}
             {validationRow(matchValid, !!confirmEmail.trim(), "Email адреса совпадают")}
             {validationRow(passwordValid, !!password, "Пароль не менее 6 символов")}
-            {validationRow(domainValid, !!email.trim(), "Разрешенный почтовый сервис")}
+            {validationRow(domainValid, !!email.trim(), "Почтовый домен не является временным")}
             {validationRow(phoneValid, false, "Телефон заполнен")}
             {validationRow(regionValid, false, "Область выбрана")}
           </div>
@@ -618,7 +575,6 @@ export default function RegisterPage() {
                 onToken={(t) => setCaptchaToken(t)}
               />
 
-              {/* ✅ Подсказка, если капча не прогрузилась/токена нет */}
               {!captchaToken ? (
                 <div className="rate-limit" style={{ marginTop: 10 }}>
                   🧩 <strong>Если вы не видите капчу</strong> — нажмите{" "}
@@ -631,7 +587,6 @@ export default function RegisterPage() {
               <button
                 type="button"
                 className="btn btn-captcha-reload"
-                // ✅ кнопку оставляем всегда доступной (как ты просил)
                 disabled={false}
                 onClick={() => resetCaptchaHard()}
               >
