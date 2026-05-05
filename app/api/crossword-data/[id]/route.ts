@@ -7,14 +7,17 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 
     const supabase = await createSupabaseServerClient();
     const { data: auth, error: authErr } = await supabase.auth.getUser();
+
     if (authErr) return NextResponse.json({ ok: false, error: "Auth fetch failed" }, { status: 500 });
     if (!auth.user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
     const user = auth.user;
 
     const { data: crossword, error: cErr } = await supabase
       .from("crosswords")
       .select("*")
       .eq("id", crosswordId)
+      .or("branch_type.eq.olympiad,branch_type.is.null")
       .single();
 
     if (cErr || !crossword) {
@@ -31,6 +34,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     if (accessErr) return NextResponse.json({ ok: false, error: accessErr.message }, { status: 500 });
 
     const isAllowed = Boolean(crossword.is_available || access);
+
     if (!isAllowed) {
       return NextResponse.json({ ok: true, locked: true, crossword }, { status: 200 });
     }
@@ -39,6 +43,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       .from("assignments")
       .select("*")
       .eq("crossword_id", crosswordId)
+      .or("branch_type.eq.olympiad,branch_type.is.null")
       .order("order_index");
 
     if (asgErr) return NextResponse.json({ ok: false, error: asgErr.message }, { status: 500 });
@@ -46,8 +51,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     const asg = assignments ?? [];
     const ids = asg.map((a: any) => a.id);
 
-    // ✅ ВАЖНО: только завершённые, + score
     let userProgress: any[] = [];
+
     if (ids.length) {
       const { data: p, error: pErr } = await supabase
         .from("user_progress")
@@ -57,12 +62,20 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
         .in("assignment_id", ids);
 
       if (pErr) return NextResponse.json({ ok: false, error: pErr.message }, { status: 500 });
+
       userProgress = p ?? [];
     }
 
     return NextResponse.json(
-      { ok: true, locked: false, crossword, assignments: asg, userProgress },
-      { status: 200 }
+      {
+        ok: true,
+        locked: false,
+        branch_type: "olympiad",
+        crossword,
+        assignments: asg,
+        userProgress,
+      },
+      { status: 200 },
     );
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || "Server error" }, { status: 500 });

@@ -17,8 +17,16 @@ function normSource(v: string | undefined) {
   const s = (v ?? "").trim().toLowerCase();
   if (!s) return undefined;
 
-  // ✅ разрешаем только то, что реально используем в навигации
-  const allowed = new Set(["textbook", "crossword", "materials", "login", "profile"]);
+  const allowed = new Set([
+    "textbook",
+    "crossword",
+    "materials",
+    "login",
+    "profile",
+    "gatehouse-material",
+    "gatehouse",
+  ]);
+
   return allowed.has(s) ? s : undefined;
 }
 
@@ -29,7 +37,6 @@ export default async function AssignmentByIdPage({
   params: MaybePromise<{ id: string }>;
   searchParams?: MaybePromise<SearchParams>;
 }) {
-  // ✅ await безопасен и для Promise, и для обычного объекта
   const p = await params;
   const sp = (await searchParams) ?? {};
 

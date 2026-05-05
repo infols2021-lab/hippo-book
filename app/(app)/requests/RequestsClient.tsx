@@ -17,6 +17,7 @@ type PurchaseRequest = {
   full_name: string;
   is_processed: boolean;
   user_id: string;
+  branch_type?: string | null;
 };
 
 type Props = {
@@ -78,11 +79,13 @@ function getPaymentQRUrl(seed?: number) {
 async function safeReadJson(res: Response) {
   const t = await res.text();
   let json: any = null;
+
   try {
     json = t ? JSON.parse(t) : null;
   } catch {
     json = null;
   }
+
   return { text: t, json };
 }
 
@@ -106,7 +109,6 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
 
   const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
 
-  // QR state
   const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState(false);
@@ -128,12 +130,14 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
       .from("purchase_requests")
       .select("*")
       .eq("user_id", userId)
+      .or("branch_type.eq.olympiad,branch_type.is.null")
       .order("created_at", { ascending: false });
 
     if (error) {
       showNotification("Ошибка загрузки заявок: " + error.message, "error");
       return;
     }
+
     setRequests((data ?? []) as PurchaseRequest[]);
   }
 
@@ -149,7 +153,6 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
   }
 
   const lastPendingRequest = useMemo(() => {
-    // requests уже отсортированы desc, так что берём первую непроцессед
     return requests.find((r) => !r.is_processed) ?? null;
   }, [requests]);
 
@@ -202,14 +205,15 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
     }
 
     const types = selectedTypesArray();
+
     if (types.length === 0) {
       showNotification("❌ Пожалуйста, выберите хотя бы один тип материала", "error");
       return;
     }
 
-    // если вдруг каким-то образом открыли редактирование обработанной (страховка)
     if (editingId) {
       const cur = requests.find((x) => x.id === editingId);
+
       if (cur?.is_processed) {
         showNotification("🔒 Обработанную заявку нельзя редактировать", "error");
         setRequestModalOpen(false);
@@ -220,6 +224,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
     const payload = {
       request_number: requestNumber,
       created_at: requestDateTime + ":00Z",
+      branch_type: "olympiad",
       class_level: classLevel,
       textbook_types: types,
       email: userEmail,
@@ -229,7 +234,6 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
     };
 
     try {
-      // ✅ РЕДАКТИРОВАНИЕ через серверный API (чтобы сразу синкать Google Sheets)
       if (editingId) {
         const res = await fetch("/api/requests/update", {
           method: "POST",
@@ -238,6 +242,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
             id: editingId,
             request_number: payload.request_number,
             created_at: payload.created_at,
+            branch_type: payload.branch_type,
             class_level: payload.class_level,
             textbook_types: payload.textbook_types,
             email: payload.email,
@@ -262,13 +267,13 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
         return;
       }
 
-      // ✅ СОЗДАНИЕ через серверный API (как и было)
       const res = await fetch("/api/requests/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           request_number: payload.request_number,
           created_at: payload.created_at,
+          branch_type: payload.branch_type,
           class_level: payload.class_level,
           textbook_types: payload.textbook_types,
           email: payload.email,
@@ -307,6 +312,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
       showNotification("❌ Вы можете удалять только свои заявки", "error");
       return;
     }
+
     if (r.is_processed) {
       showNotification("🔒 Обработанную заявку нельзя удалить", "error");
       return;
@@ -316,7 +322,6 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
     if (!okConfirm) return;
 
     try {
-      // ✅ УДАЛЕНИЕ через серверный API (чтобы сразу удалить строку в Google Sheets)
       const res = await fetch("/api/requests/delete", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -507,6 +512,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
           nav={[
             { kind: "link", href: "/materials", label: "📚 Материалы", className: "btn" },
             { kind: "link", href: "/profile", label: "👤 Профиль", className: "btn" },
+            { kind: "link", href: "/portal", label: "🏠 Портал", className: "btn secondary" },
             { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
           ]}
         />
@@ -517,9 +523,9 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
           <div className="payment-info">
             <h4>💰 Информация об оплате</h4>
             <p>
-              Стоимость каждого учебника или кроссворда — 1000 рублей. 
+              Стоимость каждого учебника или кроссворда — 1000 рублей.
               QR код для оплаты появляется сразу после создания заявки или его можно увидеть находясь на этой странице,
-              нажав на кнопку "Показать qr", в окне будет сумма к оплате из последней заявки. 
+              нажав на кнопку "Показать qr", в окне будет сумма к оплате из последней заявки.
               После подтверждения оплаты доступ к материалам будет открыт в течение 24 часов.
             </p>
           </div>
@@ -533,7 +539,6 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
               className="btn ghost qr-open"
               type="button"
               onClick={() => {
-                // ✅ показываем сумму по последней НЕобработанной заявке
                 const amount = lastPendingAmount;
                 setPaymentTotalAmount(amount);
 
@@ -577,6 +582,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
               <tbody>
                 {requests.map((r) => {
                   const locked = r.is_processed;
+
                   return (
                     <tr key={r.id}>
                       <td>

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "../../../lib/supabase/server";
 import RequestsClient from "./RequestsClient";
 
@@ -11,6 +12,7 @@ type PurchaseRequest = {
   full_name: string;
   is_processed: boolean;
   user_id: string;
+  branch_type?: string | null;
 };
 
 export default async function RequestsPage() {
@@ -18,7 +20,9 @@ export default async function RequestsPage() {
   const { data: auth } = await supabase.auth.getUser();
   const user = auth.user;
 
-  if (!user) return null;
+  if (!user) {
+    redirect("/login");
+  }
 
   const [{ data: profile }, { data: requests }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", user.id).single(),
@@ -26,6 +30,7 @@ export default async function RequestsPage() {
       .from("purchase_requests")
       .select("*")
       .eq("user_id", user.id)
+      .or("branch_type.eq.olympiad,branch_type.is.null")
       .order("created_at", { ascending: false }),
   ]);
 

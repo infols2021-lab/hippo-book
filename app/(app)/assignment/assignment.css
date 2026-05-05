@@ -547,7 +547,7 @@
   width: var(--cw-cell);
   height: var(--cw-cell);
 
-  border-radius: 8px; /* квадрат + лёгкие закругления */
+  border-radius: 8px;
 
   position: relative;
   display: flex;
@@ -566,13 +566,11 @@
   user-select: none;
 }
 
-/* клетки со словами: жирная чёрная обводка */
 .cw-cell.active {
   background: #ffffff;
   border: 3px solid #111;
 }
 
-/* пустые клетки (нет слов): светло-красные */
 .cw-cell.empty {
   background: linear-gradient(180deg, #ffe5e5, #ffd6d6);
   border: 2px solid rgba(190, 18, 60, 0.35);
@@ -581,14 +579,12 @@
     inset 0 -2px 0 rgba(0,0,0,0.03);
 }
 
-/* чёрные блоки */
 .cw-cell.blocked {
   background: linear-gradient(180deg, #2b2f36, #171a1f);
   border: 2px solid rgba(0,0,0,0.45);
   box-shadow: inset 0 2px 0 rgba(255,255,255,0.08);
 }
 
-/* hover */
 .cw-cell.active:hover {
   transform: translateY(-1px);
   box-shadow:
@@ -618,7 +614,6 @@
 .cw-grid.size-normal .cw-cell input { font-size: 14px; }
 .cw-grid.size-small .cw-cell input { font-size: 16px; }
 
-/* ✅ НОМЕР КАК В АДМИНКЕ: просто цифра внутри, сверху-слева, без бейджа */
 .cw-num {
   position: absolute;
   top: 3px;
@@ -628,13 +623,11 @@
   font-weight: 800;
   color: #111;
 
-  /* важно: фикс “уезжаний” */
   line-height: 1;
   pointer-events: none;
   transform: translateZ(0);
 }
 
-/* масштаб номера под размер клетки */
 .cw-grid.size-large .cw-num { font-size: 9px; top: 2px; left: 3px; }
 .cw-grid.size-medium .cw-num { font-size: 10px; top: 2px; left: 3px; }
 .cw-grid.size-normal .cw-num { font-size: 11px; }
@@ -999,9 +992,10 @@
 
   .review-grid-head > div:nth-child(3),
   .review-grid-row > div:nth-child(3) {
-    display: none; /* прячем колонку "Правильный" на маленьких */
+    display: none;
   }
 }
+
 /* =========================================
    FIX: убрать плавающий индикатор справа сверху
    (из legacy/global css, который наезжает на хедер)
@@ -1019,11 +1013,285 @@
   display: none !important;
 }
 
-/* на всякий случай — если это "кнопка/чип" с фикс-позицией */
 .progress-bubble,
 .floating-progress,
 .corner-progress,
 .progress-indicator,
 .question-indicator {
   display: none !important;
+}
+
+/* =========================================================
+   GATEHOUSE ASSIGNMENT THEME
+   Работает только внутри app/(app)/gatehouse/*
+   Олимпиаду не трогает.
+   ========================================================= */
+
+.gatehouse-root .container {
+  min-height: 100vh;
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(99, 102, 241, 0.34), transparent 30%),
+    radial-gradient(circle at 82% 12%, rgba(34, 211, 238, 0.18), transparent 26%),
+    radial-gradient(circle at 30% 80%, rgba(192, 132, 252, 0.16), transparent 32%),
+    linear-gradient(135deg, #070816, #0b1028 48%, #11143a);
+  padding: 24px 0 48px;
+}
+
+.gatehouse-root .header {
+  width: min(1160px, calc(100% - 32px));
+  margin: 0 auto 22px;
+  border: 1px solid rgba(165, 180, 252, 0.2);
+  border-radius: 30px;
+  padding: 22px;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(34, 211, 238, 0.18), transparent 30%),
+    radial-gradient(circle at 82% 78%, rgba(192, 132, 252, 0.18), transparent 34%),
+    linear-gradient(145deg, rgba(17, 24, 64, 0.92), rgba(7, 8, 22, 0.8));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(24px);
+}
+
+.gatehouse-root .header h1 {
+  margin: 18px 0 0;
+  color: #f8fafc;
+  font-size: clamp(36px, 6vw, 64px);
+  line-height: 0.95;
+  font-weight: 950;
+  letter-spacing: -0.06em;
+}
+
+.gatehouse-root .header-buttons {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.gatehouse-root .assignment-container {
+  width: min(860px, calc(100% - 32px));
+  max-width: none;
+  margin: 22px auto;
+  padding: 0;
+}
+
+.gatehouse-root .card,
+.gatehouse-root .question-card,
+.gatehouse-root .restart-container,
+.gatehouse-root .completion-details,
+.gatehouse-root .sentence-container {
+  border: 1px solid rgba(165, 180, 252, 0.2);
+  background:
+    radial-gradient(circle at 16% 0%, rgba(99, 102, 241, 0.14), transparent 32%),
+    linear-gradient(145deg, rgba(15, 20, 46, 0.86), rgba(9, 12, 32, 0.72));
+  color: #f8fafc;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(20px);
+}
+
+.gatehouse-root .card {
+  border-radius: 28px;
+  padding: clamp(20px, 3vw, 28px);
+}
+
+.gatehouse-root #assignmentTitle {
+  color: #f8fafc;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.gatehouse-root .question-number,
+.gatehouse-root .completion-details h3,
+.gatehouse-root .score-display {
+  color: #22d3ee;
+}
+
+.gatehouse-root .question-text {
+  color: #f8fafc;
+}
+
+.gatehouse-root .question-counter,
+.gatehouse-root .cw-mode,
+.gatehouse-root .cw-image-hint,
+.gatehouse-root .review-subtitle,
+.gatehouse-root .review-label,
+.gatehouse-root .review-qnum {
+  color: #a5b4fc;
+}
+
+.gatehouse-root .option-label,
+.gatehouse-root .fill-input-item,
+.gatehouse-root .sentence-text,
+.gatehouse-root .cw-card,
+.gatehouse-root .crossword-review-box,
+.gatehouse-root .review-card,
+.gatehouse-root .review-value,
+.gatehouse-root .review-grid,
+.gatehouse-root .review-grid-head,
+.gatehouse-root .review-metric {
+  border-color: rgba(165, 180, 252, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+  color: #f8fafc;
+}
+
+.gatehouse-root .option-label:hover {
+  background: rgba(99, 102, 241, 0.18);
+}
+
+.gatehouse-root .option-label.selected {
+  border-color: rgba(34, 211, 238, 0.62);
+  background: rgba(34, 211, 238, 0.14);
+}
+
+.gatehouse-root .fill-input-item input,
+.gatehouse-root .sentence-input {
+  border-color: rgba(165, 180, 252, 0.26);
+  background: rgba(7, 8, 22, 0.5);
+  color: #f8fafc;
+}
+
+.gatehouse-root .fill-input-item input::placeholder,
+.gatehouse-root .sentence-input::placeholder {
+  color: rgba(165, 180, 252, 0.6);
+}
+
+.gatehouse-root .fill-input-item input:focus,
+.gatehouse-root .sentence-input:focus {
+  border-color: rgba(34, 211, 238, 0.7);
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.12);
+}
+
+.gatehouse-root .fill-input-number {
+  background: linear-gradient(135deg, #6366f1, #22d3ee);
+}
+
+.gatehouse-root .navigation {
+  border-top-color: rgba(165, 180, 252, 0.18);
+}
+
+.gatehouse-root .btn,
+.gatehouse-root .btn-finish,
+.gatehouse-root .restart-btn {
+  border: 0;
+  background: linear-gradient(135deg, #6366f1, #22d3ee);
+  color: #ffffff;
+  box-shadow: 0 18px 44px rgba(99, 102, 241, 0.34);
+}
+
+.gatehouse-root .btn.secondary,
+.gatehouse-root .mode-switch-btn {
+  border: 1px solid rgba(165, 180, 252, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+  color: #f8fafc;
+  box-shadow: none;
+}
+
+.gatehouse-root .btn:hover,
+.gatehouse-root .btn-finish:hover,
+.gatehouse-root .restart-btn:hover,
+.gatehouse-root .mode-switch-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.gatehouse-root .loading {
+  color: #a5b4fc;
+}
+
+.gatehouse-root .spinner {
+  border-color: rgba(165, 180, 252, 0.18);
+  border-top-color: #22d3ee;
+}
+
+.gatehouse-root .error-message {
+  width: min(860px, calc(100% - 32px));
+  margin: 22px auto;
+  border: 1px solid rgba(251, 113, 133, 0.28);
+  background: rgba(251, 113, 133, 0.12);
+  color: #fecdd3;
+}
+
+.gatehouse-root .view-mode-notice {
+  border-color: rgba(34, 211, 238, 0.28);
+  background: rgba(34, 211, 238, 0.12);
+  color: #dffafe;
+}
+
+.gatehouse-root .result-item {
+  border-bottom-color: rgba(165, 180, 252, 0.18);
+  color: #f8fafc;
+}
+
+.gatehouse-root .review-title,
+.gatehouse-root .review-qtext,
+.gatehouse-root .review-part-idx,
+.gatehouse-root .review-part-user,
+.gatehouse-root .review-part-correct,
+.gatehouse-root .crossword-review-title,
+.gatehouse-root .crossword-review-col h5,
+.gatehouse-root .crossword-word-lines {
+  color: #f8fafc;
+}
+
+.gatehouse-root .review-grid-row {
+  border-bottom-color: rgba(165, 180, 252, 0.12);
+}
+
+.gatehouse-root .review-grid-head {
+  color: #a5b4fc;
+}
+
+.gatehouse-root .review-grid-row.row-ok {
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.gatehouse-root .review-grid-row.row-bad {
+  background: rgba(251, 113, 133, 0.08);
+}
+
+.gatehouse-root .crossword-review-col {
+  border-color: rgba(165, 180, 252, 0.18);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.gatehouse-root .crossword-word-row {
+  border-color: rgba(165, 180, 252, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.gatehouse-root .cw-grid {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.18), rgba(34, 211, 238, 0.08));
+  border-color: rgba(34, 211, 238, 0.24);
+}
+
+.gatehouse-root .cw-cell.focused {
+  outline-color: rgba(34, 211, 238, 0.45);
+}
+
+.gatehouse-root .cw-cell input {
+  caret-color: #22d3ee;
+}
+
+@media (max-width: 640px) {
+  .gatehouse-root .container {
+    padding-top: 14px;
+  }
+
+  .gatehouse-root .header,
+  .gatehouse-root .assignment-container,
+  .gatehouse-root .error-message {
+    width: min(100% - 20px, 560px);
+  }
+
+  .gatehouse-root .header {
+    border-radius: 24px;
+    padding: 18px;
+  }
+
+  .gatehouse-root .header h1 {
+    font-size: 38px;
+  }
+
+  .gatehouse-root .card {
+    border-radius: 22px;
+    padding: 18px;
+  }
 }

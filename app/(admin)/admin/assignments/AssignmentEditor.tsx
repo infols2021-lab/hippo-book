@@ -12,13 +12,34 @@ import QuestionList from "./builder/QuestionList";
 import JsonEditor from "./builder/json/JsonEditor";
 
 type MaterialOption =
-  | { kind: "textbook"; id: string; title: string }
-  | { kind: "crossword"; id: string; title: string };
+  | {
+      branch_type: "olympiad";
+      kind: "textbook";
+      id: string;
+      title: string;
+      material_kind?: "textbook";
+    }
+  | {
+      branch_type: "olympiad";
+      kind: "crossword";
+      id: string;
+      title: string;
+      material_kind?: "crossword";
+    }
+  | {
+      branch_type: "gatehouse";
+      kind: "material";
+      id: string;
+      title: string;
+      material_kind: string;
+    };
 
 type AssignmentRow = {
   id: string;
   title: string;
   order_index: number | null;
+  branch_type?: string | null;
+  material_id?: string | null;
   textbook_id: string | null;
   crossword_id: string | null;
   content: any;
@@ -33,12 +54,30 @@ type Props = {
 
 async function safeJson(res: Response) {
   const text = await res.text();
+
   if (!text) return null;
+
   try {
     return JSON.parse(text);
   } catch {
     return { ok: false, error: text };
   }
+}
+
+function materialIcon(material: MaterialOption | null) {
+  if (!material) return "—";
+  if (material.kind === "textbook") return "📚";
+  if (material.kind === "crossword") return "🧩";
+  return "🎓";
+}
+
+function materialLabel(material: MaterialOption | null) {
+  if (!material) return "—";
+
+  if (material.kind === "textbook") return `📚 ${material.title}`;
+  if (material.kind === "crossword") return `🧩 ${material.title}`;
+
+  return `🎓 ${material.title}`;
 }
 
 export default function AssignmentEditor({ material, editing, onCancel, onSaved }: Props) {
@@ -61,23 +100,27 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
   useEffect(() => {
     setTitle(editing?.title ?? "");
     setOrderIndex(Number(editing?.order_index ?? 0));
+
     const qs = editing?.content?.questions;
     setQuestions(Array.isArray(qs) && qs.length ? deepClone(qs) : [newQuestion("test")]);
+
     setMode("visual");
     setErr(null);
   }, [editing]);
 
   async function save() {
     if (!material) {
-      setErr("Сначала выберите материал (учебник/кроссворд)");
+      setErr("Сначала выберите материал");
       return;
     }
+
     if (!title.trim()) {
       setErr("Введите название задания");
       return;
     }
 
     const vr = validateQuestions(questions);
+
     if (!vr.ok) {
       const text = vr.issues.map((i) => (i.index >= 0 ? `#${i.index + 1}: ${i.message}` : i.message)).join("\n");
       setErr(text || "Ошибки в вопросах");
@@ -88,14 +131,17 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
     setSaving(true);
 
     try {
-      // ✅ шлём И kind/material_id И textbook_id/crossword_id — чтобы было совместимо со всеми вариантами API
       const payload: any = {
         title: title.trim(),
         order_index: Number.isFinite(orderIndex) ? orderIndex : 0,
         content: { questions },
 
+        branch_type: material.branch_type,
+
         kind: material.kind,
-        material_id: material.id,
+        material_kind: material.material_kind ?? material.kind,
+
+        material_id: material.kind === "material" ? material.id : null,
 
         textbook_id: material.kind === "textbook" ? material.id : null,
         crossword_id: material.kind === "crossword" ? material.id : null,
@@ -130,18 +176,31 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
         <div>
           <h3 style={{ margin: 0 }}>{editing ? "✏️ Редактирование задания" : "➕ Новое задание"}</h3>
           <div className="small-muted" style={{ marginTop: 4 }}>
-            Материал:{" "}
-            <strong>
-              {material ? `${material.kind === "textbook" ? "📚" : "🧩"} ${material.title}` : "—"}
-            </strong>
+            Материал: <strong>{material ? materialLabel(material) : "—"}</strong>
+          </div>
+          <div className="small-muted" style={{ marginTop: 4 }}>
+            Раздел: <strong>{material?.branch_type === "gatehouse" ? "🎓 Gatehouse Awards" : "🏆 Олимпиада"}</strong>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button className={`btn small ${mode === "visual" ? "" : "ghost"}`} type="button" onClick={() => setMode("visual")} disabled={saving}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span className="material-badge">{materialIcon(material)}</span>
+
+          <button
+            className={`btn small ${mode === "visual" ? "" : "ghost"}`}
+            type="button"
+            onClick={() => setMode("visual")}
+            disabled={saving}
+          >
             🎨 Редактор
           </button>
-          <button className={`btn small ${mode === "json" ? "" : "ghost"}`} type="button" onClick={() => setMode("json")} disabled={saving}>
+
+          <button
+            className={`btn small ${mode === "json" ? "" : "ghost"}`}
+            type="button"
+            onClick={() => setMode("json")}
+            disabled={saving}
+          >
             📄 JSON
           </button>
         </div>
@@ -160,7 +219,13 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
 
         <div className="col" style={{ width: 140 }}>
           <label className="small-muted">Порядок</label>
-          <input className="input" type="number" value={orderIndex} onChange={(e) => setOrderIndex(Number(e.target.value))} disabled={saving} />
+          <input
+            className="input"
+            type="number"
+            value={orderIndex}
+            onChange={(e) => setOrderIndex(Number(e.target.value))}
+            disabled={saving}
+          />
         </div>
       </div>
 
@@ -176,6 +241,7 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
         <button className="btn" type="button" onClick={() => void save()} disabled={saving}>
           💾 Сохранить
         </button>
+
         <button className="btn secondary" type="button" onClick={onCancel} disabled={saving}>
           ❌ Отмена
         </button>

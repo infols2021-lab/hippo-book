@@ -6,8 +6,7 @@ import LoadingBlock from "@/components/LoadingBlock";
 import ErrorBox from "@/components/ErrorBox";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
-import TextbooksTab from "./textbooks/TextbooksTab";
-import CrosswordsTab from "./crosswords/CrosswordsTab";
+import MaterialsManagementTab from "./materials/MaterialsManagementTab";
 import AssignmentsTab from "./assignments/AssignmentsTab";
 import UsersTab from "./users/UsersTab";
 import RequestsTab from "./requests/RequestsTab";
@@ -21,6 +20,8 @@ type Stats = {
 
 type ReqStats = { total: number; pending: number; processed: number };
 
+type AdminTab = "materials" | "assignments" | "users" | "requests";
+
 type ApiOkStats = { ok: true; stats: Stats };
 type ApiOkReqStats = { ok: true; stats: ReqStats };
 type ApiErr = { ok: false; error: string; code?: string };
@@ -28,6 +29,7 @@ type ApiErr = { ok: false; error: string; code?: string };
 async function safeJson(res: Response) {
   const text = await res.text();
   if (!text) return null;
+
   try {
     return JSON.parse(text);
   } catch {
@@ -40,9 +42,15 @@ export default function AdminClient() {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const [tab, setTab] = useState<"textbooks" | "crosswords" | "assignments" | "users" | "requests">("textbooks");
+  const [tab, setTab] = useState<AdminTab>("materials");
 
-  const [stats, setStats] = useState<Stats>({ textbooks: 0, crosswords: 0, assignments: 0, users: 0 });
+  const [stats, setStats] = useState<Stats>({
+    textbooks: 0,
+    crosswords: 0,
+    assignments: 0,
+    users: 0,
+  });
+
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsErr, setStatsErr] = useState<string | null>(null);
 
@@ -50,13 +58,12 @@ export default function AdminClient() {
 
   const tabs = useMemo(
     () => [
-      { key: "textbooks" as const, label: "📚 Учебники" },
-      { key: "crosswords" as const, label: "🧩 Кроссворды" },
+      { key: "materials" as const, label: "📦 Управление материалами" },
       { key: "assignments" as const, label: "📝 Задания" },
       { key: "users" as const, label: "👥 Пользователи" },
       { key: "requests" as const, label: "📋 Заявки" },
     ],
-    []
+    [],
   );
 
   async function loadStats() {
@@ -93,6 +100,7 @@ export default function AdminClient() {
 
   async function logout() {
     if (loggingOut) return;
+
     const ok = window.confirm("Выйти из аккаунта?");
     if (!ok) return;
 
@@ -109,6 +117,8 @@ export default function AdminClient() {
     void loadStats();
   }, []);
 
+  const totalLegacyMaterials = Number(stats.textbooks || 0) + Number(stats.crosswords || 0);
+
   return (
     <div className="admin-container">
       <div className="card" style={{ marginBottom: 14 }}>
@@ -119,6 +129,10 @@ export default function AdminClient() {
           </div>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <button className="btn small" type="button" onClick={() => router.push("/portal")}>
+              🏠 Портал
+            </button>
+
             <button className="btn small" type="button" onClick={() => router.push("/profile")}>
               👤 Профиль
             </button>
@@ -141,17 +155,25 @@ export default function AdminClient() {
         {!loadingStats && !statsErr ? (
           <div className="admin-stats-grid">
             <div className="admin-stat">
+              <div className="num">{totalLegacyMaterials}</div>
+              <div className="lbl">Олимп. материалов</div>
+            </div>
+
+            <div className="admin-stat">
               <div className="num">{stats.textbooks}</div>
               <div className="lbl">Учебников</div>
             </div>
+
             <div className="admin-stat">
               <div className="num">{stats.crosswords}</div>
               <div className="lbl">Кроссвордов</div>
             </div>
+
             <div className="admin-stat">
               <div className="num">{stats.assignments}</div>
               <div className="lbl">Заданий</div>
             </div>
+
             <div className="admin-stat">
               <div className="num">{stats.users}</div>
               <div className="lbl">Пользователей</div>
@@ -217,8 +239,7 @@ export default function AdminClient() {
         })}
       </div>
 
-      {tab === "textbooks" ? <TextbooksTab /> : null}
-      {tab === "crosswords" ? <CrosswordsTab /> : null}
+      {tab === "materials" ? <MaterialsManagementTab onChanged={loadStats} /> : null}
       {tab === "assignments" ? <AssignmentsTab /> : null}
       {tab === "users" ? <UsersTab /> : null}
       {tab === "requests" ? (

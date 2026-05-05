@@ -6,14 +6,29 @@ type Body = {
   user_id: string;
   textbook_ids?: string[];
   crossword_ids?: string[];
+  material_ids?: string[];
 };
+
+function toUniqueStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(
+      value
+        .map((item) => String(item ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+}
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
-  const { supabase } = auth;
+
+  const { supabase, user } = auth;
 
   let body: Body;
+
   try {
     body = (await req.json()) as Body;
   } catch {
@@ -21,29 +36,34 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = String(body?.user_id || "").trim();
+
   if (!userId) return fail("user_id required", 400, "VALIDATION");
 
-  const textbookIds = Array.isArray(body.textbook_ids) ? body.textbook_ids.map(String) : [];
-  const crosswordIds = Array.isArray(body.crossword_ids) ? body.crossword_ids.map(String) : [];
+  const textbookIds = toUniqueStringArray(body.textbook_ids);
+  const crosswordIds = toUniqueStringArray(body.crossword_ids);
+  const materialIds = toUniqueStringArray(body.material_ids);
 
   try {
-    // 1) чистим старые доступы
-    const [{ error: dt }, { error: dc }] = await Promise.all([
+    const [{ error: dt }, { error: dc }, { error: dm }] = await Promise.all([
       supabase.from("textbook_access").delete().eq("user_id", userId),
       supabase.from("crossword_access").delete().eq("user_id", userId),
+      supabase.from("material_access").delete().eq("user_id", userId),
     ]);
 
     if (dt) return fail(dt.message, 500, "DB_ERROR");
     if (dc) return fail(dc.message, 500, "DB_ERROR");
+    if (dm) return fail(dm.message, 500, "DB_ERROR");
 
-    // 2) вставляем новые
     if (textbookIds.length) {
       const { error } = await supabase.from("textbook_access").insert(
         textbookIds.map((id) => ({
           user_id: userId,
           textbook_id: id,
-        }))
+          granted_by: user.id,
+          granted_at: new Date().toISOString(),
+        })),
       );
+
       if (error) return fail(error.message, 500, "DB_ERROR");
     }
 
@@ -52,8 +72,24 @@ export async function POST(req: NextRequest) {
         crosswordIds.map((id) => ({
           user_id: userId,
           crossword_id: id,
-        }))
+          granted_by: user.id,
+          granted_at: new Date().toISOString(),
+        })),
       );
+
+      if (error) return fail(error.message, 500, "DB_ERROR");
+    }
+
+    if (materialIds.length) {
+      const { error } = await supabase.from("material_access").insert(
+        materialIds.map((id) => ({
+          user_id: userId,
+          material_id: id,
+          granted_by: user.id,
+          granted_at: new Date().toISOString(),
+        })),
+      );
+
       if (error) return fail(error.message, 500, "DB_ERROR");
     }
 

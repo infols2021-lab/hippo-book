@@ -1,10 +1,24 @@
-/* app/api/requests/delete/route.ts */
+// app/api/requests/delete/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
 import { deleteRequestRowByNumber } from "@/lib/integrations/googleSheets";
 
 export const runtime = "nodejs";
+
+const SHEETS_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 async function safeJson(req: NextRequest) {
   try {
@@ -24,44 +38,73 @@ export async function POST(req: NextRequest) {
   if (!body) return fail("Bad JSON", 400, "BAD_JSON");
 
   const id = String(body.id || "").trim();
-  if (!id) return fail("Missing id", 400, "VALIDATION");
+
+  if (!id) {
+    return fail("id required", 400, "VALIDATION");
+  }
 
   try {
-    const get = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from("purchase_requests")
-      .select("id,request_number,is_processed,user_id")
+      .select("id,user_id,request_number,is_processed")
       .eq("id", id)
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (get.error) return fail(get.error.message, 500, "DB_ERROR");
-    if (!get.data) return fail("Not found", 404, "NOT_FOUND");
-    if (get.data.is_processed) return fail("Processed request can't be deleted", 403, "LOCKED");
-
-    const request_number = String(get.data.request_number || "").trim();
+    if (existingError) return fail(existingError.message, 500, "DB_ERROR");
+    if (!existing) return fail("Not found", 404, "NOT_FOUND");
+    if (existing.is_processed) return fail("Processed request can't be deleted", 403, "LOCKED");
 
     const del = await supabase
       .from("purchase_requests")
       .delete()
       .eq("id", id)
       .eq("user_id", user.id)
-      .eq("is_processed", false);
+      .eq("is_processed", false)
+      .select("id")
+      .single();
 
     if (del.error) return fail(del.error.message, 500, "DB_ERROR");
 
-    let sheetOk = true;
-    let deletedRows = 0;
+    const requestNumber = String(existing.request_number || "").trim();
 
-    try {
-      if (request_number) {
-        const res = await deleteRequestRowByNumber(request_number);
-        deletedRows = res.deleted;
-      }
-    } catch {
-      sheetOk = false;
+    if (!requestNumber) {
+      return ok({
+        deleted: true,
+        id,
+        sheet: {
+          ok: false,
+          deleted: false,
+          row: null,
+          error: "Request number is empty, sheet row was not deleted",
+        },
+      });
     }
 
-    return ok({ deleted: true, request_number, sheet: { ok: sheetOk, deletedRows } });
+    try {
+      const sheet = await withTimeout(deleteRequestRowByNumber(requestNumber), SHEETS_TIMEOUT_MS, "Sheets delete");
+
+      return ok({
+        deleted: true,
+        id,
+        sheet: {
+          ok: true,
+          deleted: sheet.deleted,
+          row: sheet.rowNumber,
+        },
+      });
+    } catch (e: any) {
+      return ok({
+        deleted: true,
+        id,
+        sheet: {
+          ok: false,
+          deleted: false,
+          row: null,
+          error: String(e?.message || e || "Sheets delete error").slice(0, 500),
+        },
+      });
+    }
   } catch (e: any) {
     return fail(e?.message || "Server error", 500, "SERVER_ERROR");
   }

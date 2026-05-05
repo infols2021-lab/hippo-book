@@ -1,6 +1,10 @@
 /* lib/integrations/googleSheets.ts */
 import { google } from "googleapis";
 
+const ACCOUNTING_COLUMNS = "A:J";
+const ACCOUNTING_COLUMNS_COUNT = 10;
+const GOOGLE_API_TIMEOUT_MS = 15_000;
+
 function mustEnv(name: string) {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env: ${name}`);
@@ -19,10 +23,11 @@ export function getSpreadsheetConfig() {
 }
 
 function parseRowNumber(updatedRange?: string | null): number | null {
-  // Пример: "Учёт!A12:G12"
   if (!updatedRange) return null;
+
   const m = updatedRange.match(/![A-Z]+(\d+):/);
   if (!m) return null;
+
   const n = Number(m[1]);
   return Number.isFinite(n) ? n : null;
 }
@@ -41,38 +46,58 @@ function norm(v: any) {
   return String(v ?? "").trim();
 }
 
+function normalizeAccountingValues(values: (string | number)[]) {
+  const normalized = Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, index) => values[index] ?? "");
+  return normalized.map((value) => (typeof value === "number" ? value : norm(value)));
+}
+
 function isLikelyRequestNumber(v: string) {
-  return /^PR-/i.test(v);
+  return /^(PR|GA)-/i.test(v);
 }
 
 async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
   const sheets = getSheetsClient();
-  const meta = await sheets.spreadsheets.get({ spreadsheetId });
 
-  const found = meta.data.sheets?.find((s) => s.properties?.title === tab);
+  const meta = await sheets.spreadsheets.get(
+    {
+      spreadsheetId,
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  const found = meta.data.sheets?.find((s: any) => s.properties?.title === tab);
   const sheetId = found?.properties?.sheetId;
 
   if (sheetId === undefined || sheetId === null) {
     throw new Error(`Google Sheets tab not found: "${tab}"`);
   }
+
   return sheetId;
 }
 
-/** append в самый низ (A:G) */
+/** append в самый низ A:J */
 export async function appendAccountingRow(values: (string | number)[]) {
   const sheets = getSheetsClient();
   const { spreadsheetId, tab } = getSpreadsheetConfig();
 
-  const res = await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `${tab}!A:G`,
-    valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [values] },
-  });
+  const res = await sheets.spreadsheets.values.append(
+    {
+      spreadsheetId,
+      range: `${tab}!${ACCOUNTING_COLUMNS}`,
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values: [normalizeAccountingValues(values)] },
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
 
   const updatedRange = res.data.updates?.updatedRange ?? null;
   const rowNumber = parseRowNumber(updatedRange);
+
   return { updatedRange, rowNumber };
 }
 
@@ -81,75 +106,84 @@ export async function getExistingRequestNumbersSet() {
   const sheets = getSheetsClient();
   const { spreadsheetId, tab } = getSpreadsheetConfig();
 
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${tab}!A:A`,
-  });
+  const res = await sheets.spreadsheets.values.get(
+    {
+      spreadsheetId,
+      range: `${tab}!A:A`,
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
 
   const rows = res.data.values ?? [];
   const set = new Set<string>();
+
   for (const r of rows) {
     const v = norm(r?.[0]);
     if (v) set.add(v);
   }
+
   return set;
 }
 
 /**
- * Мапа request_number -> { rowNumber, values[0..6] }
- * Читает A:G и находит строки по колонке A.
+ * Мапа request_number -> { rowNumber, values[0..9] }
+ * Читает A:J и находит строки по колонке A.
  */
 export async function getSheetRequestRowMap() {
   const sheets = getSheetsClient();
   const { spreadsheetId, tab } = getSpreadsheetConfig();
 
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${tab}!A:G`,
-  });
+  const res = await sheets.spreadsheets.values.get(
+    {
+      spreadsheetId,
+      range: `${tab}!${ACCOUNTING_COLUMNS}`,
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
 
   const rows = res.data.values ?? [];
   const map = new Map<string, { rowNumber: number; values: string[] }>();
 
-  for (let i = 0; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i += 1) {
     const row = rows[i] ?? [];
     const rn = norm(row[0]);
+
     if (!rn) continue;
     if (!isLikelyRequestNumber(rn)) continue;
 
-    const values = [
-      norm(row[0]),
-      norm(row[1]),
-      norm(row[2]),
-      norm(row[3]),
-      norm(row[4]),
-      norm(row[5]),
-      norm(row[6]),
-    ];
-
+    const values = Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, index) => norm(row[index]));
     map.set(rn, { rowNumber: i + 1, values });
   }
 
   return map;
 }
 
-/** Обновить конкретную строку A:G по номеру строки */
+/** Обновить конкретную строку A:J по номеру строки */
 export async function updateAccountingRow(rowNumber: number, values: (string | number)[]) {
   const sheets = getSheetsClient();
   const { spreadsheetId, tab } = getSpreadsheetConfig();
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${tab}!A${rowNumber}:G${rowNumber}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [values] },
-  });
+  await sheets.spreadsheets.values.update(
+    {
+      spreadsheetId,
+      range: `${tab}!A${rowNumber}:J${rowNumber}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [normalizeAccountingValues(values)] },
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
 
   return { rowNumber };
 }
 
 /**
- * Удалить строки по номерам (1-based).
+ * Удалить строки по номерам 1-based.
  * Важно: удаляем снизу вверх.
  */
 export async function deleteAccountingRows(rowNumbers: number[]) {
@@ -174,10 +208,15 @@ export async function deleteAccountingRows(rowNumbers: number[]) {
     },
   }));
 
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId,
-    requestBody: { requests },
-  });
+  await sheets.spreadsheets.batchUpdate(
+    {
+      spreadsheetId,
+      requestBody: { requests },
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
 
   return { deleted: nums.length };
 }
@@ -186,33 +225,39 @@ export async function deleteAccountingRows(rowNumbers: number[]) {
 export async function findRowNumberByRequestNumber(requestNumber: string) {
   const rn = norm(requestNumber);
   if (!rn) return null;
+
   const map = await getSheetRequestRowMap();
   const found = map.get(rn);
+
   return found?.rowNumber ?? null;
 }
 
-/** UPSERT по request_number (A:G) */
-export async function upsertRequestRowByNumber(valuesAtoG: (string | number)[]) {
-  const rn = norm(valuesAtoG?.[0]);
+/** UPSERT по request_number A:J */
+export async function upsertRequestRowByNumber(valuesAtoJ: (string | number)[]) {
+  const rn = norm(valuesAtoJ?.[0]);
   if (!rn) throw new Error("Missing request_number in values[0]");
 
   const map = await getSheetRequestRowMap();
   const found = map.get(rn);
 
   if (found) {
-    await updateAccountingRow(found.rowNumber, valuesAtoG);
+    await updateAccountingRow(found.rowNumber, valuesAtoJ);
     return { action: "updated" as const, rowNumber: found.rowNumber };
   }
 
-  const res = await appendAccountingRow(valuesAtoG);
+  const res = await appendAccountingRow(valuesAtoJ);
   return { action: "inserted" as const, rowNumber: res.rowNumber ?? null };
 }
 
 /** DELETE по request_number */
 export async function deleteRequestRowByNumber(requestNumber: string) {
   const rowNumber = await findRowNumberByRequestNumber(requestNumber);
-  if (!rowNumber) return { ok: true, deleted: 0, rowNumber: null as number | null };
+
+  if (!rowNumber) {
+    return { ok: true, deleted: 0, rowNumber: null as number | null };
+  }
 
   const res = await deleteAccountingRows([rowNumber]);
+
   return { ok: true, deleted: res.deleted, rowNumber };
 }

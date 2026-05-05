@@ -18,15 +18,20 @@ export async function GET() {
     ] = await Promise.all([
       supabase
         .from("textbooks")
-        .select("id, title, is_available, is_active, order_index")
+        .select("id, title, is_available, is_active, order_index, branch_type")
         .eq("is_active", true)
+        .or("branch_type.eq.olympiad,branch_type.is.null")
         .order("order_index"),
       supabase
         .from("crosswords")
-        .select("id, title, is_available, is_active, order_index")
+        .select("id, title, is_available, is_active, order_index, branch_type")
         .eq("is_active", true)
+        .or("branch_type.eq.olympiad,branch_type.is.null")
         .order("order_index"),
-      supabase.from("assignments").select("id, textbook_id, crossword_id"),
+      supabase
+        .from("assignments")
+        .select("id, textbook_id, crossword_id, branch_type")
+        .or("branch_type.eq.olympiad,branch_type.is.null"),
       supabase.from("user_progress").select("assignment_id, is_completed").eq("user_id", user.id),
       supabase.from("textbook_access").select("textbook_id").eq("user_id", user.id),
       supabase.from("crossword_access").select("crossword_id").eq("user_id", user.id),
@@ -54,7 +59,11 @@ export async function GET() {
       const ids = asg.filter((a: any) => a.textbook_id === textbookId).map((a: any) => a.id);
       const total = ids.length;
       let completed = 0;
-      for (const id of ids) if (completedSet.has(id)) completed++;
+
+      for (const id of ids) {
+        if (completedSet.has(id)) completed++;
+      }
+
       const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
       return { total, completed, progressPercent };
     }
@@ -63,7 +72,11 @@ export async function GET() {
       const ids = asg.filter((a: any) => a.crossword_id === crosswordId).map((a: any) => a.id);
       const total = ids.length;
       let completed = 0;
-      for (const id of ids) if (completedSet.has(id)) completed++;
+
+      for (const id of ids) {
+        if (completedSet.has(id)) completed++;
+      }
+
       const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
       return { total, completed, progressPercent };
     }
@@ -104,10 +117,12 @@ export async function GET() {
     }
 
     let completedMaterials = 0;
+
     for (const t of availableTextbooks) {
       const { total, completed } = countForTextbook(t.id);
       if (total > 0 && completed === total) completedMaterials++;
     }
+
     for (const c of availableCrosswords) {
       const { total, completed } = countForCrossword(c.id);
       if (total > 0 && completed === total) completedMaterials++;
@@ -121,6 +136,7 @@ export async function GET() {
         : 0;
 
     return ok({
+      branch_type: "olympiad",
       stats: {
         totalMaterials,
         completedMaterials,

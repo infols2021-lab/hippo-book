@@ -1,27 +1,33 @@
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
+import type { NextRequest } from "next/server";
 
 export async function GET() {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
+
   const { supabase } = auth;
 
   try {
     const { data, error } = await supabase
       .from("crosswords")
       .select("*")
+      .or("branch_type.eq.olympiad,branch_type.is.null")
+      .order("order_index", { ascending: false })
       .order("created_at", { ascending: false });
 
     if (error) return fail(error.message, 500, "DB_ERROR");
+
     return ok({ crosswords: data ?? [] });
   } catch (e: any) {
     return fail(e?.message || "Server error", 500, "SERVER_ERROR");
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
+
   const { supabase, user } = auth;
 
   let body: any;
@@ -33,7 +39,7 @@ export async function POST(req: Request) {
 
   const title = String(body?.title ?? "").trim();
   const description = String(body?.description ?? "").trim();
-  const class_level = Array.isArray(body?.class_level) ? body.class_level.map(String) : [];
+  const class_level = Array.isArray(body?.class_level) ? body.class_level.map(String).filter(Boolean) : [];
   const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
   const is_available = Boolean(body?.is_available);
   const cover_image_url = body?.cover_image_url ? String(body.cover_image_url) : null;
@@ -48,11 +54,15 @@ export async function POST(req: Request) {
     order_index,
     is_available,
     is_active: true,
+    branch_type: "olympiad",
+    target_levels: [],
     created_by: user.id,
   };
+
   if (cover_image_url) payload.cover_image_url = cover_image_url;
 
   const { data, error } = await supabase.from("crosswords").insert(payload).select("*").single();
+
   if (error) return fail(error.message, 500, "DB_ERROR");
 
   return ok({ crossword: data });

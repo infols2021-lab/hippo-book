@@ -15,13 +15,14 @@ type ProfileRow = {
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
+
   const { supabase } = auth;
 
   try {
     const sp = req.nextUrl.searchParams;
     const q = (sp.get("q") || "").trim();
     const region = (sp.get("region") || "").trim();
-    const materials = (sp.get("materials") || "").trim(); // has | none | ""
+    const materials = (sp.get("materials") || "").trim();
 
     let query = supabase
       .from("profiles")
@@ -29,37 +30,35 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (q) {
-      // ilike по 3 полям
-      query = query.or(
-        `full_name.ilike.%${q}%,email.ilike.%${q}%,contact_phone.ilike.%${q}%`
-      );
+      query = query.or(`full_name.ilike.%${q}%,email.ilike.%${q}%,contact_phone.ilike.%${q}%`);
     }
 
     if (region) {
       query = query.eq("region", region);
     }
 
-    // ❗️ВАЖНО: НИКАКИХ .single() / .maybeSingle() / .limit(1)
     const { data: usersRaw, error: uErr } = await query;
+
     if (uErr) return fail(uErr.message, 500, "DB_ERROR");
 
     const users = (usersRaw ?? []) as ProfileRow[];
     const userIds = users.map((u) => u.id);
 
-    // access → чтобы посчитать hasMaterials
     let hasSet = new Set<string>();
 
     if (userIds.length) {
-      const [{ data: ta, error: taErr }, { data: ca, error: caErr }] = await Promise.all([
+      const [{ data: ta, error: taErr }, { data: ca, error: caErr }, { data: ma, error: maErr }] = await Promise.all([
         supabase.from("textbook_access").select("user_id").in("user_id", userIds),
         supabase.from("crossword_access").select("user_id").in("user_id", userIds),
+        supabase.from("material_access").select("user_id").in("user_id", userIds),
       ]);
 
-      const err = taErr || caErr;
+      const err = taErr || caErr || maErr;
       if (err) return fail(err.message, 500, "DB_ERROR");
 
       for (const r of ta ?? []) hasSet.add(String((r as any).user_id));
       for (const r of ca ?? []) hasSet.add(String((r as any).user_id));
+      for (const r of ma ?? []) hasSet.add(String((r as any).user_id));
     }
 
     let usersWithFlag = users.map((u) => ({ ...u, hasMaterials: hasSet.has(u.id) }));
@@ -81,9 +80,11 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
+
   const { supabase } = auth;
 
   let body: any;
+
   try {
     body = await req.json();
   } catch {
@@ -96,6 +97,7 @@ export async function PATCH(req: NextRequest) {
   if (!userId) return fail("user_id required", 400, "VALIDATION");
 
   const { error } = await supabase.from("profiles").update({ is_admin }).eq("id", userId);
+
   if (error) return fail(error.message, 500, "DB_ERROR");
 
   return ok({ updated: true });

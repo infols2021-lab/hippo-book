@@ -13,7 +13,9 @@ type ApiErr = { ok: false; error: string; code?: string };
 
 async function safeJson(res: Response) {
   const txt = await res.text();
+
   if (!txt) return null;
+
   try {
     return JSON.parse(txt);
   } catch {
@@ -24,10 +26,12 @@ async function safeJson(res: Response) {
 async function apiGet<T>(url: string): Promise<ApiOk<T>> {
   const res = await fetch(url, { cache: "no-store" });
   const json = await safeJson(res);
+
   if (!res.ok || !json?.ok) {
     const msg = (json as ApiErr | null)?.error || `HTTP ${res.status}`;
     throw new Error(msg);
   }
+
   return json as ApiOk<T>;
 }
 
@@ -38,11 +42,14 @@ async function apiPost<T>(url: string, body: any): Promise<ApiOk<T>> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
   const json = await safeJson(res);
+
   if (!res.ok || !json?.ok) {
     const msg = (json as ApiErr | null)?.error || `HTTP ${res.status}`;
     throw new Error(msg);
   }
+
   return json as ApiOk<T>;
 }
 
@@ -51,16 +58,23 @@ async function apiPost<T>(url: string, body: any): Promise<ApiOk<T>> {
 type AccessLoad = {
   textbooks: Array<{ id: string; title: string; class_level: string[] | null }>;
   crosswords: Array<{ id: string; title: string; class_level: string[] | null }>;
+
+  materials?: Array<{
+    id: string;
+    title: string;
+    branch_type: string | null;
+    material_kind: string | null;
+    target_levels: string[] | null;
+  }>;
+
   selectedTextbookIds: string[];
   selectedCrosswordIds: string[];
+  selectedMaterialIds?: string[];
 };
 
 type Props = {
   open: boolean;
-
-  /** 🔥 ВАЖНО: теперь принимаем user как в UsersTab */
   user: UserRow | null;
-
   onClose: () => void;
   onSaved?: () => Promise<void> | void;
 };
@@ -71,18 +85,20 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
   const userId = user?.id ?? null;
   const userName = user?.full_name || user?.email || "Пользователь";
 
+  const [section, setSection] = useState<"olympiad" | "gatehouse">("olympiad");
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const [textbooks, setTextbooks] = useState<AccessLoad["textbooks"]>([]);
   const [crosswords, setCrosswords] = useState<AccessLoad["crosswords"]>([]);
+  const [materials, setMaterials] = useState<NonNullable<AccessLoad["materials"]>>([]);
+
   const [tbChecked, setTbChecked] = useState<Set<string>>(new Set());
   const [cwChecked, setCwChecked] = useState<Set<string>>(new Set());
+  const [materialChecked, setMaterialChecked] = useState<Set<string>>(new Set());
 
-  const title = useMemo(
-    () => `🔐 Управление доступом — ${userName}`,
-    [userName]
-  );
+  const title = useMemo(() => `🔐 Управление доступом — ${userName}`, [userName]);
 
   /* ================= load ================= */
 
@@ -96,28 +112,34 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
       setErr(null);
 
       try {
-        const data = await apiGet<AccessLoad>(
-          `/api/admin/users/${encodeURIComponent(userId)}`
-        );
+        const data = await apiGet<AccessLoad>(`/api/admin/users/${encodeURIComponent(userId)}`);
+
         if (cancelled) return;
 
         setTextbooks(data.textbooks ?? []);
         setCrosswords(data.crosswords ?? []);
+        setMaterials(data.materials ?? []);
+
         setTbChecked(new Set((data.selectedTextbookIds ?? []).map(String)));
         setCwChecked(new Set((data.selectedCrosswordIds ?? []).map(String)));
+        setMaterialChecked(new Set((data.selectedMaterialIds ?? []).map(String)));
       } catch (e: any) {
         if (cancelled) return;
+
         setErr(e?.message || String(e));
         setTextbooks([]);
         setCrosswords([]);
+        setMaterials([]);
         setTbChecked(new Set());
         setCwChecked(new Set());
+        setMaterialChecked(new Set());
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     void load();
+
     return () => {
       cancelled = true;
     };
@@ -130,11 +152,15 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
 
     setErr(null);
     setLoading(true);
+
     try {
       const payload = {
         user_id: userId,
+
         textbook_ids: Array.from(tbChecked),
         crossword_ids: Array.from(cwChecked),
+
+        material_ids: Array.from(materialChecked),
       };
 
       await apiPost(`/api/admin/users/access`, payload);
@@ -151,13 +177,30 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
   /* ================= render ================= */
 
   return (
-    <Modal open={open} onClose={onClose} title={title} maxWidth={900}>
+    <Modal open={open} onClose={onClose} title={title} maxWidth={1000}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+        <button
+          className={section === "olympiad" ? "btn small" : "btn small ghost"}
+          type="button"
+          onClick={() => setSection("olympiad")}
+        >
+          🏆 Олимпиада
+        </button>
+
+        <button
+          className={section === "gatehouse" ? "btn small" : "btn small ghost"}
+          type="button"
+          onClick={() => setSection("gatehouse")}
+        >
+          🎓 Gatehouse Awards
+        </button>
+      </div>
+
       {loading ? <LoadingBlock text="Загружаем доступы..." /> : null}
       {err ? <ErrorBox message={err} retryMode="none" /> : null}
 
-      {!loading ? (
+      {!loading && section === "olympiad" ? (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          {/* ---------- textbooks ---------- */}
           <div>
             <h3 style={{ marginTop: 0 }}>📚 Учебники</h3>
 
@@ -194,6 +237,7 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
                           });
                         }}
                       />
+
                       <div>
                         <div style={{ fontWeight: 800 }}>{t.title}</div>
                         <div className="small-muted">
@@ -207,7 +251,6 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
             </div>
           </div>
 
-          {/* ---------- crosswords ---------- */}
           <div>
             <h3 style={{ marginTop: 0 }}>🧩 Кроссворды</h3>
 
@@ -244,6 +287,7 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
                           });
                         }}
                       />
+
                       <div>
                         <div style={{ fontWeight: 800 }}>{c.title}</div>
                         <div className="small-muted">
@@ -259,10 +303,64 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
         </div>
       ) : null}
 
+      {!loading && section === "gatehouse" ? (
+        <div>
+          <h3 style={{ marginTop: 0 }}>🎓 Материалы Gatehouse Awards</h3>
+
+          <div style={{ display: "grid", gap: 8, maxHeight: 440, overflowY: "auto" }}>
+            {materials.length === 0 ? (
+              <div className="small-muted">Нет материалов Gatehouse</div>
+            ) : (
+              materials.map((m) => {
+                const id = String(m.id);
+                const checked = materialChecked.has(id);
+                const levels = Array.isArray(m.target_levels) ? m.target_levels : [];
+
+                return (
+                  <label
+                    key={id}
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "center",
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: "1px solid rgba(0,0,0,0.08)",
+                      background: checked ? "rgba(99,102,241,0.10)" : "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        setMaterialChecked((prev) => {
+                          const next = new Set(prev);
+                          e.target.checked ? next.add(id) : next.delete(id);
+                          return next;
+                        });
+                      }}
+                    />
+
+                    <div>
+                      <div style={{ fontWeight: 800 }}>{m.title}</div>
+                      <div className="small-muted">
+                        {levels.length ? levels.join(", ") : "уровни не указаны"}
+                      </div>
+                    </div>
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : null}
+
       <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 10 }}>
         <button className="btn secondary" onClick={onClose} type="button">
           ❌ Закрыть
         </button>
+
         <button className="btn" onClick={() => void save()} type="button" disabled={loading || !userId}>
           💾 Сохранить
         </button>

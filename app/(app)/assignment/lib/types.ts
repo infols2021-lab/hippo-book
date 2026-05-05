@@ -1,3 +1,14 @@
+export type AssignmentBranchType = "olympiad" | "gatehouse";
+
+export type AssignmentSource =
+  | "textbook"
+  | "crossword"
+  | "materials"
+  | "login"
+  | "profile"
+  | "gatehouse"
+  | "gatehouse-material";
+
 export type QuestionBase = {
   q?: string;
   image?: string;
@@ -45,7 +56,7 @@ export type Progress = {
 };
 
 export type ReviewPart = {
-  index: number; // 1-based
+  index: number;
   user: string;
   correct: string;
   isCorrect: boolean;
@@ -53,10 +64,10 @@ export type ReviewPart = {
 
 export type ReviewBase = {
   questionText: string;
-  isCorrect: boolean; // 100% correct (для "Правильных ответов (100%)")
+  isCorrect: boolean;
   isSkipped: boolean;
-  pointsEarned: number; // может быть дробным (fill/sentence/crossword)
-  pointsTotal: number; // обычно 1
+  pointsEarned: number;
+  pointsTotal: number;
 };
 
 export type ReviewItem =
@@ -68,9 +79,9 @@ export type ReviewItem =
   | (ReviewBase & {
       type: "fill" | "sentence";
       userAnswers: string[];
-      correctAnswers: string[]; // "вариант1 или вариант2"
+      correctAnswers: string[];
       parts: ReviewPart[];
-      percent: number; // 0..100
+      percent: number;
       correctCount: number;
       totalCount: number;
     })
@@ -98,12 +109,21 @@ export type ReviewItem =
     });
 
 export type FinalStats = {
-  score: number; // итоговый % по баллам
-  correct: number; // сколько вопросов 100% правильные
-  incorrect: number; // сколько вопросов не 100% правильные (но отвечены)
-  skipped: number; // сколько пропущено
+  score: number;
+  correct: number;
+  incorrect: number;
+  skipped: number;
   total: number;
+  pointsEarned: number;
+  pointsTotal: number;
+};
 
-  pointsEarned: number; // набрано баллов (может быть дробным)
-  pointsTotal: number; // максимум баллов (обычно = total)
+export type AssignmentProgressRequestBody = {
+  assignmentId: string;
+  answers: any;
+  isCompleted: boolean;
+  score: number;
+  source?: AssignmentSource | string;
+  sourceId?: string;
+  branchType?: AssignmentBranchType | string;
 };

@@ -7,6 +7,11 @@ import ReviewPanel from "./components/ReviewPanel";
 import { getImageUrl } from "./lib/image";
 import { normalizeText } from "./lib/normalize";
 import type { FinalStats, ReviewItem } from "./lib/types";
+import {
+  recommendGatehouseLevel,
+  getGatehouseRecommendationBadge,
+  type GatehouseRecommendation,
+} from "@/lib/exams/recommendLevel";
 
 // ===================== TYPES =====================
 type ApiOk = {
@@ -59,6 +64,23 @@ function getCrosswordActiveCells(question: any) {
     }
   }
   return active;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+}
+
+function getAssignmentMaterialLevels(assignment: any): string[] {
+  const direct = normalizeStringArray(assignment?.target_levels);
+  if (direct.length) return direct;
+
+  const material = Array.isArray(assignment?.materials) ? assignment.materials[0] : assignment?.materials;
+  const materialLevels = normalizeStringArray(material?.target_levels);
+  if (materialLevels.length) return materialLevels;
+
+  const material2 = Array.isArray(assignment?.material) ? assignment.material[0] : assignment?.material;
+  return normalizeStringArray(material2?.target_levels);
 }
 
 // percent = правильные активные клетки / активные клетки
@@ -166,6 +188,19 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       return { href, headerLabel: "← Назад в кроссворд", actionLabel: "Вернуться в кроссворд" };
     }
 
+    if ((s === "gatehouse-material" || s === "gatehouse") && id) {
+      const href = `/gatehouse/material/${encodeURIComponent(id)}`;
+      return { href, headerLabel: "← Назад к пробному тесту", actionLabel: "Вернуться к пробному тесту" };
+    }
+
+    if (s === "gatehouse-material" || s === "gatehouse") {
+      return {
+        href: "/gatehouse/materials",
+        headerLabel: "← Назад к экзаменам",
+        actionLabel: "Вернуться к экзаменам",
+      };
+    }
+
     return { href: "/materials", headerLabel: "← Назад к материалам", actionLabel: "Вернуться к материалам" };
   }, [source, sourceId]);
 
@@ -192,6 +227,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   const [completedScreen, setCompletedScreen] = useState(false);
   const [finalStats, setFinalStats] = useState<FinalStats | null>(null);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [gatehouseRecommendation, setGatehouseRecommendation] = useState<GatehouseRecommendation | null>(null);
 
   // image modal
   const [imageModalOpen, setImageModalOpen] = useState(false);
@@ -199,6 +235,17 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   const [zoom, setZoom] = useState(1);
 
   const saveBusyRef = useRef(false);
+
+  const isGatehouse = useMemo(() => {
+    const s = String(source ?? "").trim().toLowerCase();
+    if (s === "gatehouse" || s === "gatehouse-material") return true;
+    if (assignment?.branch_type === "gatehouse") return true;
+
+    const material = Array.isArray(assignment?.materials) ? assignment.materials[0] : assignment?.materials;
+    if (material?.branch_type === "gatehouse") return true;
+
+    return false;
+  }, [assignment, source]);
 
   async function load() {
     try {
@@ -234,6 +281,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       setCompletedScreen(false);
       setFinalStats(null);
       setReviewItems([]);
+      setGatehouseRecommendation(null);
 
       setLoading(false);
     } catch (e: any) {
@@ -280,6 +328,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     setCompletedScreen(false);
     setFinalStats(null);
     setReviewItems([]);
+    setGatehouseRecommendation(null);
   }
 
   function viewPrevious() {
@@ -289,6 +338,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     setCompletedScreen(false);
     setFinalStats(null);
     setReviewItems([]);
+    setGatehouseRecommendation(null);
   }
 
   function switchMode() {
@@ -297,6 +347,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     setCompletedScreen(false);
     setFinalStats(null);
     setReviewItems([]);
+    setGatehouseRecommendation(null);
   }
 
   function notifyProfileStreakRefresh(payload?: unknown) {
@@ -318,6 +369,22 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     }
   }
 
+  function notifyGatehouseProfileRefresh(payload?: unknown) {
+    try {
+      if (typeof window === "undefined") return;
+
+      sessionStorage.setItem("gatehouse-profile-progress-dirty", "1");
+
+      if (payload !== undefined) {
+        sessionStorage.setItem("gatehouse-profile-last-save-response", JSON.stringify(payload));
+      }
+
+      window.dispatchEvent(new Event("gatehouse-profile-progress-refresh"));
+    } catch {
+      // ничего не ломаем, это только UI-синхронизация
+    }
+  }
+
   async function saveCompletedProgress(score: number) {
     if (saveBusyRef.current) return;
     saveBusyRef.current = true;
@@ -331,6 +398,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           answers,
           isCompleted: true,
           score,
+          source,
+          sourceId,
+          branchType: isGatehouse ? "gatehouse" : "olympiad",
         }),
       });
 
@@ -341,9 +411,12 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         json = null;
       }
 
-      // ✅ если сохранение прошло — триггерим обновление стрика в профиле
       if (res.ok && json?.ok) {
-        notifyProfileStreakRefresh(json?.streak ?? json);
+        if (isGatehouse) {
+          notifyGatehouseProfileRefresh(json);
+        } else {
+          notifyProfileStreakRefresh(json?.streak ?? json);
+        }
       }
     } finally {
       saveBusyRef.current = false;
@@ -718,6 +791,18 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
     await saveCompletedProgress(stats.score);
 
+    if (isGatehouse) {
+      const recommendation = recommendGatehouseLevel({
+        score: stats.score,
+        maxScore: 100,
+        percent: stats.score,
+        materialLevels: getAssignmentMaterialLevels(assignment),
+      });
+      setGatehouseRecommendation(recommendation);
+    } else {
+      setGatehouseRecommendation(null);
+    }
+
     setFinalStats(stats);
     setReviewItems(review);
     setCompletedScreen(true);
@@ -749,7 +834,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
             ↶ Сменить режим
           </button>
         </div>
-        <h1>Задание</h1>
+        <h1>{isGatehouse ? "Пробный тест" : "Задание"}</h1>
       </header>
 
       {loading ? (
@@ -785,7 +870,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           {completedScreen && finalStats ? (
             <div id="completionScreen" className="completion-message" style={{ display: "block" }}>
               <div className="card">
-                <h2>🎉 Задание завершено!</h2>
+                <h2>{isGatehouse ? "🎓 Пробный тест завершён!" : "🎉 Задание завершено!"}</h2>
 
                 <div className="score-display" id="finalScore">
                   {finalStats.score}%
@@ -800,6 +885,28 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                     ? "Неплохой результат! Есть над чем поработать."
                     : "Попробуйте пройти задание ещё раз для лучшего результата."}
                 </p>
+
+                {isGatehouse && gatehouseRecommendation ? (
+                  <div className="completion-details">
+                    <h3>🎯 Рекомендация Gatehouse Awards</h3>
+
+                    <div className="result-item">
+                      <span>Рекомендуемый уровень:</span>
+                      <span>{gatehouseRecommendation.recommendedLevelLabel}</span>
+                    </div>
+
+                    <div className="result-item">
+                      <span>Оценка результата:</span>
+                      <span>{getGatehouseRecommendationBadge(gatehouseRecommendation.band)}</span>
+                    </div>
+
+                    <p style={{ margin: "14px 0 0", lineHeight: 1.55 }}>
+                      <strong>{gatehouseRecommendation.title}</strong>
+                      <br />
+                      {gatehouseRecommendation.message}
+                    </p>
+                  </div>
+                ) : null}
 
                 <div className="completion-details">
                   <h3>📊 Детали результатов</h3>

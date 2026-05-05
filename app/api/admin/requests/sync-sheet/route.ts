@@ -13,6 +13,29 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type BranchType = "olympiad" | "gatehouse";
+
+function normalizeBranchType(value: unknown): BranchType {
+  const v = String(value ?? "").trim().toLowerCase();
+
+  if (v === "gatehouse" || v === "ga" || v === "ga_exam" || v === "exam" || v === "gatehouse_awards") {
+    return "gatehouse";
+  }
+
+  return "olympiad";
+}
+
+function toArr(v: any): string[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.map(String).map((x) => x.trim()).filter(Boolean);
+  return [String(v).trim()].filter(Boolean);
+}
+
+function formatBranchLabel(branchType: BranchType) {
+  if (branchType === "gatehouse") return "🎓 Gatehouse Awards";
+  return "🏆 Олимпиада";
+}
+
 function formatClassLevel(classLevel: string) {
   const classMap: Record<string, string> = {
     "1-2": "1-2 класс",
@@ -23,13 +46,44 @@ function formatClassLevel(classLevel: string) {
     "10-11": "10-11 класс (Техникум, колледж - 1й курс)",
     "12": "12 класс (Техникум, колледж)",
   };
+
   return classMap[classLevel] || classLevel;
 }
 
-function formatTextbookTypes(types: any) {
-  const arr = Array.isArray(types) ? types : types ? [types] : [];
-  const typeMap: Record<string, string> = { учебник: "📚 Учебник", кроссворд: "🧩 Кроссворд" };
-  return arr.map((t: any) => typeMap[String(t).toLowerCase()] || String(t)).join(", ");
+function formatTarget(branchType: BranchType, classLevel: any, targetLevel: any) {
+  if (branchType === "gatehouse") {
+    const levels = toArr(targetLevel);
+    return levels.length ? levels.join(", ") : "—";
+  }
+
+  const classes = toArr(classLevel);
+  if (!classes.length) return "—";
+
+  return classes.map(formatClassLevel).join(", ");
+}
+
+function formatMaterialTypes(branchType: BranchType, types: any) {
+  const arr = toArr(types);
+
+  if (branchType === "gatehouse") {
+    const typeMap: Record<string, string> = {
+      mock_test: "📝 Пробные тесты",
+      mock_tests: "📝 Пробные тесты",
+      "пробный тест": "📝 Пробные тесты",
+      "пробные тесты": "📝 Пробные тесты",
+    };
+
+    return arr.map((t) => typeMap[String(t).toLowerCase()] || String(t)).join(", ");
+  }
+
+  const typeMap: Record<string, string> = {
+    учебник: "📚 Учебник",
+    кроссворд: "🧩 Кроссворд",
+    textbook: "📚 Учебник",
+    crossword: "🧩 Кроссворд",
+  };
+
+  return arr.map((t) => typeMap[String(t).toLowerCase()] || String(t)).join(", ");
 }
 
 function formatDateTimeRU(dateString: string) {
@@ -53,12 +107,30 @@ function norm(v: any) {
   return String(v ?? "").trim();
 }
 
-function equalAtoG(a: (string | number)[], b: string[]) {
-  for (let i = 0; i < 7; i++) {
+function buildSheetValues(row: any) {
+  const branchType = normalizeBranchType(row.branch_type);
+
+  return [
+    String(row.request_number || ""),
+    formatDateTimeRU(String(row.created_at)),
+    formatBranchLabel(branchType),
+    formatTarget(branchType, row.class_level, row.target_level),
+    formatMaterialTypes(branchType, row.textbook_types),
+    String(row.email || ""),
+    String(row.full_name || ""),
+    formatStatus(Boolean(row.is_processed), row.processed_at ?? null),
+  ];
+}
+
+function equalRow(a: (string | number)[], b: string[]) {
+  const max = Math.max(a.length, b.length);
+
+  for (let i = 0; i < max; i++) {
     const av = norm(a[i]);
     const bv = norm(b[i]);
     if (av !== bv) return false;
   }
+
   return true;
 }
 
@@ -77,7 +149,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from("purchase_requests")
       .select(
-        "id,request_number,created_at,class_level,textbook_types,email,full_name,is_processed,processed_at,sheet_synced_at,sheet_row"
+        "id,request_number,created_at,branch_type,class_level,target_level,textbook_types,email,full_name,is_processed,processed_at,sheet_synced_at,sheet_row",
       )
       .order("created_at", { ascending: true });
 
@@ -86,6 +158,7 @@ export async function GET(req: NextRequest) {
     const rows = (data ?? []) as any[];
 
     const dbSet = new Set<string>();
+
     for (const r of rows) {
       const rn = norm(r.request_number);
       if (rn) dbSet.add(rn);
@@ -104,21 +177,13 @@ export async function GET(req: NextRequest) {
       if (ops >= limit) break;
 
       const rn = norm(r.request_number);
+
       if (!rn) {
         skipped++;
         continue;
       }
 
-      const sheetValues: (string | number)[] = [
-        rn,
-        formatDateTimeRU(String(r.created_at)),
-        formatClassLevel(String(r.class_level)),
-        formatTextbookTypes(r.textbook_types),
-        String(r.email || ""),
-        String(r.full_name || ""),
-        formatStatus(Boolean(r.is_processed), r.processed_at ?? null),
-      ];
-
+      const sheetValues = buildSheetValues(r);
       const existing = sheetMap.get(rn);
 
       try {
@@ -142,7 +207,7 @@ export async function GET(req: NextRequest) {
             sheetMap.set(rn, { rowNumber, values: sheetValues.map((x) => norm(x)) as any });
           }
         } else {
-          if (!equalAtoG(sheetValues, existing.values)) {
+          if (!equalRow(sheetValues, existing.values)) {
             await updateAccountingRow(existing.rowNumber, sheetValues);
 
             await supabase
@@ -167,11 +232,13 @@ export async function GET(req: NextRequest) {
                 })
                 .eq("id", r.id);
             }
+
             unchanged++;
           }
         }
       } catch (e: any) {
         failed++;
+
         await supabase
           .from("purchase_requests")
           .update({
@@ -185,11 +252,13 @@ export async function GET(req: NextRequest) {
 
     if (ops < limit) {
       const toDelete: number[] = [];
+
       for (const [rn, info] of sheetMap.entries()) {
         if (!dbSet.has(rn)) toDelete.push(info.rowNumber);
       }
 
       toDelete.sort((a, b) => b - a);
+
       const canDelete = Math.max(0, limit - ops);
       const slice = toDelete.slice(0, canDelete);
 

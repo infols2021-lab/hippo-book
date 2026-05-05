@@ -161,7 +161,7 @@ export default function LoginPage() {
     try {
       const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", userId).single();
       if (profile?.is_admin) window.location.href = "/admin";
-      else window.location.href = "/profile";
+      else window.location.href = "/portal";
     } catch (e: any) {
       if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
       else showBanner("error", "❌ Ошибка загрузки профиля. Обновите страницу и попробуйте снова.");
@@ -257,7 +257,7 @@ export default function LoginPage() {
           setBusy(false);
         }
       } else {
-        window.location.href = "/profile";
+        window.location.href = "/portal";
       }
     } catch (err: any) {
       if (looksLikeNetworkError(err)) showNetworkBanner(String(err?.message || err));
@@ -387,7 +387,6 @@ export default function LoginPage() {
 
       <div className="login-container">
         <div className="login-card">
-          {/* ✅ Новый бренд */}
           <div className="brand">
             <div className="brand-mark">HH</div>
             <div>
