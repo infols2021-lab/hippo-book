@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 
 export const metadata: Metadata = {
-  title: "test_hippo_book",
-  description: "Test HIPPO book on Next.js",
+  title: "hipposha_book",
+  description: "hipposha_book",
 };
 
 const fontSans = Inter({
