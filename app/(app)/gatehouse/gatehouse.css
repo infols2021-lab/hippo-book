@@ -889,3 +889,58 @@
     width: fit-content;
   }
 }
+/* Бургер-меню */
+.gatehouse-header__burger {
+  display: none; /* скрыт на десктопе */
+  border: 1px solid var(--ga-border);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ga-text);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(16px);
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.gatehouse-header__burger:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--ga-border-strong);
+}
+
+/* Мобильная версия */
+@media (max-width: 640px) {
+  .gatehouse-header__burger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .gatehouse-header__actions {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    padding: 10px;
+    border-radius: 0 0 16px 16px;
+    background: rgba(15, 20, 46, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--ga-border-strong);
+    border-top: none;
+  }
+
+  .gatehouse-header__actions--open {
+    display: flex;
+  }
+
+  /* Чтобы хедер не перекрывался */
+  .gatehouse-header__top {
+    position: relative;
+  }
+}

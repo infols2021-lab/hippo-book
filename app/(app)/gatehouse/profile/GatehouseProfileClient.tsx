@@ -206,9 +206,10 @@ export default function GatehouseProfileClient({
   return (
     <main className="gatehouse-page">
       <div className="gatehouse-container">
+        {/* ✅ новый текст описания */}
         <GatehouseHeader
           title={`Экзамены, ${displayName}`}
-          description="Здесь отображаются данные Gatehouse Awards: пробные тесты, доступные материалы и экзаменационный прогресс. Олимпиадные стрики здесь не используются."
+          description="Здесь отображаются данные для подготовки к экзаменам Gatehouse Awards."
           backHref="/portal"
           backLabel="Портал"
           actions={[
@@ -271,6 +272,7 @@ export default function GatehouseProfileClient({
                     <input id="gatehouse-email" className="gatehouse-input" value={profile.email} disabled readOnly />
                   </div>
 
+                  {/* ... остальные поля формы без изменений ... */}
                   <div className="gatehouse-form__row">
                     <label className="gatehouse-label" htmlFor="gatehouse-full-name">
                       ФИО
@@ -352,12 +354,13 @@ export default function GatehouseProfileClient({
               </div>
             </section>
 
+            {/* ✅ Быстрые действия с новым описанием */}
             <aside className="gatehouse-card">
               <div className="gatehouse-card__inner">
                 <h2 className="gatehouse-card__title">Быстрые действия</h2>
 
                 <p className="gatehouse-card__subtitle">
-                  Перейдите к пробным тестам или создайте заявку на доступ к уровню Gatehouse Awards.
+                  Перейдите к материалам или создайте заявку на получение доступа к материалам.
                 </p>
 
                 <div className="gatehouse-quick-actions">
@@ -416,6 +419,7 @@ export default function GatehouseProfileClient({
             </aside>
           </div>
 
+          {/* ✅ Сообщение в пустом списке результатов */}
           <section className="gatehouse-card">
             <div className="gatehouse-card__inner">
               <h2 className="gatehouse-card__title">Последние результаты</h2>
@@ -449,8 +453,7 @@ export default function GatehouseProfileClient({
                   <h3 className="gatehouse-empty__title">Результатов пока нет</h3>
 
                   <p className="gatehouse-empty__text">
-                    Когда вы пройдёте пробный тест Gatehouse Awards, здесь появится результат и
-                    дальнейшая рекомендация.
+                    Когда вы пройдёте задание, здесь появится результат и дальнейшая рекомендация.
                   </p>
                 </div>
               )}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { useState } from "react";
 
 type GatehouseHeaderAction = {
   href: string;
@@ -26,6 +27,8 @@ export default function GatehouseHeader({
   actions = [],
   children,
 }: GatehouseHeaderProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <header className="gatehouse-header">
       <div className="gatehouse-header__bg" aria-hidden="true">
@@ -45,16 +48,32 @@ export default function GatehouseHeader({
             <div />
           )}
 
-          {actions.length > 0 ? (
-            <div className="gatehouse-header__actions">
+          {/* Бургер-кнопка показывается на мобильных устройствах */}
+          {actions.length > 0 && (
+            <button
+              className="gatehouse-header__burger"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Открыть меню"
+            >
+              <span aria-hidden="true">☰</span>
+            </button>
+          )}
+
+          {actions.length > 0 && (
+            <div className={`gatehouse-header__actions ${mobileMenuOpen ? "gatehouse-header__actions--open" : ""}`}>
               {actions.map((action) => (
-                <Link key={`${action.href}-${action.label}`} href={action.href} className="gatehouse-header__action">
+                <Link
+                  key={`${action.href}-${action.label}`}
+                  href={action.href}
+                  className="gatehouse-header__action"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
                   {action.icon ? <span className="gatehouse-header__action-icon">{action.icon}</span> : null}
                   <span>{action.label}</span>
                 </Link>
               ))}
             </div>
-          ) : null}
+          )}
         </div>
 
         <div className="gatehouse-header__main">
