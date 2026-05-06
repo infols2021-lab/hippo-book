@@ -3,9 +3,20 @@
 import "./login.css";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getSupabaseBrowserClient } from "../../lib/supabase/client";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 
 type BannerType = "error" | "success" | "warning" | null;
+
+type ApiPayload = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  code?: string;
+  data?: any;
+  authenticated?: boolean;
+  profile?: any;
+  redirectTo?: string;
+};
 
 function isValidEmail(email: string) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -13,9 +24,9 @@ function isValidEmail(email: string) {
 }
 
 function buildHelpImageUrl(imageName: string, cacheBust?: string) {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  if (!cacheBust) return `${base}/storage/v1/object/public/help-images/${imageName}`;
-  return `${base}/storage/v1/object/public/help-images/${imageName}?v=${cacheBust}`;
+  return getStoragePublicUrl("help-images", imageName, {
+    cacheBust,
+  });
 }
 
 function looksLikeNetworkError(err: unknown) {
@@ -31,8 +42,28 @@ function looksLikeNetworkError(err: unknown) {
   );
 }
 
+async function readApiPayload(res: Response): Promise<ApiPayload | null> {
+  const text = await res.text();
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as ApiPayload;
+  } catch {
+    return {
+      ok: false,
+      error: text,
+    };
+  }
+}
+
+function unwrapApiData(json: ApiPayload | null) {
+  if (!json) return null;
+  if (json.data && typeof json.data === "object") return json.data;
+  return json;
+}
+
 export default function LoginPage() {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [cacheBust, setCacheBust] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,8 +103,8 @@ export default function LoginPage() {
     setNetworkIssue(true);
     const base =
       "🌐 Не удалось подключиться к серверу входа.\n" +
-      "Если у вас включён VPN/прокси — выключите и обновите страницу.\n" +
-      "Если VPN выключен — проверьте интернет/файрвол и попробуйте снова.";
+      "Проверьте интернет-соединение и попробуйте обновить страницу.\n" +
+      "Если проблема повторяется — попробуйте открыть сайт позже.";
     showBanner("error", extra ? `${base}\n\nДетали: ${extra}` : base);
   }
 
@@ -139,10 +170,19 @@ export default function LoginPage() {
 
     async function run() {
       try {
-        const { data } = await supabase.auth.getUser();
+        const res = await fetch("/api/auth/session", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        const json = await readApiPayload(res);
+        const payload = unwrapApiData(json);
+
         if (cancelled) return;
-        if (data?.user) {
-          await checkUserRoleAndRedirect(data.user.id);
+
+        if (res.ok && json?.ok && payload?.authenticated) {
+          const isAdmin = Boolean(payload?.profile?.is_admin);
+          window.location.href = isAdmin ? "/admin" : "/portal";
         }
       } catch (e: any) {
         if (cancelled) return;
@@ -151,31 +191,54 @@ export default function LoginPage() {
     }
 
     run();
+
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function checkUserRoleAndRedirect(userId: string) {
+  async function resendConfirmation(emailValue: string) {
     try {
-      const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", userId).single();
-      if (profile?.is_admin) window.location.href = "/admin";
-      else window.location.href = "/portal";
+      const res = await fetch("/api/auth/resend-confirmation", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          email: emailValue,
+        }),
+      });
+
+      const json = await readApiPayload(res);
+      const payload = unwrapApiData(json);
+
+      if (!res.ok || !json?.ok) {
+        showBanner(
+          "error",
+          payload?.error || payload?.message || json?.error || "Не удалось отправить письмо подтверждения.",
+        );
+        return;
+      }
+
+      showBanner(
+        "success",
+        payload?.message || json?.message || "📧 Письмо с подтверждением отправлено повторно. Проверьте почту.",
+      );
     } catch (e: any) {
       if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
-      else showBanner("error", "❌ Ошибка загрузки профиля. Обновите страницу и попробуйте снова.");
+      else showBanner("error", "❌ Не удалось отправить письмо: " + (e?.message || String(e)));
     }
   }
 
   async function doLogin(isAdmin: boolean) {
-    const e = email.trim();
+    const e = email.trim().toLowerCase();
 
     if (!e || !password) {
       setNetworkIssue(false);
       showBanner("error", "Введите email и пароль");
       return;
     }
+
     if (!isValidEmail(e)) {
       setNetworkIssue(false);
       showBanner("error", "Неверный формат email");
@@ -188,77 +251,55 @@ export default function LoginPage() {
       setBusy(true);
       showBanner("warning", "🔐 Проверяем данные...");
 
-      let data: any = null;
-      let error: any = null;
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          email: e,
+          password,
+          isAdmin,
+          mode: isAdmin ? "admin" : "student",
+        }),
+      });
 
-      try {
-        const res = await supabase.auth.signInWithPassword({ email: e, password });
-        data = res.data;
-        error = res.error;
-      } catch (inner: any) {
-        if (looksLikeNetworkError(inner)) {
-          showNetworkBanner(String(inner?.message || inner));
+      const json = await readApiPayload(res);
+      const payload = unwrapApiData(json);
+
+      if (!res.ok || !json?.ok) {
+        const msg = String(payload?.error || payload?.message || json?.error || "Ошибка входа");
+        const code = String(payload?.code || json?.code || "").toUpperCase();
+
+        if (looksLikeNetworkError(msg)) {
+          showNetworkBanner(msg);
           setBusy(false);
           return;
         }
-        throw inner;
-      }
 
-      if (error) {
-        const msg = error.message || "Неизвестная ошибка";
-        const code = (error as any).code as string | undefined;
-
-        if (looksLikeNetworkError(error) || looksLikeNetworkError(msg)) {
-          showNetworkBanner(String(msg));
-          setBusy(false);
-          return;
-        }
-
-        if (msg.includes("Invalid login credentials") || code === "invalid_credentials") {
-          showBanner("error", "❌ Неверный email или пароль. Если вы забыли пароль, воспользуйтесь восстановлением.");
-        } else if (msg.includes("Email not confirmed") || code === "email_not_confirmed") {
+        if (code === "EMAIL_NOT_CONFIRMED" || msg.toLowerCase().includes("email не подтверж")) {
           showBanner("error", "❌ Email не подтвержден. Проверьте вашу почту и подтвердите регистрацию.");
 
           const resend = window.confirm("Отправить письмо с подтверждением повторно?");
           if (resend) {
-            try {
-              const { error: resendError } = await supabase.auth.resend({ type: "signup", email: e });
-              if (!resendError) showBanner("success", "📧 Письмо с подтверждением отправлено повторно. Проверьте почту.");
-              else if (looksLikeNetworkError(resendError)) showNetworkBanner(String((resendError as any)?.message || resendError));
-            } catch (re: any) {
-              if (looksLikeNetworkError(re)) showNetworkBanner(String(re?.message || re));
-            }
+            await resendConfirmation(e);
           }
-        } else if (msg.includes("rate limit") || code === "rate_limit_exceeded") {
+        } else if (code === "INVALID_CREDENTIALS") {
+          showBanner("error", "❌ Неверный email или пароль. Если вы забыли пароль, воспользуйтесь восстановлением.");
+        } else if (code === "RATE_LIMIT") {
           showBanner("error", "⚠️ Слишком много попыток. Попробуйте через несколько минут.");
-        } else if (msg.includes("User not found")) {
+        } else if (code === "USER_NOT_FOUND") {
           showBanner("error", "❌ Пользователь с таким email не найден. Проверьте email или зарегистрируйтесь.");
         } else {
-          showBanner("error", "❌ Ошибка входа: " + msg);
+          showBanner("error", msg);
         }
 
         setBusy(false);
         return;
       }
 
-      if (data.user && !(data.user as any).email_confirmed_at) {
-        showBanner("error", "❌ Email не подтвержден. Проверьте вашу почту для завершения регистрации.");
-        await supabase.auth.signOut();
-        setBusy(false);
-        return;
-      }
-
-      if (isAdmin) {
-        const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", data.user.id).single();
-        if (profile?.is_admin) window.location.href = "/admin";
-        else {
-          showBanner("error", "❌ У вас нет прав администратора");
-          await supabase.auth.signOut();
-          setBusy(false);
-        }
-      } else {
-        window.location.href = "/portal";
-      }
+      const redirectTo = String(payload?.redirectTo || (isAdmin ? "/admin" : "/portal"));
+      window.location.href = redirectTo;
     } catch (err: any) {
       if (looksLikeNetworkError(err)) showNetworkBanner(String(err?.message || err));
       else showBanner("error", "❌ Неожиданная ошибка: " + (err?.message || String(err)));
@@ -273,6 +314,7 @@ export default function LoginPage() {
         document.body.style.overflow = "";
       }
     }
+
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [helpOpen]);
@@ -290,11 +332,17 @@ export default function LoginPage() {
   function renderBanner() {
     if (!bannerType) return null;
     const cls = bannerType === "error" ? "error" : bannerType === "success" ? "success" : "warning";
-    return <div className={cls} style={{ display: "block" }}>{bannerText}</div>;
+
+    return (
+      <div className={cls} style={{ display: "block", whiteSpace: "pre-line" }}>
+        {bannerText}
+      </div>
+    );
   }
 
   function renderNetworkActions() {
     if (!networkIssue) return null;
+
     return (
       <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button className="btn student" type="button" onClick={() => window.location.reload()}>
@@ -309,6 +357,7 @@ export default function LoginPage() {
 
   function renderExistingAccountHelp() {
     if (msgParam !== "confirmed") return null;
+
     return (
       <div className="existing-account-help">
         <strong>🎉 Отлично! Ваш аккаунт активирован.</strong>
@@ -322,7 +371,11 @@ export default function LoginPage() {
     const cached = preloaded.current[tab];
     const file = tab === "registration" ? "registration-help.png" : "rules-help.png";
     const alt = tab === "registration" ? "Инструкция по регистрации" : "Правила платформы";
-    if (cached) return <img className="help-image" src={buildHelpImageUrl(file, cacheBust || undefined)} alt={alt} />;
+
+    if (cached) {
+      return <img className="help-image" src={buildHelpImageUrl(file, cacheBust || undefined)} alt={alt} />;
+    }
+
     return <img className="help-image" src={buildHelpImageUrl(file)} alt={alt} />;
   }
 
@@ -404,7 +457,6 @@ export default function LoginPage() {
 
           {renderBanner()}
           {renderNetworkActions()}
-
           {renderExistingAccountHelp()}
 
           <div className="form-group">
@@ -417,7 +469,9 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") (document.getElementById("password") as HTMLInputElement | null)?.focus();
+                if (e.key === "Enter") {
+                  (document.getElementById("password") as HTMLInputElement | null)?.focus();
+                }
               }}
             />
           </div>

@@ -1,15 +1,32 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useEffect, useRef, useState } from "react";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 
 type Props = {
   label?: string;
-  bucket?: string; // default: question-images
-  value: string; // public url or ""
+  bucket?: string;
+  value: string;
   onChange: (nextUrl: string) => void;
   disabled?: boolean;
-  maxMB?: number; // default 5
+  maxMB?: number;
+};
+
+type UploadApiResponse = {
+  ok?: boolean;
+  error?: string;
+  url?: string | null;
+  publicUrl?: string | null;
+  imageUrl?: string | null;
+  path?: string | null;
+  bucket?: string | null;
+  data?: {
+    url?: string | null;
+    publicUrl?: string | null;
+    imageUrl?: string | null;
+    path?: string | null;
+    bucket?: string | null;
+  } | null;
 };
 
 function safeExt(name: string) {
@@ -21,8 +38,71 @@ function isAllowedImageExt(ext: string) {
   return ["jpg", "jpeg", "png", "gif", "webp", "avif"].includes(ext);
 }
 
-function randomId(len = 8) {
-  return Math.random().toString(36).slice(2, 2 + len);
+function cacheBustUrl(url: string) {
+  if (!url) return "";
+  return `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+}
+
+async function readJsonSafe<T>(res: Response): Promise<T | null> {
+  const text = await res.text();
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+function extractUploadUrl(json: UploadApiResponse | null, fallbackBucket: string): string {
+  if (!json) return "";
+
+  const directUrl = json.publicUrl || json.url || json.imageUrl || json.data?.publicUrl || json.data?.url || json.data?.imageUrl;
+
+  if (directUrl) return String(directUrl);
+
+  const bucket = json.bucket || json.data?.bucket || fallbackBucket;
+  const path = json.path || json.data?.path;
+
+  if (bucket && path) {
+    return getStoragePublicUrl(String(bucket), String(path));
+  }
+
+  return "";
+}
+
+async function uploadImageThroughApi(params: {
+  file: File;
+  bucket: string;
+  folder: string;
+}) {
+  const formData = new FormData();
+
+  formData.append("file", params.file);
+  formData.append("bucket", params.bucket);
+  formData.append("folder", params.folder);
+  formData.append("pathPrefix", params.folder);
+
+  const res = await fetch("/api/admin/upload", {
+    method: "POST",
+    body: formData,
+    cache: "no-store",
+  });
+
+  const json = await readJsonSafe<UploadApiResponse>(res);
+
+  if (!res.ok || !json?.ok) {
+    throw new Error(json?.error || `HTTP ${res.status}`);
+  }
+
+  const uploadedUrl = extractUploadUrl(json, params.bucket);
+
+  if (!uploadedUrl) {
+    throw new Error("Сервер загрузил файл, но не вернул publicUrl");
+  }
+
+  return cacheBustUrl(uploadedUrl);
 }
 
 export default function ImageUpload({
@@ -30,10 +110,9 @@ export default function ImageUpload({
   bucket = "question-images",
   value,
   onChange,
-  disabled,
+  disabled = false,
   maxMB = 5,
 }: Props) {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [dragOver, setDragOver] = useState(false);
@@ -56,67 +135,53 @@ export default function ImageUpload({
 
   async function uploadFile(file: File) {
     const ext = safeExt(file.name);
+
     if (!isAllowedImageExt(ext)) {
       throw new Error("Поддерживаются только JPG, PNG, GIF, WebP, AVIF");
     }
+
     if (file.size > maxMB * 1024 * 1024) {
-      throw new Error(`Размер файла > ${maxMB}MB`);
+      throw new Error(`Размер файла больше ${maxMB}MB`);
     }
 
-    // локальный preview сразу
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
 
     setBusy(true);
     setProgress(15);
 
-    // path
-    const path = `${Date.now()}_${randomId(6)}.${ext}`;
-
-    // лёгкая “анимация прогресса”
     setProgress(45);
 
-    const { error } = await supabase.storage.from(bucket).upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type || "application/octet-stream",
+    const finalUrl = await uploadImageThroughApi({
+      file,
+      bucket,
+      folder: "assignments",
     });
-
-    if (error) {
-      const msg = (error.message || "").toLowerCase();
-      if (msg.includes("not found") || msg.includes("bucket")) {
-        throw new Error(`Бакет "${bucket}" не найден. Создай его в Supabase Storage и сделай публичным.`);
-      }
-      throw new Error(error.message);
-    }
 
     setProgress(85);
 
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    const publicUrl = data?.publicUrl || "";
-    if (!publicUrl) throw new Error("Не удалось получить publicUrl");
-
-    // cache bust
-    const finalUrl = publicUrl + `?v=${Date.now()}`;
     onChange(finalUrl);
+    setPreviewUrl(finalUrl);
 
     setProgress(100);
-    setTimeout(resetProgress, 450);
+    window.setTimeout(resetProgress, 450);
   }
 
   async function handleFile(file: File) {
     try {
       await uploadFile(file);
     } catch (e: any) {
-      // если упало — убираем preview, если раньше не было value
       if (!value) setPreviewUrl("");
+
       resetProgress();
       alert("❌ Ошибка загрузки: " + (e?.message || String(e)));
     } finally {
       setBusy(false);
       setDragOver(false);
-      // чистим input чтобы можно было выбрать тот же файл снова
-      if (inputRef.current) inputRef.current.value = "";
+
+      if (inputRef.current) {
+        inputRef.current.value = "";
+      }
     }
   }
 
@@ -129,7 +194,9 @@ export default function ImageUpload({
         onClick={openPicker}
         onDragOver={(e) => {
           e.preventDefault();
+
           if (disabled || busy) return;
+
           setDragOver(true);
         }}
         onDragLeave={(e) => {
@@ -138,20 +205,25 @@ export default function ImageUpload({
         }}
         onDrop={(e) => {
           e.preventDefault();
+
           if (disabled || busy) return;
+
           setDragOver(false);
-          const f = e.dataTransfer.files?.[0];
-          if (f) void handleFile(f);
+
+          const file = e.dataTransfer.files?.[0];
+          if (file) void handleFile(file);
         }}
         role="button"
         aria-disabled={disabled || busy}
-        style={{ opacity: disabled ? 0.6 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+        style={{
+          opacity: disabled ? 0.6 : 1,
+          cursor: disabled ? "not-allowed" : "pointer",
+        }}
       >
-        <p style={{ margin: 0 }}>
-          📁 Нажмите для загрузки изображения или перетащите файл сюда
-        </p>
+        <p style={{ margin: 0 }}>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
+
         <p className="small-muted" style={{ marginTop: 6 }}>
-          Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF (макс. {maxMB}MB)
+          Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF, максимум {maxMB}MB
         </p>
       </div>
 
@@ -162,17 +234,15 @@ export default function ImageUpload({
         disabled={disabled || busy}
         style={{ display: "none" }}
         onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void handleFile(f);
+          const file = e.target.files?.[0];
+          if (file) void handleFile(file);
         }}
       />
 
-      {/* progress */}
       <div className="upload-progress" style={{ display: busy || progress > 0 ? "block" : "none" }}>
         <div className="upload-progress-bar" style={{ width: `${progress}%` }} />
       </div>
 
-      {/* preview */}
       {previewUrl ? (
         <div style={{ marginTop: 10 }}>
           <img
@@ -181,7 +251,6 @@ export default function ImageUpload({
             alt="Предпросмотр изображения"
             style={{ display: "block" }}
             onError={() => {
-              // если битая ссылка — просто прячем
               if (!value) setPreviewUrl("");
             }}
           />

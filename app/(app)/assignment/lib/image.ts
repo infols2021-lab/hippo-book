@@ -1,20 +1,41 @@
-function isHttpUrl(v: unknown): v is string {
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
+
+function isHttpUrl(v: unknown): boolean {
   return typeof v === "string" && /^https?:\/\//i.test(v);
 }
 
 export function getImageUrl(imagePath: unknown) {
   if (imagePath == null) return "";
-  const raw: string = String(imagePath);
 
-  if (raw.startsWith("data:") || isHttpUrl(raw)) return raw;
+  const raw = String(imagePath).trim();
+  if (!raw) return "";
 
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (raw.startsWith("data:")) return raw;
+  if (raw.startsWith("/api/storage/public/")) return raw;
+
+  const storageMarker = "/storage/v1/object/public/";
+
+  if (isHttpUrl(raw)) {
+    const markerIndex = raw.indexOf(storageMarker);
+
+    if (markerIndex === -1) return raw;
+
+    const rest = raw.slice(markerIndex + storageMarker.length).split("?")[0]?.split("#")[0] ?? "";
+    const parts = rest.split("/").filter(Boolean);
+
+    const bucket = parts.shift();
+    const path = parts.join("/");
+
+    if (!bucket || !path) return raw;
+
+    return getStoragePublicUrl(bucket, path);
+  }
+
   const bucket = process.env.NEXT_PUBLIC_ASSIGNMENTS_BUCKET || "assignments";
-  if (!base) return raw;
 
-  const cleaned: string = String(raw)
+  const cleaned = raw
     .replace(/^\/+/, "")
     .replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
 
-  return `${base}/storage/v1/object/public/${bucket}/${encodeURIComponent(cleaned)}?v=${Date.now()}`;
+  return getStoragePublicUrl(bucket, cleaned);
 }

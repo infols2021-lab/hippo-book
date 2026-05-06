@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "../../../lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDataAuthContext } from "@/lib/data/auth";
 import RequestsClient from "./RequestsClient";
 
 type PurchaseRequest = {
@@ -16,16 +17,20 @@ type PurchaseRequest = {
 };
 
 export default async function RequestsPage() {
-  const supabase = await createSupabaseServerClient();
-  const { data: auth } = await supabase.auth.getUser();
-  const user = auth.user;
+  const auth = await getDataAuthContext();
 
-  if (!user) {
-    redirect("/login");
+  if (!auth.ok) {
+    if (auth.error.status === 401) redirect("/login");
+    throw new Error(auth.error.message);
   }
 
+  const { user } = auth.ctx;
+
+  const supabase = await createSupabaseServerClient();
+
   const [{ data: profile }, { data: requests }] = await Promise.all([
-    supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+    supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+
     supabase
       .from("purchase_requests")
       .select("*")

@@ -109,8 +109,7 @@ export async function POST(req: Request) {
   const { data: assignment, error: assignmentErr } = await supabase
     .from("assignments")
     .select(
-      `
-      id,
+      `id,
       branch_type,
       material_id,
       materials(
@@ -120,8 +119,7 @@ export async function POST(req: Request) {
         target_levels,
         is_active,
         is_available
-      )
-    `,
+      )`
     )
     .eq("id", body.assignmentId)
     .single();

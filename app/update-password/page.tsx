@@ -4,13 +4,42 @@ import "./update-password.css";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import TurnstileWidget from "@/components/TurnstileWidget";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type BannerType = "error" | "success" | "warning" | null;
 type ModalKind = "error" | "success" | "warning";
 
+type ApiPayload = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  code?: string;
+  data?: any;
+  authenticated?: boolean;
+  hasSession?: boolean;
+};
+
+async function readApiPayload(res: Response): Promise<ApiPayload | null> {
+  const text = await res.text();
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as ApiPayload;
+  } catch {
+    return {
+      ok: false,
+      error: text,
+    };
+  }
+}
+
+function unwrapApiData(json: ApiPayload | null) {
+  if (!json) return null;
+  if (json.data && typeof json.data === "object") return json.data;
+  return json;
+}
+
 export default function UpdatePasswordPage() {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
   const [ready, setReady] = useState(false);
@@ -24,11 +53,9 @@ export default function UpdatePasswordPage() {
 
   const [busy, setBusy] = useState(false);
 
-  // верхний баннер оставим только для "процесса"
   const [bannerType, setBannerType] = useState<BannerType>(null);
   const [bannerText, setBannerText] = useState("");
 
-  // ✅ модалка
   const [modalOpen, setModalOpen] = useState(false);
   const [modalKind, setModalKind] = useState<ModalKind>("success");
   const [modalTitle, setModalTitle] = useState("");
@@ -38,6 +65,7 @@ export default function UpdatePasswordPage() {
     setBannerType(type);
     setBannerText(text);
   }
+
   function clearBanner() {
     setBannerType(null);
     setBannerText("");
@@ -52,7 +80,6 @@ export default function UpdatePasswordPage() {
 
   function closeModal() {
     setModalOpen(false);
-    // ✅ чтобы не залипало "Сохраняем..."
     setBusy(false);
     clearBanner();
   }
@@ -81,11 +108,15 @@ export default function UpdatePasswordPage() {
       );
     }
 
-    if (code === "NO_SESSION" || status === 401) {
+    if (code === "NO_SESSION" || code === "UNAUTHORIZED" || status === 401) {
       return (
         err ||
         "Сессия восстановления не найдена или устарела.\n\nЗапросите восстановление заново и перейдите по новой ссылке из письма."
       );
+    }
+
+    if (code === "INVALID_OR_EXPIRED_LINK") {
+      return err || "Ссылка недействительна или устарела. Запросите восстановление заново.";
     }
 
     if (code === "VALIDATION") return err || "Проверьте пароль (не менее 6 символов).";
@@ -95,59 +126,124 @@ export default function UpdatePasswordPage() {
     return `Не удалось обновить пароль (${status}). Попробуйте перезагрузить капчу и повторить.`;
   }
 
-  // 1) подхват recovery-сессии из ссылки
   useEffect(() => {
     let cancelled = false;
 
+    async function exchangeRecoverySession() {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+
+      if (code) {
+        const res = await fetch("/api/auth/exchange-code", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ code }),
+        });
+
+        const json = await readApiPayload(res);
+        const payload = unwrapApiData(json);
+
+        window.history.replaceState({}, "", "/update-password");
+
+        if (!res.ok || !json?.ok) {
+          throw new Error(
+            payload?.error ||
+              payload?.message ||
+              json?.error ||
+              "Ссылка недействительна или устарела. Запросите восстановление заново.",
+          );
+        }
+
+        return Boolean(payload?.hasSession);
+      }
+
+      const hash = window.location.hash || "";
+
+      if (hash.includes("access_token=") && hash.includes("refresh_token=")) {
+        const p = new URLSearchParams(hash.replace(/^#/, ""));
+        const access_token = p.get("access_token") || "";
+        const refresh_token = p.get("refresh_token") || "";
+
+        if (access_token && refresh_token) {
+          const res = await fetch("/api/auth/exchange-code", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              access_token,
+              refresh_token,
+            }),
+          });
+
+          const json = await readApiPayload(res);
+          const payload = unwrapApiData(json);
+
+          window.history.replaceState({}, "", "/update-password");
+
+          if (!res.ok || !json?.ok) {
+            throw new Error(
+              payload?.error ||
+                payload?.message ||
+                json?.error ||
+                "Ссылка недействительна или устарела. Запросите восстановление заново.",
+            );
+          }
+
+          return Boolean(payload?.hasSession);
+        }
+      }
+
+      return null;
+    }
+
+    async function fetchSession() {
+      const res = await fetch("/api/auth/session", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const json = await readApiPayload(res);
+      const payload = unwrapApiData(json);
+
+      if (!res.ok || !json?.ok) return false;
+
+      return Boolean(payload?.authenticated);
+    }
+
     async function run() {
       try {
-        const url = new URL(window.location.href);
-        const code = url.searchParams.get("code");
+        const exchanged = await exchangeRecoverySession();
 
-        if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          window.history.replaceState({}, "", "/update-password");
-          if (error && !cancelled) {
-            showBanner("error", "❌ Ссылка недействительна или устарела. Запросите восстановление заново.");
-          }
-        } else {
-          const hash = window.location.hash || "";
-          if (hash.includes("access_token=") && hash.includes("refresh_token=")) {
-            const p = new URLSearchParams(hash.replace(/^#/, ""));
-            const access_token = p.get("access_token") || "";
-            const refresh_token = p.get("refresh_token") || "";
-            if (access_token && refresh_token) {
-              const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-              window.history.replaceState({}, "", "/update-password");
-              if (error && !cancelled) {
-                showBanner("error", "❌ Ссылка недействительна или устарела. Запросите восстановление заново.");
-              }
-            }
-          }
-        }
-
-        const { data } = await supabase.auth.getSession();
         if (cancelled) return;
 
-        setHasSession(!!data.session);
+        const sessionExists = exchanged === true ? true : await fetchSession();
+
+        if (cancelled) return;
+
+        setHasSession(sessionExists);
         setReady(true);
 
-        if (!data.session) {
+        if (!sessionExists) {
           showBanner("warning", "ℹ️ Откройте эту страницу по ссылке из письма восстановления пароля.");
         }
-      } catch {
+      } catch (e: any) {
         if (cancelled) return;
+
         setReady(true);
         setHasSession(false);
-        showBanner("error", "❌ Не удалось обработать ссылку. Попробуйте запросить восстановление заново.");
+        showBanner("error", "❌ " + (e?.message || "Не удалось обработать ссылку. Попробуйте запросить восстановление заново."));
       }
     }
 
     run();
+
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, []);
 
   const canSubmit = useMemo(() => {
     return (
@@ -183,7 +279,7 @@ export default function UpdatePasswordPage() {
       openModal(
         "warning",
         "Нужна капча",
-        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу»."
+        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
       );
       return;
     }
@@ -198,26 +294,11 @@ export default function UpdatePasswordPage() {
         body: JSON.stringify({ password, captchaToken }),
       });
 
-      // ✅ читаем даже при 400
-      const text = await res.text();
-      let json: any = null;
-      try {
-        json = text ? JSON.parse(text) : null;
-      } catch {
-        json = null;
-      }
+      const json = await readApiPayload(res);
+      const payload = unwrapApiData(json);
 
-      if (!res.ok) {
-        const msg = friendlyErrorFromApi(json, res.status);
-        setBusy(false);
-        clearBanner();
-        resetCaptchaHard();
-        openModal("error", "Ошибка", msg);
-        return;
-      }
-
-      if (!json?.ok) {
-        const msg = friendlyErrorFromApi(json, 400);
+      if (!res.ok || !json?.ok) {
+        const msg = friendlyErrorFromApi(payload || json, res.status);
         setBusy(false);
         clearBanner();
         resetCaptchaHard();
@@ -228,10 +309,12 @@ export default function UpdatePasswordPage() {
       setBusy(false);
       clearBanner();
 
-      openModal("success", "Пароль изменён", json.message || "✅ Пароль успешно изменён! Теперь войдите в систему.");
+      openModal("success", "Пароль изменён", payload?.message || json?.message || "✅ Пароль успешно изменён! Теперь войдите в систему.");
 
-      // закрываем recovery-сессию
-      await supabase.auth.signOut();
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        cache: "no-store",
+      }).catch(() => null);
 
       setTimeout(() => {
         window.location.href = "/login";
@@ -244,8 +327,8 @@ export default function UpdatePasswordPage() {
       openModal(
         "error",
         "Ошибка",
-        "Не удалось обновить пароль.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n• Отключить VPN/прокси\n\nДетали: " +
-          (e?.message || String(e))
+        "Не удалось обновить пароль.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n\nДетали: " +
+          (e?.message || String(e)),
       );
     }
   }
@@ -254,7 +337,6 @@ export default function UpdatePasswordPage() {
 
   return (
     <div className="page-update-password">
-      {/* ✅ MODAL */}
       {modalOpen ? (
         <div
           role="dialog"
@@ -278,7 +360,7 @@ export default function UpdatePasswordPage() {
             <div className="upd-modal-body">{modalBody}</div>
 
             <div className="upd-modal-actions">
-              {(modalKind === "error" || modalKind === "warning") ? (
+              {modalKind === "error" || modalKind === "warning" ? (
                 <button
                   type="button"
                   className="btn btn-captcha-reload"
@@ -357,23 +439,15 @@ export default function UpdatePasswordPage() {
                     onToken={(t) => setCaptchaToken(t)}
                   />
 
-                  {/* ✅ Подсказка, если капча не прогрузилась / токена нет */}
                   {!captchaToken ? (
                     <div className="captcha-hint">
-                      🧩 <strong>Если вы не видите капчу</strong> — нажмите{" "}
-                      <strong>«Перезагрузить капчу»</strong>.
+                      🧩 <strong>Если вы не видите капчу</strong> — нажмите <strong>«Перезагрузить капчу»</strong>.
                       <br />
-                      Если не помогло: отключите VPN/прокси и обновите страницу.
+                      Если не помогло: обновите страницу.
                     </div>
                   ) : null}
 
-                  <button
-                    type="button"
-                    className="btn btn-captcha-reload"
-                    // ✅ как просил: всегда можно нажать
-                    disabled={false}
-                    onClick={() => resetCaptchaHard()}
-                  >
+                  <button type="button" className="btn btn-captcha-reload" disabled={false} onClick={() => resetCaptchaHard()}>
                     Перезагрузить капчу
                   </button>
                 </>

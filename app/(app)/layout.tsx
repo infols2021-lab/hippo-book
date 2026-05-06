@@ -2,13 +2,34 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  let hasUser = false;
+  let connectionError = false;
+
   try {
     const supabase = await createSupabaseServerClient();
-    const { data } = await supabase.auth.getSession();
+    const { data, error } = await supabase.auth.getUser();
 
-    if (!data.session) redirect("/login");
-    return <>{children}</>;
+    if (error) {
+      const msg = String(error.message || "").toLowerCase();
+
+      if (
+        msg.includes("auth session missing") ||
+        msg.includes("session missing") ||
+        msg.includes("jwt") ||
+        msg.includes("invalid token")
+      ) {
+        hasUser = false;
+      } else {
+        connectionError = true;
+      }
+    } else {
+      hasUser = Boolean(data.user);
+    }
   } catch {
+    connectionError = true;
+  }
+
+  if (connectionError) {
     return (
       <div className="container">
         <div className="card">
@@ -26,4 +47,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
     );
   }
+
+  if (!hasUser) {
+    redirect("/login");
+  }
+
+  return <>{children}</>;
 }

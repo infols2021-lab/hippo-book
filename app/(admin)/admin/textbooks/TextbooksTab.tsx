@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useEffect, useRef, useState } from "react";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import LoadingBlock from "@/components/LoadingBlock";
 import ErrorBox from "@/components/ErrorBox";
 
-type Props = { onChanged?: () => void | Promise<void> };
+type Props = {
+  onChanged?: () => void | Promise<void>;
+};
 
 type TextbookRow = {
   id: string;
@@ -16,6 +18,35 @@ type TextbookRow = {
   order_index: number | null;
   is_available: boolean | null;
   is_active: boolean | null;
+  assignments_count?: number | null;
+  assignment_count?: number | null;
+  assignmentsCount?: number | null;
+  _count?: {
+    assignments?: number | null;
+  } | null;
+};
+
+type AssignmentLike = {
+  id?: string;
+  textbook_id?: string | null;
+  textbookId?: string | null;
+};
+
+type UploadApiResponse = {
+  ok?: boolean;
+  error?: string;
+  url?: string | null;
+  publicUrl?: string | null;
+  imageUrl?: string | null;
+  path?: string | null;
+  bucket?: string | null;
+  data?: {
+    url?: string | null;
+    publicUrl?: string | null;
+    imageUrl?: string | null;
+    path?: string | null;
+    bucket?: string | null;
+  } | null;
 };
 
 const CLASS_OPTIONS: Array<{ value: string; label: string }> = [
@@ -28,21 +59,150 @@ const CLASS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "12", label: "12 класс (колледж)" },
 ];
 
-function safeArr(v: any): string[] {
+function safeArr(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   return v.map(String).filter(Boolean);
 }
 
-export default function TextbooksTab({ onChanged }: Props) {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+async function readJsonSafe<T = any>(res: Response): Promise<T | null> {
+  const text = await res.text();
 
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeUiErrorMessage(error: unknown, fallback = "Ошибка") {
+  const raw =
+    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
+
+  const msg = raw.trim();
+
+  if (!msg) return fallback;
+
+  const lower = msg.toLowerCase();
+
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network request failed") ||
+    lower.includes("load failed")
+  ) {
+    return "Ошибка соединения с сервером";
+  }
+
+  return msg;
+}
+
+function cacheBustUrl(url: string) {
+  if (!url) return "";
+  return `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+}
+
+function extractUploadUrl(json: UploadApiResponse | null, fallbackBucket: string): string {
+  if (!json) return "";
+
+  const directUrl = json.publicUrl || json.url || json.imageUrl || json.data?.publicUrl || json.data?.url || json.data?.imageUrl;
+
+  if (directUrl) return String(directUrl);
+
+  const bucket = json.bucket || json.data?.bucket || fallbackBucket;
+  const path = json.path || json.data?.path;
+
+  if (bucket && path) {
+    return getStoragePublicUrl(String(bucket), String(path));
+  }
+
+  return "";
+}
+
+async function uploadImageThroughApi(params: {
+  file: File;
+  bucket: string;
+  folder: string;
+}) {
+  const formData = new FormData();
+
+  formData.append("file", params.file);
+  formData.append("bucket", params.bucket);
+  formData.append("folder", params.folder);
+  formData.append("pathPrefix", params.folder);
+
+  const res = await fetch("/api/admin/upload", {
+    method: "POST",
+    body: formData,
+    cache: "no-store",
+  });
+
+  const json = await readJsonSafe<UploadApiResponse>(res);
+
+  if (!res.ok || !json?.ok) {
+    throw new Error(json?.error || `HTTP ${res.status}`);
+  }
+
+  const uploadedUrl = extractUploadUrl(json, params.bucket);
+
+  if (!uploadedUrl) {
+    throw new Error("Сервер загрузил файл, но не вернул publicUrl");
+  }
+
+  return cacheBustUrl(uploadedUrl);
+}
+
+function getInlineCount(row: TextbookRow) {
+  const raw = row.assignments_count ?? row.assignment_count ?? row.assignmentsCount ?? row._count?.assignments ?? null;
+  const n = Number(raw);
+
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
+}
+
+function buildCountsFromAssignments(assignments: AssignmentLike[]) {
+  const map: Record<string, number> = {};
+
+  for (const assignment of assignments) {
+    const textbookId = assignment.textbook_id ?? assignment.textbookId ?? null;
+
+    if (textbookId) {
+      map[String(textbookId)] = (map[String(textbookId)] || 0) + 1;
+    }
+  }
+
+  return map;
+}
+
+async function loadAssignmentCountsFallback() {
+  try {
+    const res = await fetch("/api/admin/assignments?limit=5000", {
+      cache: "no-store",
+    });
+
+    const json = await readJsonSafe<any>(res);
+
+    if (!res.ok || json?.ok === false) return {};
+
+    const assignments = Array.isArray(json?.assignments)
+      ? json.assignments
+      : Array.isArray(json?.data)
+        ? json.data
+        : [];
+
+    return buildCountsFromAssignments(assignments);
+  } catch {
+    return {};
+  }
+}
+
+export default function TextbooksTab({ onChanged }: Props) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   const [textbooks, setTextbooks] = useState<TextbookRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
 
-  // form state
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -52,12 +212,12 @@ export default function TextbooksTab({ onChanged }: Props) {
   const [orderIndex, setOrderIndex] = useState<number>(0);
   const [isAvailable, setIsAvailable] = useState(false);
 
-  // cover
   const [coverUrl, setCoverUrl] = useState<string>("");
   const [coverPreview, setCoverPreview] = useState<string>("");
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [saving, setSaving] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   async function load() {
     try {
@@ -65,26 +225,30 @@ export default function TextbooksTab({ onChanged }: Props) {
       setErr(null);
 
       const res = await fetch("/api/admin/textbooks", { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok || json?.ok === false) throw new Error(json?.error || "Не удалось загрузить учебники");
+      const json = await readJsonSafe<any>(res);
+
+      if (!res.ok || json?.ok === false) {
+        throw new Error(json?.error || "Не удалось загрузить учебники");
+      }
 
       const list: TextbookRow[] = Array.isArray(json?.textbooks) ? json.textbooks : [];
+
       setTextbooks(list);
 
-      // counts
-      const { data: ass, error: aErr } = await supabase.from("assignments").select("id,textbook_id");
-      if (!aErr) {
-        const m: Record<string, number> = {};
-        (ass ?? []).forEach((a: any) => {
-          const tid = a?.textbook_id;
-          if (tid) m[String(tid)] = (m[String(tid)] || 0) + 1;
-        });
-        setCounts(m);
+      const inlineCounts: Record<string, number> = {};
+
+      for (const tb of list) {
+        const count = getInlineCount(tb);
+        if (count !== null) inlineCounts[tb.id] = count;
+      }
+
+      if (Object.keys(inlineCounts).length > 0) {
+        setCounts(inlineCounts);
       } else {
-        setCounts({});
+        setCounts(await loadAssignmentCountsFallback());
       }
     } catch (e: any) {
-      setErr(e?.message || "Ошибка");
+      setErr(normalizeUiErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -120,33 +284,33 @@ export default function TextbooksTab({ onChanged }: Props) {
   }
 
   function closeForm() {
+    if (saving || uploadingCover) return;
     setFormOpen(false);
   }
 
   async function uploadCover(file: File) {
-    const bucket = "covers";
     const ext = (file.name.split(".").pop() || "bin").toLowerCase();
     const allowed = ["jpg", "jpeg", "png", "gif", "webp", "avif"];
-    if (!allowed.includes(ext)) throw new Error("Поддерживаются JPG/PNG/GIF/WebP/AVIF");
-    if (file.size > 5 * 1024 * 1024) throw new Error("Файл больше 5MB");
 
-    const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    if (!allowed.includes(ext)) {
+      throw new Error("Поддерживаются JPG/PNG/GIF/WebP/AVIF");
+    }
 
-    const { error } = await supabase.storage.from(bucket).upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type || "application/octet-stream",
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error("Файл больше 5MB");
+    }
+
+    return uploadImageThroughApi({
+      file,
+      bucket: "covers",
+      folder: "textbooks",
     });
-
-    if (error) throw new Error(error.message);
-
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    return data.publicUrl;
   }
 
   async function onPickCover(file: File) {
     const local = URL.createObjectURL(file);
     setCoverPreview(local);
+    setUploadingCover(true);
 
     try {
       const url = await uploadCover(file);
@@ -155,28 +319,42 @@ export default function TextbooksTab({ onChanged }: Props) {
     } catch (e: any) {
       setCoverUrl("");
       setCoverPreview("");
-      alert("❌ Ошибка загрузки обложки: " + (e?.message || String(e)));
+      alert("❌ Ошибка загрузки обложки: " + normalizeUiErrorMessage(e));
+    } finally {
+      setUploadingCover(false);
+
+      if (fileRef.current) {
+        fileRef.current.value = "";
+      }
     }
   }
 
-  function toggleClass(v: string) {
-    setClassLevel((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
+  function toggleClass(value: string) {
+    setClassLevel((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]));
   }
 
   async function save() {
-    const t = title.trim();
-    const cls = classLevel;
+    const normalizedTitle = title.trim();
+    const normalizedClassLevels = classLevel;
 
-    if (!t) return alert("❌ Введите название учебника");
-    if (!cls.length) return alert("❌ Выберите хотя бы один класс");
+    if (!normalizedTitle) {
+      alert("❌ Введите название учебника");
+      return;
+    }
+
+    if (!normalizedClassLevels.length) {
+      alert("❌ Выберите хотя бы один класс");
+      return;
+    }
 
     setSaving(true);
+
     try {
       const payload = {
-        title: t,
-        description: description.trim(),
-        class_level: cls,
-        order_index: orderIndex,
+        title: normalizedTitle,
+        description: description.trim() || null,
+        class_level: normalizedClassLevels,
+        order_index: Number.isFinite(Number(orderIndex)) ? Number(orderIndex) : 0,
         is_available: isAvailable,
         cover_image_url: coverUrl || null,
       };
@@ -185,39 +363,52 @@ export default function TextbooksTab({ onChanged }: Props) {
         ? await fetch(`/api/admin/textbooks/${encodeURIComponent(editingId)}`, {
             method: "PATCH",
             headers: { "content-type": "application/json" },
+            cache: "no-store",
             body: JSON.stringify(payload),
           })
         : await fetch("/api/admin/textbooks", {
             method: "POST",
             headers: { "content-type": "application/json" },
+            cache: "no-store",
             body: JSON.stringify(payload),
           });
 
-      const json = await res.json();
-      if (!res.ok || json?.ok === false) throw new Error(json?.error || "Не удалось сохранить");
+      const json = await readJsonSafe<any>(res);
+
+      if (!res.ok || json?.ok === false) {
+        throw new Error(json?.error || "Не удалось сохранить");
+      }
 
       setFormOpen(false);
       await load();
       await onChanged?.();
     } catch (e: any) {
-      alert("❌ Ошибка сохранения: " + (e?.message || String(e)));
+      alert("❌ Ошибка сохранения: " + normalizeUiErrorMessage(e));
     } finally {
       setSaving(false);
     }
   }
 
   async function del(tb: TextbookRow) {
-    const okConfirm = confirm(`Удалить учебник "${tb.title}"?`);
+    const okConfirm = window.confirm(`Удалить учебник "${tb.title}"?`);
     if (!okConfirm) return;
 
     try {
-      const res = await fetch(`/api/admin/textbooks/${encodeURIComponent(tb.id)}`, { method: "DELETE" });
-      const json = await res.json();
-      if (!res.ok || json?.ok === false) throw new Error(json?.error || "Не удалось удалить");
+      const res = await fetch(`/api/admin/textbooks/${encodeURIComponent(tb.id)}`, {
+        method: "DELETE",
+        cache: "no-store",
+      });
+
+      const json = await readJsonSafe<any>(res);
+
+      if (!res.ok || json?.ok === false) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+
       await load();
       await onChanged?.();
     } catch (e: any) {
-      alert("❌ Ошибка удаления: " + (e?.message || String(e)));
+      alert("❌ Ошибка удаления: " + normalizeUiErrorMessage(e));
     }
   }
 
@@ -228,6 +419,7 @@ export default function TextbooksTab({ onChanged }: Props) {
     <div className="card">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
         <h3 style={{ margin: 0 }}>📚 Учебники</h3>
+
         <button className="btn" onClick={openCreate} type="button">
           ➕ Создать учебник
         </button>
@@ -244,7 +436,7 @@ export default function TextbooksTab({ onChanged }: Props) {
             </div>
 
             <div className="col" style={{ width: 160 }}>
-              <label className="small-muted">Порядок (больше = выше)</label>
+              <label className="small-muted">Порядок, больше = выше</label>
               <input
                 className="input"
                 type="number"
@@ -260,7 +452,7 @@ export default function TextbooksTab({ onChanged }: Props) {
           </div>
 
           <div className="col" style={{ marginTop: 10 }}>
-            <label className="small-muted">Классы (множественный выбор)</label>
+            <label className="small-muted">Классы, множественный выбор</label>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {CLASS_OPTIONS.map((c) => (
@@ -281,7 +473,7 @@ export default function TextbooksTab({ onChanged }: Props) {
           </div>
 
           <div className="col" style={{ marginTop: 10 }}>
-            <label className="small-muted">Обложка (bucket: covers)</label>
+            <label className="small-muted">Обложка, bucket: covers</label>
 
             <input
               ref={fileRef}
@@ -289,14 +481,14 @@ export default function TextbooksTab({ onChanged }: Props) {
               accept="image/*"
               style={{ display: "none" }}
               onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void onPickCover(f);
+                const file = e.target.files?.[0];
+                if (file) void onPickCover(file);
               }}
             />
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <button className="btn" type="button" onClick={() => fileRef.current?.click()}>
-                📁 Загрузить обложку
+              <button className="btn" type="button" onClick={() => fileRef.current?.click()} disabled={uploadingCover}>
+                {uploadingCover ? "Загружаем..." : "📁 Загрузить обложку"}
               </button>
 
               {coverUrl ? (
@@ -307,6 +499,7 @@ export default function TextbooksTab({ onChanged }: Props) {
                     setCoverUrl("");
                     setCoverPreview("");
                   }}
+                  disabled={uploadingCover}
                 >
                   🗑️ Удалить
                 </button>
@@ -317,7 +510,13 @@ export default function TextbooksTab({ onChanged }: Props) {
               <img
                 src={coverPreview}
                 alt="cover"
-                style={{ marginTop: 10, maxWidth: 240, maxHeight: 160, borderRadius: 10, display: "block" }}
+                style={{
+                  marginTop: 10,
+                  maxWidth: 240,
+                  maxHeight: 160,
+                  borderRadius: 10,
+                  display: "block",
+                }}
               />
             ) : null}
           </div>
@@ -330,10 +529,11 @@ export default function TextbooksTab({ onChanged }: Props) {
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-            <button className="btn" onClick={() => void save()} disabled={saving} type="button">
+            <button className="btn" onClick={() => void save()} disabled={saving || uploadingCover} type="button">
               {saving ? "Сохраняем..." : "💾 Сохранить"}
             </button>
-            <button className="btn secondary" onClick={closeForm} type="button">
+
+            <button className="btn secondary" onClick={closeForm} type="button" disabled={saving || uploadingCover}>
               ❌ Отмена
             </button>
           </div>
@@ -354,6 +554,7 @@ export default function TextbooksTab({ onChanged }: Props) {
               <th>Действия</th>
             </tr>
           </thead>
+
           <tbody>
             {textbooks.length === 0 ? (
               <tr>
@@ -363,7 +564,6 @@ export default function TextbooksTab({ onChanged }: Props) {
               </tr>
             ) : (
               textbooks.map((tb, idx) => {
-                // ✅ “Новые сверху”: первый = N, последний = 1
                 const number = textbooks.length - idx;
 
                 return (
@@ -371,23 +571,28 @@ export default function TextbooksTab({ onChanged }: Props) {
                     <td>
                       <strong>{number}</strong>
                     </td>
+
                     <td>
                       <strong>{tb.title}</strong>
+
                       {tb.cover_image_url ? (
                         <div className="small-muted" style={{ marginTop: 6 }}>
                           🖼️ есть обложка
                         </div>
                       ) : null}
                     </td>
+
                     <td>{tb.description || "—"}</td>
                     <td>{safeArr(tb.class_level).length ? safeArr(tb.class_level).join(", ") : "—"}</td>
                     <td>{counts[tb.id] ?? 0}</td>
                     <td>{tb.is_available ? "🌍 Для всех" : "🔒 По доступу"}</td>
                     <td>{tb.is_active ? "✅ Активен" : "❌ Неактивен"}</td>
+
                     <td style={{ whiteSpace: "nowrap" }}>
                       <button className="btn small" onClick={() => openEdit(tb)} type="button">
                         ✏️
                       </button>{" "}
+
                       <button className="btn small secondary" onClick={() => void del(tb)} type="button">
                         🗑️
                       </button>
@@ -400,7 +605,7 @@ export default function TextbooksTab({ onChanged }: Props) {
         </table>
 
         <div className="small-muted" style={{ marginTop: 8 }}>
-          💡 Сортировка: сверху идут учебники с большим “Порядком”. Нумерация слева показывает позицию (N сверху → 1 снизу).
+          💡 Сортировка: сверху идут учебники с большим “Порядком”. Нумерация слева показывает позицию.
         </div>
       </div>
     </div>

@@ -6,5 +6,6 @@ export default async function CrosswordByIdPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+
   return <CrosswordClient crosswordId={id} initialData={null} />;
 }

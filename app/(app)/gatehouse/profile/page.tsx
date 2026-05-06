@@ -25,12 +25,15 @@ function normalizeScore(value: unknown): number {
 function formatDate(value: unknown): string {
   if (typeof value !== "string" || !value) return "—";
 
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
   try {
     return new Intl.DateTimeFormat("ru-RU", {
       day: "2-digit",
       month: "long",
       year: "numeric",
-    }).format(new Date(value));
+    }).format(date);
   } catch {
     return "—";
   }
@@ -46,71 +49,81 @@ export default async function GatehouseProfilePage() {
     redirect("/login");
   }
 
-  const { data: profileRow } = await supabase
-    .from("profiles")
-    .select("id, email, full_name, contact_phone, region, ga_completed_assignments_count")
-    .eq("id", user.id)
-    .single();
+  const [
+    { data: profileRow },
+    { count: totalMaterialsCount },
+    { count: availableMaterialsCount },
+    { count: completedAssignmentsCount },
+    { data: recentRows },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, email, full_name, contact_phone, region, ga_completed_assignments_count")
+      .eq("id", user.id)
+      .single(),
+
+    supabase
+      .from("materials")
+      .select("id", { count: "exact", head: true })
+      .eq("branch_type", "gatehouse")
+      .eq("material_kind", "mock_test")
+      .eq("is_active", true),
+
+    supabase
+      .from("material_access")
+      .select("id, materials!inner(branch_type, material_kind, is_active)", {
+        count: "exact",
+        head: true,
+      })
+      .eq("user_id", user.id)
+      .eq("materials.branch_type", "gatehouse")
+      .eq("materials.material_kind", "mock_test")
+      .eq("materials.is_active", true),
+
+    supabase
+      .from("user_progress")
+      .select("id, assignments!inner(branch_type)", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("is_completed", true)
+      .eq("assignments.branch_type", "gatehouse"),
+
+    supabase
+      .from("user_progress")
+      .select(
+        `
+        id,
+        assignment_id,
+        completed_at,
+        score,
+        assignments!inner(
+          id,
+          title,
+          branch_type,
+          material_id,
+          materials(
+            id,
+            title,
+            target_levels,
+            material_kind
+          )
+        )
+      `,
+      )
+      .eq("user_id", user.id)
+      .eq("is_completed", true)
+      .eq("assignments.branch_type", "gatehouse")
+      .order("completed_at", { ascending: false })
+      .limit(5),
+  ]);
 
   const profile = normalizeProfile(profileRow, user.email ?? "");
 
-  const { count: totalMaterialsCount } = await supabase
-    .from("materials")
-    .select("id", { count: "exact", head: true })
-    .eq("branch_type", "gatehouse")
-    .eq("material_kind", "mock_test")
-    .eq("is_active", true);
-
-  const { count: availableMaterialsCount } = await supabase
-    .from("material_access")
-    .select("id, materials!inner(branch_type, material_kind, is_active)", {
-      count: "exact",
-      head: true,
-    })
-    .eq("user_id", user.id)
-    .eq("materials.branch_type", "gatehouse")
-    .eq("materials.material_kind", "mock_test")
-    .eq("materials.is_active", true);
-
-  const { count: completedAssignmentsCount } = await supabase
-    .from("user_progress")
-    .select("id, assignments!inner(branch_type)", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .eq("is_completed", true)
-    .eq("assignments.branch_type", "gatehouse");
-
-  const { data: recentRows } = await supabase
-    .from("user_progress")
-    .select(
-      `
-      id,
-      assignment_id,
-      completed_at,
-      score,
-      assignments!inner(
-        id,
-        title,
-        branch_type,
-        material_id,
-        materials(
-          id,
-          title,
-          target_levels,
-          material_kind
-        )
-      )
-    `,
-    )
-    .eq("user_id", user.id)
-    .eq("is_completed", true)
-    .eq("assignments.branch_type", "gatehouse")
-    .order("completed_at", { ascending: false })
-    .limit(5);
-
   const recentProgress: GatehouseProfileRecentProgress[] = Array.isArray(recentRows)
     ? recentRows.map((row: any) => {
-        const assignment = row?.assignments;
-        const material = assignment?.materials;
+        const assignment = Array.isArray(row?.assignments) ? row.assignments[0] : row?.assignments;
+        const material = Array.isArray(assignment?.materials)
+          ? assignment.materials[0]
+          : assignment?.materials;
 
         return {
           id: String(row?.id ?? row?.assignment_id ?? ""),
@@ -124,13 +137,14 @@ export default async function GatehouseProfilePage() {
       })
     : [];
 
+  const fallbackCompleted = Number(profileRow?.ga_completed_assignments_count ?? 0);
+
   const stats: GatehouseProfileStats = {
     totalMaterials: totalMaterialsCount ?? 0,
     availableMaterials: availableMaterialsCount ?? 0,
     completedAssignments:
       completedAssignmentsCount ??
-      Number(profileRow?.ga_completed_assignments_count ?? 0) ??
-      0,
+      (Number.isFinite(fallbackCompleted) ? fallbackCompleted : 0),
   };
 
   return (

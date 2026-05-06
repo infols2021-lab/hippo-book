@@ -1,6 +1,67 @@
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
 
+type TextbookRow = {
+  id: string;
+  title: string;
+  is_available: boolean | null;
+};
+
+type CrosswordRow = {
+  id: string;
+  title: string;
+  is_available: boolean | null;
+};
+
+type AssignmentRow = {
+  id: string;
+  textbook_id: string | null;
+  crossword_id: string | null;
+};
+
+type ProgressRow = {
+  assignment_id: string;
+  is_completed: boolean | null;
+};
+
+function groupAssignments(assignments: AssignmentRow[]) {
+  const byTextbook = new Map<string, string[]>();
+  const byCrossword = new Map<string, string[]>();
+
+  for (const assignment of assignments) {
+    if (assignment.textbook_id) {
+      const list = byTextbook.get(assignment.textbook_id) ?? [];
+      list.push(assignment.id);
+      byTextbook.set(assignment.textbook_id, list);
+    }
+
+    if (assignment.crossword_id) {
+      const list = byCrossword.get(assignment.crossword_id) ?? [];
+      list.push(assignment.id);
+      byCrossword.set(assignment.crossword_id, list);
+    }
+  }
+
+  return { byTextbook, byCrossword };
+}
+
+function countProgress(ids: string[], completedSet: Set<string>) {
+  const total = ids.length;
+  let completed = 0;
+
+  for (const id of ids) {
+    if (completedSet.has(id)) completed++;
+  }
+
+  const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  return {
+    total,
+    completed,
+    progressPercent,
+  };
+}
+
 export async function GET() {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
@@ -9,123 +70,144 @@ export async function GET() {
 
   try {
     const [
-      { data: textbooks, error: tErr },
-      { data: crosswords, error: cErr },
-      { data: assignments, error: aErr },
-      { data: userProgress, error: pErr },
-      { data: textbookAccess, error: taErr },
-      { data: crosswordAccess, error: caErr },
+      { data: textbooks, error: textbooksError },
+      { data: crosswords, error: crosswordsError },
+      { data: assignments, error: assignmentsError },
+      { data: userProgress, error: progressError },
+      { data: textbookAccess, error: textbookAccessError },
+      { data: crosswordAccess, error: crosswordAccessError },
     ] = await Promise.all([
       supabase
         .from("textbooks")
         .select("id, title, is_available, is_active, order_index, branch_type")
         .eq("is_active", true)
         .or("branch_type.eq.olympiad,branch_type.is.null")
-        .order("order_index"),
+        .order("order_index", { ascending: false })
+        .order("created_at", { ascending: false }),
+
       supabase
         .from("crosswords")
         .select("id, title, is_available, is_active, order_index, branch_type")
         .eq("is_active", true)
         .or("branch_type.eq.olympiad,branch_type.is.null")
-        .order("order_index"),
+        .order("order_index", { ascending: false })
+        .order("created_at", { ascending: false }),
+
       supabase
         .from("assignments")
         .select("id, textbook_id, crossword_id, branch_type")
         .or("branch_type.eq.olympiad,branch_type.is.null"),
-      supabase.from("user_progress").select("assignment_id, is_completed").eq("user_id", user.id),
-      supabase.from("textbook_access").select("textbook_id").eq("user_id", user.id),
-      supabase.from("crossword_access").select("crossword_id").eq("user_id", user.id),
+
+      supabase
+        .from("user_progress")
+        .select("assignment_id, is_completed")
+        .eq("user_id", user.id),
+
+      supabase
+        .from("textbook_access")
+        .select("textbook_id")
+        .eq("user_id", user.id),
+
+      supabase
+        .from("crossword_access")
+        .select("crossword_id")
+        .eq("user_id", user.id),
     ]);
 
-    const err = tErr || cErr || aErr || pErr || taErr || caErr;
-    if (err) return fail(err.message, 500, "DB_ERROR");
+    const error =
+      textbooksError ||
+      crosswordsError ||
+      assignmentsError ||
+      progressError ||
+      textbookAccessError ||
+      crosswordAccessError;
 
-    const tb = textbooks ?? [];
-    const cw = crosswords ?? [];
-    const asg = assignments ?? [];
-    const up = userProgress ?? [];
-    const tba = textbookAccess ?? [];
-    const cwa = crosswordAccess ?? [];
-
-    const hasTextbookAccess = new Set(tba.map((x: any) => x.textbook_id));
-    const hasCrosswordAccess = new Set(cwa.map((x: any) => x.crossword_id));
-
-    const availableTextbooks = tb.filter((t: any) => t.is_available || hasTextbookAccess.has(t.id));
-    const availableCrosswords = cw.filter((c: any) => c.is_available || hasCrosswordAccess.has(c.id));
-
-    const completedSet = new Set(up.filter((x: any) => x.is_completed).map((x: any) => x.assignment_id));
-
-    function countForTextbook(textbookId: string) {
-      const ids = asg.filter((a: any) => a.textbook_id === textbookId).map((a: any) => a.id);
-      const total = ids.length;
-      let completed = 0;
-
-      for (const id of ids) {
-        if (completedSet.has(id)) completed++;
-      }
-
-      const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
-      return { total, completed, progressPercent };
+    if (error) {
+      return fail(error.message, 500, "DB_ERROR");
     }
 
-    function countForCrossword(crosswordId: string) {
-      const ids = asg.filter((a: any) => a.crossword_id === crosswordId).map((a: any) => a.id);
-      const total = ids.length;
-      let completed = 0;
+    const textbookRows = Array.isArray(textbooks) ? (textbooks as TextbookRow[]) : [];
+    const crosswordRows = Array.isArray(crosswords) ? (crosswords as CrosswordRow[]) : [];
+    const assignmentRows = Array.isArray(assignments) ? (assignments as AssignmentRow[]) : [];
+    const progressRows = Array.isArray(userProgress) ? (userProgress as ProgressRow[]) : [];
 
-      for (const id of ids) {
-        if (completedSet.has(id)) completed++;
-      }
+    const textbookAccessSet = new Set(
+      Array.isArray(textbookAccess)
+        ? textbookAccess.map((item: any) => String(item?.textbook_id ?? "")).filter(Boolean)
+        : [],
+    );
 
-      const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
-      return { total, completed, progressPercent };
-    }
+    const crosswordAccessSet = new Set(
+      Array.isArray(crosswordAccess)
+        ? crosswordAccess.map((item: any) => String(item?.crossword_id ?? "")).filter(Boolean)
+        : [],
+    );
+
+    const completedSet = new Set(
+      progressRows
+        .filter((item) => item.is_completed)
+        .map((item) => String(item.assignment_id ?? ""))
+        .filter(Boolean),
+    );
+
+    const { byTextbook, byCrossword } = groupAssignments(assignmentRows);
+
+    const availableTextbooks = textbookRows.filter(
+      (textbook) => Boolean(textbook.is_available) || textbookAccessSet.has(textbook.id),
+    );
+
+    const availableCrosswords = crosswordRows.filter(
+      (crossword) => Boolean(crossword.is_available) || crosswordAccessSet.has(crossword.id),
+    );
 
     let totalAvailableAssignments = 0;
     let completedAvailableAssignments = 0;
+    let completedMaterials = 0;
 
     const materialsProgress: any[] = [];
 
-    for (const t of availableTextbooks) {
-      const { total, completed, progressPercent } = countForTextbook(t.id);
+    for (const textbook of availableTextbooks) {
+      const assignmentIds = byTextbook.get(textbook.id) ?? [];
+      const { total, completed, progressPercent } = countProgress(assignmentIds, completedSet);
+
       totalAvailableAssignments += total;
       completedAvailableAssignments += completed;
+
+      if (total > 0 && completed === total) {
+        completedMaterials++;
+      }
+
       materialsProgress.push({
         kind: "textbook",
-        id: t.id,
-        title: t.title,
+        id: textbook.id,
+        title: textbook.title,
         total,
         completed,
         progressPercent,
-        href: `/materials#textbook-${t.id}`,
+        href: `/materials#textbook-${textbook.id}`,
       });
     }
 
-    for (const c of availableCrosswords) {
-      const { total, completed, progressPercent } = countForCrossword(c.id);
+    for (const crossword of availableCrosswords) {
+      const assignmentIds = byCrossword.get(crossword.id) ?? [];
+      const { total, completed, progressPercent } = countProgress(assignmentIds, completedSet);
+
       totalAvailableAssignments += total;
       completedAvailableAssignments += completed;
+
+      if (total > 0 && completed === total) {
+        completedMaterials++;
+      }
+
       materialsProgress.push({
         kind: "crossword",
-        id: c.id,
-        title: c.title,
+        id: crossword.id,
+        title: crossword.title,
         total,
         completed,
         progressPercent,
-        href: `/materials#crossword-${c.id}`,
+        href: `/materials#crossword-${crossword.id}`,
       });
-    }
-
-    let completedMaterials = 0;
-
-    for (const t of availableTextbooks) {
-      const { total, completed } = countForTextbook(t.id);
-      if (total > 0 && completed === total) completedMaterials++;
-    }
-
-    for (const c of availableCrosswords) {
-      const { total, completed } = countForCrossword(c.id);
-      if (total > 0 && completed === total) completedMaterials++;
     }
 
     const totalMaterials = availableTextbooks.length + availableCrosswords.length;
@@ -146,7 +228,7 @@ export async function GET() {
       },
       materialsProgress,
     });
-  } catch (e: any) {
-    return fail(e?.message || "Server error", 500, "SERVER_ERROR");
+  } catch (error: any) {
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
 }

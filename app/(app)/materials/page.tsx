@@ -1,13 +1,14 @@
-import MaterialsClient from "./MaterialsClient";
-import { createSupabaseServerClient } from "../../../lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getDataAuthContext } from "@/lib/data/auth";
+import MaterialsClient from "./MaterialsClient";
 
 export default async function MaterialsPage() {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getSession();
+  const auth = await getDataAuthContext();
 
-  if (!data.session) redirect("/login");
+  if (!auth.ok) {
+    if (auth.error.status === 401) redirect("/login");
+    throw new Error(auth.error.message);
+  }
 
-  // Ничего тяжелого не грузим тут — быстро отдаём UI
   return <MaterialsClient initialData={null} />;
 }

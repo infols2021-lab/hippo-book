@@ -1,4 +1,3 @@
-// app/api/profile-streak/route.ts
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -130,7 +129,6 @@ function getDbUnlockAtForIcon(row: StreakIconAssetRow | null) {
     null;
 
   const parsed = toInt(v, 0);
-  // ❗ Если unlockAt не задан — считаем, что иконка НЕ настроена (ставим 0, потом отфильтруем)
   return parsed > 0 ? parsed : 0;
 }
 

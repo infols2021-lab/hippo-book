@@ -24,7 +24,10 @@ function normalizeScore(value: unknown): number | null {
   if (value === null || value === undefined) return null;
 
   const score = Number(value);
-  if (!Number.isFinite(score)) return null;
+
+  if (!Number.isFinite(score)) {
+    return null;
+  }
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
@@ -39,6 +42,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 
   const { supabase, user } = auth;
   const { id } = await ctx.params;
+
   const materialId = String(id ?? "").trim();
 
   if (!materialId) {
@@ -60,29 +64,33 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       return fail("Material is not active", 404, "NOT_FOUND");
     }
 
-    const [{ data: access }, { data: assignments, error: assignmentsError }, { data: progress, error: progressError }] =
-      await Promise.all([
-        supabase
-          .from("material_access")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("material_id", materialId)
-          .maybeSingle(),
+    const [
+      { data: access, error: accessError },
+      { data: assignments, error: assignmentsError },
+      { data: progress, error: progressError },
+    ] = await Promise.all([
+      supabase
+        .from("material_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("material_id", materialId)
+        .maybeSingle(),
 
-        supabase
-          .from("assignments")
-          .select("id, title, branch_type, material_id, order_index, content, created_at")
-          .eq("material_id", materialId)
-          .eq("branch_type", material.branch_type)
-          .order("order_index", { ascending: true })
-          .order("created_at", { ascending: true }),
+      supabase
+        .from("assignments")
+        .select("id, title, branch_type, material_id, order_index, content, created_at")
+        .eq("material_id", materialId)
+        .eq("branch_type", material.branch_type)
+        .order("order_index", { ascending: true })
+        .order("created_at", { ascending: true }),
 
-        supabase
-          .from("user_progress")
-          .select("assignment_id, is_completed, score, completed_at, answers")
-          .eq("user_id", user.id),
-      ]);
+      supabase
+        .from("user_progress")
+        .select("assignment_id, is_completed, score, completed_at, answers")
+        .eq("user_id", user.id),
+    ]);
 
+    if (accessError) return fail(accessError.message, 500, "DB_ERROR");
     if (assignmentsError) return fail(assignmentsError.message, 500, "DB_ERROR");
     if (progressError) return fail(progressError.message, 500, "DB_ERROR");
 
@@ -117,10 +125,12 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       : [];
 
     const totalAssignments = assignmentRows.length;
+
     const completedAssignments = assignmentRows.filter((assignment) => {
       const savedProgress = progressByAssignment.get(assignment.id) ?? null;
       return Boolean(savedProgress?.is_completed);
     }).length;
+
     const progressPercent =
       totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
 

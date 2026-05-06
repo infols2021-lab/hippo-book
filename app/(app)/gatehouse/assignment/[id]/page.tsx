@@ -89,7 +89,9 @@ function ErrorState({
                 <span className="gatehouse-empty__icon" aria-hidden="true">
                   📝
                 </span>
+
                 <h3 className="gatehouse-empty__title">{title}</h3>
+
                 <p className="gatehouse-empty__text">{description}</p>
 
                 <div style={{ marginTop: 18 }}>

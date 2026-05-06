@@ -1,21 +1,24 @@
-/* app/(app)/requests/RequestsClient.tsx */
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useEffect, useMemo, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import Modal from "@/components/Modal";
 
 type PurchaseRequest = {
   id: string;
   request_number: string;
+  request_date?: string | null;
   created_at: string;
-  class_level: string;
+  updated_at?: string | null;
+  class_level: string | null;
   textbook_types: string[] | null;
+  material_kinds?: string[] | null;
   email: string;
   full_name: string;
+  contact_phone?: string | null;
   is_processed: boolean;
+  processed_at?: string | null;
   user_id: string;
   branch_type?: string | null;
 };
@@ -27,16 +30,95 @@ type Props = {
   initialRequests: PurchaseRequest[];
 };
 
+type RequestListApiResponse = {
+  ok?: boolean;
+  error?: string;
+  requests?: any[];
+};
+
 function generateRequestNumber() {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+
   return `PR-${year}${month}${day}-${random}`;
 }
 
-function formatClassLevel(classLevel: string) {
+function normalizeString(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeString(item)).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const text = value.trim();
+
+    if (!text) return [];
+
+    if (text.startsWith("[") && text.endsWith("]")) {
+      try {
+        return toStringArray(JSON.parse(text));
+      } catch {
+        return [];
+      }
+    }
+
+    return text
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  const single = normalizeString(value);
+  return single ? [single] : [];
+}
+
+function normalizeBranchType(value: unknown) {
+  const raw = normalizeString(value).toLowerCase();
+
+  if (
+    raw === "gatehouse" ||
+    raw === "gatehouse_awards" ||
+    raw === "ga" ||
+    raw === "ga_exam" ||
+    raw === "exam" ||
+    raw === "exams"
+  ) {
+    return "gatehouse";
+  }
+
+  return "olympiad";
+}
+
+function normalizeMaterialType(value: unknown) {
+  const raw = normalizeString(value).toLowerCase();
+
+  if (raw === "учебник" || raw === "textbook") return "textbook";
+  if (raw === "кроссворд" || raw === "crossword") return "crossword";
+
+  return raw;
+}
+
+function getRequestMaterialTypes(request: Pick<PurchaseRequest, "textbook_types" | "material_kinds">) {
+  const materialKinds = toStringArray(request.material_kinds).map(normalizeMaterialType).filter(Boolean);
+  if (materialKinds.length) return Array.from(new Set(materialKinds));
+
+  const legacyKinds = toStringArray(request.textbook_types).map(normalizeMaterialType).filter(Boolean);
+  return Array.from(new Set(legacyKinds));
+}
+
+function hasMaterialType(request: Pick<PurchaseRequest, "textbook_types" | "material_kinds">, type: "textbook" | "crossword") {
+  return getRequestMaterialTypes(request).includes(type);
+}
+
+function formatClassLevel(classLevel: string | null) {
+  if (!classLevel) return "—";
+
   const classMap: Record<string, string> = {
     "1-2": "1-2 класс",
     "3-4": "3-4 класс",
@@ -46,17 +128,31 @@ function formatClassLevel(classLevel: string) {
     "10-11": "10-11 класс (Техникум, колледж - 1й курс)",
     "12": "12 класс (Техникум, колледж)",
   };
+
   return classMap[classLevel] || classLevel;
 }
 
-function formatTextbookTypes(types: string[] | null) {
-  if (!types || !Array.isArray(types)) return "";
-  const typeMap: Record<string, string> = { учебник: "📚 Учебник", кроссворд: "🧩 Кроссворд" };
-  return types.map((t) => typeMap[t] || t).join(", ");
+function formatTextbookTypes(request: Pick<PurchaseRequest, "textbook_types" | "material_kinds">) {
+  const types = getRequestMaterialTypes(request);
+
+  if (!types.length) return "";
+
+  const typeMap: Record<string, string> = {
+    textbook: "📚 Учебник",
+    crossword: "🧩 Кроссворд",
+  };
+
+  return types.map((type) => typeMap[type] || type).join(", ");
 }
 
-function formatDateTime(dateString: string) {
-  return new Date(dateString).toLocaleString("ru-RU", {
+function formatDateTime(dateString: string | null | undefined) {
+  if (!dateString) return "—";
+
+  const d = new Date(dateString);
+
+  if (Number.isNaN(d.getTime())) return String(dateString);
+
+  return d.toLocaleString("ru-RU", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -65,34 +161,94 @@ function formatDateTime(dateString: string) {
   });
 }
 
-function calcAmountFromTypes(types: string[] | null) {
-  const count = Array.isArray(types) ? types.length : 0;
-  return count * 1000;
+function calcAmountFromRequest(request: Pick<PurchaseRequest, "textbook_types" | "material_kinds"> | null) {
+  if (!request) return 0;
+  return getRequestMaterialTypes(request).length * 1000;
 }
 
 function getPaymentQRUrl(seed?: number) {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const t = seed ?? Date.now();
-  return `${base}/storage/v1/object/public/help-images/oplata.png?t=${t}`;
+  const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
+  const t = encodeURIComponent(String(seed ?? Date.now()));
+
+  if (!supabaseUrl) return "";
+
+  return `${supabaseUrl}/storage/v1/object/public/help-images/oplata.png?t=${t}`;
 }
 
 async function safeReadJson(res: Response) {
-  const t = await res.text();
+  const text = await res.text();
   let json: any = null;
 
   try {
-    json = t ? JSON.parse(t) : null;
+    json = text ? JSON.parse(text) : null;
   } catch {
     json = null;
   }
 
-  return { text: t, json };
+  return { text, json };
+}
+
+function normalizeRequestRow(row: any): PurchaseRequest {
+  return {
+    id: String(row?.id ?? ""),
+    user_id: String(row?.user_id ?? ""),
+    request_number: String(row?.request_number ?? ""),
+    request_date: typeof row?.request_date === "string" ? row.request_date : null,
+    created_at: typeof row?.created_at === "string" ? row.created_at : "",
+    updated_at: typeof row?.updated_at === "string" ? row.updated_at : null,
+    branch_type: normalizeBranchType(row?.branch_type),
+    class_level: typeof row?.class_level === "string" ? row.class_level : null,
+    textbook_types: toStringArray(row?.textbook_types),
+    material_kinds: toStringArray(row?.material_kinds),
+    email: String(row?.email ?? ""),
+    full_name: String(row?.full_name ?? ""),
+    contact_phone: typeof row?.contact_phone === "string" ? row.contact_phone : null,
+    is_processed: Boolean(row?.is_processed),
+    processed_at: typeof row?.processed_at === "string" ? row.processed_at : null,
+  };
+}
+
+function normalizeRequests(rows: any[]): PurchaseRequest[] {
+  return rows.map(normalizeRequestRow);
+}
+
+function extractRequestFromApi(json: any): PurchaseRequest | null {
+  const candidates = [json?.request, json?.data?.request, json?.data, json?.purchaseRequest];
+
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === "object" && typeof candidate.id === "string") {
+      return normalizeRequestRow(candidate);
+    }
+  }
+
+  return null;
+}
+
+function normalizeUiErrorMessage(error: unknown, fallback = "Не удалось выполнить действие") {
+  const raw =
+    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
+
+  const msg = raw.trim();
+
+  if (!msg) return fallback;
+
+  const lower = msg.toLowerCase();
+
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network request failed") ||
+    lower.includes("load failed") ||
+    lower.includes("terminated")
+  ) {
+    return "Ошибка соединения с сервером";
+  }
+
+  return msg;
 }
 
 export default function RequestsClient({ userId, userEmail, userFullName, initialRequests }: Props) {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
-
-  const [requests, setRequests] = useState<PurchaseRequest[]>(initialRequests);
+  const [requests, setRequests] = useState<PurchaseRequest[]>(() => normalizeRequests(initialRequests));
   const [notif, setNotif] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [requestModalOpen, setRequestModalOpen] = useState(false);
@@ -112,7 +268,22 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
   const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState(false);
+
+  const [busy, setBusy] = useState(false);
+
   const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
+
+  useEffect(() => {
+    setRequests(normalizeRequests(initialRequests));
+  }, [initialRequests]);
+
+  function openPaymentModal(amount: number) {
+    setPaymentTotalAmount(amount);
+    setQrLoading(true);
+    setQrError(false);
+    setQrSeed(Date.now());
+    setPaymentModalOpen(true);
+  }
 
   function resetQrStateAndRefresh() {
     setQrError(false);
@@ -126,19 +297,22 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
   }
 
   async function reloadRequests() {
-    const { data, error } = await supabase
-      .from("purchase_requests")
-      .select("*")
-      .eq("user_id", userId)
-      .or("branch_type.eq.olympiad,branch_type.is.null")
-      .order("created_at", { ascending: false });
+    try {
+      const res = await fetch("/api/requests/list?branch_type=olympiad&limit=100", {
+        method: "GET",
+        cache: "no-store",
+      });
 
-    if (error) {
-      showNotification("Ошибка загрузки заявок: " + error.message, "error");
-      return;
+      const json = (await res.json().catch(() => null)) as RequestListApiResponse | null;
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+
+      setRequests(Array.isArray(json.requests) ? normalizeRequests(json.requests) : []);
+    } catch (error) {
+      showNotification(`Ошибка загрузки заявок: ${normalizeUiErrorMessage(error)}`, "error");
     }
-
-    setRequests((data ?? []) as PurchaseRequest[]);
   }
 
   function totalTypesSelected() {
@@ -147,17 +321,19 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
 
   function selectedTypesArray() {
     const arr: string[] = [];
-    if (typeTextbook) arr.push("учебник");
-    if (typeCrossword) arr.push("кроссворд");
+
+    if (typeTextbook) arr.push("textbook");
+    if (typeCrossword) arr.push("crossword");
+
     return arr;
   }
 
   const lastPendingRequest = useMemo(() => {
-    return requests.find((r) => !r.is_processed) ?? null;
+    return requests.find((r) => !r.is_processed && normalizeBranchType(r.branch_type) === "olympiad") ?? null;
   }, [requests]);
 
   const lastPendingAmount = useMemo(() => {
-    return lastPendingRequest ? calcAmountFromTypes(lastPendingRequest.textbook_types) : 0;
+    return lastPendingRequest ? calcAmountFromRequest(lastPendingRequest) : 0;
   }, [lastPendingRequest]);
 
   function openCreate() {
@@ -184,21 +360,22 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
     setEditingId(r.id);
     setRequestNumber(r.request_number);
 
-    const d = new Date(r.created_at);
+    const d = new Date(r.created_at || new Date().toISOString());
     const tzOffset = d.getTimezoneOffset() * 60000;
     const localISO = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
 
     setRequestDateTime(localISO);
-    setClassLevel(r.class_level);
+    setClassLevel(r.class_level || "");
 
-    const types = r.textbook_types ?? [];
-    setTypeTextbook(types.includes("учебник"));
-    setTypeCrossword(types.includes("кроссворд"));
+    setTypeTextbook(hasMaterialType(r, "textbook"));
+    setTypeCrossword(hasMaterialType(r, "crossword"));
 
     setRequestModalOpen(true);
   }
 
   async function saveRequest() {
+    if (busy) return;
+
     if (!requestDateTime || !classLevel) {
       showNotification("❌ Пожалуйста, заполните все обязательные поля", "error");
       return;
@@ -227,17 +404,21 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
       branch_type: "olympiad",
       class_level: classLevel,
       textbook_types: types,
+      material_kinds: types,
       email: userEmail,
       full_name: userFullName,
       user_id: userId,
       is_processed: false,
     };
 
+    setBusy(true);
+
     try {
       if (editingId) {
         const res = await fetch("/api/requests/update", {
           method: "POST",
           headers: { "content-type": "application/json" },
+          cache: "no-store",
           body: JSON.stringify({
             id: editingId,
             request_number: payload.request_number,
@@ -245,6 +426,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
             branch_type: payload.branch_type,
             class_level: payload.class_level,
             textbook_types: payload.textbook_types,
+            material_kinds: payload.material_kinds,
             email: payload.email,
             full_name: payload.full_name,
           }),
@@ -256,13 +438,37 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
           throw new Error(json?.error || `HTTP ${res.status}`);
         }
 
+        const updated = extractRequestFromApi(json);
+
+        setRequests((prev) => {
+          return prev.map((item) => {
+            if (item.id !== editingId) return item;
+
+            return normalizeRequestRow({
+              ...item,
+              ...(updated ?? {}),
+              request_number: payload.request_number,
+              branch_type: payload.branch_type,
+              class_level: payload.class_level,
+              textbook_types: payload.textbook_types,
+              material_kinds: payload.material_kinds,
+              email: payload.email,
+              full_name: payload.full_name,
+            });
+          });
+        });
+
         setRequestModalOpen(false);
         showNotification("✅ Заявка успешно обновлена");
 
-        if (json?.sheet && json.sheet.ok === false) {
-          showNotification("⚠️ Заявка обновлена, но синк в таблицу временно не удался. Админ досинхронизирует позже.", "error");
+        if (json?.sheet?.ok === false) {
+          showNotification(
+            "⚠️ Заявка обновлена, но синк в таблицу временно не удался. Админ досинхронизирует позже.",
+            "error",
+          );
         }
 
+        openPaymentModal(types.length * 1000);
         await reloadRequests();
         return;
       }
@@ -270,12 +476,14 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
       const res = await fetch("/api/requests/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({
           request_number: payload.request_number,
           created_at: payload.created_at,
           branch_type: payload.branch_type,
           class_level: payload.class_level,
           textbook_types: payload.textbook_types,
+          material_kinds: payload.material_kinds,
           email: payload.email,
           full_name: payload.full_name,
         }),
@@ -287,27 +495,37 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
         throw new Error(json?.error || `HTTP ${res.status}`);
       }
 
+      const created = extractRequestFromApi(json);
+
+      if (created) {
+        setRequests((prev) => [created, ...prev.filter((x) => x.id !== created.id)]);
+      }
+
       setRequestModalOpen(false);
 
       const totalAmount = types.length * 1000;
-      setPaymentTotalAmount(totalAmount);
+      openPaymentModal(totalAmount);
 
-      setPaymentModalOpen(true);
-      setQrLoading(true);
-      setQrError(false);
-      setQrSeed(Date.now());
-
-      if (json?.sheet && json.sheet.ok === false) {
-        showNotification("⚠️ Заявка создана, но запись в таблицу временно не удалась. Админ досинхронизирует позже.", "error");
+      if (json?.sheet?.ok === false) {
+        showNotification(
+          "⚠️ Заявка создана, но запись в таблицу временно не удалась. Админ досинхронизирует позже.",
+          "error",
+        );
+      } else {
+        showNotification("✅ Заявка успешно создана");
       }
 
       await reloadRequests();
     } catch (e: any) {
-      showNotification("❌ Ошибка при сохранении заявки: " + (e?.message || String(e)), "error");
+      showNotification("❌ Ошибка при сохранении заявки: " + normalizeUiErrorMessage(e), "error");
+    } finally {
+      setBusy(false);
     }
   }
 
   async function deleteRequest(r: PurchaseRequest) {
+    if (busy) return;
+
     if (r.user_id !== userId) {
       showNotification("❌ Вы можете удалять только свои заявки", "error");
       return;
@@ -321,10 +539,13 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
     const okConfirm = window.confirm(`Вы уверены, что хотите удалить заявку ${r.request_number}?`);
     if (!okConfirm) return;
 
+    setBusy(true);
+
     try {
       const res = await fetch("/api/requests/delete", {
         method: "POST",
         headers: { "content-type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({ id: r.id }),
       });
 
@@ -334,14 +555,22 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
         throw new Error(json?.error || `HTTP ${res.status}`);
       }
 
-      if (json?.sheet && json.sheet.ok === false) {
-        showNotification("⚠️ Заявка удалена, но строку в таблице не удалось удалить сразу — админский синк подчистит.", "error");
+      setRequests((prev) => prev.filter((item) => item.id !== r.id));
+
+      if (json?.sheet?.ok === false) {
+        showNotification(
+          "⚠️ Заявка удалена, но строку в таблице не удалось удалить сразу — админский синк подчистит.",
+          "error",
+        );
+      } else {
+        showNotification("✅ Заявка успешно удалена");
       }
 
-      showNotification("✅ Заявка успешно удалена");
       await reloadRequests();
     } catch (e: any) {
-      showNotification("Ошибка при удалении заявки: " + (e?.message || String(e)), "error");
+      showNotification("Ошибка при удалении заявки: " + normalizeUiErrorMessage(e), "error");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -389,15 +618,22 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
 
           <div className="form-group">
             <label>Тип учебника (стоимость каждого материала 1000р):</label>
+
             <div className="checkbox-group">
-              <div className={`checkbox-item ${typeTextbook ? "checked" : ""}`} onClick={() => setTypeTextbook((v) => !v)}>
+              <div
+                className={`checkbox-item ${typeTextbook ? "checked" : ""}`}
+                onClick={() => setTypeTextbook((v) => !v)}
+              >
                 <input type="checkbox" checked={typeTextbook} readOnly />
                 <label>
                   Учебник <span className="price-info">(1000р)</span>
                 </label>
               </div>
 
-              <div className={`checkbox-item ${typeCrossword ? "checked" : ""}`} onClick={() => setTypeCrossword((v) => !v)}>
+              <div
+                className={`checkbox-item ${typeCrossword ? "checked" : ""}`}
+                onClick={() => setTypeCrossword((v) => !v)}
+              >
                 <input type="checkbox" checked={typeCrossword} readOnly />
                 <label>
                   Кроссворд <span className="price-info">(1000р)</span>
@@ -422,11 +658,12 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn secondary" onClick={() => setRequestModalOpen(false)}>
+            <button type="button" className="btn secondary" onClick={() => setRequestModalOpen(false)} disabled={busy}>
               ❌ Отмена
             </button>
-            <button type="submit" className="btn">
-              💾 Сохранить заявку
+
+            <button type="submit" className="btn" disabled={busy}>
+              {busy ? "Сохраняем..." : "💾 Сохранить заявку"}
             </button>
           </div>
         </form>
@@ -443,17 +680,23 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
 
         {paymentTotalAmount > 0 ? (
           <div className="total-amount">
-            <h4>💰 Сумма к оплате 'в платеже обязательно указать фио, а в назначении указать 'за учебные пособия':</h4>
+            <h4>💰 Сумма к оплате:</h4>
             <div className="amount">{paymentTotalAmount} руб.</div>
+            <p className="small-muted" style={{ marginTop: 8 }}>
+              В платеже обязательно укажите ФИО, а в назначении платежа — «за учебные пособия».
+            </p>
           </div>
         ) : (
           <div className="small-muted" style={{ marginTop: 8 }}>
-            {lastPendingRequest ? "Сумма к оплате не определена." : "Нет необработанных заявок — сумма зависит от вашей последней созданной заявки."}
+            {lastPendingRequest
+              ? "Сумма к оплате не определена."
+              : "Нет необработанных заявок — сумма зависит от вашей последней созданной заявки."}
           </div>
         )}
 
         <div className="qr-head">
           <div className="qr-title">QR-код для оплаты</div>
+
           <button type="button" className="qr-refresh" onClick={resetQrStateAndRefresh} title="Обновить QR" aria-label="Обновить QR">
             ↻
           </button>
@@ -473,6 +716,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
               <div className="small-muted" style={{ marginBottom: 10 }}>
                 Нажмите “↻”, чтобы обновить и попробовать снова.
               </div>
+
               <button type="button" className="btn" onClick={resetQrStateAndRefresh}>
                 ↻ Обновить QR
               </button>
@@ -523,15 +767,14 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
           <div className="payment-info">
             <h4>💰 Информация об оплате</h4>
             <p>
-              Стоимость каждого учебника или кроссворда — 1000 рублей.
-              QR код для оплаты появляется сразу после создания заявки или его можно увидеть находясь на этой странице,
-              нажав на кнопку "Показать qr", в окне будет сумма к оплате из последней заявки.
-              После подтверждения оплаты доступ к материалам будет открыт в течение 24 часов.
+              Стоимость каждого учебника или кроссворда — 1000 рублей. QR-код для оплаты появляется сразу после создания заявки.
+              Также его можно увидеть на этой странице, нажав кнопку "Показать qr". После подтверждения оплаты доступ к материалам
+              будет открыт в течение 24 часов.
             </p>
           </div>
 
           <div className="requests-actions">
-            <button className="btn" onClick={openCreate} type="button">
+            <button className="btn" onClick={openCreate} type="button" disabled={busy}>
               ➕ Создать новую заявку
             </button>
 
@@ -540,12 +783,8 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
               type="button"
               onClick={() => {
                 const amount = lastPendingAmount;
-                setPaymentTotalAmount(amount);
 
-                setPaymentModalOpen(true);
-                setQrLoading(true);
-                setQrError(false);
-                setQrSeed(Date.now());
+                openPaymentModal(amount);
 
                 if (!lastPendingRequest) {
                   showNotification("ℹ️ Не найдено необработанных заявок. Если вы уже оплатили — дождитесь подтверждения.", "error");
@@ -561,7 +800,8 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
             <div className="empty-state">
               <h3>📭 Заявок пока нет</h3>
               <p>Создайте свою первую заявку на покупку учебников или кроссвордов</p>
-              <button className="btn" onClick={openCreate} type="button">
+
+              <button className="btn" onClick={openCreate} type="button" disabled={busy}>
                 ➕ Создать заявку
               </button>
             </div>
@@ -579,6 +819,7 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
                   <th>Действия</th>
                 </tr>
               </thead>
+
               <tbody>
                 {requests.map((r) => {
                   const locked = r.is_processed;
@@ -588,31 +829,35 @@ export default function RequestsClient({ userId, userEmail, userFullName, initia
                       <td>
                         <strong>{r.request_number}</strong>
                       </td>
+
                       <td>{formatDateTime(r.created_at)}</td>
                       <td>{formatClassLevel(r.class_level)}</td>
-                      <td>{formatTextbookTypes(r.textbook_types)}</td>
+                      <td>{formatTextbookTypes(r)}</td>
                       <td>{r.email}</td>
                       <td>{r.full_name}</td>
+
                       <td>
                         <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
                           {r.is_processed ? "✅ Обработана" : "⏳ Ожидает"}
                         </span>
                       </td>
+
                       <td>
                         <button
                           className={`btn btn-small ${locked ? "disabled" : ""}`}
                           onClick={() => openEdit(r)}
                           type="button"
-                          disabled={locked}
+                          disabled={locked || busy}
                           title={locked ? "Обработанную заявку нельзя редактировать" : "Редактировать"}
                         >
                           ✏️ Редактировать
                         </button>{" "}
+
                         <button
                           className={`btn btn-small ${locked ? "disabled" : ""}`}
                           onClick={() => void deleteRequest(r)}
                           type="button"
-                          disabled={locked}
+                          disabled={locked || busy}
                           title={locked ? "Обработанную заявку нельзя удалить" : "Удалить"}
                         >
                           🗑️ Удалить

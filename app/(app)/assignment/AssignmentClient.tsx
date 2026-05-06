@@ -42,7 +42,7 @@ function normalizeQuestions(qs: unknown): any[] {
 
 function ensureGrid(rows: number, cols: number, prev?: string[][]) {
   const g: string[][] = Array.from({ length: rows }, (_, r) =>
-    Array.from({ length: cols }, (_, c) => prev?.[r]?.[c] ?? "")
+    Array.from({ length: cols }, (_, c) => prev?.[r]?.[c] ?? ""),
   );
   return g;
 }
@@ -83,7 +83,6 @@ function getAssignmentMaterialLevels(assignment: any): string[] {
   return normalizeStringArray(material2?.target_levels);
 }
 
-// percent = правильные активные клетки / активные клетки
 function scoreCrossword(question: any, userGrid?: string[][]) {
   const grid: string[][] = Array.isArray(question?.grid) ? question.grid : [];
   const rows = Number(question?.metadata?.rows ?? grid.length ?? 0);
@@ -115,7 +114,6 @@ function scoreCrossword(question: any, userGrid?: string[][]) {
   return { total, correct, filled, percent, allCorrect };
 }
 
-// ✅ разбор слов по номеру и направлению (across/down)
 function buildCrosswordWordReview(question: any, userGrid?: string[][]) {
   const words: any[] = Array.isArray(question?.words) ? question.words : [];
   const cellNumbers: Record<string, number> = (question?.cellNumbers as any) || {};
@@ -129,6 +127,7 @@ function buildCrosswordWordReview(question: any, userGrid?: string[][]) {
     const dir: "across" | "down" = w?.direction === "down" ? "down" : "across";
     const start = w?.start;
     if (!start || !len) return "";
+
     let s = "";
     for (let i = 0; i < len; i++) {
       const r = dir === "across" ? start.row : start.row + i;
@@ -144,6 +143,7 @@ function buildCrosswordWordReview(question: any, userGrid?: string[][]) {
   for (const w of words) {
     const start = w?.start;
     if (!start) continue;
+
     const dir: "across" | "down" = w?.direction === "down" ? "down" : "across";
     const key = `${start.row}-${start.col}`;
     const number = Number(cellNumbers[key] ?? w?.number ?? 0);
@@ -151,7 +151,6 @@ function buildCrosswordWordReview(question: any, userGrid?: string[][]) {
     const userWord = wordAt(w, u).trim();
     const corrWord = wordAt(w, grid).trim();
 
-    // если слово вообще не заполнено — пусть будет "wrong"
     if (!userWord || userWord.includes(" ")) {
       wrong.push({ number, direction: dir, user: userWord || "—", correct: corrWord || "—" });
       continue;
@@ -161,8 +160,8 @@ function buildCrosswordWordReview(question: any, userGrid?: string[][]) {
     else wrong.push({ number, direction: dir, user: userWord || "—", correct: corrWord || "—" });
   }
 
-  // сортируем: по номеру, потом across перед down
   const dirOrder = (d: "across" | "down") => (d === "across" ? 0 : 1);
+
   wrong.sort((a, b) => a.number - b.number || dirOrder(a.direction) - dirOrder(b.direction));
   correct.sort((a, b) => a.number - b.number || dirOrder(a.direction) - dirOrder(b.direction));
 
@@ -173,7 +172,6 @@ function buildCrosswordWordReview(question: any, userGrid?: string[][]) {
 export default function AssignmentClient({ assignmentId, source, sourceId }: Props) {
   const router = useRouter();
 
-  // ✅ ЖЁСТКАЯ навигация "назад в источник"
   const back = useMemo(() => {
     const s = String(source ?? "").trim().toLowerCase();
     const id = String(sourceId ?? "").trim();
@@ -210,26 +208,19 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   const [assignment, setAssignment] = useState<any>(null);
   const [questions, setQuestions] = useState<any[]>([]);
 
-  // только завершённый прогресс с бэка
   const [previousProgress, setPreviousProgress] = useState<ApiOk["progress"]>(null);
 
-  // выбор режима
   const [showChoice, setShowChoice] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
 
-  // ответы (в памяти)
   const [answers, setAnswers] = useState<any>({});
-
-  // навигация
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // completion
   const [completedScreen, setCompletedScreen] = useState(false);
   const [finalStats, setFinalStats] = useState<FinalStats | null>(null);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [gatehouseRecommendation, setGatehouseRecommendation] = useState<GatehouseRecommendation | null>(null);
 
-  // image modal
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [modalSrc, setModalSrc] = useState<string>("");
   const [zoom, setZoom] = useState(1);
@@ -255,6 +246,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       const res = await fetch(`/api/assignment-data/${encodeURIComponent(assignmentId)}`, {
         cache: "no-store",
       });
+
       const json = (await res.json()) as Api;
 
       if (!res.ok || !("ok" in json) || json.ok !== true) {
@@ -262,12 +254,12 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       }
 
       setAssignment(json.assignment);
-      const qs = normalizeQuestions(json.assignment?.content?.questions);
-      setQuestions(qs);
 
+      const qs = normalizeQuestions(json.assignment?.content?.questions);
+
+      setQuestions(qs);
       setPreviousProgress(json.progress);
 
-      // если есть завершённый прогресс — предлагаем выбор
       if (json.progress?.is_completed) {
         setAnswers(json.progress.answers ?? {});
         setShowChoice(true);
@@ -311,7 +303,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape" && imageModalOpen) closeImage();
     }
+
     document.addEventListener("keydown", onKey);
+
     return () => document.removeEventListener("keydown", onKey);
   }, [imageModalOpen]);
 
@@ -320,7 +314,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   }
 
   function startFresh() {
-    // никаких сохранений незавершённых
     setIsViewMode(false);
     setAnswers({});
     setShowChoice(false);
@@ -343,6 +336,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
   function switchMode() {
     if (!previousProgress?.is_completed) return;
+
     setShowChoice(true);
     setCompletedScreen(false);
     setFinalStats(null);
@@ -354,19 +348,14 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     try {
       if (typeof window === "undefined") return;
 
-      // флаг "после выполнения задания обнови стрик"
       sessionStorage.setItem("profile-streak-dirty", "1");
 
-      // опционально сохраним snapshot/ответ (если есть) — на будущее
       if (payload !== undefined) {
         sessionStorage.setItem("profile-streak-last-save-response", JSON.stringify(payload));
       }
 
-      // событие для страниц/компонентов, которые уже открыты и слушают обновление
       window.dispatchEvent(new Event("profile-streak-refresh"));
-    } catch {
-      // ничего не ломаем, это только UI-синхронизация
-    }
+    } catch {}
   }
 
   function notifyGatehouseProfileRefresh(payload?: unknown) {
@@ -380,13 +369,12 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       }
 
       window.dispatchEvent(new Event("gatehouse-profile-progress-refresh"));
-    } catch {
-      // ничего не ломаем, это только UI-синхронизация
-    }
+    } catch {}
   }
 
   async function saveCompletedProgress(score: number) {
     if (saveBusyRef.current) return;
+
     saveBusyRef.current = true;
 
     try {
@@ -405,6 +393,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       });
 
       let json: any = null;
+
       try {
         json = await res.json();
       } catch {
@@ -435,20 +424,17 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
       if (q.type === "fill") {
         const correctCount = (q.answers || []).length;
-        const ok =
-          Array.isArray(a) && a.length >= correctCount && a.every((x: any) => String(x ?? "").trim() !== "");
+        const ok = Array.isArray(a) && a.length >= correctCount && a.every((x: any) => String(x ?? "").trim() !== "");
         if (!ok) return { ok: false as const, index: i };
       }
 
       if (q.type === "sentence") {
         const gaps = (String(q.sentence || "").match(/___/g) || []).length;
-        const ok =
-          Array.isArray(a) && a.length >= gaps && a.every((x: any) => String(x ?? "").trim() !== "");
+        const ok = Array.isArray(a) && a.length >= gaps && a.every((x: any) => String(x ?? "").trim() !== "");
         if (!ok) return { ok: false as const, index: i };
       }
 
       if (q.type === "crossword") {
-        // кроссворд должен быть заполнен по активным клеткам
         const active = getCrosswordActiveCells(q);
         const grid: string[][] = Array.isArray(q?.grid) ? q.grid : [];
         const rows = Number(q?.metadata?.rows ?? grid.length ?? 0);
@@ -456,11 +442,13 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         const u = ensureGrid(rows, cols, a);
 
         let allFilled = true;
+
         active.forEach((key) => {
           const [rS, cS] = key.split(",");
           const r = Number(rS);
           const c = Number(cS);
           const v = String(u?.[r]?.[c] ?? "").trim();
+
           if (!v) allFilled = false;
         });
 
@@ -476,7 +464,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     let incorrect = 0;
     let skipped = 0;
 
-    // ✅ баллы
     let pointsEarned = 0;
     let pointsTotal = 0;
 
@@ -486,16 +473,15 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       const questionText = String(q?.q ?? "").trim() || `Вопрос ${i + 1}`;
       const a = answers[i];
 
-      // каждый вопрос = 1 балл максимум
       pointsTotal += 1;
 
-      // TEST
       if (q.type === "test") {
         const opts: string[] = Array.isArray(q.options) ? q.options.map(String) : [];
         const correctIdx = Number(q.correct);
         const correctLabel = Number.isFinite(correctIdx) && opts[correctIdx] ? opts[correctIdx] : "—";
 
         const answered = a !== undefined && a !== null && a !== "";
+
         if (!answered) {
           skipped++;
           review.push({
@@ -535,19 +521,15 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         return;
       }
 
-      // FILL (✅ частичный зачёт)
       if (q.type === "fill") {
         const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
         const need = correctAnswers.length;
 
         const correctText = correctAnswers.map((variants: any) =>
-          (Array.isArray(variants) ? variants : [variants]).map(String).join(" или ")
+          (Array.isArray(variants) ? variants : [variants]).map(String).join(" или "),
         );
 
-        const answered =
-          Array.isArray(a) &&
-          a.length >= need &&
-          a.slice(0, need).every((x: any) => String(x ?? "").trim() !== "");
+        const answered = Array.isArray(a) && a.length >= need && a.slice(0, need).every((x: any) => String(x ?? "").trim() !== "");
 
         if (!answered) {
           skipped++;
@@ -580,6 +562,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           const user = normalizeText(userArr[idx]);
           const vars = (Array.isArray(variants) ? variants : [variants]).map(normalizeText);
           const ok = vars.some((v) => v === user);
+
           if (ok) correctCount++;
 
           return {
@@ -592,11 +575,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
         const ratio = need > 0 ? correctCount / need : 0;
         const percent = Math.round(ratio * 100);
-
-        // ✅ дробные баллы
-        pointsEarned += ratio;
-
         const fullyCorrect = need > 0 && correctCount === need;
+
+        pointsEarned += ratio;
 
         if (fullyCorrect) correct++;
         else incorrect++;
@@ -618,20 +599,16 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         return;
       }
 
-      // SENTENCE (✅ частичный зачёт)
       if (q.type === "sentence") {
         const gaps = (String(q.sentence || "").match(/___/g) || []).length;
         const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
         const need = gaps;
 
         const correctText = correctAnswers.map((variants: any) =>
-          (Array.isArray(variants) ? variants : [variants]).map(String).join(" или ")
+          (Array.isArray(variants) ? variants : [variants]).map(String).join(" или "),
         );
 
-        const answered =
-          Array.isArray(a) &&
-          a.length >= need &&
-          a.slice(0, need).every((x: any) => String(x ?? "").trim() !== "");
+        const answered = Array.isArray(a) && a.length >= need && a.slice(0, need).every((x: any) => String(x ?? "").trim() !== "");
 
         if (!answered) {
           skipped++;
@@ -664,6 +641,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           const user = normalizeText(userArr[idx]);
           const vars = (Array.isArray(variants) ? variants : [variants]).map(normalizeText);
           const ok = vars.some((v) => v === user);
+
           if (ok) correctCount++;
 
           return {
@@ -676,10 +654,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
         const ratio = need > 0 ? correctCount / need : 0;
         const percent = Math.round(ratio * 100);
+        const fullyCorrect = need > 0 && correctCount === need;
 
         pointsEarned += ratio;
-
-        const fullyCorrect = need > 0 && correctCount === need;
 
         if (fullyCorrect) correct++;
         else incorrect++;
@@ -701,11 +678,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         return;
       }
 
-      // CROSSWORD (НЕ трогаем логику)
       if (q.type === "crossword") {
         const userGrid = a as string[][] | undefined;
         const scored = scoreCrossword(q, userGrid);
-
         const answered = scored.filled > 0;
 
         if (!answered) {
@@ -724,8 +699,8 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           return;
         }
 
-        // ✅ частичный балл за кроссворд
         const ratio = scored.percent / 100;
+
         pointsEarned += ratio;
 
         if (scored.allCorrect) correct++;
@@ -745,7 +720,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         return;
       }
 
-      // OTHER
       skipped++;
       review.push({
         type: "other",
@@ -759,8 +733,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     });
 
     const total = correct + incorrect + skipped;
-
-    // ✅ итоговый процент по баллам
     const score = pointsTotal > 0 ? Math.round((pointsEarned / pointsTotal) * 100) : 0;
 
     return {
@@ -781,6 +753,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     if (isViewMode) return;
 
     const v = validateAllAnswered();
+
     if (!v.ok) {
       alert(`❌ Не все вопросы заполнены! Ответьте на вопрос ${v.index + 1}`);
       setCurrentIndex(v.index);
@@ -798,6 +771,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         percent: stats.score,
         materialLevels: getAssignmentMaterialLevels(assignment),
       });
+
       setGatehouseRecommendation(recommendation);
     } else {
       setGatehouseRecommendation(null);
@@ -815,12 +789,10 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     return finalStats.incorrect > 0 || finalStats.skipped > 0;
   }, [finalStats]);
 
-  // ===================== RENDER =====================
   return (
     <div className="container">
       <header className="header">
         <div className="header-buttons">
-          {/* ✅ вместо BackToSourceButton: жёстко уходим в источник */}
           <button className="btn secondary" type="button" onClick={() => router.push(back.href)}>
             {back.headerLabel}
           </button>
@@ -834,21 +806,25 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
             ↶ Сменить режим
           </button>
         </div>
+
         <h1>{isGatehouse ? "Пробный тест" : "Задание"}</h1>
       </header>
 
       {loading ? (
         <div id="loading" className="loading">
-          <div className="spinner"></div>
+          <div className="spinner" />
           <p>Загружаем задание...</p>
         </div>
       ) : null}
 
-      {err ? <div id="errorMessage" className="error-message">{err}</div> : null}
+      {err ? (
+        <div id="errorMessage" className="error-message">
+          {err}
+        </div>
+      ) : null}
 
       {!loading && !err && assignment ? (
         <>
-          {/* выбор режима */}
           {showChoice ? (
             <div className="assignment-container">
               <div className="restart-container" style={{ display: "block" }}>
@@ -866,7 +842,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
             </div>
           ) : null}
 
-          {/* экран завершения */}
           {completedScreen && finalStats ? (
             <div id="completionScreen" className="completion-message" style={{ display: "block" }}>
               <div className="card">
@@ -880,10 +855,10 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                   {finalStats.score >= 90
                     ? "Отличный результат! Вы прекрасно справились с заданием!"
                     : finalStats.score >= 70
-                    ? "Хороший результат! Вы хорошо усвоили материал."
-                    : finalStats.score >= 50
-                    ? "Неплохой результат! Есть над чем поработать."
-                    : "Попробуйте пройти задание ещё раз для лучшего результата."}
+                      ? "Хороший результат! Вы хорошо усвоили материал."
+                      : finalStats.score >= 50
+                        ? "Неплохой результат! Есть над чем поработать."
+                        : "Попробуйте пройти задание ещё раз для лучшего результата."}
                 </p>
 
                 {isGatehouse && gatehouseRecommendation ? (
@@ -934,8 +909,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                   <div className="result-item">
                     <span>Набрано баллов:</span>
                     <span>
-                      {Number(finalStats.pointsEarned ?? 0).toFixed(2)} /{" "}
-                      {finalStats.pointsTotal ?? finalStats.total}
+                      {Number(finalStats.pointsEarned ?? 0).toFixed(2)} / {finalStats.pointsTotal ?? finalStats.total}
                     </span>
                   </div>
                 </div>
@@ -943,17 +917,11 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                 {showReview ? <ReviewPanel items={reviewItems} /> : null}
 
                 <div style={{ marginTop: 30 }}>
-                  {/* ✅ возвращаемся в источник */}
                   <button className="btn" onClick={() => router.push(back.href)} type="button">
                     {back.actionLabel}
                   </button>
 
-                  <button
-                    className="btn secondary"
-                    onClick={() => location.reload()}
-                    style={{ marginLeft: 10 }}
-                    type="button"
-                  >
+                  <button className="btn secondary" onClick={() => location.reload()} style={{ marginLeft: 10 }} type="button">
                     Пройти заново
                   </button>
                 </div>
@@ -961,18 +929,13 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
             </div>
           ) : null}
 
-          {/* основной экран */}
           {!showChoice && !completedScreen ? (
             <div id="assignmentContent" style={{ display: "block" }}>
               <div className="assignment-container">
                 <div className="card" id="questionsCard" style={{ display: "block" }}>
                   <h2 id="assignmentTitle">{assignment.title}</h2>
 
-                  <div
-                    id="viewModeNotice"
-                    className="view-mode-notice"
-                    style={{ display: isViewMode ? "block" : "none" }}
-                  >
+                  <div id="viewModeNotice" className="view-mode-notice" style={{ display: isViewMode ? "block" : "none" }}>
                     <strong>👀 Режим просмотра</strong>
                     <br />
                     <small>Вы просматриваете свои предыдущие ответы</small>
@@ -992,18 +955,18 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
                         <div className="question-text">{q.q || "Вопрос без текста"}</div>
 
-                        {/* Общая картинка вопроса (для test/fill/sentence), кроссворд сам покажет своё */}
                         {q.image && q.type !== "crossword" ? (
                           <img
                             className="question-image"
                             src={getImageUrl(q.image)}
                             alt="Изображение к вопросу"
                             onClick={() => openImage(getImageUrl(q.image))}
-                            onError={(e) => (e.currentTarget.style.display = "none")}
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
                           />
                         ) : null}
 
-                        {/* TEST */}
                         {q.type === "test" && Array.isArray(q.options) ? (
                           <div className="options-container">
                             {q.options.map((opt: string, optIdx: number) => {
@@ -1026,7 +989,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                           </div>
                         ) : null}
 
-                        {/* FILL */}
                         {q.type === "fill" ? (
                           <>
                             <div className="fill-inputs-container">
@@ -1050,7 +1012,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                           </>
                         ) : null}
 
-                        {/* SENTENCE */}
                         {q.type === "sentence" ? (
                           <div className="sentence-container">
                             <div className="sentence-text">
@@ -1088,7 +1049,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                           </div>
                         ) : null}
 
-                        {/* CROSSWORD */}
                         {q.type === "crossword" ? (
                           <QuestionCrossword
                             question={q}
@@ -1142,7 +1102,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         </>
       ) : null}
 
-      {/* IMAGE MODAL */}
       <div
         id="imageModal"
         className="image-modal"
@@ -1164,21 +1123,16 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         />
 
         <div className="image-modal-controls">
-          <button
-            className="image-modal-btn"
-            onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
-            type="button"
-          >
+          <button className="image-modal-btn" onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))} type="button">
             −
           </button>
+
           <div className="image-modal-zoom-info">{Math.round(zoom * 100)}%</div>
-          <button
-            className="image-modal-btn"
-            onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
-            type="button"
-          >
+
+          <button className="image-modal-btn" onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))} type="button">
             +
           </button>
+
           <button className="image-modal-btn" onClick={() => setZoom(1)} type="button">
             ⟲
           </button>

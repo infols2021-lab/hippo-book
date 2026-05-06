@@ -1,11 +1,12 @@
-// app/api/admin/requests/route.ts
+/* app/api/admin/requests/route.ts */
+import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
-import type { NextRequest } from "next/server";
 import { upsertRequestRowByNumber } from "@/lib/integrations/googleSheets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type BranchType = "olympiad" | "gatehouse";
 type GrantKind = "textbook" | "crossword" | "mock_test";
@@ -50,6 +51,14 @@ const REQUEST_SELECT =
 const DB_RETRY_COUNT = 1;
 const DB_RETRY_DELAY_MS = 350;
 
+function noStoreInit(): ResponseInit {
+  return {
+    headers: {
+      "cache-control": "no-store, max-age=0",
+    },
+  };
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -68,7 +77,10 @@ function isTransientError(error: any) {
   );
 }
 
-async function runDbQuery<T>(factory: () => PromiseLike<{ data: T | null; error: any }>, label: string) {
+async function runDbQuery<T>(
+  factory: () => PromiseLike<{ data: T | null; error: any }>,
+  label: string,
+) {
   let lastError: any = null;
 
   for (let attempt = 0; attempt <= DB_RETRY_COUNT; attempt += 1) {
@@ -101,16 +113,50 @@ async function runDbQuery<T>(factory: () => PromiseLike<{ data: T | null; error:
 function normalizeBranchType(value: unknown): BranchType {
   const v = String(value ?? "").trim().toLowerCase();
 
-  if (v === "gatehouse" || v === "ga" || v === "ga_exam" || v === "exam" || v === "gatehouse_awards") {
+  if (
+    v === "gatehouse" ||
+    v === "ga" ||
+    v === "ga_exam" ||
+    v === "exam" ||
+    v === "exams" ||
+    v === "gatehouse_awards"
+  ) {
     return "gatehouse";
   }
 
   return "olympiad";
 }
 
+function norm(v: any) {
+  return String(v ?? "").trim();
+}
+
 function toArr(v: any): string[] {
   if (!v) return [];
-  if (Array.isArray(v)) return v.map(String).map((x) => x.trim()).filter(Boolean);
+
+  if (Array.isArray(v)) {
+    return v.map(String).map((x) => x.trim()).filter(Boolean);
+  }
+
+  if (typeof v === "string") {
+    const text = v.trim();
+
+    if (!text) return [];
+
+    if (text.startsWith("[") && text.endsWith("]")) {
+      try {
+        return toArr(JSON.parse(text));
+      } catch {
+        return [];
+      }
+    }
+
+    return text
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+
   return [String(v).trim()].filter(Boolean);
 }
 
@@ -148,7 +194,7 @@ function formatClassLevel(classLevel: string) {
 }
 
 function normalizeGatehouseLevel(value: unknown) {
-  const raw = String(value ?? "").trim();
+  const raw = norm(value);
   const v = raw.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
 
   if (v === "stage 1" || v === "stage1") return "stage_1";
@@ -162,17 +208,29 @@ function normalizeGatehouseLevel(value: unknown) {
   if (v === "c1") return "c1";
   if (v === "c2") return "c2";
 
-  return v;
+  return v || raw;
 }
 
-function getRequestTargetLevels(r: ReqRow) {
-  const targetLevels = toArr(r.target_levels);
-  if (targetLevels.length) return targetLevels;
-  return toArr(r.target_level);
+function formatGatehouseLevel(value: unknown) {
+  const v = normalizeGatehouseLevel(value);
+
+  const map: Record<string, string> = {
+    stage_1: "Stage 1",
+    stage_2: "Stage 2",
+    stage_3: "Stage 3",
+    a1: "A1",
+    a2: "A2",
+    b1: "B1",
+    b2: "B2",
+    c1: "C1",
+    c2: "C2",
+  };
+
+  return map[v] || norm(value) || v;
 }
 
 function normalizeGatehouseMaterialKind(value: unknown) {
-  const v = String(value ?? "").trim().toLowerCase();
+  const v = norm(value).toLowerCase();
 
   if (
     v === "mock_test" ||
@@ -190,6 +248,13 @@ function normalizeGatehouseMaterialKind(value: unknown) {
   return v;
 }
 
+function getRequestTargetLevels(r: ReqRow) {
+  const targetLevels = toArr(r.target_levels);
+  if (targetLevels.length) return targetLevels;
+
+  return toArr(r.target_level);
+}
+
 function normalizeGatehouseMaterialKinds(types: any): string[] {
   return uniq(toArr(types).map(normalizeGatehouseMaterialKind).filter(Boolean));
 }
@@ -197,13 +262,14 @@ function normalizeGatehouseMaterialKinds(types: any): string[] {
 function getRequestMaterialKinds(r: ReqRow) {
   const materialKinds = normalizeGatehouseMaterialKinds(r.material_kinds);
   if (materialKinds.length) return materialKinds;
+
   return normalizeGatehouseMaterialKinds(r.textbook_types);
 }
 
 function formatTarget(branchType: BranchType, classLevel: any, targetLevel: any) {
   if (branchType === "gatehouse") {
     const levels = toArr(targetLevel);
-    return levels.length ? levels.join(", ") : "—";
+    return levels.length ? levels.map(formatGatehouseLevel).join(", ") : "—";
   }
 
   const classes = toArr(classLevel);
@@ -290,7 +356,7 @@ function buildSheetValues(row: any) {
 
   return [
     String(row.request_number || ""),
-    formatDateTimeRU(String(row.created_at)),
+    formatDateTimeRU(String(row.created_at || "")),
     formatBranchLabel(branchType),
     formatTarget(branchType, row.class_level, getSheetTargetSource(row, branchType)),
     formatMaterialTypes(branchType, getSheetMaterialTypesSource(row, branchType)),
@@ -320,7 +386,10 @@ function gatehouseMaterialMatchesRequest(material: GatehouseMaterialRow, r: ReqR
 
   if (!targetLevels.length) return false;
 
-  const materialLevels = Array.isArray(material.target_levels) ? material.target_levels.map(String) : [];
+  const materialLevels = Array.isArray(material.target_levels)
+    ? material.target_levels.map(String)
+    : [];
+
   const materialKind = normalizeGatehouseMaterialKind(material.material_kind);
 
   const levelMatches = overlapsGatehouseLevels(materialLevels, targetLevels);
@@ -330,23 +399,26 @@ function gatehouseMaterialMatchesRequest(material: GatehouseMaterialRow, r: ReqR
 }
 
 async function findGatehouseMaterialsForRequest(supabase: any, r: ReqRow) {
-  const targetLevels = getRequestTargetLevels(r);
+  const targetLevels = getRequestTargetLevels(r).map(normalizeGatehouseLevel).filter(Boolean);
   const kinds = getRequestMaterialKinds(r);
 
   if (!targetLevels.length) return [];
 
-  let q = supabase
-    .from("materials")
-    .select("id,title,material_kind,target_levels")
-    .eq("branch_type", "gatehouse")
-    .eq("is_active", true);
-
-  if (kinds.length) {
-    q = q.in("material_kind", kinds);
-  }
-
   const { data, error } = await runDbQuery<GatehouseMaterialRow[]>(
-    () => q,
+    () => {
+      let q = supabase
+        .from("materials")
+        .select("id,title,material_kind,target_levels")
+        .eq("branch_type", "gatehouse")
+        .eq("is_active", true)
+        .overlaps("target_levels", targetLevels);
+
+      if (kinds.length) {
+        q = q.in("material_kind", kinds);
+      }
+
+      return q;
+    },
     "findGatehouseMaterialsForRequest",
   );
 
@@ -698,25 +770,29 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await runDbQuery<ReqRow[]>(makeQuery, "adminRequestsList");
 
-    if (error) return fail(error.message, 500, "DB_ERROR");
+    if (error) return fail(error.message, 500, "DB_ERROR", noStoreInit());
 
     const rows = (data ?? []) as ReqRow[];
     const last = rows[rows.length - 1] ?? null;
-    const nextCursor = rows.length === limit && last?.created_at ? { created_at: last.created_at } : null;
+    const nextCursor =
+      rows.length === limit && last?.created_at ? { created_at: last.created_at } : null;
 
-    return ok({
-      requests: rows,
-      materialsByRequest: {},
-      materialsError: null,
-      page: {
-        limit,
-        returned: rows.length,
-        hasMore: Boolean(nextCursor),
-        nextCursor,
+    return ok(
+      {
+        requests: rows,
+        materialsByRequest: {},
+        materialsError: null,
+        page: {
+          limit,
+          returned: rows.length,
+          hasMore: Boolean(nextCursor),
+          nextCursor,
+        },
       },
-    });
+      noStoreInit(),
+    );
   } catch (e: any) {
-    return fail(e?.message || "Server error", 500, "SERVER_ERROR");
+    return fail(e?.message || "Server error", 500, "SERVER_ERROR", noStoreInit());
   }
 }
 
@@ -731,13 +807,16 @@ export async function PATCH(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return fail("Bad JSON", 400, "BAD_JSON");
+    return fail("Bad JSON", 400, "BAD_JSON", noStoreInit());
   }
 
-  const ids: string[] = Array.isArray(body?.ids) ? body.ids.map(String).map((x: string) => x.trim()).filter(Boolean) : [];
+  const ids: string[] = Array.isArray(body?.ids)
+    ? body.ids.map(String).map((x: string) => x.trim()).filter(Boolean)
+    : [];
+
   const is_processed = Boolean(body?.is_processed);
 
-  if (!ids.length) return fail("ids required", 400, "VALIDATION");
+  if (!ids.length) return fail("ids required", 400, "VALIDATION", noStoreInit());
 
   try {
     const { data: reqs, error: rErr } = await runDbQuery<ReqRow[]>(
@@ -745,10 +824,19 @@ export async function PATCH(req: NextRequest) {
       "patchLoadRequests",
     );
 
-    if (rErr) return fail(rErr.message, 500, "DB_ERROR");
+    if (rErr) return fail(rErr.message, 500, "DB_ERROR", noStoreInit());
 
     const rows = (reqs ?? []) as ReqRow[];
-    const results: Record<string, { ok: boolean; granted?: string[]; error?: string; sheet?: any; grants_history?: any }> = {};
+    const results: Record<
+      string,
+      {
+        ok: boolean;
+        granted?: string[];
+        error?: string;
+        sheet?: any;
+        grants_history?: any;
+      }
+    > = {};
 
     for (const r of rows) {
       try {
@@ -774,7 +862,14 @@ export async function PATCH(req: NextRequest) {
             const t = await enrichMockTestTargetIfNeeded(supabase, rawTarget);
 
             if (t.kind === "mock_test") {
-              const keepByGrant = await existsOtherProcessedGrant(supabase, r.id, r.user_id, t.kind, t.item_id);
+              const keepByGrant = await existsOtherProcessedGrant(
+                supabase,
+                r.id,
+                r.user_id,
+                t.kind,
+                t.item_id,
+              );
+
               const keepByRequest = await existsOtherProcessedGatehouseRequestForMaterial(
                 supabase,
                 r.id,
@@ -785,19 +880,41 @@ export async function PATCH(req: NextRequest) {
 
               if (keepByGrant || keepByRequest) continue;
 
-              const del = await supabase.from("material_access").delete().eq("user_id", r.user_id).eq("material_id", t.item_id);
+              const del = await supabase
+                .from("material_access")
+                .delete()
+                .eq("user_id", r.user_id)
+                .eq("material_id", t.item_id);
+
               if (del.error) throw new Error(del.error.message);
               continue;
             }
 
-            const keep = await existsOtherProcessedGrant(supabase, r.id, r.user_id, t.kind, t.item_id);
+            const keep = await existsOtherProcessedGrant(
+              supabase,
+              r.id,
+              r.user_id,
+              t.kind,
+              t.item_id,
+            );
+
             if (keep) continue;
 
             if (t.kind === "textbook") {
-              const del = await supabase.from("textbook_access").delete().eq("user_id", r.user_id).eq("textbook_id", t.item_id);
+              const del = await supabase
+                .from("textbook_access")
+                .delete()
+                .eq("user_id", r.user_id)
+                .eq("textbook_id", t.item_id);
+
               if (del.error) throw new Error(del.error.message);
             } else if (t.kind === "crossword") {
-              const del = await supabase.from("crossword_access").delete().eq("user_id", r.user_id).eq("crossword_id", t.item_id);
+              const del = await supabase
+                .from("crossword_access")
+                .delete()
+                .eq("user_id", r.user_id)
+                .eq("crossword_id", t.item_id);
+
               if (del.error) throw new Error(del.error.message);
             }
           }
@@ -839,7 +956,11 @@ export async function PATCH(req: NextRequest) {
             ok: true,
             granted,
             grants_history: grantsHistory,
-            sheet: { ok: true, action: sres.action, row: sres.rowNumber ?? null },
+            sheet: {
+              ok: true,
+              action: sres.action,
+              row: sres.rowNumber ?? null,
+            },
           };
         } catch (e: any) {
           const msg = String(e?.message || e || "Sheets sync error").slice(0, 500);
@@ -848,7 +969,6 @@ export async function PATCH(req: NextRequest) {
             .from("purchase_requests")
             .update({
               sheet_synced_at: null,
-              sheet_row: null,
               sheet_sync_error: msg,
             })
             .eq("id", updatedRow.id);
@@ -857,16 +977,22 @@ export async function PATCH(req: NextRequest) {
             ok: true,
             granted,
             grants_history: grantsHistory,
-            sheet: { ok: false, error: msg },
+            sheet: {
+              ok: false,
+              error: msg,
+            },
           };
         }
       } catch (e: any) {
-        results[r.id] = { ok: false, error: e?.message || String(e) };
+        results[r.id] = {
+          ok: false,
+          error: e?.message || String(e),
+        };
       }
     }
 
-    return ok({ updated: true, results });
+    return ok({ updated: true, results }, noStoreInit());
   } catch (e: any) {
-    return fail(e?.message || "Server error", 500, "SERVER_ERROR");
+    return fail(e?.message || "Server error", 500, "SERVER_ERROR", noStoreInit());
   }
 }

@@ -3,8 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 
-type UserProgress = { assignment_id: string; is_completed: boolean; score?: number | null };
+type UserProgress = {
+  assignment_id: string;
+  is_completed: boolean;
+  score?: number | null;
+};
 
 type TextbookApiOk = {
   ok: true;
@@ -14,7 +19,11 @@ type TextbookApiOk = {
   userProgress?: UserProgress[];
 };
 
-type TextbookApiErr = { ok: false; error: string };
+type TextbookApiErr = {
+  ok: false;
+  error: string;
+};
+
 type TextbookApi = TextbookApiOk | TextbookApiErr;
 
 type Props = {
@@ -22,19 +31,42 @@ type Props = {
   initialData: TextbookApiOk | null;
 };
 
-function isHttpUrl(v: unknown): v is string {
+function isHttpUrl(v: unknown): boolean {
   return typeof v === "string" && /^https?:\/\//i.test(v);
 }
 
-function resolvePublicUrl(raw: any, bucket: string) {
+function resolvePublicUrl(raw: unknown, bucket: string) {
   if (!raw) return null;
-  if (isHttpUrl(raw)) return raw;
 
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!base) return null;
+  const value = String(raw).trim();
+  if (!value) return null;
 
-  const key = String(raw).replace(/^\/+/, "").replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
-  return `${base}/storage/v1/object/public/${bucket}/${encodeURIComponent(key)}?v=${Date.now()}`;
+  if (value.startsWith("data:")) return value;
+  if (value.startsWith("/api/storage/public/")) return value;
+
+  const storageMarker = "/storage/v1/object/public/";
+
+  if (isHttpUrl(value)) {
+    const markerIndex = value.indexOf(storageMarker);
+
+    if (markerIndex === -1) return value;
+
+    const rest = value.slice(markerIndex + storageMarker.length).split("?")[0]?.split("#")[0] ?? "";
+    const parts = rest.split("/").filter(Boolean);
+
+    const parsedBucket = parts.shift();
+    const parsedPath = parts.join("/");
+
+    if (!parsedBucket || !parsedPath) return value;
+
+    return getStoragePublicUrl(parsedBucket, parsedPath);
+  }
+
+  const cleaned = value
+    .replace(/^\/+/, "")
+    .replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
+
+  return getStoragePublicUrl(bucket, cleaned);
 }
 
 function guessAssignmentType(assignment: any) {
@@ -43,13 +75,87 @@ function guessAssignmentType(assignment: any) {
 
   if (aType === "fill") return { icon: "✍️", label: "Ввод ответа", cls: "fill" as const };
   if (aType === "sentence") return { icon: "📝", label: "Заполнение предложения", cls: "sentence" as const };
+
   return { icon: "📝", label: "Тест", cls: "test" as const };
 }
 
 export default function TextbookClient({ textbookId, initialData }: Props) {
   const router = useRouter();
+  const invalidTextbookId = !textbookId?.trim();
 
-  if (!textbookId) {
+  const [data, setData] = useState<TextbookApiOk | null>(initialData);
+  const [loading, setLoading] = useState<boolean>(!initialData && !invalidTextbookId);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (invalidTextbookId) return;
+
+    let cancelled = false;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch(`/api/textbook-data/${encodeURIComponent(textbookId)}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        const json = (await res.json()) as TextbookApi;
+
+        if (!res.ok || !json.ok) {
+          const msg = (json as TextbookApiErr).error || "Не удалось загрузить учебник";
+          throw new Error(msg);
+        }
+
+        if (cancelled) return;
+
+        setData(json);
+        setLoading(false);
+      } catch (e: any) {
+        if (cancelled) return;
+
+        setLoading(false);
+        setError(e?.message || "Ошибка загрузки учебника");
+      }
+    }
+
+    if (!initialData) void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialData, invalidTextbookId, textbookId]);
+
+  const textbook = data?.textbook ?? null;
+  const assignments = data?.assignments ?? [];
+  const userProgress = data?.userProgress ?? [];
+
+  const completedSet = useMemo(
+    () => new Set(userProgress.filter((x) => x.is_completed).map((x) => x.assignment_id)),
+    [userProgress],
+  );
+
+  const scoreById = useMemo(() => {
+    const m = new Map<string, number>();
+
+    for (const p of userProgress) {
+      if (p?.assignment_id && typeof p.score === "number") {
+        m.set(p.assignment_id, p.score);
+      }
+    }
+
+    return m;
+  }, [userProgress]);
+
+  const completedCount = userProgress.filter((x) => x.is_completed).length;
+  const totalCount = assignments.length;
+  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  const coverUrl = resolvePublicUrl(textbook?.cover_image_url, "covers");
+
+  if (invalidTextbookId) {
     return (
       <div className="textbook-container">
         <div className="error" style={{ display: "block" }}>
@@ -63,68 +169,6 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
     );
   }
 
-  const [data, setData] = useState<TextbookApiOk | null>(initialData);
-  const [loading, setLoading] = useState<boolean>(!initialData);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const res = await fetch(`/api/textbook-data/${encodeURIComponent(textbookId)}`, {
-          method: "GET",
-          cache: "no-store",
-        });
-        const json = (await res.json()) as TextbookApi;
-
-        if (!res.ok || !json.ok) {
-          const msg = (json as TextbookApiErr).error || "Не удалось загрузить учебник";
-          throw new Error(msg);
-        }
-
-        if (cancelled) return;
-        setData(json);
-        setLoading(false);
-      } catch (e: any) {
-        if (cancelled) return;
-        setLoading(false);
-        setError(e?.message || "Ошибка загрузки учебника");
-      }
-    }
-
-    if (!initialData) load();
-    return () => {
-      cancelled = true;
-    };
-  }, [initialData, textbookId]);
-
-  const textbook = data?.textbook ?? null;
-  const assignments = data?.assignments ?? [];
-  const userProgress = data?.userProgress ?? [];
-
-  const completedSet = useMemo(
-    () => new Set(userProgress.filter((x) => x.is_completed).map((x) => x.assignment_id)),
-    [userProgress],
-  );
-
-  const scoreById = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of userProgress) {
-      if (p?.assignment_id && typeof p.score === "number") m.set(p.assignment_id, p.score);
-    }
-    return m;
-  }, [userProgress]);
-
-  const completedCount = userProgress.filter((x) => x.is_completed).length;
-  const totalCount = assignments.length;
-  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-
-  const coverUrl = resolvePublicUrl(textbook?.cover_image_url, "covers");
-
   return (
     <div className="textbook-container">
       <AppHeader
@@ -135,7 +179,6 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
         ]}
       />
 
-      {/* ✅ железобетонно назад в материалы */}
       <div className="back-button">
         <button className="btn secondary" type="button" onClick={() => router.push("/materials")}>
           ← Назад
@@ -144,7 +187,7 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
 
       {loading ? (
         <div id="loading" className="loading" style={{ display: "block" }}>
-          <div className="spinner"></div>
+          <div className="spinner" />
           <p>Загружаем учебник...</p>
         </div>
       ) : null}
@@ -173,7 +216,6 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
               <div
                 className="textbook-cover"
                 id="textbookCover"
-                // ✅ FIX: 16:9 и без странной обрезки
                 style={{ aspectRatio: "16 / 9", height: "auto" }}
               >
                 {coverUrl ? (
@@ -182,7 +224,6 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
                     alt="Обложка учебника"
                     loading="lazy"
                     decoding="async"
-                    // ✅ FIX: показываем обложку целиком
                     style={{ objectFit: "contain", objectPosition: "center" }}
                     onError={(e) => {
                       const img = e.currentTarget;
@@ -199,6 +240,7 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
                 <div className="textbook-title" id="textbookTitle">
                   {textbook.title}
                 </div>
+
                 <div className="textbook-description" id="textbookDescription">
                   {textbook.description || "Учебные материалы и задания"}
                 </div>
@@ -252,6 +294,12 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
                         className={`assignment-item ${isCompleted ? "completed" : ""}`}
                         onClick={() => router.push(`/assignment/${a.id}?source=textbook&sourceId=${textbookId}`)}
                         role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            router.push(`/assignment/${a.id}?source=textbook&sourceId=${textbookId}`);
+                          }
+                        }}
                       >
                         <div className={`assignment-icon ${meta.cls}`}>{meta.icon}</div>
 

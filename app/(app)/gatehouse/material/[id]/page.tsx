@@ -14,8 +14,10 @@ function normalizeArray(value: unknown): string[] {
 
 function normalizeScore(value: unknown): number | null {
   if (value === null || value === undefined) return null;
+
   const score = Number(value);
   if (!Number.isFinite(score)) return null;
+
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
@@ -32,9 +34,10 @@ function normalizeMaterial(row: any): GatehouseMaterialPageData["material"] {
     order_index: Number(row?.order_index ?? 0),
     class_levels: normalizeArray(row?.class_levels),
     target_levels: normalizeArray(row?.target_levels),
-    legacy_source_table: row?.legacy_source_table === "textbooks" || row?.legacy_source_table === "crosswords"
-      ? row.legacy_source_table
-      : null,
+    legacy_source_table:
+      row?.legacy_source_table === "textbooks" || row?.legacy_source_table === "crosswords"
+        ? row.legacy_source_table
+        : null,
     legacy_source_id: typeof row?.legacy_source_id === "string" ? row.legacy_source_id : null,
     created_by: typeof row?.created_by === "string" ? row.created_by : null,
     created_at: typeof row?.created_at === "string" ? row.created_at : new Date().toISOString(),
@@ -84,33 +87,31 @@ export default async function GatehouseMaterialByIdPage({
 
   const material = normalizeMaterial(materialRow);
 
-  const [
-    { data: accessRow },
-    { data: assignmentsRows, error: assignmentsError },
-    { data: progressRows, error: progressError },
-  ] = await Promise.all([
-    supabase
-      .from("material_access")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("material_id", material.id)
-      .maybeSingle(),
+  const [{ data: accessRow }, { data: assignmentsRows, error: assignmentsError }, { data: progressRows, error: progressError }] =
+    await Promise.all([
+      supabase
+        .from("material_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("material_id", material.id)
+        .maybeSingle(),
 
-    supabase
-      .from("assignments")
-      .select("id, title, order_index, content, created_at")
-      .eq("material_id", material.id)
-      .eq("branch_type", "gatehouse")
-      .order("order_index", { ascending: true })
-      .order("created_at", { ascending: true }),
+      supabase
+        .from("assignments")
+        .select("id, title, order_index, content, created_at")
+        .eq("material_id", material.id)
+        .eq("branch_type", "gatehouse")
+        .order("order_index", { ascending: true })
+        .order("created_at", { ascending: true }),
 
-    supabase
-      .from("user_progress")
-      .select("assignment_id, is_completed, score, completed_at")
-      .eq("user_id", user.id),
-  ]);
+      supabase
+        .from("user_progress")
+        .select("assignment_id, is_completed, score, completed_at")
+        .eq("user_id", user.id),
+    ]);
 
   const hasAccess = Boolean(material.is_available || accessRow);
+
   const progressByAssignment = new Map(
     Array.isArray(progressRows)
       ? progressRows.map((item: any) => [
@@ -127,9 +128,7 @@ export default async function GatehouseMaterialByIdPage({
   const assignments: GatehouseAssignmentPreview[] = Array.isArray(assignmentsRows)
     ? assignmentsRows.map((assignment: any) => {
         const progress = progressByAssignment.get(String(assignment?.id ?? ""));
-        const questions = Array.isArray(assignment?.content?.questions)
-          ? assignment.content.questions
-          : [];
+        const questions = Array.isArray(assignment?.content?.questions) ? assignment.content.questions : [];
 
         return {
           id: String(assignment?.id ?? ""),

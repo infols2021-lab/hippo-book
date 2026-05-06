@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import GatehouseHeader from "@/components/gatehouse/GatehouseHeader";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   GATEHOUSE_LEVELS,
   type GatehouseLevelCode,
@@ -58,6 +57,12 @@ type FormState = {
   selectedLevel: GatehouseLevelCode | "";
 };
 
+type RequestListApiResponse = {
+  ok?: boolean;
+  error?: string;
+  requests?: any[];
+};
+
 async function safeReadJson(res: Response) {
   const text = await res.text();
 
@@ -69,12 +74,12 @@ async function safeReadJson(res: Response) {
 }
 
 function getPaymentQRUrl(seed?: number): string {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const t = seed ?? Date.now();
+  const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
+  const t = encodeURIComponent(String(seed ?? Date.now()));
 
-  if (!base) return "";
+  if (!supabaseUrl) return "";
 
-  return `${base}/storage/v1/object/public/help-images/oplata.png?t=${t}`;
+  return `${supabaseUrl}/storage/v1/object/public/help-images/oplata.png?t=${t}`;
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -98,11 +103,37 @@ function formatProcessedAt(value: string | null): string {
   return ` · ${formatDateTime(value)}`;
 }
 
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const text = value.trim();
+
+    if (!text) return [];
+
+    if (text.startsWith("[") && text.endsWith("]")) {
+      try {
+        return toStringArray(JSON.parse(text));
+      } catch {
+        return [];
+      }
+    }
+
+    return text
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  const single = String(value ?? "").trim();
+  return single ? [single] : [];
+}
+
 function getRequestLevels(request: GatehousePurchaseRequest): GatehouseLevelCode[] {
   const source =
-    Array.isArray(request.target_levels) && request.target_levels.length
-      ? request.target_levels
-      : request.target_level;
+    Array.isArray(request.target_levels) && request.target_levels.length ? request.target_levels : request.target_level;
 
   if (!Array.isArray(source)) return [];
 
@@ -110,6 +141,7 @@ function getRequestLevels(request: GatehousePurchaseRequest): GatehouseLevelCode
 
   for (const value of source) {
     const level = normalizeGatehouseLevel(value);
+
     if (level && !levels.includes(level)) {
       levels.push(level);
     }
@@ -120,9 +152,7 @@ function getRequestLevels(request: GatehousePurchaseRequest): GatehouseLevelCode
 
 function getRequestMaterialLabel(request: GatehousePurchaseRequest): string {
   const kinds =
-    Array.isArray(request.material_kinds) && request.material_kinds.length
-      ? request.material_kinds
-      : request.textbook_types;
+    Array.isArray(request.material_kinds) && request.material_kinds.length ? request.material_kinds : request.textbook_types;
 
   if (!Array.isArray(kinds) || !kinds.length) return "📝 Пробные тесты";
 
@@ -167,21 +197,68 @@ function safeDisplayName(profile: GatehouseRequestProfile): string {
   return "Не указано";
 }
 
+function normalizeRequests(rows: any[]): GatehousePurchaseRequest[] {
+  return rows.map((row: any) => ({
+    id: String(row?.id ?? ""),
+    user_id: String(row?.user_id ?? ""),
+    request_number: String(row?.request_number ?? ""),
+    request_date: typeof row?.request_date === "string" ? row.request_date : null,
+    created_at: typeof row?.created_at === "string" ? row.created_at : "",
+    updated_at: typeof row?.updated_at === "string" ? row.updated_at : null,
+    branch_type: "gatehouse",
+    class_level: typeof row?.class_level === "string" ? row.class_level : null,
+    target_level: toStringArray(row?.target_level),
+    target_levels: toStringArray(row?.target_levels),
+    textbook_types: toStringArray(row?.textbook_types),
+    material_kinds: toStringArray(row?.material_kinds),
+    email: String(row?.email ?? ""),
+    full_name: String(row?.full_name ?? ""),
+    contact_phone: typeof row?.contact_phone === "string" ? row.contact_phone : null,
+    is_processed: Boolean(row?.is_processed),
+    processed_at: typeof row?.processed_at === "string" ? row.processed_at : null,
+  }));
+}
+
+function normalizeUiErrorMessage(error: unknown, fallback = "Не удалось выполнить действие") {
+  const raw =
+    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
+
+  const msg = raw.trim();
+
+  if (!msg) return fallback;
+
+  const lower = msg.toLowerCase();
+
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network request failed") ||
+    lower.includes("load failed") ||
+    lower.includes("terminated")
+  ) {
+    return "Ошибка соединения с сервером";
+  }
+
+  return msg;
+}
+
 export default function GatehouseRequestsClient({
   profile,
   initialRequests,
   initialError,
 }: GatehouseRequestsClientProps) {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
-  const [requests, setRequests] = useState<GatehousePurchaseRequest[]>(initialRequests);
-  const [notice, setNotice] = useState<Notice | null>(
-    initialError ? { type: "error", text: initialError } : null,
-  );
+  const [requests, setRequests] = useState<GatehousePurchaseRequest[]>(() => normalizeRequests(initialRequests));
+  const [notice, setNotice] = useState<Notice | null>(initialError ? { type: "error", text: initialError } : null);
+
   const [formOpen, setFormOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [form, setForm] = useState<FormState>(() => createInitialForm());
   const [busy, setBusy] = useState(false);
+
   const [qrSeed, setQrSeed] = useState(Date.now());
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState(false);
+
   const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
 
   const pendingRequests = requests.filter((request) => !request.is_processed);
@@ -193,42 +270,36 @@ export default function GatehouseRequestsClient({
     window.setTimeout(() => setNotice(null), 4500);
   }
 
+  function openPayment() {
+    setQrError(false);
+    setQrLoading(true);
+    setQrSeed(Date.now());
+    setPaymentOpen(true);
+  }
+
+  function refreshQr() {
+    setQrError(false);
+    setQrLoading(true);
+    setQrSeed(Date.now());
+  }
+
   async function reloadRequests() {
-    const { data, error } = await supabase
-      .from("purchase_requests")
-      .select("*")
-      .eq("user_id", profile.id)
-      .eq("branch_type", "gatehouse")
-      .order("created_at", { ascending: false });
+    try {
+      const res = await fetch("/api/requests/list?branch_type=gatehouse&limit=100", {
+        method: "GET",
+        cache: "no-store",
+      });
 
-    if (error) {
-      showNotice(`Ошибка загрузки заявок: ${error.message}`, "error");
-      return;
+      const json = (await res.json().catch(() => null)) as RequestListApiResponse | null;
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+
+      setRequests(Array.isArray(json.requests) ? normalizeRequests(json.requests) : []);
+    } catch (error: any) {
+      showNotice(`Ошибка загрузки заявок: ${normalizeUiErrorMessage(error)}`, "error");
     }
-
-    setRequests(
-      Array.isArray(data)
-        ? data.map((row: any) => ({
-            id: String(row?.id ?? ""),
-            user_id: String(row?.user_id ?? ""),
-            request_number: String(row?.request_number ?? ""),
-            request_date: typeof row?.request_date === "string" ? row.request_date : null,
-            created_at: typeof row?.created_at === "string" ? row.created_at : "",
-            updated_at: typeof row?.updated_at === "string" ? row.updated_at : null,
-            branch_type: "gatehouse",
-            class_level: typeof row?.class_level === "string" ? row.class_level : null,
-            target_level: Array.isArray(row?.target_level) ? row.target_level.map(String) : [],
-            target_levels: Array.isArray(row?.target_levels) ? row.target_levels.map(String) : [],
-            textbook_types: Array.isArray(row?.textbook_types) ? row.textbook_types.map(String) : [],
-            material_kinds: Array.isArray(row?.material_kinds) ? row.material_kinds.map(String) : [],
-            email: String(row?.email ?? ""),
-            full_name: String(row?.full_name ?? ""),
-            contact_phone: typeof row?.contact_phone === "string" ? row.contact_phone : null,
-            is_processed: Boolean(row?.is_processed),
-            processed_at: typeof row?.processed_at === "string" ? row.processed_at : null,
-          }))
-        : [],
-    );
   }
 
   function openCreate() {
@@ -251,6 +322,7 @@ export default function GatehouseRequestsClient({
       created_at: request.created_at || new Date().toISOString(),
       selectedLevel: firstLevel,
     });
+
     setFormOpen(true);
     setPaymentOpen(false);
   }
@@ -273,6 +345,7 @@ export default function GatehouseRequestsClient({
     setBusy(true);
 
     const fullName = safeDisplayName(profile);
+
     const payload = {
       id: form.id,
       request_number: form.request_number,
@@ -294,6 +367,7 @@ export default function GatehouseRequestsClient({
       const res = await fetch(form.id ? "/api/requests/update" : "/api/requests/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify(payload),
       });
 
@@ -304,8 +378,7 @@ export default function GatehouseRequestsClient({
       }
 
       setFormOpen(false);
-      setQrSeed(Date.now());
-      setPaymentOpen(true);
+      openPayment();
 
       if (json?.sheet?.ok === false) {
         showNotice(
@@ -320,7 +393,7 @@ export default function GatehouseRequestsClient({
 
       await reloadRequests();
     } catch (error: any) {
-      showNotice(error?.message || "Не удалось сохранить заявку.", "error");
+      showNotice(normalizeUiErrorMessage(error, "Не удалось сохранить заявку."), "error");
     } finally {
       setBusy(false);
     }
@@ -343,6 +416,7 @@ export default function GatehouseRequestsClient({
       const res = await fetch("/api/requests/delete", {
         method: "POST",
         headers: { "content-type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({ id: request.id }),
       });
 
@@ -360,7 +434,7 @@ export default function GatehouseRequestsClient({
 
       await reloadRequests();
     } catch (error: any) {
-      showNotice(error?.message || "Не удалось удалить заявку.", "error");
+      showNotice(normalizeUiErrorMessage(error, "Не удалось удалить заявку."), "error");
     } finally {
       setBusy(false);
     }
@@ -430,40 +504,39 @@ export default function GatehouseRequestsClient({
             <section className="gatehouse-card">
               <div className="gatehouse-card__inner">
                 <h2 className="gatehouse-card__title">Новая заявка</h2>
+
                 <p className="gatehouse-card__subtitle">
-                  Сейчас в экзаменах доступен один тип материала — пробные тесты. Позже сюда можно добавить новые типы
-                  без изменения формы профиля.
+                  Сейчас в экзаменах доступен один тип материала — пробные тесты. Позже сюда можно
+                  добавить новые типы без изменения формы профиля.
                 </p>
 
                 <div className="gatehouse-quick-actions">
-                  <button className="gatehouse-quick-action" type="button" onClick={openCreate}>
+                  <button className="gatehouse-quick-action" type="button" onClick={openCreate} disabled={busy}>
                     <span className="gatehouse-quick-action__main">
                       <span className="gatehouse-quick-action__icon" aria-hidden="true">
                         📝
                       </span>
+
                       <span>
                         <span className="gatehouse-quick-action__title">Создать заявку</span>
-                        <span className="gatehouse-quick-action__text">Выбрать уровень и запросить пробный тест</span>
+                        <span className="gatehouse-quick-action__text">
+                          Выбрать уровень и запросить пробный тест
+                        </span>
                       </span>
                     </span>
+
                     <span className="gatehouse-quick-action__arrow" aria-hidden="true">
                       →
                     </span>
                   </button>
 
                   {lastPendingRequest ? (
-                    <button
-                      className="gatehouse-quick-action"
-                      type="button"
-                      onClick={() => {
-                        setQrSeed(Date.now());
-                        setPaymentOpen(true);
-                      }}
-                    >
+                    <button className="gatehouse-quick-action" type="button" onClick={openPayment} disabled={busy}>
                       <span className="gatehouse-quick-action__main">
                         <span className="gatehouse-quick-action__icon" aria-hidden="true">
                           💳
                         </span>
+
                         <span>
                           <span className="gatehouse-quick-action__title">Показать QR</span>
                           <span className="gatehouse-quick-action__text">
@@ -471,6 +544,7 @@ export default function GatehouseRequestsClient({
                           </span>
                         </span>
                       </span>
+
                       <span className="gatehouse-quick-action__arrow" aria-hidden="true">
                         →
                       </span>
@@ -484,6 +558,7 @@ export default function GatehouseRequestsClient({
                       <label className="gatehouse-label" htmlFor="ga-request-number">
                         Номер заявки
                       </label>
+
                       <input id="ga-request-number" className="gatehouse-input" value={form.request_number} readOnly disabled />
                     </div>
 
@@ -491,6 +566,7 @@ export default function GatehouseRequestsClient({
                       <label className="gatehouse-label" htmlFor="ga-request-date">
                         Дата создания
                       </label>
+
                       <input id="ga-request-date" className="gatehouse-input" value={formatDateTime(form.created_at)} readOnly disabled />
                     </div>
 
@@ -498,6 +574,7 @@ export default function GatehouseRequestsClient({
                       <label className="gatehouse-label" htmlFor="ga-request-email">
                         Email
                       </label>
+
                       <input id="ga-request-email" className="gatehouse-input" value={profile.email} readOnly disabled />
                     </div>
 
@@ -505,6 +582,7 @@ export default function GatehouseRequestsClient({
                       <label className="gatehouse-label" htmlFor="ga-request-name">
                         ФИО
                       </label>
+
                       <input id="ga-request-name" className="gatehouse-input" value={safeDisplayName(profile)} readOnly disabled />
                     </div>
 
@@ -512,7 +590,14 @@ export default function GatehouseRequestsClient({
                       <label className="gatehouse-label" htmlFor="ga-request-phone">
                         Телефон
                       </label>
-                      <input id="ga-request-phone" className="gatehouse-input" value={profile.contact_phone || "Не указан"} readOnly disabled />
+
+                      <input
+                        id="ga-request-phone"
+                        className="gatehouse-input"
+                        value={profile.contact_phone || "Не указан"}
+                        readOnly
+                        disabled
+                      />
                     </div>
 
                     <div className="gatehouse-form__row">
@@ -538,6 +623,7 @@ export default function GatehouseRequestsClient({
                               key={level.code}
                               className={["gatehouse-button", active ? "" : "gatehouse-button--ghost"].join(" ")}
                               type="button"
+                              disabled={busy}
                               onClick={() =>
                                 setForm((current) => ({
                                   ...current,
@@ -569,9 +655,10 @@ export default function GatehouseRequestsClient({
             <aside className="gatehouse-card">
               <div className="gatehouse-card__inner">
                 <h2 className="gatehouse-card__title">Оплата</h2>
+
                 <p className="gatehouse-card__subtitle">
-                  После создания заявки можно открыть QR-код оплаты. Администратор обработает заявку и выдаст материалы
-                  по выбранному уровню.
+                  После создания заявки можно открыть QR-код оплаты. Администратор обработает
+                  заявку и выдаст материалы по выбранному уровню.
                 </p>
 
                 {paymentOpen ? (
@@ -584,13 +671,33 @@ export default function GatehouseRequestsClient({
                           border: "1px solid var(--ga-border)",
                           background: "rgba(255,255,255,0.08)",
                           padding: 14,
+                          minHeight: 120,
+                          display: "grid",
+                          placeItems: "center",
                         }}
                       >
+                        {qrLoading ? <div style={{ fontWeight: 900, opacity: 0.85 }}>⏳ Загружаем QR...</div> : null}
+
+                        {qrError ? (
+                          <div className="gatehouse-message gatehouse-message--error" style={{ width: "100%" }}>
+                            Не удалось загрузить QR-код. Нажмите “Обновить QR”.
+                          </div>
+                        ) : null}
+
                         <img
+                          key={qrUrl}
                           src={qrUrl}
                           alt="QR-код оплаты"
+                          onLoad={() => {
+                            setQrLoading(false);
+                            setQrError(false);
+                          }}
+                          onError={() => {
+                            setQrLoading(false);
+                            setQrError(true);
+                          }}
                           style={{
-                            display: "block",
+                            display: qrLoading || qrError ? "none" : "block",
                             width: "100%",
                             maxWidth: 360,
                             margin: "0 auto",
@@ -599,13 +706,11 @@ export default function GatehouseRequestsClient({
                         />
                       </div>
                     ) : (
-                      <div className="gatehouse-message gatehouse-message--error">
-                        Не удалось собрать ссылку на QR-код. Проверьте NEXT_PUBLIC_SUPABASE_URL.
-                      </div>
+                      <div className="gatehouse-message gatehouse-message--error">Не удалось собрать ссылку на QR-код.</div>
                     )}
 
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-                      <button className="gatehouse-button gatehouse-button--ghost" type="button" onClick={() => setQrSeed(Date.now())}>
+                      <button className="gatehouse-button gatehouse-button--ghost" type="button" onClick={refreshQr}>
                         Обновить QR
                       </button>
 
@@ -619,7 +724,9 @@ export default function GatehouseRequestsClient({
                     <span className="gatehouse-empty__icon" aria-hidden="true">
                       💳
                     </span>
+
                     <h3 className="gatehouse-empty__title">QR появится после создания заявки</h3>
+
                     <p className="gatehouse-empty__text">Стоимость текущего типа материала: {getRequestAmount()} ₽.</p>
                   </div>
                 )}
@@ -630,6 +737,7 @@ export default function GatehouseRequestsClient({
           <section className="gatehouse-card">
             <div className="gatehouse-card__inner">
               <h2 className="gatehouse-card__title">Мои заявки</h2>
+
               <p className="gatehouse-card__subtitle">Здесь отображаются только заявки на экзамены Gatehouse Awards.</p>
 
               {requests.length > 0 ? (
@@ -667,7 +775,14 @@ export default function GatehouseRequestsClient({
                           <div className="gatehouse-recent__score">{request.is_processed ? "✅" : "⏳"}</div>
 
                           {!request.is_processed ? (
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                flexWrap: "wrap",
+                                justifyContent: "flex-end",
+                              }}
+                            >
                               <button
                                 className="gatehouse-button gatehouse-button--ghost"
                                 type="button"
@@ -681,7 +796,7 @@ export default function GatehouseRequestsClient({
                               <button
                                 className="gatehouse-button gatehouse-button--ghost"
                                 type="button"
-                                onClick={() => deleteRequest(request)}
+                                onClick={() => void deleteRequest(request)}
                                 disabled={busy}
                                 style={{ padding: "9px 12px", fontSize: 13 }}
                               >
@@ -699,7 +814,9 @@ export default function GatehouseRequestsClient({
                   <span className="gatehouse-empty__icon" aria-hidden="true">
                     📋
                   </span>
+
                   <h3 className="gatehouse-empty__title">Заявок пока нет</h3>
+
                   <p className="gatehouse-empty__text">Создайте заявку на пробный тест Gatehouse Awards, выбрав нужный уровень.</p>
                 </div>
               )}

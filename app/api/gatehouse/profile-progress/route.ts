@@ -4,12 +4,18 @@ import { requireUser } from "@/lib/api/auth";
 
 function normalizeScore(value: unknown): number {
   const score = Number(value ?? 0);
-  if (!Number.isFinite(score)) return 0;
+
+  if (!Number.isFinite(score)) {
+    return 0;
+  }
+
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 function formatDate(value: unknown): string {
-  if (typeof value !== "string" || !value) return "—";
+  if (typeof value !== "string" || !value) {
+    return "—";
+  }
 
   try {
     return new Intl.DateTimeFormat("ru-RU", {
@@ -22,6 +28,11 @@ function formatDate(value: unknown): string {
   }
 }
 
+function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
 export async function GET(_req: NextRequest) {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
@@ -30,28 +41,22 @@ export async function GET(_req: NextRequest) {
 
   try {
     const [
-      { count: totalMaterialsCount, error: totalMaterialsError },
-      { count: availableMaterialsCount, error: availableMaterialsError },
+      { data: materialsRows, error: materialsError },
+      { data: accessRows, error: accessError },
       { count: completedAssignmentsCount, error: completedAssignmentsError },
       { data: recentRows, error: recentError },
     ] = await Promise.all([
       supabase
         .from("materials")
-        .select("id", { count: "exact", head: true })
+        .select("id, is_available")
         .eq("branch_type", "gatehouse")
         .eq("material_kind", "mock_test")
         .eq("is_active", true),
 
       supabase
         .from("material_access")
-        .select("id, materials!inner(branch_type, material_kind, is_active)", {
-          count: "exact",
-          head: true,
-        })
-        .eq("user_id", user.id)
-        .eq("materials.branch_type", "gatehouse")
-        .eq("materials.material_kind", "mock_test")
-        .eq("materials.is_active", true),
+        .select("material_id")
+        .eq("user_id", user.id),
 
       supabase
         .from("user_progress")
@@ -90,8 +95,8 @@ export async function GET(_req: NextRequest) {
     ]);
 
     const error =
-      totalMaterialsError?.message ||
-      availableMaterialsError?.message ||
+      materialsError?.message ||
+      accessError?.message ||
       completedAssignmentsError?.message ||
       recentError?.message ||
       null;
@@ -100,10 +105,25 @@ export async function GET(_req: NextRequest) {
       return fail(error, 500, "DB_ERROR");
     }
 
+    const materialAccessSet = new Set(
+      Array.isArray(accessRows)
+        ? accessRows.map((item: any) => String(item?.material_id ?? "")).filter(Boolean)
+        : [],
+    );
+
+    const totalMaterials = Array.isArray(materialsRows) ? materialsRows.length : 0;
+
+    const availableMaterials = Array.isArray(materialsRows)
+      ? materialsRows.filter((material: any) => {
+          const id = String(material?.id ?? "");
+          return Boolean(material?.is_available) || materialAccessSet.has(id);
+        }).length
+      : 0;
+
     const recentProgress = Array.isArray(recentRows)
       ? recentRows.map((row: any) => {
-          const assignment = row?.assignments;
-          const material = assignment?.materials;
+          const assignment = firstOrNull(row?.assignments);
+          const material = firstOrNull(assignment?.materials);
 
           return {
             id: String(row?.id ?? row?.assignment_id ?? ""),
@@ -119,8 +139,8 @@ export async function GET(_req: NextRequest) {
 
     return ok({
       stats: {
-        totalMaterials: totalMaterialsCount ?? 0,
-        availableMaterials: availableMaterialsCount ?? 0,
+        totalMaterials,
+        availableMaterials,
         completedAssignments: completedAssignmentsCount ?? 0,
       },
       recentProgress,

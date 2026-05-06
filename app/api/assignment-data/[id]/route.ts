@@ -30,8 +30,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     const { data: assignment, error: aErr } = await supabase
       .from("assignments")
       .select(
-        `
-        *,
+        `*,
         materials(
           id,
           title,
@@ -42,8 +41,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
           target_levels,
           class_levels
         )
-      `,
-      )
+      `)
       .eq("id", id)
       .single();
 

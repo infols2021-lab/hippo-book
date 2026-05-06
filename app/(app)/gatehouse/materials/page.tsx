@@ -31,9 +31,10 @@ function normalizeMaterial(row: any): MaterialDbRow {
     order_index: Number(row?.order_index ?? 0),
     class_levels: normalizeArray(row?.class_levels),
     target_levels: normalizeArray(row?.target_levels),
-    legacy_source_table: row?.legacy_source_table === "textbooks" || row?.legacy_source_table === "crosswords"
-      ? row.legacy_source_table
-      : null,
+    legacy_source_table:
+      row?.legacy_source_table === "textbooks" || row?.legacy_source_table === "crosswords"
+        ? row.legacy_source_table
+        : null,
     legacy_source_id: typeof row?.legacy_source_id === "string" ? row.legacy_source_id : null,
     created_by: typeof row?.created_by === "string" ? row.created_by : null,
     created_at: typeof row?.created_at === "string" ? row.created_at : new Date().toISOString(),
@@ -62,7 +63,9 @@ function buildMaterialsWithProgress({
 
   return materials.map((material) => {
     const materialAssignments = assignments.filter((assignment) => assignment.material_id === material.id);
+
     const totalAssignments = materialAssignments.length;
+
     const completedAssignments = materialAssignments.filter((assignment) =>
       completedSet.has(assignment.id),
     ).length;
@@ -131,6 +134,7 @@ export default async function GatehouseMaterialsPage() {
   const materials = Array.isArray(materialsRows) ? materialsRows.map(normalizeMaterial) : [];
   const assignments = Array.isArray(assignmentsRows) ? (assignmentsRows as AssignmentRow[]) : [];
   const userProgress = Array.isArray(progressRows) ? (progressRows as UserProgressRow[]) : [];
+
   const accessIds = new Set(
     Array.isArray(accessRows)
       ? accessRows.map((item: any) => String(item?.material_id ?? "")).filter(Boolean)

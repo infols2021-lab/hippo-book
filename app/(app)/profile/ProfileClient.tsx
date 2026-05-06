@@ -3,16 +3,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import Modal from "@/components/Modal";
 import StreakRoadmapModal from "@/components/streak/StreakRoadmapModal";
-import StreakLeaderboardModal, {
-  type StreakLeaderboardRow,
-} from "@/components/profile/StreakLeaderboardModal";
-import TitlePickerModal, {
-  type TitlePickerChoice,
-  type TitleCatalogItem,
-} from "@/components/profile/TitlePickerModal";
+import StreakLeaderboardModal, { type StreakLeaderboardRow } from "@/components/profile/StreakLeaderboardModal";
+import TitlePickerModal, { type TitlePickerChoice, type TitleCatalogItem } from "@/components/profile/TitlePickerModal";
 import { getTierCodeByStreak } from "@/lib/streaks/roadmap";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,24 +47,14 @@ export type StreakSnapshot = {
   last_completed_date: string | null;
   done_today: boolean;
   can_save_today: boolean;
-  tier_code:
-    | "none"
-    | "bronze"
-    | "silver"
-    | "gold"
-    | "platinum"
-    | "diamond"
-    | "legendary"
-    | string;
+  tier_code: "none" | "bronze" | "silver" | "gold" | "platinum" | "diamond" | "legendary" | string;
 };
 
 type IconVisualPayloadFromApi = {
-  code?: string | null; // ✅ DB code
+  code?: string | null;
   publicUrl?: string | null;
   candidatePublicUrls?: string[] | null;
   cacheTag?: string | null;
-
-  // ✅ полезно для emoji/tier fallback
   emojiFallback?: string | null;
   tierCode?: string | null;
   label?: string | null;
@@ -100,12 +85,11 @@ type ProfileStreakApiResponse = {
 
   titleCatalog?: TitleCatalogItem[] | null;
 
-  // ✅ DB-first (приходит из /api/profile-streak)
-  unlockedIconCodes?: string[] | null; // DB codes
-  selectedIconCode?: string | null; // DB code
-  effectiveIconCode?: string | null; // DB code
+  unlockedIconCodes?: string[] | null;
+  selectedIconCode?: string | null;
+  effectiveIconCode?: string | null;
 
-  appliedIconCode?: string | null; // DB code
+  appliedIconCode?: string | null;
   appliedIcon?: IconVisualPayloadFromApi | null;
 
   selectedIcon?: IconVisualPayloadFromApi | null;
@@ -116,7 +100,6 @@ type SaveStreakIconApiResponse = {
   ok?: boolean;
   error?: string;
 
-  // ✅ DB codes
   selectedIconCode?: string | null;
   selectedIconDbCode?: string | null;
   effectiveIconCode?: string | null;
@@ -149,6 +132,19 @@ type LeaderboardApiResponse = {
   serverTs?: unknown;
 };
 
+type ProfileUpdateApiResponse = {
+  ok?: boolean;
+  error?: string;
+  profile?: {
+    id?: string;
+    email?: string | null;
+    full_name?: string | null;
+    contact_phone?: string | null;
+    region?: string | null;
+    is_admin?: boolean | null;
+  } | null;
+};
+
 type CustomUpdateRetryAction =
   | { type: "icon"; iconCode: string }
   | { type: "title-select"; choice: TitlePickerChoice }
@@ -175,7 +171,7 @@ type Props = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MODULE-LEVEL CONSTANTS & CACHES
+// CONSTANTS / CACHE
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STREAK_ICON_BUCKET =
@@ -185,33 +181,23 @@ const STREAK_ICON_BUCKET =
 
 const STREAK_CACHE_KEY = "ek_profile_streak_cache_v3";
 const PROGRESS_CACHE_KEY = "ek_profile_progress_cache_v1";
+
 const STREAK_CACHE_TTL_MS = 60_000;
 const PROGRESS_CACHE_TTL_MS = 5 * 60_000;
-
-// leaderboard (не кэшируем в storage, просто держим в памяти)
 const LEADERBOARD_MIN_REFRESH_MS = 25_000;
 
-/**
- * ✅ URL cache for loaded icons.
- * Key: `${bucket}::${iconCode}::${cacheTag || "v0"}`
- */
 const ICON_URL_RESOLVED_CACHE = new Map<string, string>();
 
 type StreakClientCache = {
   ts: number;
   streak: StreakSnapshot | null;
 
-  // ✅ DB code
   selectedIconServer: string | null;
-
   unlockedIconCodes: string[] | null;
 
-  // ✅ DB code
   appliedIconCode: string | null;
   appliedIconUrls: string[];
   appliedIconCacheTag: string | null;
-
-  // ✅ for emoji fallback
   appliedIconEmojiFallback?: string | null;
   appliedIconTierCode?: string | null;
 
@@ -227,21 +213,25 @@ type ProgressClientCache = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UTILITIES
+// HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
-function uniqStrings(values: (string | null | undefined)[]): string[] {
+function uniqStrings(values: (string | null | undefined)[]) {
   const set = new Set<string>();
+
   for (const v of values) {
     if (typeof v !== "string") continue;
+
     const s = v.trim();
     if (!s) continue;
+
     set.add(s);
   }
+
   return Array.from(set);
 }
 
@@ -259,9 +249,11 @@ function getClosedCustomUpdateDialog(): CustomUpdateDialogState {
 function regionLabel(region: string) {
   return region?.trim() ? region : "Не указана";
 }
+
 function phoneLabel(phone: string) {
   return phone?.trim() ? phone : "Не указан";
 }
+
 function nameLabel(name: string) {
   return name?.trim() ? name : "Ученик";
 }
@@ -274,16 +266,19 @@ function asInt(value: unknown, fallback = 0) {
 function asBool(value: unknown, fallback = false) {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value !== 0;
+
   if (typeof value === "string") {
     const s = value.trim().toLowerCase();
     if (["1", "true", "yes", "y"].includes(s)) return true;
     if (["0", "false", "no", "n"].includes(s)) return false;
   }
+
   return fallback;
 }
 
 function asStringOrNull(value: unknown): string | null {
   if (typeof value !== "string") return null;
+
   const s = value.trim();
   return s ? s : null;
 }
@@ -292,11 +287,13 @@ function pick(obj: Record<string, any>, keys: string[]) {
   for (const k of keys) {
     if (obj[k] !== undefined) return obj[k];
   }
+
   return undefined;
 }
 
 function safeJsonParse<T>(raw: string | null): T | null {
   if (!raw) return null;
+
   try {
     return JSON.parse(raw) as T;
   } catch {
@@ -306,16 +303,18 @@ function safeJsonParse<T>(raw: string | null): T | null {
 
 function readStreakCache(): StreakClientCache | null {
   if (typeof window === "undefined") return null;
-  const cached = safeJsonParse<StreakClientCache>(
-    sessionStorage.getItem(STREAK_CACHE_KEY)
-  );
+
+  const cached = safeJsonParse<StreakClientCache>(sessionStorage.getItem(STREAK_CACHE_KEY));
+
   if (!cached?.ts) return null;
   if (Date.now() - cached.ts > STREAK_CACHE_TTL_MS) return null;
+
   return cached;
 }
 
 function writeStreakCache(payload: StreakClientCache) {
   if (typeof window === "undefined") return;
+
   try {
     sessionStorage.setItem(STREAK_CACHE_KEY, JSON.stringify(payload));
   } catch {}
@@ -323,16 +322,18 @@ function writeStreakCache(payload: StreakClientCache) {
 
 function readProgressCache(): ProgressClientCache | null {
   if (typeof window === "undefined") return null;
-  const cached = safeJsonParse<ProgressClientCache>(
-    sessionStorage.getItem(PROGRESS_CACHE_KEY)
-  );
+
+  const cached = safeJsonParse<ProgressClientCache>(sessionStorage.getItem(PROGRESS_CACHE_KEY));
+
   if (!cached?.ts) return null;
   if (Date.now() - cached.ts > PROGRESS_CACHE_TTL_MS) return null;
+
   return cached;
 }
 
 function writeProgressCache(payload: ProgressClientCache) {
   if (typeof window === "undefined") return;
+
   try {
     sessionStorage.setItem(PROGRESS_CACHE_KEY, JSON.stringify(payload));
   } catch {}
@@ -340,7 +341,9 @@ function writeProgressCache(payload: ProgressClientCache) {
 
 function runWhenIdle(fn: () => void, timeout = 900) {
   if (typeof window === "undefined") return;
+
   const w = window as any;
+
   if (typeof w.requestIdleCallback === "function") {
     w.requestIdleCallback(fn, { timeout });
   } else {
@@ -350,88 +353,111 @@ function runWhenIdle(fn: () => void, timeout = 900) {
 
 function normalizeUiErrorMessage(error: unknown, fallback = "Произошла ошибка") {
   const raw =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-      ? error
-      : error == null
-      ? ""
-      : String(error);
+    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
+
   const msg = raw.trim();
+
   if (!msg) return fallback;
+
   const lower = msg.toLowerCase();
+
   if (
     lower.includes("failed to fetch") ||
     lower.includes("networkerror") ||
     lower.includes("network request failed") ||
-    lower.includes("load failed")
-  )
+    lower.includes("load failed") ||
+    lower.includes("terminated") ||
+    lower.includes("econnreset") ||
+    lower.includes("etimedout") ||
+    lower.includes("socket") ||
+    lower.includes("network")
+  ) {
     return "Ошибка соединения с сервером";
+  }
+
   return msg;
+}
+
+function normalizeDbIconCode(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+
+  let s = input.trim();
+  if (!s) return null;
+
+  s = s.split("#")[0] ?? s;
+  s = s.split("?")[0] ?? s;
+  s = s.replace(/\\/g, "/");
+
+  const base = s.split("/").filter(Boolean).at(-1) ?? s;
+  const noExt = base.replace(/\.(webp|png|jpg|jpeg|svg)$/i, "").trim();
+
+  if (!noExt) return null;
+
+  if (/^[a-z0-9]+(_[a-z0-9]+)+$/i.test(noExt) && !noExt.includes("-")) return null;
+
+  return noExt;
+}
+
+function toStorageProxyUrl(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+
+  const value = raw.trim();
+  if (!value) return "";
+
+  if (value.startsWith("/api/storage/public/")) return value;
+  if (value.startsWith("data:")) return value;
+
+  const marker = "/storage/v1/object/public/";
+  const idx = value.indexOf(marker);
+
+  if (idx === -1) return value;
+
+  const restWithQuery = value.slice(idx + marker.length);
+  const cleanRest = restWithQuery.split("?")[0]?.split("#")[0] ?? "";
+  const parts = cleanRest.split("/").filter(Boolean);
+
+  const bucket = parts.shift();
+  const path = parts.join("/");
+
+  if (!bucket || !path) return value;
+
+  return getStoragePublicUrl(bucket, path);
 }
 
 function normalizeStreakSnapshotFromApi(rawInput: unknown): StreakSnapshot | null {
   if (!rawInput || typeof rawInput !== "object") return null;
+
   const raw = rawInput as Record<string, any>;
 
   const rawCurrent = asInt(
-    pick(raw, [
-      "raw_current_streak",
-      "rawCurrentStreak",
-      "current_streak",
-      "currentStreak",
-      "current",
-      "streak",
-    ]),
-    0
+    pick(raw, ["raw_current_streak", "rawCurrentStreak", "current_streak", "currentStreak", "current", "streak"]),
+    0,
   );
+
   const displayCurrent = asInt(
-    pick(raw, [
-      "display_current_streak",
-      "displayCurrentStreak",
-      "current_streak",
-      "currentStreak",
-    ]),
-    rawCurrent
+    pick(raw, ["display_current_streak", "displayCurrentStreak", "current_streak", "currentStreak"]),
+    rawCurrent,
   );
+
   const longest = asInt(
-    pick(raw, [
-      "longest_streak",
-      "longestStreak",
-      "display_longest_streak",
-      "displayLongestStreak",
-    ]),
-    displayCurrent
+    pick(raw, ["longest_streak", "longestStreak", "display_longest_streak", "displayLongestStreak"]),
+    displayCurrent,
   );
+
   const doneToday = asBool(
-    pick(raw, [
-      "done_today",
-      "today_completed",
-      "todayCompleted",
-      "is_today_completed",
-      "isTodayCompleted",
-    ]),
-    false
+    pick(raw, ["done_today", "today_completed", "todayCompleted", "is_today_completed", "isTodayCompleted"]),
+    false,
   );
-  const canSaveToday = asBool(
-    pick(raw, ["can_save_today", "canSaveToday"]),
-    !doneToday
-  );
-  const tierCode =
-    asStringOrNull(pick(raw, ["tier_code", "tierCode"])) ??
-    getTierCodeByStreak(displayCurrent);
-  const today =
-    asStringOrNull(pick(raw, ["today", "today_date", "todayDate"])) ??
-    new Date().toISOString().slice(0, 10);
+
+  const canSaveToday = asBool(pick(raw, ["can_save_today", "canSaveToday"]), !doneToday);
+
+  const tierCode = asStringOrNull(pick(raw, ["tier_code", "tierCode"])) ?? getTierCodeByStreak(displayCurrent);
+
+  const today = asStringOrNull(pick(raw, ["today", "today_date", "todayDate"])) ?? new Date().toISOString().slice(0, 10);
+
   const lastCompletedDate =
-    asStringOrNull(
-      pick(raw, [
-        "last_completed_date",
-        "lastCompletedDate",
-        "activity_date",
-        "lastActivityDate",
-      ])
-    ) ?? null;
+    asStringOrNull(pick(raw, ["last_completed_date", "lastCompletedDate", "activity_date", "lastActivityDate"])) ??
+    null;
 
   return {
     today,
@@ -445,32 +471,9 @@ function normalizeStreakSnapshotFromApi(rawInput: unknown): StreakSnapshot | nul
   };
 }
 
-// ✅ DB icon code normalizer (НЕ переводим в roadmap коды)
-function normalizeDbIconCode(input: unknown): string | null {
-  if (typeof input !== "string") return null;
-  let s = input.trim();
-  if (!s) return null;
-
-  s = s.split("#")[0] ?? s;
-  s = s.split("?")[0] ?? s;
-  s = s.replace(/\\/g, "/");
-
-  const base = s.split("/").filter(Boolean).at(-1) ?? s;
-  const noExt = base
-    .replace(/\.(webp|png|jpg|jpeg|svg)$/i, "")
-    .trim();
-
-  if (!noExt) return null;
-
-  // если вдруг в кеше остался roadmap-код вида bronze_hop — лучше игнорнуть
-  if (/^[a-z0-9]+(_[a-z0-9]+)+$/i.test(noExt) && !noExt.includes("-"))
-    return null;
-
-  return noExt;
-}
-
 function getStreakTierUi(tierCode?: string, streakValue?: number) {
   const v = Math.max(0, Number(streakValue || 0));
+
   switch (tierCode) {
     case "legendary":
       return {
@@ -528,17 +531,18 @@ function joinClasses(...parts: Array<string | null | undefined | false>) {
   return parts.filter(Boolean).join(" ");
 }
 
-// leaderboard helpers
 function normalizeLeaderboardRows(input: unknown): StreakLeaderboardRow[] {
   if (!Array.isArray(input)) return [];
+
   const out: StreakLeaderboardRow[] = [];
   const seen = new Set<number>();
 
   for (const it of input) {
     if (!it || typeof it !== "object") continue;
-    const r = it as Record<string, any>;
 
+    const r = it as Record<string, any>;
     const place = asInt(r.place, 0);
+
     if (place <= 0) continue;
     if (seen.has(place)) continue;
 
@@ -548,16 +552,20 @@ function normalizeLeaderboardRows(input: unknown): StreakLeaderboardRow[] {
       longest: asInt(r.longest, 0),
       isMe: asBool(r.isMe, false),
     });
+
     seen.add(place);
   }
 
   out.sort((a, b) => a.place - b.place);
+
   return out;
 }
 
 function asIntOrNull(v: unknown): number | null {
   if (v === null || v === undefined) return null;
+
   const n = Number(v);
+
   return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
 }
 
@@ -582,30 +590,32 @@ function buildCandidateUrls(params: {
     : [];
 
   const variantPaths: string[] = [];
+
   if (params.variant && typeof params.variant === "object") {
     const v = params.variant as any;
+
     if (typeof v.webpPath === "string") variantPaths.push(v.webpPath);
     if (typeof v.pngPath === "string") variantPaths.push(v.pngPath);
+
     if (v.meta && typeof v.meta === "object") {
       if (typeof v.meta.webpPath === "string") variantPaths.push(v.meta.webpPath);
       if (typeof v.meta.pngPath === "string") variantPaths.push(v.meta.pngPath);
     }
   }
 
-  const supabase = getSupabaseBrowserClient();
   const toUrl = (p: string) => {
     const raw = p.trim();
+
     if (!raw) return null;
-    if (/^https?:\/\//i.test(raw) || raw.startsWith("data:")) return raw;
-    return (
-      supabase.storage
-        .from(STREAK_ICON_BUCKET)
-        .getPublicUrl(raw.replace(/^\/+/, "")).data.publicUrl || null
-    );
+    if (/^https?:\/\//i.test(raw) || raw.startsWith("data:") || raw.startsWith("/api/storage/public/")) {
+      return toStorageProxyUrl(raw);
+    }
+
+    return getStoragePublicUrl(STREAK_ICON_BUCKET, raw.replace(/^\/+/, ""));
   };
 
   return uniqStrings([
-    ...preferred.map((x) => (typeof x === "string" ? x.trim() : "")).filter(Boolean),
+    ...preferred.map((x) => (typeof x === "string" ? toStorageProxyUrl(x) : "")).filter(Boolean),
     ...(variantPaths.map(toUrl).filter(Boolean) as string[]),
     ...(fromCode.map(toUrl).filter(Boolean) as string[]),
   ]);
@@ -620,6 +630,7 @@ function preloadIconByUrls(params: {
   if (!isNonEmptyString(params.iconCode)) return;
 
   const cacheKey = makeIconCacheKey(STREAK_ICON_BUCKET, params.iconCode, params.cacheTag);
+
   if (ICON_URL_RESOLVED_CACHE.has(cacheKey)) return;
 
   const candidates = buildCandidateUrls({
@@ -631,29 +642,32 @@ function preloadIconByUrls(params: {
   if (!candidates.length) return;
 
   let idx = 0;
+
   function tryNext() {
     if (idx >= candidates.length) {
       ICON_URL_RESOLVED_CACHE.set(cacheKey, "");
       return;
     }
+
     const url = candidates[idx++];
     const img = new Image();
+
     img.onload = () => ICON_URL_RESOLVED_CACHE.set(cacheKey, url);
     img.onerror = tryNext;
     img.src = url;
   }
+
   tryNext();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// StreakIconVisual — emoji first, затем гарантированно картинка (если загрузилась)
+// STREAK ICON VISUAL
 // ─────────────────────────────────────────────────────────────────────────────
 
 type StreakIconVisualProps = {
-  iconCode: string | null; // ✅ DB code
+  iconCode: string | null;
   cacheTag?: string | null;
   preferredUrls?: string[] | null;
-
   variant?: unknown;
   emojiFallback: string;
   alt: string;
@@ -676,20 +690,21 @@ function StreakIconVisual({
   priority = false,
 }: StreakIconVisualProps) {
   const cacheKey = iconCode ? makeIconCacheKey(STREAK_ICON_BUCKET, iconCode, cacheTag) : null;
-
   const preferredKey = Array.isArray(preferredUrls) ? preferredUrls.join("|") : "";
 
   const candidateUrls = useMemo(
     () => buildCandidateUrls({ preferredUrls, iconCode, variant }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [iconCode, cacheTag, preferredKey]
+    [iconCode, cacheTag, preferredKey],
   );
 
   const candidatesKey = useMemo(() => candidateUrls.join("|"), [candidateUrls]);
 
   const [shownSrc, setShownSrc] = useState<string | null>(() => {
     if (!cacheKey) return null;
+
     const cached = ICON_URL_RESOLVED_CACHE.get(cacheKey);
+
     return cached && cached !== "" ? cached : null;
   });
 
@@ -699,17 +714,20 @@ function StreakIconVisual({
   useEffect(() => {
     if (lastKeyRef.current !== cacheKey) {
       lastKeyRef.current = cacheKey;
+
       setShownSrc(() => {
         if (!cacheKey) return null;
+
         const cached = ICON_URL_RESOLVED_CACHE.get(cacheKey);
+
         return cached && cached !== "" ? cached : null;
       });
+
       setPendingIndex(0);
       return;
     }
 
     setPendingIndex(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cacheKey, candidatesKey]);
 
   useEffect(() => {
@@ -731,6 +749,7 @@ function StreakIconVisual({
     }
 
     const src = candidateUrls[pendingIndex] ?? null;
+
     if (!src) {
       setPendingIndex((i) => i + 1);
       return;
@@ -739,13 +758,15 @@ function StreakIconVisual({
     if (shownSrc === src) return;
 
     let alive = true;
-
     const img = new Image();
+
     img.decoding = "async";
 
     const markReady = () => {
       if (!alive) return;
+
       setShownSrc(src);
+
       if (cacheKey) ICON_URL_RESOLVED_CACHE.set(cacheKey, src);
     };
 
@@ -816,7 +837,6 @@ function StreakIconVisual({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProfileClient({
-  userId,
   userEmail,
   initialProfile,
   backgroundUrl,
@@ -825,17 +845,17 @@ export default function ProfileClient({
   streak: streakProp,
   equippedTitleLabel = null,
 }: Props) {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
-
   const cachedStreak = typeof window !== "undefined" ? readStreakCache() : null;
   const cachedProgress = typeof window !== "undefined" ? readProgressCache() : null;
 
   const cachedSelectedIconServer = normalizeDbIconCode(cachedStreak?.selectedIconServer ?? null);
   const cachedAppliedIconCode = normalizeDbIconCode(cachedStreak?.appliedIconCode ?? null);
 
+  const backgroundProxyUrl = useMemo(() => toStorageProxyUrl(backgroundUrl), [backgroundUrl]);
+
   const [profile, setProfile] = useState<ProfileData>(initialProfile);
 
-  const [bgLoading, setBgLoading] = useState<boolean>(Boolean(backgroundUrl));
+  const [bgLoading, setBgLoading] = useState<boolean>(Boolean(backgroundProxyUrl));
   const [bgReady, setBgReady] = useState<boolean>(false);
 
   const [notif, setNotif] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -849,7 +869,6 @@ export default function ProfileClient({
   const [streakModalOpen, setStreakModalOpen] = useState(false);
   const [titleModalOpen, setTitleModalOpen] = useState(false);
 
-  // ✅ leaderboard modal
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
@@ -858,20 +877,21 @@ export default function ProfileClient({
   const [leaderboardMyPlace, setLeaderboardMyPlace] = useState<number | null>(null);
   const [leaderboardMyCurrent, setLeaderboardMyCurrent] = useState<number | null>(null);
   const [leaderboardMyLongest, setLeaderboardMyLongest] = useState<number | null>(null);
+
   const lastLeaderboardFetchAtRef = useRef<number>(0);
   const leaderboardAbortRef = useRef<AbortController | null>(null);
 
-  const [customUpdateDialog, setCustomUpdateDialog] = useState<CustomUpdateDialogState>(
-    getClosedCustomUpdateDialog()
-  );
+  const [customUpdateDialog, setCustomUpdateDialog] = useState<CustomUpdateDialogState>(getClosedCustomUpdateDialog());
 
   const [stats, setStats] = useState<Stats | null>(statsProp ?? cachedProgress?.stats ?? null);
   const [materialsProgress, setMaterialsProgress] = useState<MaterialProgressItem[] | null>(
-    progressProp ?? cachedProgress?.materialsProgress ?? null
+    progressProp ?? cachedProgress?.materialsProgress ?? null,
   );
+
   const [progressLoading, setProgressLoading] = useState<boolean>(
-    Boolean(!statsProp && !progressProp && !(cachedProgress?.stats && cachedProgress?.materialsProgress))
+    Boolean(!statsProp && !progressProp && !(cachedProgress?.stats && cachedProgress?.materialsProgress)),
   );
+
   const [progressError, setProgressError] = useState<string | null>(null);
 
   const [streak, setStreak] = useState<StreakSnapshot | null>(streakProp ?? cachedStreak?.streak ?? null);
@@ -879,37 +899,47 @@ export default function ProfileClient({
   const [streakError, setStreakError] = useState<string | null>(null);
 
   const [equippedTitleLabelState, setEquippedTitleLabelState] = useState<string | null>(
-    cachedStreak?.titleLabel ?? equippedTitleLabel ?? null
+    cachedStreak?.titleLabel ?? equippedTitleLabel ?? null,
   );
+
   const [equippedTitleCodeState, setEquippedTitleCodeState] = useState<string | null>(cachedStreak?.titleCode ?? null);
+
   const [titleCatalogState, setTitleCatalogState] = useState<TitleCatalogItem[] | null>(
-    cachedStreak?.titleCatalog ?? null
+    cachedStreak?.titleCatalog ?? null,
   );
+
   const [savingTitle, setSavingTitle] = useState(false);
 
-  // ✅ DB unlocked codes
   const [unlockedIconCodesState, setUnlockedIconCodesState] = useState<string[] | null>(
-    Array.isArray(cachedStreak?.unlockedIconCodes) ? (cachedStreak!.unlockedIconCodes ?? null) : null
+    Array.isArray(cachedStreak?.unlockedIconCodes) ? cachedStreak!.unlockedIconCodes ?? null : null,
   );
 
-  // ✅ Applied icon info (DB code + urls + cacheTag + emoji/tier)
   const [appliedIconCodeState, setAppliedIconCodeState] = useState<string | null>(cachedAppliedIconCode ?? null);
-  const [appliedIconUrlsState, setAppliedIconUrlsState] = useState<string[]>(cachedStreak?.appliedIconUrls ?? []);
-  const [appliedIconCacheTagState, setAppliedIconCacheTagState] = useState<string | null>(
-    cachedStreak?.appliedIconCacheTag ?? null
-  );
-  const [appliedIconEmojiFallbackState, setAppliedIconEmojiFallbackState] = useState<string | null>(
-    cachedStreak?.appliedIconEmojiFallback ?? null
-  );
-  const [appliedIconTierCodeState, setAppliedIconTierCodeState] = useState<string | null>(
-    cachedStreak?.appliedIconTierCode ?? null
+
+  const [appliedIconUrlsState, setAppliedIconUrlsState] = useState<string[]>(
+    Array.isArray(cachedStreak?.appliedIconUrls)
+      ? cachedStreak.appliedIconUrls.map(toStorageProxyUrl).filter(Boolean)
+      : [],
   );
 
-  // ✅ Local/server selection are DB codes
-  const [selectedStreakIconCodeLocal, setSelectedStreakIconCodeLocal] = useState<string | null>(null);
-  const [selectedStreakIconCodeServer, setSelectedStreakIconCodeServer] = useState<string | null>(
-    cachedSelectedIconServer ?? null
+  const [appliedIconCacheTagState, setAppliedIconCacheTagState] = useState<string | null>(
+    cachedStreak?.appliedIconCacheTag ?? null,
   );
+
+  const [appliedIconEmojiFallbackState, setAppliedIconEmojiFallbackState] = useState<string | null>(
+    cachedStreak?.appliedIconEmojiFallback ?? null,
+  );
+
+  const [appliedIconTierCodeState, setAppliedIconTierCodeState] = useState<string | null>(
+    cachedStreak?.appliedIconTierCode ?? null,
+  );
+
+  const [selectedStreakIconCodeLocal, setSelectedStreakIconCodeLocal] = useState<string | null>(null);
+
+  const [selectedStreakIconCodeServer, setSelectedStreakIconCodeServer] = useState<string | null>(
+    cachedSelectedIconServer ?? null,
+  );
+
   const [savingStreakIcon, setSavingStreakIcon] = useState(false);
 
   const lastStreakFetchAtRef = useRef<number>(0);
@@ -921,23 +951,23 @@ export default function ProfileClient({
   const streakDisplay = Math.max(0, Number(streak?.display_current_streak ?? 0));
   const longestStreakDisplay = Math.max(0, Number(streak?.longest_streak ?? 0));
 
-  // ✅ unlocked for UI = DB codes
   const unlockedIconCodesForUi: string[] = useMemo(() => {
     if (Array.isArray(unlockedIconCodesState) && unlockedIconCodesState.length) {
       return unlockedIconCodesState.map((c) => normalizeDbIconCode(c)).filter(Boolean) as string[];
     }
+
     return [];
   }, [unlockedIconCodesState]);
 
-  // ✅ effective selected = DB code
   const effectiveSelectedStreakIconCode = useMemo(() => {
     const candidate = normalizeDbIconCode(selectedStreakIconCodeLocal ?? selectedStreakIconCodeServer);
+
     if (candidate && unlockedIconCodesForUi.includes(candidate)) return candidate;
     if (unlockedIconCodesForUi.length) return unlockedIconCodesForUi[unlockedIconCodesForUi.length - 1];
+
     return candidate ?? null;
   }, [selectedStreakIconCodeLocal, selectedStreakIconCodeServer, unlockedIconCodesForUi]);
 
-  // ✅ ВАЖНО: цвета UI берём ОТ ВЫБРАННОЙ ИКОНКИ (tier_code из БД), а не от tier стрика
   const uiTierCodeForColors = useMemo(() => {
     const fromIcon =
       effectiveSelectedStreakIconCode &&
@@ -948,8 +978,8 @@ export default function ProfileClient({
 
     if (fromIcon) return fromIcon;
 
-    // fallback: если вдруг tierCode иконки ещё не приехал — красим по tier серии
     const fromStreak = typeof streak?.tier_code === "string" ? streak.tier_code.trim().toLowerCase() : "";
+
     return fromStreak || getTierCodeByStreak(streakDisplay);
   }, [effectiveSelectedStreakIconCode, appliedIconCodeState, appliedIconTierCodeState, streak?.tier_code, streakDisplay]);
 
@@ -960,6 +990,7 @@ export default function ProfileClient({
       const e = typeof appliedIconEmojiFallbackState === "string" ? appliedIconEmojiFallbackState.trim() : "";
       if (e) return e;
     }
+
     return streakUiBase.icon || "✨";
   }, [effectiveSelectedStreakIconCode, appliedIconCodeState, appliedIconEmojiFallbackState, streakUiBase.icon]);
 
@@ -970,18 +1001,21 @@ export default function ProfileClient({
     if (!effectiveSelectedStreakIconCode) return [];
     if (!appliedIconCodeState) return [];
     if (appliedIconCodeState !== effectiveSelectedStreakIconCode) return [];
-    return appliedIconUrlsState ?? [];
+
+    return (appliedIconUrlsState ?? []).map(toStorageProxyUrl).filter(Boolean);
   }, [effectiveSelectedStreakIconCode, appliedIconCodeState, appliedIconUrlsState]);
 
   const cacheTagForCurrentIcon = useMemo(() => {
     if (!effectiveSelectedStreakIconCode) return null;
     if (!appliedIconCodeState) return null;
     if (appliedIconCodeState !== effectiveSelectedStreakIconCode) return null;
+
     return appliedIconCacheTagState ?? null;
   }, [effectiveSelectedStreakIconCode, appliedIconCodeState, appliedIconCacheTagState]);
 
   useEffect(() => {
     if (!effectiveSelectedStreakIconCode) return;
+
     preloadIconByUrls({
       iconCode: effectiveSelectedStreakIconCode,
       cacheTag: cacheTagForCurrentIcon,
@@ -992,6 +1026,7 @@ export default function ProfileClient({
 
   useEffect(() => {
     if (!unlockedIconCodesForUi.length) return;
+
     runWhenIdle(() => {
       for (const code of unlockedIconCodesForUi) {
         preloadIconByUrls({
@@ -1035,6 +1070,7 @@ export default function ProfileClient({
     setCustomUpdateDialog((prev) => {
       if (!prev.open) return prev;
       if (prev.mode === "loading") return prev;
+
       return getClosedCustomUpdateDialog();
     });
   }
@@ -1049,15 +1085,19 @@ export default function ProfileClient({
 
   async function retryCustomUpdateDialogAction() {
     const action = customUpdateDialog.retryAction;
+
     if (!action) return;
+
     if (action.type === "icon") {
       await handleSelectStreakIcon(action.iconCode, { force: true });
       return;
     }
+
     if (action.type === "title-select") {
       await handleSelectTitle(action.choice, { force: true });
       return;
     }
+
     if (action.type === "title-clear") {
       await handleClearSelectedTitle({ force: true });
     }
@@ -1076,7 +1116,9 @@ export default function ProfileClient({
     const urls = uniqStrings([
       ...(Array.isArray(appliedIcon?.candidatePublicUrls) ? appliedIcon!.candidatePublicUrls! : []),
       appliedIcon?.publicUrl ?? null,
-    ]).filter(Boolean);
+    ])
+      .map(toStorageProxyUrl)
+      .filter(Boolean);
 
     const cacheTag = typeof appliedIcon?.cacheTag === "string" ? appliedIcon.cacheTag : null;
     const emojiFallback = typeof appliedIcon?.emojiFallback === "string" ? appliedIcon.emojiFallback : null;
@@ -1087,10 +1129,13 @@ export default function ProfileClient({
 
   function applyStreakResponseToState(json: ProfileStreakApiResponse) {
     const normalizedStreak = normalizeStreakSnapshotFromApi(json.streak ?? null);
+
     if (normalizedStreak) setStreak(normalizedStreak);
 
     const rawTitleObj = (json.selectedTitle ?? json.equippedTitle ?? null) as Record<string, any> | null;
+
     const apiTitleLabel = rawTitleObj && typeof rawTitleObj.label === "string" ? rawTitleObj.label : null;
+
     const apiTitleCode =
       (rawTitleObj && typeof rawTitleObj.titleCode === "string" && rawTitleObj.titleCode) ||
       (rawTitleObj && typeof rawTitleObj.code === "string" && rawTitleObj.code) ||
@@ -1099,7 +1144,9 @@ export default function ProfileClient({
     setEquippedTitleLabelState(apiTitleLabel ?? null);
     setEquippedTitleCodeState(apiTitleCode ?? null);
 
-    if (Array.isArray(json.titleCatalog)) setTitleCatalogState(json.titleCatalog as TitleCatalogItem[]);
+    if (Array.isArray(json.titleCatalog)) {
+      setTitleCatalogState(json.titleCatalog as TitleCatalogItem[]);
+    }
 
     if (Array.isArray(json.unlockedIconCodes)) {
       const norm = json.unlockedIconCodes.map((c) => normalizeDbIconCode(c)).filter(Boolean) as string[];
@@ -1109,9 +1156,11 @@ export default function ProfileClient({
     const apiSelected = normalizeDbIconCode(json.selectedIconCode ?? null);
     const apiEffective = normalizeDbIconCode(json.effectiveIconCode ?? null);
     const resolvedIcon = apiSelected ?? apiEffective ?? null;
+
     setSelectedStreakIconCodeServer(resolvedIcon);
 
     const applied = extractAppliedIconInfo(json);
+
     setAppliedIconCodeState(applied.appliedIconCode);
     setAppliedIconUrlsState(applied.urls);
     setAppliedIconCacheTagState(applied.cacheTag);
@@ -1129,8 +1178,11 @@ export default function ProfileClient({
 
     setSelectedStreakIconCodeLocal((prev) => {
       if (!prev) return prev;
+
       const compareWith = apiSelected ?? apiEffective ?? null;
+
       if (compareWith && prev === compareWith) return null;
+
       return prev;
     });
 
@@ -1148,9 +1200,7 @@ export default function ProfileClient({
       appliedIconTierCode: applied.tierCode,
       titleCode: apiTitleCode ?? null,
       titleLabel: apiTitleLabel ?? null,
-      titleCatalog: Array.isArray(json.titleCatalog)
-        ? (json.titleCatalog as TitleCatalogItem[])
-        : titleCatalogState ?? null,
+      titleCatalog: Array.isArray(json.titleCatalog) ? (json.titleCatalog as TitleCatalogItem[]) : titleCatalogState ?? null,
     });
 
     try {
@@ -1161,43 +1211,60 @@ export default function ProfileClient({
   async function refreshStreakFromApi(options?: { silent?: boolean; force?: boolean }) {
     const silent = Boolean(options?.silent);
     const now = Date.now();
+
     if (!options?.force && now - lastStreakFetchAtRef.current < 12_000) return;
+
     lastStreakFetchAtRef.current = now;
 
     streakAbortRef.current?.abort();
+
     const controller = new AbortController();
     streakAbortRef.current = controller;
 
     try {
       if (!silent) setStreakLoading(true);
+
       setStreakError(null);
 
-      const res = await fetch("/api/profile-streak", { method: "GET", cache: "no-store", signal: controller.signal });
+      const res = await fetch("/api/profile-streak", {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal,
+      });
 
       let json: ProfileStreakApiResponse | null = null;
+
       try {
         json = (await res.json()) as ProfileStreakApiResponse;
       } catch {
         json = null;
       }
 
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить стрик");
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Не удалось загрузить стрик");
+      }
 
       applyStreakResponseToState(json);
+
       if (!silent) setStreakLoading(false);
     } catch (e: any) {
       if (e?.name === "AbortError") return;
+
       if (!silent) setStreakLoading(false);
+
       setStreakError(normalizeUiErrorMessage(e, "Не удалось загрузить стрик"));
     }
   }
 
   async function refreshLeaderboardFromApi(options?: { force?: boolean }) {
     const now = Date.now();
+
     if (!options?.force && now - lastLeaderboardFetchAtRef.current < LEADERBOARD_MIN_REFRESH_MS) return;
+
     lastLeaderboardFetchAtRef.current = now;
 
     leaderboardAbortRef.current?.abort();
+
     const controller = new AbortController();
     leaderboardAbortRef.current = controller;
 
@@ -1212,19 +1279,19 @@ export default function ProfileClient({
       });
 
       let json: LeaderboardApiResponse | null = null;
+
       try {
         json = (await res.json()) as LeaderboardApiResponse;
       } catch {
         json = null;
       }
 
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить рейтинг");
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Не удалось загрузить рейтинг");
+      }
 
-      const top = normalizeLeaderboardRows(json?.top);
-      const around = normalizeLeaderboardRows(json?.around);
-
-      setLeaderboardTop(top);
-      setLeaderboardAround(around);
+      setLeaderboardTop(normalizeLeaderboardRows(json?.top));
+      setLeaderboardAround(normalizeLeaderboardRows(json?.around));
       setLeaderboardMyPlace(asIntOrNull(json?.myPlace));
       setLeaderboardMyCurrent(asIntOrNull(json?.myCurrent));
       setLeaderboardMyLongest(asIntOrNull(json?.myLongest));
@@ -1232,53 +1299,76 @@ export default function ProfileClient({
       setLeaderboardLoading(false);
     } catch (e: any) {
       if (e?.name === "AbortError") return;
+
       setLeaderboardLoading(false);
       setLeaderboardError(normalizeUiErrorMessage(e, "Не удалось загрузить рейтинг"));
     }
   }
 
   useEffect(() => {
-    if (!backgroundUrl) {
+    if (!backgroundProxyUrl) {
       setBgLoading(false);
       setBgReady(false);
       return;
     }
+
     setBgLoading(true);
+
     const img = new Image();
+
     img.onload = () => {
       setBgLoading(false);
       setBgReady(true);
     };
+
     img.onerror = () => {
       setBgLoading(false);
       setBgReady(false);
     };
-    img.src = backgroundUrl;
+
+    img.src = backgroundProxyUrl;
+
     const t = setTimeout(() => setBgLoading(false), 6000);
+
     return () => clearTimeout(t);
-  }, [backgroundUrl]);
+  }, [backgroundProxyUrl]);
 
   useEffect(() => {
     let cancelled = false;
+
     async function loadProgress() {
       if (statsProp && progressProp) {
         setProgressLoading(false);
         return;
       }
+
       progressAbortRef.current?.abort();
+
       const controller = new AbortController();
       progressAbortRef.current = controller;
 
       try {
         setProgressLoading(true);
         setProgressError(null);
-        const res = await fetch("/api/profile-progress", { method: "GET", cache: "no-store", signal: controller.signal });
-        const json = await res.json();
-        if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить прогресс");
+
+        const res = await fetch("/api/profile-progress", {
+          method: "GET",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok || !json?.ok) {
+          throw new Error(json?.error || "Не удалось загрузить прогресс");
+        }
+
         if (cancelled) return;
+
         setStats(json.stats as Stats);
         setMaterialsProgress(json.materialsProgress as MaterialProgressItem[]);
         setProgressLoading(false);
+
         writeProgressCache({
           ts: Date.now(),
           stats: json.stats as Stats,
@@ -1286,11 +1376,14 @@ export default function ProfileClient({
         });
       } catch (e: any) {
         if (e?.name === "AbortError" || cancelled) return;
+
         setProgressLoading(false);
         setProgressError(normalizeUiErrorMessage(e, "Не удалось загрузить прогресс"));
       }
     }
+
     runWhenIdle(() => void loadProgress(), 1200);
+
     return () => {
       cancelled = true;
       progressAbortRef.current?.abort();
@@ -1299,21 +1392,35 @@ export default function ProfileClient({
 
   useEffect(() => {
     let cancelled = false;
-    const dirty = typeof window !== "undefined" ? sessionStorage.getItem("profile-streak-dirty") === "1" : false;
 
+    const dirty = typeof window !== "undefined" ? sessionStorage.getItem("profile-streak-dirty") === "1" : false;
     const hasFreshCache = Boolean(cachedStreak?.streak && Date.now() - (cachedStreak?.ts ?? 0) < STREAK_CACHE_TTL_MS);
+
     if (streakProp || cachedStreak?.streak) setStreakLoading(false);
 
     const doFetch = async () => {
-      if (!cancelled) await refreshStreakFromApi({ silent: true, force: dirty || !hasFreshCache });
+      if (!cancelled) {
+        await refreshStreakFromApi({
+          silent: true,
+          force: dirty || !hasFreshCache,
+        });
+      }
     };
-    if (dirty || !hasFreshCache) void doFetch();
-    else runWhenIdle(() => void doFetch(), 900);
+
+    if (dirty || !hasFreshCache) {
+      void doFetch();
+    } else {
+      runWhenIdle(() => void doFetch(), 900);
+    }
 
     const onFocus = () => void refreshStreakFromApi({ silent: true });
+
     const onVisibility = () => {
-      if (document.visibilityState === "visible") void refreshStreakFromApi({ silent: true });
+      if (document.visibilityState === "visible") {
+        void refreshStreakFromApi({ silent: true });
+      }
     };
+
     const onCustomRefresh = () => void refreshStreakFromApi({ silent: false, force: true });
 
     window.addEventListener("focus", onFocus);
@@ -1322,9 +1429,11 @@ export default function ProfileClient({
 
     return () => {
       cancelled = true;
+
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("profile-streak-refresh", onCustomRefresh as EventListener);
+
       streakAbortRef.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1337,10 +1446,11 @@ export default function ProfileClient({
     } catch {}
   }, []);
 
-  // fetch leaderboard on open
   useEffect(() => {
     if (!leaderboardOpen) return;
+
     void refreshLeaderboardFromApi({ force: false });
+
     return () => {
       leaderboardAbortRef.current?.abort();
     };
@@ -1353,6 +1463,7 @@ export default function ProfileClient({
     setEditRegion(profile.region || "");
     setEditOpen(true);
   }
+
   function closeEdit() {
     setEditOpen(false);
   }
@@ -1360,20 +1471,52 @@ export default function ProfileClient({
   async function saveProfile() {
     const fullName = editFullName.trim();
     const phone = editPhone.trim();
-    const region = editRegion;
+    const region = editRegion.trim();
+
     if (!fullName || !phone || !region) {
       showNotification("❌ Заполните все поля", "error");
       return;
     }
+
     try {
       setSaving(true);
-      const { error } = await supabase
-        .from("profiles")
-        .update({ full_name: fullName, contact_phone: phone, region })
-        .eq("id", userId);
-      if (error) throw error;
-      setProfile((p) => ({ ...p, full_name: fullName, contact_phone: phone, region }));
-      showNotification("✅ Профиль успешно обновлен!");
+
+      const res = await fetch("/api/profile/update", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: JSON.stringify({
+          full_name: fullName,
+          contact_phone: phone,
+          region,
+        }),
+      });
+
+      let json: ProfileUpdateApiResponse | null = null;
+
+      try {
+        json = (await res.json()) as ProfileUpdateApiResponse;
+      } catch {
+        json = null;
+      }
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Не удалось обновить профиль");
+      }
+
+      const updated = json.profile;
+
+      setProfile((p) => ({
+        ...p,
+        full_name: updated?.full_name ?? fullName,
+        contact_phone: updated?.contact_phone ?? phone,
+        region: updated?.region ?? region,
+        is_admin: typeof updated?.is_admin === "boolean" ? updated.is_admin : p.is_admin,
+      }));
+
+      showNotification("✅ Профиль успешно обновлён!");
       closeEdit();
     } catch (e: any) {
       showNotification("❌ Ошибка обновления профиля: " + normalizeUiErrorMessage(e), "error");
@@ -1384,22 +1527,25 @@ export default function ProfileClient({
 
   async function logout() {
     try {
-      await supabase.auth.signOut();
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        cache: "no-store",
+      });
     } finally {
       window.location.href = "/login";
     }
   }
 
-  // ✅ iconCodeRaw = DB code
   async function handleSelectStreakIcon(iconCodeRaw: string, options?: { force?: boolean }) {
     const normalized = normalizeDbIconCode(iconCodeRaw);
+
     if (!normalized) {
       showNotification("❌ Некорректный код иконки", "error");
       return;
     }
+
     if (!options?.force && (savingStreakIcon || savingTitle || customUpdateDialog.open)) return;
 
-    // если знаем unlocked list — не даём выбрать недоступное
     if (unlockedIconCodesForUi.length && !unlockedIconCodesForUi.includes(normalized)) {
       showNotification("🔒 Иконка ещё не разблокирована", "error");
       return;
@@ -1410,37 +1556,50 @@ export default function ProfileClient({
 
     try {
       openUpdateLoading("icon");
+
       setSelectedStreakIconCodeLocal(normalized);
       setSavingStreakIcon(true);
 
-      preloadIconByUrls({ iconCode: normalized, cacheTag: null, preferredUrls: null, variant: null });
+      preloadIconByUrls({
+        iconCode: normalized,
+        cacheTag: null,
+        preferredUrls: null,
+        variant: null,
+      });
 
       const res = await fetch("/api/profile-streak-icon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ iconCode: normalized }), // ✅ DB code
+        cache: "no-store",
+        body: JSON.stringify({ iconCode: normalized }),
       });
 
       let json: SaveStreakIconApiResponse | null = null;
+
       try {
         json = (await res.json()) as SaveStreakIconApiResponse;
       } catch {
         json = null;
       }
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось сохранить иконку серии");
 
-      const resolvedSelected = normalizeDbIconCode(json.selectedIconCode ?? normalized);
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Не удалось сохранить иконку серии");
+      }
+
+      const resolvedSelected = normalizeDbIconCode(json.selectedIconCode ?? json.selectedIconDbCode ?? normalized);
       const resolvedEffective = normalizeDbIconCode(json.effectiveIconCode ?? null);
 
       setSelectedStreakIconCodeServer(resolvedSelected ?? resolvedEffective ?? normalized);
       setSelectedStreakIconCodeLocal(null);
       setCustomUpdateDialog(getClosedCustomUpdateDialog());
+
       showNotification("✅ Иконка серии успешно обновлена");
 
       void refreshStreakFromApi({ silent: true, force: true });
     } catch (e: any) {
       setSelectedStreakIconCodeLocal(prevLocal);
       setSelectedStreakIconCodeServer(prevServer);
+
       showUpdateError("icon", e, { type: "icon", iconCode: normalized });
     } finally {
       setSavingStreakIcon(false);
@@ -1455,6 +1614,7 @@ export default function ProfileClient({
 
     try {
       openUpdateLoading("title");
+
       setSavingTitle(true);
       setEquippedTitleCodeState(choice.code);
       setEquippedTitleLabelState(choice.label);
@@ -1462,34 +1622,43 @@ export default function ProfileClient({
       const res = await fetch("/api/profile-streak-title", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({ titleCode: choice.code }),
       });
 
       let json: SaveStreakTitleApiResponse | null = null;
+
       try {
         json = (await res.json()) as SaveStreakTitleApiResponse;
       } catch {
         json = null;
       }
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось сохранить титул");
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Не удалось сохранить титул");
+      }
 
       const savedCode =
         (typeof json.selectedTitle?.code === "string" && json.selectedTitle.code) ||
         (typeof json.selectedTitleCode === "string" && json.selectedTitleCode) ||
+        (typeof json.selectedTitleDbCode === "string" && json.selectedTitleDbCode) ||
         choice.code;
 
-      const savedLabel =
-        (typeof json.selectedTitle?.label === "string" && json.selectedTitle.label) || choice.label;
+      const savedLabel = (typeof json.selectedTitle?.label === "string" && json.selectedTitle.label) || choice.label;
 
       setEquippedTitleCodeState(savedCode);
       setEquippedTitleLabelState(savedLabel);
       setCustomUpdateDialog(getClosedCustomUpdateDialog());
+
       showNotification("✅ Титул успешно обновлён");
+
       setTitleModalOpen(false);
+
       void refreshStreakFromApi({ silent: true, force: true });
     } catch (e: any) {
       setEquippedTitleCodeState(prevCode);
       setEquippedTitleLabelState(prevLabel);
+
       showUpdateError("title", e, { type: "title-select", choice });
     } finally {
       setSavingTitle(false);
@@ -1504,6 +1673,7 @@ export default function ProfileClient({
 
     try {
       openUpdateLoading("title");
+
       setSavingTitle(true);
       setEquippedTitleCodeState(null);
       setEquippedTitleLabelState(null);
@@ -1511,57 +1681,65 @@ export default function ProfileClient({
       const res = await fetch("/api/profile-streak-title", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({ reset: true }),
       });
 
       let json: SaveStreakTitleApiResponse | null = null;
+
       try {
         json = (await res.json()) as SaveStreakTitleApiResponse;
       } catch {
         json = null;
       }
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось сбросить титул");
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Не удалось сбросить титул");
+      }
 
       setEquippedTitleCodeState(null);
       setEquippedTitleLabelState(null);
       setCustomUpdateDialog(getClosedCustomUpdateDialog());
+
       showNotification("✅ Титул успешно сброшен");
+
       setTitleModalOpen(false);
+
       void refreshStreakFromApi({ silent: true, force: true });
     } catch (e: any) {
       setEquippedTitleCodeState(prevCode);
       setEquippedTitleLabelState(prevLabel);
+
       showUpdateError("title", e, { type: "title-clear" });
     } finally {
       setSavingTitle(false);
     }
   }
 
-  const overlayCss = backgroundUrl && (bgReady || !bgLoading) ? `url('${backgroundUrl}')` : "none";
+  const overlayCss = backgroundProxyUrl && (bgReady || !bgLoading) ? `url('${backgroundProxyUrl}')` : "none";
 
   const effectiveTitleLabelForUi = equippedTitleLabelState ?? null;
   const effectiveTitleCodeForUi = equippedTitleCodeState ?? null;
-  const titleText =
-    effectiveTitleLabelForUi?.trim() || (streakDisplay >= 1 ? "Без титула (пока не выбран)" : "Без титула");
+
+  const titleText = effectiveTitleLabelForUi?.trim() || (streakDisplay >= 1 ? "Без титула (пока не выбран)" : "Без титула");
 
   const streakChipTitle = streakLoading
     ? "Загружаем стрик..."
     : streakError
-    ? `Стрик временно недоступен: ${streakError}`
-    : streak
-    ? `Серия: ${streakDisplay} дн. • Рекорд: ${streak.longest_streak} дн.`
-    : "Серия пока не началась";
+      ? `Стрик временно недоступен: ${streakError}`
+      : streak
+        ? `Серия: ${streakDisplay} дн. • Рекорд: ${streak.longest_streak} дн.`
+        : "Серия пока не началась";
 
   const streakChipSub = streakLoading
     ? "серия"
     : streak?.done_today
-    ? "сегодня ✅"
-    : streakDisplay > 0
-    ? "сохранить сегодня"
-    : "начни серию";
+      ? "сегодня ✅"
+      : streakDisplay > 0
+        ? "сохранить сегодня"
+        : "начни серию";
 
-  const titleSavingNow =
-    customUpdateDialog.open && customUpdateDialog.scope === "title" && customUpdateDialog.mode === "loading";
+  const titleSavingNow = customUpdateDialog.open && customUpdateDialog.scope === "title" && customUpdateDialog.mode === "loading";
 
   return (
     <div id="profileBody" style={{ ["--profile-overlay" as any]: overlayCss }}>
@@ -1609,24 +1787,15 @@ export default function ProfileClient({
               onChange={(e) => setEditFullName(e.target.value)}
             />
           </div>
+
           <div className="form-group">
             <label htmlFor="editPhone">Контактный телефон:</label>
-            <input
-              id="editPhone"
-              type="tel"
-              required
-              value={editPhone}
-              onChange={(e) => setEditPhone(e.target.value)}
-            />
+            <input id="editPhone" type="tel" required value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
           </div>
+
           <div className="form-group">
             <label htmlFor="editRegion">Область проживания:</label>
-            <select
-              id="editRegion"
-              required
-              value={editRegion}
-              onChange={(e) => setEditRegion(e.target.value)}
-            >
+            <select id="editRegion" required value={editRegion} onChange={(e) => setEditRegion(e.target.value)}>
               <option value="">-- Выберите область --</option>
               <option value="Белгородская">Белгородская область</option>
               <option value="Курская">Курская область</option>
@@ -1636,6 +1805,7 @@ export default function ProfileClient({
               <option value="Другое">Другая область</option>
             </select>
           </div>
+
           <div className="form-group">
             <label>Email:</label>
             <input type="email" value={userEmail} disabled style={{ backgroundColor: "#f5f5f5", color: "#666" }} />
@@ -1643,10 +1813,12 @@ export default function ProfileClient({
               Email нельзя изменить
             </div>
           </div>
+
           <div className="modal-actions">
             <button type="button" className="btn secondary" onClick={closeEdit}>
               ❌ Отмена
             </button>
+
             <button type="submit" className="btn" disabled={saving}>
               {saving ? "Сохранение..." : "💾 Сохранить изменения"}
             </button>
@@ -1720,6 +1892,7 @@ export default function ProfileClient({
                 <span className="spinner" />
                 <span>{customUpdateDialog.message || "Обновляем..."}</span>
               </div>
+
               <div
                 style={{
                   fontSize: 14,
@@ -1730,9 +1903,9 @@ export default function ProfileClient({
                   padding: "10px 12px",
                 }}
               >
-                Пожалуйста, дождитесь завершения. Пока окно открыто, выбор новой
-                иконки/титула временно заблокирован.
+                Пожалуйста, дождитесь завершения. Пока окно открыто, выбор новой иконки/титула временно заблокирован.
               </div>
+
               <div className="modal-actions" style={{ justifyContent: "flex-end" }}>
                 <button type="button" className="btn secondary" disabled>
                   ⏳ Обновление...
@@ -1753,19 +1926,20 @@ export default function ProfileClient({
                 }}
               >
                 <span style={{ fontSize: 20, lineHeight: 1 }}>❌</span>
+
                 <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ fontWeight: 900, color: "#b71c1c" }}>
-                    Не удалось обновить
-                  </div>
+                  <div style={{ fontWeight: 900, color: "#b71c1c" }}>Не удалось обновить</div>
                   <div style={{ color: "#7f1d1d", fontWeight: 700, lineHeight: 1.35 }}>
                     {customUpdateDialog.message || "Ошибка соединения с сервером"}
                   </div>
                 </div>
               </div>
+
               <div className="modal-actions">
                 <button type="button" className="btn secondary" onClick={closeCustomUpdateDialog}>
                   ✖ Закрыть
                 </button>
+
                 <button type="button" className="btn" onClick={() => void retryCustomUpdateDialogAction()}>
                   🔄 Повторить
                 </button>
@@ -1808,10 +1982,12 @@ export default function ProfileClient({
                   emojiClassName="streak-visual__emoji--chip"
                 />
               </span>
+
               <span className="streak-chip-main">
                 <span className="streak-chip-value">{streakLoading ? "…" : streakDisplay}</span>
                 <span className="streak-chip-unit">дн.</span>
               </span>
+
               <span className="streak-chip-sub">{streakChipSub}</span>
             </button>
 
@@ -1828,9 +2004,11 @@ export default function ProfileClient({
             <Link className="nav-pill nav-pill--info" href="/info">
               <span>📄</span>Информация
             </Link>
+
             <Link className="nav-pill nav-pill--materials" href="/materials">
               <span>📚</span>Материалы
             </Link>
+
             <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}>
               <span>⏻</span>Выйти
             </button>
@@ -1844,6 +2022,7 @@ export default function ProfileClient({
                 className={(() => {
                   const allowed = new Set(["none", "bronze", "silver", "gold", "platinum", "diamond", "legendary"]);
                   const t = allowed.has(String(uiTierCodeForColors)) ? String(uiTierCodeForColors) : "none";
+
                   return `avatar-circle avatar-circle--${t}`;
                 })()}
                 role="img"
@@ -1852,6 +2031,7 @@ export default function ProfileClient({
                 <div className="avatar-inner">
                   <div className="avatar-icon" aria-hidden="true">
                     <span className="avatar-icon-bg" />
+
                     <StreakIconVisual
                       iconCode={effectiveSelectedStreakIconCode ?? null}
                       cacheTag={cacheTagForCurrentIcon}
@@ -1920,6 +2100,7 @@ export default function ProfileClient({
                   >
                     🏷️
                   </span>
+
                   <span
                     className="profile-title-slot-text"
                     style={{
@@ -1932,6 +2113,7 @@ export default function ProfileClient({
                   >
                     {titleText}
                   </span>
+
                   <span
                     aria-hidden="true"
                     style={{
@@ -1956,10 +2138,9 @@ export default function ProfileClient({
                   title="Открыть подробности серии"
                 >
                   <span className="streak-summary-key">🔥 Текущая серия</span>
-                  <span className="streak-summary-value">
-                    {streakLoading ? "…" : `${streakDisplay} дн.`}
-                  </span>
+                  <span className="streak-summary-value">{streakLoading ? "…" : `${streakDisplay} дн.`}</span>
                 </button>
+
                 <button
                   type="button"
                   className="streak-summary-row streak-summary-row--button"
@@ -1967,9 +2148,7 @@ export default function ProfileClient({
                   title="Открыть подробности серии"
                 >
                   <span className="streak-summary-key">🏆 Рекорд</span>
-                  <span className="streak-summary-value">
-                    {streakLoading ? "…" : `${longestStreakDisplay} дн.`}
-                  </span>
+                  <span className="streak-summary-value">{streakLoading ? "…" : `${longestStreakDisplay} дн.`}</span>
                 </button>
               </div>
 
@@ -1982,7 +2161,9 @@ export default function ProfileClient({
                   </div>
                   <div className="mini-val">{phoneLabel(profile.contact_phone)}</div>
                 </div>
+
                 <div className="profile-mini-divider" />
+
                 <div className="mini-col">
                   <div className="mini-cap">
                     <span className="mini-ico">📍</span> РЕГИОН
@@ -1992,12 +2173,11 @@ export default function ProfileClient({
               </div>
 
               <div className="pill pill--teal">
-                <span className="pill-icon">📘</span>Доступно заданий:{" "}
-                {stats?.totalAvailableAssignments ?? "—"}
+                <span className="pill-icon">📘</span>Доступно заданий: {stats?.totalAvailableAssignments ?? "—"}
               </div>
+
               <div className="pill pill--red">
-                <span className="pill-icon">✅</span>Выполнено:{" "}
-                {stats?.completedAvailableAssignments ?? "—"}
+                <span className="pill-icon">✅</span>Выполнено: {stats?.completedAvailableAssignments ?? "—"}
               </div>
 
               <button className="action-btn action-btn--primary" onClick={openEdit} type="button">
@@ -2016,11 +2196,14 @@ export default function ProfileClient({
 
               <button
                 className="action-btn action-btn--dangerSoft"
-                onClick={() => (window.location.href = "/requests")}
+                onClick={() => {
+                  window.location.href = "/requests";
+                }}
                 type="button"
               >
                 <span>📝</span> Заявки на покупку
               </button>
+
               {profile.is_admin ? (
                 <Link className="action-btn action-btn--soft" href="/admin">
                   <span>⚙️</span> Админка
@@ -2034,25 +2217,30 @@ export default function ProfileClient({
               <div className="section-title">
                 <span className="section-ico">📊</span>Статистика по доступным <b>материалам</b>
               </div>
+
               <div className="mini-stats">
                 <div className="mini-stat">
                   <div className="mini-stat-number">{stats?.totalMaterials ?? "—"}</div>
                   <div className="mini-stat-label">Доступных материала</div>
                 </div>
+
                 <div className="mini-stat">
                   <div className="mini-stat-number">{stats?.completedMaterials ?? "—"}</div>
                   <div className="mini-stat-label">Пройдено материалов</div>
                 </div>
+
                 <div className="mini-stat">
                   <div className="mini-stat-number">{stats ? `${stats.successRate}%` : "—"}</div>
                   <div className="mini-stat-label">Общий прогресс</div>
                 </div>
               </div>
+
               {progressLoading ? (
                 <div style={{ marginTop: 12, fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>
                   🔄 Подгружаем прогресс...
                 </div>
               ) : null}
+
               {progressError ? (
                 <div style={{ marginTop: 12, fontWeight: 900, color: "#c62828" }}>
                   ❌ Прогресс не загрузился: {progressError}
@@ -2064,14 +2252,13 @@ export default function ProfileClient({
               <div className="section-title">
                 <span className="section-ico">📁</span>Прогресс по доступным <b>материалам</b>
               </div>
+
               {!materialsProgress ? (
                 <div style={{ fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>📚 Загрузка материалов...</div>
               ) : materialsProgress.length === 0 ? (
                 <div style={{ fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>
                   📚 Материалы пока не доступны
-                  <div style={{ marginTop: 6, fontWeight: 700 }}>
-                    Обратитесь к администратору для получения доступа
-                  </div>
+                  <div style={{ marginTop: 6, fontWeight: 700 }}>Обратитесь к администратору для получения доступа</div>
                 </div>
               ) : (
                 <div className="progress-list">
@@ -2079,13 +2266,22 @@ export default function ProfileClient({
                     <div
                       key={`${m.kind}-${m.id}`}
                       className="progress-row"
-                      onClick={() => (window.location.href = m.href)}
+                      onClick={() => {
+                        window.location.href = m.href;
+                      }}
                     >
                       <div className="progress-left">
-                        <div className={"progress-type " + (m.kind === "textbook" ? "progress-type--textbook" : "progress-type--crossword")}>
+                        <div
+                          className={
+                            "progress-type " +
+                            (m.kind === "textbook" ? "progress-type--textbook" : "progress-type--crossword")
+                          }
+                        >
                           {m.kind === "textbook" ? "📗 УЧЕБНИК" : "🧩 КРОССВОРД"}
                         </div>
+
                         <div className="progress-title">{m.title}</div>
+
                         <div className="progress-sub">
                           {m.kind === "textbook"
                             ? `${m.completed} из ${m.total} заданий выполнено`
@@ -2093,10 +2289,12 @@ export default function ProfileClient({
                           {m.total === 0 ? " (нет заданий)" : ""}
                         </div>
                       </div>
+
                       <div className="progress-right">
                         <div className="progress-bar">
                           <div className="progress-fill" style={{ width: `${m.progressPercent}%` }} />
                         </div>
+
                         <div className="progress-percent">{m.progressPercent}%</div>
                       </div>
                     </div>
@@ -2110,13 +2308,18 @@ export default function ProfileClient({
                 <span className="section-ico">💡</span>
                 <b>Информация</b>
               </div>
+
               <ul className="info-list">
                 <li className="info-li">
-                  <span className="info-bullet">▢</span>На этой странице отображается ваш прогресс по доступным учебникам и кроссвордам.
+                  <span className="info-bullet">▢</span>
+                  На этой странице отображается ваш прогресс по доступным учебникам и кроссвордам.
                 </li>
+
                 <li className="info-li">
-                  <span className="info-bullet">▢</span>В разделе "Прогресс по материалам" показаны все учебники и кроссворды, к которым у вас есть доступ.
+                  <span className="info-bullet">▢</span>В разделе "Прогресс по материалам" показаны все учебники и кроссворды,
+                  к которым у вас есть доступ.
                 </li>
+
                 <li className="info-li">
                   <span className="info-bullet">▢</span>
                   <span>

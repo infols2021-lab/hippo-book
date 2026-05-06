@@ -1,22 +1,47 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+/* lib/supabase/admin.ts */
+import "server-only";
 
-let _adminClient: SupabaseClient<any> | null = null;
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { directFetch } from "@/lib/net/directFetch";
+
+let adminClient: SupabaseClient<any> | null = null;
+let adminClientKey = "";
+
+function mustEnv(name: string) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`${name} is missing`);
+  }
+
+  return value;
+}
+
+function getClientKey(url: string, serviceRole: string) {
+  return `${url}:${serviceRole.slice(0, 12)}`;
+}
 
 /**
- * Supabase Admin client (service_role).
- * ВАЖНО: здесь intentionally any, чтобы TS не превращал таблицы в never
- * (пока ты не подключил сгенерированные Database types).
+ * Supabase Admin client через service_role.
+ *
+ * ВАЖНО:
+ * - Только server-side.
+ * - Никогда не импортировать в client components.
+ * - intentionally any, пока нет сгенерированных Database types.
  */
 export function getSupabaseAdminClient(): SupabaseClient<any> {
-  if (_adminClient) return _adminClient;
+  const url = mustEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const serviceRole = mustEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const nextKey = getClientKey(url, serviceRole);
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (adminClient && adminClientKey === nextKey) {
+    return adminClient;
+  }
 
-  if (!url) throw new Error("NEXT_PUBLIC_SUPABASE_URL is missing");
-  if (!serviceRole) throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing");
-
-  _adminClient = createClient<any>(url, serviceRole, {
+  adminClient = createClient<any>(url, serviceRole, {
+    global: {
+      fetch: directFetch,
+    },
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -24,5 +49,7 @@ export function getSupabaseAdminClient(): SupabaseClient<any> {
     },
   });
 
-  return _adminClient;
+  adminClientKey = nextKey;
+
+  return adminClient;
 }

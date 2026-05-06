@@ -21,6 +21,10 @@ function sortMaterials(materials: MaterialWithProgress[]): MaterialWithProgress[
   });
 }
 
+function isGatehouseMaterialsTab(value: unknown): value is GatehouseMaterialsTab {
+  return value === "mock_tests" || value === "coming_soon";
+}
+
 export default function GatehouseMaterialsClient({
   initialMaterials,
   initialError,
@@ -28,8 +32,13 @@ export default function GatehouseMaterialsClient({
   const [tab, setTab] = useState<GatehouseMaterialsTab>("mock_tests");
 
   const materials = useMemo(() => sortMaterials(initialMaterials), [initialMaterials]);
+
   const availableCount = materials.filter((material) => material.hasAccess).length;
   const lockedCount = materials.length - availableCount;
+
+  const materialTabs = BRANCH_CONFIGS.gatehouse.materialTabs.filter((item) =>
+    isGatehouseMaterialsTab(item.key),
+  );
 
   return (
     <main className="gatehouse-page">
@@ -83,7 +92,7 @@ export default function GatehouseMaterialsClient({
           <div className="gatehouse-card">
             <div className="gatehouse-card__inner">
               <div className="gatehouse-materials-tabs" role="tablist" aria-label="Разделы материалов">
-                {BRANCH_CONFIGS.gatehouse.materialTabs.map((item) => (
+                {materialTabs.map((item) => (
                   <button
                     key={item.key}
                     className={[

@@ -1,32 +1,43 @@
+/* lib/supabase/client.ts */
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-let _client: SupabaseClient | null = null;
+let browserClient: SupabaseClient<any> | null = null;
+
+function mustPublicEnv(name: string) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`${name} is missing`);
+  }
+
+  return value;
+}
 
 /**
- * Browser (client-side) Supabase client singleton.
- * Надёжно: один клиент на вкладку, не пересоздаётся на каждый рендер.
+ * Browser Supabase client singleton.
  *
- * ⚠️ ВАЖНО:
- * Эти auth-настройки КРИТИЧНЫ для:
- * - recovery (reset password)
- * - magic link
- * - exchangeCodeForSession(code)
+ * Используется только в client components.
+ * Сейчас нужен для оставшихся client-side мест:
+ * - recovery / reset password
+ * - magic link / OAuth callback handling
+ * - временные старые клиентские операции, которые ещё переносим на API routes
  */
-export function getSupabaseBrowserClient() {
-  if (_client) return _client;
+export function getSupabaseBrowserClient(): SupabaseClient<any> {
+  if (browserClient) {
+    return browserClient;
+  }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const url = mustPublicEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const anon = mustPublicEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
-  _client = createBrowserClient(url, anon, {
+  browserClient = createBrowserClient<any>(url, anon, {
     auth: {
-      // ✅ ОБЯЗАТЕЛЬНО для восстановления пароля
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
   });
 
-  return _client;
+  return browserClient;
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { FormEvent, useRef, useState } from "react";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import {
   GATEHOUSE_LEVELS,
   formatGatehouseLevels,
@@ -21,17 +21,117 @@ type Notice = {
   text: string;
 };
 
-function safeArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item ?? "").trim()).filter(Boolean);
-}
+type UploadApiResponse = {
+  ok?: boolean;
+  error?: string;
+  url?: string | null;
+  publicUrl?: string | null;
+  imageUrl?: string | null;
+  path?: string | null;
+  bucket?: string | null;
+  data?: {
+    url?: string | null;
+    publicUrl?: string | null;
+    imageUrl?: string | null;
+    path?: string | null;
+    bucket?: string | null;
+  } | null;
+};
 
 function getInitialLevels(material: GatehouseMaterialRow | null): GatehouseLevelCode[] {
   return normalizeGatehouseLevels(material?.target_levels ?? []);
 }
 
+async function readJsonSafe<T = any>(res: Response): Promise<T | null> {
+  const text = await res.text();
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeUiErrorMessage(error: unknown, fallback = "Ошибка") {
+  const raw =
+    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
+
+  const msg = raw.trim();
+
+  if (!msg) return fallback;
+
+  const lower = msg.toLowerCase();
+
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network request failed") ||
+    lower.includes("load failed")
+  ) {
+    return "Ошибка соединения с сервером";
+  }
+
+  return msg;
+}
+
+function cacheBustUrl(url: string) {
+  if (!url) return "";
+  return `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+}
+
+function extractUploadUrl(json: UploadApiResponse | null, fallbackBucket: string): string {
+  if (!json) return "";
+
+  const directUrl = json.publicUrl || json.url || json.imageUrl || json.data?.publicUrl || json.data?.url || json.data?.imageUrl;
+
+  if (directUrl) return String(directUrl);
+
+  const bucket = json.bucket || json.data?.bucket || fallbackBucket;
+  const path = json.path || json.data?.path;
+
+  if (bucket && path) {
+    return getStoragePublicUrl(String(bucket), String(path));
+  }
+
+  return "";
+}
+
+async function uploadImageThroughApi(params: {
+  file: File;
+  bucket: string;
+  folder: string;
+}) {
+  const formData = new FormData();
+
+  formData.append("file", params.file);
+  formData.append("bucket", params.bucket);
+  formData.append("folder", params.folder);
+  formData.append("pathPrefix", params.folder);
+
+  const res = await fetch("/api/admin/upload", {
+    method: "POST",
+    body: formData,
+    cache: "no-store",
+  });
+
+  const json = await readJsonSafe<UploadApiResponse>(res);
+
+  if (!res.ok || !json?.ok) {
+    throw new Error(json?.error || `HTTP ${res.status}`);
+  }
+
+  const uploadedUrl = extractUploadUrl(json, params.bucket);
+
+  if (!uploadedUrl) {
+    throw new Error("Сервер загрузил файл, но не вернул publicUrl");
+  }
+
+  return cacheBustUrl(uploadedUrl);
+}
+
 export default function GatehouseMaterialEditor({ material, onCancel, onSaved }: Props) {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [title, setTitle] = useState(material?.title ?? "");
@@ -41,6 +141,7 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
   const [isAvailable, setIsAvailable] = useState(Boolean(material?.is_available));
   const [coverUrl, setCoverUrl] = useState(material?.cover_image_url ?? "");
   const [coverPreview, setCoverPreview] = useState(material?.cover_image_url ?? "");
+
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -62,7 +163,6 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
   }
 
   async function uploadCover(file: File) {
-    const bucket = "covers";
     const ext = (file.name.split(".").pop() || "bin").toLowerCase();
     const allowed = ["jpg", "jpeg", "png", "gif", "webp", "avif"];
 
@@ -74,22 +174,16 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
       throw new Error("Файл больше 5MB");
     }
 
-    const path = `gatehouse/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-
-    const { error } = await supabase.storage.from(bucket).upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type || "application/octet-stream",
+    return uploadImageThroughApi({
+      file,
+      bucket: "covers",
+      folder: "gatehouse",
     });
-
-    if (error) throw new Error(error.message);
-
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    return data.publicUrl;
   }
 
   async function onPickCover(file: File) {
     const local = URL.createObjectURL(file);
+
     setCoverPreview(local);
     setUploadingCover(true);
     setNotice(null);
@@ -101,16 +195,23 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
     } catch (error: any) {
       setCoverUrl("");
       setCoverPreview("");
-      showError("Ошибка загрузки обложки: " + (error?.message || String(error)));
+      showError("Ошибка загрузки обложки: " + normalizeUiErrorMessage(error));
     } finally {
       setUploadingCover(false);
+
+      if (fileRef.current) {
+        fileRef.current.value = "";
+      }
     }
   }
 
   function clearCover() {
     setCoverUrl("");
     setCoverPreview("");
-    if (fileRef.current) fileRef.current.value = "";
+
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -149,7 +250,7 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
     };
 
     try {
-      const url = isEdit ? `/api/admin/materials/${material?.id}` : "/api/admin/materials";
+      const url = isEdit ? `/api/admin/materials/${encodeURIComponent(String(material?.id))}` : "/api/admin/materials";
       const method = isEdit ? "PATCH" : "POST";
 
       const res = await fetch(url, {
@@ -157,11 +258,11 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
         headers: {
           "Content-Type": "application/json",
         },
+        cache: "no-store",
         body: JSON.stringify(payload),
       });
 
-      const text = await res.text();
-      const json = text ? JSON.parse(text) : null;
+      const json = await readJsonSafe<any>(res);
 
       if (!res.ok || json?.ok === false) {
         throw new Error(json?.error || "Не удалось сохранить материал");
@@ -174,7 +275,7 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
 
       await onSaved();
     } catch (error: any) {
-      showError(error?.message || "Не удалось сохранить материал.");
+      showError(normalizeUiErrorMessage(error, "Не удалось сохранить материал."));
     } finally {
       setSaving(false);
     }
@@ -185,13 +286,11 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
       <div className="admin-section-head">
         <div>
           <h3>{isEdit ? "✏️ Изменить пробный тест" : "➕ Новый пробный тест"}</h3>
-          <p>
-            Материал относится только к Gatehouse Awards. Олимпиадные учебники и кроссворды не
-            меняются.
-          </p>
+
+          <p>Материал относится только к Gatehouse Awards. Олимпиадные учебники и кроссворды не меняются.</p>
         </div>
 
-        <button type="button" className="btn" onClick={onCancel} disabled={saving}>
+        <button type="button" className="btn" onClick={onCancel} disabled={saving || uploadingCover}>
           ✕ Закрыть
         </button>
       </div>
@@ -207,6 +306,7 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
         <div className="form-grid">
           <label className="form-field">
             <span>Название</span>
+
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
@@ -217,6 +317,7 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
 
           <label className="form-field">
             <span>Порядок</span>
+
             <input
               type="number"
               value={orderIndex}
@@ -228,6 +329,7 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
 
         <label className="form-field">
           <span>Описание</span>
+
           <textarea
             value={description}
             onChange={(event) => setDescription(event.target.value)}
@@ -269,6 +371,7 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
             onChange={(event) => setIsAvailable(event.target.checked)}
             disabled={saving}
           />
+
           <span>Доступен всем без заявки</span>
         </label>
 
@@ -292,6 +395,7 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
                 ref={fileRef}
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+                style={{ display: "none" }}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) void onPickCover(file);
@@ -302,6 +406,7 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
               <div className="form-grid">
                 <label className="form-field">
                   <span>URL обложки</span>
+
                   <input
                     value={coverUrl}
                     onChange={(event) => {
@@ -324,12 +429,7 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
                   {uploadingCover ? "Загружаем..." : "📷 Загрузить"}
                 </button>
 
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={clearCover}
-                  disabled={saving || uploadingCover}
-                >
+                <button type="button" className="btn" onClick={clearCover} disabled={saving || uploadingCover}>
                   🧹 Очистить
                 </button>
               </div>
@@ -342,7 +442,7 @@ export default function GatehouseMaterialEditor({ material, onCancel, onSaved }:
             {saving ? "Сохраняем..." : isEdit ? "💾 Сохранить" : "➕ Создать"}
           </button>
 
-          <button type="button" className="btn" onClick={onCancel} disabled={saving}>
+          <button type="button" className="btn" onClick={onCancel} disabled={saving || uploadingCover}>
             Отмена
           </button>
         </div>

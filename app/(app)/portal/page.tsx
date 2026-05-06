@@ -1,25 +1,24 @@
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDataAuthContext } from "@/lib/data/auth";
 import PortalClient from "./PortalClient";
 
 export default async function PortalPage() {
-  const supabase = await createSupabaseServerClient();
+  const auth = await getDataAuthContext();
 
-  const { data: auth } = await supabase.auth.getUser();
-  const user = auth.user;
+  if (!auth.ok) {
+    if (auth.error.status === 401) {
+      redirect("/login");
+    }
 
-  if (!user) redirect("/login");
+    throw new Error(auth.error.message);
+  }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, is_admin")
-    .eq("id", user.id)
-    .single();
+  const { user, profile } = auth.ctx;
 
   return (
     <PortalClient
       userName={profile?.full_name ?? ""}
-      userEmail={user.email ?? ""}
+      userEmail={user.email ?? profile?.email ?? ""}
       isAdmin={Boolean(profile?.is_admin)}
     />
   );

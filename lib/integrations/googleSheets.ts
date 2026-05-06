@@ -1,18 +1,47 @@
 /* lib/integrations/googleSheets.ts */
+import "server-only";
+
 import { google } from "googleapis";
 
-const ACCOUNTING_COLUMNS = "A:J";
-const ACCOUNTING_COLUMNS_COUNT = 10;
+const ACCOUNTING_COLUMNS = "A:G";
+const ACCOUNTING_LAST_COLUMN = "G";
+const ACCOUNTING_COLUMNS_COUNT = 7;
 const GOOGLE_API_TIMEOUT_MS = 15_000;
 
+export type AccountingRowValue = string | number | null | undefined;
+
+export type SheetRowInfo = {
+  rowNumber: number;
+  values: string[];
+};
+
 function mustEnv(name: string) {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env: ${name}`);
-  return v;
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing env: ${name}`);
+  }
+
+  return value;
+}
+
+function norm(value: unknown) {
+  return String(value ?? "").trim();
 }
 
 function getPrivateKey() {
-  return mustEnv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(/\\n/g, "\n");
+  return mustEnv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY")
+    .replace(/^"|"$/g, "")
+    .replace(/\\n/g, "\n");
+}
+
+function quoteSheetName(tab: string) {
+  const safe = String(tab || "Учёт").replace(/'/g, "''");
+  return `'${safe}'`;
+}
+
+function range(tab: string, address: string) {
+  return `${quoteSheetName(tab)}!${address}`;
 }
 
 export function getSpreadsheetConfig() {
@@ -20,16 +49,6 @@ export function getSpreadsheetConfig() {
     spreadsheetId: mustEnv("GOOGLE_SHEETS_SPREADSHEET_ID"),
     tab: process.env.GOOGLE_SHEETS_TAB || "Учёт",
   };
-}
-
-function parseRowNumber(updatedRange?: string | null): number | null {
-  if (!updatedRange) return null;
-
-  const m = updatedRange.match(/![A-Z]+(\d+):/);
-  if (!m) return null;
-
-  const n = Number(m[1]);
-  return Number.isFinite(n) ? n : null;
 }
 
 function getSheetsClient() {
@@ -42,17 +61,30 @@ function getSheetsClient() {
   return google.sheets({ version: "v4", auth });
 }
 
-function norm(v: any) {
-  return String(v ?? "").trim();
+function parseRowNumber(updatedRange?: string | null): number | null {
+  if (!updatedRange) return null;
+
+  const match = updatedRange.match(/![A-Z]+(\d+):/);
+  if (!match) return null;
+
+  const rowNumber = Number(match[1]);
+  return Number.isFinite(rowNumber) && rowNumber > 0 ? rowNumber : null;
 }
 
-function normalizeAccountingValues(values: (string | number)[]) {
-  const normalized = Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, index) => values[index] ?? "");
-  return normalized.map((value) => (typeof value === "number" ? value : norm(value)));
+function normalizeAccountingValues(values: AccountingRowValue[]) {
+  return Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, index) => {
+    const value = values[index];
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    return norm(value);
+  });
 }
 
-function isLikelyRequestNumber(v: string) {
-  return /^(PR|GA)-/i.test(v);
+function isLikelyRequestNumber(value: string) {
+  return /^(PR|GA)-/i.test(norm(value));
 }
 
 async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
@@ -67,7 +99,7 @@ async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
     },
   );
 
-  const found = meta.data.sheets?.find((s: any) => s.properties?.title === tab);
+  const found = meta.data.sheets?.find((sheet) => sheet.properties?.title === tab);
   const sheetId = found?.properties?.sheetId;
 
   if (sheetId === undefined || sheetId === null) {
@@ -77,18 +109,22 @@ async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
   return sheetId;
 }
 
-/** append в самый низ A:J */
-export async function appendAccountingRow(values: (string | number)[]) {
+/**
+ * Append строки заявки в конец A:G.
+ */
+export async function appendAccountingRow(values: AccountingRowValue[]) {
   const sheets = getSheetsClient();
   const { spreadsheetId, tab } = getSpreadsheetConfig();
 
   const res = await sheets.spreadsheets.values.append(
     {
       spreadsheetId,
-      range: `${tab}!${ACCOUNTING_COLUMNS}`,
+      range: range(tab, ACCOUNTING_COLUMNS),
       valueInputOption: "USER_ENTERED",
       insertDataOption: "INSERT_ROWS",
-      requestBody: { values: [normalizeAccountingValues(values)] },
+      requestBody: {
+        values: [normalizeAccountingValues(values)],
+      },
     },
     {
       timeout: GOOGLE_API_TIMEOUT_MS,
@@ -98,10 +134,15 @@ export async function appendAccountingRow(values: (string | number)[]) {
   const updatedRange = res.data.updates?.updatedRange ?? null;
   const rowNumber = parseRowNumber(updatedRange);
 
-  return { updatedRange, rowNumber };
+  return {
+    updatedRange,
+    rowNumber,
+  };
 }
 
-/** читает колонку A */
+/**
+ * Читает колонку A и возвращает Set request_number.
+ */
 export async function getExistingRequestNumbersSet() {
   const sheets = getSheetsClient();
   const { spreadsheetId, tab } = getSpreadsheetConfig();
@@ -109,7 +150,7 @@ export async function getExistingRequestNumbersSet() {
   const res = await sheets.spreadsheets.values.get(
     {
       spreadsheetId,
-      range: `${tab}!A:A`,
+      range: range(tab, "A:A"),
     },
     {
       timeout: GOOGLE_API_TIMEOUT_MS,
@@ -119,17 +160,21 @@ export async function getExistingRequestNumbersSet() {
   const rows = res.data.values ?? [];
   const set = new Set<string>();
 
-  for (const r of rows) {
-    const v = norm(r?.[0]);
-    if (v) set.add(v);
+  for (const row of rows) {
+    const requestNumber = norm(row?.[0]);
+
+    if (!requestNumber) continue;
+    if (!isLikelyRequestNumber(requestNumber)) continue;
+
+    set.add(requestNumber);
   }
 
   return set;
 }
 
 /**
- * Мапа request_number -> { rowNumber, values[0..9] }
- * Читает A:J и находит строки по колонке A.
+ * Мапа request_number -> { rowNumber, values[0..6] }.
+ * Читает A:G и учитывает только строки, где колонка A похожа на номер заявки.
  */
 export async function getSheetRequestRowMap() {
   const sheets = getSheetsClient();
@@ -138,7 +183,7 @@ export async function getSheetRequestRowMap() {
   const res = await sheets.spreadsheets.values.get(
     {
       spreadsheetId,
-      range: `${tab}!${ACCOUNTING_COLUMNS}`,
+      range: range(tab, ACCOUNTING_COLUMNS),
     },
     {
       timeout: GOOGLE_API_TIMEOUT_MS,
@@ -146,33 +191,45 @@ export async function getSheetRequestRowMap() {
   );
 
   const rows = res.data.values ?? [];
-  const map = new Map<string, { rowNumber: number; values: string[] }>();
+  const map = new Map<string, SheetRowInfo>();
 
-  for (let i = 0; i < rows.length; i += 1) {
-    const row = rows[i] ?? [];
-    const rn = norm(row[0]);
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index] ?? [];
+    const requestNumber = norm(row[0]);
 
-    if (!rn) continue;
-    if (!isLikelyRequestNumber(rn)) continue;
+    if (!requestNumber) continue;
+    if (!isLikelyRequestNumber(requestNumber)) continue;
 
-    const values = Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, index) => norm(row[index]));
-    map.set(rn, { rowNumber: i + 1, values });
+    const values = Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, valueIndex) => norm(row[valueIndex]));
+
+    map.set(requestNumber, {
+      rowNumber: index + 1,
+      values,
+    });
   }
 
   return map;
 }
 
-/** Обновить конкретную строку A:J по номеру строки */
-export async function updateAccountingRow(rowNumber: number, values: (string | number)[]) {
+/**
+ * Обновить конкретную строку A:G по номеру строки.
+ */
+export async function updateAccountingRow(rowNumber: number, values: AccountingRowValue[]) {
+  if (!Number.isFinite(rowNumber) || rowNumber <= 0) {
+    throw new Error(`Invalid row number: ${rowNumber}`);
+  }
+
   const sheets = getSheetsClient();
   const { spreadsheetId, tab } = getSpreadsheetConfig();
 
   await sheets.spreadsheets.values.update(
     {
       spreadsheetId,
-      range: `${tab}!A${rowNumber}:J${rowNumber}`,
+      range: range(tab, `A${rowNumber}:${ACCOUNTING_LAST_COLUMN}${rowNumber}`),
       valueInputOption: "USER_ENTERED",
-      requestBody: { values: [normalizeAccountingValues(values)] },
+      requestBody: {
+        values: [normalizeAccountingValues(values)],
+      },
     },
     {
       timeout: GOOGLE_API_TIMEOUT_MS,
@@ -184,26 +241,28 @@ export async function updateAccountingRow(rowNumber: number, values: (string | n
 
 /**
  * Удалить строки по номерам 1-based.
- * Важно: удаляем снизу вверх.
+ * Важно: удаляем снизу вверх, иначе номера строк съедут.
  */
 export async function deleteAccountingRows(rowNumbers: number[]) {
   const nums = Array.from(new Set(rowNumbers))
-    .filter((n) => Number.isFinite(n) && n > 0)
+    .filter((rowNumber) => Number.isFinite(rowNumber) && rowNumber > 0)
     .sort((a, b) => b - a);
 
-  if (nums.length === 0) return { deleted: 0 };
+  if (!nums.length) {
+    return { deleted: 0 };
+  }
 
   const sheets = getSheetsClient();
   const { spreadsheetId, tab } = getSpreadsheetConfig();
   const sheetId = await getSheetIdByTitle(spreadsheetId, tab);
 
-  const requests = nums.map((n) => ({
+  const requests = nums.map((rowNumber) => ({
     deleteDimension: {
       range: {
         sheetId,
         dimension: "ROWS",
-        startIndex: n - 1,
-        endIndex: n,
+        startIndex: rowNumber - 1,
+        endIndex: rowNumber,
       },
     },
   }));
@@ -218,46 +277,73 @@ export async function deleteAccountingRows(rowNumbers: number[]) {
     },
   );
 
-  return { deleted: nums.length };
+  return {
+    deleted: nums.length,
+  };
 }
 
-/** Найти строку по request_number */
+/**
+ * Найти строку в Google Sheets по request_number.
+ */
 export async function findRowNumberByRequestNumber(requestNumber: string) {
-  const rn = norm(requestNumber);
-  if (!rn) return null;
+  const normalized = norm(requestNumber);
+  if (!normalized) return null;
 
   const map = await getSheetRequestRowMap();
-  const found = map.get(rn);
+  const found = map.get(normalized);
 
   return found?.rowNumber ?? null;
 }
 
-/** UPSERT по request_number A:J */
-export async function upsertRequestRowByNumber(valuesAtoJ: (string | number)[]) {
-  const rn = norm(valuesAtoJ?.[0]);
-  if (!rn) throw new Error("Missing request_number in values[0]");
+/**
+ * UPSERT строки A:G по request_number из колонки A.
+ */
+export async function upsertRequestRowByNumber(valuesAtoG: AccountingRowValue[]) {
+  const requestNumber = norm(valuesAtoG?.[0]);
 
-  const map = await getSheetRequestRowMap();
-  const found = map.get(rn);
-
-  if (found) {
-    await updateAccountingRow(found.rowNumber, valuesAtoJ);
-    return { action: "updated" as const, rowNumber: found.rowNumber };
+  if (!requestNumber) {
+    throw new Error("Missing request_number in values[0]");
   }
 
-  const res = await appendAccountingRow(valuesAtoJ);
-  return { action: "inserted" as const, rowNumber: res.rowNumber ?? null };
+  const map = await getSheetRequestRowMap();
+  const found = map.get(requestNumber);
+
+  if (found) {
+    await updateAccountingRow(found.rowNumber, valuesAtoG);
+
+    return {
+      action: "updated" as const,
+      rowNumber: found.rowNumber,
+    };
+  }
+
+  const appended = await appendAccountingRow(valuesAtoG);
+
+  return {
+    action: "inserted" as const,
+    rowNumber: appended.rowNumber ?? null,
+  };
 }
 
-/** DELETE по request_number */
+/**
+ * DELETE строки из Google Sheets по request_number.
+ */
 export async function deleteRequestRowByNumber(requestNumber: string) {
   const rowNumber = await findRowNumberByRequestNumber(requestNumber);
 
   if (!rowNumber) {
-    return { ok: true, deleted: 0, rowNumber: null as number | null };
+    return {
+      ok: true,
+      deleted: 0,
+      rowNumber: null as number | null,
+    };
   }
 
-  const res = await deleteAccountingRows([rowNumber]);
+  const deleted = await deleteAccountingRows([rowNumber]);
 
-  return { ok: true, deleted: res.deleted, rowNumber };
+  return {
+    ok: true,
+    deleted: deleted.deleted,
+    rowNumber,
+  };
 }

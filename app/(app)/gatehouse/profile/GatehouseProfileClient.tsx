@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import GatehouseHeader from "@/components/gatehouse/GatehouseHeader";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export type GatehouseProfileData = {
   id: string;
@@ -35,6 +34,18 @@ type GatehouseProfileClientProps = {
   initialRecentProgress: GatehouseProfileRecentProgress[];
 };
 
+type ProfileUpdateApiResponse = {
+  ok?: boolean;
+  error?: string;
+  profile?: {
+    id?: string;
+    email?: string | null;
+    full_name?: string | null;
+    contact_phone?: string | null;
+    region?: string | null;
+  } | null;
+};
+
 const REGION_OPTIONS = [
   { value: "Белгородская", label: "Белгородская область" },
   { value: "Курская", label: "Курская область" },
@@ -44,15 +55,15 @@ const REGION_OPTIONS = [
   { value: "Другое", label: "Другая область" },
 ];
 
-function normalizeRegionValue(value: string) {
+function normalizeRegionValue(value: string | null | undefined) {
   const raw = String(value || "").trim();
   if (!raw) return "";
 
-  const exact = REGION_OPTIONS.find((r) => r.value === raw || r.label === raw);
+  const exact = REGION_OPTIONS.find((region) => region.value === raw || region.label === raw);
   if (exact) return exact.value;
 
   const withoutWord = raw.replace(/\s+область$/i, "").trim();
-  const byShort = REGION_OPTIONS.find((r) => r.value === withoutWord);
+  const byShort = REGION_OPTIONS.find((region) => region.value === withoutWord);
   if (byShort) return byShort.value;
 
   if (raw.toLowerCase() === "другая область") return "Другое";
@@ -70,67 +81,126 @@ function getDisplayName(profile: GatehouseProfileData): string {
   return "ученик";
 }
 
+async function safeReadJson<T>(res: Response): Promise<T | null> {
+  const text = await res.text();
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeUiErrorMessage(error: unknown, fallback = "Не удалось выполнить действие") {
+  const raw =
+    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
+
+  const msg = raw.trim();
+
+  if (!msg) return fallback;
+
+  const lower = msg.toLowerCase();
+
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network request failed") ||
+    lower.includes("load failed") ||
+    lower.includes("terminated") ||
+    lower.includes("econnreset") ||
+    lower.includes("etimedout") ||
+    lower.includes("socket") ||
+    lower.includes("network")
+  ) {
+    return "Ошибка соединения с сервером";
+  }
+
+  return msg;
+}
+
 export default function GatehouseProfileClient({
   initialProfile,
   initialStats,
   initialRecentProgress,
 }: GatehouseProfileClientProps) {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [profile, setProfile] = useState<GatehouseProfileData>({
     ...initialProfile,
     region: normalizeRegionValue(initialProfile.region),
   });
+
   const [form, setForm] = useState({
     full_name: initialProfile.full_name,
     contact_phone: initialProfile.contact_phone,
     region: normalizeRegionValue(initialProfile.region),
   });
+
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   const displayName = getDisplayName(profile);
-  const hasCurrentRegionOption =
-    !form.region || REGION_OPTIONS.some((region) => region.value === form.region);
+
+  const hasCurrentRegionOption = !form.region || REGION_OPTIONS.some((region) => region.value === form.region);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!profile.id || saving) return;
+    if (saving) return;
 
     setSaving(true);
     setSuccessMessage("");
     setErrorMessage("");
 
     const payload = {
-      full_name: form.full_name.trim() || null,
-      contact_phone: form.contact_phone.trim() || null,
-      region: normalizeRegionValue(form.region) || null,
+      full_name: form.full_name.trim(),
+      contact_phone: form.contact_phone.trim(),
+      region: normalizeRegionValue(form.region),
     };
 
-    const { error } = await supabase.from("profiles").update(payload).eq("id", profile.id);
-
-    setSaving(false);
-
-    if (error) {
-      setErrorMessage(error.message || "Не удалось сохранить профиль.");
+    if (!payload.full_name) {
+      setSaving(false);
+      setErrorMessage("Введите ФИО.");
       return;
     }
 
-    const nextProfile: GatehouseProfileData = {
-      ...profile,
-      full_name: payload.full_name ?? "",
-      contact_phone: payload.contact_phone ?? "",
-      region: payload.region ?? "",
-    };
+    try {
+      const res = await fetch("/api/profile/update", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: JSON.stringify(payload),
+      });
 
-    setProfile(nextProfile);
-    setForm({
-      full_name: nextProfile.full_name,
-      contact_phone: nextProfile.contact_phone,
-      region: nextProfile.region,
-    });
-    setSuccessMessage("Профиль обновлён. Эти данные также обновятся в олимпиаде.");
+      const json = await safeReadJson<ProfileUpdateApiResponse>(res);
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+
+      const nextProfile: GatehouseProfileData = {
+        ...profile,
+        full_name: json.profile?.full_name ?? payload.full_name,
+        contact_phone: json.profile?.contact_phone ?? payload.contact_phone,
+        region: normalizeRegionValue(json.profile?.region ?? payload.region),
+      };
+
+      setProfile(nextProfile);
+      setForm({
+        full_name: nextProfile.full_name,
+        contact_phone: nextProfile.contact_phone,
+        region: nextProfile.region,
+      });
+
+      setSuccessMessage("Профиль обновлён. Эти данные также обновятся в олимпиаде.");
+    } catch (error: any) {
+      setErrorMessage(normalizeUiErrorMessage(error, "Не удалось сохранить профиль."));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -186,6 +256,7 @@ export default function GatehouseProfileClient({
             <section className="gatehouse-card">
               <div className="gatehouse-card__inner">
                 <h2 className="gatehouse-card__title">Профиль ученика</h2>
+
                 <p className="gatehouse-card__subtitle">
                   ФИО, телефон и регион общие для олимпиады и экзаменов. Если изменить их здесь,
                   они сразу изменятся и в профиле олимпиады.
@@ -196,19 +267,15 @@ export default function GatehouseProfileClient({
                     <label className="gatehouse-label" htmlFor="gatehouse-email">
                       Email
                     </label>
-                    <input
-                      id="gatehouse-email"
-                      className="gatehouse-input"
-                      value={profile.email}
-                      disabled
-                      readOnly
-                    />
+
+                    <input id="gatehouse-email" className="gatehouse-input" value={profile.email} disabled readOnly />
                   </div>
 
                   <div className="gatehouse-form__row">
                     <label className="gatehouse-label" htmlFor="gatehouse-full-name">
                       ФИО
                     </label>
+
                     <input
                       id="gatehouse-full-name"
                       className="gatehouse-input"
@@ -227,6 +294,7 @@ export default function GatehouseProfileClient({
                     <label className="gatehouse-label" htmlFor="gatehouse-phone">
                       Телефон
                     </label>
+
                     <input
                       id="gatehouse-phone"
                       className="gatehouse-input"
@@ -245,6 +313,7 @@ export default function GatehouseProfileClient({
                     <label className="gatehouse-label" htmlFor="gatehouse-region">
                       Область проживания
                     </label>
+
                     <select
                       id="gatehouse-region"
                       className="gatehouse-input gatehouse-select"
@@ -269,9 +338,7 @@ export default function GatehouseProfileClient({
                   </div>
 
                   {successMessage ? (
-                    <div className="gatehouse-message gatehouse-message--success">
-                      {successMessage}
-                    </div>
+                    <div className="gatehouse-message gatehouse-message--success">{successMessage}</div>
                   ) : null}
 
                   {errorMessage ? (
@@ -288,6 +355,7 @@ export default function GatehouseProfileClient({
             <aside className="gatehouse-card">
               <div className="gatehouse-card__inner">
                 <h2 className="gatehouse-card__title">Быстрые действия</h2>
+
                 <p className="gatehouse-card__subtitle">
                   Перейдите к пробным тестам или создайте заявку на доступ к уровню Gatehouse Awards.
                 </p>
@@ -298,13 +366,13 @@ export default function GatehouseProfileClient({
                       <span className="gatehouse-quick-action__icon" aria-hidden="true">
                         📝
                       </span>
+
                       <span>
                         <span className="gatehouse-quick-action__title">Пробные тесты</span>
-                        <span className="gatehouse-quick-action__text">
-                          Открыть экзаменационные материалы
-                        </span>
+                        <span className="gatehouse-quick-action__text">Открыть экзаменационные материалы</span>
                       </span>
                     </span>
+
                     <span className="gatehouse-quick-action__arrow" aria-hidden="true">
                       →
                     </span>
@@ -315,13 +383,13 @@ export default function GatehouseProfileClient({
                       <span className="gatehouse-quick-action__icon" aria-hidden="true">
                         📋
                       </span>
+
                       <span>
                         <span className="gatehouse-quick-action__title">Заявки</span>
-                        <span className="gatehouse-quick-action__text">
-                          Запросить доступ к нужному уровню
-                        </span>
+                        <span className="gatehouse-quick-action__text">Запросить доступ к нужному уровню</span>
                       </span>
                     </span>
+
                     <span className="gatehouse-quick-action__arrow" aria-hidden="true">
                       →
                     </span>
@@ -332,13 +400,13 @@ export default function GatehouseProfileClient({
                       <span className="gatehouse-quick-action__icon" aria-hidden="true">
                         🏠
                       </span>
+
                       <span>
                         <span className="gatehouse-quick-action__title">Портал</span>
-                        <span className="gatehouse-quick-action__text">
-                          Вернуться к выбору направления
-                        </span>
+                        <span className="gatehouse-quick-action__text">Вернуться к выбору направления</span>
                       </span>
                     </span>
+
                     <span className="gatehouse-quick-action__arrow" aria-hidden="true">
                       →
                     </span>
@@ -351,6 +419,7 @@ export default function GatehouseProfileClient({
           <section className="gatehouse-card">
             <div className="gatehouse-card__inner">
               <h2 className="gatehouse-card__title">Последние результаты</h2>
+
               <p className="gatehouse-card__subtitle">
                 Здесь будут отображаться только задания из раздела Gatehouse Awards.
               </p>
@@ -361,6 +430,7 @@ export default function GatehouseProfileClient({
                     <article className="gatehouse-recent__item" key={item.id}>
                       <div>
                         <h3 className="gatehouse-recent__title">{item.assignmentTitle}</h3>
+
                         <p className="gatehouse-recent__meta">
                           {item.materialTitle} · {item.completedAtLabel}
                         </p>
@@ -375,7 +445,9 @@ export default function GatehouseProfileClient({
                   <span className="gatehouse-empty__icon" aria-hidden="true">
                     🎓
                   </span>
+
                   <h3 className="gatehouse-empty__title">Результатов пока нет</h3>
+
                   <p className="gatehouse-empty__text">
                     Когда вы пройдёте пробный тест Gatehouse Awards, здесь появится результат и
                     дальнейшая рекомендация.

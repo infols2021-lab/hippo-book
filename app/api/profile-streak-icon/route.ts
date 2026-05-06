@@ -1,4 +1,3 @@
-// app/api/profile-streak-icon/route.ts
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -288,61 +287,4 @@ export async function POST(req: Request) {
     res.headers.set("Cache-Control", "no-store, max-age=0");
     return res;
   }
-
-  // 3) Validate выбранной иконки: должна существовать и быть активной
-  const row = activeRows.find((r) => r.code === requestedCode) ?? null;
-  if (!row) return fail("Иконка не найдена или отключена (is_active=false)", 404, "ICON_NOT_FOUND");
-
-  const unlockAt = getDbUnlockAtForIcon(row);
-  if (unlockAt <= 0) return fail("У иконки не указан meta.unlock_at", 400, "ICON_BAD_UNLOCK_AT");
-  if (unlockAt > longestForUnlocks) return fail("Icon is not unlocked yet", 403, "ICON_NOT_UNLOCKED");
-
-  // 4) Save exactly DB code
-  const { data: updatedProfile, error: updErr } = await supabase
-    .from("profiles")
-    .update({ selected_streak_icon_code: row.code })
-    .eq("id", user.id)
-    .select("id, selected_streak_icon_code")
-    .single();
-
-  if (updErr) return fail(updErr.message, 500, "PROFILE_ICON_SAVE_FAILED");
-  if (!updatedProfile || updatedProfile.id !== user.id) {
-    return fail("Profile row was not updated", 500, "PROFILE_ICON_SAVE_NOT_APPLIED");
-  }
-
-  const savedDbCode =
-    typeof updatedProfile.selected_streak_icon_code === "string" ? updatedProfile.selected_streak_icon_code : row.code;
-
-  const selectedIcon = iconByCode[savedDbCode] ?? buildIconVisualPayload(supabase, bucket, row);
-
-  const effectiveIconCode = resolveEffective(savedDbCode);
-  const effectiveIcon = effectiveIconCode ? iconByCode[effectiveIconCode] ?? null : null;
-
-  const res = ok({
-    saved: true,
-    reset: false,
-
-    streak,
-    longestForUnlocks,
-
-    iconCatalog,
-    unlockedIconCodes,
-
-    selectedIconCode: savedDbCode,
-    selectedIconDbCode: savedDbCode,
-    selectedIcon,
-
-    effectiveIconCode: effectiveIconCode ?? null,
-    effectiveIconDbCode: effectiveIconCode ?? null,
-    effectiveIcon,
-
-    appliedIconCode: savedDbCode,
-    appliedIcon: selectedIcon,
-
-    bucket,
-    serverTs: new Date().toISOString(),
-  });
-
-  res.headers.set("Cache-Control", "no-store, max-age=0");
-  return res;
 }

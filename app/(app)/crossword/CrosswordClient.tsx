@@ -4,8 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 
-type UserProgress = { assignment_id: string; is_completed: boolean };
+type UserProgress = {
+  assignment_id: string;
+  is_completed: boolean;
+};
 
 type CrosswordApiOk = {
   ok: true;
@@ -15,7 +19,11 @@ type CrosswordApiOk = {
   userProgress?: UserProgress[];
 };
 
-type CrosswordApiErr = { ok: false; error: string };
+type CrosswordApiErr = {
+  ok: false;
+  error: string;
+};
+
 type CrosswordApi = CrosswordApiOk | CrosswordApiErr;
 
 type Props = {
@@ -23,43 +31,55 @@ type Props = {
   initialData: CrosswordApiOk | null;
 };
 
-function isHttpUrl(v: unknown): v is string {
+function isHttpUrl(v: unknown): boolean {
   return typeof v === "string" && /^https?:\/\//i.test(v);
 }
 
-function resolvePublicUrl(raw: any, bucket: string) {
+function resolvePublicUrl(raw: unknown, bucket: string) {
   if (!raw) return null;
-  if (isHttpUrl(raw)) return raw;
 
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!base) return null;
+  const value = String(raw).trim();
+  if (!value) return null;
 
-  const key = String(raw).replace(/^\/+/, "").replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
-  return `${base}/storage/v1/object/public/${bucket}/${encodeURIComponent(key)}?v=${Date.now()}`;
+  if (value.startsWith("data:")) return value;
+  if (value.startsWith("/api/storage/public/")) return value;
+
+  const storageMarker = "/storage/v1/object/public/";
+
+  if (isHttpUrl(value)) {
+    const markerIndex = value.indexOf(storageMarker);
+
+    if (markerIndex === -1) return value;
+
+    const rest = value.slice(markerIndex + storageMarker.length).split("?")[0]?.split("#")[0] ?? "";
+    const parts = rest.split("/").filter(Boolean);
+
+    const parsedBucket = parts.shift();
+    const parsedPath = parts.join("/");
+
+    if (!parsedBucket || !parsedPath) return value;
+
+    return getStoragePublicUrl(parsedBucket, parsedPath);
+  }
+
+  const cleaned = value
+    .replace(/^\/+/, "")
+    .replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
+
+  return getStoragePublicUrl(bucket, cleaned);
 }
 
 export default function CrosswordClient({ crosswordId, initialData }: Props) {
   const router = useRouter();
-
-  if (!crosswordId) {
-    return (
-      <div className="crossword-container">
-        <div className="error" style={{ display: "block" }}>
-          ❌ Некорректная ссылка на кроссворд
-          <div style={{ height: 10 }} />
-          <a className="btn" href="/materials">
-            ← Назад к материалам
-          </a>
-        </div>
-      </div>
-    );
-  }
+  const invalidCrosswordId = !crosswordId?.trim();
 
   const [data, setData] = useState<CrosswordApiOk | null>(initialData);
-  const [loading, setLoading] = useState<boolean>(!initialData);
+  const [loading, setLoading] = useState<boolean>(!initialData && !invalidCrosswordId);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (invalidCrosswordId) return;
+
     let cancelled = false;
 
     async function load() {
@@ -71,6 +91,7 @@ export default function CrosswordClient({ crosswordId, initialData }: Props) {
           method: "GET",
           cache: "no-store",
         });
+
         const json = (await res.json()) as CrosswordApi;
 
         if (!res.ok || !json.ok) {
@@ -79,20 +100,23 @@ export default function CrosswordClient({ crosswordId, initialData }: Props) {
         }
 
         if (cancelled) return;
+
         setData(json);
         setLoading(false);
       } catch (e: any) {
         if (cancelled) return;
+
         setLoading(false);
         setError(e?.message || "Ошибка загрузки кроссворда");
       }
     }
 
-    if (!initialData) load();
+    if (!initialData) void load();
+
     return () => {
       cancelled = true;
     };
-  }, [initialData, crosswordId]);
+  }, [initialData, invalidCrosswordId, crosswordId]);
 
   const crossword = data?.crossword ?? null;
   const assignments = data?.assignments ?? [];
@@ -108,6 +132,20 @@ export default function CrosswordClient({ crosswordId, initialData }: Props) {
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   const coverUrl = resolvePublicUrl(crossword?.cover_image_url, "covers");
+
+  if (invalidCrosswordId) {
+    return (
+      <div className="crossword-container">
+        <div className="error" style={{ display: "block" }}>
+          ❌ Некорректная ссылка на кроссворд
+          <div style={{ height: 10 }} />
+          <a className="btn" href="/materials">
+            ← Назад к материалам
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="crossword-container">
@@ -127,7 +165,7 @@ export default function CrosswordClient({ crosswordId, initialData }: Props) {
 
       {loading ? (
         <div className="loading" style={{ display: "block" }}>
-          <div className="spinner"></div>
+          <div className="spinner" />
           <p>Загружаем кроссворд...</p>
         </div>
       ) : null}
@@ -180,10 +218,12 @@ export default function CrosswordClient({ crosswordId, initialData }: Props) {
                     <div className="stat-number">{completedCount}</div>
                     <div className="stat-label">Разгадано</div>
                   </div>
+
                   <div className="stat-item">
                     <div className="stat-number">{totalCount}</div>
                     <div className="stat-label">Всего слов</div>
                   </div>
+
                   <div className="stat-item">
                     <div className="stat-number">{progressPercent}%</div>
                     <div className="stat-label">Прогресс</div>
@@ -214,6 +254,12 @@ export default function CrosswordClient({ crosswordId, initialData }: Props) {
                         className={`assignment-item ${isCompleted ? "completed" : ""}`}
                         onClick={() => router.push(`/assignment/${a.id}?source=crossword&sourceId=${crosswordId}`)}
                         role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            router.push(`/assignment/${a.id}?source=crossword&sourceId=${crosswordId}`);
+                          }
+                        }}
                       >
                         <div className="assignment-icon">🧩</div>
 

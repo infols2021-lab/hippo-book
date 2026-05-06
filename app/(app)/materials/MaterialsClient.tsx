@@ -2,15 +2,24 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import AppHeader from "@/components/AppHeader";
 import LoadingBlock from "@/components/LoadingBlock";
 import ErrorBox from "@/components/ErrorBox";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 
 type Textbook = any;
 type Crossword = any;
-type Assignment = { id: string; textbook_id: string | null; crossword_id: string | null };
-type UserProgress = { assignment_id: string; is_completed: boolean };
+
+type Assignment = {
+  id: string;
+  textbook_id: string | null;
+  crossword_id: string | null;
+};
+
+type UserProgress = {
+  assignment_id: string;
+  is_completed: boolean;
+};
 
 type MaterialsData = {
   textbooks: Textbook[];
@@ -38,14 +47,56 @@ function computeProgress(
 
   const total = ids.length;
   let completed = 0;
-  for (const x of ids) if (completedSet.has(x)) completed++;
+
+  for (const x of ids) {
+    if (completedSet.has(x)) completed += 1;
+  }
+
   const progress = total > 0 ? (completed / total) * 100 : 0;
+
   return { total, completed, progress };
+}
+
+function normalizeMaterialsData(input: any): MaterialsData {
+  const payload = input?.data && typeof input.data === "object" ? input.data : input;
+
+  return {
+    textbooks: Array.isArray(payload?.textbooks) ? payload.textbooks : [],
+    crosswords: Array.isArray(payload?.crosswords) ? payload.crosswords : [],
+    assignments: Array.isArray(payload?.assignments) ? payload.assignments : [],
+    userProgress: Array.isArray(payload?.userProgress) ? payload.userProgress : [],
+    textbookAccess: Array.isArray(payload?.textbookAccess) ? payload.textbookAccess : [],
+    crosswordAccess: Array.isArray(payload?.crosswordAccess) ? payload.crosswordAccess : [],
+  };
+}
+
+function toStorageProxyUrl(raw: unknown) {
+  if (typeof raw !== "string") return "";
+  const value = raw.trim();
+  if (!value) return "";
+
+  if (value.startsWith("/api/storage/public/")) return value;
+  if (value.startsWith("data:")) return value;
+
+  const marker = "/storage/v1/object/public/";
+  const idx = value.indexOf(marker);
+
+  if (idx === -1) return value;
+
+  const restWithQuery = value.slice(idx + marker.length);
+  const cleanRest = restWithQuery.split("?")[0]?.split("#")[0] ?? "";
+  const parts = cleanRest.split("/").filter(Boolean);
+
+  const bucket = parts.shift();
+  const path = parts.join("/");
+
+  if (!bucket || !path) return value;
+
+  return getStoragePublicUrl(bucket, path);
 }
 
 export default function MaterialsClient({ initialData }: Props) {
   const router = useRouter();
-  useMemo(() => getSupabaseBrowserClient(), []); // паттерн оставлен
 
   const [tab, setTab] = useState<"textbooks" | "crosswords">("textbooks");
 
@@ -61,22 +112,31 @@ export default function MaterialsClient({ initialData }: Props) {
         setLoading(true);
         setError(null);
 
-        const res = await fetch("/api/materials-data", { cache: "no-store" });
-        const json = await res.json();
+        const res = await fetch("/api/materials-data", {
+          method: "GET",
+          cache: "no-store",
+        });
 
-        if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить материалы");
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok || !json?.ok) {
+          throw new Error(json?.error || "Не удалось загрузить материалы");
+        }
 
         if (cancelled) return;
-        setData(json as MaterialsData);
+
+        setData(normalizeMaterialsData(json));
         setLoading(false);
       } catch (e: any) {
         if (cancelled) return;
+
         setLoading(false);
         setError(e?.message || String(e));
       }
     }
 
-    if (!initialData) load();
+    if (!initialData) void load();
+
     return () => {
       cancelled = true;
     };
@@ -90,15 +150,24 @@ export default function MaterialsClient({ initialData }: Props) {
       setTab("textbooks");
       setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" }), 50);
     }
+
     if (hash.startsWith("#crossword-")) {
       setTab("crosswords");
       setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" }), 50);
     }
   }, []);
 
-  const completedSet = new Set((data?.userProgress || []).filter((x) => x.is_completed).map((x) => x.assignment_id));
-  const textbookAccess = new Set((data?.textbookAccess || []).map((x) => x.textbook_id));
-  const crosswordAccess = new Set((data?.crosswordAccess || []).map((x) => x.crossword_id));
+  const completedSet = useMemo(() => {
+    return new Set((data?.userProgress || []).filter((x) => x.is_completed).map((x) => x.assignment_id));
+  }, [data?.userProgress]);
+
+  const textbookAccess = useMemo(() => {
+    return new Set((data?.textbookAccess || []).map((x) => x.textbook_id));
+  }, [data?.textbookAccess]);
+
+  const crosswordAccess = useMemo(() => {
+    return new Set((data?.crosswordAccess || []).map((x) => x.crossword_id));
+  }, [data?.crosswordAccess]);
 
   return (
     <div className="materials-page">
@@ -120,6 +189,7 @@ export default function MaterialsClient({ initialData }: Props) {
           >
             📚 Учебники
           </button>
+
           <button
             className={`material-tab ${tab === "crosswords" ? "active" : ""}`}
             onClick={() => setTab("crosswords")}
@@ -143,8 +213,13 @@ export default function MaterialsClient({ initialData }: Props) {
 
                 <div className="materials-grid">
                   {(() => {
-                    const available = (data.textbooks || []).filter((t: any) => t.is_available || textbookAccess.has(t.id));
-                    const locked = (data.textbooks || []).filter((t: any) => !t.is_available && !textbookAccess.has(t.id));
+                    const available = (data.textbooks || []).filter((t: any) => {
+                      return Boolean(t.is_available || textbookAccess.has(t.id));
+                    });
+
+                    const locked = (data.textbooks || []).filter((t: any) => {
+                      return Boolean(!t.is_available && !textbookAccess.has(t.id));
+                    });
 
                     if (available.length === 0) {
                       return (
@@ -160,8 +235,15 @@ export default function MaterialsClient({ initialData }: Props) {
                     return (
                       <>
                         {available.map((t: any) => {
-                          const { total, completed, progress } = computeProgress("textbook", t.id, data.assignments, completedSet);
+                          const { total, completed, progress } = computeProgress(
+                            "textbook",
+                            t.id,
+                            data.assignments,
+                            completedSet,
+                          );
+
                           const pct = Math.round(progress);
+                          const coverUrl = toStorageProxyUrl(t.cover_image_url);
 
                           return (
                             <div
@@ -176,14 +258,16 @@ export default function MaterialsClient({ initialData }: Props) {
                               }}
                             >
                               <div className="material-cover">
-                                {t.cover_image_url ? (
+                                {coverUrl ? (
                                   <img
-                                    src={t.cover_image_url}
+                                    src={coverUrl}
                                     alt={t.title}
+                                    loading="lazy"
+                                    decoding="async"
                                     onError={(e) => {
                                       const img = e.currentTarget;
                                       img.style.display = "none";
-                                      (img.parentElement as HTMLElement).innerHTML = "📚";
+                                      if (img.parentElement) img.parentElement.innerHTML = "📚";
                                     }}
                                   />
                                 ) : (
@@ -208,16 +292,25 @@ export default function MaterialsClient({ initialData }: Props) {
                           );
                         })}
 
-                        {locked.map((t: any) => (
-                          <div key={t.id} className="material-card locked" role="group" aria-label="Недоступный учебник">
-                            <div className="material-cover">
-                              {t.cover_image_url ? <img src={t.cover_image_url} alt={t.title} /> : "📚"}
+                        {locked.map((t: any) => {
+                          const coverUrl = toStorageProxyUrl(t.cover_image_url);
+
+                          return (
+                            <div key={t.id} className="material-card locked" role="group" aria-label="Недоступный учебник">
+                              <div className="material-cover">
+                                {coverUrl ? (
+                                  <img src={coverUrl} alt={t.title} loading="lazy" decoding="async" />
+                                ) : (
+                                  "📚"
+                                )}
+                              </div>
+
+                              <div className="material-title">{t.title}</div>
+                              <div className="material-description">{t.description || "Учебные материалы и задания"}</div>
+                              <div className="locked-overlay">🔒 Недоступен</div>
                             </div>
-                            <div className="material-title">{t.title}</div>
-                            <div className="material-description">{t.description || "Учебные материалы и задания"}</div>
-                            <div className="locked-overlay">🔒 Недоступен</div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </>
                     );
                   })()}
@@ -232,8 +325,13 @@ export default function MaterialsClient({ initialData }: Props) {
 
                 <div className="materials-grid">
                   {(() => {
-                    const available = (data.crosswords || []).filter((c: any) => c.is_available || crosswordAccess.has(c.id));
-                    const locked = (data.crosswords || []).filter((c: any) => !c.is_available && !crosswordAccess.has(c.id));
+                    const available = (data.crosswords || []).filter((c: any) => {
+                      return Boolean(c.is_available || crosswordAccess.has(c.id));
+                    });
+
+                    const locked = (data.crosswords || []).filter((c: any) => {
+                      return Boolean(!c.is_available && !crosswordAccess.has(c.id));
+                    });
 
                     if (available.length === 0) {
                       return (
@@ -249,8 +347,15 @@ export default function MaterialsClient({ initialData }: Props) {
                     return (
                       <>
                         {available.map((c: any) => {
-                          const { total, completed, progress } = computeProgress("crossword", c.id, data.assignments, completedSet);
+                          const { total, completed, progress } = computeProgress(
+                            "crossword",
+                            c.id,
+                            data.assignments,
+                            completedSet,
+                          );
+
                           const pct = Math.round(progress);
+                          const coverUrl = toStorageProxyUrl(c.cover_image_url);
 
                           return (
                             <div
@@ -265,14 +370,16 @@ export default function MaterialsClient({ initialData }: Props) {
                               }}
                             >
                               <div className="material-cover">
-                                {c.cover_image_url ? (
+                                {coverUrl ? (
                                   <img
-                                    src={c.cover_image_url}
+                                    src={coverUrl}
                                     alt={c.title}
+                                    loading="lazy"
+                                    decoding="async"
                                     onError={(e) => {
                                       const img = e.currentTarget;
                                       img.style.display = "none";
-                                      (img.parentElement as HTMLElement).innerHTML = "🧩";
+                                      if (img.parentElement) img.parentElement.innerHTML = "🧩";
                                     }}
                                   />
                                 ) : (
@@ -297,16 +404,25 @@ export default function MaterialsClient({ initialData }: Props) {
                           );
                         })}
 
-                        {locked.map((c: any) => (
-                          <div key={c.id} className="material-card locked" role="group" aria-label="Недоступный кроссворд">
-                            <div className="material-cover">
-                              {c.cover_image_url ? <img src={c.cover_image_url} alt={c.title} /> : "🧩"}
+                        {locked.map((c: any) => {
+                          const coverUrl = toStorageProxyUrl(c.cover_image_url);
+
+                          return (
+                            <div key={c.id} className="material-card locked" role="group" aria-label="Недоступный кроссворд">
+                              <div className="material-cover">
+                                {coverUrl ? (
+                                  <img src={coverUrl} alt={c.title} loading="lazy" decoding="async" />
+                                ) : (
+                                  "🧩"
+                                )}
+                              </div>
+
+                              <div className="material-title">{c.title}</div>
+                              <div className="material-description">{c.description || "Разгадайте кроссворд"}</div>
+                              <div className="locked-overlay">🔒 Недоступен</div>
                             </div>
-                            <div className="material-title">{c.title}</div>
-                            <div className="material-description">{c.description || "Разгадайте кроссворд"}</div>
-                            <div className="locked-overlay">🔒 Недоступен</div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </>
                     );
                   })()}

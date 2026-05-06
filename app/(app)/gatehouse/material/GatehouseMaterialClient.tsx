@@ -52,10 +52,12 @@ export default function GatehouseMaterialClient({
   initialError,
 }: GatehouseMaterialClientProps) {
   const data = initialData;
+
   const assignments = useMemo(() => {
     return [...(data?.assignments ?? [])].sort((a, b) => {
       const orderDiff = Number(a.order_index ?? 0) - Number(b.order_index ?? 0);
       if (orderDiff !== 0) return orderDiff;
+
       return String(a.title ?? "").localeCompare(String(b.title ?? ""), "ru");
     });
   }, [data?.assignments]);
@@ -191,6 +193,7 @@ export default function GatehouseMaterialClient({
                             <span aria-hidden="true">{getAssignmentIcon(assignment)} </span>
                             {index + 1}. {assignment.title}
                           </h3>
+
                           <p className="gatehouse-recent__meta">
                             {getAssignmentStatusLabel(assignment)}
                             {assignment.isCompleted ? ` · результат ${formatScore(assignment.score)}` : ""}
@@ -232,7 +235,9 @@ export default function GatehouseMaterialClient({
                   <span className="gatehouse-empty__icon" aria-hidden="true">
                     📝
                   </span>
+
                   <h3 className="gatehouse-empty__title">Заданий пока нет</h3>
+
                   <p className="gatehouse-empty__text">
                     Администратор уже создал материал, но задания для него ещё не добавлены.
                   </p>

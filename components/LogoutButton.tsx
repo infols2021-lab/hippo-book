@@ -1,11 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Props = {
-  className?: string; // "btn secondary"
+  className?: string;
   children?: React.ReactNode;
   confirm?: boolean;
   redirectTo?: string;
@@ -18,7 +16,6 @@ export default function LogoutButton({
   redirectTo = "/login",
 }: Props) {
   const router = useRouter();
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
   async function run() {
     if (confirm) {
@@ -26,8 +23,13 @@ export default function LogoutButton({
       if (!ok) return;
     }
 
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      cache: "no-store",
+    }).catch(() => null);
+
     router.push(redirectTo);
+    router.refresh();
   }
 
   return (

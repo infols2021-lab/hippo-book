@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import LoadingBlock from "@/components/LoadingBlock";
 import ErrorBox from "@/components/ErrorBox";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 import MaterialsManagementTab from "./materials/MaterialsManagementTab";
 import AssignmentsTab from "./assignments/AssignmentsTab";
@@ -18,13 +17,29 @@ type Stats = {
   users: number;
 };
 
-type ReqStats = { total: number; pending: number; processed: number };
+type ReqStats = {
+  total: number;
+  pending: number;
+  processed: number;
+};
 
 type AdminTab = "materials" | "assignments" | "users" | "requests";
 
-type ApiOkStats = { ok: true; stats: Stats };
-type ApiOkReqStats = { ok: true; stats: ReqStats };
-type ApiErr = { ok: false; error: string; code?: string };
+type ApiOkStats = {
+  ok: true;
+  stats: Stats;
+};
+
+type ApiOkReqStats = {
+  ok: true;
+  stats: ReqStats;
+};
+
+type ApiErr = {
+  ok: false;
+  error: string;
+  code?: string;
+};
 
 async function safeJson(res: Response) {
   const text = await res.text();
@@ -37,11 +52,32 @@ async function safeJson(res: Response) {
   }
 }
 
+function normalizeUiErrorMessage(error: unknown, fallback = "Произошла ошибка") {
+  const raw =
+    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
+
+  const msg = raw.trim();
+
+  if (!msg) return fallback;
+
+  const lower = msg.toLowerCase();
+
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network request failed") ||
+    lower.includes("load failed")
+  ) {
+    return "Ошибка соединения с сервером";
+  }
+
+  return msg;
+}
+
 export default function AdminClient() {
   const router = useRouter();
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
-  const [loggingOut, setLoggingOut] = useState(false);
 
+  const [loggingOut, setLoggingOut] = useState(false);
   const [tab, setTab] = useState<AdminTab>("materials");
 
   const [stats, setStats] = useState<Stats>({
@@ -53,7 +89,6 @@ export default function AdminClient() {
 
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsErr, setStatsErr] = useState<string | null>(null);
-
   const [pendingRequests, setPendingRequests] = useState(0);
 
   const tabs = useMemo(
@@ -79,19 +114,29 @@ export default function AdminClient() {
       const json1 = (await safeJson(res1)) as ApiOkStats | ApiErr | null;
       const json2 = (await safeJson(res2)) as ApiOkReqStats | ApiErr | null;
 
-      if (!res1.ok || !json1) throw new Error(`HTTP ${res1.status}`);
-      if (!json1.ok) throw new Error((json1 as ApiErr).error || "Не удалось загрузить статистику");
+      if (!res1.ok || !json1) {
+        throw new Error(`HTTP ${res1.status}`);
+      }
+
+      if (!json1.ok) {
+        throw new Error((json1 as ApiErr).error || "Не удалось загрузить статистику");
+      }
 
       setStats(json1.stats);
 
-      if (res2.ok && json2 && (json2 as any).ok) {
-        setPendingRequests((json2 as ApiOkReqStats).stats.pending || 0);
+      if (res2.ok && json2 && json2.ok) {
+        setPendingRequests(json2.stats.pending || 0);
       } else {
         setPendingRequests(0);
       }
     } catch (e: any) {
-      setStatsErr(e?.message || String(e));
-      setStats({ textbooks: 0, crosswords: 0, assignments: 0, users: 0 });
+      setStatsErr(normalizeUiErrorMessage(e, "Не удалось загрузить статистику"));
+      setStats({
+        textbooks: 0,
+        crosswords: 0,
+        assignments: 0,
+        users: 0,
+      });
       setPendingRequests(0);
     } finally {
       setLoadingStats(false);
@@ -101,20 +146,26 @@ export default function AdminClient() {
   async function logout() {
     if (loggingOut) return;
 
-    const ok = window.confirm("Выйти из аккаунта?");
-    if (!ok) return;
+    const confirmed = window.confirm("Выйти из аккаунта?");
+    if (!confirmed) return;
 
     try {
       setLoggingOut(true);
-      await supabase.auth.signOut();
+
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        cache: "no-store",
+      });
     } finally {
       router.push("/login");
+      router.refresh();
       setLoggingOut(false);
     }
   }
 
   useEffect(() => {
     void loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const totalLegacyMaterials = Number(stats.textbooks || 0) + Number(stats.crosswords || 0);
@@ -242,13 +293,7 @@ export default function AdminClient() {
       {tab === "materials" ? <MaterialsManagementTab onChanged={loadStats} /> : null}
       {tab === "assignments" ? <AssignmentsTab /> : null}
       {tab === "users" ? <UsersTab /> : null}
-      {tab === "requests" ? (
-        <RequestsTab
-          onPendingChanged={(p) => {
-            setPendingRequests(p);
-          }}
-        />
-      ) : null}
+      {tab === "requests" ? <RequestsTab onPendingChanged={(p) => setPendingRequests(p)} /> : null}
     </div>
   );
 }

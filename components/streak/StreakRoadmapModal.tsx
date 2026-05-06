@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import * as Roadmap from "@/lib/streaks/roadmap";
 
 type StreakSnapshotLike =
@@ -21,17 +21,13 @@ type StreakSnapshotLike =
 type NormalizedMilestone = {
   kind: "icon" | "title";
 
-  // ✅ теперь "code" = DB code (bronze-1, gold-1, ...)
   code: string;
-
-  // ✅ оставляем поле для совместимости (равно code)
   dbCode?: string | null;
 
   label: string;
   day: number;
   description?: string;
 
-  // visual
   emoji?: string;
   publicUrl?: string | null;
   candidatePublicUrls?: string[] | null;
@@ -57,15 +53,10 @@ type Props = {
 
   equippedTitleLabel?: string | null;
 
-  // ✅ это DB codes (bronze-1, ...)
   unlockedIconCodes?: string[] | null;
   selectedIconCode?: string | null;
   onSelectIconCode?: (code: string) => void;
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Roadmap background (Storage)
-// ─────────────────────────────────────────────────────────────────────────────
 
 const ROADMAP_BG_BUCKET =
   process.env.NEXT_PUBLIC_STREAK_ROADMAP_BG_BUCKET ||
@@ -75,8 +66,7 @@ const ROADMAP_BG_BUCKET =
 const ROADMAP_BG_WEBP_PATH = "v1/defaults/roadmap-bg(1).webp";
 const ROADMAP_BG_PNG_PATH = "v1/defaults/roadmap-bg(1).png";
 
-// simple module cache so we don't re-probe every open
-let ROADMAP_BG_CACHED_URL: string | null | undefined = undefined; // undefined = not tried, null = tried but failed, string = ok
+let ROADMAP_BG_CACHED_URL: string | null | undefined = undefined;
 
 function tryLoadImage(url: string) {
   return new Promise<boolean>((resolve) => {
@@ -85,20 +75,19 @@ function tryLoadImage(url: string) {
     img.onload = () => resolve(true);
     img.onerror = () => resolve(false);
     img.src = url;
-    // just in case browser already has it cached:
-    if (img.complete && img.naturalWidth > 0) resolve(true);
+
+    if (img.complete && img.naturalWidth > 0) {
+      resolve(true);
+    }
   });
 }
 
 async function resolveRoadmapBgUrl(): Promise<string | null> {
   if (ROADMAP_BG_CACHED_URL !== undefined) return ROADMAP_BG_CACHED_URL ?? null;
 
-  const supabase = getSupabaseBrowserClient();
+  const webp = getStoragePublicUrl(ROADMAP_BG_BUCKET, ROADMAP_BG_WEBP_PATH);
+  const png = getStoragePublicUrl(ROADMAP_BG_BUCKET, ROADMAP_BG_PNG_PATH);
 
-  const webp = supabase.storage.from(ROADMAP_BG_BUCKET).getPublicUrl(ROADMAP_BG_WEBP_PATH).data.publicUrl || "";
-  const png = supabase.storage.from(ROADMAP_BG_BUCKET).getPublicUrl(ROADMAP_BG_PNG_PATH).data.publicUrl || "";
-
-  // Try webp first, then png
   if (webp) {
     const ok = await tryLoadImage(webp);
     if (ok) {
@@ -118,10 +107,6 @@ async function resolveRoadmapBgUrl(): Promise<string | null> {
   ROADMAP_BG_CACHED_URL = null;
   return null;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// utils
-// ─────────────────────────────────────────────────────────────────────────────
 
 function num(v: unknown, fallback = 0) {
   const n = Number(v);
@@ -152,24 +137,18 @@ function guessIconEmoji(code: string, label?: string) {
   return "🎖️";
 }
 
-/**
- * ✅ Нормализация DB code (НЕ переводим в roadmap code!).
- * Поддержка: если вдруг прилетел путь/URL/расширение — берём basename без ext.
- */
 function normalizeDbIconCode(code: string | null | undefined): string | null {
   if (!code) return null;
+
   let s = String(code).trim();
   if (!s) return null;
 
-  // remove query/hash
   s = s.split("#")[0] ?? s;
   s = s.split("?")[0] ?? s;
 
-  // normalize slashes and take basename
   s = s.replace(/\\/g, "/");
   const base = s.split("/").filter(Boolean).at(-1) ?? s;
 
-  // strip ext
   const noExt = base.replace(/\.(webp|png|jpg|jpeg|svg)$/i, "").trim();
 
   return noExt ? noExt : null;
@@ -177,12 +156,14 @@ function normalizeDbIconCode(code: string | null | undefined): string | null {
 
 function resolveTierCodeForUi(currentStreak: number, serverTierCode?: string) {
   const fn = (Roadmap as any).getTierCodeByStreak;
+
   if (typeof fn === "function") {
     try {
       const t = fn(currentStreak);
       if (typeof t === "string" && t.trim()) return t.trim();
     } catch {}
   }
+
   return String(serverTierCode || "").trim().toLowerCase();
 }
 
@@ -196,6 +177,7 @@ function getTierBadge(tierCode?: string, streakValue?: number) {
   if (s === "gold") return { icon: "🥇", label: "Золотой" };
   if (s === "silver") return { icon: "🥈", label: "Серебряный" };
   if (s === "bronze") return { icon: "🥉", label: "Бронзовый" };
+
   return { icon: v > 0 ? "🔥" : "✨", label: v > 0 ? "Серия" : "Нет серии" };
 }
 
@@ -205,11 +187,13 @@ function buildRoadmapRows(icons: NormalizedMilestone[], titles: NormalizedMilest
   const put = (m: NormalizedMilestone) => {
     const day = Math.max(1, Math.floor(num(m.day, 0)));
     const row = map.get(day) ?? { day };
+
     if (m.kind === "title") {
       if (!row.title) row.title = m;
     } else {
       if (!row.icon) row.icon = m;
     }
+
     map.set(day, row);
   };
 
@@ -221,6 +205,7 @@ function buildRoadmapRows(icons: NormalizedMilestone[], titles: NormalizedMilest
 
 function computeRailProgressPercent(currentStreak: number, rows: RoadmapRow[]) {
   const s = Math.max(0, num(currentStreak));
+
   if (!rows.length) return 0;
   if (rows.length === 1) return s >= rows[0].day ? 100 : 0;
 
@@ -230,10 +215,12 @@ function computeRailProgressPercent(currentStreak: number, rows: RoadmapRow[]) {
   if (s <= firstDay) {
     return clamp((s / Math.max(1, firstDay)) * (100 / Math.max(1, rows.length - 1)) * 0.35, 0, 100);
   }
+
   if (s >= lastDay) return 100;
 
   let prevIndex = 0;
-  for (let i = 0; i < rows.length; i++) {
+
+  for (let i = 0; i < rows.length; i += 1) {
     if (rows[i].day <= s) prevIndex = i;
     else break;
   }
@@ -247,6 +234,7 @@ function computeRailProgressPercent(currentStreak: number, rows: RoadmapRow[]) {
   const segmentProgress = clamp((s - prevDay) / Math.max(1, nextDay - prevDay), 0, 1);
   const virtualIndex = prevIndex + segmentProgress;
   const totalSegments = Math.max(1, rows.length - 1);
+
   return clamp((virtualIndex / totalSegments) * 100, 0, 100);
 }
 
@@ -266,14 +254,15 @@ function normalizeDbTitleRow(row: ApiTitleRow, idx: number): NormalizedMilestone
           row.days ??
           row.requiredDays ??
           row.required_days,
-        0
-      )
-    )
+        0,
+      ),
+    ),
   );
+
   if (day <= 0) return null;
 
   const label = String(
-    row.label ?? row.title ?? row.name ?? row.display_name ?? row.displayName ?? titleCaseFromCode(code)
+    row.label ?? row.title ?? row.name ?? row.display_name ?? row.displayName ?? titleCaseFromCode(code),
   ).trim();
 
   const description = String(row.description ?? row.desc ?? row.subtitle ?? row.note ?? "").trim() || undefined;
@@ -284,9 +273,9 @@ function normalizeDbTitleRow(row: ApiTitleRow, idx: number): NormalizedMilestone
 function normalizeDbIconRow(row: ApiIconRow, idx: number): NormalizedMilestone | null {
   if (!row || typeof row !== "object") return null;
 
-  // ✅ ВАЖНО: row.code из API = DB code
   const rawDbCode = String(row.code ?? row.icon_code ?? row.iconCode ?? row.id ?? row.key ?? `icon_${idx + 1}`).trim();
   const dbCode = normalizeDbIconCode(rawDbCode);
+
   if (!dbCode) return null;
 
   const day = Math.max(
@@ -303,10 +292,11 @@ function normalizeDbIconRow(row: ApiIconRow, idx: number): NormalizedMilestone |
           row.required_days ??
           (row.meta && (row.meta.unlock_at ?? row.meta.unlockAt ?? row.meta.day)) ??
           0,
-        0
-      )
-    )
+        0,
+      ),
+    ),
   );
+
   if (day <= 0) return null;
 
   const label = String(row.label ?? row.title ?? row.name ?? row.fullLabel ?? row.display_name ?? dbCode).trim();
@@ -334,32 +324,32 @@ function normalizeDbIconRow(row: ApiIconRow, idx: number): NormalizedMilestone |
 
 function dedupeByDayKeepFirst<T extends { day: number }>(list: T[]) {
   const map = new Map<number, T>();
+
   for (const item of list) {
     if (!map.has(item.day)) map.set(item.day, item);
   }
+
   return [...map.values()].sort((a, b) => a.day - b.day);
 }
 
 function safeUniqUrls(urls: Array<string | null | undefined>) {
   const out: string[] = [];
   const seen = new Set<string>();
+
   for (const u of urls) {
     const s = typeof u === "string" ? u.trim() : "";
     if (!s || seen.has(s)) continue;
+
     seen.add(s);
     out.push(s);
   }
+
   return out;
 }
 
 function getSelectableCodeForIcon(m: NormalizedMilestone) {
-  // ✅ selection code = DB code (никаких normalizeIconCode!)
   return normalizeDbIconCode(m.dbCode ?? null) ?? normalizeDbIconCode(m.code) ?? m.code;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// IconThumb: картинка -> эмодзи пока грузится
-// ─────────────────────────────────────────────────────────────────────────────
 
 function IconThumb({
   urls,
@@ -441,10 +431,6 @@ function IconThumb({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DB-first load
-// ─────────────────────────────────────────────────────────────────────────────
-
 type DbRoadmapPayload = {
   iconCatalog?: any[] | null;
   titleCatalog?: any[] | null;
@@ -453,6 +439,7 @@ type DbRoadmapPayload = {
 async function fetchDbRoadmap(): Promise<DbRoadmapPayload> {
   const res = await fetch("/api/profile-streak", { method: "GET", cache: "no-store" });
   const json = await res.json().catch(() => null);
+
   if (!res.ok || !json?.ok) {
     throw new Error(json?.error || "Не удалось загрузить дорожку");
   }
@@ -462,10 +449,6 @@ async function fetchDbRoadmap(): Promise<DbRoadmapPayload> {
     titleCatalog: Array.isArray(json.titleCatalog) ? json.titleCatalog : null,
   };
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Component
-// ─────────────────────────────────────────────────────────────────────────────
 
 export default function StreakRoadmapModal({
   open,
@@ -491,14 +474,13 @@ export default function StreakRoadmapModal({
   const [dbIconsRaw, setDbIconsRaw] = useState<any[] | null>(null);
   const [dbTitlesRaw, setDbTitlesRaw] = useState<any[] | null>(null);
 
-  // ✅ Roadmap background url (null => fallback to default css)
   const [roadmapBgUrl, setRoadmapBgUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
+
     if (!open) return;
 
-    // background load (silent)
     resolveRoadmapBgUrl()
       .then((url) => {
         if (!alive) return;
@@ -518,12 +500,14 @@ export default function StreakRoadmapModal({
     fetchDbRoadmap()
       .then((payload) => {
         if (!alive) return;
+
         setDbIconsRaw(Array.isArray(payload.iconCatalog) ? payload.iconCatalog : []);
         setDbTitlesRaw(Array.isArray(payload.titleCatalog) ? payload.titleCatalog : []);
         setDbLoading(false);
       })
       .catch((e: any) => {
         if (!alive) return;
+
         setDbLoading(false);
         setDbError(String(e?.message || "Не удалось загрузить дорожку"));
         setDbIconsRaw([]);
@@ -548,7 +532,6 @@ export default function StreakRoadmapModal({
       ? (dbTitlesRaw.map(normalizeDbTitleRow).filter(Boolean) as NormalizedMilestone[])
       : [];
 
-    // ✅ больше НЕ режем иконки по dbCode (теперь оно всегда есть)
     return {
       icons: dedupeByDayKeepFirst(iconsDb.sort((a, b) => a.day - b.day || a.label.localeCompare(b.label, "ru"))),
       titles: titlesDb.sort((a, b) => a.day - b.day || a.label.localeCompare(b.label, "ru")),
@@ -567,41 +550,53 @@ export default function StreakRoadmapModal({
 
   const unlockedSet = useMemo(() => {
     const set = new Set<string>();
+
     if (Array.isArray(unlockedIconCodes)) {
       for (const c of unlockedIconCodes) {
         const n = normalizeDbIconCode(c);
         if (n) set.add(n);
       }
     }
+
     return set;
   }, [unlockedIconCodes]);
 
   const effectiveSelectedIconCode = useMemo(() => {
     const sel = normalizeDbIconCode(selectedIconCode);
+
     if (sel) {
       const found = icons.find((m) => getSelectableCodeForIcon(m) === sel);
       if (found) return getSelectableCodeForIcon(found);
     }
-    const latestUnlocked = [...icons].filter((m) => m.day <= longestStreak).sort((a, b) => a.day - b.day).at(-1);
+
+    const latestUnlocked = [...icons]
+      .filter((m) => m.day <= longestStreak)
+      .sort((a, b) => a.day - b.day)
+      .at(-1);
+
     return latestUnlocked ? getSelectableCodeForIcon(latestUnlocked) : null;
   }, [selectedIconCode, icons, longestStreak]);
 
   const selectedIcon = useMemo(() => {
     if (!effectiveSelectedIconCode) return null;
+
     return icons.find((m) => getSelectableCodeForIcon(m) === effectiveSelectedIconCode) ?? null;
   }, [icons, effectiveSelectedIconCode]);
 
   const nextReward = useMemo(() => {
     const next = mergedRoadmap.find((m) => longestStreak < m.day) ?? null;
+
     if (!next) return null;
+
     return { ...next, left: Math.max(0, next.day - currentStreak) };
   }, [mergedRoadmap, longestStreak, currentStreak]);
 
-  const lineProgressPercent = useMemo(() => computeRailProgressPercent(currentStreak, roadmapRows), [currentStreak, roadmapRows]);
+  const lineProgressPercent = useMemo(
+    () => computeRailProgressPercent(currentStreak, roadmapRows),
+    [currentStreak, roadmapRows],
+  );
 
   const showAnyError = error || dbError;
-
-  // ✅ CSS var for background: if null => keep default gradients only
   const roadmapBgCss = roadmapBgUrl ? `url('${roadmapBgUrl}')` : "none";
 
   return (
@@ -638,6 +633,7 @@ export default function StreakRoadmapModal({
             <span>{tierBadge.icon}</span>
             <b>{tierBadge.label}</b>
           </div>
+
           <div className="srm-status-pill">
             <span>🏷️</span>
             <b>{equippedTitleLabel?.trim() || "Титул не выбран"}</b>
@@ -672,6 +668,7 @@ export default function StreakRoadmapModal({
           ) : (
             <div className="srm-next-card">
               <div className="srm-next-kind">{nextReward.kind === "title" ? "🏷️ Титул" : "🎖️ Иконка"}</div>
+
               <div className="srm-next-main">
                 <div className="srm-next-name">{nextReward.label}</div>
                 <div className="srm-next-sub">
@@ -679,6 +676,7 @@ export default function StreakRoadmapModal({
                   {nextReward.left === 1 ? "день" : nextReward.left >= 2 && nextReward.left <= 4 ? "дня" : "дней"}
                 </div>
               </div>
+
               <div className="srm-next-badge">+{nextReward.left}</div>
             </div>
           )}
@@ -688,7 +686,9 @@ export default function StreakRoadmapModal({
           <div className="srm-panel-header">
             <div>
               <div className="srm-panel-title">Иконки серии</div>
-              <div className="srm-panel-subtitle">Дни/названия берутся из БД. Отключённые/удалённые иконки не показываются.</div>
+              <div className="srm-panel-subtitle">
+                Дни/названия берутся из БД. Отключённые/удалённые иконки не показываются.
+              </div>
             </div>
           </div>
 
@@ -698,11 +698,10 @@ export default function StreakRoadmapModal({
 
           <div className="srm-icons-grid">
             {icons.map((m) => {
-              const selectCode = getSelectableCodeForIcon(m); // ✅ DB code
+              const selectCode = getSelectableCodeForIcon(m);
               const unlockedByDay = longestStreak >= m.day;
               const unlockedByList = unlockedSet.has(selectCode);
               const unlocked = unlockedByDay || unlockedByList;
-
               const selected = effectiveSelectedIconCode === selectCode;
 
               const urls = safeUniqUrls([m.publicUrl, ...(m.candidatePublicUrls ?? [])]);
@@ -717,7 +716,7 @@ export default function StreakRoadmapModal({
                     .join(" ")}
                   onClick={() => {
                     if (!unlocked) return;
-                    onSelectIconCode?.(selectCode); // ✅ отправляем DB code
+                    onSelectIconCode?.(selectCode);
                   }}
                   disabled={!unlocked}
                   title={unlocked ? `${m.label} • ${m.day} дн.` : `${m.label} • откроется на ${m.day} дне`}
@@ -726,6 +725,7 @@ export default function StreakRoadmapModal({
                     <div className="srm-icon-ball" aria-hidden="true">
                       <IconThumb urls={urls} emoji={emoji} alt={m.label} size={44} radius={14} />
                     </div>
+
                     {!unlocked ? <div className="srm-lock-badge">🔒</div> : null}
                   </div>
 
@@ -740,6 +740,7 @@ export default function StreakRoadmapModal({
 
           <div className="srm-selected-row">
             <span className="srm-selected-label">Текущая выбранная:</span>
+
             <span className="srm-selected-pill">
               <span style={{ display: "inline-flex", alignItems: "center" }}>
                 {selectedIcon ? (
@@ -756,6 +757,7 @@ export default function StreakRoadmapModal({
               </span>
               <b>{selectedIcon?.label || "—"}</b>
             </span>
+
             {selectedIcon?.description ? <span className="srm-selected-sub">{selectedIcon.description}</span> : null}
           </div>
         </section>
@@ -763,8 +765,8 @@ export default function StreakRoadmapModal({
         <section className="srm-panel">
           <div className="srm-panel-title">Дорожка наград</div>
           <div className="srm-panel-subtitle">
-            Полоса серии по центру. <b>Титулы — слева</b>, <b>иконки — справа</b>. Награды одного дня идут в одной строке.
-            Дни/названия — из БД.
+            Полоса серии по центру. <b>Титулы — слева</b>, <b>иконки — справа</b>. Награды одного дня идут в одной
+            строке. Дни/названия — из БД.
           </div>
 
           <div className="srm-roadmap-wrap" style={{ ["--srm-roadmap-bg" as any]: roadmapBgCss }}>
@@ -785,7 +787,6 @@ export default function StreakRoadmapModal({
                 const rowUnlockedByLongest = longestStreak >= row.day;
                 const rowReachedByCurrent = currentStreak >= row.day;
                 const isCurrentTarget = !!nextReward && nextReward.day === row.day;
-
                 const nodeEmoji = row.icon?.emoji || (row.title ? "🏷️" : "🎯");
 
                 return (
@@ -813,7 +814,9 @@ export default function StreakRoadmapModal({
                     </div>
 
                     <div className="srm-road-center">
-                      <div className={`srm-node ${rowReachedByCurrent ? "is-reached" : ""} ${isCurrentTarget ? "is-next" : ""}`}>{nodeEmoji}</div>
+                      <div className={`srm-node ${rowReachedByCurrent ? "is-reached" : ""} ${isCurrentTarget ? "is-next" : ""}`}>
+                        {nodeEmoji}
+                      </div>
                       <div className="srm-node-day">{row.day}д</div>
                     </div>
 
@@ -837,6 +840,7 @@ export default function StreakRoadmapModal({
                                 radius={16}
                               />
                             </div>
+
                             <div className="srm-road-card-inlineText">
                               <div className="srm-road-card-day">{row.icon.day} дн.</div>
                               <div className="srm-road-card-title">{row.icon.label}</div>
@@ -856,7 +860,6 @@ export default function StreakRoadmapModal({
         </section>
       </div>
 
-      {/* styles unchanged (plus bg layer) */}
       <style jsx>{`
         .streak-roadmap-modal {
           display: flex;
@@ -864,6 +867,7 @@ export default function StreakRoadmapModal({
           gap: 18px;
           color: #273444;
         }
+
         .srm-panel {
           background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(245,250,255,0.92));
           border: 1px solid rgba(136, 170, 196, 0.18);
@@ -873,6 +877,7 @@ export default function StreakRoadmapModal({
             0 10px 28px rgba(56, 88, 120, 0.08),
             inset 0 1px 0 rgba(255,255,255,0.75);
         }
+
         .srm-panel-header {
           display: flex;
           align-items: flex-start;
@@ -880,12 +885,14 @@ export default function StreakRoadmapModal({
           gap: 12px;
           margin-bottom: 10px;
         }
+
         .srm-panel-title {
           font-size: 20px;
           font-weight: 900;
           line-height: 1.15;
           color: #314457;
         }
+
         .srm-panel-subtitle {
           margin-top: 6px;
           font-size: 13px;
@@ -893,11 +900,13 @@ export default function StreakRoadmapModal({
           color: rgba(49, 68, 87, 0.68);
           line-height: 1.35;
         }
+
         .srm-top-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 12px;
         }
+
         .srm-stat-card {
           border-radius: 18px;
           padding: 14px;
@@ -908,18 +917,23 @@ export default function StreakRoadmapModal({
           box-shadow: 0 8px 22px rgba(39, 58, 83, 0.06);
           min-height: 84px;
         }
+
         .srm-stat-card--warm {
           background: linear-gradient(135deg, rgba(255,247,236,0.96), rgba(255,240,224,0.9));
         }
+
         .srm-stat-card--cool {
           background: linear-gradient(135deg, rgba(243,248,255,0.97), rgba(236,244,255,0.92));
         }
+
         .srm-stat-card--done {
           background: linear-gradient(135deg, rgba(235,252,240,0.98), rgba(223,247,231,0.93));
         }
+
         .srm-stat-card--todo {
           background: linear-gradient(135deg, rgba(255,249,232,0.98), rgba(255,244,214,0.92));
         }
+
         .srm-stat-icon {
           width: 46px;
           height: 46px;
@@ -932,7 +946,11 @@ export default function StreakRoadmapModal({
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);
           flex: 0 0 auto;
         }
-        .srm-stat-content { min-width: 0; }
+
+        .srm-stat-content {
+          min-width: 0;
+        }
+
         .srm-stat-value {
           font-size: 24px;
           font-weight: 900;
@@ -940,18 +958,21 @@ export default function StreakRoadmapModal({
           line-height: 1.05;
           color: #263a4e;
         }
+
         .srm-stat-label {
           margin-top: 4px;
           font-size: 13px;
           font-weight: 800;
           color: rgba(38, 58, 78, 0.62);
         }
+
         .srm-status-line {
           display: flex;
           flex-wrap: wrap;
           gap: 10px;
           margin-top: -2px;
         }
+
         .srm-status-pill {
           display: inline-flex;
           align-items: center;
@@ -964,12 +985,17 @@ export default function StreakRoadmapModal({
           font-weight: 800;
           color: #33475c;
         }
+
         .srm-status-pill--error {
           background: rgba(255, 241, 241, 0.92);
           border-color: rgba(220, 65, 65, 0.18);
           color: #a53030;
         }
-        .srm-next-panel { padding-top: 14px; }
+
+        .srm-next-panel {
+          padding-top: 14px;
+        }
+
         .srm-next-card {
           margin-top: 10px;
           display: grid;
@@ -981,6 +1007,7 @@ export default function StreakRoadmapModal({
           background: linear-gradient(135deg, rgba(240,247,255,0.98), rgba(232,244,255,0.94));
           border: 1px solid rgba(111, 154, 201, 0.16);
         }
+
         .srm-next-kind {
           font-size: 12px;
           font-weight: 900;
@@ -991,19 +1018,25 @@ export default function StreakRoadmapModal({
           border-radius: 999px;
           white-space: nowrap;
         }
-        .srm-next-main { min-width: 0; }
+
+        .srm-next-main {
+          min-width: 0;
+        }
+
         .srm-next-name {
           font-size: 19px;
           font-weight: 900;
           color: #2d4156;
           line-height: 1.1;
         }
+
         .srm-next-sub {
           margin-top: 4px;
           font-size: 13px;
           font-weight: 700;
           color: rgba(45,65,86,0.72);
         }
+
         .srm-next-badge {
           font-size: 18px;
           font-weight: 900;
@@ -1013,6 +1046,7 @@ export default function StreakRoadmapModal({
           border-radius: 12px;
           padding: 8px 12px;
         }
+
         .srm-next-final {
           margin-top: 10px;
           display: flex;
@@ -1023,6 +1057,7 @@ export default function StreakRoadmapModal({
           background: linear-gradient(135deg, rgba(242,255,245,0.97), rgba(236,251,240,0.93));
           border: 1px solid rgba(88, 176, 114, 0.14);
         }
+
         .srm-next-final-icon {
           width: 44px;
           height: 44px;
@@ -1032,23 +1067,27 @@ export default function StreakRoadmapModal({
           background: rgba(255,255,255,0.86);
           font-size: 22px;
         }
+
         .srm-next-final-title {
           font-size: 16px;
           font-weight: 900;
           color: #2f4b3c;
         }
+
         .srm-next-final-sub {
           margin-top: 3px;
           font-size: 13px;
           font-weight: 700;
           color: rgba(47,75,60,0.68);
         }
+
         .srm-icons-grid {
           display: grid;
           grid-template-columns: repeat(6, minmax(0, 1fr));
           gap: 12px;
           margin-top: 12px;
         }
+
         .srm-icon-tile {
           border-radius: 16px;
           border: 1px solid rgba(129, 157, 183, 0.16);
@@ -1063,12 +1102,21 @@ export default function StreakRoadmapModal({
           transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
           box-shadow: 0 6px 18px rgba(57, 89, 122, 0.06);
         }
+
         .srm-icon-tile:hover:not(:disabled) {
           transform: translateY(-2px);
           box-shadow: 0 10px 24px rgba(57, 89, 122, 0.1);
         }
-        .srm-icon-tile:disabled { cursor: not-allowed; }
-        .srm-icon-tile.is-locked { opacity: 0.72; filter: grayscale(0.15); }
+
+        .srm-icon-tile:disabled {
+          cursor: not-allowed;
+        }
+
+        .srm-icon-tile.is-locked {
+          opacity: 0.72;
+          filter: grayscale(0.15);
+        }
+
         .srm-icon-tile.is-selected {
           border-color: rgba(74, 180, 220, 0.58);
           box-shadow:
@@ -1076,6 +1124,7 @@ export default function StreakRoadmapModal({
             0 10px 28px rgba(60, 153, 194, 0.14);
           background: linear-gradient(180deg, rgba(246,252,255,1), rgba(236,249,255,0.98));
         }
+
         .srm-icon-tile-top {
           width: 100%;
           display: flex;
@@ -1084,6 +1133,7 @@ export default function StreakRoadmapModal({
           position: relative;
           min-height: 44px;
         }
+
         .srm-icon-ball {
           width: 44px;
           height: 44px;
@@ -1094,6 +1144,7 @@ export default function StreakRoadmapModal({
           border: 1px solid rgba(129,157,183,0.16);
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
         }
+
         .srm-lock-badge {
           position: absolute;
           top: -2px;
@@ -1104,6 +1155,7 @@ export default function StreakRoadmapModal({
           padding: 2px 5px;
           border: 1px solid rgba(129,157,183,0.18);
         }
+
         .srm-icon-title {
           margin-top: 2px;
           font-size: 13px;
@@ -1112,11 +1164,13 @@ export default function StreakRoadmapModal({
           text-align: center;
           color: #34485e;
         }
+
         .srm-icon-day {
           font-size: 12px;
           font-weight: 900;
           color: rgba(52,72,94,0.64);
         }
+
         .srm-icon-meta {
           margin-top: auto;
           font-size: 11px;
@@ -1124,7 +1178,11 @@ export default function StreakRoadmapModal({
           color: rgba(52,72,94,0.6);
           text-align: center;
         }
-        .srm-icon-tile.is-selected .srm-icon-meta { color: #3fa7c6; }
+
+        .srm-icon-tile.is-selected .srm-icon-meta {
+          color: #3fa7c6;
+        }
+
         .srm-selected-row {
           margin-top: 12px;
           display: flex;
@@ -1132,11 +1190,13 @@ export default function StreakRoadmapModal({
           gap: 10px;
           flex-wrap: wrap;
         }
+
         .srm-selected-label {
           font-size: 13px;
           font-weight: 800;
           color: rgba(47,64,82,0.72);
         }
+
         .srm-selected-pill {
           display: inline-flex;
           align-items: center;
@@ -1148,13 +1208,13 @@ export default function StreakRoadmapModal({
           color: #35607a;
           font-size: 13px;
         }
+
         .srm-selected-sub {
           font-size: 12px;
           font-weight: 700;
           color: rgba(53,96,122,0.72);
         }
 
-        /* ✅ background: if --srm-roadmap-bg is "none" => only default gradients stay */
         .srm-roadmap-wrap {
           position: relative;
           margin-top: 14px;
@@ -1166,7 +1226,6 @@ export default function StreakRoadmapModal({
           background-repeat: repeat, no-repeat, no-repeat, no-repeat;
           background-position: center, center, center, center;
           background-size: 1024px 1024px, cover, cover, cover;
-
           border: 1px solid rgba(136,170,196,0.14);
           border-radius: 22px;
           padding: 18px 14px;
@@ -1183,6 +1242,7 @@ export default function StreakRoadmapModal({
           pointer-events: none;
           z-index: 1;
         }
+
         .srm-center-rail-track {
           position: absolute;
           left: 50%;
@@ -1194,6 +1254,7 @@ export default function StreakRoadmapModal({
           background: linear-gradient(180deg, rgba(209,225,240,0.85), rgba(197,219,238,0.7));
           box-shadow: inset 0 1px 2px rgba(255,255,255,0.75);
         }
+
         .srm-center-rail-progress {
           position: absolute;
           left: 50%;
@@ -1206,6 +1267,7 @@ export default function StreakRoadmapModal({
             0 0 0 4px rgba(255, 154, 67, 0.08),
             0 6px 16px rgba(255, 120, 63, 0.2);
         }
+
         .srm-center-progress-bubble {
           position: absolute;
           left: 50%;
@@ -1220,6 +1282,7 @@ export default function StreakRoadmapModal({
           box-shadow: 0 8px 22px rgba(255, 129, 55, 0.14);
           white-space: nowrap;
         }
+
         .srm-roadmap-list {
           position: relative;
           z-index: 2;
@@ -1227,6 +1290,7 @@ export default function StreakRoadmapModal({
           flex-direction: column;
           gap: 14px;
         }
+
         .srm-road-row {
           display: grid;
           grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr);
@@ -1234,13 +1298,21 @@ export default function StreakRoadmapModal({
           gap: 12px;
           min-height: 124px;
         }
+
         .srm-road-side {
           min-height: 1px;
           display: flex;
           align-items: center;
         }
-        .srm-road-side > * { width: 100%; }
-        .srm-road-placeholder { height: 1px; }
+
+        .srm-road-side > * {
+          width: 100%;
+        }
+
+        .srm-road-placeholder {
+          height: 1px;
+        }
+
         .srm-road-center {
           display: flex;
           flex-direction: column;
@@ -1249,6 +1321,7 @@ export default function StreakRoadmapModal({
           gap: 6px;
           min-height: 124px;
         }
+
         .srm-node {
           width: 44px;
           height: 44px;
@@ -1261,6 +1334,7 @@ export default function StreakRoadmapModal({
           box-shadow: 0 6px 16px rgba(58, 87, 117, 0.08);
           transition: transform 0.15s ease;
         }
+
         .srm-node.is-reached {
           border-color: rgba(255, 145, 68, 0.25);
           box-shadow:
@@ -1268,7 +1342,11 @@ export default function StreakRoadmapModal({
             0 8px 20px rgba(255, 142, 77, 0.16);
           background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(255,247,240,0.98));
         }
-        .srm-node.is-next { transform: scale(1.06); }
+
+        .srm-node.is-next {
+          transform: scale(1.06);
+        }
+
         .srm-node-day {
           font-size: 11px;
           font-weight: 900;
@@ -1279,6 +1357,7 @@ export default function StreakRoadmapModal({
           border-radius: 999px;
           line-height: 1;
         }
+
         .srm-road-card {
           border-radius: 18px;
           border: 1px solid rgba(136,170,196,0.16);
@@ -1287,12 +1366,15 @@ export default function StreakRoadmapModal({
           box-shadow: 0 8px 22px rgba(56, 86, 116, 0.06);
           min-height: 104px;
         }
+
         .srm-road-card--title {
           background: linear-gradient(135deg, rgba(246,250,255,0.98), rgba(241,248,255,0.95));
         }
+
         .srm-road-card--icon {
           background: linear-gradient(135deg, rgba(255,250,242,0.98), rgba(255,247,235,0.94));
         }
+
         .srm-road-card-top {
           display: flex;
           align-items: center;
@@ -1300,6 +1382,7 @@ export default function StreakRoadmapModal({
           gap: 8px;
           margin-bottom: 8px;
         }
+
         .srm-kind-chip {
           display: inline-flex;
           align-items: center;
@@ -1311,8 +1394,17 @@ export default function StreakRoadmapModal({
           border: 1px solid rgba(136,170,196,0.14);
           white-space: nowrap;
         }
-        .srm-kind-chip--title { background: rgba(236,244,255,0.98); color: #45617d; }
-        .srm-kind-chip--icon { background: rgba(255,243,227,0.98); color: #8a5a2c; }
+
+        .srm-kind-chip--title {
+          background: rgba(236,244,255,0.98);
+          color: #45617d;
+        }
+
+        .srm-kind-chip--icon {
+          background: rgba(255,243,227,0.98);
+          color: #8a5a2c;
+        }
+
         .srm-state-chip {
           border-radius: 999px;
           padding: 5px 8px;
@@ -1321,22 +1413,26 @@ export default function StreakRoadmapModal({
           white-space: nowrap;
           border: 1px solid transparent;
         }
+
         .srm-state-chip.ok {
           background: rgba(231, 250, 236, 0.98);
           color: #2d8b52;
           border-color: rgba(45, 139, 82, 0.12);
         }
+
         .srm-state-chip.lock {
           background: rgba(244,247,251,0.98);
           color: #6a7f96;
           border-color: rgba(106,127,150,0.12);
         }
+
         .srm-road-card-day {
           font-size: 18px;
           font-weight: 900;
           color: #2c4155;
           line-height: 1.1;
         }
+
         .srm-road-card-title {
           margin-top: 4px;
           font-size: 16px;
@@ -1344,6 +1440,7 @@ export default function StreakRoadmapModal({
           color: #2f465d;
           line-height: 1.15;
         }
+
         .srm-road-card-desc {
           margin-top: 5px;
           font-size: 12px;
@@ -1351,12 +1448,14 @@ export default function StreakRoadmapModal({
           color: rgba(47,70,93,0.66);
           line-height: 1.3;
         }
+
         .srm-road-card-inline {
           display: grid;
           grid-template-columns: 56px minmax(0, 1fr);
           gap: 10px;
           align-items: center;
         }
+
         .srm-road-card-iconBall {
           width: 52px;
           height: 52px;
@@ -1369,13 +1468,32 @@ export default function StreakRoadmapModal({
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);
           overflow: hidden;
         }
-        .srm-road-card-inlineText { min-width: 0; }
 
-        @media (max-width: 1100px) { .srm-icons-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+        .srm-road-card-inlineText {
+          min-width: 0;
+        }
+
+        @media (max-width: 1100px) {
+          .srm-icons-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+        }
+
         @media (max-width: 900px) {
-          .srm-top-grid { grid-template-columns: 1fr; }
-          .srm-icons-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-          .srm-roadmap-wrap { padding-left: 10px; padding-right: 10px; background-size: 820px 820px, cover, cover, cover; }
+          .srm-top-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .srm-icons-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+
+          .srm-roadmap-wrap {
+            padding-left: 10px;
+            padding-right: 10px;
+            background-size: 820px 820px, cover, cover, cover;
+          }
+
           .srm-road-row {
             grid-template-columns: 1fr;
             gap: 8px;
@@ -1383,7 +1501,11 @@ export default function StreakRoadmapModal({
             position: relative;
             min-height: unset;
           }
-          .srm-center-rail { left: 26px; }
+
+          .srm-center-rail {
+            left: 26px;
+          }
+
           .srm-road-center {
             position: absolute;
             left: 0;
@@ -1391,15 +1513,38 @@ export default function StreakRoadmapModal({
             width: 52px;
             min-height: unset;
           }
-          .srm-road-side--left, .srm-road-side--right { width: 100%; }
-          .srm-road-placeholder { display: none; }
+
+          .srm-road-side--left,
+          .srm-road-side--right {
+            width: 100%;
+          }
+
+          .srm-road-placeholder {
+            display: none;
+          }
         }
+
         @media (max-width: 640px) {
-          .srm-icons-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-          .srm-next-card { grid-template-columns: 1fr; align-items: start; }
-          .srm-next-badge { justify-self: start; }
-          .srm-road-card-top { flex-wrap: wrap; }
-          .srm-roadmap-wrap { background-size: 700px 700px, cover, cover, cover; }
+          .srm-icons-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .srm-next-card {
+            grid-template-columns: 1fr;
+            align-items: start;
+          }
+
+          .srm-next-badge {
+            justify-self: start;
+          }
+
+          .srm-road-card-top {
+            flex-wrap: wrap;
+          }
+
+          .srm-roadmap-wrap {
+            background-size: 700px 700px, cover, cover, cover;
+          }
         }
       `}</style>
     </Modal>

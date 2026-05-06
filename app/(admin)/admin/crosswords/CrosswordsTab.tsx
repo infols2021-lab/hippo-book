@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useEffect, useRef, useState } from "react";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import LoadingBlock from "@/components/LoadingBlock";
 import ErrorBox from "@/components/ErrorBox";
 
-type Props = { onChanged?: () => void | Promise<void> };
+type Props = {
+  onChanged?: () => void | Promise<void>;
+};
 
 type CrosswordRow = {
   id: string;
@@ -16,6 +18,35 @@ type CrosswordRow = {
   order_index: number | null;
   is_available: boolean | null;
   is_active: boolean | null;
+  assignments_count?: number | null;
+  assignment_count?: number | null;
+  assignmentsCount?: number | null;
+  _count?: {
+    assignments?: number | null;
+  } | null;
+};
+
+type AssignmentLike = {
+  id?: string;
+  crossword_id?: string | null;
+  crosswordId?: string | null;
+};
+
+type UploadApiResponse = {
+  ok?: boolean;
+  error?: string;
+  url?: string | null;
+  publicUrl?: string | null;
+  imageUrl?: string | null;
+  path?: string | null;
+  bucket?: string | null;
+  data?: {
+    url?: string | null;
+    publicUrl?: string | null;
+    imageUrl?: string | null;
+    path?: string | null;
+    bucket?: string | null;
+  } | null;
 };
 
 const CLASS_OPTIONS: Array<{ value: string; label: string }> = [
@@ -28,21 +59,150 @@ const CLASS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "12", label: "12 класс (колледж)" },
 ];
 
-function safeArr(v: any): string[] {
+function safeArr(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   return v.map(String).filter(Boolean);
 }
 
-export default function CrosswordsTab({ onChanged }: Props) {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+async function readJsonSafe<T = any>(res: Response): Promise<T | null> {
+  const text = await res.text();
 
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeUiErrorMessage(error: unknown, fallback = "Ошибка") {
+  const raw =
+    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
+
+  const msg = raw.trim();
+
+  if (!msg) return fallback;
+
+  const lower = msg.toLowerCase();
+
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network request failed") ||
+    lower.includes("load failed")
+  ) {
+    return "Ошибка соединения с сервером";
+  }
+
+  return msg;
+}
+
+function cacheBustUrl(url: string) {
+  if (!url) return "";
+  return `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+}
+
+function extractUploadUrl(json: UploadApiResponse | null, fallbackBucket: string): string {
+  if (!json) return "";
+
+  const directUrl = json.publicUrl || json.url || json.imageUrl || json.data?.publicUrl || json.data?.url || json.data?.imageUrl;
+
+  if (directUrl) return String(directUrl);
+
+  const bucket = json.bucket || json.data?.bucket || fallbackBucket;
+  const path = json.path || json.data?.path;
+
+  if (bucket && path) {
+    return getStoragePublicUrl(String(bucket), String(path));
+  }
+
+  return "";
+}
+
+async function uploadImageThroughApi(params: {
+  file: File;
+  bucket: string;
+  folder: string;
+}) {
+  const formData = new FormData();
+
+  formData.append("file", params.file);
+  formData.append("bucket", params.bucket);
+  formData.append("folder", params.folder);
+  formData.append("pathPrefix", params.folder);
+
+  const res = await fetch("/api/admin/upload", {
+    method: "POST",
+    body: formData,
+    cache: "no-store",
+  });
+
+  const json = await readJsonSafe<UploadApiResponse>(res);
+
+  if (!res.ok || !json?.ok) {
+    throw new Error(json?.error || `HTTP ${res.status}`);
+  }
+
+  const uploadedUrl = extractUploadUrl(json, params.bucket);
+
+  if (!uploadedUrl) {
+    throw new Error("Сервер загрузил файл, но не вернул publicUrl");
+  }
+
+  return cacheBustUrl(uploadedUrl);
+}
+
+function getInlineCount(row: CrosswordRow) {
+  const raw = row.assignments_count ?? row.assignment_count ?? row.assignmentsCount ?? row._count?.assignments ?? null;
+  const n = Number(raw);
+
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
+}
+
+function buildCountsFromAssignments(assignments: AssignmentLike[]) {
+  const map: Record<string, number> = {};
+
+  for (const assignment of assignments) {
+    const crosswordId = assignment.crossword_id ?? assignment.crosswordId ?? null;
+
+    if (crosswordId) {
+      map[String(crosswordId)] = (map[String(crosswordId)] || 0) + 1;
+    }
+  }
+
+  return map;
+}
+
+async function loadAssignmentCountsFallback() {
+  try {
+    const res = await fetch("/api/admin/assignments?limit=5000", {
+      cache: "no-store",
+    });
+
+    const json = await readJsonSafe<any>(res);
+
+    if (!res.ok || json?.ok === false) return {};
+
+    const assignments = Array.isArray(json?.assignments)
+      ? json.assignments
+      : Array.isArray(json?.data)
+        ? json.data
+        : [];
+
+    return buildCountsFromAssignments(assignments);
+  } catch {
+    return {};
+  }
+}
+
+export default function CrosswordsTab({ onChanged }: Props) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   const [crosswords, setCrosswords] = useState<CrosswordRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
 
-  // form
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -52,12 +212,12 @@ export default function CrosswordsTab({ onChanged }: Props) {
   const [orderIndex, setOrderIndex] = useState<number>(0);
   const [isAvailable, setIsAvailable] = useState(false);
 
-  // cover
   const [coverUrl, setCoverUrl] = useState<string>("");
   const [coverPreview, setCoverPreview] = useState<string>("");
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [saving, setSaving] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   async function load() {
     try {
@@ -65,26 +225,30 @@ export default function CrosswordsTab({ onChanged }: Props) {
       setErr(null);
 
       const res = await fetch("/api/admin/crosswords", { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok || json?.ok === false) throw new Error(json?.error || "Не удалось загрузить кроссворды");
+      const json = await readJsonSafe<any>(res);
+
+      if (!res.ok || json?.ok === false) {
+        throw new Error(json?.error || "Не удалось загрузить кроссворды");
+      }
 
       const list: CrosswordRow[] = Array.isArray(json?.crosswords) ? json.crosswords : [];
+
       setCrosswords(list);
 
-      // counts
-      const { data: ass, error: aErr } = await supabase.from("assignments").select("id,crossword_id");
-      if (!aErr) {
-        const m: Record<string, number> = {};
-        (ass ?? []).forEach((a: any) => {
-          const cid = a?.crossword_id;
-          if (cid) m[String(cid)] = (m[String(cid)] || 0) + 1;
-        });
-        setCounts(m);
+      const inlineCounts: Record<string, number> = {};
+
+      for (const cw of list) {
+        const count = getInlineCount(cw);
+        if (count !== null) inlineCounts[cw.id] = count;
+      }
+
+      if (Object.keys(inlineCounts).length > 0) {
+        setCounts(inlineCounts);
       } else {
-        setCounts({});
+        setCounts(await loadAssignmentCountsFallback());
       }
     } catch (e: any) {
-      setErr(e?.message || "Ошибка");
+      setErr(normalizeUiErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -120,33 +284,33 @@ export default function CrosswordsTab({ onChanged }: Props) {
   }
 
   function closeForm() {
+    if (saving || uploadingCover) return;
     setFormOpen(false);
   }
 
   async function uploadCover(file: File) {
-    const bucket = "covers";
     const ext = (file.name.split(".").pop() || "bin").toLowerCase();
     const allowed = ["jpg", "jpeg", "png", "gif", "webp", "avif"];
-    if (!allowed.includes(ext)) throw new Error("Поддерживаются JPG/PNG/GIF/WebP/AVIF");
-    if (file.size > 5 * 1024 * 1024) throw new Error("Файл больше 5MB");
 
-    const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    if (!allowed.includes(ext)) {
+      throw new Error("Поддерживаются JPG/PNG/GIF/WebP/AVIF");
+    }
 
-    const { error } = await supabase.storage.from(bucket).upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type || "application/octet-stream",
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error("Файл больше 5MB");
+    }
+
+    return uploadImageThroughApi({
+      file,
+      bucket: "covers",
+      folder: "crosswords",
     });
-
-    if (error) throw new Error(error.message);
-
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    return data.publicUrl;
   }
 
   async function onPickCover(file: File) {
     const local = URL.createObjectURL(file);
     setCoverPreview(local);
+    setUploadingCover(true);
 
     try {
       const url = await uploadCover(file);
@@ -155,28 +319,42 @@ export default function CrosswordsTab({ onChanged }: Props) {
     } catch (e: any) {
       setCoverUrl("");
       setCoverPreview("");
-      alert("❌ Ошибка загрузки обложки: " + (e?.message || String(e)));
+      alert("❌ Ошибка загрузки обложки: " + normalizeUiErrorMessage(e));
+    } finally {
+      setUploadingCover(false);
+
+      if (fileRef.current) {
+        fileRef.current.value = "";
+      }
     }
   }
 
-  function toggleClass(v: string) {
-    setClassLevel((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
+  function toggleClass(value: string) {
+    setClassLevel((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]));
   }
 
   async function save() {
-    const t = title.trim();
-    const cls = classLevel;
+    const normalizedTitle = title.trim();
+    const normalizedClassLevels = classLevel;
 
-    if (!t) return alert("❌ Введите название кроссворда");
-    if (!cls.length) return alert("❌ Выберите хотя бы один класс");
+    if (!normalizedTitle) {
+      alert("❌ Введите название кроссворда");
+      return;
+    }
+
+    if (!normalizedClassLevels.length) {
+      alert("❌ Выберите хотя бы один класс");
+      return;
+    }
 
     setSaving(true);
+
     try {
       const payload = {
-        title: t,
-        description: description.trim(),
-        class_level: cls,
-        order_index: orderIndex,
+        title: normalizedTitle,
+        description: description.trim() || null,
+        class_level: normalizedClassLevels,
+        order_index: Number.isFinite(Number(orderIndex)) ? Number(orderIndex) : 0,
         is_available: isAvailable,
         cover_image_url: coverUrl || null,
       };
@@ -185,49 +363,54 @@ export default function CrosswordsTab({ onChanged }: Props) {
         ? await fetch(`/api/admin/crosswords/${encodeURIComponent(editingId)}`, {
             method: "PATCH",
             headers: { "content-type": "application/json" },
+            cache: "no-store",
             body: JSON.stringify(payload),
           })
         : await fetch("/api/admin/crosswords", {
             method: "POST",
             headers: { "content-type": "application/json" },
+            cache: "no-store",
             body: JSON.stringify(payload),
           });
 
-      const json = await res.json();
-      if (!res.ok || json?.ok === false) throw new Error(json?.error || "Не удалось сохранить");
+      const json = await readJsonSafe<any>(res);
+
+      if (!res.ok || json?.ok === false) {
+        throw new Error(json?.error || "Не удалось сохранить");
+      }
 
       setFormOpen(false);
       await load();
       await onChanged?.();
     } catch (e: any) {
-      alert("❌ Ошибка сохранения: " + (e?.message || String(e)));
+      alert("❌ Ошибка сохранения: " + normalizeUiErrorMessage(e));
     } finally {
       setSaving(false);
     }
   }
 
   async function del(cw: CrosswordRow) {
-  const okConfirm = confirm(`Удалить кроссворд "${cw.title}"?`);
-  if (!okConfirm) return;
+    const okConfirm = window.confirm(`Удалить кроссворд "${cw.title}"?`);
+    if (!okConfirm) return;
 
-  try {
-    const res = await fetch(`/api/admin/crosswords/${encodeURIComponent(cw.id)}`, { method: "DELETE" });
+    try {
+      const res = await fetch(`/api/admin/crosswords/${encodeURIComponent(cw.id)}`, {
+        method: "DELETE",
+        cache: "no-store",
+      });
 
-    // ✅ SAFE JSON: если тело пустое — не падаем
-    const text = await res.text();
-    const json = text ? JSON.parse(text) : null;
+      const json = await readJsonSafe<any>(res);
 
-    if (!res.ok || (json && json?.ok === false)) {
-      throw new Error(json?.error || `HTTP ${res.status}`);
+      if (!res.ok || json?.ok === false) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+
+      await load();
+      await onChanged?.();
+    } catch (e: any) {
+      alert("❌ Ошибка удаления: " + normalizeUiErrorMessage(e));
     }
-
-    await load();
-    await onChanged?.();
-  } catch (e: any) {
-    alert("❌ Ошибка удаления: " + (e?.message || String(e)));
   }
-}
-
 
   if (loading) return <LoadingBlock text="Загружаем кроссворды..." />;
   if (err) return <ErrorBox message={err} retryMode="reload" />;
@@ -236,6 +419,7 @@ export default function CrosswordsTab({ onChanged }: Props) {
     <div className="card">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
         <h3 style={{ margin: 0 }}>🧩 Кроссворды</h3>
+
         <button className="btn" onClick={openCreate} type="button">
           ➕ Создать кроссворд
         </button>
@@ -252,7 +436,7 @@ export default function CrosswordsTab({ onChanged }: Props) {
             </div>
 
             <div className="col" style={{ width: 160 }}>
-              <label className="small-muted">Порядок (больше = выше)</label>
+              <label className="small-muted">Порядок, больше = выше</label>
               <input
                 className="input"
                 type="number"
@@ -268,7 +452,7 @@ export default function CrosswordsTab({ onChanged }: Props) {
           </div>
 
           <div className="col" style={{ marginTop: 10 }}>
-            <label className="small-muted">Классы (множественный выбор)</label>
+            <label className="small-muted">Классы, множественный выбор</label>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {CLASS_OPTIONS.map((c) => (
@@ -289,7 +473,7 @@ export default function CrosswordsTab({ onChanged }: Props) {
           </div>
 
           <div className="col" style={{ marginTop: 10 }}>
-            <label className="small-muted">Обложка (bucket: covers)</label>
+            <label className="small-muted">Обложка, bucket: covers</label>
 
             <input
               ref={fileRef}
@@ -297,14 +481,14 @@ export default function CrosswordsTab({ onChanged }: Props) {
               accept="image/*"
               style={{ display: "none" }}
               onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void onPickCover(f);
+                const file = e.target.files?.[0];
+                if (file) void onPickCover(file);
               }}
             />
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <button className="btn" type="button" onClick={() => fileRef.current?.click()}>
-                📁 Загрузить обложку
+              <button className="btn" type="button" onClick={() => fileRef.current?.click()} disabled={uploadingCover}>
+                {uploadingCover ? "Загружаем..." : "📁 Загрузить обложку"}
               </button>
 
               {coverUrl ? (
@@ -315,6 +499,7 @@ export default function CrosswordsTab({ onChanged }: Props) {
                     setCoverUrl("");
                     setCoverPreview("");
                   }}
+                  disabled={uploadingCover}
                 >
                   🗑️ Удалить
                 </button>
@@ -325,7 +510,13 @@ export default function CrosswordsTab({ onChanged }: Props) {
               <img
                 src={coverPreview}
                 alt="cover"
-                style={{ marginTop: 10, maxWidth: 240, maxHeight: 160, borderRadius: 10, display: "block" }}
+                style={{
+                  marginTop: 10,
+                  maxWidth: 240,
+                  maxHeight: 160,
+                  borderRadius: 10,
+                  display: "block",
+                }}
               />
             ) : null}
           </div>
@@ -338,10 +529,11 @@ export default function CrosswordsTab({ onChanged }: Props) {
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-            <button className="btn" onClick={() => void save()} disabled={saving} type="button">
+            <button className="btn" onClick={() => void save()} disabled={saving || uploadingCover} type="button">
               {saving ? "Сохраняем..." : "💾 Сохранить"}
             </button>
-            <button className="btn secondary" onClick={closeForm} type="button">
+
+            <button className="btn secondary" onClick={closeForm} type="button" disabled={saving || uploadingCover}>
               ❌ Отмена
             </button>
           </div>
@@ -362,6 +554,7 @@ export default function CrosswordsTab({ onChanged }: Props) {
               <th>Действия</th>
             </tr>
           </thead>
+
           <tbody>
             {crosswords.length === 0 ? (
               <tr>
@@ -371,29 +564,35 @@ export default function CrosswordsTab({ onChanged }: Props) {
               </tr>
             ) : (
               crosswords.map((cw, idx) => {
-                const number = crosswords.length - idx; // ✅ N сверху → 1 снизу
+                const number = crosswords.length - idx;
+
                 return (
                   <tr key={cw.id}>
                     <td>
                       <strong>{number}</strong>
                     </td>
+
                     <td>
                       <strong>{cw.title}</strong>
+
                       {cw.cover_image_url ? (
                         <div className="small-muted" style={{ marginTop: 6 }}>
                           🖼️ есть обложка
                         </div>
                       ) : null}
                     </td>
+
                     <td>{cw.description || "—"}</td>
                     <td>{safeArr(cw.class_level).length ? safeArr(cw.class_level).join(", ") : "—"}</td>
                     <td>{counts[cw.id] ?? 0}</td>
                     <td>{cw.is_available ? "🌍 Для всех" : "🔒 По доступу"}</td>
                     <td>{cw.is_active ? "✅ Активен" : "❌ Неактивен"}</td>
+
                     <td style={{ whiteSpace: "nowrap" }}>
                       <button className="btn small" onClick={() => openEdit(cw)} type="button">
                         ✏️
                       </button>{" "}
+
                       <button className="btn small secondary" onClick={() => void del(cw)} type="button">
                         🗑️
                       </button>
@@ -406,7 +605,7 @@ export default function CrosswordsTab({ onChanged }: Props) {
         </table>
 
         <div className="small-muted" style={{ marginTop: 8 }}>
-          💡 Сортировка: сверху кроссворды с большим “Порядком”. Нумерация слева показывает позицию (N сверху → 1 снизу).
+          💡 Сортировка: сверху кроссворды с большим “Порядком”. Нумерация слева показывает позицию.
         </div>
       </div>
     </div>
