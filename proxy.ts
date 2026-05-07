@@ -18,7 +18,7 @@ const PROTECTED_PREFIXES = [
   "/admin",
 ];
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const res = NextResponse.next();
 
   // Обновляем сессионные куки Supabase на каждом запросе.
