@@ -17,7 +17,6 @@ function getPointsTotal(q: any): number {
   return Number.isFinite(p) && p > 0 ? p : 1;
 }
 
-/** Порция результата для одного поля ввода */
 function buildParts(correctAnswers: any[], userArr: string[], totalCount: number) {
   const parts: any[] = [];
   for (let idx = 0; idx < totalCount; idx++) {
@@ -147,7 +146,7 @@ export function calcAndBuildReview(
     }
 
     // ---------------------------------------------------------------
-    // COUNT TOTALS (для всех базовых типов, кроме complex)
+    // COUNT TOTALS
     // ---------------------------------------------------------------
     statsSum.total++;
     statsSum.pointsTotal += pointsTotal;
@@ -311,12 +310,7 @@ export function calcAndBuildReview(
 
       const isAllCorrect = correctCount === totalCount;
       if (isAllCorrect) statsSum.correct++;
-      else if (correctCount > 0) {
-        // чёткий учёт частично правильных
-        statsSum.incorrect++;
-      } else {
-        statsSum.incorrect++;
-      }
+      else statsSum.incorrect++;
 
       return {
         type: "fill",
@@ -402,11 +396,7 @@ export function calcAndBuildReview(
 
       const isAllCorrect = correctCount === totalCount;
       if (isAllCorrect) statsSum.correct++;
-      else if (correctCount > 0) {
-        statsSum.incorrect++;
-      } else {
-        statsSum.incorrect++;
-      }
+      else statsSum.incorrect++;
 
       return {
         type: "sentence",

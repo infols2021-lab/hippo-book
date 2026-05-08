@@ -4,27 +4,10 @@ import React from "react";
 import type { QuestionComplex, QuestionAny } from "../lib/types";
 import MediaRenderer from "./MediaRenderer";
 
-// Импортируем компоненты подвопросов
 import QuestionTest from "./QuestionTest";
+import QuestionFill from "./QuestionFill";
+import QuestionSentence from "./QuestionSentence";
 import QuestionMatching from "./QuestionMatching";
-
-// Заглушки для типов, которые еще не созданы/не обновлены в "снежном коме"
-const QuestionFillPlaceholder = ({ onChange, value, disabled }: any) => (
-  <input 
-    type="text" 
-    className="input" 
-    disabled={disabled} 
-    value={value?.[0] || ""} 
-    onChange={(e) => onChange([e.target.value])} 
-    placeholder="Впишите ответ..."
-  />
-);
-
-const QuestionSentencePlaceholder = ({ onChange, value, disabled }: any) => (
-  <div style={{ fontStyle: "italic", color: "rgba(0,0,0,0.5)" }}>
-    Компонент предложения будет подключен позже
-  </div>
-);
 
 type Props = {
   question: QuestionComplex;
@@ -36,24 +19,19 @@ type Props = {
 export default function QuestionComplex({ question, value = [], onChange, disabled }: Props) {
   const subQuestions = question.subQuestions || [];
 
-  // Функция для точечного обновления ответа на конкретный подвопрос
   function handleSubChange(index: number, subVal: any) {
     if (disabled) return;
-    
     const nextValue = [...(Array.isArray(value) ? value : [])];
-    
     while (nextValue.length <= index) {
       nextValue.push(null);
     }
-    
     nextValue[index] = subVal;
     onChange(nextValue);
   }
 
-  // Роутер для рендеринга правильного компонента подвопроса
   function renderSubQuestion(subQ: QuestionAny, index: number) {
     const subValue = Array.isArray(value) ? value[index] : undefined;
-    
+
     switch (subQ.type) {
       case "test":
         return (
@@ -66,7 +44,8 @@ export default function QuestionComplex({ question, value = [], onChange, disabl
         );
       case "fill":
         return (
-          <QuestionFillPlaceholder
+          <QuestionFill
+            question={subQ as any}
             value={subValue}
             onChange={(val: any) => handleSubChange(index, val)}
             disabled={disabled}
@@ -74,7 +53,8 @@ export default function QuestionComplex({ question, value = [], onChange, disabl
         );
       case "sentence":
         return (
-          <QuestionSentencePlaceholder
+          <QuestionSentence
+            question={subQ as any}
             value={subValue}
             onChange={(val: any) => handleSubChange(index, val)}
             disabled={disabled}

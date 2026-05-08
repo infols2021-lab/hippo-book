@@ -87,7 +87,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
     const status = getStatusConfig(r);
     const scorePercent =
       r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
-    const itemMedia = (r as any).media; // будет убрано после обновления типов
+    const itemMedia = r.media; // теперь типизировано
 
     return (
       <div
@@ -303,6 +303,10 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               {Object.entries(r.correctMatches).map(([leftId, correctRightId], mI) => {
                 const userRightId = r.userMatches?.[leftId];
                 const isCorrect = userRightId === correctRightId;
+                const rightText = r.rightLabels?.[correctRightId] || `Элемент B #${correctRightId}`;
+                const userRightText = userRightId
+                  ? r.rightLabels?.[userRightId] || `Элемент B #${userRightId}`
+                  : "—";
                 return (
                   <div
                     key={mI}
@@ -321,14 +325,12 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                     </div>
                     <div style={{ fontSize: "14px", color: "#1e293b" }}>
                       Ваш выбор:{" "}
-                      <span style={{ fontWeight: 700 }}>
-                        {userRightId ? `Элемент B #${userRightId}` : "—"}
-                      </span>
+                      <span style={{ fontWeight: 700 }}>{userRightText}</span>
                     </div>
                     {!isCorrect && (
                       <div style={{ fontSize: "14px", color: "#10b981" }}>
                         Правильно:{" "}
-                        <span style={{ fontWeight: 700 }}>Элемент B #{correctRightId}</span>
+                        <span style={{ fontWeight: 700 }}>{rightText}</span>
                       </div>
                     )}
                   </div>

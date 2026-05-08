@@ -111,6 +111,7 @@ export type ReviewBase = {
   isSkipped: boolean;
   pointsEarned: number;
   pointsTotal: number;
+  media?: MediaAttachment[]; // <-- поддержка медиа в ревью
 };
 
 export type ReviewItem =
@@ -154,6 +155,8 @@ export type ReviewItem =
       totalPairsCount: number;
       userMatches: Record<string, string>;
       correctMatches: Record<string, string>;
+      /** Читаемые названия правых элементов (ключ – ID элемента, значение – текст). */
+      rightLabels?: Record<string, string>;
     })
   | (ReviewBase & {
       type: "complex";

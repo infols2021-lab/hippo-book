@@ -1,54 +1,50 @@
+// app/(app)/assignment/lib/image.ts
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 
 function isHttpUrl(v: unknown): boolean {
   return typeof v === "string" && /^https?:\/\//i.test(v);
 }
 
-function isImageFile(url: string): boolean {
-  const ext = url.split('.').pop()?.toLowerCase();
-  return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif'].includes(ext || '');
-}
-
+/**
+ * Возвращает URL, готовый для использования в src изображений / аудио / iframe.
+ *
+ * Для полных HTTP-ссылок (Supabase, Yandex) – возвращает как есть.
+ * Для уже готовых прокси-путей (/api/storage/public/…) – возвращает без изменений.
+ * Для data: URI – возвращает без изменений.
+ * Для любого другого формата (обычно относительный путь) – строит URL через
+ * наш прокси getStoragePublicUrl, чтобы не зависеть от структуры хранилища.
+ *
+ * Оптимизация изображений через /api/media временно отключена для повышения
+ * стабильности загрузки из Yandex Object Storage.
+ */
 export function getImageUrl(imagePath: unknown) {
   if (imagePath == null) return "";
 
   const raw = String(imagePath).trim();
   if (!raw) return "";
 
-  // 1. Если это уже готовая ссылка (base64 или наш прокси)
-  if (raw.startsWith("data:")) return raw;
-  if (raw.startsWith("/api/media")) return raw;
+  // 1. Уже готовый URL (data: или наши прокси-пути) – возвращаем без изменений
+  if (
+    raw.startsWith("data:") ||
+    raw.startsWith("/api/media") ||
+    raw.startsWith("/api/storage/public")
+  ) {
+    return raw;
+  }
 
-  let publicUrl = "";
-
-  // 2. Логика для Supabase (старые задания)
-  // Обычно ссылки supabase содержат 'supabase.co' или маркер '/storage/v1/object/public/'
-  const supabaseMarker = "/storage/v1/object/public/";
-  const isSupabase = raw.includes("supabase.co") || raw.includes(supabaseMarker);
-
+  // 2. Прямые HTTP/HTTPS ссылки (например, на Supabase или Yandex) — отдаём как есть,
+  //    чтобы браузер мог загружать их напрямую, без лишнего проксирования.
   if (isHttpUrl(raw)) {
-    publicUrl = raw;
-  } else if (isSupabase || raw.startsWith("assignments/")) {
-    // Если в БД лежит путь типа "assignments/photo.png" от Supabase
-    // Замени [PROJECT_ID] на ID своего проекта Supabase, если env не подтягивается
-    const supabaseDomain = process.env.NEXT_PUBLIC_SUPABASE_URL; 
-    const bucket = "assignments";
-    const path = raw.replace("assignments/", "");
-    publicUrl = `${supabaseDomain}${supabaseMarker}${bucket}/${path}`;
-  } else {
-    // 3. Логика для Yandex Cloud (новые задания)
-    const bucket = process.env.NEXT_PUBLIC_ASSIGNMENTS_BUCKET || "assignments";
-    const cleaned = raw
-      .replace(/^\/+/, "")
-      .replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
-
-    publicUrl = getStoragePublicUrl(bucket, cleaned);
+    return raw;
   }
 
-  // Оптимизируем через наш API только картинки
-  if (isImageFile(publicUrl)) {
-    return `/api/media?url=${encodeURIComponent(publicUrl)}`;
-  }
+  // 3. Относительный путь (например, пришедший из старых заданий, где url — просто
+  //    имя файла или путь относительно бакета). Строим абсолютный URL через наш прокси,
+  //    используя дефолтный бакет для новых заданий.
+  const bucket = process.env.NEXT_PUBLIC_ASSIGNMENTS_BUCKET || "question-images";
+  const cleaned = raw
+    .replace(/^\/+/, "")
+    .replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
 
-  return publicUrl;
+  return getStoragePublicUrl(bucket, cleaned);
 }
