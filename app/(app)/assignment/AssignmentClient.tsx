@@ -252,6 +252,16 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     setIsViewMode(true);
     setShowChoice(false);
     setCurrentIndex(0);
+    setCompletedScreen(false);
+  }
+
+  function switchMode() {
+    if (!previousProgress?.is_completed) return;
+    setShowChoice(true);
+    setCompletedScreen(false);
+    setFinalStats(null);
+    setReviewItems([]);
+    setGatehouseRecommendation(null);
   }
 
   async function saveProgress(score: number) {
@@ -283,7 +293,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   async function finish() {
     if (isViewMode) return;
     
-    // Используем внешнюю логику валидации
     const v = validateAllAnswered(questions, answers);
     if (!v.ok) {
       alert(`❌ Заполните вопрос №${v.index + 1}`);
@@ -291,7 +300,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       return;
     }
 
-    // Используем внешнюю логику подсчета
     const { stats, review } = calcAndBuildReview(questions, answers);
 
     if (isGatehouse) {
@@ -361,9 +369,19 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       {/* HEADER */}
       <header className="premium-header">
         <div className="header-content">
-          <button className="back-button" onClick={() => router.push(back.href)}>
-            {back.headerLabel}
-          </button>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button className="back-button" onClick={() => router.push(back.href)}>
+              {back.headerLabel}
+            </button>
+
+            {/* КНОПКА СМЕНЫ РЕЖИМА ПРЯМО ВО ВРЕМЯ ПРОХОЖДЕНИЯ */}
+            {previousProgress?.is_completed && !showChoice && !completedScreen && (
+               <button className="mode-switch-button" onClick={switchMode}>
+                 ↶ Сменить режим
+               </button>
+            )}
+          </div>
+
           <div className="assignment-badge" style={{ background: theme.primary }}>
             {theme.badge}
           </div>
@@ -435,14 +453,10 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
             </div>
 
             <div className="premium-card active-question" style={{ background: theme.cardBg }}>
-              {/* Заголовок вопроса */}
               <h2 className="question-title">{currentIndex + 1}. {questions[currentIndex]?.q}</h2>
 
-              {/* Мультимедиа блок */}
               <div className="media-section">
                 <MediaRenderer media={questions[currentIndex]?.media} />
-                
-                {/* Fallback для старых фото */}
                 {!questions[currentIndex]?.media?.length && questions[currentIndex]?.image && questions[currentIndex]?.type !== 'crossword' && (
                   <img 
                     className="legacy-image" 
@@ -453,12 +467,10 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                 )}
               </div>
 
-              {/* Тело вопроса (контролы) */}
               <div className="question-content">
                 {renderQuestionComponent(questions[currentIndex], currentIndex)}
               </div>
 
-              {/* Навигация */}
               <div className="navigation-footer">
                 <button 
                   className="nav-btn" 
@@ -471,7 +483,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                 
                 {currentIndex < questions.length - 1 ? (
                   <button className="btn-premium primary" style={{ flex: 1, background: theme.primary }} onClick={() => setCurrentIndex(i => i + 1)}>
-                    Следующий вопрос →
+                    Далее →
                   </button>
                 ) : (
                   !isViewMode && (
@@ -508,7 +520,15 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       <style jsx>{`
         .premium-header { padding: 30px 20px; }
         .header-content { max-width: 900px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
-        .back-button { background: rgba(255,255,255,0.7); border: none; padding: 12px 24px; border-radius: 16px; cursor: pointer; font-weight: 700; color: inherit; backdrop-filter: blur(10px); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        
+        .back-button, .mode-switch-button { 
+          background: rgba(255,255,255,0.7); border: none; padding: 12px 24px; border-radius: 16px; 
+          cursor: pointer; font-weight: 700; color: inherit; backdrop-filter: blur(10px); 
+          box-shadow: 0 4px 15px rgba(0,0,0,0.05); transition: all 0.2s;
+        }
+        .mode-switch-button { background: rgba(0,0,0,0.05); color: #6366f1; }
+        .back-button:hover, .mode-switch-button:hover { transform: translateY(-2px); background: #fff; }
+
         .assignment-badge { color: #fff; padding: 8px 16px; border-radius: 12px; font-size: 11px; font-weight: 900; letter-spacing: 1.5px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         
         .premium-main { max-width: 850px; margin: 0 auto; padding: 0 20px 60px; }
@@ -535,7 +555,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         .btn-premium.secondary { background: rgba(0,0,0,0.05); color: inherit; }
         .btn-premium.finish { background: #10b981; color: #fff; box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3); }
         .btn-premium:hover { transform: translateY(-3px); filter: brightness(1.05); }
-        .btn-premium:active { transform: translateY(-1px); }
 
         .button-group { display: flex; gap: 15px; justify-content: center; }
 
@@ -548,8 +567,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         .stat-item span { font-size: 13px; opacity: 0.5; font-weight: 600; }
 
         .recommendation-box { background: rgba(99, 102, 241, 0.05); padding: 30px; border-radius: 30px; border: 2px solid rgba(99, 102, 241, 0.1); margin-bottom: 40px; text-align: center; }
-        .recommendation-box h3 { margin: 0 0 15px 0; font-size: 20px; }
-        .badge-wrap { margin-top: 20px; }
         
         .loader-container { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .premium-spinner { width: 60px; height: 60px; border: 6px solid; border-radius: 50%; animation: spin 1s linear infinite; }
@@ -565,7 +582,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         .modal-scroll-wrap { overflow: auto; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
         .modal-controls { margin-top: 25px; display: flex; gap: 25px; align-items: center; color: #fff; background: rgba(255,255,255,0.1); padding: 10px 30px; border-radius: 30px; }
         .modal-controls button { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #fff; background: none; color: #fff; font-size: 22px; cursor: pointer; transition: all 0.2s; }
-        .modal-controls button:hover { background: #fff; color: #000; }
       `}</style>
     </div>
   );

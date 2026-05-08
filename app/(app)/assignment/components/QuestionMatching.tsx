@@ -11,33 +11,25 @@ type Props = {
   disabled?: boolean;
 };
 
-// Точка подключения
 type DotNode = { id: string; x: number; y: number; side: "left" | "right" };
 
 export default function QuestionMatching({ question, value = {}, onChange, disabled }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Оригинальные пары (левая колонка стабильна)
   const pairs = Array.isArray(question.pairs) ? question.pairs : [];
   
-  // Состояние перемешанной правой колонки
   const [rightItems, setRightItems] = useState<MatchingPair[]>([]);
   const [isMounted, setIsMounted] = useState(false);
-
-  // Координаты точек (anchor points) для SVG
   const [dots, setDots] = useState<Record<string, DotNode>>({});
-  
-  // Состояние активного рисования линии
   const [drawingLine, setDrawingLine] = useState<{ startId: string; x: number; y: number } | null>(null);
 
-  // 1. Инициализация и перемешивание правой колонки только после маунта (чтобы избежать Hydration error)
+  // 1. Перемешивание правой колонки один раз при загрузке
   useEffect(() => {
     const shuffled = [...pairs].sort(() => Math.random() - 0.5);
     setRightItems(shuffled);
     setIsMounted(true);
   }, [pairs]);
 
-  // 2. Функция для обновления координат всех точек
+  // 2. Функция точного расчета координат точек
   const updateDotPositions = useCallback(() => {
     if (!containerRef.current) return;
     const containerRect = containerRef.current.getBoundingClientRect();
@@ -54,7 +46,6 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
       newDots[id] = {
         id,
         side,
-        // Координаты центра точки относительно контейнера
         x: rect.left - containerRect.left + rect.width / 2,
         y: rect.top - containerRect.top + rect.height / 2,
       };
@@ -63,26 +54,33 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
     setDots(newDots);
   }, []);
 
-  // 3. Отслеживаем ресайз и скролл для пересчета точек
+  // 3. Следим за размерами через ResizeObserver (чтобы линии не ехали при загрузке картинок)
   useEffect(() => {
-    if (!isMounted) return;
-    
-    // Небольшая задержка, чтобы DOM успел отрендерить медиа (картинки могут изменить высоту)
-    const timeout = setTimeout(updateDotPositions, 100);
-    window.addEventListener("resize", updateDotPositions);
+    if (!isMounted || !containerRef.current) return;
+
+    const observer = new ResizeObserver(() => {
+      updateDotPositions();
+    });
+
+    observer.observe(containerRef.current);
+    // Также наблюдаем за всеми карточками внутри
+    containerRef.current.querySelectorAll(".matching-card").forEach(card => {
+      observer.observe(card);
+    });
+
+    window.addEventListener("scroll", updateDotPositions);
     
     return () => {
-      clearTimeout(timeout);
-      window.removeEventListener("resize", updateDotPositions);
+      observer.disconnect();
+      window.removeEventListener("scroll", updateDotPositions);
     };
   }, [isMounted, updateDotPositions]);
 
-  // 4. Логика рисования (Pointer Events)
+  // 4. Pointer Events
   const handlePointerDown = (e: React.PointerEvent, id: string, side: "left" | "right") => {
     if (disabled) return;
-    e.preventDefault(); // Предотвращаем скролл на телефонах во время рисования
     
-    // Удаляем старую связь, если точка уже подключена
+    // Сброс старой связи
     if (side === "left" && value[id]) {
       const nextVal = { ...value };
       delete nextVal[id];
@@ -96,9 +94,7 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
       }
     }
 
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    
+    const rect = containerRef.current!.getBoundingClientRect();
     setDrawingLine({
       startId: id,
       x: e.clientX - rect.left,
@@ -119,22 +115,19 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
   const handlePointerUp = (e: React.PointerEvent) => {
     if (!drawingLine) return;
 
-    // Находим элемент под курсором в момент отпускания
     const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest(".matching-dot") as HTMLElement;
     
     if (targetEl) {
       const endId = targetEl.dataset.id;
       const endSide = targetEl.dataset.side;
-      
       const startDot = dots[drawingLine.startId];
       
-      // Проверяем, что соединяем левую с правой (а не левую с левой)
       if (startDot && endId && endSide && startDot.side !== endSide) {
         const leftId = startDot.side === "left" ? startDot.id : endId;
         const rightId = startDot.side === "right" ? startDot.id : endId;
         
-        // Удаляем любые другие связи с этой правой точкой (1 к 1)
         const nextVal = { ...value };
+        // Правило 1:1
         Object.keys(nextVal).forEach(key => {
           if (nextVal[key] === rightId) delete nextVal[key];
         });
@@ -147,14 +140,13 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
     setDrawingLine(null);
   };
 
-  // Построение плавной кривой Безье между двумя точками
-  const generateBezierCurve = (x1: number, y1: number, x2: number, y2: number) => {
+  const generateCurve = (x1: number, y1: number, x2: number, y2: number) => {
     const dx = Math.abs(x2 - x1);
-    const offset = Math.max(dx * 0.4, 30); // Изгиб зависит от расстояния
-    return `M ${x1} ${y1} C ${x1 + offset} ${y1}, ${x2 - offset} ${y2}, ${x2} ${y2}`;
+    const midX = (x1 + x2) / 2;
+    return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
   };
 
-  if (!isMounted) return <div style={{ minHeight: "200px" }} />;
+  if (!isMounted) return <div style={{ height: "300px", background: "rgba(0,0,0,0.02)", borderRadius: "20px" }} />;
 
   return (
     <div
@@ -165,54 +157,41 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
       style={{
         position: "relative",
         width: "100%",
-        padding: "10px 0",
+        minHeight: "400px",
+        padding: "20px 0",
         userSelect: "none",
-        touchAction: drawingLine ? "none" : "auto", // Блокируем скролл только при рисовании
+        touchAction: drawingLine ? "none" : "auto",
       }}
     >
-      {/* Слой SVG для линий */}
-      <svg
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          pointerEvents: "none",
-          zIndex: 10,
-        }}
-      >
-        {/* Отрисовка установленных связей */}
+      {/* Слой SVG */}
+      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 1 }}>
         {Object.entries(value).map(([leftId, rightId]) => {
-          const dotA = dots[leftId];
-          const dotB = dots[rightId];
-          if (!dotA || !dotB) return null;
-
+          const a = dots[leftId];
+          const b = dots[rightId];
+          if (!a || !b) return null;
           return (
             <path
               key={`${leftId}-${rightId}`}
-              d={generateBezierCurve(dotA.x, dotA.y, dotB.x, dotB.y)}
+              d={generateCurve(a.x, a.y, b.x, b.y)}
               fill="none"
-              stroke={disabled ? "#a8c9ff" : "#007bff"}
-              strokeWidth="4"
+              stroke="#007bff"
+              strokeWidth="5"
               strokeLinecap="round"
-              className="matching-line-animate"
-              style={{ transition: "stroke 0.3s ease" }}
+              className="line-dash"
             />
           );
         })}
 
-        {/* Отрисовка активной (рисуемой) линии */}
         {drawingLine && dots[drawingLine.startId] && (
           <path
-            d={generateBezierCurve(
+            d={generateCurve(
               dots[drawingLine.startId].side === "left" ? dots[drawingLine.startId].x : drawingLine.x,
               dots[drawingLine.startId].side === "left" ? dots[drawingLine.startId].y : drawingLine.y,
               dots[drawingLine.startId].side === "right" ? dots[drawingLine.startId].x : drawingLine.x,
               dots[drawingLine.startId].side === "right" ? dots[drawingLine.startId].y : drawingLine.y
             )}
             fill="none"
-            stroke="#007bff"
+            stroke="rgba(0,123,255,0.5)"
             strokeWidth="4"
             strokeDasharray="8 8"
             strokeLinecap="round"
@@ -221,89 +200,80 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
       </svg>
 
       {/* Колонки */}
-      <div style={{ display: "flex", justifyContent: "space-between", gap: "20px", position: "relative", zIndex: 5 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "40px", position: "relative", zIndex: 2 }}>
         
         {/* ЛЕВАЯ КОЛОНКА */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1, maxWidth: "45%" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px", width: "42%" }}>
           {pairs.map((p) => (
-            <div key={`left-${p.id}`} style={{ position: "relative", display: "flex", alignItems: "center" }}>
-              <div style={{
-                flex: 1, padding: "16px", background: "#fff", borderRadius: "16px",
-                border: value[p.id] ? "2px solid #007bff" : "2px solid rgba(0,0,0,0.08)",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.04)"
+            <div key={`l-${p.id}`} className="matching-card-wrapper" style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <div className="matching-card" style={{
+                flex: 1, padding: "15px", background: "#fff", borderRadius: "20px",
+                border: value[p.id] ? "2px solid #007bff" : "2px solid #e2e8f0",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.03)", minHeight: "80px"
               }}>
-                {p.left.text && <div style={{ fontSize: "15px", fontWeight: 500, marginBottom: "8px" }}>{p.left.text}</div>}
+                {p.left.text && <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "8px" }}>{p.left.text}</div>}
                 <MediaRenderer media={p.left.media} />
               </div>
-              
-              {/* Левая точка подключения */}
               <div
                 className="matching-dot"
-                data-id={p.id}
-                data-side="left"
+                data-id={p.id} data-side="left"
                 onPointerDown={(e) => handlePointerDown(e, p.id, "left")}
                 style={{
-                  width: "24px", height: "24px", borderRadius: "50%", background: value[p.id] ? "#007bff" : "#fff",
-                  border: value[p.id] ? "4px solid #fff" : "4px solid #d1d5db", boxShadow: "0 0 0 1px rgba(0,0,0,0.1)",
-                  position: "absolute", right: "-12px", cursor: disabled ? "default" : "pointer",
-                  transition: "all 0.2s ease", zIndex: 20
+                  width: "28px", height: "28px", borderRadius: "50%", background: value[p.id] ? "#007bff" : "#fff",
+                  border: value[p.id] ? "5px solid #fff" : "5px solid #cbd5e1", 
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                  position: "absolute", right: "-14px", cursor: "pointer", zIndex: 10
                 }}
               />
             </div>
           ))}
         </div>
 
-        {/* ОПЦИОНАЛЬНОЕ ЦЕНТРАЛЬНОЕ МЕДИА */}
+        {/* ЦЕНТР (ОПЦИОНАЛЬНО) */}
         {question.centerImage && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
-            <div style={{ padding: "12px", background: "rgba(255,255,255,0.8)", backdropFilter: "blur(10px)", borderRadius: "24px", border: "1px solid rgba(0,0,0,0.05)" }}>
+          <div style={{ display: "flex", alignItems: "center", width: "10%" }}>
+            <div style={{ padding: "8px", background: "#fff", borderRadius: "15px", boxShadow: "0 5px 15px rgba(0,0,0,0.05)" }}>
               <MediaRenderer media={[question.centerImage]} />
             </div>
           </div>
         )}
 
         {/* ПРАВАЯ КОЛОНКА */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1, maxWidth: "45%" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px", width: "42%" }}>
           {rightItems.map((p) => {
             const isConnected = Object.values(value).includes(p.id);
             return (
-              <div key={`right-${p.id}`} style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                {/* Правая точка подключения */}
+              <div key={`r-${p.id}`} className="matching-card-wrapper" style={{ position: "relative", display: "flex", alignItems: "center" }}>
                 <div
                   className="matching-dot"
-                  data-id={p.id}
-                  data-side="right"
+                  data-id={p.id} data-side="right"
                   onPointerDown={(e) => handlePointerDown(e, p.id, "right")}
                   style={{
-                    width: "24px", height: "24px", borderRadius: "50%", background: isConnected ? "#007bff" : "#fff",
-                    border: isConnected ? "4px solid #fff" : "4px solid #d1d5db", boxShadow: "0 0 0 1px rgba(0,0,0,0.1)",
-                    position: "absolute", left: "-12px", cursor: disabled ? "default" : "pointer",
-                    transition: "all 0.2s ease", zIndex: 20
+                    width: "28px", height: "28px", borderRadius: "50%", background: isConnected ? "#007bff" : "#fff",
+                    border: isConnected ? "5px solid #fff" : "5px solid #cbd5e1",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                    position: "absolute", left: "-14px", cursor: "pointer", zIndex: 10
                   }}
                 />
-                
-                <div style={{
-                  flex: 1, padding: "16px", background: "#fff", borderRadius: "16px",
-                  border: isConnected ? "2px solid #007bff" : "2px solid rgba(0,0,0,0.08)",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.04)"
+                <div className="matching-card" style={{
+                  flex: 1, padding: "15px", background: "#fff", borderRadius: "20px",
+                  border: isConnected ? "2px solid #007bff" : "2px solid #e2e8f0",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.03)", minHeight: "80px"
                 }}>
-                  {p.right.text && <div style={{ fontSize: "15px", fontWeight: 500, marginBottom: "8px" }}>{p.right.text}</div>}
+                  {p.right.text && <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "8px" }}>{p.right.text}</div>}
                   <MediaRenderer media={p.right.media} />
                 </div>
               </div>
             );
           })}
         </div>
-
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes dash {
-          to { stroke-dashoffset: -16; }
-        }
-        .matching-line-animate {
-          animation: dash 1s linear infinite;
-        }
+        @keyframes lineDash { to { stroke-dashoffset: -20; } }
+        .line-dash { stroke-dasharray: 10 5; animation: lineDash 1.5s linear infinite; }
+        .matching-card { transition: all 0.3s ease; }
+        .matching-dot:hover { transform: scale(1.2); }
       `}} />
     </div>
   );
