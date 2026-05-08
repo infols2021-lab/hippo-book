@@ -1,16 +1,26 @@
+// app/api/assignment-progress/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { calcAndBuildReview } from "@/lib/assignments/scoring";
+import {
+  assertOlympiadAssignmentAccess,
+  assertGatehouseAssignmentAccess,
+} from "@/lib/assignments/access";
 import { recommendGatehouseLevel } from "@/lib/exams/recommendLevel";
 
 type Body = {
   assignmentId: string;
   answers: any;
   isCompleted: boolean;
-  score: number;
+  score: number;           // игнорируется – пересчитывается сервером
   source?: string;
   sourceId?: string;
   branchType?: string;
 };
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
 
 function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -41,7 +51,6 @@ function getMaterialId(assignment: any): string | null {
 
 function isGatehouseAssignment(assignment: any, body: Body) {
   const material = firstOrNull(assignment?.materials);
-
   return (
     body.branchType === "gatehouse" ||
     body.source === "gatehouse" ||
@@ -59,7 +68,6 @@ async function recalcCompletedCounters(supabase: any, userId: string) {
       .eq("user_id", userId)
       .eq("is_completed", true)
       .eq("assignments.branch_type", "olympiad"),
-
     supabase
       .from("user_progress")
       .select("id, assignments!inner(branch_type)", { count: "exact", head: true })
@@ -82,12 +90,18 @@ async function recalcCompletedCounters(supabase: any, userId: string) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────
+// POST handler
+// ─────────────────────────────────────────────────────────────
+
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
   const { data: auth, error: authErr } = await supabase.auth.getUser();
 
-  if (authErr) return NextResponse.json({ ok: false, error: "Auth fetch failed" }, { status: 500 });
-  if (!auth.user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (authErr)
+    return NextResponse.json({ ok: false, error: "Auth fetch failed" }, { status: 500 });
+  if (!auth.user)
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
   let body: Body;
   try {
@@ -97,21 +111,26 @@ export async function POST(req: Request) {
   }
 
   if (!body?.assignmentId) {
-    return NextResponse.json({ ok: false, error: "assignmentId required" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "assignmentId required" },
+      { status: 400 }
+    );
   }
 
   if (!body.isCompleted) {
     return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
   }
 
-  const safeScore = normalizeScore(body.score);
-
+  // Загружаем задание вместе со связанным материалом
   const { data: assignment, error: assignmentErr } = await supabase
     .from("assignments")
     .select(
       `id,
       branch_type,
       material_id,
+      textbook_id,
+      crossword_id,
+      content,
       materials(
         id,
         branch_type,
@@ -127,40 +146,51 @@ export async function POST(req: Request) {
   if (assignmentErr || !assignment) {
     return NextResponse.json(
       { ok: false, error: assignmentErr?.message || "Assignment not found" },
-      { status: 404 },
+      { status: 404 }
     );
   }
 
+  // Проверяем доступ к заданию
   const gatehouse = isGatehouseAssignment(assignment, body);
-  const material = firstOrNull((assignment as any).materials);
-  const materialId = getMaterialId(assignment);
-
-  if (gatehouse) {
-    if (!materialId) {
-      return NextResponse.json({ ok: false, error: "Gatehouse assignment has no material" }, { status: 400 });
+  try {
+    if (gatehouse) {
+      await assertGatehouseAssignmentAccess(supabase, auth.user.id, assignment);
+    } else {
+      await assertOlympiadAssignmentAccess(supabase, auth.user.id, assignment);
     }
-
-    if (material?.is_active === false) {
-      return NextResponse.json({ ok: false, error: "Material is not active" }, { status: 404 });
-    }
-
-    const { data: access, error: accessErr } = await supabase
-      .from("material_access")
-      .select("id")
-      .eq("user_id", auth.user.id)
-      .eq("material_id", materialId)
-      .maybeSingle();
-
-    if (accessErr) {
-      return NextResponse.json({ ok: false, error: accessErr.message }, { status: 500 });
-    }
-
-    const hasAccess = Boolean(material?.is_available || access);
-
-    if (!hasAccess) {
-      return NextResponse.json({ ok: false, error: "No access to this Gatehouse material" }, { status: 403 });
-    }
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: err.message || "Access denied" },
+      { status: err.status || 403 }
+    );
   }
+
+  // Запрещаем повторное завершение
+  const { data: existing } = await supabase
+    .from("user_progress")
+    .select("id, is_completed, score")
+    .eq("user_id", auth.user.id)
+    .eq("assignment_id", body.assignmentId)
+    .maybeSingle();
+
+  if (existing?.is_completed) {
+    return NextResponse.json(
+      { ok: false, error: "Задание уже было завершено ранее" },
+      { status: 409 }
+    );
+  }
+
+  // Серверный пересчёт баллов
+  const questions = assignment.content?.questions;
+  if (!Array.isArray(questions)) {
+    return NextResponse.json(
+      { ok: false, error: "Некорректное содержимое задания" },
+      { status: 500 }
+    );
+  }
+
+  const { stats } = calcAndBuildReview(questions, body.answers);
+  const realScore = normalizeScore(stats.score);
 
   const payload = {
     user_id: auth.user.id,
@@ -168,19 +198,8 @@ export async function POST(req: Request) {
     answers: body.answers ?? {},
     is_completed: true,
     completed_at: new Date().toISOString(),
-    score: safeScore,
+    score: realScore, // <-- только серверное значение
   };
-
-  const { data: existing, error: exErr } = await supabase
-    .from("user_progress")
-    .select("id")
-    .eq("user_id", auth.user.id)
-    .eq("assignment_id", body.assignmentId)
-    .maybeSingle();
-
-  if (exErr) {
-    return NextResponse.json({ ok: false, error: exErr.message }, { status: 500 });
-  }
 
   const res = existing?.id
     ? await supabase.from("user_progress").update(payload).eq("id", existing.id)
@@ -193,10 +212,11 @@ export async function POST(req: Request) {
   const counters = await recalcCompletedCounters(supabase, auth.user.id);
 
   if (gatehouse) {
+    const materialId = getMaterialId(assignment);
     const recommendation = recommendGatehouseLevel({
-      score: safeScore,
+      score: realScore,
       maxScore: 100,
-      percent: safeScore,
+      percent: realScore,
       materialLevels: getMaterialLevels(assignment),
     });
 
@@ -204,7 +224,7 @@ export async function POST(req: Request) {
       user_id: auth.user.id,
       assignment_id: body.assignmentId,
       material_id: materialId,
-      score: safeScore,
+      score: realScore,
       recommended_level: recommendation.recommendedLevel,
       breakdown: {
         recommendation,
@@ -217,29 +237,22 @@ export async function POST(req: Request) {
 
     const { error: examErr } = await supabase
       .from("exam_results")
-      .upsert(examResultPayload, {
-        onConflict: "user_id,assignment_id",
-      });
+      .upsert(examResultPayload, { onConflict: "user_id,assignment_id" });
 
-    if (examErr) {
-      console.error("exam_results upsert error:", examErr.message);
-    }
+    if (examErr) console.error("exam_results upsert error:", examErr.message);
 
     return NextResponse.json(
-      {
-        ok: true,
-        branch_type: "gatehouse",
-        recommendation,
-        counters,
-      },
-      { status: 200 },
+      { ok: true, branch_type: "gatehouse", score: realScore, recommendation, counters },
+      { status: 200 }
     );
   }
 
+  // Олимпиада — запись стрика
   let streak: any = null;
-  const { data: streakData, error: streakErr } = await supabase.rpc("record_streak_completion", {
-    _assignment_id: body.assignmentId,
-  });
+  const { data: streakData, error: streakErr } = await supabase.rpc(
+    "record_streak_completion",
+    { _assignment_id: body.assignmentId }
+  );
 
   if (!streakErr) {
     streak = streakData ?? null;
@@ -248,12 +261,7 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json(
-    {
-      ok: true,
-      branch_type: "olympiad",
-      streak,
-      counters,
-    },
-    { status: 200 },
+    { ok: true, branch_type: "olympiad", score: realScore, streak, counters },
+    { status: 200 }
   );
 }

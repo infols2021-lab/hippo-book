@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import type { ReviewItem, ReviewPart } from "../lib/types";
+import type { ReviewItem } from "../lib/types";
 import MediaRenderer from "./MediaRenderer";
 
 // Форматирование баллов
@@ -12,85 +12,231 @@ function fmtPoints(x: number) {
 
 // Конфигурация статусов
 function getStatusConfig(item: ReviewItem) {
-  if (item.isSkipped) return { key: "skipped", label: "Пропущен", color: "#94a3b8", bg: "#f8fafc" };
-  if (item.isCorrect) return { key: "correct", label: "Правильно", color: "#10b981", bg: "#f0fdf4" };
-  if (item.pointsEarned > 0) return { key: "partial", label: "Частично", color: "#f59e0b", bg: "#fffbeb" };
+  if (item.isSkipped)
+    return { key: "skipped", label: "Пропущен", color: "#94a3b8", bg: "#f8fafc" };
+  if (item.isCorrect)
+    return { key: "correct", label: "Правильно", color: "#10b981", bg: "#f0fdf4" };
+  if (item.pointsEarned > 0)
+    return { key: "partial", label: "Частично", color: "#f59e0b", bg: "#fffbeb" };
   return { key: "incorrect", label: "Неправильно", color: "#ef4444", bg: "#fef2f2" };
 }
 
-export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
-  
-  function renderItem(r: ReviewItem, idx?: number) {
-    const status = getStatusConfig(r);
-    const scorePercent = (r.pointsEarned / r.pointsTotal) * 100;
-    
-    // Приводим к any, чтобы TS не ругался на отсутствие media в ReviewItem, 
-    // пока ты не обновил lib/types.ts
-    const itemMedia = (r as any).media;
-
-    return (
-      <div 
-        key={idx}
-        className={`review-card-premium status-${status.key} animate-in`}
+/** Маленькая карточка для одного поля ввода (fill/sentence) */
+function FillRow({
+  index,
+  userAnswer,
+  correctAnswer,
+  isCorrect,
+}: {
+  index: number;
+  userAnswer: string;
+  correctAnswer: string;
+  isCorrect: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "48px 1fr 1fr",
+        gap: "12px",
+        alignItems: "flex-start",
+        padding: "12px 16px",
+        borderBottom: "1px solid rgba(0,0,0,0.04)",
+        background: isCorrect ? "rgba(16, 185, 129, 0.03)" : "rgba(239, 68, 68, 0.03)",
+      }}
+    >
+      <div
         style={{
-          background: "#fff",
-          borderRadius: "28px",
-          padding: "24px",
-          marginBottom: "24px",
-          border: `1px solid rgba(0,0,0,0.06)`,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.02)",
-          position: "relative",
-          overflow: "hidden"
+          fontWeight: 800,
+          color: isCorrect ? "#10b981" : "#cbd5e1",
+          fontSize: "14px",
+          lineHeight: "1.4",
+          paddingTop: "2px",
         }}
       >
-        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "6px", background: status.color }} />
+        {index + 1}
+      </div>
+      <div
+        style={{
+          fontWeight: 700,
+          color: isCorrect ? "#1e293b" : "#ef4444",
+          wordBreak: "break-word",
+          lineHeight: "1.5",
+          fontSize: "14px",
+        }}
+      >
+        {userAnswer || "—"}
+      </div>
+      <div
+        style={{
+          fontWeight: 700,
+          color: "#10b981",
+          wordBreak: "break-word",
+          lineHeight: "1.5",
+          fontSize: "14px",
+        }}
+      >
+        {correctAnswer}
+      </div>
+    </div>
+  );
+}
 
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px", marginBottom: "20px" }}>
+export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
+  function renderItem(r: ReviewItem, idx?: number) {
+    const status = getStatusConfig(r);
+    const scorePercent =
+      r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
+    const itemMedia = (r as any).media; // будет убрано после обновления типов
+
+    return (
+      <div
+        key={idx}
+        className="review-card"
+        style={{
+          background: "#ffffff",
+          borderRadius: "24px",
+          padding: "24px",
+          marginBottom: "20px",
+          border: "1px solid rgba(0,0,0,0.06)",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.02)",
+          position: "relative",
+        }}
+      >
+        {/* Цветная полоса слева */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: "5px",
+            background: status.color,
+            borderRadius: "24px 0 0 24px",
+          }}
+        />
+
+        {/* Заголовок */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: "16px",
+            marginBottom: "18px",
+          }}
+        >
           <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-              <span style={{ fontSize: "11px", fontWeight: 900, color: status.color, textTransform: "uppercase", letterSpacing: "1px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  color: status.color,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                }}
+              >
                 {idx !== undefined ? `Вопрос ${idx + 1}` : "Подвопрос"}
               </span>
-              <span style={{ padding: "3px 10px", borderRadius: "8px", background: status.bg, color: status.color, fontSize: "11px", fontWeight: 800 }}>
+              <span
+                style={{
+                  padding: "3px 10px",
+                  borderRadius: "8px",
+                  background: status.bg,
+                  color: status.color,
+                  fontSize: "12px",
+                  fontWeight: 800,
+                }}
+              >
                 {status.label}
               </span>
             </div>
-            <h4 style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b", margin: 0, lineHeight: 1.4, whiteSpace: "pre-wrap" }}>
+            <h4
+              style={{
+                fontSize: "18px",
+                fontWeight: 700,
+                color: "#1e293b",
+                margin: 0,
+                lineHeight: 1.35,
+                whiteSpace: "pre-wrap",
+              }}
+            >
               {r.questionText}
             </h4>
           </div>
 
-          <div style={{ textAlign: "right" }}>
+          {/* Баллы */}
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
             <div style={{ fontSize: "16px", fontWeight: 900, color: "#1e293b" }}>
               <span style={{ color: status.color }}>{fmtPoints(r.pointsEarned)}</span>
-              <span style={{ opacity: 0.3, fontWeight: 400 }}> / {r.pointsTotal}</span>
+              <span style={{ opacity: 0.3, fontWeight: 500 }}>
+                {" "}
+                / {r.pointsTotal}
+              </span>
             </div>
-            <div style={{ width: "80px", height: "5px", background: "rgba(0,0,0,0.05)", borderRadius: "10px", marginTop: "8px", overflow: "hidden", marginLeft: "auto" }}>
-              <div style={{ width: `${scorePercent}%`, height: "100%", background: status.color, transition: "width 0.8s ease" }} />
+            <div
+              style={{
+                width: "80px",
+                height: "5px",
+                background: "rgba(0,0,0,0.05)",
+                borderRadius: "10px",
+                marginTop: "8px",
+                overflow: "hidden",
+                marginLeft: "auto",
+              }}
+            >
+              <div
+                style={{
+                  width: `${scorePercent}%`,
+                  height: "100%",
+                  background: status.color,
+                  borderRadius: "10px",
+                  transition: "width 0.6s ease",
+                }}
+              />
             </div>
           </div>
-        </header>
+        </div>
 
-        {/* --- КОНТЕКСТ (МЕДИА) --- */}
+        {/* Медиа (если есть) */}
         {itemMedia && itemMedia.length > 0 && (
-          <div style={{ marginBottom: "20px", borderRadius: "16px", overflow: "hidden", border: "1px solid rgba(0,0,0,0.03)" }}>
+          <div style={{ marginBottom: "20px", borderRadius: "14px", overflow: "hidden" }}>
             <MediaRenderer media={itemMedia} />
           </div>
         )}
 
-        {/* --- ТЕСТ --- */}
+        {/* ===== ТЕСТ ===== */}
         {r.type === "test" && (
-          <div className="review-details-box">
-            <div className="ans-row">
-              <span className="ans-label">Ваш выбор:</span>
-              <div className={`ans-val ${r.isCorrect ? "col-ok" : "col-bad"}`}>
+          <div
+            style={{
+              background: "#f8fafc",
+              borderRadius: "16px",
+              padding: "16px",
+              minWidth: 0,
+            }}
+          >
+            <div style={{ marginBottom: "12px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "4px" }}>
+                ВАШ ОТВЕТ
+              </div>
+              <div
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 700,
+                  color: r.isCorrect ? "#10b981" : "#ef4444",
+                  wordBreak: "break-word",
+                }}
+              >
                 {Array.isArray(r.userLabel) ? r.userLabel.join(", ") : r.userLabel || "—"}
               </div>
             </div>
             {!r.isCorrect && (
-              <div className="ans-row">
-                <span className="ans-label">Правильно:</span>
-                <div className="ans-val col-ok">
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "4px" }}>
+                  ПРАВИЛЬНЫЙ ОТВЕТ
+                </div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: "#10b981", wordBreak: "break-word" }}>
                   {Array.isArray(r.correctLabel) ? r.correctLabel.join(", ") : r.correctLabel}
                 </div>
               </div>
@@ -98,48 +244,93 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           </div>
         )}
 
-        {/* --- ВПИСЫВАНИЕ (FILL / SENTENCE) --- */}
+        {/* ===== FILL / SENTENCE ===== */}
         {(r.type === "fill" || r.type === "sentence") && (
-          <div className="review-table-wrap">
-            <table className="review-table">
-              <thead>
-                <tr>
-                  {/* ФИКС ОШИБКИ: width задается через style */}
-                  <th style={{ width: "50px" }}>№</th>
-                  <th>Ваш ответ</th>
-                  <th>Верно</th>
-                </tr>
-              </thead>
-              <tbody>
-                {r.parts.map((p, pI) => (
-                  <tr key={pI} className={p.isCorrect ? "row-ok" : "row-bad"}>
-                    <td className="cell-num">{pI + 1}</td>
-                    <td className="cell-ans">{p.user || "—"}</td>
-                    <td className="cell-corr">{p.correct}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div
+            style={{
+              border: "1px solid rgba(0,0,0,0.06)",
+              borderRadius: "18px",
+              overflow: "hidden",
+              background: "#ffffff",
+            }}
+          >
+            {/* Заголовок колонок */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "48px 1fr 1fr",
+                gap: "12px",
+                padding: "10px 16px",
+                background: "#f8fafc",
+                borderBottom: "1px solid rgba(0,0,0,0.06)",
+                fontSize: "12px",
+                fontWeight: 800,
+                textTransform: "uppercase",
+                color: "#64748b",
+                letterSpacing: "0.3px",
+              }}
+            >
+              <div>№</div>
+              <div>Ваш ответ</div>
+              <div>Верный ответ</div>
+            </div>
+            {/* Строки */}
+            {(r.parts ?? []).map((p, pI) => (
+              <FillRow
+                key={pI}
+                index={pI}
+                userAnswer={p.user || ""}
+                correctAnswer={p.correct}
+                isCorrect={p.isCorrect}
+              />
+            ))}
           </div>
         )}
 
-        {/* --- МАТЧИНГ (СОПОСТАВЛЕНИЕ) --- */}
+        {/* ===== MATCHING ===== */}
         {r.type === "matching" && (
-          <div className="review-details-box">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "10px" }}>
-              {Object.entries(r.correctMatches).map(([leftId, correctId], mI) => {
-                const isPairOk = r.userMatches[leftId] === correctId;
+          <div
+            style={{
+              background: "#f8fafc",
+              borderRadius: "16px",
+              padding: "16px",
+            }}
+          >
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "12px" }}>
+              РЕЗУЛЬТАТЫ СОПОСТАВЛЕНИЯ
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {Object.entries(r.correctMatches).map(([leftId, correctRightId], mI) => {
+                const userRightId = r.userMatches?.[leftId];
+                const isCorrect = userRightId === correctRightId;
                 return (
-                  <div key={mI} style={{ 
-                    padding: "12px 18px", borderRadius: "16px", border: "1px solid",
-                    borderColor: isPairOk ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)",
-                    background: isPairOk ? "#f0fdf4" : "#fef2f2",
-                    display: "flex", justifyContent: "space-between", alignItems: "center"
-                  }}>
-                    <span style={{ fontSize: "14px", fontWeight: 600, color: "#475569" }}>Пара #{mI + 1}</span>
-                    <span style={{ fontSize: "12px", fontWeight: 800, color: isPairOk ? "#10b981" : "#ef4444" }}>
-                      {isPairOk ? "✅ ВЕРНО" : "❌ ОШИБКА"}
-                    </span>
+                  <div
+                    key={mI}
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: "12px",
+                      border: `1px solid ${isCorrect ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
+                      background: isCorrect ? "#f0fdf4" : "#fef2f2",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: isCorrect ? "#166534" : "#991b1b" }}>
+                      Пара {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
+                    </div>
+                    <div style={{ fontSize: "14px", color: "#1e293b" }}>
+                      Ваш выбор:{" "}
+                      <span style={{ fontWeight: 700 }}>
+                        {userRightId ? `Элемент B #${userRightId}` : "—"}
+                      </span>
+                    </div>
+                    {!isCorrect && (
+                      <div style={{ fontSize: "14px", color: "#10b981" }}>
+                        Правильно:{" "}
+                        <span style={{ fontWeight: 700 }}>Элемент B #{correctRightId}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -147,151 +338,132 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           </div>
         )}
 
-        {/* --- КОМПЛЕКСНЫЙ (ВЛОЖЕННОСТЬ) --- */}
-        {r.type === "complex" && (
-          <div style={{ marginTop: "24px", padding: "20px", background: "#f8fafc", borderRadius: "24px", border: "1px dashed rgba(0,0,0,0.1)" }}>
-            <div style={{ fontSize: "12px", fontWeight: 800, opacity: 0.4, marginBottom: "20px", textAlign: "center", textTransform: "uppercase" }}>Вложенные задания</div>
-            {r.subReviews.map((sr, srI) => renderItem(sr, srI))}
+        {/* ===== COMPLEX ===== */}
+        {r.type === "complex" && r.subReviews && (
+          <div style={{ marginTop: "16px" }}>
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: 800,
+                color: "#94a3b8",
+                textTransform: "uppercase",
+                letterSpacing: "1px",
+                marginBottom: "16px",
+                textAlign: "center",
+              }}
+            >
+              Вложенные задания
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {r.subReviews.map((sr, srI) => (
+                <div key={srI} style={{ paddingLeft: "12px", borderLeft: "3px solid rgba(99,102,241,0.2)" }}>
+                  {renderItem(sr, srI)}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* --- КРОССВОРД --- */}
+        {/* ===== CROSSWORD / OTHER ===== */}
         {r.type === "crossword" && (
-          <div className="review-details-box">
-             <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "12px", color: "#334155" }}>{r.note}</div>
-             <div style={{ display: "flex", gap: "12px" }}>
-                <span className="badge-pill">Заполнено: <b>{r.crosswordStats.filled}/{r.crosswordStats.total}</b></span>
-                <span className="badge-pill">Точность: <b>{r.crosswordStats.percent}%</b></span>
-             </div>
+          <div
+            style={{
+              background: "#f8fafc",
+              borderRadius: "16px",
+              padding: "16px",
+              fontSize: "14px",
+              fontWeight: 600,
+              color: "#334155",
+            }}
+          >
+            {r.note}
+            <div style={{ display: "flex", gap: "12px", marginTop: "10px" }}>
+              <span className="badge-pill">
+                Заполнено: <b>{r.crosswordStats?.filled}/{r.crosswordStats?.total}</b>
+              </span>
+              <span className="badge-pill">
+                Точность: <b>{r.crosswordStats?.percent}%</b>
+              </span>
+            </div>
           </div>
         )}
 
-        {/* --- ПРИМЕЧАНИЕ --- */}
         {r.type === "other" && r.note && (
-          <div className="review-details-box" style={{ fontStyle: "italic", opacity: 0.7 }}>{r.note}</div>
+          <div
+            style={{
+              background: "#f8fafc",
+              borderRadius: "16px",
+              padding: "16px",
+              fontStyle: "italic",
+              color: "#64748b",
+            }}
+          >
+            {r.note}
+          </div>
         )}
       </div>
     );
   }
 
   return (
-    <section className="review-panel-root">
-      <div className="review-header-main">
-        <div className="review-icon-wrap">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <section style={{ marginTop: "40px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "16px",
+          marginBottom: "28px",
+        }}
+      >
+        <div
+          style={{
+            width: "52px",
+            height: "52px",
+            background: "#6366f1",
+            borderRadius: "16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 8px 20px rgba(99,102,241,0.25)",
+          }}
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
         </div>
         <div>
-          <h3 style={{ fontSize: "24px", fontWeight: 800, margin: 0, color: "#1e293b" }}>Разбор прохождения</h3>
-          <p style={{ margin: "4px 0 0", fontSize: "14px", opacity: 0.5, fontWeight: 600 }}>Изучите свои ошибки, чтобы улучшить результат в следующий раз</p>
+          <h3 style={{ fontSize: "24px", fontWeight: 800, margin: 0, color: "#1e293b" }}>
+            Разбор прохождения
+          </h3>
+          <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#94a3b8", fontWeight: 600 }}>
+            Изучите свои ошибки, чтобы улучшить результат в следующий раз
+          </p>
         </div>
       </div>
 
-      <div className="review-list">
+      <div style={{ display: "flex", flexDirection: "column" }}>
         {items.map((r, idx) => renderItem(r, idx))}
       </div>
 
       <style jsx>{`
-        .review-panel-root {
-          margin-top: 50px;
-        }
-        .review-header-main {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          margin-bottom: 32px;
-        }
-        .review-icon-wrap {
-          width: 52px;
-          height: 52px;
-          background: #6366f1;
-          border-radius: 18px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 8px 20px rgba(99,102,241,0.25);
-        }
-
-        .review-details-box {
-          background: #f8fafc;
-          padding: 20px;
-          border-radius: 20px;
-          border: 1px solid rgba(0,0,0,0.03);
-        }
-        .ans-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 12px 0;
-        }
-        .ans-row:not(:last-child) {
-          border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
-        .ans-label {
-          font-size: 13px;
-          font-weight: 700;
-          color: #64748b;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-        .ans-val {
-          font-size: 16px;
-          font-weight: 700;
-        }
-        .col-ok { color: #10b981; }
-        .col-bad { color: #ef4444; }
-
-        .review-table-wrap {
-          border: 1px solid rgba(0,0,0,0.06);
-          border-radius: 20px;
-          overflow: hidden;
-          background: #fff;
-        }
-        .review-table {
-          width: 100%;
-          border-collapse: collapse;
-          table-layout: fixed;
-        }
-        .review-table th {
-          background: #f8fafc;
-          text-align: left;
-          padding: 14px 20px;
-          font-size: 12px;
-          font-weight: 800;
-          text-transform: uppercase;
-          color: #64748b;
-          letter-spacing: 0.5px;
-        }
-        .review-table td {
-          padding: 16px 20px;
-          font-size: 15px;
-          border-top: 1px solid rgba(0,0,0,0.04);
-          word-break: break-word;
-        }
-        
-        .cell-num { font-weight: 800; color: #cbd5e1; }
-        .cell-ans { font-weight: 700; color: #1e293b; }
-        .cell-corr { font-weight: 700; color: #10b981; }
-        
-        .row-ok { background: rgba(16, 185, 129, 0.02); }
-        .row-bad { background: rgba(239, 68, 68, 0.02); }
-        .row-bad .cell-ans { color: #ef4444; }
-
         .badge-pill {
           font-size: 12px;
           font-weight: 700;
-          background: #fff;
-          padding: 6px 14px;
+          background: #ffffff;
+          padding: 6px 12px;
           border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+          border: 1px solid rgba(0, 0, 0, 0.04);
           color: #475569;
-        }
-
-        .animate-in {
-          animation: slideUp 0.7s cubic-bezier(0.23, 1, 0.32, 1) forwards;
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </section>

@@ -1,3 +1,4 @@
+// app/api/admin/upload/route.ts
 import { NextResponse } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -12,8 +13,8 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Увеличиваем лимит для аудио и PDF
-const DEFAULT_MAX_MB = 50; 
+// Максимальный размер файла по умолчанию (50 МБ для всех типов)
+const DEFAULT_MAX_MB = 50;
 
 function noStoreInit(): ResponseInit {
   return {
@@ -66,6 +67,7 @@ function buildStoragePath(params: {
   folder: string;
   explicitPath: string;
 }) {
+  // Если передан явный путь – используем его
   if (params.explicitPath) {
     return normalizeStorageObjectPath(params.explicitPath);
   }
@@ -78,16 +80,36 @@ function buildStoragePath(params: {
 }
 
 function validateFile(file: File) {
+  if (!file || !(file instanceof File)) {
+    throw new Error("Передан невалидный объект файла");
+  }
+
+  if (file.size <= 0) {
+    throw new Error(`Файл ${file.name} пустой`);
+  }
+
   const ext = getFileExtension(file.name);
 
   if (!isAllowedMediaExtension(ext)) {
-    throw new Error(`Тип файла .${ext} не поддерживается`);
+    throw new Error(
+      `Тип файла .${ext} не поддерживается. Разрешены: jpg, jpeg, png, gif, webp, avif, mp3, wav, ogg, m4a, pdf`
+    );
   }
 }
 
 async function fileToUploadBody(file: File) {
   const arrayBuffer = await file.arrayBuffer();
   return Buffer.from(arrayBuffer);
+}
+
+/**
+ * Определяет тип медиа для отображения на клиенте
+ */
+function getMediaType(ext: string): "image" | "audio" | "pdf" | "unknown" {
+  if (["jpg", "jpeg", "png", "gif", "webp", "avif"].includes(ext)) return "image";
+  if (["mp3", "wav", "ogg", "m4a"].includes(ext)) return "audio";
+  if (ext === "pdf") return "pdf";
+  return "unknown";
 }
 
 export async function POST(req: Request) {
@@ -97,7 +119,7 @@ export async function POST(req: Request) {
   try {
     const formData = await req.formData();
 
-    // Теперь мы достаем массив файлов вместо одного
+    // Извлекаем все файлы из FormData
     const fileValues = formData.getAll("file");
     const bucket = String(formData.get("bucket") || "media").trim();
     const folder = cleanFolder(formData.get("folder"));
@@ -105,25 +127,31 @@ export async function POST(req: Request) {
     const upsert = parseBoolean(formData.get("upsert"), false);
     const maxBytes = parseMaxBytes(formData.get("maxMB"));
 
+    if (!bucket) {
+      return fail("Не указан bucket для загрузки", 400, "MISSING_BUCKET", noStoreInit());
+    }
+
+    // Валидация файлов
     const validFiles: File[] = [];
 
     for (const fileValue of fileValues) {
       if (!(fileValue instanceof File)) continue;
-      
-      if (fileValue.size <= 0) {
-        return fail(`Файл ${fileValue.name} пустой`, 400, "EMPTY_FILE", noStoreInit());
+
+      try {
+        validateFile(fileValue);
+      } catch (validationError: any) {
+        return fail(validationError.message, 400, "INVALID_FILE", noStoreInit());
       }
-      
+
       if (fileValue.size > maxBytes) {
         return fail(
-          `Файл ${fileValue.name} больше ${Math.round(maxBytes / 1024 / 1024)}MB`,
+          `Файл ${fileValue.name} превышает максимальный размер ${Math.round(maxBytes / 1024 / 1024)}MB`,
           413,
           "FILE_TOO_LARGE",
           noStoreInit()
         );
       }
-      
-      validateFile(fileValue);
+
       validFiles.push(fileValue);
     }
 
@@ -131,12 +159,12 @@ export async function POST(req: Request) {
       return fail("Нет корректных файлов для загрузки", 400, "NO_FILES", noStoreInit());
     }
 
-    // Обрабатываем файлы параллельно
+    // Параллельная загрузка всех файлов
     const uploadPromises = validFiles.map(async (file) => {
       const path = buildStoragePath({
         file,
         folder,
-        explicitPath: validFiles.length === 1 ? explicitPath : "", // Explicit path только если файл один
+        explicitPath: validFiles.length === 1 ? explicitPath : "",
       });
 
       const body = await fileToUploadBody(file);
@@ -150,12 +178,8 @@ export async function POST(req: Request) {
         cacheControl: "31536000",
       });
 
-      // Определяем наш тип медиа для фронта
       const ext = getFileExtension(file.name);
-      let mediaType = "application/octet-stream";
-      if (["jpg", "jpeg", "png", "gif", "webp", "avif"].includes(ext)) mediaType = "image";
-      else if (["mp3", "wav", "ogg", "m4a"].includes(ext)) mediaType = "audio";
-      else if (ext === "pdf") mediaType = "pdf";
+      const mediaType = getMediaType(ext);
 
       return {
         bucket: uploaded.bucket,
@@ -170,12 +194,11 @@ export async function POST(req: Request) {
 
     const results = await Promise.all(uploadPromises);
 
-    // Возвращаем массив. Для обратной совместимости, если файл 1, можно вернуть его же в корне,
-    // но лучше использовать results массив.
+    // Формируем ответ с обратной совместимостью
     return ok(
       {
         files: results,
-        // Оставляем поля первого файла в корне объекта для обратной совместимости старого кода админки
+        // Поля первого файла для старого кода админки
         bucket: results[0].bucket,
         path: results[0].path,
         publicUrl: results[0].publicUrl,
@@ -187,6 +210,7 @@ export async function POST(req: Request) {
     const message = String(error?.message || error || "Upload error");
     const lower = message.toLowerCase();
 
+    // Понятные сообщения для клиента
     if (lower.includes("not allowed") || lower.includes("не разреш") || lower.includes("permission") || lower.includes("admin")) {
       return fail(message, 403, "UPLOAD_FORBIDDEN", noStoreInit());
     }

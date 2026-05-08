@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useId, useMemo } from "react";
 import type { QuestionMatching, MatchingPair } from "../lib/types";
 import MediaRenderer from "./MediaRenderer";
 
@@ -15,18 +15,19 @@ type DotNode = { id: string; x: number; y: number; side: "left" | "right" };
 
 export default function QuestionMatching({ question, value = {}, onChange, disabled }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  
+  const filterId = useId(); // Уникальный id для каждого экземпляра
+
   const pairs = Array.isArray(question.pairs) ? question.pairs : [];
   const [rightItems, setRightItems] = useState<MatchingPair[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [dots, setDots] = useState<Record<string, DotNode>>({});
-  
+
   // startId — это ID точки, x/y — координаты курсора, side — откуда начали тянуть
-  const [drawingLine, setDrawingLine] = useState<{ 
-    startId: string; 
-    side: "left" | "right"; 
-    x: number; 
-    y: number 
+  const [drawingLine, setDrawingLine] = useState<{
+    startId: string;
+    side: "left" | "right";
+    x: number;
+    y: number;
   } | null>(null);
 
   // 1. Инициализация и перемешивание правой колонки
@@ -50,7 +51,6 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
       if (!id || !side) return;
 
       const rect = htmlEl.getBoundingClientRect();
-      // Уникальный ключ side-id исключает конфликты
       newDots[`${side}-${id}`] = {
         id,
         side,
@@ -70,7 +70,7 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
     });
 
     observer.observe(containerRef.current);
-    containerRef.current.querySelectorAll(".matching-card").forEach(card => {
+    containerRef.current.querySelectorAll(".matching-card").forEach((card) => {
       observer.observe(card);
     });
 
@@ -87,7 +87,7 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
     if (side === "left") {
       delete nextVal[id];
     } else {
-      const leftKey = Object.keys(nextVal).find(k => nextVal[k] === id);
+      const leftKey = Object.keys(nextVal).find((k) => nextVal[k] === id);
       if (leftKey) delete nextVal[leftKey];
     }
     onChange(nextVal);
@@ -114,21 +114,21 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
   const handlePointerUp = (e: React.PointerEvent) => {
     if (!drawingLine) return;
 
-    // Ищем точку под курсором в момент отпускания
-    const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest(".matching-dot") as HTMLElement;
-    
+    const targetEl = document
+      .elementFromPoint(e.clientX, e.clientY)
+      ?.closest(".matching-dot") as HTMLElement;
+
     if (targetEl) {
       const targetId = targetEl.dataset.id;
       const targetSide = targetEl.dataset.side as "left" | "right";
-      
-      // Проверяем, что соединяем разные стороны
+
       if (targetId && targetSide !== drawingLine.side) {
         const leftId = drawingLine.side === "left" ? drawingLine.startId : targetId;
         const rightId = drawingLine.side === "right" ? drawingLine.startId : targetId;
-        
+
         const nextVal = { ...value };
         // Очищаем другие связи с этим rightId (режим 1 к 1)
-        Object.keys(nextVal).forEach(k => {
+        Object.keys(nextVal).forEach((k) => {
           if (nextVal[k] === rightId) delete nextVal[k];
         });
         nextVal[leftId] = rightId;
@@ -138,17 +138,24 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
     setDrawingLine(null);
   };
 
-  // Универсальный генератор пути (кривая или прямая)
-  const generatePath = (x1: number, y1: number, x2: number, y2: number) => {
-    // Если разница по высоте минимальна, рисуем прямую (L), чтобы избежать артефактов Bezier
-    if (Math.abs(y1 - y2) < 2) {
-      return `M ${x1} ${y1} L ${x2} ${y2}`;
-    }
+  // Генератор пути, который всегда виден, даже если точки на одной высоте
+  const generatePath = useCallback((x1: number, y1: number, x2: number, y2: number) => {
     const midX = (x1 + x2) / 2;
-    return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
-  };
+    // Если точки почти на одном уровне – делаем явный изгиб вверх или вниз
+    if (Math.abs(y1 - y2) < 10) {
+      const offsetY = 30; // величина отступа для изгиба
+      return `M ${x1} ${y1} 
+              C ${midX} ${y1 - offsetY}, ${midX} ${y2 - offsetY}, ${x2} ${y2}`;
+    }
+    // Иначе стандартная S‑образная кривая
+    return `M ${x1} ${y1} 
+            C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+  }, []);
 
-  if (!isMounted) return <div style={{ height: "300px", background: "rgba(0,0,0,0.02)", borderRadius: "20px" }} />;
+  if (!isMounted)
+    return (
+      <div style={{ height: "300px", background: "rgba(0,0,0,0.02)", borderRadius: "20px" }} />
+    );
 
   return (
     <div
@@ -162,16 +169,26 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
         minHeight: "350px",
         padding: "20px 0",
         userSelect: "none",
-        touchAction: "none", // Блокируем скролл во время рисования
+        touchAction: "none",
       }}
     >
       {/* SVG СЛОЙ (Выше фона, но ниже точек) */}
-      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 5 }}>
+      <svg
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+          zIndex: 5,
+        }}
+      >
         <defs>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+          <filter id={filterId}>
+            <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
             <feMerge>
-              <feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
         </defs>
@@ -189,7 +206,7 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
               stroke="#6366f1"
               strokeWidth="6"
               strokeLinecap="round"
-              style={{ filter: "url(#glow)", opacity: 0.9 }}
+              style={{ filter: `url(#${filterId})`, opacity: 0.9 }}
             />
           );
         })}
@@ -201,7 +218,7 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
               dots[`${drawingLine.side}-${drawingLine.startId}`].x,
               dots[`${drawingLine.side}-${drawingLine.startId}`].y,
               drawingLine.x,
-              drawingLine.y
+              drawingLine.y,
             )}
             fill="none"
             stroke="#6366f1"
@@ -213,27 +230,59 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
         )}
       </svg>
 
-      <div style={{ display: "flex", justifyContent: "space-between", gap: "50px", position: "relative", zIndex: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "50px",
+          position: "relative",
+          zIndex: 10,
+        }}
+      >
         {/* ЛЕВАЯ КОЛОНКА */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px", width: "42%" }}>
           {pairs.map((p) => (
-            <div key={p.id} className="matching-card" style={{ 
-              position: "relative", background: "#fff", border: `2px solid ${value[p.id] ? "#6366f1" : "#e2e8f0"}`,
-              borderRadius: "20px", padding: "16px", display: "flex", alignItems: "center", minHeight: "80px",
-              boxShadow: value[p.id] ? "0 8px 20px rgba(99,102,241,0.12)" : "0 2px 10px rgba(0,0,0,0.02)"
-            }}>
+            <div
+              key={p.id}
+              className="matching-card"
+              style={{
+                position: "relative",
+                background: "#fff",
+                border: `2px solid ${value[p.id] ? "#6366f1" : "#e2e8f0"}`,
+                borderRadius: "20px",
+                padding: "16px",
+                display: "flex",
+                alignItems: "center",
+                minHeight: "80px",
+                boxShadow: value[p.id]
+                  ? "0 8px 20px rgba(99,102,241,0.12)"
+                  : "0 2px 10px rgba(0,0,0,0.02)",
+              }}
+            >
               <div style={{ flex: 1 }}>
-                {p.left.text && <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "8px" }}>{p.left.text}</div>}
+                {p.left.text && (
+                  <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "8px" }}>
+                    {p.left.text}
+                  </div>
+                )}
                 <MediaRenderer media={p.left.media} />
               </div>
               <div
                 className="matching-dot"
-                data-id={p.id} data-side="left"
+                data-id={p.id}
+                data-side="left"
                 onPointerDown={(e) => handlePointerDown(e, p.id, "left")}
                 style={{
-                  width: "32px", height: "32px", borderRadius: "50%", background: value[p.id] ? "#6366f1" : "#fff",
-                  border: "6px solid #fff", boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-                  position: "absolute", right: "-16px", cursor: "crosshair", zIndex: 50
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "50%",
+                  background: value[p.id] ? "#6366f1" : "#fff",
+                  border: "6px solid #fff",
+                  boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+                  position: "absolute",
+                  right: "-16px",
+                  cursor: "crosshair",
+                  zIndex: 50,
                 }}
               />
             </div>
@@ -245,23 +294,47 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
           {rightItems.map((p) => {
             const isConnected = Object.values(value).includes(p.id);
             return (
-              <div key={p.id} className="matching-card" style={{ 
-                position: "relative", background: "#fff", border: `2px solid ${isConnected ? "#6366f1" : "#e2e8f0"}`,
-                borderRadius: "20px", padding: "16px", display: "flex", alignItems: "center", minHeight: "80px",
-                boxShadow: isConnected ? "0 8px 20px rgba(99,102,241,0.12)" : "0 2px 10px rgba(0,0,0,0.02)"
-              }}>
+              <div
+                key={p.id}
+                className="matching-card"
+                style={{
+                  position: "relative",
+                  background: "#fff",
+                  border: `2px solid ${isConnected ? "#6366f1" : "#e2e8f0"}`,
+                  borderRadius: "20px",
+                  padding: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  minHeight: "80px",
+                  boxShadow: isConnected
+                    ? "0 8px 20px rgba(99,102,241,0.12)"
+                    : "0 2px 10px rgba(0,0,0,0.02)",
+                }}
+              >
                 <div
                   className="matching-dot"
-                  data-id={p.id} data-side="right"
+                  data-id={p.id}
+                  data-side="right"
                   onPointerDown={(e) => handlePointerDown(e, p.id, "right")}
                   style={{
-                    width: "32px", height: "32px", borderRadius: "50%", background: isConnected ? "#6366f1" : "#fff",
-                    border: "6px solid #fff", boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-                    position: "absolute", left: "-16px", cursor: "crosshair", zIndex: 50
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    background: isConnected ? "#6366f1" : "#fff",
+                    border: "6px solid #fff",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+                    position: "absolute",
+                    left: "-16px",
+                    cursor: "crosshair",
+                    zIndex: 50,
                   }}
                 />
                 <div style={{ flex: 1 }}>
-                  {p.right.text && <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "8px" }}>{p.right.text}</div>}
+                  {p.right.text && (
+                    <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "8px" }}>
+                      {p.right.text}
+                    </div>
+                  )}
                   <MediaRenderer media={p.right.media} />
                 </div>
               </div>
@@ -271,9 +344,15 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
       </div>
 
       <style jsx>{`
-        .matching-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .matching-dot { transition: transform 0.2s ease, background 0.2s ease; }
-        .matching-dot:hover { transform: scale(1.15); }
+        .matching-card {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .matching-dot {
+          transition: transform 0.2s ease, background 0.2s ease;
+        }
+        .matching-dot:hover {
+          transform: scale(1.15);
+        }
       `}</style>
     </div>
   );

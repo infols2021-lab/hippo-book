@@ -1,3 +1,4 @@
+/* lib/storage/server.ts */
 import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
@@ -27,7 +28,6 @@ const DEFAULT_UPLOAD_BUCKETS = [
 ];
 
 const DEFAULT_ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "avif"];
-// Новый список с поддержкой аудио и PDF
 const DEFAULT_ALLOWED_MEDIA_EXTENSIONS = [...DEFAULT_ALLOWED_IMAGE_EXTENSIONS, "mp3", "wav", "ogg", "m4a", "pdf"];
 
 export type UploadStorageObjectInput = {
@@ -37,6 +37,7 @@ export type UploadStorageObjectInput = {
   contentType?: string;
   upsert?: boolean;
   cacheControl?: string;
+  maxRetries?: number; // количество повторных попыток при transient-ошибках
 };
 
 export type DownloadStorageObjectResult = {
@@ -47,7 +48,6 @@ export type DownloadStorageObjectResult = {
 
 function envList(name: string, fallback: string[]) {
   const raw = process.env[name];
-
   if (!raw) return fallback;
 
   const list = raw
@@ -63,7 +63,6 @@ export function getPublicStorageBuckets() {
 }
 
 export function getUploadStorageBuckets() {
-  // Если задан бакет Яндекса, добавляем его в список разрешенных
   const yandexBucket = process.env.YANDEX_BUCKET_NAME;
   const buckets = envList("STORAGE_UPLOAD_BUCKETS", DEFAULT_UPLOAD_BUCKETS);
   if (yandexBucket && !buckets.includes(yandexBucket)) {
@@ -78,13 +77,11 @@ export function isValidBucketName(bucket: string) {
 
 export function normalizeStorageObjectPath(path: string | string[]) {
   const raw = Array.isArray(path) ? path.join("/") : String(path || "");
-
   const clean = raw
     .split("/")
     .map((part) => part.trim())
     .filter(Boolean)
     .join("/");
-
   if (!clean) return "";
 
   try {
@@ -101,7 +98,6 @@ export function isSafeStorageObjectPath(path: string) {
   if (path.includes("\0")) return false;
 
   const parts = path.split("/");
-
   return parts.every((part) => {
     if (!part) return false;
     if (part === "." || part === "..") return false;
@@ -113,9 +109,7 @@ export function assertPublicStorageBucket(bucket: string) {
   if (!isValidBucketName(bucket)) {
     throw new Error("Некорректное имя bucket");
   }
-
   const allowed = getPublicStorageBuckets();
-
   if (!allowed.includes(bucket) && bucket !== process.env.YANDEX_BUCKET_NAME) {
     throw new Error(`Bucket "${bucket}" не разрешён для публичной выдачи`);
   }
@@ -125,9 +119,7 @@ export function assertUploadStorageBucket(bucket: string) {
   if (!isValidBucketName(bucket)) {
     throw new Error("Некорректное имя bucket");
   }
-
   const allowed = getUploadStorageBuckets();
-
   if (!allowed.includes(bucket)) {
     throw new Error(`Bucket "${bucket}" не разрешён для загрузки`);
   }
@@ -135,7 +127,6 @@ export function assertUploadStorageBucket(bucket: string) {
 
 export function safeStorageFileName(name: string) {
   const fallback = "file";
-
   const raw = String(name || fallback)
     .trim()
     .replace(/\s+/g, "-")
@@ -149,23 +140,19 @@ export function safeStorageFileName(name: string) {
 export function getFileExtension(name: string) {
   const clean = safeStorageFileName(name);
   const ext = clean.split(".").pop()?.toLowerCase() || "";
-
   return ext || "bin";
 }
 
-// Оставлено для обратной совместимости, чтобы старый код не сломался
 export function isAllowedImageExtension(ext: string) {
   return DEFAULT_ALLOWED_IMAGE_EXTENSIONS.includes(String(ext || "").toLowerCase());
 }
 
-// Новая функция для всех типов медиа (Используется в новом route.ts)
 export function isAllowedMediaExtension(ext: string) {
   return DEFAULT_ALLOWED_MEDIA_EXTENSIONS.includes(String(ext || "").toLowerCase());
 }
 
 export function guessContentTypeFromPath(path: string) {
   const ext = getFileExtension(path);
-
   if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
   if (ext === "png") return "image/png";
   if (ext === "gif") return "image/gif";
@@ -177,7 +164,6 @@ export function guessContentTypeFromPath(path: string) {
   if (ext === "wav") return "audio/wav";
   if (ext === "ogg") return "audio/ogg";
   if (ext === "m4a") return "audio/mp4";
-
   return "application/octet-stream";
 }
 
@@ -186,28 +172,17 @@ function getSupabaseStorageKey(admin: boolean) {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (admin) {
-    if (!serviceRole) {
-      throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-    }
-
+    if (!serviceRole) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
     return serviceRole;
   }
-
   if (serviceRole) return serviceRole;
-
-  if (!anon) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  }
-
+  if (!anon) throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY");
   return anon;
 }
 
 export function createSupabaseStorageClient(options?: { admin?: boolean }) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  if (!url) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-  }
+  if (!url) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
 
   const key = getSupabaseStorageKey(Boolean(options?.admin));
 
@@ -226,98 +201,125 @@ export function createSupabaseStorageClient(options?: { admin?: boolean }) {
 export async function downloadPublicStorageObject(bucket: string, path: string | string[]) {
   const cleanBucket = String(bucket || "").trim();
   const cleanPath = normalizeStorageObjectPath(path);
-
   assertPublicStorageBucket(cleanBucket);
-
   if (!isSafeStorageObjectPath(cleanPath)) {
     throw new Error("Некорректный путь к файлу");
   }
-
   const supabase = createSupabaseStorageClient({ admin: false });
-
   const { data, error } = await supabase.storage.from(cleanBucket).download(cleanPath);
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    throw new Error("Файл не найден");
-  }
+  if (error) throw error;
+  if (!data) throw new Error("Файл не найден");
 
   const contentType = data.type || guessContentTypeFromPath(cleanPath);
   const size = typeof data.size === "number" ? data.size : null;
-
-  return {
-    data,
-    contentType,
-    size,
-  } satisfies DownloadStorageObjectResult;
+  return { data, contentType, size } satisfies DownloadStorageObjectResult;
 }
 
+/**
+ * Проверяет, является ли ошибка transient (повторяемой).
+ * Используется для автоматических ретраев при загрузке.
+ */
+function isTransientStorageError(error: any): boolean {
+  const msg = String(error?.message || error || "").toLowerCase();
+  return (
+    msg.includes("fetch failed") ||
+    msg.includes("econnreset") ||
+    msg.includes("etimedout") ||
+    msg.includes("network") ||
+    msg.includes("terminated") ||
+    msg.includes("timeout") ||
+    msg.includes("too many requests")
+  );
+}
+
+/**
+ * Загружает объект в хранилище с автоматическими повторными попытками.
+ * Для Supabase upload встроен retry (до 2 дополнительных попыток).
+ */
 export async function uploadStorageObject(input: UploadStorageObjectInput) {
   const bucket = String(input.bucket || "").trim();
   const path = normalizeStorageObjectPath(input.path);
-
   assertUploadStorageBucket(bucket);
 
   if (!isSafeStorageObjectPath(path)) {
     throw new Error("Некорректный путь к файлу");
   }
 
-  // Конвертируем ArrayBuffer в Buffer (если нужно) для совместимости с aws-sdk
   let safeBody = input.file;
   if (input.file instanceof ArrayBuffer) {
     safeBody = Buffer.from(input.file);
   }
 
   const isYandexBucket = bucket === process.env.YANDEX_BUCKET_NAME;
+  const maxRetries = Math.max(0, Number(input.maxRetries) || 2);
+  let lastError: unknown = null;
 
-  if (isYandexBucket) {
-    // ЗАГРУЗКА В YANDEX OBJECT STORAGE
-    const s3Client = new S3Client({
-      region: process.env.YANDEX_REGION || "ru-central1",
-      endpoint: "https://storage.yandexcloud.net",
-      credentials: {
-        accessKeyId: process.env.YANDEX_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY!,
-      },
-    });
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (isYandexBucket) {
+        // Yandex Object Storage (прямой S3)
+        const s3Client = new S3Client({
+          region: process.env.YANDEX_REGION || "ru-central1",
+          endpoint: "https://storage.yandexcloud.net",
+          credentials: {
+            accessKeyId: process.env.YANDEX_ACCESS_KEY_ID!,
+            secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY!,
+          },
+        });
 
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: path,
-        // Принудительное подавление ошибки TS через as any, так как в рантайме S3Client принимает Buffer/Uint8Array
-        Body: safeBody as any,
-        ContentType: input.contentType || guessContentTypeFromPath(path),
-        CacheControl: input.cacheControl || "max-age=31536000",
-      })
-    );
+        await s3Client.send(
+          new PutObjectCommand({
+            Bucket: bucket,
+            Key: path,
+            Body: safeBody as any,
+            ContentType: input.contentType || guessContentTypeFromPath(path),
+            CacheControl: input.cacheControl || "max-age=31536000",
+          })
+        );
 
-    return {
-      bucket,
-      path,
-      publicUrl: `https://storage.yandexcloud.net/${bucket}/${path}`,
-    };
-  } else {
-    // ЗАГРУЗКА В SUPABASE (Для старых бакетов вроде covers, backgrounds)
-    const supabase = createSupabaseStorageClient({ admin: true });
+        return {
+          bucket,
+          path,
+          publicUrl: `https://storage.yandexcloud.net/${bucket}/${path}`,
+        };
+      } else {
+        // Supabase Storage
+        const supabase = createSupabaseStorageClient({ admin: true });
 
-    const { data, error } = await supabase.storage.from(bucket).upload(path, input.file, {
-      cacheControl: input.cacheControl ?? "31536000",
-      upsert: Boolean(input.upsert),
-      contentType: input.contentType || guessContentTypeFromPath(path),
-    });
+        const { data, error } = await supabase.storage
+          .from(bucket)
+          .upload(path, input.file, {
+            cacheControl: input.cacheControl ?? "31536000",
+            upsert: Boolean(input.upsert),
+            contentType: input.contentType || guessContentTypeFromPath(path),
+          });
 
-    if (error) {
-      throw error;
+        if (error) {
+          // Не transient ошибка или исчерпаны попытки
+          if (!isTransientStorageError(error) || attempt === maxRetries) {
+            throw error;
+          }
+          lastError = error;
+          // Небольшая задержка перед повтором
+          await new Promise(resolve => setTimeout(resolve, 800 * (attempt + 1)));
+          continue;
+        }
+
+        return {
+          bucket,
+          path: data?.path || path,
+          publicUrl: getStoragePublicUrl(bucket, data?.path || path),
+        };
+      }
+    } catch (error: any) {
+      lastError = error;
+      if (!isTransientStorageError(error) || attempt === maxRetries) {
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, 800 * (attempt + 1)));
     }
-
-    return {
-      bucket,
-      path: data?.path || path,
-      publicUrl: getStoragePublicUrl(bucket, data?.path || path),
-    };
   }
+
+  // Финальный бросок (не должен достигнуться, но на всякий случай)
+  throw lastError ?? new Error("Upload failed after retries");
 }

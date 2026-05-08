@@ -1,9 +1,24 @@
-// app/(app)/assignment/lib/scoring.ts
-import { normalizeText } from "./normalize";
-import type { FinalStats, ReviewItem } from "./types";
+// lib/assignments/scoring.ts
+// Серверная версия скоринга – используется в API для проверки ответов и подсчёта баллов.
+// Идентична клиентской логике, но гарантирует отсутствие манипуляций со стороны клиента.
+
+import type { FinalStats, ReviewItem } from "@/app/(app)/assignment/lib/types";
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Нормализация текста (копия из клиентской normalize.ts, чтобы не зависеть от
+// клиентских модулей, которые могут использовать browser API).
+// ---------------------------------------------------------------------------
+function normalizeText(text: any) {
+  if (!text) return "";
+  let normalized = String(text).toLowerCase().trim();
+  normalized = normalized.replace(/[''`´]/g, "'");
+  normalized = normalized.replace(/\s*'\s*/g, "'");
+  normalized = normalized.replace(/\s+/g, " ");
+  return normalized;
+}
+
+// ---------------------------------------------------------------------------
+// Вспомогательные функции
 // ---------------------------------------------------------------------------
 
 function buildCorrectStrings(arr: any[]): string[] {
@@ -17,18 +32,15 @@ function getPointsTotal(q: any): number {
   return Number.isFinite(p) && p > 0 ? p : 1;
 }
 
-/** Порция результата для одного поля ввода */
 function buildParts(correctAnswers: any[], userArr: string[], totalCount: number) {
   const parts: any[] = [];
   for (let idx = 0; idx < totalCount; idx++) {
     const variants = correctAnswers[idx];
     const userRaw = String(userArr[idx] ?? "");
     const userNorm = normalizeText(userRaw);
-
     const varsNorm = (Array.isArray(variants) ? variants : [variants]).map((v: any) =>
       normalizeText(String(v))
     );
-
     const ok = userNorm.length > 0 && varsNorm.some((v) => v === userNorm);
 
     parts.push({
@@ -42,7 +54,7 @@ function buildParts(correctAnswers: any[], userArr: string[], totalCount: number
 }
 
 // ---------------------------------------------------------------------------
-// Validate
+// Проверка, на все ли вопросы даны ответы
 // ---------------------------------------------------------------------------
 
 export function validateAllAnswered(
@@ -82,8 +94,7 @@ export function validateAllAnswered(
       if (!subRes.ok) return { ok: false, index: i, subIndex: subRes.index };
     } else if (q.type === "matching") {
       const pairs = q.pairs || [];
-      const has =
-        a && typeof a === "object" && Object.keys(a).length === pairs.length;
+      const has = a && typeof a === "object" && Object.keys(a).length === pairs.length;
       if (!has) return { ok: false, index: i };
     }
   }
@@ -91,7 +102,7 @@ export function validateAllAnswered(
 }
 
 // ---------------------------------------------------------------------------
-// Main
+// Главная функция подсчёта баллов и построения обзора
 // ---------------------------------------------------------------------------
 
 export function calcAndBuildReview(
@@ -113,9 +124,7 @@ export function calcAndBuildReview(
     const questionText = String(q?.q ?? "").trim() || `Вопрос ${idxText}`;
     const pointsTotal = getPointsTotal(q);
 
-    // ---------------------------------------------------------------
     // COMPLEX
-    // ---------------------------------------------------------------
     if (q.type === "complex") {
       const subQs = q.subQuestions || [];
       const subAns = Array.isArray(a) ? a : [];
@@ -146,15 +155,11 @@ export function calcAndBuildReview(
       } as ReviewItem;
     }
 
-    // ---------------------------------------------------------------
-    // COUNT TOTALS (для всех базовых типов, кроме complex)
-    // ---------------------------------------------------------------
+    // Базовые вопросы – добавляем в общую статистику
     statsSum.total++;
     statsSum.pointsTotal += pointsTotal;
 
-    // ---------------------------------------------------------------
     // TEST
-    // ---------------------------------------------------------------
     if (q.type === "test") {
       const isMultiple = !!q.multiple;
       const opts: any[] = Array.isArray(q.options) ? q.options : [];
@@ -162,9 +167,7 @@ export function calcAndBuildReview(
       const getOptText = (idx: number) => {
         const opt = opts[idx];
         if (!opt) return "—";
-        return typeof opt === "string"
-          ? opt
-          : opt.text || `Вариант ${idx + 1}`;
+        return typeof opt === "string" ? opt : opt.text || `Вариант ${idx + 1}`;
       };
 
       const correctArr = Array.isArray(q.correct)
@@ -187,7 +190,6 @@ export function calcAndBuildReview(
           isSkipped: true,
           userLabel: isMultiple ? [] : "Не отвечено",
           correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
-          isMultiple,
           fraction: 0,
           pointsEarned: 0,
           pointsTotal,
@@ -244,9 +246,7 @@ export function calcAndBuildReview(
       } as ReviewItem;
     }
 
-    // ---------------------------------------------------------------
     // FILL
-    // ---------------------------------------------------------------
     if (q.type === "fill") {
       const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
       const totalCount = correctAnswers.length;
@@ -283,8 +283,7 @@ export function calcAndBuildReview(
         statsSum.skipped++;
         const parts = buildParts(correctAnswers, userArr, totalCount);
         const correctCount = parts.filter((p) => p.isCorrect).length;
-        const percent =
-          totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+        const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
 
         return {
           type: "fill",
@@ -309,19 +308,13 @@ export function calcAndBuildReview(
 
       statsSum.pointsEarned += pointsEarned;
 
-      const isAllCorrect = correctCount === totalCount;
-      if (isAllCorrect) statsSum.correct++;
-      else if (correctCount > 0) {
-        // чёткий учёт частично правильных
-        statsSum.incorrect++;
-      } else {
-        statsSum.incorrect++;
-      }
+      if (correctCount === totalCount) statsSum.correct++;
+      else statsSum.incorrect++;
 
       return {
         type: "fill",
         questionText,
-        isCorrect: isAllCorrect,
+        isCorrect: correctCount === totalCount,
         isSkipped: false,
         userAnswers: userArr,
         correctAnswers: correctStrings,
@@ -334,9 +327,7 @@ export function calcAndBuildReview(
       } as ReviewItem;
     }
 
-    // ---------------------------------------------------------------
     // SENTENCE
-    // ---------------------------------------------------------------
     if (q.type === "sentence") {
       const gaps = (String(q.sentence || "").match(/___/g) || []).length;
       const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
@@ -374,8 +365,7 @@ export function calcAndBuildReview(
         statsSum.skipped++;
         const parts = buildParts(correctAnswers, userArr, totalCount);
         const correctCount = parts.filter((p) => p.isCorrect).length;
-        const percent =
-          totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+        const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
 
         return {
           type: "sentence",
@@ -400,18 +390,13 @@ export function calcAndBuildReview(
 
       statsSum.pointsEarned += pointsEarned;
 
-      const isAllCorrect = correctCount === totalCount;
-      if (isAllCorrect) statsSum.correct++;
-      else if (correctCount > 0) {
-        statsSum.incorrect++;
-      } else {
-        statsSum.incorrect++;
-      }
+      if (correctCount === totalCount) statsSum.correct++;
+      else statsSum.incorrect++;
 
       return {
         type: "sentence",
         questionText,
-        isCorrect: isAllCorrect,
+        isCorrect: correctCount === totalCount,
         isSkipped: false,
         userAnswers: userArr,
         correctAnswers: correctStrings,
@@ -424,21 +409,17 @@ export function calcAndBuildReview(
       } as ReviewItem;
     }
 
-    // ---------------------------------------------------------------
     // MATCHING
-    // ---------------------------------------------------------------
     if (q.type === "matching") {
       const pairs = Array.isArray(q.pairs) ? q.pairs : [];
       const totalPairsCount = pairs.length;
 
-      // Правильные соответствия: левый id пары -> такой же id (так как оба элемента пары имеют один id)
       const correctMatches: Record<string, string> = {};
       pairs.forEach((p: any) => {
         correctMatches[p.id] = p.id;
       });
 
-      const answered =
-        a && typeof a === "object" && Object.keys(a).length > 0;
+      const answered = a && typeof a === "object" && Object.keys(a).length > 0;
 
       if (!answered) {
         statsSum.skipped++;
@@ -465,20 +446,18 @@ export function calcAndBuildReview(
         }
       });
 
-      const fraction =
-        totalPairsCount > 0 ? correctPairsCount / totalPairsCount : 0;
+      const fraction = totalPairsCount > 0 ? correctPairsCount / totalPairsCount : 0;
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
 
-      const isAllCorrect = correctPairsCount === totalPairsCount;
-      if (isAllCorrect) statsSum.correct++;
+      if (correctPairsCount === totalPairsCount) statsSum.correct++;
       else statsSum.incorrect++;
 
       return {
         type: "matching",
         questionText,
-        isCorrect: isAllCorrect,
+        isCorrect: correctPairsCount === totalPairsCount,
         isSkipped: false,
         correctPairsCount,
         totalPairsCount,
@@ -489,9 +468,7 @@ export function calcAndBuildReview(
       } as ReviewItem;
     }
 
-    // ---------------------------------------------------------------
     // OTHER / CROSSWORD
-    // ---------------------------------------------------------------
     statsSum.skipped++;
     return {
       type: "other",
@@ -504,9 +481,6 @@ export function calcAndBuildReview(
     } as ReviewItem;
   }
 
-  // -----------------------------------------------------------------------
-  // Process each question
-  // -----------------------------------------------------------------------
   questions.forEach((q, i) => {
     review.push(processQ(q, answers[i], String(i + 1)));
   });
