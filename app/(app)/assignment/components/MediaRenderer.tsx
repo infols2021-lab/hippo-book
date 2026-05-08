@@ -24,7 +24,7 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  // Сброс при смене URL
+  // Сброс при смене URL, чтобы плеер не продолжал играть старый трек на новом вопросе
   useEffect(() => {
     setIsPlaying(false);
     setProgress(0);
@@ -82,7 +82,7 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
         background: isPlaying ? "rgba(0, 123, 255, 0.1)" : "#007bff",
         color: isPlaying ? "#007bff" : "#fff", border: "none", display: "flex",
         alignItems: "center", justifyContent: "center", cursor: "pointer",
-        transition: "all 0.2s ease", boxShadow: isPlaying ? "none" : "0 6px 15px rgba(0, 123, 255, 0.2)"
+        transition: "all 0.2s ease", boxShadow: isPlaying ? "none" : "0 6px 15px rgba(0, 123, 255, 0.3)"
       }}>
         {isPlaying ? (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
@@ -112,7 +112,7 @@ function ZoomableImage({ url, name }: { url: string; name?: string }) {
   const [hasError, setHasError] = useState(false);
   const finalUrl = getImageUrl(url);
 
-  // Сброс при смене картинки
+  // Сброс состояния при смене URL
   useEffect(() => {
     setIsLoading(true);
     setHasError(false);
@@ -142,6 +142,8 @@ function ZoomableImage({ url, name }: { url: string; name?: string }) {
             alt={name || "Task Image"}
             onLoad={() => setIsLoading(false)}
             onError={() => { setHasError(true); setIsLoading(false); }}
+            loading="lazy"
+            decoding="async"
             style={{
               width: "100%", maxHeight: "400px", objectFit: "contain",
               display: "block", transition: "opacity 0.4s ease",
@@ -174,7 +176,7 @@ function ZoomableImage({ url, name }: { url: string; name?: string }) {
           }}
         >
           <img src={finalUrl} style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: "12px", boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }} alt="Full" />
-          <button style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", color: "#fff", fontSize: "30px", cursor: "pointer" }}>✕</button>
+          <button style={{ position: "absolute", top: "20px", right: "30px", background: "none", border: "none", color: "#fff", fontSize: "40px", cursor: "pointer" }}>&times;</button>
         </div>
       )}
     </>
@@ -217,8 +219,8 @@ export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) 
       {media.map((m) => {
         if (!m.url) return null;
         
-        // КЛЮЧЕВОЙ МОМЕНТ: Использование URL в качестве key гарантирует 
-        // полную перезагрузку компонента при смене вопроса.
+        // Уникальный ключ по ID + URL гарантирует уничтожение старого компонента и 
+        // создание нового при смене вопроса. Это убирает эффект "старой картинки".
         const uniqueKey = `${m.id}-${m.url}`;
 
         if (m.type === "audio") return <CustomAudioPlayer key={uniqueKey} url={m.url} name={m.name} />;
