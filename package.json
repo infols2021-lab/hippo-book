@@ -12,6 +12,7 @@
     "@aws-sdk/client-s3": "^3.1045.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.91.0",
+    "busboy": "^1.6.0",
     "directory-tree": "^3.6.0",
     "googleapis": "^171.2.0",
     "next": "16.1.4",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/busboy": "^1.5.4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

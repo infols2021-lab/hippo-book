@@ -452,7 +452,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
               </div>
             </div>
 
-            <div className="premium-card active-question" style={{ background: theme.cardBg }}>
+            <div key={currentIndex} className="premium-card active-question" style={{ background: theme.cardBg }}>
               <h2 className="question-title">{currentIndex + 1}. {questions[currentIndex]?.q}</h2>
 
               <div className="media-section">
