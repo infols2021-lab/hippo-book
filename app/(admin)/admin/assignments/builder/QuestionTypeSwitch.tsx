@@ -13,6 +13,8 @@ export default function QuestionTypeSwitch({ value, onChange, disabled }: Props)
     { t: "test", label: "📝 Тест" },
     { t: "fill", label: "✍️ Вписать" },
     { t: "sentence", label: "📝 Предложение" },
+    { t: "matching", label: "🔗 Сопоставление" },
+    { t: "complex", label: "📚 Комплексный" },
     { t: "crossword", label: "🧩 Кроссворд" },
   ];
 

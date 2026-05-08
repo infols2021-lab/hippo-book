@@ -2,21 +2,39 @@
 export type EditorMode = "visual" | "json";
 
 // ===== Question types =====
-export type QuestionType = "test" | "fill" | "sentence" | "crossword";
+export type QuestionType = "test" | "fill" | "sentence" | "crossword" | "complex" | "matching";
+
+// ===== Media =====
+export type MediaType = "image" | "audio" | "pdf";
+
+export type MediaAttachment = {
+  id: string;
+  url: string;
+  type: MediaType;
+  name?: string; // Имя файла (особенно полезно для PDF)
+};
 
 // ===== Base =====
 export type BaseQuestion = {
   id: string;
   type: QuestionType;
   q?: string;
-  image?: string;
+  image?: string; // Устаревшее (оставлено для совместимости старых данных)
+  media?: MediaAttachment[]; // Новый массив медиа-файлов
 };
 
 // ===== Test =====
+export type TestOption = {
+  id: string;
+  text: string;
+  media?: MediaAttachment[];
+};
+
 export type TestQuestion = BaseQuestion & {
   type: "test";
-  options: string[];
-  correct: number;
+  multiple?: boolean; // Чекбокс для множественного выбора
+  options: TestOption[]; // Обновленная структура опций с поддержкой медиа
+  correct: number[]; // Массив индексов правильных ответов (даже если один)
 };
 
 // ===== Fill =====
@@ -30,6 +48,30 @@ export type SentenceQuestion = BaseQuestion & {
   type: "sentence";
   sentence: string;
   answers: string[][];
+};
+
+// ===== Complex =====
+export type ComplexQuestion = BaseQuestion & {
+  type: "complex";
+  subQuestions: Question[]; // Вложенные вопросы
+};
+
+// ===== Matching =====
+export type MatchingItem = {
+  text?: string;
+  media?: MediaAttachment[];
+};
+
+export type MatchingPair = {
+  id: string;
+  left: MatchingItem;
+  right: MatchingItem;
+};
+
+export type MatchingQuestion = BaseQuestion & {
+  type: "matching";
+  centerImage?: MediaAttachment; // То самое "центральное изображение"
+  pairs: MatchingPair[];
 };
 
 // ===== Crossword (editor helpers) =====
@@ -73,7 +115,13 @@ export type CrosswordQuestion = BaseQuestion & {
 };
 
 // ===== Union =====
-export type Question = TestQuestion | FillQuestion | SentenceQuestion | CrosswordQuestion;
+export type Question =
+  | TestQuestion
+  | FillQuestion
+  | SentenceQuestion
+  | CrosswordQuestion
+  | ComplexQuestion
+  | MatchingQuestion;
 
 // ===== Helpers =====
 export function deepClone<T>(v: T): T {
@@ -88,8 +136,13 @@ export function newQuestion(type: QuestionType): Question {
       id,
       type: "test",
       q: "",
-      options: ["", ""],
-      correct: 0,
+      multiple: false,
+      media: [],
+      options: [
+        { id: crypto.randomUUID(), text: "", media: [] },
+        { id: crypto.randomUUID(), text: "", media: [] },
+      ],
+      correct: [0], // По умолчанию первый вариант верный
     };
   }
 
@@ -98,6 +151,7 @@ export function newQuestion(type: QuestionType): Question {
       id,
       type: "fill",
       q: "",
+      media: [],
       answers: [[""]],
     };
   }
@@ -106,8 +160,36 @@ export function newQuestion(type: QuestionType): Question {
     return {
       id,
       type: "sentence",
+      q: "",
+      media: [],
       sentence: "",
       answers: [],
+    };
+  }
+
+  if (type === "complex") {
+    return {
+      id,
+      type: "complex",
+      q: "",
+      media: [],
+      subQuestions: [],
+    };
+  }
+
+  if (type === "matching") {
+    return {
+      id,
+      type: "matching",
+      q: "",
+      media: [],
+      pairs: [
+        {
+          id: crypto.randomUUID(),
+          left: { text: "", media: [] },
+          right: { text: "", media: [] },
+        },
+      ],
     };
   }
 
@@ -115,6 +197,8 @@ export function newQuestion(type: QuestionType): Question {
   return {
     id,
     type: "crossword",
+    q: "",
+    media: [],
     grid: Array.from({ length: 15 }, () => Array.from({ length: 15 }, () => "")),
     words: [],
     blocks: [],

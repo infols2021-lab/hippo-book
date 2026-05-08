@@ -2,11 +2,23 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+
+// === КОМПОНЕНТЫ ВОПРОСОВ ===
 import QuestionCrossword from "./components/QuestionCrossword";
+import QuestionTest from "./components/QuestionTest";
+import QuestionFill from "./components/QuestionFill";
+import QuestionSentence from "./components/QuestionSentence";
+import QuestionMatching from "./components/QuestionMatching";
+import QuestionComplex from "./components/QuestionComplex";
+import MediaRenderer from "./components/MediaRenderer";
 import ReviewPanel from "./components/ReviewPanel";
+
+// === ЛОГИКА И ТИПЫ ===
 import { getImageUrl } from "./lib/image";
 import { normalizeText } from "./lib/normalize";
-import type { FinalStats, ReviewItem } from "./lib/types";
+import type { FinalStats, ReviewItem, QuestionAny } from "./lib/types";
+import { validateAllAnswered, calcAndBuildReview } from "./lib/scoring";
+
 import {
   recommendGatehouseLevel,
   getGatehouseRecommendationBadge,
@@ -34,10 +46,14 @@ type Props = {
   sourceId?: string;
 };
 
-// ===================== HELPERS =====================
-function normalizeQuestions(qs: unknown): any[] {
+// ===================== HELPERS (ORIGINAL LOGIC) =====================
+function normalizeQuestions(qs: unknown): QuestionAny[] {
   if (!Array.isArray(qs)) return [];
-  return qs.map((q) => (q && typeof q === "object" ? q : { q: String(q ?? "") }));
+  return qs.map((q) => {
+    const base = q && typeof q === "object" ? q : { q: String(q ?? "") };
+    if (!base.id) base.id = crypto.randomUUID();
+    return base as QuestionAny;
+  });
 }
 
 function ensureGrid(rows: number, cols: number, prev?: string[][]) {
@@ -83,130 +99,16 @@ function getAssignmentMaterialLevels(assignment: any): string[] {
   return normalizeStringArray(material2?.target_levels);
 }
 
-function scoreCrossword(question: any, userGrid?: string[][]) {
-  const grid: string[][] = Array.isArray(question?.grid) ? question.grid : [];
-  const rows = Number(question?.metadata?.rows ?? grid.length ?? 0);
-  const cols = Number(question?.metadata?.cols ?? (grid?.[0]?.length ?? 0));
-
-  const activeCells = getCrosswordActiveCells(question);
-  const u = ensureGrid(rows, cols, userGrid);
-
-  let total = 0;
-  let correct = 0;
-  let filled = 0;
-
-  activeCells.forEach((key) => {
-    const [rS, cS] = key.split(",");
-    const r = Number(rS);
-    const c = Number(cS);
-
-    const correctLetter = String(grid?.[r]?.[c] ?? "").toUpperCase().trim();
-    const userLetter = String(u?.[r]?.[c] ?? "").toUpperCase().trim();
-
-    total++;
-    if (userLetter) filled++;
-    if (userLetter && correctLetter && userLetter === correctLetter) correct++;
-  });
-
-  const percent = total > 0 ? Math.round((correct / total) * 100) : 0;
-  const allCorrect = total > 0 && correct === total;
-
-  return { total, correct, filled, percent, allCorrect };
-}
-
-function buildCrosswordWordReview(question: any, userGrid?: string[][]) {
-  const words: any[] = Array.isArray(question?.words) ? question.words : [];
-  const cellNumbers: Record<string, number> = (question?.cellNumbers as any) || {};
-  const grid: string[][] = Array.isArray(question?.grid) ? question.grid : [];
-  const rows = Number(question?.metadata?.rows ?? grid.length ?? 0);
-  const cols = Number(question?.metadata?.cols ?? (grid?.[0]?.length ?? 0));
-  const u = ensureGrid(rows, cols, userGrid);
-
-  function wordAt(w: any, from: string[][]) {
-    const len = Number(w?.length ?? 0);
-    const dir: "across" | "down" = w?.direction === "down" ? "down" : "across";
-    const start = w?.start;
-    if (!start || !len) return "";
-
-    let s = "";
-    for (let i = 0; i < len; i++) {
-      const r = dir === "across" ? start.row : start.row + i;
-      const c = dir === "across" ? start.col + i : start.col;
-      s += String(from?.[r]?.[c] ?? "").toUpperCase();
-    }
-    return s;
-  }
-
-  const wrong: Array<{ number: number; direction: "across" | "down"; user: string; correct: string }> = [];
-  const correct: Array<{ number: number; direction: "across" | "down"; word: string }> = [];
-
-  for (const w of words) {
-    const start = w?.start;
-    if (!start) continue;
-
-    const dir: "across" | "down" = w?.direction === "down" ? "down" : "across";
-    const key = `${start.row}-${start.col}`;
-    const number = Number(cellNumbers[key] ?? w?.number ?? 0);
-
-    const userWord = wordAt(w, u).trim();
-    const corrWord = wordAt(w, grid).trim();
-
-    if (!userWord || userWord.includes(" ")) {
-      wrong.push({ number, direction: dir, user: userWord || "—", correct: corrWord || "—" });
-      continue;
-    }
-
-    if (userWord === corrWord && corrWord) correct.push({ number, direction: dir, word: corrWord });
-    else wrong.push({ number, direction: dir, user: userWord || "—", correct: corrWord || "—" });
-  }
-
-  const dirOrder = (d: "across" | "down") => (d === "across" ? 0 : 1);
-
-  wrong.sort((a, b) => a.number - b.number || dirOrder(a.direction) - dirOrder(b.direction));
-  correct.sort((a, b) => a.number - b.number || dirOrder(a.direction) - dirOrder(b.direction));
-
-  return { wrong, correct };
-}
-
 // ===================== COMPONENT =====================
 export default function AssignmentClient({ assignmentId, source, sourceId }: Props) {
   const router = useRouter();
 
-  const back = useMemo(() => {
-    const s = String(source ?? "").trim().toLowerCase();
-    const id = String(sourceId ?? "").trim();
-
-    if (s === "textbook" && id) {
-      const href = `/textbook/${encodeURIComponent(id)}`;
-      return { href, headerLabel: "← Назад в учебник", actionLabel: "Вернуться в учебник" };
-    }
-
-    if (s === "crossword" && id) {
-      const href = `/crossword/${encodeURIComponent(id)}`;
-      return { href, headerLabel: "← Назад в кроссворд", actionLabel: "Вернуться в кроссворд" };
-    }
-
-    if ((s === "gatehouse-material" || s === "gatehouse") && id) {
-      const href = `/gatehouse/material/${encodeURIComponent(id)}`;
-      return { href, headerLabel: "← Назад к пробному тесту", actionLabel: "Вернуться к пробному тесту" };
-    }
-
-    if (s === "gatehouse-material" || s === "gatehouse") {
-      return {
-        href: "/gatehouse/materials",
-        headerLabel: "← Назад к экзаменам",
-        actionLabel: "Вернуться к экзаменам",
-      };
-    }
-
-    return { href: "/materials", headerLabel: "← Назад к материалам", actionLabel: "Вернуться к материалам" };
-  }, [source, sourceId]);
-
+  // --- STATE ---
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   const [assignment, setAssignment] = useState<any>(null);
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<QuestionAny[]>([]);
 
   const [previousProgress, setPreviousProgress] = useState<ApiOk["progress"]>(null);
 
@@ -227,26 +129,61 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
   const saveBusyRef = useRef(false);
 
+  // --- THEME LOGIC ---
   const isGatehouse = useMemo(() => {
     const s = String(source ?? "").trim().toLowerCase();
-    if (s === "gatehouse" || s === "gatehouse-material") return true;
-    if (assignment?.branch_type === "gatehouse") return true;
-
-    const material = Array.isArray(assignment?.materials) ? assignment.materials[0] : assignment?.materials;
-    if (material?.branch_type === "gatehouse") return true;
-
-    return false;
+    return s.includes("gatehouse") || assignment?.branch_type === "gatehouse";
   }, [assignment, source]);
 
+  const theme = useMemo(() => {
+    if (isGatehouse) {
+      return {
+        primary: "#6366f1",
+        accent: "#a855f7",
+        bg: "linear-gradient(135deg, #f5f3ff 0%, #e0e7ff 100%)",
+        cardBg: "rgba(255, 255, 255, 0.95)",
+        text: "#1e1b4b",
+        buttonText: "#ffffff",
+        badge: "PROFICIENCY TEST"
+      };
+    }
+    return {
+      primary: "#0ea5e9",
+      accent: "#f59e0b",
+      bg: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
+      cardBg: "#ffffff",
+      text: "#0c4a6e",
+      buttonText: "#ffffff",
+      badge: "OLYMPIAD"
+    };
+  }, [isGatehouse]);
+
+  const back = useMemo(() => {
+    const s = String(source ?? "").trim().toLowerCase();
+    const id = String(sourceId ?? "").trim();
+
+    if (s === "textbook" && id) {
+      return { href: `/textbook/${encodeURIComponent(id)}`, headerLabel: "← Назад в учебник", actionLabel: "Вернуться в учебник" };
+    }
+    if (s === "crossword" && id) {
+      return { href: `/crossword/${encodeURIComponent(id)}`, headerLabel: "← Назад в кроссворд", actionLabel: "Вернуться в кроссворд" };
+    }
+    if ((s === "gatehouse-material" || s === "gatehouse") && id) {
+      return { href: `/gatehouse/material/${encodeURIComponent(id)}`, headerLabel: "← Назад к тесту", actionLabel: "Вернуться к тесту" };
+    }
+    if (s === "gatehouse-material" || s === "gatehouse") {
+      return { href: "/gatehouse/materials", headerLabel: "← К экзаменам", actionLabel: "К экзаменам" };
+    }
+    return { href: "/materials", headerLabel: "← К материалам", actionLabel: "К материалам" };
+  }, [source, sourceId]);
+
+  // --- ACTIONS ---
   async function load() {
     try {
       setLoading(true);
       setErr(null);
 
-      const res = await fetch(`/api/assignment-data/${encodeURIComponent(assignmentId)}`, {
-        cache: "no-store",
-      });
-
+      const res = await fetch(`/api/assignment-data/${encodeURIComponent(assignmentId)}`, { cache: "no-store" });
       const json = (await res.json()) as Api;
 
       if (!res.ok || !("ok" in json) || json.ok !== true) {
@@ -254,9 +191,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       }
 
       setAssignment(json.assignment);
-
       const qs = normalizeQuestions(json.assignment?.content?.questions);
-
       setQuestions(qs);
       setPreviousProgress(json.progress);
 
@@ -274,7 +209,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       setFinalStats(null);
       setReviewItems([]);
       setGatehouseRecommendation(null);
-
       setLoading(false);
     } catch (e: any) {
       setLoading(false);
@@ -282,10 +216,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     }
   }
 
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assignmentId]);
+  useEffect(() => { load(); }, [assignmentId]);
 
   function openImage(src: string) {
     setModalSrc(src);
@@ -300,12 +231,8 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   }
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && imageModalOpen) closeImage();
-    }
-
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape" && imageModalOpen) closeImage(); }
     document.addEventListener("keydown", onKey);
-
     return () => document.removeEventListener("keydown", onKey);
   }, [imageModalOpen]);
 
@@ -319,64 +246,17 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     setShowChoice(false);
     setCurrentIndex(0);
     setCompletedScreen(false);
-    setFinalStats(null);
-    setReviewItems([]);
-    setGatehouseRecommendation(null);
   }
 
   function viewPrevious() {
     setIsViewMode(true);
     setShowChoice(false);
     setCurrentIndex(0);
-    setCompletedScreen(false);
-    setFinalStats(null);
-    setReviewItems([]);
-    setGatehouseRecommendation(null);
   }
 
-  function switchMode() {
-    if (!previousProgress?.is_completed) return;
-
-    setShowChoice(true);
-    setCompletedScreen(false);
-    setFinalStats(null);
-    setReviewItems([]);
-    setGatehouseRecommendation(null);
-  }
-
-  function notifyProfileStreakRefresh(payload?: unknown) {
-    try {
-      if (typeof window === "undefined") return;
-
-      sessionStorage.setItem("profile-streak-dirty", "1");
-
-      if (payload !== undefined) {
-        sessionStorage.setItem("profile-streak-last-save-response", JSON.stringify(payload));
-      }
-
-      window.dispatchEvent(new Event("profile-streak-refresh"));
-    } catch {}
-  }
-
-  function notifyGatehouseProfileRefresh(payload?: unknown) {
-    try {
-      if (typeof window === "undefined") return;
-
-      sessionStorage.setItem("gatehouse-profile-progress-dirty", "1");
-
-      if (payload !== undefined) {
-        sessionStorage.setItem("gatehouse-profile-last-save-response", JSON.stringify(payload));
-      }
-
-      window.dispatchEvent(new Event("gatehouse-profile-progress-refresh"));
-    } catch {}
-  }
-
-  async function saveCompletedProgress(score: number) {
+  async function saveProgress(score: number) {
     if (saveBusyRef.current) return;
-
     saveBusyRef.current = true;
-
     try {
       const res = await fetch("/api/assignment-progress", {
         method: "POST",
@@ -391,378 +271,28 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           branchType: isGatehouse ? "gatehouse" : "olympiad",
         }),
       });
-
-      let json: any = null;
-
-      try {
-        json = await res.json();
-      } catch {
-        json = null;
-      }
-
+      const json = await res.json();
       if (res.ok && json?.ok) {
-        if (isGatehouse) {
-          notifyGatehouseProfileRefresh(json);
-        } else {
-          notifyProfileStreakRefresh(json?.streak ?? json);
-        }
+        window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
       }
     } finally {
       saveBusyRef.current = false;
     }
   }
 
-  function validateAllAnswered() {
-    for (let i = 0; i < questions.length; i++) {
-      const q: any = questions[i];
-      const a = answers[i];
-
-      if (q.type === "test") {
-        const ok = a !== undefined && a !== null && a !== "";
-        if (!ok) return { ok: false as const, index: i };
-      }
-
-      if (q.type === "fill") {
-        const correctCount = (q.answers || []).length;
-        const ok = Array.isArray(a) && a.length >= correctCount && a.every((x: any) => String(x ?? "").trim() !== "");
-        if (!ok) return { ok: false as const, index: i };
-      }
-
-      if (q.type === "sentence") {
-        const gaps = (String(q.sentence || "").match(/___/g) || []).length;
-        const ok = Array.isArray(a) && a.length >= gaps && a.every((x: any) => String(x ?? "").trim() !== "");
-        if (!ok) return { ok: false as const, index: i };
-      }
-
-      if (q.type === "crossword") {
-        const active = getCrosswordActiveCells(q);
-        const grid: string[][] = Array.isArray(q?.grid) ? q.grid : [];
-        const rows = Number(q?.metadata?.rows ?? grid.length ?? 0);
-        const cols = Number(q?.metadata?.cols ?? (grid?.[0]?.length ?? 0));
-        const u = ensureGrid(rows, cols, a);
-
-        let allFilled = true;
-
-        active.forEach((key) => {
-          const [rS, cS] = key.split(",");
-          const r = Number(rS);
-          const c = Number(cS);
-          const v = String(u?.[r]?.[c] ?? "").trim();
-
-          if (!v) allFilled = false;
-        });
-
-        if (!allFilled) return { ok: false as const, index: i };
-      }
-    }
-
-    return { ok: true as const, index: -1 };
-  }
-
-  function calcAndBuildReview(): { stats: FinalStats; review: ReviewItem[] } {
-    let correct = 0;
-    let incorrect = 0;
-    let skipped = 0;
-
-    let pointsEarned = 0;
-    let pointsTotal = 0;
-
-    const review: ReviewItem[] = [];
-
-    questions.forEach((q: any, i) => {
-      const questionText = String(q?.q ?? "").trim() || `Вопрос ${i + 1}`;
-      const a = answers[i];
-
-      pointsTotal += 1;
-
-      if (q.type === "test") {
-        const opts: string[] = Array.isArray(q.options) ? q.options.map(String) : [];
-        const correctIdx = Number(q.correct);
-        const correctLabel = Number.isFinite(correctIdx) && opts[correctIdx] ? opts[correctIdx] : "—";
-
-        const answered = a !== undefined && a !== null && a !== "";
-
-        if (!answered) {
-          skipped++;
-          review.push({
-            type: "test",
-            questionText,
-            isCorrect: false,
-            isSkipped: true,
-            userLabel: "Не отвечено",
-            correctLabel,
-            pointsEarned: 0,
-            pointsTotal: 1,
-          });
-          return;
-        }
-
-        const userIdx = Number(a);
-        const userLabel = Number.isFinite(userIdx) && opts[userIdx] ? opts[userIdx] : String(a);
-        const isCorrect = userIdx === correctIdx;
-
-        if (isCorrect) {
-          correct++;
-          pointsEarned += 1;
-        } else {
-          incorrect++;
-        }
-
-        review.push({
-          type: "test",
-          questionText,
-          isCorrect,
-          isSkipped: false,
-          userLabel,
-          correctLabel,
-          pointsEarned: isCorrect ? 1 : 0,
-          pointsTotal: 1,
-        });
-        return;
-      }
-
-      if (q.type === "fill") {
-        const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
-        const need = correctAnswers.length;
-
-        const correctText = correctAnswers.map((variants: any) =>
-          (Array.isArray(variants) ? variants : [variants]).map(String).join(" или "),
-        );
-
-        const answered = Array.isArray(a) && a.length >= need && a.slice(0, need).every((x: any) => String(x ?? "").trim() !== "");
-
-        if (!answered) {
-          skipped++;
-          review.push({
-            type: "fill",
-            questionText,
-            isCorrect: false,
-            isSkipped: true,
-            userAnswers: Array.isArray(a) ? a.map((x: any) => String(x ?? "")) : [],
-            correctAnswers: correctText,
-            parts: Array.from({ length: need }).map((_, idx) => ({
-              index: idx + 1,
-              user: String((Array.isArray(a) ? a[idx] : "") ?? ""),
-              correct: correctText[idx] ?? "—",
-              isCorrect: false,
-            })),
-            percent: 0,
-            correctCount: 0,
-            totalCount: need,
-            pointsEarned: 0,
-            pointsTotal: 1,
-          });
-          return;
-        }
-
-        const userArr: string[] = (a as any[]).slice(0, need).map((x) => String(x ?? ""));
-        let correctCount = 0;
-
-        const parts = correctAnswers.map((variants: any, idx: number) => {
-          const user = normalizeText(userArr[idx]);
-          const vars = (Array.isArray(variants) ? variants : [variants]).map(normalizeText);
-          const ok = vars.some((v) => v === user);
-
-          if (ok) correctCount++;
-
-          return {
-            index: idx + 1,
-            user: userArr[idx] ?? "",
-            correct: correctText[idx] ?? "—",
-            isCorrect: ok,
-          };
-        });
-
-        const ratio = need > 0 ? correctCount / need : 0;
-        const percent = Math.round(ratio * 100);
-        const fullyCorrect = need > 0 && correctCount === need;
-
-        pointsEarned += ratio;
-
-        if (fullyCorrect) correct++;
-        else incorrect++;
-
-        review.push({
-          type: "fill",
-          questionText,
-          isCorrect: fullyCorrect,
-          isSkipped: false,
-          userAnswers: userArr,
-          correctAnswers: correctText,
-          parts,
-          percent,
-          correctCount,
-          totalCount: need,
-          pointsEarned: ratio,
-          pointsTotal: 1,
-        });
-        return;
-      }
-
-      if (q.type === "sentence") {
-        const gaps = (String(q.sentence || "").match(/___/g) || []).length;
-        const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
-        const need = gaps;
-
-        const correctText = correctAnswers.map((variants: any) =>
-          (Array.isArray(variants) ? variants : [variants]).map(String).join(" или "),
-        );
-
-        const answered = Array.isArray(a) && a.length >= need && a.slice(0, need).every((x: any) => String(x ?? "").trim() !== "");
-
-        if (!answered) {
-          skipped++;
-          review.push({
-            type: "sentence",
-            questionText,
-            isCorrect: false,
-            isSkipped: true,
-            userAnswers: Array.isArray(a) ? a.map((x: any) => String(x ?? "")) : [],
-            correctAnswers: correctText,
-            parts: Array.from({ length: need }).map((_, idx) => ({
-              index: idx + 1,
-              user: String((Array.isArray(a) ? a[idx] : "") ?? ""),
-              correct: correctText[idx] ?? "—",
-              isCorrect: false,
-            })),
-            percent: 0,
-            correctCount: 0,
-            totalCount: need,
-            pointsEarned: 0,
-            pointsTotal: 1,
-          });
-          return;
-        }
-
-        const userArr: string[] = (a as any[]).slice(0, need).map((x) => String(x ?? ""));
-        let correctCount = 0;
-
-        const parts = correctAnswers.slice(0, need).map((variants: any, idx: number) => {
-          const user = normalizeText(userArr[idx]);
-          const vars = (Array.isArray(variants) ? variants : [variants]).map(normalizeText);
-          const ok = vars.some((v) => v === user);
-
-          if (ok) correctCount++;
-
-          return {
-            index: idx + 1,
-            user: userArr[idx] ?? "",
-            correct: correctText[idx] ?? "—",
-            isCorrect: ok,
-          };
-        });
-
-        const ratio = need > 0 ? correctCount / need : 0;
-        const percent = Math.round(ratio * 100);
-        const fullyCorrect = need > 0 && correctCount === need;
-
-        pointsEarned += ratio;
-
-        if (fullyCorrect) correct++;
-        else incorrect++;
-
-        review.push({
-          type: "sentence",
-          questionText,
-          isCorrect: fullyCorrect,
-          isSkipped: false,
-          userAnswers: userArr,
-          correctAnswers: correctText,
-          parts,
-          percent,
-          correctCount,
-          totalCount: need,
-          pointsEarned: ratio,
-          pointsTotal: 1,
-        });
-        return;
-      }
-
-      if (q.type === "crossword") {
-        const userGrid = a as string[][] | undefined;
-        const scored = scoreCrossword(q, userGrid);
-        const answered = scored.filled > 0;
-
-        if (!answered) {
-          skipped++;
-          review.push({
-            type: "crossword",
-            questionText,
-            isCorrect: false,
-            isSkipped: true,
-            note: "Кроссворд не заполнен",
-            crosswordStats: { filled: scored.filled, total: scored.total, percent: scored.percent },
-            wordReview: buildCrosswordWordReview(q, userGrid),
-            pointsEarned: 0,
-            pointsTotal: 1,
-          });
-          return;
-        }
-
-        const ratio = scored.percent / 100;
-
-        pointsEarned += ratio;
-
-        if (scored.allCorrect) correct++;
-        else incorrect++;
-
-        review.push({
-          type: "crossword",
-          questionText,
-          isCorrect: scored.allCorrect,
-          isSkipped: false,
-          note: `Правильность по клеткам: ${scored.correct}/${scored.total}`,
-          crosswordStats: { filled: scored.filled, total: scored.total, percent: scored.percent },
-          wordReview: buildCrosswordWordReview(q, userGrid),
-          pointsEarned: ratio,
-          pointsTotal: 1,
-        });
-        return;
-      }
-
-      skipped++;
-      review.push({
-        type: "other",
-        questionText,
-        isCorrect: false,
-        isSkipped: true,
-        note: "Тип вопроса пока не поддержан.",
-        pointsEarned: 0,
-        pointsTotal: 1,
-      });
-    });
-
-    const total = correct + incorrect + skipped;
-    const score = pointsTotal > 0 ? Math.round((pointsEarned / pointsTotal) * 100) : 0;
-
-    return {
-      stats: {
-        score,
-        correct,
-        incorrect,
-        skipped,
-        total,
-        pointsEarned,
-        pointsTotal,
-      },
-      review,
-    };
-  }
-
   async function finish() {
     if (isViewMode) return;
-
-    const v = validateAllAnswered();
-
+    
+    // Используем внешнюю логику валидации
+    const v = validateAllAnswered(questions, answers);
     if (!v.ok) {
-      alert(`❌ Не все вопросы заполнены! Ответьте на вопрос ${v.index + 1}`);
+      alert(`❌ Заполните вопрос №${v.index + 1}`);
       setCurrentIndex(v.index);
       return;
     }
 
-    const { stats, review } = calcAndBuildReview();
-
-    await saveCompletedProgress(stats.score);
+    // Используем внешнюю логику подсчета
+    const { stats, review } = calcAndBuildReview(questions, answers);
 
     if (isGatehouse) {
       const recommendation = recommendGatehouseLevel({
@@ -771,377 +301,272 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         percent: stats.score,
         materialLevels: getAssignmentMaterialLevels(assignment),
       });
-
       setGatehouseRecommendation(recommendation);
-    } else {
-      setGatehouseRecommendation(null);
     }
 
     setFinalStats(stats);
     setReviewItems(review);
     setCompletedScreen(true);
+    await saveProgress(stats.score);
   }
 
-  const q = questions[currentIndex] || null;
+  function renderQuestionComponent(q: QuestionAny, index: number) {
+    const val = answers[index];
+    const sharedProps = { 
+      disabled: isViewMode, 
+      onChange: (v: any) => setAnswerForQuestion(index, v) 
+    };
 
-  const showReview = useMemo(() => {
-    if (!finalStats) return false;
-    return finalStats.incorrect > 0 || finalStats.skipped > 0;
-  }, [finalStats]);
+    switch (q.type) {
+      case "test": return <QuestionTest question={q as any} value={val} {...sharedProps} />;
+      case "fill": return <QuestionFill question={q as any} value={val} {...sharedProps} />;
+      case "sentence": return <QuestionSentence question={q as any} value={val} {...sharedProps} />;
+      case "matching": return <QuestionMatching question={q as any} value={val} {...sharedProps} />;
+      case "complex": return <QuestionComplex question={q as any} value={val} {...sharedProps} />;
+      case "crossword":
+        return (
+          <QuestionCrossword
+            question={q as any}
+            value={val}
+            disabled={isViewMode}
+            onOpenImage={openImage}
+            onChange={sharedProps.onChange}
+          />
+        );
+      default: return <div className="error-message">Тип "{q.type}" не поддерживается</div>;
+    }
+  }
+
+  if (loading) return (
+    <div className="loader-container" style={{ background: theme.bg }}>
+      <div className="premium-spinner" style={{ borderColor: theme.primary, borderTopColor: "transparent" }} />
+      <p style={{ color: theme.primary, fontWeight: 600, marginTop: "20px" }}>Загружаем материалы...</p>
+    </div>
+  );
+
+  if (err) return (
+    <div className="loader-container" style={{ background: theme.bg }}>
+      <div className="error-card">{err}</div>
+      <button onClick={() => window.location.reload()} className="btn-premium primary" style={{ background: theme.primary, marginTop: "20px" }}>Попробовать снова</button>
+    </div>
+  );
 
   return (
-    <div className="container">
-      <header className="header">
-        <div className="header-buttons">
-          <button className="btn secondary" type="button" onClick={() => router.push(back.href)}>
+    <div className="assignment-page" style={{ 
+      background: theme.bg, 
+      minHeight: "100vh", 
+      color: theme.text,
+      fontFamily: "var(--font-geist-sans), 'Inter', sans-serif"
+    }}>
+      {/* HEADER */}
+      <header className="premium-header">
+        <div className="header-content">
+          <button className="back-button" onClick={() => router.push(back.href)}>
             {back.headerLabel}
           </button>
-
-          <button
-            className="mode-switch-btn"
-            onClick={switchMode}
-            style={{ display: previousProgress?.is_completed ? "block" : "none" }}
-            type="button"
-          >
-            ↶ Сменить режим
-          </button>
+          <div className="assignment-badge" style={{ background: theme.primary }}>
+            {theme.badge}
+          </div>
         </div>
-
-        <h1>{isGatehouse ? "Пробный тест" : "Задание"}</h1>
       </header>
 
-      {loading ? (
-        <div id="loading" className="loading">
-          <div className="spinner" />
-          <p>Загружаем задание...</p>
-        </div>
-      ) : null}
+      <main className="premium-main">
+        {/* ЭКРАН ВЫБОРА РЕЖИМА (ЕСЛИ УЖЕ ПРОЙДЕНО) */}
+        {showChoice && (
+          <div className="premium-card animate-in" style={{ background: theme.cardBg }}>
+            <h2 className="card-title">📊 Предыдущий результат</h2>
+            <p className="card-subtitle">У вас уже есть сохраненный прогресс. Хотите начать с чистого листа или просто посмотреть ошибки?</p>
+            <div className="button-group">
+              <button className="btn-premium primary" style={{ background: theme.primary }} onClick={startFresh}>Начать заново</button>
+              <button className="btn-premium secondary" onClick={viewPrevious}>Посмотреть ответы</button>
+            </div>
+          </div>
+        )}
 
-      {err ? (
-        <div id="errorMessage" className="error-message">
-          {err}
-        </div>
-      ) : null}
+        {/* ЭКРАН РЕЗУЛЬТАТОВ */}
+        {completedScreen && finalStats && (
+          <div className="premium-card animate-in" style={{ background: theme.cardBg }}>
+            <div className="score-circle" style={{ borderColor: theme.primary }}>
+              <span className="score-value" style={{ color: theme.primary }}>{finalStats.score}%</span>
+              <span className="score-label">Ваш балл</span>
+            </div>
 
-      {!loading && !err && assignment ? (
-        <>
-          {showChoice ? (
-            <div className="assignment-container">
-              <div className="restart-container" style={{ display: "block" }}>
-                <h3>📊 У вас есть предыдущий результат</h3>
-                <p>Вы можете просмотреть свои прошлые ответы или начать заново с чистыми полями</p>
-                <div>
-                  <button className="restart-btn" onClick={startFresh} type="button">
-                    Начать заново
-                  </button>
-                  <button className="btn secondary" onClick={viewPrevious} type="button">
-                    Просмотреть прошлые ответы
-                  </button>
-                </div>
+            {gatehouseRecommendation && (
+              <div className="recommendation-box">
+                <h3>🎯 Рекомендация: {gatehouseRecommendation.recommendedLevelLabel}</h3>
+                <p>{gatehouseRecommendation.message}</p>
+                <div className="badge-wrap">{getGatehouseRecommendationBadge(gatehouseRecommendation.band)}</div>
+              </div>
+            )}
+
+            <div className="stats-grid">
+              <div className="stat-item"><span>Всего вопросов:</span> <b>{finalStats.total}</b></div>
+              <div className="stat-item"><span>Набрано баллов:</span> <b>{finalStats.pointsEarned.toFixed(2)} / {finalStats.pointsTotal}</b></div>
+              <div className="stat-item"><span>Правильно:</span> <b style={{color: '#10b981'}}>{finalStats.correct}</b></div>
+              <div className="stat-item"><span>Ошибки:</span> <b style={{color: '#ef4444'}}>{finalStats.incorrect}</b></div>
+            </div>
+
+            <div className="review-section">
+              <ReviewPanel items={reviewItems} />
+            </div>
+
+            <div className="button-group" style={{ marginTop: "40px" }}>
+              <button className="btn-premium primary" style={{ flex: 1, background: theme.primary }} onClick={() => router.push(back.href)}>К списку материалов</button>
+              <button className="btn-premium secondary" style={{ flex: 1 }} onClick={() => window.location.reload()}>Пройти еще раз</button>
+            </div>
+          </div>
+        )}
+
+        {/* ПРОЦЕСС ВЫПОЛНЕНИЯ ЗАДАНИЯ */}
+        {!showChoice && !completedScreen && assignment && (
+          <div className="assignment-layout animate-in">
+            {/* PROGRESS BAR */}
+            <div className="progress-container">
+              <div className="progress-bar-bg">
+                <div className="progress-fill" style={{ 
+                  width: `${((currentIndex + 1) / questions.length) * 100}%`, 
+                  background: theme.primary 
+                }} />
+              </div>
+              <div className="progress-info">
+                <span>Вопрос {currentIndex + 1} из {questions.length}</span>
+                {isViewMode && <span className="view-mode-tag">👀 РЕЖИМ ПРОСМОТРА</span>}
               </div>
             </div>
-          ) : null}
 
-          {completedScreen && finalStats ? (
-            <div id="completionScreen" className="completion-message" style={{ display: "block" }}>
-              <div className="card">
-                <h2>{isGatehouse ? "🎓 Пробный тест завершён!" : "🎉 Задание завершено!"}</h2>
+            <div className="premium-card active-question" style={{ background: theme.cardBg }}>
+              {/* Заголовок вопроса */}
+              <h2 className="question-title">{currentIndex + 1}. {questions[currentIndex]?.q}</h2>
 
-                <div className="score-display" id="finalScore">
-                  {finalStats.score}%
-                </div>
-
-                <p id="completionMessage">
-                  {finalStats.score >= 90
-                    ? "Отличный результат! Вы прекрасно справились с заданием!"
-                    : finalStats.score >= 70
-                      ? "Хороший результат! Вы хорошо усвоили материал."
-                      : finalStats.score >= 50
-                        ? "Неплохой результат! Есть над чем поработать."
-                        : "Попробуйте пройти задание ещё раз для лучшего результата."}
-                </p>
-
-                {isGatehouse && gatehouseRecommendation ? (
-                  <div className="completion-details">
-                    <h3>🎯 Рекомендация Gatehouse Awards</h3>
-
-                    <div className="result-item">
-                      <span>Рекомендуемый уровень:</span>
-                      <span>{gatehouseRecommendation.recommendedLevelLabel}</span>
-                    </div>
-
-                    <div className="result-item">
-                      <span>Оценка результата:</span>
-                      <span>{getGatehouseRecommendationBadge(gatehouseRecommendation.band)}</span>
-                    </div>
-
-                    <p style={{ margin: "14px 0 0", lineHeight: 1.55 }}>
-                      <strong>{gatehouseRecommendation.title}</strong>
-                      <br />
-                      {gatehouseRecommendation.message}
-                    </p>
-                  </div>
-                ) : null}
-
-                <div className="completion-details">
-                  <h3>📊 Детали результатов</h3>
-
-                  <div className="result-item">
-                    <span>Всего вопросов:</span>
-                    <span>{finalStats.total}</span>
-                  </div>
-
-                  <div className="result-item">
-                    <span>Правильных ответов (100%):</span>
-                    <span>{finalStats.correct}</span>
-                  </div>
-
-                  <div className="result-item">
-                    <span>Неправильных ответов:</span>
-                    <span>{finalStats.incorrect}</span>
-                  </div>
-
-                  <div className="result-item">
-                    <span>Пропущено вопросов:</span>
-                    <span>{finalStats.skipped}</span>
-                  </div>
-
-                  <div className="result-item">
-                    <span>Набрано баллов:</span>
-                    <span>
-                      {Number(finalStats.pointsEarned ?? 0).toFixed(2)} / {finalStats.pointsTotal ?? finalStats.total}
-                    </span>
-                  </div>
-                </div>
-
-                {showReview ? <ReviewPanel items={reviewItems} /> : null}
-
-                <div style={{ marginTop: 30 }}>
-                  <button className="btn" onClick={() => router.push(back.href)} type="button">
-                    {back.actionLabel}
-                  </button>
-
-                  <button className="btn secondary" onClick={() => location.reload()} style={{ marginLeft: 10 }} type="button">
-                    Пройти заново
-                  </button>
-                </div>
+              {/* Мультимедиа блок */}
+              <div className="media-section">
+                <MediaRenderer media={questions[currentIndex]?.media} />
+                
+                {/* Fallback для старых фото */}
+                {!questions[currentIndex]?.media?.length && questions[currentIndex]?.image && questions[currentIndex]?.type !== 'crossword' && (
+                  <img 
+                    className="legacy-image" 
+                    src={getImageUrl(questions[currentIndex].image!)} 
+                    alt="task-media" 
+                    onClick={() => openImage(getImageUrl(questions[currentIndex].image!))} 
+                  />
+                )}
               </div>
-            </div>
-          ) : null}
 
-          {!showChoice && !completedScreen ? (
-            <div id="assignmentContent" style={{ display: "block" }}>
-              <div className="assignment-container">
-                <div className="card" id="questionsCard" style={{ display: "block" }}>
-                  <h2 id="assignmentTitle">{assignment.title}</h2>
+              {/* Тело вопроса (контролы) */}
+              <div className="question-content">
+                {renderQuestionComponent(questions[currentIndex], currentIndex)}
+              </div>
 
-                  <div id="viewModeNotice" className="view-mode-notice" style={{ display: isViewMode ? "block" : "none" }}>
-                    <strong>👀 Режим просмотра</strong>
-                    <br />
-                    <small>Вы просматриваете свои предыдущие ответы</small>
-                  </div>
-
-                  <div className="question-counter">
-                    Вопрос <span id="currentQuestion">{currentIndex + 1}</span> из{" "}
-                    <span id="totalQuestions">{questions.length}</span>
-                  </div>
-
-                  <div id="questionsContainer">
-                    {q ? (
-                      <div className="question-card">
-                        <div className="question-number">
-                          Вопрос {currentIndex + 1} из {questions.length}
-                        </div>
-
-                        <div className="question-text">{q.q || "Вопрос без текста"}</div>
-
-                        {q.image && q.type !== "crossword" ? (
-                          <img
-                            className="question-image"
-                            src={getImageUrl(q.image)}
-                            alt="Изображение к вопросу"
-                            onClick={() => openImage(getImageUrl(q.image))}
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
-                        ) : null}
-
-                        {q.type === "test" && Array.isArray(q.options) ? (
-                          <div className="options-container">
-                            {q.options.map((opt: string, optIdx: number) => {
-                              const selected = Number(answers[currentIndex]) === optIdx;
-
-                              return (
-                                <label key={optIdx} className={`option-label ${selected ? "selected" : ""}`}>
-                                  <input
-                                    className="option-radio"
-                                    type="radio"
-                                    name={`q-${currentIndex}`}
-                                    disabled={isViewMode}
-                                    checked={selected}
-                                    onChange={() => setAnswerForQuestion(currentIndex, optIdx)}
-                                  />
-                                  {opt}
-                                </label>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-
-                        {q.type === "fill" ? (
-                          <>
-                            <div className="fill-inputs-container">
-                              {(q.answers || []).map((_variants: any, idx: number) => (
-                                <div className="fill-input-item" key={idx}>
-                                  <div className="fill-input-number">{idx + 1}</div>
-                                  <input
-                                    disabled={isViewMode}
-                                    value={(answers[currentIndex]?.[idx] ?? "") as string}
-                                    onChange={(e) => {
-                                      const arr = Array.isArray(answers[currentIndex]) ? [...answers[currentIndex]] : [];
-                                      arr[idx] = e.target.value;
-                                      setAnswerForQuestion(currentIndex, arr);
-                                    }}
-                                    placeholder={`Введите ответ ${idx + 1}...`}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                            <div className="fill-input-count">Количество ответов: {(q.answers || []).length}</div>
-                          </>
-                        ) : null}
-
-                        {q.type === "sentence" ? (
-                          <div className="sentence-container">
-                            <div className="sentence-text">
-                              {(() => {
-                                const parts = String(q.sentence || "").split("___");
-                                const gaps = parts.length - 1;
-                                const arr = Array.isArray(answers[currentIndex]) ? answers[currentIndex] : [];
-
-                                return (
-                                  <>
-                                    {parts.map((part: string, idx: number) => (
-                                      <span key={idx}>
-                                        <span style={{ whiteSpace: "pre-line" }}>{part}</span>
-                                        {idx < gaps ? (
-                                          <span className="sentence-gap">
-                                            <input
-                                              className="sentence-input"
-                                              disabled={isViewMode}
-                                              value={arr[idx] ?? ""}
-                                              placeholder={`Ответ ${idx + 1}`}
-                                              onChange={(e) => {
-                                                const next = Array.isArray(arr) ? [...arr] : [];
-                                                next[idx] = e.target.value;
-                                                setAnswerForQuestion(currentIndex, next);
-                                              }}
-                                            />
-                                          </span>
-                                        ) : null}
-                                      </span>
-                                    ))}
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {q.type === "crossword" ? (
-                          <QuestionCrossword
-                            question={q}
-                            value={answers[currentIndex] as string[][] | undefined}
-                            disabled={isViewMode}
-                            onOpenImage={(src) => openImage(src)}
-                            onChange={(grid) => setAnswerForQuestion(currentIndex, grid)}
-                          />
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="navigation">
-                    <button
-                      className="btn secondary"
-                      id="prevBtn"
-                      style={{ display: currentIndex > 0 ? "block" : "none" }}
-                      onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
-                      type="button"
-                    >
-                      ← Назад
+              {/* Навигация */}
+              <div className="navigation-footer">
+                <button 
+                  className="nav-btn" 
+                  disabled={currentIndex === 0} 
+                  onClick={() => setCurrentIndex(i => i - 1)}
+                  style={{ opacity: currentIndex === 0 ? 0.3 : 1 }}
+                >
+                  ← Назад
+                </button>
+                
+                {currentIndex < questions.length - 1 ? (
+                  <button className="btn-premium primary" style={{ flex: 1, background: theme.primary }} onClick={() => setCurrentIndex(i => i + 1)}>
+                    Следующий вопрос →
+                  </button>
+                ) : (
+                  !isViewMode && (
+                    <button className="btn-premium finish" style={{ flex: 1 }} onClick={finish}>
+                      Завершить и проверить ✨
                     </button>
-
-                    <button
-                      className="btn"
-                      id="nextBtn"
-                      style={{ display: currentIndex < questions.length - 1 ? "block" : "none" }}
-                      onClick={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))}
-                      type="button"
-                    >
-                      Далее →
-                    </button>
-
-                    {!isViewMode ? (
-                      <button
-                        className="btn-finish"
-                        id="finishBtn"
-                        style={{ display: currentIndex === questions.length - 1 ? "block" : "none" }}
-                        onClick={() => void finish()}
-                        type="button"
-                      >
-                        Завершить задание
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
+                  )
+                )}
               </div>
             </div>
-          ) : null}
-        </>
-      ) : null}
+          </div>
+        )}
+      </main>
 
-      <div
-        id="imageModal"
-        className="image-modal"
-        style={{ display: imageModalOpen ? "block" : "none" }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) closeImage();
-        }}
-      >
-        <span className="image-modal-close" onClick={closeImage}>
-          &times;
-        </span>
-
-        <img
-          className="image-modal-content"
-          id="modalImage"
-          src={modalSrc}
-          alt=""
-          style={{ transform: `translate(-50%, -50%) scale(${zoom})` }}
-        />
-
-        <div className="image-modal-controls">
-          <button className="image-modal-btn" onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))} type="button">
-            −
-          </button>
-
-          <div className="image-modal-zoom-info">{Math.round(zoom * 100)}%</div>
-
-          <button className="image-modal-btn" onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))} type="button">
-            +
-          </button>
-
-          <button className="image-modal-btn" onClick={() => setZoom(1)} type="button">
-            ⟲
-          </button>
+      {/* МОДАЛКА ЗУМА ИЗОБРАЖЕНИЙ */}
+      {imageModalOpen && (
+        <div className="modal-overlay" onClick={closeImage}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <button className="modal-close" onClick={closeImage}>×</button>
+            <div className="modal-scroll-wrap">
+               <img src={modalSrc} style={{ transform: `scale(${zoom})`, transition: 'transform 0.2s ease' }} alt="Zoomed" />
+            </div>
+            <div className="modal-controls">
+              <button onClick={() => setZoom(z => Math.max(0.5, z - 0.2))}>−</button>
+              <span>{Math.round(zoom * 100)}%</span>
+              <button onClick={() => setZoom(z => Math.min(4, z + 0.2))}>+</button>
+              <button onClick={() => setZoom(1)}>⟲</button>
+            </div>
+          </div>
         </div>
+      )}
 
-        <div className="image-modal-hint" style={{ display: zoom > 1 ? "block" : "none" }}>
-          🔍 Масштабирование
-        </div>
-      </div>
+      {/* CSS STYLES */}
+      <style jsx>{`
+        .premium-header { padding: 30px 20px; }
+        .header-content { max-width: 900px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .back-button { background: rgba(255,255,255,0.7); border: none; padding: 12px 24px; border-radius: 16px; cursor: pointer; font-weight: 700; color: inherit; backdrop-filter: blur(10px); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .assignment-badge { color: #fff; padding: 8px 16px; border-radius: 12px; font-size: 11px; font-weight: 900; letter-spacing: 1.5px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        
+        .premium-main { max-width: 850px; margin: 0 auto; padding: 0 20px 60px; }
+        .premium-card { border-radius: 40px; padding: 40px; box-shadow: 0 30px 60px rgba(0,0,0,0.08); border: 1px solid rgba(255,255,255,0.8); }
+        .card-title { font-size: 32px; font-weight: 800; margin-bottom: 16px; text-align: center; }
+        .card-subtitle { text-align: center; opacity: 0.6; margin-bottom: 40px; line-height: 1.5; }
+        
+        .progress-container { margin-bottom: 30px; }
+        .progress-bar-bg { height: 12px; background: rgba(0,0,0,0.05); border-radius: 20px; overflow: hidden; margin-bottom: 12px; }
+        .progress-fill { height: 100%; border-radius: 20px; transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .progress-info { display: flex; justify-content: space-between; font-size: 14px; font-weight: 800; opacity: 0.5; }
+        .view-mode-tag { color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 2px 8px; border-radius: 6px; }
+
+        .question-title { font-size: 24px; font-weight: 800; line-height: 1.4; margin-bottom: 30px; color: #111827; }
+        .media-section { margin-bottom: 35px; border-radius: 24px; overflow: hidden; }
+        .legacy-image { width: 100%; border-radius: 20px; cursor: zoom-in; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+
+        .navigation-footer { display: flex; gap: 20px; margin-top: 50px; padding-top: 35px; border-top: 2px solid rgba(0,0,0,0.03); }
+        .nav-btn { background: rgba(0,0,0,0.03); border: none; font-weight: 800; cursor: pointer; padding: 16px 25px; border-radius: 18px; color: inherit; transition: all 0.2s; }
+        .nav-btn:hover:not(:disabled) { background: rgba(0,0,0,0.06); }
+        
+        .btn-premium { padding: 18px 35px; border-radius: 20px; border: none; font-weight: 800; font-size: 17px; cursor: pointer; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .btn-premium.primary { color: #fff; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        .btn-premium.secondary { background: rgba(0,0,0,0.05); color: inherit; }
+        .btn-premium.finish { background: #10b981; color: #fff; box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3); }
+        .btn-premium:hover { transform: translateY(-3px); filter: brightness(1.05); }
+        .btn-premium:active { transform: translateY(-1px); }
+
+        .button-group { display: flex; gap: 15px; justify-content: center; }
+
+        .score-circle { width: 180px; height: 180px; border: 10px solid; border-radius: 50%; margin: 0 auto 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; animation: scaleIn 0.5s ease-out; }
+        .score-value { font-size: 56px; font-weight: 900; }
+        .score-label { font-size: 14px; font-weight: 800; opacity: 0.4; text-transform: uppercase; margin-top: -5px; }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+        .stat-item { background: rgba(0,0,0,0.02); padding: 20px; border-radius: 24px; display: flex; flex-direction: column; gap: 6px; border: 1px solid rgba(0,0,0,0.02); }
+        .stat-item span { font-size: 13px; opacity: 0.5; font-weight: 600; }
+
+        .recommendation-box { background: rgba(99, 102, 241, 0.05); padding: 30px; border-radius: 30px; border: 2px solid rgba(99, 102, 241, 0.1); margin-bottom: 40px; text-align: center; }
+        .recommendation-box h3 { margin: 0 0 15px 0; font-size: 20px; }
+        .badge-wrap { margin-top: 20px; }
+        
+        .loader-container { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .premium-spinner { width: 60px; height: 60px; border: 6px solid; border-radius: 50%; animation: spin 1s linear infinite; }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .animate-in { animation: fadeIn 0.7s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.92); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 30px; backdrop-filter: blur(10px); }
+        .modal-content { position: relative; max-width: 95%; max-height: 90%; display: flex; flex-direction: column; align-items: center; }
+        .modal-close { position: absolute; top: -60px; right: 0; background: rgba(255,255,255,0.1); border: none; color: #fff; width: 44px; height: 44px; border-radius: 50%; font-size: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-scroll-wrap { overflow: auto; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+        .modal-controls { margin-top: 25px; display: flex; gap: 25px; align-items: center; color: #fff; background: rgba(255,255,255,0.1); padding: 10px 30px; border-radius: 30px; }
+        .modal-controls button { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #fff; background: none; color: #fff; font-size: 22px; cursor: pointer; transition: all 0.2s; }
+        .modal-controls button:hover { background: #fff; color: #000; }
+      `}</style>
     </div>
   );
 }

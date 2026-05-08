@@ -1,63 +1,63 @@
 import { normalizeText } from "./normalize";
 import type { FinalStats, QuestionAny, ReviewItem } from "./types";
 
-/**
- * В твоих типах ReviewItem для fill/sentence ожидается:
- * - correctAnswers: string[]
- * - userAnswers: string[]
- * - parts: ReviewPart[]
- * - percent, correctCount, totalCount
- * - pointsEarned, pointsTotal
- *
- * Для test — userLabel/correctLabel и тоже points*
- */
-
-export function validateAllAnswered(questions: QuestionAny[], answers: any) {
+export function validateAllAnswered(
+  questions: QuestionAny[],
+  answers: any
+): { ok: boolean; index: number; subIndex?: number } {
   for (let i = 0; i < questions.length; i++) {
     const q: any = questions[i];
     const a = answers[i];
 
     if (q.type === "test") {
-      const has = a !== undefined && a !== null && a !== "";
-      if (!has) return { ok: false as const, index: i };
+      if (q.multiple) {
+        const has = Array.isArray(a) && a.length > 0;
+        if (!has) return { ok: false, index: i };
+      } else {
+        const has = a !== undefined && a !== null && a !== "";
+        if (!has) return { ok: false, index: i };
+      }
     } else if (q.type === "fill") {
       const correctCount = (q.answers || []).length;
       const has =
         Array.isArray(a) &&
         a.length >= correctCount &&
         a.every((x: any) => String(x ?? "").trim() !== "");
-      if (!has) return { ok: false as const, index: i };
+      if (!has) return { ok: false, index: i };
     } else if (q.type === "sentence") {
       const gaps = (String(q.sentence || "").match(/___/g) || []).length;
       const has =
         Array.isArray(a) &&
         a.length >= gaps &&
         a.every((x: any) => String(x ?? "").trim() !== "");
-      if (!has) return { ok: false as const, index: i };
+      if (!has) return { ok: false, index: i };
+    } else if (q.type === "complex") {
+      const subQs = q.subQuestions || [];
+      const subAns = Array.isArray(a) ? a : [];
+      const subRes = validateAllAnswered(subQs, subAns);
+      if (!subRes.ok) return { ok: false, index: i, subIndex: subRes.index };
+    } else if (q.type === "matching") {
+      const pairs = q.pairs || [];
+      const has = a && typeof a === "object" && Object.keys(a).length === pairs.length;
+      if (!has) return { ok: false, index: i };
     }
   }
-  return { ok: true as const, index: -1 };
+  return { ok: true, index: -1 };
 }
 
-// строим "правильные ответы" как string[] (каждый элемент "a or b")
 function buildCorrectStrings(arr: any[]): string[] {
   return (arr || []).map((variants: any) =>
     (Array.isArray(variants) ? variants : [variants]).map(String).join(" или ")
   );
 }
 
-// универсальный pointsTotal (если нет — 1)
 function getPointsTotal(q: any): number {
   const p = Number(q?.points);
   return Number.isFinite(p) && p > 0 ? p : 1;
 }
 
-// parts для fill/sentence: на каждую ячейку
 function buildParts(correctAnswers: any[], userArr: string[], totalCount: number) {
-  // ReviewPart тип импортировать не надо — TS выведет из ReviewItem["parts"][number]
-  // поэтому делаем как any и не ломаем типы проекта
   const parts: any[] = [];
-
   for (let idx = 0; idx < totalCount; idx++) {
     const variants = correctAnswers[idx];
     const userRaw = String(userArr[idx] ?? "");
@@ -76,7 +76,6 @@ function buildParts(correctAnswers: any[], userArr: string[], totalCount: number
       correct: (Array.isArray(variants) ? variants : [variants]).map(String),
     });
   }
-
   return parts;
 }
 
@@ -84,235 +83,292 @@ export function calcAndBuildReview(
   questions: QuestionAny[],
   answers: any
 ): { stats: FinalStats; review: ReviewItem[] } {
-  let correct = 0;
-  let incorrect = 0;
-  let skipped = 0;
-
-  let pointsTotalSum = 0;
-  let pointsEarnedSum = 0;
+  const statsSum = {
+    correct: 0,
+    incorrect: 0,
+    skipped: 0,
+    total: 0,
+    pointsEarned: 0,
+    pointsTotal: 0,
+  };
 
   const review: ReviewItem[] = [];
 
-  questions.forEach((q: any, i) => {
-    const questionText = String(q?.q ?? "").trim() || `Вопрос ${i + 1}`;
-    const a = answers[i];
-
+  function processQ(q: any, a: any, idxText: string): ReviewItem {
+    const questionText = String(q?.q ?? "").trim() || `Вопрос ${idxText}`;
     const pointsTotal = getPointsTotal(q);
+
+    // COMPLEX - Обработка "матрешки"
+    if (q.type === "complex") {
+      const subQs = q.subQuestions || [];
+      const subAns = Array.isArray(a) ? a : [];
+
+      const subReviews: ReviewItem[] = [];
+      let complexEarned = 0;
+      let complexTotal = 0;
+      let complexAllSkipped = true;
+      let complexAllCorrect = true;
+
+      subQs.forEach((sq: any, subI: number) => {
+        const sr = processQ(sq, subAns[subI], `${idxText}.${subI + 1}`);
+        subReviews.push(sr);
+        complexEarned += sr.pointsEarned;
+        complexTotal += sr.pointsTotal;
+        if (!sr.isSkipped) complexAllSkipped = false;
+        if (!sr.isCorrect) complexAllCorrect = false;
+      });
+
+      return {
+        type: "complex",
+        questionText,
+        isCorrect: complexTotal > 0 && complexEarned === complexTotal,
+        isSkipped: complexAllSkipped,
+        pointsEarned: Number(complexEarned.toFixed(2)),
+        pointsTotal: complexTotal,
+        subReviews,
+      } as ReviewItem;
+    }
+
+    // === БАЗОВЫЕ ВОПРОСЫ (Добавляются в статистику) ===
+    statsSum.total++;
+    statsSum.pointsTotal += pointsTotal;
 
     // TEST
     if (q.type === "test") {
-      pointsTotalSum += pointsTotal;
+      const isMultiple = !!q.multiple;
+      const opts: any[] = Array.isArray(q.options) ? q.options : [];
+      
+      const getOptText = (idx: number) => {
+        const opt = opts[idx];
+        if (!opt) return "—";
+        return typeof opt === "string" ? opt : (opt.text || `Вариант ${idx + 1}`);
+      };
 
-      const opts: string[] = Array.isArray(q.options) ? q.options.map(String) : [];
-      const correctIdx = Number(q.correct);
-      const correctLabel =
-        Number.isFinite(correctIdx) && opts[correctIdx] ? opts[correctIdx] : "—";
+      const correctArr = Array.isArray(q.correct) ? q.correct : (typeof q.correct === "number" ? [q.correct] : []);
+      const correctLabels = correctArr.map((c: any) => getOptText(Number(c)));
 
-      const answered = a !== undefined && a !== null && a !== "";
+      const answered = isMultiple 
+        ? (Array.isArray(a) && a.length > 0)
+        : (a !== undefined && a !== null && a !== "");
+
       if (!answered) {
-        skipped++;
-        review.push({
+        statsSum.skipped++;
+        return {
           type: "test",
           questionText,
           isCorrect: false,
           isSkipped: true,
-          userLabel: "Не отвечено",
-          correctLabel,
+          userLabel: isMultiple ? [] : "Не отвечено",
+          correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
+          isMultiple,
+          fraction: 0,
           pointsEarned: 0,
           pointsTotal,
-        } as ReviewItem);
-        return;
+        } as ReviewItem;
       }
 
-      const userIdx = Number(a);
-      const userLabel = Number.isFinite(userIdx) && opts[userIdx] ? opts[userIdx] : String(a);
-      const isCorrect = userIdx === correctIdx;
+      let fraction = 0;
+      let isCorrect = false;
+      let userLabels: string | string[] = [];
 
-      if (isCorrect) {
-        correct++;
-        pointsEarnedSum += pointsTotal;
+      if (isMultiple) {
+        const userArr = Array.isArray(a) ? a.map(Number) : [];
+        userLabels = userArr.map((c: number) => getOptText(c));
+        
+        const correctSet = new Set(correctArr.map(Number));
+        const userSet = new Set(userArr);
+        
+        let correctSelected = 0;
+        let wrongSelected = 0;
+
+        userSet.forEach((val: number) => {
+          if (correctSet.has(val)) correctSelected++;
+          else wrongSelected++;
+        });
+
+        // Дробный подсчет с защитой от "прокликивания" всех вариантов
+        const totalCorrect = correctSet.size || 1;
+        fraction = Math.max(0, correctSelected - wrongSelected) / totalCorrect;
+        isCorrect = fraction === 1;
       } else {
-        incorrect++;
+        const userIdx = Number(a);
+        userLabels = getOptText(userIdx) as string;
+        const correctIdx = Number(correctArr[0]);
+        isCorrect = userIdx === correctIdx;
+        fraction = isCorrect ? 1 : 0;
       }
 
-      review.push({
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+      statsSum.pointsEarned += pointsEarned;
+
+      if (isCorrect) statsSum.correct++;
+      else statsSum.incorrect++;
+
+      return {
         type: "test",
         questionText,
         isCorrect,
         isSkipped: false,
-        userLabel,
-        correctLabel,
-        pointsEarned: isCorrect ? pointsTotal : 0,
+        userLabel: userLabels,
+        correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
+        fraction,
+        isMultiple,
+        pointsEarned,
         pointsTotal,
-      } as ReviewItem);
-      return;
+      } as ReviewItem;
     }
 
     // FILL
     if (q.type === "fill") {
-      pointsTotalSum += pointsTotal;
-
       const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
       const totalCount = correctAnswers.length;
-
-      const answered =
-        Array.isArray(a) &&
-        a.length >= totalCount &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
-
+      const answered = Array.isArray(a) && a.length >= totalCount && a.every((x: any) => String(x ?? "").trim() !== "");
       const correctStrings = buildCorrectStrings(correctAnswers);
-
-      // user answers (строки)
       const userArr: string[] = Array.isArray(a) ? (a as any[]).map((x) => String(x ?? "")) : [];
 
       if (!answered) {
-        skipped++;
-
+        statsSum.skipped++;
         const parts = buildParts(correctAnswers, userArr, totalCount);
         const correctCount = parts.filter((p) => p.isCorrect).length;
         const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
 
-        review.push({
-          type: "fill",
-          questionText,
-          isCorrect: false,
-          isSkipped: true,
-          userAnswers: userArr,
-          correctAnswers: correctStrings,
-          parts,
-          percent,
-          correctCount,
-          totalCount,
-          pointsEarned: 0,
-          pointsTotal,
-        } as ReviewItem);
-        return;
+        return {
+          type: "fill", questionText, isCorrect: false, isSkipped: true,
+          userAnswers: userArr, correctAnswers: correctStrings, parts,
+          percent, correctCount, totalCount, pointsEarned: 0, pointsTotal,
+        } as ReviewItem;
       }
 
       const parts = buildParts(correctAnswers, userArr, totalCount);
       const correctCount = parts.filter((p) => p.isCorrect).length;
       const ok = correctCount === totalCount;
-
       const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
 
       if (ok) {
-        correct++;
-        pointsEarnedSum += pointsTotal;
+        statsSum.correct++;
+        statsSum.pointsEarned += pointsTotal;
       } else {
-        incorrect++;
+        statsSum.incorrect++;
       }
 
-      review.push({
-        type: "fill",
-        questionText,
-        isCorrect: ok,
-        isSkipped: false,
-        userAnswers: userArr,
-        correctAnswers: correctStrings,
-        parts,
-        percent,
-        correctCount,
-        totalCount,
-        pointsEarned: ok ? pointsTotal : 0,
-        pointsTotal,
-      } as ReviewItem);
-      return;
+      return {
+        type: "fill", questionText, isCorrect: ok, isSkipped: false,
+        userAnswers: userArr, correctAnswers: correctStrings, parts,
+        percent, correctCount, totalCount, pointsEarned: ok ? pointsTotal : 0, pointsTotal,
+      } as ReviewItem;
     }
 
     // SENTENCE
     if (q.type === "sentence") {
-      pointsTotalSum += pointsTotal;
-
       const gaps = (String(q.sentence || "").match(/___/g) || []).length;
       const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
       const totalCount = gaps;
-
       const correctStrings = buildCorrectStrings(correctAnswers);
-
-      const answered =
-        Array.isArray(a) &&
-        a.length >= gaps &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
-
-      const userArr: string[] = Array.isArray(a)
-        ? (a as any[]).slice(0, gaps).map((x) => String(x ?? ""))
-        : [];
+      const answered = Array.isArray(a) && a.length >= gaps && a.every((x: any) => String(x ?? "").trim() !== "");
+      const userArr: string[] = Array.isArray(a) ? (a as any[]).slice(0, gaps).map((x) => String(x ?? "")) : [];
 
       if (!answered) {
-        skipped++;
-
+        statsSum.skipped++;
         const parts = buildParts(correctAnswers, userArr, totalCount);
         const correctCount = parts.filter((p) => p.isCorrect).length;
         const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
 
-        review.push({
-          type: "sentence",
-          questionText,
-          isCorrect: false,
-          isSkipped: true,
-          userAnswers: userArr,
-          correctAnswers: correctStrings,
-          parts,
-          percent,
-          correctCount,
-          totalCount,
-          pointsEarned: 0,
-          pointsTotal,
-        } as ReviewItem);
-        return;
+        return {
+          type: "sentence", questionText, isCorrect: false, isSkipped: true,
+          userAnswers: userArr, correctAnswers: correctStrings, parts,
+          percent, correctCount, totalCount, pointsEarned: 0, pointsTotal,
+        } as ReviewItem;
       }
 
       const parts = buildParts(correctAnswers, userArr, totalCount);
       const correctCount = parts.filter((p) => p.isCorrect).length;
       const ok = correctCount === totalCount;
-
       const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
 
       if (ok) {
-        correct++;
-        pointsEarnedSum += pointsTotal;
+        statsSum.correct++;
+        statsSum.pointsEarned += pointsTotal;
       } else {
-        incorrect++;
+        statsSum.incorrect++;
       }
 
-      review.push({
-        type: "sentence",
-        questionText,
-        isCorrect: ok,
-        isSkipped: false,
-        userAnswers: userArr,
-        correctAnswers: correctStrings,
-        parts,
-        percent,
-        correctCount,
-        totalCount,
-        pointsEarned: ok ? pointsTotal : 0,
-        pointsTotal,
-      } as ReviewItem);
-      return;
+      return {
+        type: "sentence", questionText, isCorrect: ok, isSkipped: false,
+        userAnswers: userArr, correctAnswers: correctStrings, parts,
+        percent, correctCount, totalCount, pointsEarned: ok ? pointsTotal : 0, pointsTotal,
+      } as ReviewItem;
     }
 
-    // OTHER
-    pointsTotalSum += pointsTotal;
-    skipped++;
-    review.push({
-      type: "other",
-      questionText,
-      isCorrect: false,
-      isSkipped: true,
-      note: "Тип вопроса пока не поддержан (добавим позже).",
-      pointsEarned: 0,
-      pointsTotal,
-    } as ReviewItem);
+    // MATCHING
+    if (q.type === "matching") {
+      const pairs = Array.isArray(q.pairs) ? q.pairs : [];
+      const totalPairsCount = pairs.length;
+      
+      const answered = a && typeof a === "object" && Object.keys(a).length > 0;
+      
+      if (!answered) {
+        statsSum.skipped++;
+        return {
+           type: "matching", questionText, isCorrect: false, isSkipped: true,
+           correctPairsCount: 0, totalPairsCount, userMatches: {}, correctMatches: {}, pointsEarned: 0, pointsTotal
+        } as ReviewItem;
+      }
+
+      let correctPairsCount = 0;
+      const userMatches = a;
+      const correctMatches: Record<string, string> = {};
+      
+      pairs.forEach((p: any) => {
+        correctMatches[p.id] = p.id;
+        // Пользователь в качестве ответа присылает словарь вида: id левого элемента -> id правого элемента
+        if (userMatches[p.id] === p.id) {
+          correctPairsCount++;
+        }
+      });
+
+      const fraction = totalPairsCount > 0 ? correctPairsCount / totalPairsCount : 0;
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+      const isCorrect = correctPairsCount === totalPairsCount && totalPairsCount > 0;
+
+      statsSum.pointsEarned += pointsEarned;
+      if (isCorrect) statsSum.correct++;
+      else statsSum.incorrect++;
+
+      return {
+        type: "matching", questionText, isCorrect, isSkipped: false,
+        correctPairsCount, totalPairsCount, userMatches, correctMatches,
+        pointsEarned, pointsTotal
+      } as ReviewItem;
+    }
+
+    // OTHER (включая crossword)
+    statsSum.skipped++;
+    return {
+      type: "other", questionText, isCorrect: false, isSkipped: true,
+      note: "Тип вопроса пока не поддержан в стандартном Review (отрабатывается отдельно).",
+      pointsEarned: 0, pointsTotal,
+    } as ReviewItem;
+  }
+
+  questions.forEach((q, i) => {
+    review.push(processQ(q, answers[i], String(i + 1)));
   });
 
-  const total = correct + incorrect + skipped;
-  const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+  // Теперь общий процент считается из честных ЗАРАБОТАННЫХ баллов
+  const score = statsSum.pointsTotal > 0 
+    ? Math.round((statsSum.pointsEarned / statsSum.pointsTotal) * 100) 
+    : 0;
 
-  // ✅ НЕ трогаю твой FinalStats тип — кладу только базовые поля
-  // (points* уже есть в review, а общий подсчет если нужен — можно добавить в types.ts)
   return {
-    stats: { score, correct, incorrect, skipped, total } as FinalStats,
+    stats: { 
+      score, 
+      correct: statsSum.correct, 
+      incorrect: statsSum.incorrect, 
+      skipped: statsSum.skipped, 
+      total: statsSum.total,
+      pointsEarned: Number(statsSum.pointsEarned.toFixed(2)),
+      pointsTotal: statsSum.pointsTotal
+    },
     review,
   };
 }

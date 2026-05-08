@@ -9,16 +9,35 @@ export type AssignmentSource =
   | "gatehouse"
   | "gatehouse-material";
 
+// ===== Новые типы для медиа =====
+export type MediaType = "image" | "audio" | "pdf";
+
+export type MediaAttachment = {
+  id: string;
+  url: string;
+  type: MediaType;
+  name?: string;
+};
+
 export type QuestionBase = {
+  id: string;
   q?: string;
-  image?: string;
+  image?: string; // Устаревшее
+  media?: MediaAttachment[]; // Новое
   type?: string;
+};
+
+export type TestOption = {
+  id: string;
+  text: string;
+  media?: MediaAttachment[];
 };
 
 export type QuestionTest = QuestionBase & {
   type: "test";
-  options?: string[];
-  correct?: number;
+  multiple?: boolean;
+  options?: TestOption[] | string[]; // Совместимость со старым форматом
+  correct?: number[] | number; // Массив индексов (или число для старых)
 };
 
 export type QuestionFill = QuestionBase & {
@@ -41,11 +60,35 @@ export type QuestionCrossword = QuestionBase & {
   metadata?: { rows?: number; cols?: number };
 };
 
+export type QuestionComplex = QuestionBase & {
+  type: "complex";
+  subQuestions?: QuestionAny[];
+};
+
+export type MatchingItem = {
+  text?: string;
+  media?: MediaAttachment[];
+};
+
+export type MatchingPair = {
+  id: string;
+  left: MatchingItem;
+  right: MatchingItem;
+};
+
+export type QuestionMatching = QuestionBase & {
+  type: "matching";
+  centerImage?: MediaAttachment;
+  pairs?: MatchingPair[];
+};
+
 export type QuestionAny =
   | QuestionTest
   | QuestionFill
   | QuestionSentence
   | QuestionCrossword
+  | QuestionComplex
+  | QuestionMatching
   | (QuestionBase & Record<string, any>);
 
 export type Progress = {
@@ -73,8 +116,10 @@ export type ReviewBase = {
 export type ReviewItem =
   | (ReviewBase & {
       type: "test";
-      userLabel: string;
-      correctLabel: string;
+      userLabel: string | string[];
+      correctLabel: string | string[];
+      fraction?: number; // 0..1 для дробных баллов
+      isMultiple?: boolean;
     })
   | (ReviewBase & {
       type: "fill" | "sentence";
@@ -102,6 +147,17 @@ export type ReviewItem =
           word: string;
         }>;
       };
+    })
+  | (ReviewBase & {
+      type: "matching";
+      correctPairsCount: number;
+      totalPairsCount: number;
+      userMatches: Record<string, string>;
+      correctMatches: Record<string, string>;
+    })
+  | (ReviewBase & {
+      type: "complex";
+      subReviews: ReviewItem[]; // Результаты по каждому подвопросу
     })
   | (ReviewBase & {
       type: "other";

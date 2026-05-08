@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import ImageUpload from "./ImageUpload";
+import MediaUpload from "./MediaUpload";
 import QuestionTypeSwitch from "./QuestionTypeSwitch";
 import { deepClone, type Question, type QuestionType } from "./types";
 
@@ -10,6 +11,8 @@ import TestEditor from "./test/TestEditor";
 import FillEditor from "./fill/FillEditor";
 import SentenceEditor from "./sentence/SentenceEditor";
 import CrosswordEditor from "./crossword/CrosswordEditor";
+import ComplexEditor from "./complex/ComplexEditor";
+import MatchingEditor from "./matching/MatchingEditor";
 
 type Props = {
   index: number;
@@ -29,6 +32,8 @@ function typeLabel(t: QuestionType) {
   if (t === "fill") return "✍️ Вписать ответ";
   if (t === "sentence") return "📝 Заполнить предложение";
   if (t === "crossword") return "🧩 Кроссворд";
+  if (t === "complex") return "📚 Комплексный вопрос";
+  if (t === "matching") return "🔗 Сопоставление";
   return t;
 }
 
@@ -75,6 +80,10 @@ export default function QuestionItem({
       ? "qtype-fill"
       : q.type === "sentence"
       ? "qtype-sentence"
+      : q.type === "complex"
+      ? "qtype-complex"
+      : q.type === "matching"
+      ? "qtype-matching"
       : "qtype-crossword";
 
   // ====== Zoomable image state (for crossword) ======
@@ -318,15 +327,26 @@ export default function QuestionItem({
         </div>
       ) : null}
 
-      {/* ===== ИЗОБРАЖЕНИЕ (НЕ ДЛЯ КРОССВОРДА) ===== */}
+      {/* ===== НОВЫЙ МУЛЬТИ-МЕДИА ЗАГРУЗЧИК (НЕ ДЛЯ КРОССВОРДА) ===== */}
       {q.type !== "crossword" ? (
-        <ImageUpload
-          value={typeof q.image === "string" ? q.image : ""}
-          onChange={(nextUrl) => patch({ image: nextUrl || "" })}
-          disabled={disabled}
-          bucket="question-images"
-          label="Изображение для вопроса (опционально):"
-        />
+        <>
+          {/* Оставлено для обратной совместимости старых данных (единичная картинка) */}
+          {q.image && typeof q.image === "string" && !q.media?.length && (
+             <div className="form-group" style={{ marginBottom: "16px" }}>
+               <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Устаревшее изображение:</label>
+               <img src={q.image} alt="old media" style={{ maxWidth: 200, borderRadius: 8 }} />
+               <button className="btn btn-small btn-danger" style={{ marginTop: 8 }} onClick={() => patch({ image: "" })}>Удалить</button>
+             </div>
+          )}
+
+          <MediaUpload
+            value={q.media || []}
+            onChange={(nextMedia) => patch({ media: nextMedia })}
+            disabled={disabled}
+            bucket="question-images"
+            label="Прикрепленные медиафайлы (Изображения, Аудио, PDF):"
+          />
+        </>
       ) : null}
 
       {/* ===== ИЗОБРАЖЕНИЕ КРОССВОРДА (УВЕЛИЧЕНИЕ/ПИНЧ) ===== */}
@@ -453,6 +473,12 @@ export default function QuestionItem({
           <SentenceEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
         ) : q.type === "crossword" ? (
           <CrosswordEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
+        ) : q.type === "complex" ? (
+          // @ts-ignore
+          <ComplexEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
+        ) : q.type === "matching" ? (
+          // @ts-ignore
+          <MatchingEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
         ) : null}
       </div>
     </div>

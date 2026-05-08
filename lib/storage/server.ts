@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { directFetch } from "@/lib/net/directFetch";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 
@@ -26,6 +27,8 @@ const DEFAULT_UPLOAD_BUCKETS = [
 ];
 
 const DEFAULT_ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "avif"];
+// Новый список с поддержкой аудио и PDF
+const DEFAULT_ALLOWED_MEDIA_EXTENSIONS = [...DEFAULT_ALLOWED_IMAGE_EXTENSIONS, "mp3", "wav", "ogg", "m4a", "pdf"];
 
 export type UploadStorageObjectInput = {
   bucket: string;
@@ -60,7 +63,13 @@ export function getPublicStorageBuckets() {
 }
 
 export function getUploadStorageBuckets() {
-  return envList("STORAGE_UPLOAD_BUCKETS", DEFAULT_UPLOAD_BUCKETS);
+  // Если задан бакет Яндекса, добавляем его в список разрешенных
+  const yandexBucket = process.env.YANDEX_BUCKET_NAME;
+  const buckets = envList("STORAGE_UPLOAD_BUCKETS", DEFAULT_UPLOAD_BUCKETS);
+  if (yandexBucket && !buckets.includes(yandexBucket)) {
+    buckets.push(yandexBucket);
+  }
+  return buckets;
 }
 
 export function isValidBucketName(bucket: string) {
@@ -107,7 +116,7 @@ export function assertPublicStorageBucket(bucket: string) {
 
   const allowed = getPublicStorageBuckets();
 
-  if (!allowed.includes(bucket)) {
+  if (!allowed.includes(bucket) && bucket !== process.env.YANDEX_BUCKET_NAME) {
     throw new Error(`Bucket "${bucket}" не разрешён для публичной выдачи`);
   }
 }
@@ -144,8 +153,14 @@ export function getFileExtension(name: string) {
   return ext || "bin";
 }
 
+// Оставлено для обратной совместимости, чтобы старый код не сломался
 export function isAllowedImageExtension(ext: string) {
   return DEFAULT_ALLOWED_IMAGE_EXTENSIONS.includes(String(ext || "").toLowerCase());
+}
+
+// Новая функция для всех типов медиа (Используется в новом route.ts)
+export function isAllowedMediaExtension(ext: string) {
+  return DEFAULT_ALLOWED_MEDIA_EXTENSIONS.includes(String(ext || "").toLowerCase());
 }
 
 export function guessContentTypeFromPath(path: string) {
@@ -158,6 +173,10 @@ export function guessContentTypeFromPath(path: string) {
   if (ext === "avif") return "image/avif";
   if (ext === "svg") return "image/svg+xml";
   if (ext === "pdf") return "application/pdf";
+  if (ext === "mp3") return "audio/mpeg";
+  if (ext === "wav") return "audio/wav";
+  if (ext === "ogg") return "audio/ogg";
+  if (ext === "m4a") return "audio/mp4";
 
   return "application/octet-stream";
 }
@@ -246,21 +265,59 @@ export async function uploadStorageObject(input: UploadStorageObjectInput) {
     throw new Error("Некорректный путь к файлу");
   }
 
-  const supabase = createSupabaseStorageClient({ admin: true });
-
-  const { data, error } = await supabase.storage.from(bucket).upload(path, input.file, {
-    cacheControl: input.cacheControl ?? "31536000",
-    upsert: Boolean(input.upsert),
-    contentType: input.contentType || guessContentTypeFromPath(path),
-  });
-
-  if (error) {
-    throw error;
+  // Конвертируем ArrayBuffer в Buffer (если нужно) для совместимости с aws-sdk
+  let safeBody = input.file;
+  if (input.file instanceof ArrayBuffer) {
+    safeBody = Buffer.from(input.file);
   }
 
-  return {
-    bucket,
-    path: data?.path || path,
-    publicUrl: getStoragePublicUrl(bucket, data?.path || path),
-  };
+  const isYandexBucket = bucket === process.env.YANDEX_BUCKET_NAME;
+
+  if (isYandexBucket) {
+    // ЗАГРУЗКА В YANDEX OBJECT STORAGE
+    const s3Client = new S3Client({
+      region: process.env.YANDEX_REGION || "ru-central1",
+      endpoint: "https://storage.yandexcloud.net",
+      credentials: {
+        accessKeyId: process.env.YANDEX_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY!,
+      },
+    });
+
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: path,
+        // Принудительное подавление ошибки TS через as any, так как в рантайме S3Client принимает Buffer/Uint8Array
+        Body: safeBody as any,
+        ContentType: input.contentType || guessContentTypeFromPath(path),
+        CacheControl: input.cacheControl || "max-age=31536000",
+      })
+    );
+
+    return {
+      bucket,
+      path,
+      publicUrl: `https://storage.yandexcloud.net/${bucket}/${path}`,
+    };
+  } else {
+    // ЗАГРУЗКА В SUPABASE (Для старых бакетов вроде covers, backgrounds)
+    const supabase = createSupabaseStorageClient({ admin: true });
+
+    const { data, error } = await supabase.storage.from(bucket).upload(path, input.file, {
+      cacheControl: input.cacheControl ?? "31536000",
+      upsert: Boolean(input.upsert),
+      contentType: input.contentType || guessContentTypeFromPath(path),
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      bucket,
+      path: data?.path || path,
+      publicUrl: getStoragePublicUrl(bucket, data?.path || path),
+    };
+  }
 }
