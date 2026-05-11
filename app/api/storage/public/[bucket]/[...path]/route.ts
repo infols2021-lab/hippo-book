@@ -6,6 +6,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+// Vercel: увеличиваем таймаут — крупные файлы (аудио, PDF) могут грузиться дольше 10 сек
+export const maxDuration = 30;
+
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
@@ -30,12 +33,8 @@ function normalizePath(parts: unknown) {
 }
 
 /**
- * Дефолтный список публичных бакетов — зеркалит DEFAULT_PUBLIC_BUCKETS
- * из lib/storage/server.ts. Используется когда STORAGE_PUBLIC_BUCKETS
- * не задан в env, либо как база для объединения со значением из env.
- *
- * ВАЖНО: этот список должен оставаться синхронизированным с
- * DEFAULT_PUBLIC_BUCKETS в lib/storage/server.ts.
+ * Дефолтный список публичных бакетов.
+ * ВАЖНО: синхронизировать с DEFAULT_PUBLIC_BUCKETS в lib/storage/server.ts
  */
 const DEFAULT_PROXY_PUBLIC_BUCKETS = [
   "covers",
@@ -49,17 +48,10 @@ const DEFAULT_PROXY_PUBLIC_BUCKETS = [
 ];
 
 /**
- * Возвращает итоговый массив разрешённых публичных бакетов.
- *
- * Логика:
- * 1. Если STORAGE_PUBLIC_BUCKETS задан — берём его как базу.
- * 2. Если НЕ задан — используем DEFAULT_PROXY_PUBLIC_BUCKETS как базу.
- * 3. В обоих случаях дополнительно добавляем YANDEX_BUCKET_NAME (если задан).
- *
- * Это исправляет баг: раньше при незаданном STORAGE_PUBLIC_BUCKETS список
- * был пуст, и isBucketAllowed возвращал true для всех (dev-режим).
- * Но при частично заданном STORAGE_PUBLIC_BUCKETS бакеты Supabase
- * (question-images и др.) блокировались 403, не попав в список.
+ * Возвращает список разрешённых бакетов.
+ * Если STORAGE_PUBLIC_BUCKETS задан — берём его.
+ * Если нет — используем DEFAULT_PROXY_PUBLIC_BUCKETS.
+ * Yandex-бакет добавляется всегда.
  */
 function getAllowedPublicBuckets(): string[] {
   const fromEnv = (process.env.STORAGE_PUBLIC_BUCKETS || "")
@@ -67,10 +59,8 @@ function getAllowedPublicBuckets(): string[] {
     .map((b) => b.trim())
     .filter(Boolean);
 
-  // Если env задан — используем его; если нет — берём дефолты
   const base = fromEnv.length > 0 ? fromEnv : [...DEFAULT_PROXY_PUBLIC_BUCKETS];
 
-  // Всегда добавляем Yandex-бакет, если задан и ещё не в списке
   const yandexBucket = process.env.YANDEX_BUCKET_NAME;
   if (yandexBucket && !base.includes(yandexBucket)) {
     base.push(yandexBucket);
@@ -80,33 +70,23 @@ function getAllowedPublicBuckets(): string[] {
 }
 
 function isBucketAllowed(bucket: string) {
-  const allowed = getAllowedPublicBuckets();
-  return allowed.includes(bucket);
+  return getAllowedPublicBuckets().includes(bucket);
 }
 
 function getSupabaseUrl() {
   return String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
 }
 
-function getYandexEndpoint() {
-  return "https://storage.yandexcloud.net";
-}
-
 function isYandexBucket(bucket: string) {
-  const yandexBucket = process.env.YANDEX_BUCKET_NAME;
-  return Boolean(yandexBucket && bucket === yandexBucket);
+  const yb = process.env.YANDEX_BUCKET_NAME;
+  return Boolean(yb && bucket === yb);
 }
 
-/** Безопасность: запрещаем path traversal */
+/** Запрещаем path traversal */
 function isSafeStorageObjectPath(path: string) {
   if (!path) return false;
   if (path.startsWith("/") || path.includes("\\") || path.includes("\0")) return false;
-
-  const parts = path.split("/");
-  return parts.every((part) => {
-    if (!part || part === "." || part === "..") return false;
-    return true;
-  });
+  return path.split("/").every((part) => part && part !== "." && part !== "..");
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -120,17 +100,14 @@ function encodeStoragePath(path: string) {
     .join("/");
 }
 
-/** Прямая ссылка на публичный объект в Supabase Storage */
 function buildSupabasePublicUrl(bucket: string, objectPath: string) {
   const base = getSupabaseUrl();
   if (!base) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-
   return `${base}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodeStoragePath(objectPath)}`;
 }
 
-/** Прямая ссылка на публичный объект в Yandex Object Storage */
 function buildYandexPublicUrl(bucket: string, objectPath: string) {
-  return `${getYandexEndpoint()}/${encodeURIComponent(bucket)}/${encodeStoragePath(objectPath)}`;
+  return `https://storage.yandexcloud.net/${encodeURIComponent(bucket)}/${encodeStoragePath(objectPath)}`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -148,16 +125,6 @@ async function readParams(ctx: RouteContext): Promise<RouteParams> {
   return await ctx.params;
 }
 
-/** Формирует ответ-редирект (307) на целевой URL с кеширующими заголовками */
-function redirectResponse(url: string, cacheMaxAge = 300) {
-  return NextResponse.redirect(url, {
-    status: 307,
-    headers: {
-      "cache-control": `public, max-age=${cacheMaxAge}`,
-    },
-  });
-}
-
 // ─────────────────────────────────────────────────────────────
 // Handlers
 // ─────────────────────────────────────────────────────────────
@@ -169,24 +136,94 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 
   if (!bucket) return jsonError("Bucket is required", 400, "VALIDATION");
   if (!objectPath) return jsonError("Path is required", 400, "VALIDATION");
-  if (!isBucketAllowed(bucket)) return jsonError(`Public access to bucket "${bucket}" is not allowed`, 403, "BUCKET_NOT_ALLOWED");
-  if (!isSafeStorageObjectPath(objectPath)) return jsonError("Invalid object path", 400, "INVALID_PATH");
+  if (!isBucketAllowed(bucket))
+    return jsonError(`Public access to bucket "${bucket}" is not allowed`, 403, "BUCKET_NOT_ALLOWED");
+  if (!isSafeStorageObjectPath(objectPath))
+    return jsonError("Invalid object path", 400, "INVALID_PATH");
+
+  let targetUrl: string;
+  try {
+    targetUrl = isYandexBucket(bucket)
+      ? buildYandexPublicUrl(bucket, objectPath)
+      : buildSupabasePublicUrl(bucket, objectPath);
+  } catch (e: any) {
+    return jsonError(e?.message || "URL build error", 500, "URL_BUILD_ERROR");
+  }
 
   try {
-    // Для Yandex-бакетов редиректим на прямое хранилище (публичный доступ)
-    if (isYandexBucket(bucket)) {
-      const targetUrl = buildYandexPublicUrl(bucket, objectPath);
-      return redirectResponse(targetUrl, 31536000);
+    // Формируем upstream-заголовки
+    const upstreamHeaders: Record<string, string> = {
+      // Представляемся браузером — некоторые CDN блокируют bot-like UA
+      "User-Agent":
+        "Mozilla/5.0 (compatible; HippoProxy/1.0; +https://hippo-book.ru)",
+    };
+
+    // ↓ Пробрасываем Range для поддержки audio seek через прокси.
+    //   Без этого браузер не может перематывать аудиофайлы.
+    const rangeHeader = req.headers.get("Range");
+    if (rangeHeader) {
+      upstreamHeaders["Range"] = rangeHeader;
     }
 
-    // Для всех остальных — Supabase
-    const targetUrl = buildSupabasePublicUrl(bucket, objectPath);
-    return redirectResponse(targetUrl, 300);
+    // Запрашиваем файл server-to-server.
+    // Пользователю не нужен прямой доступ к Яндексу/Supabase —
+    // наш сервер сам забирает контент и стримит его пользователю.
+    const upstream = await fetch(targetUrl, {
+      headers: upstreamHeaders,
+      // Отключаем Next.js-кеш fetch — нам важен свежий ответ от upstream,
+      // а кешировать будем на уровне браузера через Cache-Control
+      cache: "no-store",
+    });
+
+    // 206 Partial Content — легитимный ответ на Range-запрос
+    if (!upstream.ok && upstream.status !== 206) {
+      if (upstream.status === 404) {
+        return jsonError("File not found", 404, "NOT_FOUND");
+      }
+      return jsonError(`Upstream error: ${upstream.status}`, 502, "UPSTREAM_ERROR");
+    }
+
+    // ─── Формируем заголовки ответа ───────────────────────────────────────
+    const resHeaders: Record<string, string> = {
+      // Тип контента — берём от upstream (image/jpeg, audio/mp4, и т.д.)
+      "Content-Type":
+        upstream.headers.get("Content-Type") || "application/octet-stream",
+
+      // Долгое кеширование в браузере — файлы в хранилище immutable
+      "Cache-Control": "public, max-age=31536000, immutable",
+
+      // Безопасность
+      "X-Content-Type-Options": "nosniff",
+    };
+
+    // Пробрасываем заголовки для range requests и кеш-валидации
+    const headersToForward = [
+      "Content-Length",
+      "Content-Range",
+      "Accept-Ranges",
+      "ETag",
+      "Last-Modified",
+    ] as const;
+
+    for (const header of headersToForward) {
+      const val = upstream.headers.get(header);
+      if (val) resHeaders[header] = val;
+    }
+
+    // ─── Стримим тело напрямую — без буферизации в памяти ────────────────
+    // upstream.body — это ReadableStream, NextResponse умеет его стримить.
+    return new NextResponse(upstream.body, {
+      status: upstream.status, // 200 или 206 (для range requests)
+      headers: resHeaders,
+    });
   } catch (e: any) {
-    return jsonError(e?.message || "Storage redirect error", 500, "STORAGE_REDIRECT_ERROR");
+    // fetch упал (network error, timeout и т.д.)
+    return jsonError(e?.message || "Storage fetch error", 502, "FETCH_ERROR");
   }
 }
 
+// HEAD используется браузером для preflight проверок и audio duration
 export async function HEAD(req: NextRequest, ctx: RouteContext) {
+  // Переиспользуем GET — NextResponse автоматически уберёт body для HEAD
   return GET(req, ctx);
 }
