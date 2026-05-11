@@ -40,6 +40,25 @@ function buildParts(correctAnswers: any[], userArr: string[], totalCount: number
   return parts;
 }
 
+/**
+ * Безопасно клампает финальный score в диапазон 0–100.
+ * Защита от NaN / Infinity / отрицательных значений.
+ */
+function clampScore(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+/**
+ * Безопасно вычисляет долю: earned / total.
+ * Возвращает 0 если total <= 0 или результат не конечный.
+ */
+function safeFraction(earned: number, total: number): number {
+  if (total <= 0 || !Number.isFinite(earned) || !Number.isFinite(total)) return 0;
+  const f = earned / total;
+  return Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : 0;
+}
+
 // ---------------------------------------------------------------------------
 // Validate
 // ---------------------------------------------------------------------------
@@ -48,9 +67,17 @@ export function validateAllAnswered(
   questions: any[],
   answers: any
 ): { ok: boolean; index: number; subIndex?: number } {
+  // Defensive guard: если questions не массив — считаем что всё ок (нечего валидировать)
+  if (!Array.isArray(questions)) return { ok: true, index: -1 };
+
+  // Defensive guard: если answers не объект — считаем что ничего не отвечено
+  const safeAnswers = answers && typeof answers === "object" ? answers : {};
+
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i];
-    const a = answers[i];
+    if (!q || typeof q !== "object") continue;
+
+    const a = (safeAnswers as any)[i];
 
     if (q.type === "test") {
       if (q.multiple) {
@@ -97,6 +124,28 @@ export function calcAndBuildReview(
   questions: any[],
   answers: any
 ): { stats: FinalStats; review: ReviewItem[] } {
+  // Defensive guard: если пришёл мусор — возвращаем пустой результат
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return {
+      stats: {
+        score: 0,
+        correct: 0,
+        incorrect: 0,
+        skipped: 0,
+        total: 0,
+        pointsEarned: 0,
+        pointsTotal: 0,
+      },
+      review: [],
+    };
+  }
+
+  // Defensive guard: answers должен быть объектом (массивом или обычным объектом)
+  const safeAnswers =
+    answers !== null && answers !== undefined && typeof answers === "object"
+      ? answers
+      : {};
+
   const statsSum = {
     correct: 0,
     incorrect: 0,
@@ -109,6 +158,21 @@ export function calcAndBuildReview(
   const review: ReviewItem[] = [];
 
   function processQ(q: any, a: any, idxText: string): ReviewItem {
+    // Defensive guard: если вопрос битый — возвращаем skipped
+    if (!q || typeof q !== "object") {
+      statsSum.skipped++;
+      statsSum.total++;
+      return {
+        type: "other",
+        questionText: `Вопрос ${idxText}`,
+        isCorrect: false,
+        isSkipped: true,
+        note: "Некорректная структура вопроса.",
+        pointsEarned: 0,
+        pointsTotal: 1,
+      } as ReviewItem;
+    }
+
     const questionText = String(q?.q ?? "").trim() || `Вопрос ${idxText}`;
     const pointsTotal = getPointsTotal(q);
 
@@ -116,7 +180,7 @@ export function calcAndBuildReview(
     // COMPLEX
     // ---------------------------------------------------------------
     if (q.type === "complex") {
-      const subQs = q.subQuestions || [];
+      const subQs = Array.isArray(q.subQuestions) ? q.subQuestions : [];
       const subAns = Array.isArray(a) ? a : [];
 
       const subReviews: ReviewItem[] = [];
@@ -128,8 +192,8 @@ export function calcAndBuildReview(
       subQs.forEach((sq: any, subI: number) => {
         const sr = processQ(sq, subAns[subI], `${idxText}.${subI + 1}`);
         subReviews.push(sr);
-        complexEarned += sr.pointsEarned;
-        complexTotal += sr.pointsTotal;
+        complexEarned += Number.isFinite(sr.pointsEarned) ? sr.pointsEarned : 0;
+        complexTotal += Number.isFinite(sr.pointsTotal) ? sr.pointsTotal : 0;
         if (!sr.isSkipped) complexAllSkipped = false;
         if (!sr.isCorrect) complexAllCorrect = false;
       });
@@ -161,9 +225,7 @@ export function calcAndBuildReview(
       const getOptText = (idx: number) => {
         const opt = opts[idx];
         if (!opt) return "—";
-        return typeof opt === "string"
-          ? opt
-          : opt.text || `Вариант ${idx + 1}`;
+        return typeof opt === "string" ? opt : opt.text || `Вариант ${idx + 1}`;
       };
 
       const correctArr = Array.isArray(q.correct)
@@ -214,6 +276,8 @@ export function calcAndBuildReview(
 
         const totalCorrect = correctSet.size || 1;
         fraction = Math.max(0, correctSelected - wrongSelected) / totalCorrect;
+        // Дополнительная защита: fraction должен быть в [0, 1]
+        fraction = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
         isCorrect = fraction === 1;
       } else {
         const userIdx = Number(a);
@@ -282,8 +346,7 @@ export function calcAndBuildReview(
         statsSum.skipped++;
         const parts = buildParts(correctAnswers, userArr, totalCount);
         const correctCount = parts.filter((p) => p.isCorrect).length;
-        const percent =
-          totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+        const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
 
         return {
           type: "fill",
@@ -303,7 +366,7 @@ export function calcAndBuildReview(
 
       const parts = buildParts(correctAnswers, userArr, totalCount);
       const correctCount = parts.filter((p) => p.isCorrect).length;
-      const fraction = totalCount > 0 ? correctCount / totalCount : 0;
+      const fraction = safeFraction(correctCount, totalCount);
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
@@ -368,8 +431,7 @@ export function calcAndBuildReview(
         statsSum.skipped++;
         const parts = buildParts(correctAnswers, userArr, totalCount);
         const correctCount = parts.filter((p) => p.isCorrect).length;
-        const percent =
-          totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+        const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
 
         return {
           type: "sentence",
@@ -389,7 +451,7 @@ export function calcAndBuildReview(
 
       const parts = buildParts(correctAnswers, userArr, totalCount);
       const correctCount = parts.filter((p) => p.isCorrect).length;
-      const fraction = totalCount > 0 ? correctCount / totalCount : 0;
+      const fraction = safeFraction(correctCount, totalCount);
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
@@ -421,10 +483,11 @@ export function calcAndBuildReview(
       const pairs = Array.isArray(q.pairs) ? q.pairs : [];
       const totalPairsCount = pairs.length;
 
-      // Правильные соответствия: левый id пары -> такой же id (так как оба элемента пары имеют один id)
       const correctMatches: Record<string, string> = {};
       pairs.forEach((p: any) => {
-        correctMatches[p.id] = p.id;
+        if (p?.id != null) {
+          correctMatches[String(p.id)] = String(p.id);
+        }
       });
 
       const answered =
@@ -450,13 +513,15 @@ export function calcAndBuildReview(
       const userMatches = a as Record<string, string>;
 
       pairs.forEach((p: any) => {
-        if (userMatches[p.id] === correctMatches[p.id]) {
-          correctPairsCount++;
+        if (p?.id != null) {
+          const key = String(p.id);
+          if (userMatches[key] === correctMatches[key]) {
+            correctPairsCount++;
+          }
         }
       });
 
-      const fraction =
-        totalPairsCount > 0 ? correctPairsCount / totalPairsCount : 0;
+      const fraction = safeFraction(correctPairsCount, totalPairsCount);
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
@@ -498,13 +563,13 @@ export function calcAndBuildReview(
   // Process each question
   // -----------------------------------------------------------------------
   questions.forEach((q, i) => {
-    review.push(processQ(q, answers[i], String(i + 1)));
+    review.push(processQ(q, (safeAnswers as any)[i], String(i + 1)));
   });
 
-  const score =
-    statsSum.pointsTotal > 0
-      ? Math.round((statsSum.pointsEarned / statsSum.pointsTotal) * 100)
-      : 0;
+  // Финальный score клампаем в [0, 100] — защита от деления на 0 и NaN
+  const score = clampScore(
+    safeFraction(statsSum.pointsEarned, statsSum.pointsTotal) * 100
+  );
 
   return {
     stats: {

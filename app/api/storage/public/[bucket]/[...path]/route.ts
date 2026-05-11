@@ -30,27 +30,57 @@ function normalizePath(parts: unknown) {
 }
 
 /**
- * Возвращает массив публичных бакетов:
- * - из STORAGE_PUBLIC_BUCKETS (через запятую)
- * - YANDEX_BUCKET_NAME, если задан
+ * Дефолтный список публичных бакетов — зеркалит DEFAULT_PUBLIC_BUCKETS
+ * из lib/storage/server.ts. Используется когда STORAGE_PUBLIC_BUCKETS
+ * не задан в env, либо как база для объединения со значением из env.
+ *
+ * ВАЖНО: этот список должен оставаться синхронизированным с
+ * DEFAULT_PUBLIC_BUCKETS в lib/storage/server.ts.
+ */
+const DEFAULT_PROXY_PUBLIC_BUCKETS = [
+  "covers",
+  "question-images",
+  "help-images",
+  "backgrounds",
+  "streak-icons",
+  "streak_icon_assets",
+  "streak-roadmap-bg",
+  "profile-backgrounds",
+];
+
+/**
+ * Возвращает итоговый массив разрешённых публичных бакетов.
+ *
+ * Логика:
+ * 1. Если STORAGE_PUBLIC_BUCKETS задан — берём его как базу.
+ * 2. Если НЕ задан — используем DEFAULT_PROXY_PUBLIC_BUCKETS как базу.
+ * 3. В обоих случаях дополнительно добавляем YANDEX_BUCKET_NAME (если задан).
+ *
+ * Это исправляет баг: раньше при незаданном STORAGE_PUBLIC_BUCKETS список
+ * был пуст, и isBucketAllowed возвращал true для всех (dev-режим).
+ * Но при частично заданном STORAGE_PUBLIC_BUCKETS бакеты Supabase
+ * (question-images и др.) блокировались 403, не попав в список.
  */
 function getAllowedPublicBuckets(): string[] {
-  const list = (process.env.STORAGE_PUBLIC_BUCKETS || "")
+  const fromEnv = (process.env.STORAGE_PUBLIC_BUCKETS || "")
     .split(",")
     .map((b) => b.trim())
     .filter(Boolean);
 
+  // Если env задан — используем его; если нет — берём дефолты
+  const base = fromEnv.length > 0 ? fromEnv : [...DEFAULT_PROXY_PUBLIC_BUCKETS];
+
+  // Всегда добавляем Yandex-бакет, если задан и ещё не в списке
   const yandexBucket = process.env.YANDEX_BUCKET_NAME;
-  if (yandexBucket && !list.includes(yandexBucket)) {
-    list.push(yandexBucket);
+  if (yandexBucket && !base.includes(yandexBucket)) {
+    base.push(yandexBucket);
   }
 
-  return list;
+  return base;
 }
 
 function isBucketAllowed(bucket: string) {
   const allowed = getAllowedPublicBuckets();
-  if (!allowed.length) return true; // если переменная не задана – разрешаем все (dev-режим)
   return allowed.includes(bucket);
 }
 
@@ -63,7 +93,8 @@ function getYandexEndpoint() {
 }
 
 function isYandexBucket(bucket: string) {
-  return bucket === process.env.YANDEX_BUCKET_NAME;
+  const yandexBucket = process.env.YANDEX_BUCKET_NAME;
+  return Boolean(yandexBucket && bucket === yandexBucket);
 }
 
 /** Безопасность: запрещаем path traversal */
@@ -142,13 +173,13 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
   if (!isSafeStorageObjectPath(objectPath)) return jsonError("Invalid object path", 400, "INVALID_PATH");
 
   try {
-    // Для Yandex‑бакетов редиректим на прямое хранилище (публичный доступ)
+    // Для Yandex-бакетов редиректим на прямое хранилище (публичный доступ)
     if (isYandexBucket(bucket)) {
       const targetUrl = buildYandexPublicUrl(bucket, objectPath);
       return redirectResponse(targetUrl, 31536000);
     }
 
-    // Для всех остальных – Supabase
+    // Для всех остальных — Supabase
     const targetUrl = buildSupabasePublicUrl(bucket, objectPath);
     return redirectResponse(targetUrl, 300);
   } catch (e: any) {

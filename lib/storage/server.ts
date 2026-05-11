@@ -28,7 +28,17 @@ const DEFAULT_UPLOAD_BUCKETS = [
 ];
 
 const DEFAULT_ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "avif"];
-const DEFAULT_ALLOWED_MEDIA_EXTENSIONS = [...DEFAULT_ALLOWED_IMAGE_EXTENSIONS, "mp3", "wav", "ogg", "m4a", "pdf"];
+
+// mp4 добавлен: аудиозаписи с iPhone/Android часто имеют расширение .mp4
+const DEFAULT_ALLOWED_MEDIA_EXTENSIONS = [
+  ...DEFAULT_ALLOWED_IMAGE_EXTENSIONS,
+  "mp3",
+  "wav",
+  "ogg",
+  "m4a",
+  "mp4",
+  "pdf",
+];
 
 export type UploadStorageObjectInput = {
   bucket: string;
@@ -37,7 +47,7 @@ export type UploadStorageObjectInput = {
   contentType?: string;
   upsert?: boolean;
   cacheControl?: string;
-  maxRetries?: number; // количество повторных попыток при transient-ошибках
+  maxRetries?: number;
 };
 
 export type DownloadStorageObjectResult = {
@@ -164,6 +174,8 @@ export function guessContentTypeFromPath(path: string) {
   if (ext === "wav") return "audio/wav";
   if (ext === "ogg") return "audio/ogg";
   if (ext === "m4a") return "audio/mp4";
+  // mp4 — контейнер AAC; аудиофайлы с мобильных устройств часто имеют именно это расширение
+  if (ext === "mp4") return "audio/mp4";
   return "application/octet-stream";
 }
 
@@ -215,10 +227,6 @@ export async function downloadPublicStorageObject(bucket: string, path: string |
   return { data, contentType, size } satisfies DownloadStorageObjectResult;
 }
 
-/**
- * Проверяет, является ли ошибка transient (повторяемой).
- * Используется для автоматических ретраев при загрузке.
- */
 function isTransientStorageError(error: any): boolean {
   const msg = String(error?.message || error || "").toLowerCase();
   return (
@@ -232,10 +240,6 @@ function isTransientStorageError(error: any): boolean {
   );
 }
 
-/**
- * Загружает объект в хранилище с автоматическими повторными попытками.
- * Для Supabase upload встроен retry (до 2 дополнительных попыток).
- */
 export async function uploadStorageObject(input: UploadStorageObjectInput) {
   const bucket = String(input.bucket || "").trim();
   const path = normalizeStorageObjectPath(input.path);
@@ -257,7 +261,6 @@ export async function uploadStorageObject(input: UploadStorageObjectInput) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       if (isYandexBucket) {
-        // Yandex Object Storage (прямой S3)
         const s3Client = new S3Client({
           region: process.env.YANDEX_REGION || "ru-central1",
           endpoint: "https://storage.yandexcloud.net",
@@ -283,7 +286,6 @@ export async function uploadStorageObject(input: UploadStorageObjectInput) {
           publicUrl: `https://storage.yandexcloud.net/${bucket}/${path}`,
         };
       } else {
-        // Supabase Storage
         const supabase = createSupabaseStorageClient({ admin: true });
 
         const { data, error } = await supabase.storage
@@ -295,13 +297,11 @@ export async function uploadStorageObject(input: UploadStorageObjectInput) {
           });
 
         if (error) {
-          // Не transient ошибка или исчерпаны попытки
           if (!isTransientStorageError(error) || attempt === maxRetries) {
             throw error;
           }
           lastError = error;
-          // Небольшая задержка перед повтором
-          await new Promise(resolve => setTimeout(resolve, 800 * (attempt + 1)));
+          await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
           continue;
         }
 
@@ -316,10 +316,9 @@ export async function uploadStorageObject(input: UploadStorageObjectInput) {
       if (!isTransientStorageError(error) || attempt === maxRetries) {
         throw error;
       }
-      await new Promise(resolve => setTimeout(resolve, 800 * (attempt + 1)));
+      await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
     }
   }
 
-  // Финальный бросок (не должен достигнуться, но на всякий случай)
   throw lastError ?? new Error("Upload failed after retries");
 }

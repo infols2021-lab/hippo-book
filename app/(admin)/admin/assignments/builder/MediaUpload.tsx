@@ -23,17 +23,16 @@ export default function MediaUpload({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /**
-   * Безопасно разбирает ответ сервера, возвращает JSON или выбрасывает
-   * понятную ошибку. Предотвращает ситуацию, когда клиент получает HTML
-   * вместо JSON и ломается с "Unexpected token '<'".
-   */
+  // Ref-флаг защиты от race condition при двойном клике / двойном drop:
+  // useState асинхронен и не успевает заблокировать второй вызов handleFiles
+  // до следующего рендера. useRef проверяется синхронно — мгновенно.
+  const uploadingRef = useRef(false);
+
   async function parseServerResponse(response: Response) {
     const contentType = response.headers.get("content-type") || "";
 
     if (!response.ok) {
       const rawText = await response.text();
-      // Если сервер прислал HTML (например, страницу ошибки 500)
       if (contentType.includes("text/html") || rawText.trimStart().startsWith("<")) {
         const titleMatch = rawText.match(/<title>(.*?)<\/title>/i);
         const message = titleMatch
@@ -42,7 +41,6 @@ export default function MediaUpload({
         throw new Error(message);
       }
 
-      // Пытаемся извлечь JSON‑ошибку
       try {
         const json = JSON.parse(rawText);
         throw new Error(json.error || `Ошибка загрузки (${response.status})`);
@@ -55,16 +53,17 @@ export default function MediaUpload({
       }
     }
 
-    // Успешный ответ
     return response.json();
   }
 
   async function handleFiles(files: FileList | File[]) {
-    if (disabled || uploading) return;
+    // Двойная защита: ref — синхронная (мгновенная), state — для UI
+    if (disabled || uploadingRef.current) return;
 
+    // mp4 добавлен: аудиозаписи с мобильных устройств часто имеют расширение .mp4
     const allowedExtensions = [
       "jpg", "jpeg", "png", "gif", "webp", "avif",
-      "mp3", "wav", "ogg", "m4a", "pdf",
+      "mp3", "wav", "ogg", "m4a", "mp4", "pdf",
     ];
 
     const validFiles = Array.from(files).filter((f) => {
@@ -74,11 +73,13 @@ export default function MediaUpload({
 
     if (validFiles.length === 0) {
       setUploadError(
-        "Неподдерживаемый формат файла. Разрешены: JPG, PNG, GIF, WebP, MP3, WAV, PDF.",
+        "Неподдерживаемый формат файла. Разрешены: JPG, PNG, GIF, WebP, MP3, WAV, OGG, M4A, MP4, PDF.",
       );
       return;
     }
 
+    // Выставляем оба флага — ref синхронно, state для рендера
+    uploadingRef.current = true;
     setUploading(true);
     setUploadError(null);
 
@@ -95,7 +96,6 @@ export default function MediaUpload({
 
       const data = await parseServerResponse(response);
 
-      // Приоритет: новый массив files, затем старый формат с одним файлом
       const uploadedFiles: Array<{
         publicUrl: string;
         mediaType: string;
@@ -104,7 +104,6 @@ export default function MediaUpload({
         if (Array.isArray(data.files) && data.files.length > 0) {
           return data.files;
         }
-        // Обратная совместимость со старым API (объект в корне ответа)
         if (data.publicUrl) {
           return [
             {
@@ -130,7 +129,6 @@ export default function MediaUpload({
 
       onChange([...value, ...newMedia]);
     } catch (err: any) {
-      // Формируем читаемое сообщение для пользователя
       let message = "Ошибка при загрузке файлов.";
       if (err instanceof Error) {
         if (
@@ -146,6 +144,7 @@ export default function MediaUpload({
       }
       setUploadError(message);
     } finally {
+      uploadingRef.current = false;
       setUploading(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -215,14 +214,12 @@ export default function MediaUpload({
           </div>
         ) : (
           <div style={{ color: "rgba(0,0,0,0.5)" }}>
-            <span
-              style={{ fontSize: "24px", display: "block", marginBottom: "8px" }}
-            >
+            <span style={{ fontSize: "24px", display: "block", marginBottom: "8px" }}>
               📥
             </span>
             Перетащите файлы сюда или нажмите для выбора
             <div style={{ fontSize: "12px", marginTop: "4px" }}>
-              (JPG, PNG, GIF, WebP, MP3, WAV, PDF)
+              (JPG, PNG, GIF, WebP, MP3, WAV, OGG, M4A, MP4, PDF)
             </div>
           </div>
         )}
@@ -232,7 +229,7 @@ export default function MediaUpload({
           ref={fileInputRef}
           style={{ display: "none" }}
           onChange={(e) => e.target.files && handleFiles(e.target.files)}
-          accept="image/*,audio/*,application/pdf"
+          accept="image/*,audio/*,video/mp4,application/pdf"
           disabled={disabled}
         />
       </div>
@@ -309,9 +306,7 @@ export default function MediaUpload({
               )}
               {m.type === "audio" && (
                 <div style={{ textAlign: "center", padding: "10px 0" }}>
-                  <div style={{ fontSize: "24px", marginBottom: "8px" }}>
-                    🎵
-                  </div>
+                  <div style={{ fontSize: "24px", marginBottom: "8px" }}>🎵</div>
                   <audio
                     src={m.url}
                     controls
@@ -346,13 +341,7 @@ export default function MediaUpload({
                   >
                     📄
                   </div>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      lineHeight: 1.2,
-                    }}
-                  >
+                  <div style={{ fontSize: "12px", fontWeight: 500, lineHeight: 1.2 }}>
                     {m.name || "Документ PDF"}
                   </div>
                 </div>
@@ -391,12 +380,8 @@ export default function MediaUpload({
       {/* Анимация спиннера */}
       <style jsx>{`
         @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

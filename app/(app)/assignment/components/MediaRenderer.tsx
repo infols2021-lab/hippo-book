@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import type { MediaAttachment } from "../lib/types";
 import { getImageUrl } from "../lib/image";
 
@@ -9,22 +9,35 @@ import { getImageUrl } from "../lib/image";
 // ============================================================================
 function formatTime(timeInSeconds: number) {
   if (isNaN(timeInSeconds)) return "00:00";
+
   const m = Math.floor(timeInSeconds / 60);
   const s = Math.floor(timeInSeconds % 60);
-  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+
+  return `${m.toString().padStart(2, "0")}:${s
+    .toString()
+    .padStart(2, "0")}`;
 }
 
 // ============================================================================
-// КАСТОМНЫЙ АУДИОПЛЕЕР (Glassmorphism & Premium UI)
+// КАСТОМНЫЙ АУДИОПЛЕЕР
 // ============================================================================
-function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
+function CustomAudioPlayer({
+  url,
+  name,
+}: {
+  url: string;
+  name?: string;
+}) {
   const audioRef = useRef<HTMLAudioElement>(null);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [audioError, setAudioError] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const finalUrl = useMemo(() => getImageUrl(url), [url]);
 
   // Сброс при смене URL
   useEffect(() => {
@@ -38,22 +51,29 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
 
   useEffect(() => {
     const audio = audioRef.current;
+
     if (!audio) return;
 
     const updateProgress = () => {
       setCurrentTime(audio.currentTime);
       setProgress((audio.currentTime / audio.duration) * 100 || 0);
     };
+
     const updateDuration = () => {
       setDuration(audio.duration);
       setLoading(false);
     };
+
     const handleEnded = () => setIsPlaying(false);
+
     const handleError = () => {
       setAudioError(true);
       setLoading(false);
     };
-    const handleCanPlay = () => setLoading(false);
+
+    const handleCanPlay = () => {
+      setLoading(false);
+    };
 
     audio.addEventListener("timeupdate", updateProgress);
     audio.addEventListener("loadedmetadata", updateDuration);
@@ -72,18 +92,24 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
 
   const togglePlay = () => {
     if (!audioRef.current || audioError) return;
+
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().catch(() => setAudioError(true));
+      audioRef.current.play().catch(() => {
+        setAudioError(true);
+      });
+
       setIsPlaying(true);
     }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!audioRef.current || audioError) return;
+
     const newTime = (Number(e.target.value) / 100) * duration;
+
     audioRef.current.currentTime = newTime;
   };
 
@@ -96,16 +122,16 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
         gap: "16px",
         padding: "12px 20px",
         borderRadius: "20px",
-        background: "rgba(255, 255, 255, 0.8)",
+        background: "rgba(255,255,255,0.8)",
         backdropFilter: "blur(12px)",
-        border: "1px solid rgba(0, 0, 0, 0.05)",
-        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.05)",
+        border: "1px solid rgba(0,0,0,0.05)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
         width: "100%",
         maxWidth: "450px",
         margin: "10px 0",
       }}
     >
-      <audio ref={audioRef} src={getImageUrl(url)} preload="metadata" />
+      <audio ref={audioRef} src={finalUrl} preload="metadata" />
 
       <button
         onClick={togglePlay}
@@ -115,15 +141,20 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
           height: "46px",
           minWidth: "46px",
           borderRadius: "50%",
-          background: isPlaying ? "rgba(0, 123, 255, 0.1)" : "#007bff",
+          background: isPlaying
+            ? "rgba(0,123,255,0.1)"
+            : "#007bff",
           color: isPlaying ? "#007bff" : "#fff",
           border: "none",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          cursor: audioError || loading ? "not-allowed" : "pointer",
+          cursor:
+            audioError || loading ? "not-allowed" : "pointer",
           transition: "all 0.2s ease",
-          boxShadow: isPlaying ? "none" : "0 6px 15px rgba(0, 123, 255, 0.3)",
+          boxShadow: isPlaying
+            ? "none"
+            : "0 6px 15px rgba(0,123,255,0.3)",
           opacity: audioError || loading ? 0.6 : 1,
         }}
       >
@@ -141,17 +172,35 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
         ) : audioError ? (
           <span style={{ fontSize: 16 }}>⚠️</span>
         ) : isPlaying ? (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
             <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
           </svg>
         ) : (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "3px" }}>
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            style={{ marginLeft: "3px" }}
+          >
             <path d="M8 5v14l11-7z" />
           </svg>
         )}
       </button>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px",
+        }}
+      >
         {name && (
           <div
             style={{
@@ -166,23 +215,47 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
             {name}
           </div>
         )}
+
         {audioError ? (
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#c62828" }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#c62828",
+            }}
+          >
             Не удалось загрузить аудио
           </div>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "11px", fontWeight: 600, minWidth: "35px" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                minWidth: "35px",
+              }}
+            >
               {formatTime(currentTime)}
             </span>
+
             <input
               type="range"
               min="0"
               max="100"
               value={progress || 0}
               onChange={handleSeek}
-              style={{ flex: 1, cursor: "pointer" }}
+              style={{
+                flex: 1,
+                cursor: "pointer",
+              }}
             />
+
             <span
               style={{
                 fontSize: "11px",
@@ -201,19 +274,34 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
 }
 
 // ============================================================================
-// ИЗОБРАЖЕНИЕ С ФУНКЦИЕЙ ZOOM, ЛОАДЕРОМ И ПОВТОРОМ ПРИ ОШИБКЕ
+// ИЗОБРАЖЕНИЕ
 // ============================================================================
-function ZoomableImage({ url, name }: { url: string; name?: string }) {
+function ZoomableImage({
+  url,
+  name,
+}: {
+  url: string;
+  name?: string;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const finalUrl = getImageUrl(url);
+
+  const finalUrl = useMemo(() => {
+    const base = getImageUrl(url);
+
+    if (!base) return "";
+
+    if (retryCount === 0) return base;
+
+    return `${base}${base.includes("?") ? "&" : "?"}retry=${retryCount}`;
+  }, [url, retryCount]);
 
   useEffect(() => {
     setIsLoading(true);
     setHasError(false);
-  }, [url, retryCount]);
+  }, [finalUrl]);
 
   const handleRetry = useCallback(() => {
     setRetryCount((c) => c + 1);
@@ -238,16 +326,16 @@ function ZoomableImage({ url, name }: { url: string; name?: string }) {
           maxWidth: "600px",
           border: "1px solid rgba(0,0,0,0.06)",
         }}
-        onClick={() => !isLoading && !hasError && setIsOpen(true)}
+        onClick={() =>
+          !isLoading && !hasError && setIsOpen(true)
+        }
       >
-        {/* Скелетон во время загрузки */}
         {isLoading && !hasError && (
           <div className="media-loader">
             <div className="spinner"></div>
           </div>
         )}
 
-        {/* Изображение или заглушка ошибки */}
         {hasError ? (
           <div
             style={{
@@ -256,10 +344,25 @@ function ZoomableImage({ url, name }: { url: string; name?: string }) {
               color: "#94a3b8",
             }}
           >
-            <div style={{ fontSize: "32px", marginBottom: 8 }}>⚠️</div>
-            <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: 12 }}>
+            <div
+              style={{
+                fontSize: "32px",
+                marginBottom: 8,
+              }}
+            >
+              ⚠️
+            </div>
+
+            <div
+              style={{
+                fontSize: "14px",
+                fontWeight: 600,
+                marginBottom: 12,
+              }}
+            >
               Не удалось загрузить фото
             </div>
+
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -301,7 +404,6 @@ function ZoomableImage({ url, name }: { url: string; name?: string }) {
           />
         )}
 
-        {/* Кнопка "Увеличить" (только если картинка загрузилась) */}
         {!isLoading && !hasError && (
           <div
             style={{
@@ -324,7 +426,6 @@ function ZoomableImage({ url, name }: { url: string; name?: string }) {
         )}
       </div>
 
-      {/* Модалка полноразмерного просмотра */}
       {isOpen && !hasError && (
         <div
           onClick={() => setIsOpen(false)}
@@ -346,14 +447,15 @@ function ZoomableImage({ url, name }: { url: string; name?: string }) {
         >
           <img
             src={finalUrl}
+            alt="Full"
             style={{
               maxWidth: "100%",
               maxHeight: "100%",
               borderRadius: "12px",
               boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
             }}
-            alt="Full"
           />
+
           <button
             onClick={() => setIsOpen(false)}
             style={{
@@ -378,10 +480,24 @@ function ZoomableImage({ url, name }: { url: string; name?: string }) {
 // ============================================================================
 // ПРОСМОТРЩИК PDF
 // ============================================================================
-function PdfViewer({ url, name }: { url: string; name?: string }) {
-  const finalUrl = getImageUrl(url);
+function PdfViewer({
+  url,
+  name,
+}: {
+  url: string;
+  name?: string;
+}) {
+  const finalUrl = useMemo(() => getImageUrl(url), [url]);
+
   return (
-    <div className="media-item-fade" style={{ margin: "16px 0", width: "100%", maxWidth: "800px" }}>
+    <div
+      className="media-item-fade"
+      style={{
+        margin: "16px 0",
+        width: "100%",
+        maxWidth: "800px",
+      }}
+    >
       <div
         style={{
           display: "flex",
@@ -394,8 +510,16 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
           borderBottom: "none",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", overflow: "hidden" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            overflow: "hidden",
+          }}
+        >
           <span style={{ fontSize: "18px" }}>📄</span>
+
           <span
             style={{
               fontSize: "13px",
@@ -409,6 +533,7 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
             {name || "PDF Document"}
           </span>
         </div>
+
         <a
           href={finalUrl}
           target="_blank"
@@ -427,6 +552,7 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
           ОТКРЫТЬ ↗
         </a>
       </div>
+
       <div
         style={{
           height: "500px",
@@ -448,26 +574,58 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
 }
 
 // ============================================================================
-// ГЛАВНЫЙ КОМПОНЕНТ-РЕНДЕРЕР
+// ГЛАВНЫЙ РЕНДЕРЕР
 // ============================================================================
-export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) {
+export default function MediaRenderer({
+  media,
+}: {
+  media?: MediaAttachment[];
+}) {
   if (!media || media.length === 0) return null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+        width: "100%",
+      }}
+    >
       {media.map((m) => {
         if (!m.url) return null;
 
-        // Уникальный ключ по ID + URL гарантирует уничтожение старого компонента и
-        // создание нового при смене вопроса. Это убирает эффект "старой картинки".
         const uniqueKey = `${m.id}-${m.url}`;
 
-        if (m.type === "audio")
-          return <CustomAudioPlayer key={uniqueKey} url={m.url} name={m.name} />;
-        if (m.type === "image")
-          return <ZoomableImage key={uniqueKey} url={m.url} name={m.name} />;
-        if (m.type === "pdf")
-          return <PdfViewer key={uniqueKey} url={m.url} name={m.name} />;
+        if (m.type === "audio") {
+          return (
+            <CustomAudioPlayer
+              key={uniqueKey}
+              url={m.url}
+              name={m.name}
+            />
+          );
+        }
+
+        if (m.type === "image") {
+          return (
+            <ZoomableImage
+              key={uniqueKey}
+              url={m.url}
+              name={m.name}
+            />
+          );
+        }
+
+        if (m.type === "pdf") {
+          return (
+            <PdfViewer
+              key={uniqueKey}
+              url={m.url}
+              name={m.name}
+            />
+          );
+        }
 
         return null;
       })}
@@ -476,16 +634,19 @@ export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) 
         .media-item-fade {
           animation: mediaAppear 0.4s ease-out forwards;
         }
+
         @keyframes mediaAppear {
           from {
             opacity: 0;
             transform: translateY(5px);
           }
+
           to {
             opacity: 1;
             transform: translateY(0);
           }
         }
+
         .media-loader {
           position: absolute;
           inset: 0;
@@ -494,6 +655,7 @@ export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) 
           justify-content: center;
           z-index: 5;
         }
+
         .spinner {
           width: 30px;
           height: 30px;
@@ -502,6 +664,7 @@ export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) 
           border-radius: 50%;
           animation: mediaSpin 0.8s linear infinite;
         }
+
         @keyframes mediaSpin {
           to {
             transform: rotate(360deg);

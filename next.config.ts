@@ -22,7 +22,6 @@ function getSupabaseRemotePatterns(): NonNullable<NextConfig["images"]>["remoteP
 }
 
 function getYandexRemotePatterns(): NonNullable<NextConfig["images"]>["remotePatterns"] {
-  // Yandex Object Storage – для загрузки через <Image> и обычных <img>
   return [
     {
       protocol: "https" as const,
@@ -34,17 +33,21 @@ function getYandexRemotePatterns(): NonNullable<NextConfig["images"]>["remotePat
 const nextConfig: NextConfig = {
   poweredByHeader: false,
 
+  // serverBodySizeLimit существует в рантайме Next.js 13.4.4+, но отсутствует
+  // в типах старых версий пакета — поэтому приводим к any.
+  // Без этого Next.js обрезает тело запроса на 4 МБ до попадания в route handler,
+  // что даёт 413 на аудиофайлах ≥ 5 МБ.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  experimental: {
+    serverBodySizeLimit: "20mb",
+  } as any,
+
   images: {
     remotePatterns: [
       ...(getSupabaseRemotePatterns() ?? []),
       ...(getYandexRemotePatterns() ?? []),
     ],
   },
-
-  // Увеличение лимита тела запроса НЕ задаётся через next.config в App Router.
-  // Для поддержки больших файлов (аудио) используйте клиентскую загрузку через
-  // presigned URL в Supabase/Yandex, либо настройте обратный прокси (Nginx).
-  // В коде уже реализована прямая загрузка в Storage (lib/storage/server.ts).
 
   async redirects() {
     return [
