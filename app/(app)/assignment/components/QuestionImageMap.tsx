@@ -27,7 +27,7 @@ type PointPixel = {
 type AnswerAnchor = {
   answerId: string;
   x: number;
-  y: number; // центр нижней грани карточки
+  y: number; // центр верхней грани карточки
 };
 
 type Props = {
@@ -43,6 +43,24 @@ type Props = {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+/** Генератор плавной кривой от ответа к точке */
+function buildCurvePath(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): string {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  // контрольные точки: первая идёт вверх от ответа, вторая — вниз к точке
+  const cp1x = x1;
+  const cp1y = y1 - Math.min(50, dist * 0.4);
+  const cp2x = x2;
+  const cp2y = y2 + Math.min(50, dist * 0.4);
+  return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,10 +134,11 @@ export default function QuestionImageMap({
       const el = answerElRefs.current.get(ans.id);
       if (el) {
         const rect = el.getBoundingClientRect();
+        // anchor: center top of the element
         newAnchors.push({
           answerId: ans.id,
           x: rect.left + rect.width / 2 - containerRect.left,
-          y: rect.bottom - containerRect.top,
+          y: rect.top - containerRect.top,
         });
       }
     }
@@ -227,238 +246,258 @@ export default function QuestionImageMap({
   // ============================================================
 
   return (
-    <div
-      ref={containerRef}
-      onClick={handleMapBackgroundClick}
-      style={{
-        position: "relative",
-        width: "100%",
-        userSelect: "none",
-        touchAction: "none",
-      }}
-    >
-      {/* ====== SVG overlay ====== */}
-      <svg
-        className="imagemap-svg"
+    <div>
+      {/* Подсказка сверху */}
+      <div
         style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          pointerEvents: "none",
-          zIndex: 5,
+          textAlign: "center",
+          marginBottom: 16,
+          color: "#475569",
+          fontWeight: 600,
+          fontSize: 14,
         }}
       >
-        <defs>
-          <filter id={filterId}>
-            <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        {/* existing connections */}
-        {Object.entries(value).map(([ansId, pointId]) => {
-          const anchor = getAnchor(ansId);
-          const point = getAnswerPoint(ansId);
-          if (!anchor || !point) return null;
-          return (
-            <line
-              key={`${ansId}-${pointId}`}
-              x1={anchor.x}
-              y1={anchor.y}
-              x2={point.x}
-              y2={point.y}
-              stroke="#6366f1"
-              strokeWidth="4"
-              strokeLinecap="round"
-              style={{ filter: `url(#${filterId})`, opacity: 0.85 }}
-            />
-          );
-        })}
-      </svg>
-
-      {/* ====== Central Image + Points ====== */}
-      <div
-        className="imagemap-map-area"
-        style={{ position: "relative", width: "100%", marginBottom: "16px" }}
-      >
-        <img
-          className="imagemap-image"
-          src={imageUrl}
-          alt=""
-          onLoad={handleImageLoad}
-          draggable={false}
-          style={{
-            display: "block",
-            width: "100%",
-            height: "auto",
-            borderRadius: "16px",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
-          }}
-        />
-
-        {/* clickable points */}
-        {pointPixels.map((pt) => {
-          const isConnected = Object.values(value).includes(pt.id);
-          const isSelectable = !!selectedAnswerId;
-          const cursor =
-            disabled ? "not-allowed" : isSelectable ? "pointer" : "default";
-
-          return (
-            <div
-              key={pt.id}
-              data-point-id={pt.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePointClick(pt.id, e);
-              }}
-              style={{
-                position: "absolute",
-                left: pt.x - 16,
-                top: pt.y - 16,
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                background: isConnected
-                  ? "#6366f1"
-                  : isSelectable
-                  ? "rgba(99,102,241,0.25)"
-                  : "rgba(0,0,0,0.2)",
-                border: "3px solid #fff",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                cursor,
-                transition: "background 0.15s ease",
-                boxSizing: "border-box",
-                zIndex: 10,
-              }}
-            >
-              {pt.label && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: -20,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    background: "rgba(0,0,0,0.6)",
-                    color: "#fff",
-                    padding: "2px 6px",
-                    borderRadius: 4,
-                    fontSize: 10,
-                    whiteSpace: "nowrap",
-                    pointerEvents: "none",
-                  }}
-                >
-                  {pt.label}
-                </span>
-              )}
-            </div>
-          );
-        })}
+        {selectedAnswerId
+          ? "✅ Ответ выбран – нажмите на нужную точку на карте"
+          : "👆 Сначала нажмите на карточку ответа, затем – на точку на карте"}
       </div>
 
-      {/* ====== Answer Cards ====== */}
       <div
-        className="imagemap-answers"
+        ref={containerRef}
+        onClick={handleMapBackgroundClick}
         style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "16px",
-          justifyContent: "center",
-          marginTop: "12px",
+          position: "relative",
+          width: "100%",
+          userSelect: "none",
+          touchAction: "none",
         }}
       >
-        {answers.map((ans) => {
-          const isConnected = !!value[ans.id];
-          const isSelected = selectedAnswerId === ans.id;
+        {/* ====== SVG overlay ====== */}
+        <svg
+          className="imagemap-svg"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+            zIndex: 5,
+          }}
+        >
+          <defs>
+            <filter id={filterId}>
+              <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
 
-          return (
-            <div
-              key={ans.id}
-              ref={(el) => setAnswerRef(ans.id, el)}
-              className="imagemap-answer-card"
-              onClick={() => handleAnswerClick(ans.id)}
-              style={{
-                background: isSelected
-                  ? "rgba(99,102,241,0.12)"
-                  : isConnected
-                  ? "rgba(99,102,241,0.05)"
-                  : "#fff",
-                border: `2px solid ${
-                  isSelected
+          {/* existing connections */}
+          {Object.entries(value).map(([ansId, pointId]) => {
+            const anchor = getAnchor(ansId);
+            const point = getAnswerPoint(ansId);
+            if (!anchor || !point) return null;
+            return (
+              <path
+                key={`${ansId}-${pointId}`}
+                d={buildCurvePath(anchor.x, anchor.y, point.x, point.y)}
+                fill="none"
+                stroke="#6366f1"
+                strokeWidth="3"
+                strokeLinecap="round"
+                style={{ filter: `url(#${filterId})`, opacity: 0.85 }}
+              />
+            );
+          })}
+        </svg>
+
+        {/* ====== Central Image + Points ====== */}
+        <div
+          className="imagemap-map-area"
+          style={{ position: "relative", width: "100%", marginBottom: "16px" }}
+        >
+          <img
+            className="imagemap-image"
+            src={imageUrl}
+            alt=""
+            onLoad={handleImageLoad}
+            draggable={false}
+            style={{
+              display: "block",
+              width: "100%",
+              height: "auto",
+              borderRadius: "16px",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
+            }}
+          />
+
+          {/* clickable points */}
+          {pointPixels.map((pt) => {
+            const isConnected = Object.values(value).includes(pt.id);
+            const isSelectable = !!selectedAnswerId;
+            const cursor =
+              disabled ? "not-allowed" : isSelectable ? "pointer" : "default";
+
+            return (
+              <div
+                key={pt.id}
+                data-point-id={pt.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePointClick(pt.id, e);
+                }}
+                className={
+                  isSelectable && !isConnected ? "imagemap-point-pulse" : ""
+                }
+                style={{
+                  position: "absolute",
+                  left: pt.x - 16,
+                  top: pt.y - 16,
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: isConnected
                     ? "#6366f1"
+                    : isSelectable
+                    ? "rgba(99,102,241,0.35)"
+                    : "rgba(0,0,0,0.2)",
+                  border: "3px solid #fff",
+                  boxShadow: isSelectable
+                    ? "0 0 0 4px rgba(99,102,241,0.2)"
+                    : "0 2px 8px rgba(0,0,0,0.15)",
+                  cursor,
+                  transition: "background 0.15s ease, box-shadow 0.15s ease",
+                  boxSizing: "border-box",
+                  zIndex: 10,
+                }}
+              >
+                {pt.label && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -20,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      background: "rgba(0,0,0,0.6)",
+                      color: "#fff",
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      fontSize: 10,
+                      whiteSpace: "nowrap",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {pt.label}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ====== Answer Cards ====== */}
+        <div
+          className="imagemap-answers"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "16px",
+            justifyContent: "center",
+            marginTop: "12px",
+          }}
+        >
+          {answers.map((ans) => {
+            const isConnected = !!value[ans.id];
+            const isSelected = selectedAnswerId === ans.id;
+
+            return (
+              <div
+                key={ans.id}
+                ref={(el) => setAnswerRef(ans.id, el)}
+                className="imagemap-answer-card"
+                onClick={() => handleAnswerClick(ans.id)}
+                style={{
+                  background: isSelected
+                    ? "rgba(99,102,241,0.12)"
                     : isConnected
-                    ? "rgba(99,102,241,0.3)"
-                    : "#e2e8f0"
-                }`,
-                borderRadius: "16px",
-                padding: "12px 16px",
-                minWidth: "100px",
-                maxWidth: "180px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "8px",
-                cursor: disabled ? "not-allowed" : "pointer",
-                transition: "all 0.2s ease",
-                boxShadow: isSelected
-                  ? "0 4px 12px rgba(99,102,241,0.15)"
-                  : isConnected
-                  ? "0 2px 8px rgba(0,0,0,0.04)"
-                  : "0 1px 4px rgba(0,0,0,0.02)",
-                opacity: disabled && !isConnected ? 0.6 : 1,
-              }}
-            >
-              {/* media thumbnail */}
-              {ans.media && ans.media.length > 0 && (
-                <div
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    justifyContent: "center",
-                  }}
-                >
-                  <div style={{ maxWidth: 80, maxHeight: 80, overflow: "hidden" }}>
-                    <MediaRenderer media={ans.media} />
+                    ? "rgba(99,102,241,0.05)"
+                    : "#fff",
+                  border: `2px solid ${
+                    isSelected
+                      ? "#6366f1"
+                      : isConnected
+                      ? "rgba(99,102,241,0.3)"
+                      : "#e2e8f0"
+                  }`,
+                  borderRadius: "16px",
+                  padding: "12px 16px",
+                  minWidth: "100px",
+                  maxWidth: "180px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "8px",
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  transition: "all 0.2s ease",
+                  boxShadow: isSelected
+                    ? "0 4px 12px rgba(99,102,241,0.15)"
+                    : isConnected
+                    ? "0 2px 8px rgba(0,0,0,0.04)"
+                    : "0 1px 4px rgba(0,0,0,0.02)",
+                  opacity: disabled && !isConnected ? 0.6 : 1,
+                }}
+              >
+                {/* media thumbnail */}
+                {ans.media && ans.media.length > 0 && (
+                  <div
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <div style={{ maxWidth: 80, maxHeight: 80, overflow: "hidden" }}>
+                      <MediaRenderer media={ans.media} />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* text */}
-              {ans.text && (
-                <span
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 14,
-                    color: isSelected ? "#6366f1" : "#334155",
-                    textAlign: "center",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {ans.text}
-                </span>
-              )}
+                {/* text */}
+                {ans.text && (
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 14,
+                      color: isSelected ? "#6366f1" : "#334155",
+                      textAlign: "center",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {ans.text}
+                  </span>
+                )}
 
-              {/* indicator */}
-              {isConnected && (
-                <span style={{ fontSize: 20, lineHeight: 1 }}>✅</span>
-              )}
-              {isSelected && !isConnected && (
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: "#6366f1",
-                    fontWeight: 600,
-                  }}
-                >
-                  Выберите точку на карте
-                </span>
-              )}
-            </div>
-          );
-        })}
+                {/* indicator */}
+                {isConnected && (
+                  <span style={{ fontSize: 20, lineHeight: 1 }}>✅</span>
+                )}
+                {isSelected && !isConnected && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "#6366f1",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Теперь выберите точку
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <style jsx>{`
@@ -467,6 +506,22 @@ export default function QuestionImageMap({
         }
         .imagemap-answer-card:active {
           transform: translateY(0);
+        }
+
+        /* pulse animation for available points */
+        @keyframes pulse {
+          0% {
+            transform: translate(-50%, -50%) scale(1);
+          }
+          50% {
+            transform: translate(-50%, -50%) scale(1.15);
+          }
+          100% {
+            transform: translate(-50%, -50%) scale(1);
+          }
+        }
+        .imagemap-point-pulse {
+          animation: pulse 1.2s ease-in-out infinite;
         }
       `}</style>
     </div>

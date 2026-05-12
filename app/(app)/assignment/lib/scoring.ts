@@ -482,16 +482,32 @@ export function calcAndBuildReview(
     }
 
     // ---------------------------------------------------------------
-    // MATCHING
+    // MATCHING – добавлены читаемые названия rightLabels
     // ---------------------------------------------------------------
     if (q.type === "matching") {
       const pairs = Array.isArray(q.pairs) ? q.pairs : [];
       const totalPairsCount = pairs.length;
 
+      // Правильные соответствия (left.id -> right.id)
       const correctMatches: Record<string, string> = {};
+      // Читаемые названия правых элементов (right.id -> текст)
+      const rightLabels: Record<string, string> = {};
+
       pairs.forEach((p: any) => {
         if (p?.id != null) {
           correctMatches[String(p.id)] = String(p.id);
+        }
+        // Пытаемся взять текст правого элемента или название файла
+        const right = p?.right;
+        if (right) {
+          if (right.text && String(right.text).trim()) {
+            rightLabels[String(p.id)] = String(right.text).trim();
+          } else if (Array.isArray(right.media) && right.media.length > 0) {
+            const firstName = right.media[0]?.name?.trim();
+            rightLabels[String(p.id)] = firstName || `Картинка`;
+          } else {
+            rightLabels[String(p.id)] = `Элемент ${String(p.id)}`;
+          }
         }
       });
 
@@ -509,6 +525,7 @@ export function calcAndBuildReview(
           totalPairsCount,
           userMatches: {},
           correctMatches,
+          rightLabels,   // <-- передаём даже для пропущенных, чтобы обзор был однородным
           pointsEarned: 0,
           pointsTotal,
         } as ReviewItem;
@@ -544,18 +561,19 @@ export function calcAndBuildReview(
         totalPairsCount,
         userMatches,
         correctMatches,
+        rightLabels,   // <-- теперь всегда передаём
         pointsEarned,
         pointsTotal,
       } as ReviewItem;
     }
 
     // ---------------------------------------------------------------
-    // IMAGEMAP
+    // IMAGEMAP – добавлены читаемые названия answerLabels/pointLabels
     // ---------------------------------------------------------------
     if (q.type === "imagemap") {
       const answersArr = Array.isArray(q.answers) ? q.answers : [];
       const pointsArr = Array.isArray(q.points) ? q.points : [];
-      const totalPairsCount = answersArr.length; // каждая answer должна быть связана с точкой
+      const totalPairsCount = answersArr.length;
 
       if (totalPairsCount === 0) {
         statsSum.skipped++;
@@ -573,7 +591,7 @@ export function calcAndBuildReview(
         } as ReviewItem;
       }
 
-      // Строим правильные соответствия и словари для отображения
+      // Правильные соответствия и словари для отображения
       const correctMatches: Record<string, string> = {};
       const answerLabels: Record<string, string> = {};
       const pointLabels: Record<string, string> = {};
@@ -583,7 +601,15 @@ export function calcAndBuildReview(
         if (point) {
           correctMatches[ans.id] = point.id;
         }
-        answerLabels[ans.id] = ans.text || `Ответ ${ans.id}`;
+        // Текст ответа или название первого медиафайла
+        if (ans.text && String(ans.text).trim()) {
+          answerLabels[ans.id] = String(ans.text).trim();
+        } else if (Array.isArray(ans.media) && ans.media.length > 0) {
+          const firstName = ans.media[0]?.name?.trim();
+          answerLabels[ans.id] = firstName || `Ответ`;
+        } else {
+          answerLabels[ans.id] = `Ответ #${ans.id}`;
+        }
       }
 
       for (const point of pointsArr) {

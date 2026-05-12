@@ -22,6 +22,8 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+const DRAG_THRESHOLD_PX = 3; // минимальное движение для распознавания перетаскивания
+
 // --------------------------------------------------------------------------
 // Component
 // --------------------------------------------------------------------------
@@ -100,7 +102,6 @@ export default function ImageMapEditor({ value, onChange, disabled }: Props) {
 
   const removeAnswer = useCallback(
     (answerId: string) => {
-      // remove answer and also unlink any point that references it
       const nextAnswers = answers.filter((a) => a.id !== answerId);
       const nextPoints = points.map((p) =>
         p.correctAnswerId === answerId ? { ...p, correctAnswerId: "" } : p,
@@ -112,6 +113,8 @@ export default function ImageMapEditor({ value, onChange, disabled }: Props) {
 
   // ---------- Drag a point on the image ----------
   const [draggingPointId, setDraggingPointId] = useState<string | null>(null);
+  const dragMovedRef = useRef(false);       // true, если текущий захват сопровождался движением
+  const dragStartClient = useRef<{ x: number; y: number } | null>(null);
 
   const getPercentFromEvent = useCallback(
     (e: React.MouseEvent | React.PointerEvent): { x: number; y: number } | null => {
@@ -130,15 +133,20 @@ export default function ImageMapEditor({ value, onChange, disabled }: Props) {
     [],
   );
 
+  // Обработчик клика по картинке – добавляет новую точку, если не было перетаскивания
   const handleImageClick = useCallback(
     (e: React.MouseEvent) => {
       if (disabled) return;
-      if (draggingPointId) return; // don't add new when dragging
+      // Если недавно перетаскивали точку – не создаём новую
+      if (dragMovedRef.current) {
+        dragMovedRef.current = false;
+        return;
+      }
       const perc = getPercentFromEvent(e);
       if (!perc) return;
       addPoint(perc.x, perc.y);
     },
-    [disabled, draggingPointId, getPercentFromEvent, addPoint],
+    [disabled, getPercentFromEvent, addPoint],
   );
 
   const handlePointPointerDown = useCallback(
@@ -146,6 +154,8 @@ export default function ImageMapEditor({ value, onChange, disabled }: Props) {
       if (disabled) return;
       e.stopPropagation();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      dragMovedRef.current = false;
+      dragStartClient.current = { x: e.clientX, y: e.clientY };
       setDraggingPointId(pointId);
     },
     [disabled],
@@ -154,12 +164,24 @@ export default function ImageMapEditor({ value, onChange, disabled }: Props) {
   useEffect(() => {
     if (!draggingPointId) return;
     const onMove = (e: PointerEvent) => {
+      const start = dragStartClient.current;
+      if (start) {
+        const dx = e.clientX - start.x;
+        const dy = e.clientY - start.y;
+        if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) {
+          dragMovedRef.current = true;
+        }
+      }
       const perc = getPercentFromEvent(e as any);
       if (perc) {
         updatePoint(draggingPointId, { x: clamp(perc.x, 0, 100), y: clamp(perc.y, 0, 100) });
       }
     };
-    const onUp = () => setDraggingPointId(null);
+    const onUp = () => {
+      setDraggingPointId(null);
+      dragStartClient.current = null;
+      // dragMovedRef остаётся в true, если было движение, и будет сброшен только при следующем клике
+    };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     return () => {

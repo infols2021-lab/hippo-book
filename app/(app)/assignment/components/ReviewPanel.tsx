@@ -303,9 +303,9 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               {Object.entries(r.correctMatches).map(([leftId, correctRightId], mI) => {
                 const userRightId = r.userMatches?.[leftId];
                 const isCorrect = userRightId === correctRightId;
-                const rightText = r.rightLabels?.[correctRightId] || `Элемент B #${correctRightId}`;
+                const rightText = r.rightLabels?.[correctRightId] || `Элемент ${correctRightId}`;
                 const userRightText = userRightId
-                  ? r.rightLabels?.[userRightId] || `Элемент B #${userRightId}`
+                  ? r.rightLabels?.[userRightId] || `Элемент ${userRightId}`
                   : "—";
                 return (
                   <div
@@ -331,6 +331,58 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                       <div style={{ fontSize: "14px", color: "#10b981" }}>
                         Правильно:{" "}
                         <span style={{ fontWeight: 700 }}>{rightText}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ===== IMAGEMAP ===== */}
+        {r.type === "imagemap" && (
+          <div
+            style={{
+              background: "#f8fafc",
+              borderRadius: "16px",
+              padding: "16px",
+            }}
+          >
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "12px" }}>
+              РЕЗУЛЬТАТЫ КАРТЫ ИЗОБРАЖЕНИЯ
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {Object.entries(r.correctMatches).map(([answerId, correctPointId], mI) => {
+                const userPointId = r.userMatches?.[answerId];
+                const isCorrect = userPointId === correctPointId;
+                const answerLabel = r.answerLabels?.[answerId] || `Ответ`;
+                const pointLabel = r.pointLabels?.[correctPointId] || `Точка`;
+                return (
+                  <div
+                    key={mI}
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: "12px",
+                      border: `1px solid ${isCorrect ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
+                      background: isCorrect ? "#f0fdf4" : "#fef2f2",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: isCorrect ? "#166534" : "#991b1b" }}>
+                      Связь {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
+                    </div>
+                    <div style={{ fontSize: "14px", color: "#1e293b" }}>
+                      {answerLabel} → указана точка:{" "}
+                      <span style={{ fontWeight: 700 }}>
+                        {r.pointLabels?.[userPointId] || "—"}
+                      </span>
+                    </div>
+                    {!isCorrect && (
+                      <div style={{ fontSize: "14px", color: "#10b981" }}>
+                        Правильно: {answerLabel} → {pointLabel}
                       </div>
                     )}
                   </div>
