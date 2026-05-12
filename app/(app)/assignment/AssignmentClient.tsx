@@ -631,6 +631,89 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         .modal-scroll-wrap { overflow: auto; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
         .modal-controls { margin-top: 25px; display: flex; gap: 25px; align-items: center; color: #fff; background: rgba(255,255,255,0.1); padding: 10px 30px; border-radius: 30px; }
         .modal-controls button { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #fff; background: none; color: #fff; font-size: 22px; cursor: pointer; transition: all 0.2s; }
+
+        /* ============ АДАПТИВНОСТЬ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ============ */
+        @media (max-width: 768px) {
+          .premium-header { padding: 18px 12px; }
+          .header-content { flex-direction: column; align-items: flex-start; gap: 12px; }
+          .assignment-badge { align-self: flex-end; }
+
+          .premium-main { max-width: 100%; padding: 0 10px 40px; }
+          .premium-card { border-radius: 28px; padding: 24px 16px; }
+          .card-title { font-size: 26px; }
+          .card-subtitle { font-size: 14px; margin-bottom: 24px; }
+
+          .progress-container { margin-bottom: 20px; }
+          .progress-bar-bg { height: 10px; border-radius: 14px; }
+          .progress-info { font-size: 12px; }
+
+          .question-title { font-size: 20px; margin-bottom: 20px; }
+
+          .materials-block {
+            border-radius: 16px;
+            padding: 14px;
+            margin-bottom: 18px;
+          }
+          .materials-label, .answer-label {
+            font-size: 11px;
+            margin-bottom: 10px;
+          }
+          .answer-block {
+            border-radius: 20px;
+            padding: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+          }
+
+          .navigation-footer {
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 30px;
+            padding-top: 25px;
+          }
+          .nav-btn {
+            width: 100%;
+            text-align: center;
+            padding: 14px 20px;
+            font-size: 16px;
+            border-radius: 14px;
+          }
+          .btn-premium {
+            padding: 16px 24px;
+            font-size: 16px;
+            width: 100%;
+            text-align: center;
+            border-radius: 16px;
+          }
+          .btn-premium.primary,
+          .btn-premium.secondary,
+          .btn-premium.finish {
+            width: 100%;
+            flex: none;
+          }
+
+          .legacy-image {
+            border-radius: 14px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.04);
+          }
+
+          .score-circle { width: 140px; height: 140px; margin-bottom: 24px; }
+          .score-value { font-size: 44px; }
+
+          .stats-grid { grid-template-columns: 1fr; gap: 12px; }
+          .stat-item { padding: 16px; border-radius: 18px; }
+
+          .button-group { flex-direction: column; gap: 12px; }
+          .button-group .btn-premium { width: 100%; }
+
+          .recommendation-box { padding: 20px; border-radius: 24px; }
+        }
+
+        @media (max-width: 480px) {
+          .premium-card { padding: 18px 12px; }
+          .question-title { font-size: 18px; }
+          .btn-premium { padding: 14px 18px; font-size: 15px; }
+          .nav-btn { padding: 12px 16px; font-size: 15px; }
+        }
       `}</style>
     </div>
   );

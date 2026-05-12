@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { useMemo, useRef, useState } from "react";
 import { getImageUrl } from "../lib/image";
 
 type Dir = "across" | "down";
@@ -48,7 +48,6 @@ export default function QuestionCrossword({
   const words: Word[] = Array.isArray(question?.words) ? question.words : [];
   const cellNumbers: Record<string, number> = question?.cellNumbers || {};
 
-  // responsive size: for very large grids (> 20 cols) we always use "size-large"
   const sizeClass = useMemo(() => {
     if (rows > 15 || cols > 15) return "size-large";
     if (rows > 12 || cols > 12) return "size-medium";
@@ -79,26 +78,9 @@ export default function QuestionCrossword({
     Array.from({ length: rows }, () => Array.from({ length: cols }, () => null))
   );
 
-  const gridContainerRef = useRef<HTMLDivElement | null>(null);
-
   const [focused, setFocused] = useState<{ r: number; c: number } | null>(null);
   const [dir, setDir] = useState<Dir>("across");
   const lastClickRef = useRef<{ r: number; c: number; t: number } | null>(null);
-
-  // --- Scroll focused cell into view (mobile-friendly) ---
-  useEffect(() => {
-    if (!focused) return;
-    const r = focused.r;
-    const c = focused.c;
-    const el = inputRefs.current?.[r]?.[c];
-    if (!el) return;
-
-    // small delay to let keyboard / layout settle on mobile
-    const timer = setTimeout(() => {
-      el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [focused]);
 
   function isHardBlocked(r: number, c: number) {
     return blocks.some((b) => b.row === r && b.col === c);
@@ -234,10 +216,6 @@ export default function QuestionCrossword({
     lastClickRef.current = { r, c, t: now };
   }
 
-  // ------------------------------------------------------------------
-  // RENDER
-  // ------------------------------------------------------------------
-
   return (
     <div className="crossword-container">
       {question?.image ? (
@@ -254,7 +232,7 @@ export default function QuestionCrossword({
       ) : null}
 
       <div className="cw-card">
-        <div className="cw-grid-wrap" ref={gridContainerRef}>
+        <div className="cw-grid-wrap">
           <div className={`cw-grid ${sizeClass}`}>
             {Array.from({ length: rows }).map((_, r) => (
               <div className="cw-row" key={r}>
