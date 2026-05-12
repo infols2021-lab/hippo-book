@@ -102,7 +102,9 @@ export default function QuestionImageMap({
   // ---- Refs for answer elements (to measure anchors) ----
   const answerElRefs = useRef<Map<string, HTMLElement>>(new Map());
 
-  // ---- calculate pixel positions ----
+  const recalcRequestedRef = useRef(false);
+
+  // ---- calculate pixel positions (debounced) ----
   const recalc = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -125,7 +127,10 @@ export default function QuestionImageMap({
         correctAnswerId: p.correctAnswerId,
         label: p.label,
       }));
-      setPointPixels(newPoints);
+      setPointPixels((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(newPoints)) return prev;
+        return newPoints;
+      });
     }
 
     // ---- answer anchors ----
@@ -134,7 +139,6 @@ export default function QuestionImageMap({
       const el = answerElRefs.current.get(ans.id);
       if (el) {
         const rect = el.getBoundingClientRect();
-        // anchor: center top of the element
         newAnchors.push({
           answerId: ans.id,
           x: rect.left + rect.width / 2 - containerRect.left,
@@ -142,7 +146,10 @@ export default function QuestionImageMap({
         });
       }
     }
-    setAnswerAnchors(newAnchors);
+    setAnswerAnchors((prev) => {
+      if (JSON.stringify(prev) === JSON.stringify(newAnchors)) return prev;
+      return newAnchors;
+    });
   }, [points, answers]);
 
   // recalc on mount, resize, and whenever connections change
@@ -151,9 +158,25 @@ export default function QuestionImageMap({
   }, [recalc, value]);
 
   useEffect(() => {
-    const onResize = () => recalc();
+    const onResize = () => {
+      if (!recalcRequestedRef.current) {
+        recalcRequestedRef.current = true;
+        requestAnimationFrame(() => {
+          recalc();
+          recalcRequestedRef.current = false;
+        });
+      }
+    };
     window.addEventListener("resize", onResize);
-    const observer = new ResizeObserver(() => recalc());
+    const observer = new ResizeObserver(() => {
+      if (!recalcRequestedRef.current) {
+        recalcRequestedRef.current = true;
+        requestAnimationFrame(() => {
+          recalc();
+          recalcRequestedRef.current = false;
+        });
+      }
+    });
     if (containerRef.current) {
       observer.observe(containerRef.current);
     }
@@ -433,8 +456,8 @@ export default function QuestionImageMap({
                   }`,
                   borderRadius: "16px",
                   padding: "12px 16px",
-                  minWidth: "100px",
-                  maxWidth: "180px",
+                  minWidth: "120px",
+                  maxWidth: "200px",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -458,7 +481,7 @@ export default function QuestionImageMap({
                       justifyContent: "center",
                     }}
                   >
-                    <div style={{ maxWidth: 80, maxHeight: 80, overflow: "hidden" }}>
+                    <div style={{ width: 100, height: 100, overflow: "hidden" }}>
                       <MediaRenderer media={ans.media} />
                     </div>
                   </div>
