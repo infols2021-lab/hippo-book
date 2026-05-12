@@ -6,6 +6,10 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { directFetch } from "@/lib/net/directFetch";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 
+// ---------------------------------------------------------------
+// Дефолтные публичные бакеты (отдаются через прокси)
+// hippo-book-audio — твой яндекс-бакет для аудиофайлов
+// ---------------------------------------------------------------
 const DEFAULT_PUBLIC_BUCKETS = [
   "covers",
   "question-images",
@@ -15,6 +19,7 @@ const DEFAULT_PUBLIC_BUCKETS = [
   "streak_icon_assets",
   "streak-roadmap-bg",
   "profile-backgrounds",
+  "hippo-book-audio",
 ];
 
 const DEFAULT_UPLOAD_BUCKETS = [

@@ -8,6 +8,7 @@ type Props = {
   onChange: (media: MediaAttachment[]) => void;
   disabled?: boolean;
   bucket?: string;
+  audioBucket?: string;
   label?: string;
 };
 
@@ -16,6 +17,7 @@ export default function MediaUpload({
   onChange,
   disabled,
   bucket = "question-images",
+  audioBucket,
   label = "Медиафайлы (Изображения, Аудио, PDF):",
 }: Props) {
   const [uploading, setUploading] = useState(false);
@@ -85,8 +87,13 @@ export default function MediaUpload({
 
     for (const file of validFiles) {
       try {
+        // Определяем расширение и выбираем бакет
+        const ext = file.name.split(".").pop()?.toLowerCase() || "";
+        const isAudio = ["mp3", "wav", "ogg", "m4a", "mp4"].includes(ext);
+        const targetBucket = isAudio && audioBucket ? audioBucket : bucket;
+
         const formData = new FormData();
-        formData.append("bucket", bucket);
+        formData.append("bucket", targetBucket);
         formData.append("file", file);
 
         const response = await fetch("/api/admin/upload", {
@@ -286,7 +293,6 @@ export default function MediaUpload({
               }}
             >
               {m.type === "image" && (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={m.url}
                   alt={m.name || "media"}

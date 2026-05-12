@@ -348,6 +348,7 @@ export default function QuestionItem({
             onChange={(nextMedia) => patch({ media: nextMedia })}
             disabled={disabled}
             bucket="question-images"
+            audioBucket="hippo-book-audio"
             label="Прикрепленные медиафайлы (Изображения, Аудио, PDF):"
           />
         </>
