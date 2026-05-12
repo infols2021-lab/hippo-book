@@ -1,3 +1,4 @@
+// app/(admin)/admin/assignments/builder/validate.ts
 import type { Question } from "./types";
 
 export type ValidationIssue = {
@@ -7,7 +8,7 @@ export type ValidationIssue = {
 
 export type ValidationResult = {
   ok: boolean;
-  issues: ValidationIssue[]; // ✅ ВСЕГДА ЕСТЬ
+  issues: ValidationIssue[];
 };
 
 export function validateQuestions(questions: Question[]): ValidationResult {
@@ -19,8 +20,8 @@ export function validateQuestions(questions: Question[]): ValidationResult {
   }
 
   questions.forEach((q, index) => {
-    // В вопросе должен быть либо текст, либо прикрепленное медиа (кроме кроссворда)
-    if (q.type !== "crossword" && !q.q?.trim() && (!q.media || q.media.length === 0)) {
+    // Текст или медиа обязательны (кроме кроссворда и imagemap)
+    if (q.type !== "crossword" && q.type !== "imagemap" && !q.q?.trim() && (!q.media || q.media.length === 0)) {
       issues.push({ index, message: "Добавьте текст вопроса или прикрепите медиа-файл" });
     }
 
@@ -72,6 +73,51 @@ export function validateQuestions(questions: Question[]): ValidationResult {
     if (q.type === "matching") {
       if (!q.pairs?.length || q.pairs.length < 2) {
         issues.push({ index, message: "Добавьте минимум 2 пары для сопоставления" });
+      }
+    }
+
+    if (q.type === "imagemap") {
+      // Проверка наличия центральной картинки
+      if (!q.image || !String(q.image).trim()) {
+        issues.push({ index, message: "Загрузите центральное изображение для карты" });
+      }
+
+      // Проверка наличия точек
+      if (!q.points || q.points.length === 0) {
+        issues.push({ index, message: "Добавьте хотя бы одну точку на изображении" });
+      }
+
+      // Проверка наличия ответов
+      if (!q.answers || q.answers.length === 0) {
+        issues.push({ index, message: "Добавьте хотя бы один вариант ответа" });
+      }
+
+      // Проверка, что каждая точка ссылается на существующий ответ
+      if (q.points && q.answers) {
+        const answerIds = new Set(q.answers.map(a => a.id));
+        for (const point of q.points) {
+          if (!point.correctAnswerId) {
+            issues.push({ index, message: `Точка "${point.label || point.id}" не связана с ответом` });
+          } else if (!answerIds.has(point.correctAnswerId)) {
+            issues.push({ index, message: `Точка "${point.label || point.id}" ссылается на несуществующий ответ` });
+          }
+        }
+
+        // Проверка 1:1 (дублирование)
+        const pointToAnswer = new Map<string, string>();
+        for (const point of q.points) {
+          if (point.correctAnswerId) {
+            const existing = pointToAnswer.get(point.correctAnswerId);
+            if (existing) {
+              issues.push({
+                index,
+                message: `Ответ "${q.answers.find(a => a.id === point.correctAnswerId)?.text || point.correctAnswerId}" используется несколькими точками. Лучше 1:1.`,
+              });
+              break;
+            }
+            pointToAnswer.set(point.correctAnswerId, point.id);
+          }
+        }
       }
     }
   });

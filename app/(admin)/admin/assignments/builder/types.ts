@@ -2,7 +2,7 @@
 export type EditorMode = "visual" | "json";
 
 // ===== Question types =====
-export type QuestionType = "test" | "fill" | "sentence" | "crossword" | "complex" | "matching";
+export type QuestionType = "test" | "fill" | "sentence" | "crossword" | "complex" | "matching" | "imagemap";
 
 // ===== Media =====
 export type MediaType = "image" | "audio" | "pdf";
@@ -19,7 +19,7 @@ export type BaseQuestion = {
   id: string;
   type: QuestionType;
   q?: string;
-  image?: string; // Устаревшее (оставлено для совместимости старых данных)
+  image?: string; // Устаревшее (оставлено для совместимости старых данных) — также используется для imagemap
   media?: MediaAttachment[]; // Новый массив медиа-файлов
 };
 
@@ -114,6 +114,28 @@ export type CrosswordQuestion = BaseQuestion & {
   metadata: CrosswordMetadata;
 };
 
+// ===== Image Map =====
+export type ImageMapPoint = {
+  id: string;
+  x: number; // 0..100 (% от ширины)
+  y: number; // 0..100 (% от высоты)
+  correctAnswerId: string;
+  label?: string; // вспомогательная подпись для админа/ученика
+};
+
+export type ImageMapAnswer = {
+  id: string;
+  text?: string;
+  media?: MediaAttachment[];   // может быть картинкой
+};
+
+export type ImageMapQuestion = BaseQuestion & {
+  type: "imagemap";
+  image: string;               // URL центральной картинки (обязателен)
+  points: ImageMapPoint[];
+  answers: ImageMapAnswer[];
+};
+
 // ===== Union =====
 export type Question =
   | TestQuestion
@@ -121,7 +143,8 @@ export type Question =
   | SentenceQuestion
   | CrosswordQuestion
   | ComplexQuestion
-  | MatchingQuestion;
+  | MatchingQuestion
+  | ImageMapQuestion;
 
 // ===== Helpers =====
 export function deepClone<T>(v: T): T {
@@ -188,6 +211,34 @@ export function newQuestion(type: QuestionType): Question {
           id: crypto.randomUUID(),
           left: { text: "", media: [] },
           right: { text: "", media: [] },
+        },
+      ],
+    };
+  }
+
+  if (type === "imagemap") {
+    const firstPointId = crypto.randomUUID();
+    const firstAnswerId = crypto.randomUUID();
+    return {
+      id,
+      type: "imagemap",
+      q: "",
+      image: "",
+      media: [],
+      points: [
+        {
+          id: firstPointId,
+          x: 50,
+          y: 50,
+          correctAnswerId: firstAnswerId,
+          label: "Точка 1",
+        },
+      ],
+      answers: [
+        {
+          id: firstAnswerId,
+          text: "Ответ 1",
+          media: [],
         },
       ],
     };

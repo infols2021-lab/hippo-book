@@ -111,6 +111,11 @@ export function validateAllAnswered(
       const has =
         a && typeof a === "object" && Object.keys(a).length === pairs.length;
       if (!has) return { ok: false, index: i };
+    } else if (q.type === "imagemap") {
+      const answersCount = (q.answers || []).length;
+      const has =
+        a && typeof a === "object" && Object.keys(a).length === answersCount;
+      if (!has) return { ok: false, index: i };
     }
   }
   return { ok: true, index: -1 };
@@ -539,6 +544,103 @@ export function calcAndBuildReview(
         totalPairsCount,
         userMatches,
         correctMatches,
+        pointsEarned,
+        pointsTotal,
+      } as ReviewItem;
+    }
+
+    // ---------------------------------------------------------------
+    // IMAGEMAP
+    // ---------------------------------------------------------------
+    if (q.type === "imagemap") {
+      const answersArr = Array.isArray(q.answers) ? q.answers : [];
+      const pointsArr = Array.isArray(q.points) ? q.points : [];
+      const totalPairsCount = answersArr.length; // каждая answer должна быть связана с точкой
+
+      if (totalPairsCount === 0) {
+        statsSum.skipped++;
+        return {
+          type: "imagemap",
+          questionText,
+          isCorrect: false,
+          isSkipped: true,
+          correctPairsCount: 0,
+          totalPairsCount: 0,
+          userMatches: {},
+          correctMatches: {},
+          pointsEarned: 0,
+          pointsTotal,
+        } as ReviewItem;
+      }
+
+      // Строим правильные соответствия и словари для отображения
+      const correctMatches: Record<string, string> = {};
+      const answerLabels: Record<string, string> = {};
+      const pointLabels: Record<string, string> = {};
+
+      for (const ans of answersArr) {
+        const point = pointsArr.find((p: any) => p.correctAnswerId === ans.id);
+        if (point) {
+          correctMatches[ans.id] = point.id;
+        }
+        answerLabels[ans.id] = ans.text || `Ответ ${ans.id}`;
+      }
+
+      for (const point of pointsArr) {
+        pointLabels[point.id] = point.label || `Точка ${point.id}`;
+      }
+
+      const userMatches = (a && typeof a === "object" ? a : {}) as Record<string, string>;
+      const answered = Object.keys(userMatches).length > 0;
+
+      if (!answered) {
+        statsSum.skipped++;
+        return {
+          type: "imagemap",
+          questionText,
+          isCorrect: false,
+          isSkipped: true,
+          correctPairsCount: 0,
+          totalPairsCount,
+          userMatches: {},
+          correctMatches,
+          answerLabels,
+          pointLabels,
+          pointsEarned: 0,
+          pointsTotal,
+        } as ReviewItem;
+      }
+
+      let correctPairsCount = 0;
+
+      for (const ans of answersArr) {
+        const userPointId = userMatches[ans.id];
+        const correctPointId = correctMatches[ans.id];
+        if (userPointId === correctPointId) {
+          correctPairsCount++;
+        }
+      }
+
+      const fraction = safeFraction(correctPairsCount, totalPairsCount);
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+
+      statsSum.pointsEarned += pointsEarned;
+
+      const isAllCorrect = correctPairsCount === totalPairsCount;
+      if (isAllCorrect) statsSum.correct++;
+      else statsSum.incorrect++;
+
+      return {
+        type: "imagemap",
+        questionText,
+        isCorrect: isAllCorrect,
+        isSkipped: false,
+        correctPairsCount,
+        totalPairsCount,
+        userMatches,
+        correctMatches,
+        answerLabels,
+        pointLabels,
         pointsEarned,
         pointsTotal,
       } as ReviewItem;

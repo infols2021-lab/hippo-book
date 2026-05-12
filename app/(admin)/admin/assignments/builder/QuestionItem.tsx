@@ -13,6 +13,7 @@ import SentenceEditor from "./sentence/SentenceEditor";
 import CrosswordEditor from "./crossword/CrosswordEditor";
 import ComplexEditor from "./complex/ComplexEditor";
 import MatchingEditor from "./matching/MatchingEditor";
+import ImageMapEditor from "./imagemap/ImageMapEditor";
 
 type Props = {
   index: number;
@@ -34,6 +35,7 @@ function typeLabel(t: QuestionType) {
   if (t === "crossword") return "🧩 Кроссворд";
   if (t === "complex") return "📚 Комплексный вопрос";
   if (t === "matching") return "🔗 Сопоставление";
+  if (t === "imagemap") return "🗺 Карта";
   return t;
 }
 
@@ -84,6 +86,8 @@ export default function QuestionItem({
       ? "qtype-complex"
       : q.type === "matching"
       ? "qtype-matching"
+      : q.type === "imagemap"
+      ? "qtype-imagemap"
       : "qtype-crossword";
 
   // ====== Zoomable image state (for crossword) ======
@@ -479,6 +483,9 @@ export default function QuestionItem({
         ) : q.type === "matching" ? (
           // @ts-ignore
           <MatchingEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
+        ) : q.type === "imagemap" ? (
+          // @ts-ignore
+          <ImageMapEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
         ) : null}
       </div>
     </div>

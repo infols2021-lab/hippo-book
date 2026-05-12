@@ -175,7 +175,6 @@ app/api/crossword-data/route.ts
 app/api/gatehouse/profile-progress/route.ts
 app/api/material-data/[id]/route.ts
 app/api/materials-data/route.ts
-app/api/media/route.ts
 app/api/profile-progress/route.ts
 app/api/profile-streak-icon/route.ts
 app/api/profile-streak-leaderboard/route.ts
@@ -227,6 +226,7 @@ components/profile/StreakLeaderboardModal.tsx
 components/profile/TitlePickerModal.tsx
 components/streak/StreakRoadmapModal.tsx
 components/TurnstileWidget.tsx
+components/ui/SafeImg.tsx
 components/Upload/UploadArea.tsx
 components/Upload/UploadProgress.tsx
 eslint.config.mjs
@@ -8941,6 +8941,141 @@ export default function TurnstileWidget(props: {
 }
 
 ================
+File: components/ui/SafeImg.tsx
+================
+/**
+ * components/ui/SafeImg.tsx
+ *
+ * Универсальный <img> компонент для всего сайта.
+ * Автоматически прогоняет src через прокси — пользователям
+ * не нужен прямой доступ к Яндексу или Supabase.
+ *
+ * Использование — везде вместо <img>:
+ *   import { SafeImg } from "@/components/ui/SafeImg";
+ *   <SafeImg src={someUrl} alt="..." className="..." />
+ */
+
+"use client";
+
+import React, { useState, useCallback } from "react";
+import { rewriteSupabasePublicStorageUrl } from "@/lib/storage/publicUrl";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Типы
+// ─────────────────────────────────────────────────────────────────────────────
+
+type SafeImgProps = Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src"> & {
+  /** Исходный URL — любой формат: прямой Yandex, Supabase, прокси или data: */
+  src?: string | null;
+  /** Fallback если картинка не загрузилась (по умолчанию — скрыть элемент) */
+  fallbackSrc?: string;
+  /** Показывать ли заглушку при ошибке (по умолчанию true) */
+  showPlaceholderOnError?: boolean;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Компонент
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function SafeImg({
+  src,
+  alt = "",
+  fallbackSrc,
+  showPlaceholderOnError = true,
+  style,
+  ...rest
+}: SafeImgProps) {
+  const [retryCount, setRetryCount] = useState(0);
+  const [hasError, setHasError] = useState(false);
+
+  // Конвертируем URL в прокси-формат
+  // rewriteSupabasePublicStorageUrl:
+  //   - /api/storage/public/... → оставляет как есть
+  //   - https://storage.yandexcloud.net/... → конвертирует в прокси
+  //   - https://xxx.supabase.co/storage/... → конвертирует в прокси
+  //   - data:... → оставляет как есть
+  //   - "" / null / undefined → ""
+  const rawUrl = src ? String(src).trim() : "";
+  const baseUrl = rawUrl ? rewriteSupabasePublicStorageUrl(rawUrl) : "";
+
+  // При retry добавляем ?retry=N чтобы сломать браузерный кеш ошибки
+  const proxiedSrc = baseUrl
+    ? retryCount > 0
+      ? `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}retry=${retryCount}`
+      : baseUrl
+    : "";
+
+  const handleError = useCallback(() => {
+    if (fallbackSrc && !hasError) {
+      setHasError(true);
+      return;
+    }
+    if (!hasError) {
+      setHasError(true);
+    }
+  }, [fallbackSrc, hasError]);
+
+  // Нет URL — ничего не рендерим
+  if (!proxiedSrc && !hasError) return null;
+
+  // Ошибка + есть fallback — показываем fallback
+  const displaySrc = hasError && fallbackSrc ? fallbackSrc : proxiedSrc;
+
+  if (!displaySrc) {
+    // Нет ни URL ни fallback — показываем заглушку или ничего
+    if (!showPlaceholderOnError) return null;
+    return (
+      <div
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f1f5f9",
+          color: "#94a3b8",
+          fontSize: "11px",
+          fontWeight: 600,
+          borderRadius: "inherit",
+          ...style,
+        }}
+        {...(rest as any)}
+      >
+        ⚠️
+      </div>
+    );
+  }
+
+  // eslint-disable-next-line @next/next/no-img-element
+  return (
+    <img
+      src={displaySrc}
+      alt={alt}
+      onError={handleError}
+      style={style}
+      {...rest}
+    />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Вспомогательная функция для использования вне JSX
+// (например в src атрибутах обычных img тегов)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Конвертирует любой URL изображения в прокси-URL.
+ * Используй когда нужно src без компонента SafeImg.
+ *
+ * Пример:
+ *   <img src={toProxyUrl(cover_image_url)} alt="..." />
+ */
+export function toProxyUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  const raw = String(url).trim();
+  if (!raw) return "";
+  return rewriteSupabasePublicStorageUrl(raw);
+}
+
+================
 File: components/Upload/UploadArea.tsx
 ================
 
@@ -16491,414 +16626,6 @@ export default function ImageUpload({
 }
 
 ================
-File: app/(admin)/admin/assignments/builder/MediaUpload.tsx
-================
-"use client";
-
-import { useRef, useState } from "react";
-import type { MediaAttachment } from "./types";
-
-type Props = {
-  value: MediaAttachment[];
-  onChange: (media: MediaAttachment[]) => void;
-  disabled?: boolean;
-  bucket?: string;
-  label?: string;
-};
-
-export default function MediaUpload({
-  value,
-  onChange,
-  disabled,
-  bucket = "question-images",
-  label = "Медиафайлы (Изображения, Аудио, PDF):",
-}: Props) {
-  const [uploading, setUploading] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  /**
-   * Безопасно разбирает ответ сервера, возвращает JSON или выбрасывает
-   * понятную ошибку. Предотвращает ситуацию, когда клиент получает HTML
-   * вместо JSON и ломается с "Unexpected token '<'".
-   */
-  async function parseServerResponse(response: Response) {
-    const contentType = response.headers.get("content-type") || "";
-
-    if (!response.ok) {
-      const rawText = await response.text();
-      // Если сервер прислал HTML (например, страницу ошибки 500)
-      if (contentType.includes("text/html") || rawText.trimStart().startsWith("<")) {
-        const titleMatch = rawText.match(/<title>(.*?)<\/title>/i);
-        const message = titleMatch
-          ? `Ошибка сервера: ${titleMatch[1]}`
-          : `Ошибка сервера (${response.status})`;
-        throw new Error(message);
-      }
-
-      // Пытаемся извлечь JSON‑ошибку
-      try {
-        const json = JSON.parse(rawText);
-        throw new Error(json.error || `Ошибка загрузки (${response.status})`);
-      } catch (e) {
-        throw new Error(
-          rawText.length > 200
-            ? `Ошибка загрузки (${response.status}): ${rawText.slice(0, 200)}…`
-            : rawText,
-        );
-      }
-    }
-
-    // Успешный ответ
-    return response.json();
-  }
-
-  async function handleFiles(files: FileList | File[]) {
-    if (disabled || uploading) return;
-
-    const allowedExtensions = [
-      "jpg", "jpeg", "png", "gif", "webp", "avif",
-      "mp3", "wav", "ogg", "m4a", "pdf",
-    ];
-
-    const validFiles = Array.from(files).filter((f) => {
-      const ext = f.name.split(".").pop()?.toLowerCase() || "";
-      return allowedExtensions.includes(ext);
-    });
-
-    if (validFiles.length === 0) {
-      setUploadError(
-        "Неподдерживаемый формат файла. Разрешены: JPG, PNG, GIF, WebP, MP3, WAV, PDF.",
-      );
-      return;
-    }
-
-    setUploading(true);
-    setUploadError(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("bucket", bucket);
-      formData.append("kind", "image"); // исторический флаг, сервер его игнорирует
-      validFiles.forEach((file) => formData.append("file", file));
-
-      const response = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await parseServerResponse(response);
-
-      // Приоритет: новый массив files, затем старый формат с одним файлом
-      const uploadedFiles: Array<{
-        publicUrl: string;
-        mediaType: string;
-        fileName: string;
-      }> = (() => {
-        if (Array.isArray(data.files) && data.files.length > 0) {
-          return data.files;
-        }
-        // Обратная совместимость со старым API (объект в корне ответа)
-        if (data.publicUrl) {
-          return [
-            {
-              publicUrl: data.publicUrl,
-              mediaType: data.mediaType || "image",
-              fileName: data.fileName || "file",
-            },
-          ];
-        }
-        return [];
-      })();
-
-      if (uploadedFiles.length === 0) {
-        throw new Error("Сервер не вернул ни одного загруженного файла.");
-      }
-
-      const newMedia: MediaAttachment[] = uploadedFiles.map((uf: any) => ({
-        id: crypto.randomUUID(),
-        url: uf.publicUrl,
-        type: uf.mediaType || "image",
-        name: uf.fileName || "Без имени",
-      }));
-
-      onChange([...value, ...newMedia]);
-    } catch (err: any) {
-      // Формируем читаемое сообщение для пользователя
-      let message = "Ошибка при загрузке файлов.";
-      if (err instanceof Error) {
-        if (
-          err.message.includes("Failed to fetch") ||
-          err.message.includes("NetworkError")
-        ) {
-          message = "Ошибка соединения с сервером. Проверьте интернет и попробуйте снова.";
-        } else {
-          message = err.message;
-        }
-      } else if (typeof err === "string") {
-        message = err;
-      }
-      setUploadError(message);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-  }
-
-  function handleRemove(idToRemove: string) {
-    if (disabled) return;
-    onChange(value.filter((m) => m.id !== idToRemove));
-  }
-
-  return (
-    <div className="form-group" style={{ marginBottom: "16px" }}>
-      <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
-        {label}
-      </label>
-
-      {/* ---- Зона перетаскивания / выбора ---- */}
-      <div
-        style={{
-          border: `2px dashed ${dragOver ? "#007bff" : "rgba(0,0,0,0.15)"}`,
-          borderRadius: "12px",
-          padding: "20px",
-          textAlign: "center",
-          backgroundColor: dragOver ? "rgba(0,123,255,0.05)" : "transparent",
-          transition: "all 0.2s ease",
-          cursor: disabled ? "not-allowed" : "pointer",
-          opacity: disabled ? 0.6 : 1,
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          if (!disabled) setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          if (e.dataTransfer.files?.length) {
-            handleFiles(e.dataTransfer.files);
-          }
-        }}
-        onClick={() => !disabled && fileInputRef.current?.click()}
-      >
-        {uploading ? (
-          <div
-            style={{
-              color: "#007bff",
-              fontWeight: 500,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <div
-              style={{
-                width: 24,
-                height: 24,
-                border: "3px solid rgba(0,123,255,0.2)",
-                borderTopColor: "#007bff",
-                borderRadius: "50%",
-                animation: "spin 0.8s linear infinite",
-              }}
-            />
-            <span>Загрузка файлов…</span>
-          </div>
-        ) : (
-          <div style={{ color: "rgba(0,0,0,0.5)" }}>
-            <span
-              style={{ fontSize: "24px", display: "block", marginBottom: "8px" }}
-            >
-              📥
-            </span>
-            Перетащите файлы сюда или нажмите для выбора
-            <div style={{ fontSize: "12px", marginTop: "4px" }}>
-              (JPG, PNG, GIF, WebP, MP3, WAV, PDF)
-            </div>
-          </div>
-        )}
-        <input
-          type="file"
-          multiple
-          ref={fileInputRef}
-          style={{ display: "none" }}
-          onChange={(e) => e.target.files && handleFiles(e.target.files)}
-          accept="image/*,audio/*,application/pdf"
-          disabled={disabled}
-        />
-      </div>
-
-      {/* ---- Ошибка загрузки ---- */}
-      {uploadError && (
-        <div
-          style={{
-            marginTop: "8px",
-            padding: "10px 14px",
-            background: "#fff5f5",
-            color: "#c62828",
-            border: "1px solid #ffcdd2",
-            borderRadius: "8px",
-            fontSize: "13px",
-            fontWeight: 500,
-            lineHeight: 1.4,
-          }}
-        >
-          ⚠️ {uploadError}
-          <button
-            type="button"
-            onClick={() => setUploadError(null)}
-            style={{
-              marginLeft: 10,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "#c62828",
-              fontWeight: "bold",
-            }}
-            title="Закрыть"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* ---- Список уже прикреплённых файлов ---- */}
-      {value.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "12px",
-            marginTop: "16px",
-          }}
-        >
-          {value.map((m) => (
-            <div
-              key={m.id}
-              style={{
-                position: "relative",
-                border: "1px solid rgba(0,0,0,0.1)",
-                borderRadius: "8px",
-                padding: "8px",
-                width: "200px",
-                backgroundColor: "#fff",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-              }}
-            >
-              {m.type === "image" && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={m.url}
-                  alt={m.name || "media"}
-                  style={{
-                    width: "100%",
-                    height: "100px",
-                    objectFit: "contain",
-                    borderRadius: "4px",
-                  }}
-                />
-              )}
-              {m.type === "audio" && (
-                <div style={{ textAlign: "center", padding: "10px 0" }}>
-                  <div style={{ fontSize: "24px", marginBottom: "8px" }}>
-                    🎵
-                  </div>
-                  <audio
-                    src={m.url}
-                    controls
-                    style={{ width: "100%", height: "30px" }}
-                  />
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      color: "#666",
-                      marginTop: 4,
-                      wordBreak: "break-all",
-                    }}
-                  >
-                    {m.name}
-                  </div>
-                </div>
-              )}
-              {m.type === "pdf" && (
-                <div
-                  style={{
-                    textAlign: "center",
-                    padding: "16px 0",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "32px",
-                      marginBottom: "8px",
-                      color: "#e25555",
-                    }}
-                  >
-                    📄
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    {m.name || "Документ PDF"}
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => handleRemove(m.id)}
-                disabled={disabled}
-                style={{
-                  position: "absolute",
-                  top: "-8px",
-                  right: "-8px",
-                  background: "#ff4d4f",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "50%",
-                  width: "24px",
-                  height: "24px",
-                  cursor: disabled ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "14px",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-                }}
-                title="Удалить"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Анимация спиннера */}
-      <style jsx>{`
-        @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
-
-================
 File: app/(admin)/admin/assignments/builder/QuestionItem.tsx
 ================
 "use client";
@@ -21278,183 +21005,6 @@ File: app/(app)/assignment/assignment.css
     border-radius: 22px;
     padding: 18px;
   }
-}
-
-================
-File: app/(app)/assignment/components/QuestionComplex.tsx
-================
-"use client";
-
-import React from "react";
-import type { QuestionComplex, QuestionAny } from "../lib/types";
-import MediaRenderer from "./MediaRenderer";
-
-import QuestionTest from "./QuestionTest";
-import QuestionFill from "./QuestionFill";
-import QuestionSentence from "./QuestionSentence";
-import QuestionMatching from "./QuestionMatching";
-
-type Props = {
-  question: QuestionComplex;
-  value: any[]; // Массив ответов на каждый подвопрос
-  onChange: (val: any[]) => void;
-  disabled?: boolean;
-};
-
-export default function QuestionComplex({ question, value = [], onChange, disabled }: Props) {
-  const subQuestions = question.subQuestions || [];
-
-  function handleSubChange(index: number, subVal: any) {
-    if (disabled) return;
-    const nextValue = [...(Array.isArray(value) ? value : [])];
-    while (nextValue.length <= index) {
-      nextValue.push(null);
-    }
-    nextValue[index] = subVal;
-    onChange(nextValue);
-  }
-
-  function renderSubQuestion(subQ: QuestionAny, index: number) {
-    const subValue = Array.isArray(value) ? value[index] : undefined;
-
-    switch (subQ.type) {
-      case "test":
-        return (
-          <QuestionTest
-            question={subQ as any}
-            value={subValue}
-            onChange={(val: any) => handleSubChange(index, val)}
-            disabled={disabled}
-          />
-        );
-      case "fill":
-        return (
-          <QuestionFill
-            question={subQ as any}
-            value={subValue}
-            onChange={(val: any) => handleSubChange(index, val)}
-            disabled={disabled}
-          />
-        );
-      case "sentence":
-        return (
-          <QuestionSentence
-            question={subQ as any}
-            value={subValue}
-            onChange={(val: any) => handleSubChange(index, val)}
-            disabled={disabled}
-          />
-        );
-      case "matching":
-        return (
-          <QuestionMatching
-            question={subQ as any}
-            value={subValue || {}}
-            onChange={(val: Record<string, string>) => handleSubChange(index, val)}
-            disabled={disabled}
-          />
-        );
-      default:
-        return (
-          <div style={{ color: "#ff4d4f", padding: "12px", background: "rgba(255, 77, 79, 0.1)", borderRadius: "8px", fontSize: "14px" }}>
-            ⚠️ Неподдерживаемый тип подвопроса: {subQ.type}
-          </div>
-        );
-    }
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
-      {/* ГЛАВНЫЙ БЛОК КОМПЛЕКСНОГО ВОПРОСА (Текст + Медиа) */}
-      <div style={{
-        padding: "24px",
-        background: "#f8f9fa",
-        borderRadius: "16px",
-        border: "1px solid rgba(0,0,0,0.06)",
-        boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)"
-      }}>
-        {question.q && (
-          <div style={{ 
-            fontSize: "16px", 
-            lineHeight: 1.6, 
-            color: "#333", 
-            marginBottom: question.media?.length ? "16px" : "0", 
-            fontWeight: 500, 
-            whiteSpace: "pre-wrap" 
-          }}>
-            {question.q}
-          </div>
-        )}
-        
-        <MediaRenderer media={question.media} />
-      </div>
-
-      {/* ПОДВОПРОСЫ */}
-      <div style={{ 
-        display: "flex", 
-        flexDirection: "column", 
-        gap: "40px", 
-        paddingLeft: "20px", 
-        borderLeft: "4px solid rgba(0, 123, 255, 0.2)" 
-      }}>
-        {subQuestions.length === 0 ? (
-          <div style={{ color: "rgba(0,0,0,0.5)", fontStyle: "italic" }}>Нет подвопросов</div>
-        ) : (
-          subQuestions.map((subQ, index) => (
-            <div key={subQ.id || `subq-${index}`} style={{ display: "flex", flexDirection: "column", gap: "12px", position: "relative" }}>
-              
-              <div style={{
-                position: "absolute",
-                left: "-20px",
-                top: "14px",
-                width: "12px",
-                height: "4px",
-                background: "rgba(0, 123, 255, 0.2)",
-                borderRadius: "0 2px 2px 0"
-              }} />
-
-              <div style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
-                <div style={{
-                  background: "#007bff",
-                  color: "#fff",
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  flexShrink: 0,
-                  boxShadow: "0 4px 8px rgba(0, 123, 255, 0.3)"
-                }}>
-                  {index + 1}
-                </div>
-                
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {subQ.q && (
-                    <div style={{ fontSize: "16px", fontWeight: 600, color: "#222", marginBottom: "12px", whiteSpace: "pre-wrap" }}>
-                      {subQ.q}
-                    </div>
-                  )}
-                  
-                  {subQ.media && subQ.media.length > 0 && (
-                    <div style={{ marginBottom: "16px" }}>
-                      <MediaRenderer media={subQ.media} />
-                    </div>
-                  )}
-
-                  <div style={{ background: "#fff", borderRadius: "16px", padding: "16px", border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
-                    {renderSubQuestion(subQ, index)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
 }
 
 ================
@@ -27382,53 +26932,6 @@ export async function GET() {
 }
 
 ================
-File: app/api/media/route.ts
-================
-import { NextRequest, NextResponse } from 'next/server';
-import sharp from 'sharp';
-
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const imageUrl = searchParams.get('url');
-
-  if (!imageUrl) return new NextResponse("No URL provided", { status: 400 });
-
-  try {
-    // Добавляем User-Agent, чтобы хранилища не блокировали запрос от "бота"
-    const response = await fetch(imageUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
-
-    if (!response.ok) {
-      console.error(`Failed to fetch: ${response.status} ${imageUrl}`);
-      // Если не удалось скачать для оптимизации, просто редиректим на оригинал
-      return NextResponse.redirect(imageUrl);
-    }
-    
-    const arrayBuffer = await response.arrayBuffer();
-    const inputBuffer = Buffer.from(arrayBuffer);
-
-    const optimizedImage = await sharp(inputBuffer)
-      .resize(1200, null, { withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toBuffer();
-
-    return new NextResponse(new Uint8Array(optimizedImage), {
-      headers: {
-        'Content-Type': 'image/webp',
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
-    });
-  } catch (error) {
-    console.error("Optimization error, redirecting to raw:", error);
-    // В случае любой ошибки sharp'а просто отдаем оригинал, чтобы картинка не "пропадала"
-    return NextResponse.redirect(imageUrl);
-  }
-}
-
-================
 File: app/api/profile-streak-title/route.ts
 ================
 // app/api/profile-streak-title/route.ts
@@ -27576,171 +27079,6 @@ export async function POST(req: Request) {
   });
   res.headers.set("Cache-Control", "no-store, max-age=0");
   return res;
-}
-
-================
-File: app/api/storage/public/[bucket]/[...path]/route.ts
-================
-/* app/api/storage/public/[bucket]/[...path]/route.ts */
-
-import { NextRequest, NextResponse } from "next/server";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-// ─────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────
-
-type RouteParams = { bucket: string; path: string[] };
-type RouteContext = { params: RouteParams | Promise<RouteParams> };
-
-// ─────────────────────────────────────────────────────────────
-// Config helpers
-// ─────────────────────────────────────────────────────────────
-
-function normalizeBucket(value: unknown) {
-  return String(value ?? "").trim();
-}
-
-function normalizePath(parts: unknown) {
-  if (!Array.isArray(parts)) return "";
-  return parts
-    .map((part) => String(part ?? "").trim())
-    .filter(Boolean)
-    .join("/");
-}
-
-/**
- * Возвращает массив публичных бакетов:
- * - из STORAGE_PUBLIC_BUCKETS (через запятую)
- * - YANDEX_BUCKET_NAME, если задан
- */
-function getAllowedPublicBuckets(): string[] {
-  const list = (process.env.STORAGE_PUBLIC_BUCKETS || "")
-    .split(",")
-    .map((b) => b.trim())
-    .filter(Boolean);
-
-  const yandexBucket = process.env.YANDEX_BUCKET_NAME;
-  if (yandexBucket && !list.includes(yandexBucket)) {
-    list.push(yandexBucket);
-  }
-
-  return list;
-}
-
-function isBucketAllowed(bucket: string) {
-  const allowed = getAllowedPublicBuckets();
-  if (!allowed.length) return true; // если переменная не задана – разрешаем все (dev-режим)
-  return allowed.includes(bucket);
-}
-
-function getSupabaseUrl() {
-  return String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
-}
-
-function getYandexEndpoint() {
-  return "https://storage.yandexcloud.net";
-}
-
-function isYandexBucket(bucket: string) {
-  return bucket === process.env.YANDEX_BUCKET_NAME;
-}
-
-/** Безопасность: запрещаем path traversal */
-function isSafeStorageObjectPath(path: string) {
-  if (!path) return false;
-  if (path.startsWith("/") || path.includes("\\") || path.includes("\0")) return false;
-
-  const parts = path.split("/");
-  return parts.every((part) => {
-    if (!part || part === "." || part === "..") return false;
-    return true;
-  });
-}
-
-// ─────────────────────────────────────────────────────────────
-// URL builders
-// ─────────────────────────────────────────────────────────────
-
-function encodeStoragePath(path: string) {
-  return path
-    .split("/")
-    .map((part) => encodeURIComponent(part))
-    .join("/");
-}
-
-/** Прямая ссылка на публичный объект в Supabase Storage */
-function buildSupabasePublicUrl(bucket: string, objectPath: string) {
-  const base = getSupabaseUrl();
-  if (!base) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-
-  return `${base}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodeStoragePath(objectPath)}`;
-}
-
-/** Прямая ссылка на публичный объект в Yandex Object Storage */
-function buildYandexPublicUrl(bucket: string, objectPath: string) {
-  return `${getYandexEndpoint()}/${encodeURIComponent(bucket)}/${encodeStoragePath(objectPath)}`;
-}
-
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-
-function jsonError(message: string, status = 500, code = "STORAGE_PROXY_ERROR") {
-  return NextResponse.json(
-    { ok: false, error: message, code },
-    { status, headers: { "cache-control": "no-store, max-age=0" } }
-  );
-}
-
-async function readParams(ctx: RouteContext): Promise<RouteParams> {
-  return await ctx.params;
-}
-
-/** Формирует ответ-редирект (307) на целевой URL с кеширующими заголовками */
-function redirectResponse(url: string, cacheMaxAge = 300) {
-  return NextResponse.redirect(url, {
-    status: 307,
-    headers: {
-      "cache-control": `public, max-age=${cacheMaxAge}`,
-    },
-  });
-}
-
-// ─────────────────────────────────────────────────────────────
-// Handlers
-// ─────────────────────────────────────────────────────────────
-
-export async function GET(req: NextRequest, ctx: RouteContext) {
-  const params = await readParams(ctx);
-  const bucket = normalizeBucket(params.bucket);
-  const objectPath = normalizePath(params.path);
-
-  if (!bucket) return jsonError("Bucket is required", 400, "VALIDATION");
-  if (!objectPath) return jsonError("Path is required", 400, "VALIDATION");
-  if (!isBucketAllowed(bucket)) return jsonError(`Public access to bucket "${bucket}" is not allowed`, 403, "BUCKET_NOT_ALLOWED");
-  if (!isSafeStorageObjectPath(objectPath)) return jsonError("Invalid object path", 400, "INVALID_PATH");
-
-  try {
-    // Для Yandex‑бакетов редиректим на прямое хранилище (публичный доступ)
-    if (isYandexBucket(bucket)) {
-      const targetUrl = buildYandexPublicUrl(bucket, objectPath);
-      return redirectResponse(targetUrl, 31536000);
-    }
-
-    // Для всех остальных – Supabase
-    const targetUrl = buildSupabasePublicUrl(bucket, objectPath);
-    return redirectResponse(targetUrl, 300);
-  } catch (e: any) {
-    return jsonError(e?.message || "Storage redirect error", 500, "STORAGE_REDIRECT_ERROR");
-  }
-}
-
-export async function HEAD(req: NextRequest, ctx: RouteContext) {
-  return GET(req, ctx);
 }
 
 ================
@@ -30974,6 +30312,399 @@ export default function AdminClient() {
 }
 
 ================
+File: app/(admin)/admin/assignments/builder/MediaUpload.tsx
+================
+"use client";
+
+import { useRef, useState } from "react";
+import type { MediaAttachment } from "./types";
+
+type Props = {
+  value: MediaAttachment[];
+  onChange: (media: MediaAttachment[]) => void;
+  disabled?: boolean;
+  bucket?: string;
+  label?: string;
+};
+
+export default function MediaUpload({
+  value,
+  onChange,
+  disabled,
+  bucket = "question-images",
+  label = "Медиафайлы (Изображения, Аудио, PDF):",
+}: Props) {
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Ref-флаг защиты от race condition при двойном клике / двойном drop:
+  // useState асинхронен и не успевает заблокировать второй вызов handleFiles
+  // до следующего рендера. useRef проверяется синхронно — мгновенно.
+  const uploadingRef = useRef(false);
+
+  async function parseServerResponse(response: Response) {
+    const contentType = response.headers.get("content-type") || "";
+
+    if (!response.ok) {
+      const rawText = await response.text();
+      if (contentType.includes("text/html") || rawText.trimStart().startsWith("<")) {
+        const titleMatch = rawText.match(/<title>(.*?)<\/title>/i);
+        const message = titleMatch
+          ? `Ошибка сервера: ${titleMatch[1]}`
+          : `Ошибка сервера (${response.status})`;
+        throw new Error(message);
+      }
+
+      try {
+        const json = JSON.parse(rawText);
+        throw new Error(json.error || `Ошибка загрузки (${response.status})`);
+      } catch (e) {
+        throw new Error(
+          rawText.length > 200
+            ? `Ошибка загрузки (${response.status}): ${rawText.slice(0, 200)}…`
+            : rawText,
+        );
+      }
+    }
+
+    return response.json();
+  }
+
+  async function handleFiles(files: FileList | File[]) {
+    // Двойная защита: ref — синхронная (мгновенная), state — для UI
+    if (disabled || uploadingRef.current) return;
+
+    // mp4 добавлен: аудиозаписи с мобильных устройств часто имеют расширение .mp4
+    const allowedExtensions = [
+      "jpg", "jpeg", "png", "gif", "webp", "avif",
+      "mp3", "wav", "ogg", "m4a", "mp4", "pdf",
+    ];
+
+    const validFiles = Array.from(files).filter((f) => {
+      const ext = f.name.split(".").pop()?.toLowerCase() || "";
+      return allowedExtensions.includes(ext);
+    });
+
+    if (validFiles.length === 0) {
+      setUploadError(
+        "Неподдерживаемый формат файла. Разрешены: JPG, PNG, GIF, WebP, MP3, WAV, OGG, M4A, MP4, PDF.",
+      );
+      return;
+    }
+
+    // Выставляем оба флага — ref синхронно, state для рендера
+    uploadingRef.current = true;
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("bucket", bucket);
+      formData.append("kind", "image"); // исторический флаг, сервер его игнорирует
+      validFiles.forEach((file) => formData.append("file", file));
+
+      const response = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await parseServerResponse(response);
+
+      const uploadedFiles: Array<{
+        publicUrl: string;
+        mediaType: string;
+        fileName: string;
+      }> = (() => {
+        if (Array.isArray(data.files) && data.files.length > 0) {
+          return data.files;
+        }
+        if (data.publicUrl) {
+          return [
+            {
+              publicUrl: data.publicUrl,
+              mediaType: data.mediaType || "image",
+              fileName: data.fileName || "file",
+            },
+          ];
+        }
+        return [];
+      })();
+
+      if (uploadedFiles.length === 0) {
+        throw new Error("Сервер не вернул ни одного загруженного файла.");
+      }
+
+      const newMedia: MediaAttachment[] = uploadedFiles.map((uf: any) => ({
+        id: crypto.randomUUID(),
+        url: uf.publicUrl,
+        type: uf.mediaType || "image",
+        name: uf.fileName || "Без имени",
+      }));
+
+      onChange([...value, ...newMedia]);
+    } catch (err: any) {
+      let message = "Ошибка при загрузке файлов.";
+      if (err instanceof Error) {
+        if (
+          err.message.includes("Failed to fetch") ||
+          err.message.includes("NetworkError")
+        ) {
+          message = "Ошибка соединения с сервером. Проверьте интернет и попробуйте снова.";
+        } else {
+          message = err.message;
+        }
+      } else if (typeof err === "string") {
+        message = err;
+      }
+      setUploadError(message);
+    } finally {
+      uploadingRef.current = false;
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
+  function handleRemove(idToRemove: string) {
+    if (disabled) return;
+    onChange(value.filter((m) => m.id !== idToRemove));
+  }
+
+  return (
+    <div className="form-group" style={{ marginBottom: "16px" }}>
+      <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
+        {label}
+      </label>
+
+      {/* ---- Зона перетаскивания / выбора ---- */}
+      <div
+        style={{
+          border: `2px dashed ${dragOver ? "#007bff" : "rgba(0,0,0,0.15)"}`,
+          borderRadius: "12px",
+          padding: "20px",
+          textAlign: "center",
+          backgroundColor: dragOver ? "rgba(0,123,255,0.05)" : "transparent",
+          transition: "all 0.2s ease",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.6 : 1,
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!disabled) setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          if (e.dataTransfer.files?.length) {
+            handleFiles(e.dataTransfer.files);
+          }
+        }}
+        onClick={() => !disabled && fileInputRef.current?.click()}
+      >
+        {uploading ? (
+          <div
+            style={{
+              color: "#007bff",
+              fontWeight: 500,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                border: "3px solid rgba(0,123,255,0.2)",
+                borderTopColor: "#007bff",
+                borderRadius: "50%",
+                animation: "spin 0.8s linear infinite",
+              }}
+            />
+            <span>Загрузка файлов…</span>
+          </div>
+        ) : (
+          <div style={{ color: "rgba(0,0,0,0.5)" }}>
+            <span style={{ fontSize: "24px", display: "block", marginBottom: "8px" }}>
+              📥
+            </span>
+            Перетащите файлы сюда или нажмите для выбора
+            <div style={{ fontSize: "12px", marginTop: "4px" }}>
+              (JPG, PNG, GIF, WebP, MP3, WAV, OGG, M4A, MP4, PDF)
+            </div>
+          </div>
+        )}
+        <input
+          type="file"
+          multiple
+          ref={fileInputRef}
+          style={{ display: "none" }}
+          onChange={(e) => e.target.files && handleFiles(e.target.files)}
+          accept="image/*,audio/*,video/mp4,application/pdf"
+          disabled={disabled}
+        />
+      </div>
+
+      {/* ---- Ошибка загрузки ---- */}
+      {uploadError && (
+        <div
+          style={{
+            marginTop: "8px",
+            padding: "10px 14px",
+            background: "#fff5f5",
+            color: "#c62828",
+            border: "1px solid #ffcdd2",
+            borderRadius: "8px",
+            fontSize: "13px",
+            fontWeight: 500,
+            lineHeight: 1.4,
+          }}
+        >
+          ⚠️ {uploadError}
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            style={{
+              marginLeft: 10,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#c62828",
+              fontWeight: "bold",
+            }}
+            title="Закрыть"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* ---- Список уже прикреплённых файлов ---- */}
+      {value.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "12px",
+            marginTop: "16px",
+          }}
+        >
+          {value.map((m) => (
+            <div
+              key={m.id}
+              style={{
+                position: "relative",
+                border: "1px solid rgba(0,0,0,0.1)",
+                borderRadius: "8px",
+                padding: "8px",
+                width: "200px",
+                backgroundColor: "#fff",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+              }}
+            >
+              {m.type === "image" && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={m.url}
+                  alt={m.name || "media"}
+                  style={{
+                    width: "100%",
+                    height: "100px",
+                    objectFit: "contain",
+                    borderRadius: "4px",
+                  }}
+                />
+              )}
+              {m.type === "audio" && (
+                <div style={{ textAlign: "center", padding: "10px 0" }}>
+                  <div style={{ fontSize: "24px", marginBottom: "8px" }}>🎵</div>
+                  <audio
+                    src={m.url}
+                    controls
+                    style={{ width: "100%", height: "30px" }}
+                  />
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "#666",
+                      marginTop: 4,
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {m.name}
+                  </div>
+                </div>
+              )}
+              {m.type === "pdf" && (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "16px 0",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "32px",
+                      marginBottom: "8px",
+                      color: "#e25555",
+                    }}
+                  >
+                    📄
+                  </div>
+                  <div style={{ fontSize: "12px", fontWeight: 500, lineHeight: 1.2 }}>
+                    {m.name || "Документ PDF"}
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleRemove(m.id)}
+                disabled={disabled}
+                style={{
+                  position: "absolute",
+                  top: "-8px",
+                  right: "-8px",
+                  background: "#ff4d4f",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "24px",
+                  height: "24px",
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "14px",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                }}
+                title="Удалить"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Анимация спиннера */}
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+================
 File: app/(admin)/admin/requests/RequestsTab.tsx
 ================
 "use client";
@@ -31851,6 +31582,196 @@ export default async function AssignmentByIdPage({
   const sourceId = normStr(first(sp["sourceId"]));
 
   return <AssignmentClient assignmentId={assignmentId} source={source} sourceId={sourceId} />;
+}
+
+================
+File: app/(app)/assignment/components/QuestionComplex.tsx
+================
+"use client";
+
+import React from "react";
+import type { QuestionComplex, QuestionAny } from "../lib/types";
+import MediaRenderer from "./MediaRenderer";
+import QuestionTest from "./QuestionTest";
+import QuestionFill from "./QuestionFill";
+import QuestionSentence from "./QuestionSentence";
+import QuestionMatching from "./QuestionMatching";
+
+type Props = {
+  question: QuestionComplex;
+  value: any[];
+  onChange: (val: any[]) => void;
+  disabled?: boolean;
+};
+
+export default function QuestionComplex({
+  question,
+  value = [],
+  onChange,
+  disabled,
+}: Props) {
+  const subQuestions = question.subQuestions || [];
+
+  function handleSubChange(index: number, subVal: any) {
+    if (disabled) return;
+    const next = [...(Array.isArray(value) ? value : [])];
+    while (next.length <= index) next.push(null);
+    next[index] = subVal;
+    onChange(next);
+  }
+
+  function renderSubQuestion(subQ: QuestionAny, index: number) {
+    const subValue = Array.isArray(value) ? value[index] : undefined;
+
+    switch (subQ.type) {
+      case "test":
+        return (
+          <QuestionTest
+            question={subQ as any}
+            value={subValue}
+            onChange={(v: any) => handleSubChange(index, v)}
+            disabled={disabled}
+          />
+        );
+      case "fill":
+        return (
+          <QuestionFill
+            question={subQ as any}
+            value={subValue}
+            onChange={(v: any) => handleSubChange(index, v)}
+            disabled={disabled}
+          />
+        );
+      case "sentence":
+        return (
+          <QuestionSentence
+            question={subQ as any}
+            value={subValue}
+            onChange={(v: any) => handleSubChange(index, v)}
+            disabled={disabled}
+          />
+        );
+      case "matching":
+        return (
+          <QuestionMatching
+            question={subQ as any}
+            value={subValue || {}}
+            onChange={(v: Record<string, string>) =>
+              handleSubChange(index, v)
+            }
+            disabled={disabled}
+          />
+        );
+      default:
+        return (
+          <div
+            style={{
+              color: "#ff4d4f",
+              padding: 12,
+              background: "rgba(255,77,79,0.1)",
+              borderRadius: 8,
+              fontSize: 14,
+            }}
+          >
+            ⚠️ Неподдерживаемый тип подвопроса: {subQ.type}
+          </div>
+        );
+    }
+  }
+
+  if (subQuestions.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 40,
+        paddingLeft: 20,
+        borderLeft: "4px solid rgba(0,123,255,0.2)",
+      }}
+    >
+      {subQuestions.map((subQ, index) => (
+        <div
+          key={subQ.id || `subq-${index}`}
+          style={{
+            display: "flex",
+            gap: 16,
+            alignItems: "flex-start",
+            position: "relative",
+          }}
+        >
+          {/* Горизонтальный коннектор к левой линии */}
+          <div
+            style={{
+              position: "absolute",
+              left: -20,
+              top: 14,
+              width: 12,
+              height: 4,
+              background: "rgba(0,123,255,0.2)",
+              borderRadius: "0 2px 2px 0",
+            }}
+          />
+
+          {/* Номер подвопроса */}
+          <div
+            style={{
+              background: "#007bff",
+              color: "#fff",
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              fontWeight: 600,
+              flexShrink: 0,
+              boxShadow: "0 4px 8px rgba(0,123,255,0.3)",
+            }}
+          >
+            {index + 1}
+          </div>
+
+          {/* Тело подвопроса */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {subQ.q && (
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: "#222",
+                  marginBottom: 12,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {subQ.q}
+              </div>
+            )}
+
+            {subQ.media && subQ.media.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <MediaRenderer media={subQ.media} />
+              </div>
+            )}
+
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 16,
+                padding: 16,
+                border: "1px solid rgba(0,0,0,0.06)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
+              }}
+            >
+              {renderSubQuestion(subQ, index)}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 ================
@@ -35280,335 +35201,6 @@ export default function TitlePickerModal({
 }
 
 ================
-File: lib/storage/server.ts
-================
-/* lib/storage/server.ts */
-import "server-only";
-
-import { createClient } from "@supabase/supabase-js";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { directFetch } from "@/lib/net/directFetch";
-import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
-
-const DEFAULT_PUBLIC_BUCKETS = [
-  "covers",
-  "question-images",
-  "help-images",
-  "backgrounds",
-  "streak-icons",
-  "streak_icon_assets",
-  "streak-roadmap-bg",
-  "profile-backgrounds",
-];
-
-const DEFAULT_UPLOAD_BUCKETS = [
-  "covers",
-  "question-images",
-  "backgrounds",
-  "streak-icons",
-  "streak_icon_assets",
-  "streak-roadmap-bg",
-  "profile-backgrounds",
-];
-
-const DEFAULT_ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "avif"];
-const DEFAULT_ALLOWED_MEDIA_EXTENSIONS = [...DEFAULT_ALLOWED_IMAGE_EXTENSIONS, "mp3", "wav", "ogg", "m4a", "pdf"];
-
-export type UploadStorageObjectInput = {
-  bucket: string;
-  path: string;
-  file: Blob | ArrayBuffer | Uint8Array | Buffer;
-  contentType?: string;
-  upsert?: boolean;
-  cacheControl?: string;
-  maxRetries?: number; // количество повторных попыток при transient-ошибках
-};
-
-export type DownloadStorageObjectResult = {
-  data: Blob;
-  contentType: string;
-  size: number | null;
-};
-
-function envList(name: string, fallback: string[]) {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-
-  const list = raw
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  return list.length ? list : fallback;
-}
-
-export function getPublicStorageBuckets() {
-  return envList("STORAGE_PUBLIC_BUCKETS", DEFAULT_PUBLIC_BUCKETS);
-}
-
-export function getUploadStorageBuckets() {
-  const yandexBucket = process.env.YANDEX_BUCKET_NAME;
-  const buckets = envList("STORAGE_UPLOAD_BUCKETS", DEFAULT_UPLOAD_BUCKETS);
-  if (yandexBucket && !buckets.includes(yandexBucket)) {
-    buckets.push(yandexBucket);
-  }
-  return buckets;
-}
-
-export function isValidBucketName(bucket: string) {
-  return /^[a-zA-Z0-9._-]{1,80}$/.test(bucket);
-}
-
-export function normalizeStorageObjectPath(path: string | string[]) {
-  const raw = Array.isArray(path) ? path.join("/") : String(path || "");
-  const clean = raw
-    .split("/")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join("/");
-  if (!clean) return "";
-
-  try {
-    return decodeURIComponent(clean);
-  } catch {
-    return clean;
-  }
-}
-
-export function isSafeStorageObjectPath(path: string) {
-  if (!path) return false;
-  if (path.startsWith("/")) return false;
-  if (path.includes("\\")) return false;
-  if (path.includes("\0")) return false;
-
-  const parts = path.split("/");
-  return parts.every((part) => {
-    if (!part) return false;
-    if (part === "." || part === "..") return false;
-    return true;
-  });
-}
-
-export function assertPublicStorageBucket(bucket: string) {
-  if (!isValidBucketName(bucket)) {
-    throw new Error("Некорректное имя bucket");
-  }
-  const allowed = getPublicStorageBuckets();
-  if (!allowed.includes(bucket) && bucket !== process.env.YANDEX_BUCKET_NAME) {
-    throw new Error(`Bucket "${bucket}" не разрешён для публичной выдачи`);
-  }
-}
-
-export function assertUploadStorageBucket(bucket: string) {
-  if (!isValidBucketName(bucket)) {
-    throw new Error("Некорректное имя bucket");
-  }
-  const allowed = getUploadStorageBuckets();
-  if (!allowed.includes(bucket)) {
-    throw new Error(`Bucket "${bucket}" не разрешён для загрузки`);
-  }
-}
-
-export function safeStorageFileName(name: string) {
-  const fallback = "file";
-  const raw = String(name || fallback)
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-zA-Z0-9а-яА-ЯёЁ._-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^[-_.]+|[-_.]+$/g, "");
-
-  return raw || fallback;
-}
-
-export function getFileExtension(name: string) {
-  const clean = safeStorageFileName(name);
-  const ext = clean.split(".").pop()?.toLowerCase() || "";
-  return ext || "bin";
-}
-
-export function isAllowedImageExtension(ext: string) {
-  return DEFAULT_ALLOWED_IMAGE_EXTENSIONS.includes(String(ext || "").toLowerCase());
-}
-
-export function isAllowedMediaExtension(ext: string) {
-  return DEFAULT_ALLOWED_MEDIA_EXTENSIONS.includes(String(ext || "").toLowerCase());
-}
-
-export function guessContentTypeFromPath(path: string) {
-  const ext = getFileExtension(path);
-  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
-  if (ext === "png") return "image/png";
-  if (ext === "gif") return "image/gif";
-  if (ext === "webp") return "image/webp";
-  if (ext === "avif") return "image/avif";
-  if (ext === "svg") return "image/svg+xml";
-  if (ext === "pdf") return "application/pdf";
-  if (ext === "mp3") return "audio/mpeg";
-  if (ext === "wav") return "audio/wav";
-  if (ext === "ogg") return "audio/ogg";
-  if (ext === "m4a") return "audio/mp4";
-  return "application/octet-stream";
-}
-
-function getSupabaseStorageKey(admin: boolean) {
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (admin) {
-    if (!serviceRole) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-    return serviceRole;
-  }
-  if (serviceRole) return serviceRole;
-  if (!anon) throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  return anon;
-}
-
-export function createSupabaseStorageClient(options?: { admin?: boolean }) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-
-  const key = getSupabaseStorageKey(Boolean(options?.admin));
-
-  return createClient(url, key, {
-    global: {
-      fetch: directFetch,
-    },
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
-}
-
-export async function downloadPublicStorageObject(bucket: string, path: string | string[]) {
-  const cleanBucket = String(bucket || "").trim();
-  const cleanPath = normalizeStorageObjectPath(path);
-  assertPublicStorageBucket(cleanBucket);
-  if (!isSafeStorageObjectPath(cleanPath)) {
-    throw new Error("Некорректный путь к файлу");
-  }
-  const supabase = createSupabaseStorageClient({ admin: false });
-  const { data, error } = await supabase.storage.from(cleanBucket).download(cleanPath);
-  if (error) throw error;
-  if (!data) throw new Error("Файл не найден");
-
-  const contentType = data.type || guessContentTypeFromPath(cleanPath);
-  const size = typeof data.size === "number" ? data.size : null;
-  return { data, contentType, size } satisfies DownloadStorageObjectResult;
-}
-
-/**
- * Проверяет, является ли ошибка transient (повторяемой).
- * Используется для автоматических ретраев при загрузке.
- */
-function isTransientStorageError(error: any): boolean {
-  const msg = String(error?.message || error || "").toLowerCase();
-  return (
-    msg.includes("fetch failed") ||
-    msg.includes("econnreset") ||
-    msg.includes("etimedout") ||
-    msg.includes("network") ||
-    msg.includes("terminated") ||
-    msg.includes("timeout") ||
-    msg.includes("too many requests")
-  );
-}
-
-/**
- * Загружает объект в хранилище с автоматическими повторными попытками.
- * Для Supabase upload встроен retry (до 2 дополнительных попыток).
- */
-export async function uploadStorageObject(input: UploadStorageObjectInput) {
-  const bucket = String(input.bucket || "").trim();
-  const path = normalizeStorageObjectPath(input.path);
-  assertUploadStorageBucket(bucket);
-
-  if (!isSafeStorageObjectPath(path)) {
-    throw new Error("Некорректный путь к файлу");
-  }
-
-  let safeBody = input.file;
-  if (input.file instanceof ArrayBuffer) {
-    safeBody = Buffer.from(input.file);
-  }
-
-  const isYandexBucket = bucket === process.env.YANDEX_BUCKET_NAME;
-  const maxRetries = Math.max(0, Number(input.maxRetries) || 2);
-  let lastError: unknown = null;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      if (isYandexBucket) {
-        // Yandex Object Storage (прямой S3)
-        const s3Client = new S3Client({
-          region: process.env.YANDEX_REGION || "ru-central1",
-          endpoint: "https://storage.yandexcloud.net",
-          credentials: {
-            accessKeyId: process.env.YANDEX_ACCESS_KEY_ID!,
-            secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY!,
-          },
-        });
-
-        await s3Client.send(
-          new PutObjectCommand({
-            Bucket: bucket,
-            Key: path,
-            Body: safeBody as any,
-            ContentType: input.contentType || guessContentTypeFromPath(path),
-            CacheControl: input.cacheControl || "max-age=31536000",
-          })
-        );
-
-        return {
-          bucket,
-          path,
-          publicUrl: `https://storage.yandexcloud.net/${bucket}/${path}`,
-        };
-      } else {
-        // Supabase Storage
-        const supabase = createSupabaseStorageClient({ admin: true });
-
-        const { data, error } = await supabase.storage
-          .from(bucket)
-          .upload(path, input.file, {
-            cacheControl: input.cacheControl ?? "31536000",
-            upsert: Boolean(input.upsert),
-            contentType: input.contentType || guessContentTypeFromPath(path),
-          });
-
-        if (error) {
-          // Не transient ошибка или исчерпаны попытки
-          if (!isTransientStorageError(error) || attempt === maxRetries) {
-            throw error;
-          }
-          lastError = error;
-          // Небольшая задержка перед повтором
-          await new Promise(resolve => setTimeout(resolve, 800 * (attempt + 1)));
-          continue;
-        }
-
-        return {
-          bucket,
-          path: data?.path || path,
-          publicUrl: getStoragePublicUrl(bucket, data?.path || path),
-        };
-      }
-    } catch (error: any) {
-      lastError = error;
-      if (!isTransientStorageError(error) || attempt === maxRetries) {
-        throw error;
-      }
-      await new Promise(resolve => setTimeout(resolve, 800 * (attempt + 1)));
-    }
-  }
-
-  // Финальный бросок (не должен достигнуться, но на всякий случай)
-  throw lastError ?? new Error("Upload failed after retries");
-}
-
-================
 File: lib/supabase/client.ts
 ================
 /* lib/supabase/client.ts */
@@ -35712,523 +35304,6 @@ export async function createSupabaseServerClient() {
       },
     },
   });
-}
-
-================
-File: app/(app)/assignment/components/MediaRenderer.tsx
-================
-"use client";
-
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import type { MediaAttachment } from "../lib/types";
-import { getImageUrl } from "../lib/image";
-
-// ============================================================================
-// Утилита для форматирования времени (секунды -> мм:сс)
-// ============================================================================
-function formatTime(timeInSeconds: number) {
-  if (isNaN(timeInSeconds)) return "00:00";
-  const m = Math.floor(timeInSeconds / 60);
-  const s = Math.floor(timeInSeconds % 60);
-  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-}
-
-// ============================================================================
-// КАСТОМНЫЙ АУДИОПЛЕЕР (Glassmorphism & Premium UI)
-// ============================================================================
-function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [audioError, setAudioError] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  // Сброс при смене URL
-  useEffect(() => {
-    setIsPlaying(false);
-    setProgress(0);
-    setCurrentTime(0);
-    setDuration(0);
-    setAudioError(false);
-    setLoading(true);
-  }, [url]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const updateProgress = () => {
-      setCurrentTime(audio.currentTime);
-      setProgress((audio.currentTime / audio.duration) * 100 || 0);
-    };
-    const updateDuration = () => {
-      setDuration(audio.duration);
-      setLoading(false);
-    };
-    const handleEnded = () => setIsPlaying(false);
-    const handleError = () => {
-      setAudioError(true);
-      setLoading(false);
-    };
-    const handleCanPlay = () => setLoading(false);
-
-    audio.addEventListener("timeupdate", updateProgress);
-    audio.addEventListener("loadedmetadata", updateDuration);
-    audio.addEventListener("ended", handleEnded);
-    audio.addEventListener("error", handleError);
-    audio.addEventListener("canplay", handleCanPlay);
-
-    return () => {
-      audio.removeEventListener("timeupdate", updateProgress);
-      audio.removeEventListener("loadedmetadata", updateDuration);
-      audio.removeEventListener("ended", handleEnded);
-      audio.removeEventListener("error", handleError);
-      audio.removeEventListener("canplay", handleCanPlay);
-    };
-  }, []);
-
-  const togglePlay = () => {
-    if (!audioRef.current || audioError) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play().catch(() => setAudioError(true));
-      setIsPlaying(true);
-    }
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!audioRef.current || audioError) return;
-    const newTime = (Number(e.target.value) / 100) * duration;
-    audioRef.current.currentTime = newTime;
-  };
-
-  return (
-    <div
-      className="media-item-fade"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "16px",
-        padding: "12px 20px",
-        borderRadius: "20px",
-        background: "rgba(255, 255, 255, 0.8)",
-        backdropFilter: "blur(12px)",
-        border: "1px solid rgba(0, 0, 0, 0.05)",
-        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.05)",
-        width: "100%",
-        maxWidth: "450px",
-        margin: "10px 0",
-      }}
-    >
-      <audio ref={audioRef} src={getImageUrl(url)} preload="metadata" />
-
-      <button
-        onClick={togglePlay}
-        disabled={audioError || loading}
-        style={{
-          width: "46px",
-          height: "46px",
-          minWidth: "46px",
-          borderRadius: "50%",
-          background: isPlaying ? "rgba(0, 123, 255, 0.1)" : "#007bff",
-          color: isPlaying ? "#007bff" : "#fff",
-          border: "none",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: audioError || loading ? "not-allowed" : "pointer",
-          transition: "all 0.2s ease",
-          boxShadow: isPlaying ? "none" : "0 6px 15px rgba(0, 123, 255, 0.3)",
-          opacity: audioError || loading ? 0.6 : 1,
-        }}
-      >
-        {loading ? (
-          <div
-            style={{
-              width: 18,
-              height: 18,
-              border: "2px solid rgba(255,255,255,0.3)",
-              borderTopColor: "#fff",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-            }}
-          />
-        ) : audioError ? (
-          <span style={{ fontSize: 16 }}>⚠️</span>
-        ) : isPlaying ? (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-          </svg>
-        ) : (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "3px" }}>
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </button>
-
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
-        {name && (
-          <div
-            style={{
-              fontSize: "12px",
-              fontWeight: 700,
-              opacity: 0.8,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {name}
-          </div>
-        )}
-        {audioError ? (
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#c62828" }}>
-            Не удалось загрузить аудио
-          </div>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "11px", fontWeight: 600, minWidth: "35px" }}>
-              {formatTime(currentTime)}
-            </span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={progress || 0}
-              onChange={handleSeek}
-              style={{ flex: 1, cursor: "pointer" }}
-            />
-            <span
-              style={{
-                fontSize: "11px",
-                fontWeight: 600,
-                minWidth: "35px",
-                textAlign: "right",
-              }}
-            >
-              {formatTime(duration)}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// ИЗОБРАЖЕНИЕ С ФУНКЦИЕЙ ZOOM, ЛОАДЕРОМ И ПОВТОРОМ ПРИ ОШИБКЕ
-// ============================================================================
-function ZoomableImage({ url, name }: { url: string; name?: string }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const finalUrl = getImageUrl(url);
-
-  useEffect(() => {
-    setIsLoading(true);
-    setHasError(false);
-  }, [url, retryCount]);
-
-  const handleRetry = useCallback(() => {
-    setRetryCount((c) => c + 1);
-  }, []);
-
-  return (
-    <>
-      <div
-        className="media-item-fade"
-        style={{
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: isLoading ? "default" : "zoom-in",
-          margin: "12px 0",
-          borderRadius: "20px",
-          overflow: "hidden",
-          background: "#f8fafc",
-          minHeight: "200px",
-          width: "100%",
-          maxWidth: "600px",
-          border: "1px solid rgba(0,0,0,0.06)",
-        }}
-        onClick={() => !isLoading && !hasError && setIsOpen(true)}
-      >
-        {/* Скелетон во время загрузки */}
-        {isLoading && !hasError && (
-          <div className="media-loader">
-            <div className="spinner"></div>
-          </div>
-        )}
-
-        {/* Изображение или заглушка ошибки */}
-        {hasError ? (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "40px",
-              color: "#94a3b8",
-            }}
-          >
-            <div style={{ fontSize: "32px", marginBottom: 8 }}>⚠️</div>
-            <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: 12 }}>
-              Не удалось загрузить фото
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRetry();
-              }}
-              style={{
-                padding: "8px 16px",
-                background: "#007bff",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontWeight: 600,
-                fontSize: 13,
-              }}
-            >
-              Повторить загрузку
-            </button>
-          </div>
-        ) : (
-          <img
-            src={finalUrl}
-            alt={name || "Task Image"}
-            onLoad={() => setIsLoading(false)}
-            onError={() => {
-              setHasError(true);
-              setIsLoading(false);
-            }}
-            loading="lazy"
-            decoding="async"
-            style={{
-              width: "100%",
-              maxHeight: "400px",
-              objectFit: "contain",
-              display: "block",
-              transition: "opacity 0.4s ease",
-              opacity: isLoading ? 0 : 1,
-            }}
-          />
-        )}
-
-        {/* Кнопка "Увеличить" (только если картинка загрузилась) */}
-        {!isLoading && !hasError && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "12px",
-              right: "12px",
-              background: "rgba(0,0,0,0.5)",
-              color: "#fff",
-              padding: "5px 10px",
-              borderRadius: "10px",
-              backdropFilter: "blur(4px)",
-              fontSize: "11px",
-              fontWeight: 800,
-              pointerEvents: "none",
-              textTransform: "uppercase",
-            }}
-          >
-            🔍 Увеличить
-          </div>
-        )}
-      </div>
-
-      {/* Модалка полноразмерного просмотра */}
-      {isOpen && !hasError && (
-        <div
-          onClick={() => setIsOpen(false)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.9)",
-            backdropFilter: "blur(10px)",
-            zIndex: 99999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "zoom-out",
-            padding: "20px",
-          }}
-        >
-          <img
-            src={finalUrl}
-            style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
-              borderRadius: "12px",
-              boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
-            }}
-            alt="Full"
-          />
-          <button
-            onClick={() => setIsOpen(false)}
-            style={{
-              position: "absolute",
-              top: "20px",
-              right: "30px",
-              background: "none",
-              border: "none",
-              color: "#fff",
-              fontSize: "40px",
-              cursor: "pointer",
-            }}
-          >
-            &times;
-          </button>
-        </div>
-      )}
-    </>
-  );
-}
-
-// ============================================================================
-// ПРОСМОТРЩИК PDF
-// ============================================================================
-function PdfViewer({ url, name }: { url: string; name?: string }) {
-  const finalUrl = getImageUrl(url);
-  return (
-    <div className="media-item-fade" style={{ margin: "16px 0", width: "100%", maxWidth: "800px" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          background: "#f1f5f9",
-          padding: "12px 18px",
-          borderRadius: "16px 16px 0 0",
-          border: "1px solid #e2e8f0",
-          borderBottom: "none",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", overflow: "hidden" }}>
-          <span style={{ fontSize: "18px" }}>📄</span>
-          <span
-            style={{
-              fontSize: "13px",
-              fontWeight: 700,
-              color: "#475569",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {name || "PDF Document"}
-          </span>
-        </div>
-        <a
-          href={finalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            fontSize: "11px",
-            color: "#007bff",
-            fontWeight: 800,
-            textDecoration: "none",
-            background: "#fff",
-            padding: "6px 12px",
-            borderRadius: "12px",
-            boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
-          }}
-        >
-          ОТКРЫТЬ ↗
-        </a>
-      </div>
-      <div
-        style={{
-          height: "500px",
-          borderRadius: "0 0 16px 16px",
-          overflow: "hidden",
-          border: "1px solid #e2e8f0",
-          background: "#fff",
-        }}
-      >
-        <iframe
-          src={`${finalUrl}#toolbar=0`}
-          width="100%"
-          height="100%"
-          style={{ border: "none" }}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// ГЛАВНЫЙ КОМПОНЕНТ-РЕНДЕРЕР
-// ============================================================================
-export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) {
-  if (!media || media.length === 0) return null;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%" }}>
-      {media.map((m) => {
-        if (!m.url) return null;
-
-        // Уникальный ключ по ID + URL гарантирует уничтожение старого компонента и
-        // создание нового при смене вопроса. Это убирает эффект "старой картинки".
-        const uniqueKey = `${m.id}-${m.url}`;
-
-        if (m.type === "audio")
-          return <CustomAudioPlayer key={uniqueKey} url={m.url} name={m.name} />;
-        if (m.type === "image")
-          return <ZoomableImage key={uniqueKey} url={m.url} name={m.name} />;
-        if (m.type === "pdf")
-          return <PdfViewer key={uniqueKey} url={m.url} name={m.name} />;
-
-        return null;
-      })}
-
-      <style jsx global>{`
-        .media-item-fade {
-          animation: mediaAppear 0.4s ease-out forwards;
-        }
-        @keyframes mediaAppear {
-          from {
-            opacity: 0;
-            transform: translateY(5px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .media-loader {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 5;
-        }
-        .spinner {
-          width: 30px;
-          height: 30px;
-          border: 3px solid rgba(0, 123, 255, 0.1);
-          border-top-color: #007bff;
-          border-radius: 50%;
-          animation: mediaSpin 0.8s linear infinite;
-        }
-        @keyframes mediaSpin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
-    </div>
-  );
 }
 
 ================
@@ -36756,176 +35831,6 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
         </div>
       ) : null}
     </div>
-  );
-}
-
-================
-File: app/api/admin/upload/route.ts
-================
-// app/api/admin/upload/route.ts
-import { NextResponse } from "next/server";
-import { ok, fail } from "@/lib/api/response";
-import { requireAdmin } from "@/lib/api/admin";
-import {
-  getFileExtension,
-  isAllowedMediaExtension,
-  normalizeStorageObjectPath,
-  safeStorageFileName,
-  uploadStorageObject,
-} from "@/lib/storage/server";
-import Busboy from "busboy";
-import { Readable } from "stream";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-function noStoreInit(): ResponseInit {
-  return {
-    headers: {
-      "cache-control": "no-store, max-age=0",
-    },
-  };
-}
-
-function randomId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-  }
-  return Math.random().toString(36).slice(2, 14);
-}
-
-function cleanFolder(folder: string) {
-  const raw = folder.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
-  if (!raw) return "";
-  return raw
-    .split("/")
-    .map((part) => safeStorageFileName(part))
-    .filter(Boolean)
-    .join("/");
-}
-
-function getMediaType(ext: string): "image" | "audio" | "pdf" | "unknown" {
-  if (["jpg", "jpeg", "png", "gif", "webp", "avif"].includes(ext)) return "image";
-  if (["mp3", "wav", "ogg", "m4a"].includes(ext)) return "audio";
-  if (ext === "pdf") return "pdf";
-  return "unknown";
-}
-
-export async function POST(req: Request) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  // Получаем заголовки из запроса
-  const headers: Record<string, string> = {};
-  req.headers.forEach((value, key) => {
-    headers[key] = value;
-  });
-
-  const bodyStream = Readable.fromWeb(req.body as any);
-  const busboy = Busboy({ headers });
-
-  const fields: Record<string, string> = {};
-  const files: Array<{
-    fieldname: string;
-    file: Buffer;
-    filename: string;
-    mimeType: string;
-  }> = [];
-
-  const parsePromise = new Promise<void>((resolve, reject) => {
-    busboy.on("field", (name, val) => {
-      fields[name] = val;
-    });
-    busboy.on("file", (fieldname, stream, { filename, mimeType }) => {
-      const chunks: Buffer[] = [];
-      stream.on("data", (chunk: Buffer) => chunks.push(chunk));
-      stream.on("end", () => {
-        files.push({ fieldname, file: Buffer.concat(chunks), filename, mimeType });
-      });
-    });
-    busboy.on("error", (err: Error) => reject(err));
-    busboy.on("finish", resolve);
-    bodyStream.pipe(busboy);
-  });
-
-  try {
-    await parsePromise;
-  } catch (err: any) {
-    return fail("Error parsing upload: " + String(err.message), 400, "PARSE_ERROR", noStoreInit());
-  }
-
-  const bucket = String(fields.bucket || "media").trim();
-  const folder = cleanFolder(fields.folder || "");
-  const explicitPath = String(fields.path || "").trim();
-  const upsert = ["1", "true", "yes", "y", "да"].includes(String(fields.upsert || "").toLowerCase());
-
-  if (!bucket) {
-    return fail("Не указан bucket для загрузки", 400, "MISSING_BUCKET", noStoreInit());
-  }
-
-  // Валидация файлов
-  const validFiles: typeof files = [];
-  for (const f of files) {
-    const ext = getFileExtension(f.filename);
-
-    if (!isAllowedMediaExtension(ext)) {
-      return fail(
-        `Тип файла .${ext} не поддерживается. Разрешены: jpg, jpeg, png, gif, webp, avif, mp3, wav, ogg, m4a, pdf`,
-        400,
-        "INVALID_FILE",
-        noStoreInit()
-      );
-    }
-
-    validFiles.push(f);
-  }
-
-  if (validFiles.length === 0) {
-    return fail("Нет корректных файлов для загрузки", 400, "NO_FILES", noStoreInit());
-  }
-
-  // Загрузка всех файлов параллельно
-  const uploadPromises = validFiles.map(async (f) => {
-    const ext = getFileExtension(f.filename);
-    const path = explicitPath
-      ? normalizeStorageObjectPath(explicitPath)
-      : (() => {
-          const baseName = safeStorageFileName(f.filename.replace(/\.[^.]+$/, ""));
-          const fileName = `${Date.now()}_${randomId()}_${baseName}.${ext}`;
-          return folder ? `${folder}/${fileName}` : fileName;
-        })();
-
-    const result = await uploadStorageObject({
-      bucket,
-      path,
-      file: f.file,
-      contentType: f.mimeType || undefined,
-      upsert,
-      cacheControl: "31536000",
-    });
-
-    return {
-      bucket: result.bucket,
-      path: result.path,
-      publicUrl: result.publicUrl,
-      fileName: f.filename,
-      fileSize: f.file.length,
-      mimeType: f.mimeType,
-      mediaType: getMediaType(ext),
-    };
-  });
-
-  const results = await Promise.all(uploadPromises);
-
-  return ok(
-    {
-      files: results,
-      bucket: results[0]?.bucket ?? "",
-      path: results[0]?.path ?? "",
-      publicUrl: results[0]?.publicUrl ?? "",
-      fileName: results[0]?.fileName ?? "",
-    },
-    noStoreInit()
   );
 }
 
@@ -38372,6 +37277,239 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     return fail(e?.message || "Server error", 500, "SERVER_ERROR", noStoreInit());
   }
+}
+
+================
+File: app/api/storage/public/[bucket]/[...path]/route.ts
+================
+/* app/api/storage/public/[bucket]/[...path]/route.ts */
+
+import { NextRequest, NextResponse } from "next/server";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+// Vercel: увеличиваем таймаут — крупные файлы (аудио, PDF) могут грузиться дольше 10 сек
+export const maxDuration = 30;
+
+// ─────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────
+
+type RouteParams = { bucket: string; path: string[] };
+type RouteContext = { params: RouteParams | Promise<RouteParams> };
+
+// ─────────────────────────────────────────────────────────────
+// Config helpers
+// ─────────────────────────────────────────────────────────────
+
+function normalizeBucket(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function normalizePath(parts: unknown) {
+  if (!Array.isArray(parts)) return "";
+  return parts
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join("/");
+}
+
+/**
+ * Дефолтный список публичных бакетов.
+ * ВАЖНО: синхронизировать с DEFAULT_PUBLIC_BUCKETS в lib/storage/server.ts
+ */
+const DEFAULT_PROXY_PUBLIC_BUCKETS = [
+  "covers",
+  "question-images",
+  "help-images",
+  "backgrounds",
+  "streak-icons",
+  "streak_icon_assets",
+  "streak-roadmap-bg",
+  "profile-backgrounds",
+];
+
+/**
+ * Возвращает список разрешённых бакетов.
+ * Если STORAGE_PUBLIC_BUCKETS задан — берём его.
+ * Если нет — используем DEFAULT_PROXY_PUBLIC_BUCKETS.
+ * Yandex-бакет добавляется всегда.
+ */
+function getAllowedPublicBuckets(): string[] {
+  const fromEnv = (process.env.STORAGE_PUBLIC_BUCKETS || "")
+    .split(",")
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  const base = fromEnv.length > 0 ? fromEnv : [...DEFAULT_PROXY_PUBLIC_BUCKETS];
+
+  const yandexBucket = process.env.YANDEX_BUCKET_NAME;
+  if (yandexBucket && !base.includes(yandexBucket)) {
+    base.push(yandexBucket);
+  }
+
+  return base;
+}
+
+function isBucketAllowed(bucket: string) {
+  return getAllowedPublicBuckets().includes(bucket);
+}
+
+function getSupabaseUrl() {
+  return String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
+}
+
+function isYandexBucket(bucket: string) {
+  const yb = process.env.YANDEX_BUCKET_NAME;
+  return Boolean(yb && bucket === yb);
+}
+
+/** Запрещаем path traversal */
+function isSafeStorageObjectPath(path: string) {
+  if (!path) return false;
+  if (path.startsWith("/") || path.includes("\\") || path.includes("\0")) return false;
+  return path.split("/").every((part) => part && part !== "." && part !== "..");
+}
+
+// ─────────────────────────────────────────────────────────────
+// URL builders
+// ─────────────────────────────────────────────────────────────
+
+function encodeStoragePath(path: string) {
+  return path
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+}
+
+function buildSupabasePublicUrl(bucket: string, objectPath: string) {
+  const base = getSupabaseUrl();
+  if (!base) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  return `${base}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodeStoragePath(objectPath)}`;
+}
+
+function buildYandexPublicUrl(bucket: string, objectPath: string) {
+  return `https://storage.yandexcloud.net/${encodeURIComponent(bucket)}/${encodeStoragePath(objectPath)}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+function jsonError(message: string, status = 500, code = "STORAGE_PROXY_ERROR") {
+  return NextResponse.json(
+    { ok: false, error: message, code },
+    { status, headers: { "cache-control": "no-store, max-age=0" } }
+  );
+}
+
+async function readParams(ctx: RouteContext): Promise<RouteParams> {
+  return await ctx.params;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Handlers
+// ─────────────────────────────────────────────────────────────
+
+export async function GET(req: NextRequest, ctx: RouteContext) {
+  const params = await readParams(ctx);
+  const bucket = normalizeBucket(params.bucket);
+  const objectPath = normalizePath(params.path);
+
+  if (!bucket) return jsonError("Bucket is required", 400, "VALIDATION");
+  if (!objectPath) return jsonError("Path is required", 400, "VALIDATION");
+  if (!isBucketAllowed(bucket))
+    return jsonError(`Public access to bucket "${bucket}" is not allowed`, 403, "BUCKET_NOT_ALLOWED");
+  if (!isSafeStorageObjectPath(objectPath))
+    return jsonError("Invalid object path", 400, "INVALID_PATH");
+
+  let targetUrl: string;
+  try {
+    targetUrl = isYandexBucket(bucket)
+      ? buildYandexPublicUrl(bucket, objectPath)
+      : buildSupabasePublicUrl(bucket, objectPath);
+  } catch (e: any) {
+    return jsonError(e?.message || "URL build error", 500, "URL_BUILD_ERROR");
+  }
+
+  try {
+    // Формируем upstream-заголовки
+    const upstreamHeaders: Record<string, string> = {
+      // Представляемся браузером — некоторые CDN блокируют bot-like UA
+      "User-Agent":
+        "Mozilla/5.0 (compatible; HippoProxy/1.0; +https://hippo-book.ru)",
+    };
+
+    // ↓ Пробрасываем Range для поддержки audio seek через прокси.
+    //   Без этого браузер не может перематывать аудиофайлы.
+    const rangeHeader = req.headers.get("Range");
+    if (rangeHeader) {
+      upstreamHeaders["Range"] = rangeHeader;
+    }
+
+    // Запрашиваем файл server-to-server.
+    // Пользователю не нужен прямой доступ к Яндексу/Supabase —
+    // наш сервер сам забирает контент и стримит его пользователю.
+    const upstream = await fetch(targetUrl, {
+      headers: upstreamHeaders,
+      // Отключаем Next.js-кеш fetch — нам важен свежий ответ от upstream,
+      // а кешировать будем на уровне браузера через Cache-Control
+      cache: "no-store",
+    });
+
+    // 206 Partial Content — легитимный ответ на Range-запрос
+    if (!upstream.ok && upstream.status !== 206) {
+      if (upstream.status === 404) {
+        return jsonError("File not found", 404, "NOT_FOUND");
+      }
+      return jsonError(`Upstream error: ${upstream.status}`, 502, "UPSTREAM_ERROR");
+    }
+
+    // ─── Формируем заголовки ответа ───────────────────────────────────────
+    const resHeaders: Record<string, string> = {
+      // Тип контента — берём от upstream (image/jpeg, audio/mp4, и т.д.)
+      "Content-Type":
+        upstream.headers.get("Content-Type") || "application/octet-stream",
+
+      // Долгое кеширование в браузере — файлы в хранилище immutable
+      "Cache-Control": "public, max-age=31536000, immutable",
+
+      // Безопасность
+      "X-Content-Type-Options": "nosniff",
+    };
+
+    // Пробрасываем заголовки для range requests и кеш-валидации
+    const headersToForward = [
+      "Content-Length",
+      "Content-Range",
+      "Accept-Ranges",
+      "ETag",
+      "Last-Modified",
+    ] as const;
+
+    for (const header of headersToForward) {
+      const val = upstream.headers.get(header);
+      if (val) resHeaders[header] = val;
+    }
+
+    // ─── Стримим тело напрямую — без буферизации в памяти ────────────────
+    // upstream.body — это ReadableStream, NextResponse умеет его стримить.
+    return new NextResponse(upstream.body, {
+      status: upstream.status, // 200 или 206 (для range requests)
+      headers: resHeaders,
+    });
+  } catch (e: any) {
+    // fetch упал (network error, timeout и т.д.)
+    return jsonError(e?.message || "Storage fetch error", 502, "FETCH_ERROR");
+  }
+}
+
+// HEAD используется браузером для preflight проверок и audio duration
+export async function HEAD(req: NextRequest, ctx: RouteContext) {
+  // Переиспользуем GET — NextResponse автоматически уберёт body для HEAD
+  return GET(req, ctx);
 }
 
 ================
@@ -40489,68 +39627,332 @@ export default function StreakRoadmapModal({
 }
 
 ================
-File: next.config.ts
+File: lib/storage/server.ts
 ================
-// next.config.ts
-import type { NextConfig } from "next";
+/* lib/storage/server.ts */
+import "server-only";
 
-function getSupabaseRemotePatterns(): NonNullable<NextConfig["images"]>["remotePatterns"] {
-  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!rawUrl) return [];
+import { createClient } from "@supabase/supabase-js";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { directFetch } from "@/lib/net/directFetch";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
+
+const DEFAULT_PUBLIC_BUCKETS = [
+  "covers",
+  "question-images",
+  "help-images",
+  "backgrounds",
+  "streak-icons",
+  "streak_icon_assets",
+  "streak-roadmap-bg",
+  "profile-backgrounds",
+];
+
+const DEFAULT_UPLOAD_BUCKETS = [
+  "covers",
+  "question-images",
+  "backgrounds",
+  "streak-icons",
+  "streak_icon_assets",
+  "streak-roadmap-bg",
+  "profile-backgrounds",
+];
+
+const DEFAULT_ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "avif"];
+
+// mp4 добавлен: аудиозаписи с iPhone/Android часто имеют расширение .mp4
+const DEFAULT_ALLOWED_MEDIA_EXTENSIONS = [
+  ...DEFAULT_ALLOWED_IMAGE_EXTENSIONS,
+  "mp3",
+  "wav",
+  "ogg",
+  "m4a",
+  "mp4",
+  "pdf",
+];
+
+export type UploadStorageObjectInput = {
+  bucket: string;
+  path: string;
+  file: Blob | ArrayBuffer | Uint8Array | Buffer;
+  contentType?: string;
+  upsert?: boolean;
+  cacheControl?: string;
+  maxRetries?: number;
+};
+
+export type DownloadStorageObjectResult = {
+  data: Blob;
+  contentType: string;
+  size: number | null;
+};
+
+function envList(name: string, fallback: string[]) {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+
+  const list = raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return list.length ? list : fallback;
+}
+
+export function getPublicStorageBuckets() {
+  return envList("STORAGE_PUBLIC_BUCKETS", DEFAULT_PUBLIC_BUCKETS);
+}
+
+export function getUploadStorageBuckets() {
+  const yandexBucket = process.env.YANDEX_BUCKET_NAME;
+  const buckets = envList("STORAGE_UPLOAD_BUCKETS", DEFAULT_UPLOAD_BUCKETS);
+  if (yandexBucket && !buckets.includes(yandexBucket)) {
+    buckets.push(yandexBucket);
+  }
+  return buckets;
+}
+
+export function isValidBucketName(bucket: string) {
+  return /^[a-zA-Z0-9._-]{1,80}$/.test(bucket);
+}
+
+export function normalizeStorageObjectPath(path: string | string[]) {
+  const raw = Array.isArray(path) ? path.join("/") : String(path || "");
+  const clean = raw
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("/");
+  if (!clean) return "";
 
   try {
-    const url = new URL(rawUrl);
-    if (!url.hostname) return [];
-
-    return [
-      {
-        protocol: url.protocol.replace(":", "") as "http" | "https",
-        hostname: url.hostname,
-        pathname: "/storage/v1/object/public/**",
-      },
-    ];
+    return decodeURIComponent(clean);
   } catch {
-    return [];
+    return clean;
   }
 }
 
-function getYandexRemotePatterns(): NonNullable<NextConfig["images"]>["remotePatterns"] {
-  // Yandex Object Storage – для загрузки через <Image> и обычных <img>
-  return [
-    {
-      protocol: "https" as const,
-      hostname: "storage.yandexcloud.net",
-    },
-  ];
+export function isSafeStorageObjectPath(path: string) {
+  if (!path) return false;
+  if (path.startsWith("/")) return false;
+  if (path.includes("\\")) return false;
+  if (path.includes("\0")) return false;
+
+  const parts = path.split("/");
+  return parts.every((part) => {
+    if (!part) return false;
+    if (part === "." || part === "..") return false;
+    return true;
+  });
 }
 
-const nextConfig: NextConfig = {
-  poweredByHeader: false,
+export function assertPublicStorageBucket(bucket: string) {
+  if (!isValidBucketName(bucket)) {
+    throw new Error("Некорректное имя bucket");
+  }
+  const allowed = getPublicStorageBuckets();
+  if (!allowed.includes(bucket) && bucket !== process.env.YANDEX_BUCKET_NAME) {
+    throw new Error(`Bucket "${bucket}" не разрешён для публичной выдачи`);
+  }
+}
 
-  images: {
-    remotePatterns: [
-      ...(getSupabaseRemotePatterns() ?? []),
-      ...(getYandexRemotePatterns() ?? []),
-    ],
-  },
+export function assertUploadStorageBucket(bucket: string) {
+  if (!isValidBucketName(bucket)) {
+    throw new Error("Некорректное имя bucket");
+  }
+  const allowed = getUploadStorageBuckets();
+  if (!allowed.includes(bucket)) {
+    throw new Error(`Bucket "${bucket}" не разрешён для загрузки`);
+  }
+}
 
-  // Увеличение лимита тела запроса НЕ задаётся через next.config в App Router.
-  // Для поддержки больших файлов (аудио) используйте клиентскую загрузку через
-  // presigned URL в Supabase/Yandex, либо настройте обратный прокси (Nginx).
-  // В коде уже реализована прямая загрузка в Storage (lib/storage/server.ts).
+export function safeStorageFileName(name: string) {
+  const fallback = "file";
+  const raw = String(name || fallback)
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-zA-Z0-9а-яА-ЯёЁ._-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-_.]+|[-_.]+$/g, "");
 
-  async redirects() {
-    return [
-      {
-        source: "/:path*.html",
-        destination: "/:path*",
-        permanent: true,
-      },
-    ];
-  },
-};
+  return raw || fallback;
+}
 
-export default nextConfig;
+export function getFileExtension(name: string) {
+  const clean = safeStorageFileName(name);
+  const ext = clean.split(".").pop()?.toLowerCase() || "";
+  return ext || "bin";
+}
+
+export function isAllowedImageExtension(ext: string) {
+  return DEFAULT_ALLOWED_IMAGE_EXTENSIONS.includes(String(ext || "").toLowerCase());
+}
+
+export function isAllowedMediaExtension(ext: string) {
+  return DEFAULT_ALLOWED_MEDIA_EXTENSIONS.includes(String(ext || "").toLowerCase());
+}
+
+export function guessContentTypeFromPath(path: string) {
+  const ext = getFileExtension(path);
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "png") return "image/png";
+  if (ext === "gif") return "image/gif";
+  if (ext === "webp") return "image/webp";
+  if (ext === "avif") return "image/avif";
+  if (ext === "svg") return "image/svg+xml";
+  if (ext === "pdf") return "application/pdf";
+  if (ext === "mp3") return "audio/mpeg";
+  if (ext === "wav") return "audio/wav";
+  if (ext === "ogg") return "audio/ogg";
+  if (ext === "m4a") return "audio/mp4";
+  // mp4 — контейнер AAC; аудиофайлы с мобильных устройств часто имеют именно это расширение
+  if (ext === "mp4") return "audio/mp4";
+  return "application/octet-stream";
+}
+
+function getSupabaseStorageKey(admin: boolean) {
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (admin) {
+    if (!serviceRole) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+    return serviceRole;
+  }
+  if (serviceRole) return serviceRole;
+  if (!anon) throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  return anon;
+}
+
+export function createSupabaseStorageClient(options?: { admin?: boolean }) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+
+  const key = getSupabaseStorageKey(Boolean(options?.admin));
+
+  return createClient(url, key, {
+    global: {
+      fetch: directFetch,
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
+export async function downloadPublicStorageObject(bucket: string, path: string | string[]) {
+  const cleanBucket = String(bucket || "").trim();
+  const cleanPath = normalizeStorageObjectPath(path);
+  assertPublicStorageBucket(cleanBucket);
+  if (!isSafeStorageObjectPath(cleanPath)) {
+    throw new Error("Некорректный путь к файлу");
+  }
+  const supabase = createSupabaseStorageClient({ admin: false });
+  const { data, error } = await supabase.storage.from(cleanBucket).download(cleanPath);
+  if (error) throw error;
+  if (!data) throw new Error("Файл не найден");
+
+  const contentType = data.type || guessContentTypeFromPath(cleanPath);
+  const size = typeof data.size === "number" ? data.size : null;
+  return { data, contentType, size } satisfies DownloadStorageObjectResult;
+}
+
+function isTransientStorageError(error: any): boolean {
+  const msg = String(error?.message || error || "").toLowerCase();
+  return (
+    msg.includes("fetch failed") ||
+    msg.includes("econnreset") ||
+    msg.includes("etimedout") ||
+    msg.includes("network") ||
+    msg.includes("terminated") ||
+    msg.includes("timeout") ||
+    msg.includes("too many requests")
+  );
+}
+
+export async function uploadStorageObject(input: UploadStorageObjectInput) {
+  const bucket = String(input.bucket || "").trim();
+  const path = normalizeStorageObjectPath(input.path);
+  assertUploadStorageBucket(bucket);
+
+  if (!isSafeStorageObjectPath(path)) {
+    throw new Error("Некорректный путь к файлу");
+  }
+
+  let safeBody = input.file;
+  if (input.file instanceof ArrayBuffer) {
+    safeBody = Buffer.from(input.file);
+  }
+
+  const isYandexBucket = bucket === process.env.YANDEX_BUCKET_NAME;
+  const maxRetries = Math.max(0, Number(input.maxRetries) || 2);
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (isYandexBucket) {
+        const s3Client = new S3Client({
+          region: process.env.YANDEX_REGION || "ru-central1",
+          endpoint: "https://storage.yandexcloud.net",
+          credentials: {
+            accessKeyId: process.env.YANDEX_ACCESS_KEY_ID!,
+            secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY!,
+          },
+        });
+
+        await s3Client.send(
+          new PutObjectCommand({
+            Bucket: bucket,
+            Key: path,
+            Body: safeBody as any,
+            ContentType: input.contentType || guessContentTypeFromPath(path),
+            CacheControl: input.cacheControl || "max-age=31536000",
+          })
+        );
+
+        return {
+          bucket,
+          path,
+          publicUrl: `https://storage.yandexcloud.net/${bucket}/${path}`,
+        };
+      } else {
+        const supabase = createSupabaseStorageClient({ admin: true });
+
+        const { data, error } = await supabase.storage
+          .from(bucket)
+          .upload(path, input.file, {
+            cacheControl: input.cacheControl ?? "31536000",
+            upsert: Boolean(input.upsert),
+            contentType: input.contentType || guessContentTypeFromPath(path),
+          });
+
+        if (error) {
+          if (!isTransientStorageError(error) || attempt === maxRetries) {
+            throw error;
+          }
+          lastError = error;
+          await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+          continue;
+        }
+
+        return {
+          bucket,
+          path: data?.path || path,
+          publicUrl: getStoragePublicUrl(bucket, data?.path || path),
+        };
+      }
+    } catch (error: any) {
+      lastError = error;
+      if (!isTransientStorageError(error) || attempt === maxRetries) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+    }
+  }
+
+  throw lastError ?? new Error("Upload failed after retries");
+}
 
 ================
 File: public/styles/base.css
@@ -41918,531 +41320,6 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
 }
 
 ================
-File: app/(app)/assignment/lib/scoring.ts
-================
-// app/(app)/assignment/lib/scoring.ts
-import { normalizeText } from "./normalize";
-import type { FinalStats, ReviewItem } from "./types";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function buildCorrectStrings(arr: any[]): string[] {
-  return (arr || []).map((variants: any) =>
-    (Array.isArray(variants) ? variants : [variants]).map(String).join(" или ")
-  );
-}
-
-function getPointsTotal(q: any): number {
-  const p = Number(q?.points);
-  return Number.isFinite(p) && p > 0 ? p : 1;
-}
-
-function buildParts(correctAnswers: any[], userArr: string[], totalCount: number) {
-  const parts: any[] = [];
-  for (let idx = 0; idx < totalCount; idx++) {
-    const variants = correctAnswers[idx];
-    const userRaw = String(userArr[idx] ?? "");
-    const userNorm = normalizeText(userRaw);
-
-    const varsNorm = (Array.isArray(variants) ? variants : [variants]).map((v: any) =>
-      normalizeText(String(v))
-    );
-
-    const ok = userNorm.length > 0 && varsNorm.some((v) => v === userNorm);
-
-    parts.push({
-      index: idx,
-      isCorrect: ok,
-      user: userRaw,
-      correct: (Array.isArray(variants) ? variants : [variants]).map(String),
-    });
-  }
-  return parts;
-}
-
-// ---------------------------------------------------------------------------
-// Validate
-// ---------------------------------------------------------------------------
-
-export function validateAllAnswered(
-  questions: any[],
-  answers: any
-): { ok: boolean; index: number; subIndex?: number } {
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-    const a = answers[i];
-
-    if (q.type === "test") {
-      if (q.multiple) {
-        const has = Array.isArray(a) && a.length > 0;
-        if (!has) return { ok: false, index: i };
-      } else {
-        const has = a !== undefined && a !== null && a !== "";
-        if (!has) return { ok: false, index: i };
-      }
-    } else if (q.type === "fill") {
-      const correctCount = (q.answers || []).length;
-      const has =
-        Array.isArray(a) &&
-        a.length >= correctCount &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
-      if (!has) return { ok: false, index: i };
-    } else if (q.type === "sentence") {
-      const gaps = (String(q.sentence || "").match(/___/g) || []).length;
-      const has =
-        Array.isArray(a) &&
-        a.length >= gaps &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
-      if (!has) return { ok: false, index: i };
-    } else if (q.type === "complex") {
-      const subQs = q.subQuestions || [];
-      const subAns = Array.isArray(a) ? a : [];
-      const subRes = validateAllAnswered(subQs, subAns);
-      if (!subRes.ok) return { ok: false, index: i, subIndex: subRes.index };
-    } else if (q.type === "matching") {
-      const pairs = q.pairs || [];
-      const has =
-        a && typeof a === "object" && Object.keys(a).length === pairs.length;
-      if (!has) return { ok: false, index: i };
-    }
-  }
-  return { ok: true, index: -1 };
-}
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
-export function calcAndBuildReview(
-  questions: any[],
-  answers: any
-): { stats: FinalStats; review: ReviewItem[] } {
-  const statsSum = {
-    correct: 0,
-    incorrect: 0,
-    skipped: 0,
-    total: 0,
-    pointsEarned: 0,
-    pointsTotal: 0,
-  };
-
-  const review: ReviewItem[] = [];
-
-  function processQ(q: any, a: any, idxText: string): ReviewItem {
-    const questionText = String(q?.q ?? "").trim() || `Вопрос ${idxText}`;
-    const pointsTotal = getPointsTotal(q);
-
-    // ---------------------------------------------------------------
-    // COMPLEX
-    // ---------------------------------------------------------------
-    if (q.type === "complex") {
-      const subQs = q.subQuestions || [];
-      const subAns = Array.isArray(a) ? a : [];
-
-      const subReviews: ReviewItem[] = [];
-      let complexEarned = 0;
-      let complexTotal = 0;
-      let complexAllSkipped = true;
-      let complexAllCorrect = true;
-
-      subQs.forEach((sq: any, subI: number) => {
-        const sr = processQ(sq, subAns[subI], `${idxText}.${subI + 1}`);
-        subReviews.push(sr);
-        complexEarned += sr.pointsEarned;
-        complexTotal += sr.pointsTotal;
-        if (!sr.isSkipped) complexAllSkipped = false;
-        if (!sr.isCorrect) complexAllCorrect = false;
-      });
-
-      return {
-        type: "complex",
-        questionText,
-        isCorrect: complexTotal > 0 && complexEarned === complexTotal,
-        isSkipped: complexAllSkipped,
-        pointsEarned: Number(complexEarned.toFixed(2)),
-        pointsTotal: complexTotal,
-        subReviews,
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // COUNT TOTALS
-    // ---------------------------------------------------------------
-    statsSum.total++;
-    statsSum.pointsTotal += pointsTotal;
-
-    // ---------------------------------------------------------------
-    // TEST
-    // ---------------------------------------------------------------
-    if (q.type === "test") {
-      const isMultiple = !!q.multiple;
-      const opts: any[] = Array.isArray(q.options) ? q.options : [];
-
-      const getOptText = (idx: number) => {
-        const opt = opts[idx];
-        if (!opt) return "—";
-        return typeof opt === "string"
-          ? opt
-          : opt.text || `Вариант ${idx + 1}`;
-      };
-
-      const correctArr = Array.isArray(q.correct)
-        ? q.correct
-        : typeof q.correct === "number"
-          ? [q.correct]
-          : [];
-      const correctLabels = correctArr.map((c: any) => getOptText(Number(c)));
-
-      const answered = isMultiple
-        ? Array.isArray(a) && a.length > 0
-        : a !== undefined && a !== null && a !== "";
-
-      if (!answered) {
-        statsSum.skipped++;
-        return {
-          type: "test",
-          questionText,
-          isCorrect: false,
-          isSkipped: true,
-          userLabel: isMultiple ? [] : "Не отвечено",
-          correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
-          isMultiple,
-          fraction: 0,
-          pointsEarned: 0,
-          pointsTotal,
-        } as ReviewItem;
-      }
-
-      let fraction = 0;
-      let isCorrect = false;
-      let userLabels: string | string[] = [];
-
-      if (isMultiple) {
-        const userArr = Array.isArray(a) ? a.map(Number) : [];
-        userLabels = userArr.map((c: number) => getOptText(c));
-
-        const correctSet = new Set(correctArr.map(Number));
-        const userSet = new Set(userArr);
-
-        let correctSelected = 0;
-        let wrongSelected = 0;
-
-        userSet.forEach((val: number) => {
-          if (correctSet.has(val)) correctSelected++;
-          else wrongSelected++;
-        });
-
-        const totalCorrect = correctSet.size || 1;
-        fraction = Math.max(0, correctSelected - wrongSelected) / totalCorrect;
-        isCorrect = fraction === 1;
-      } else {
-        const userIdx = Number(a);
-        userLabels = getOptText(userIdx);
-        const correctIdx = Number(correctArr[0]);
-        isCorrect = userIdx === correctIdx;
-        fraction = isCorrect ? 1 : 0;
-      }
-
-      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
-      statsSum.pointsEarned += pointsEarned;
-
-      if (isCorrect) statsSum.correct++;
-      else statsSum.incorrect++;
-
-      return {
-        type: "test",
-        questionText,
-        isCorrect,
-        isSkipped: false,
-        userLabel: userLabels,
-        correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
-        fraction,
-        isMultiple,
-        pointsEarned,
-        pointsTotal,
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // FILL
-    // ---------------------------------------------------------------
-    if (q.type === "fill") {
-      const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
-      const totalCount = correctAnswers.length;
-
-      if (totalCount === 0) {
-        statsSum.skipped++;
-        return {
-          type: "fill",
-          questionText,
-          isCorrect: false,
-          isSkipped: true,
-          userAnswers: [],
-          correctAnswers: [],
-          parts: [],
-          percent: 0,
-          correctCount: 0,
-          totalCount: 0,
-          pointsEarned: 0,
-          pointsTotal,
-        } as ReviewItem;
-      }
-
-      const correctStrings = buildCorrectStrings(correctAnswers);
-      const userArr: string[] = Array.isArray(a)
-        ? (a as any[]).map((x) => String(x ?? ""))
-        : [];
-
-      const answered =
-        Array.isArray(a) &&
-        a.length >= totalCount &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
-
-      if (!answered) {
-        statsSum.skipped++;
-        const parts = buildParts(correctAnswers, userArr, totalCount);
-        const correctCount = parts.filter((p) => p.isCorrect).length;
-        const percent =
-          totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
-
-        return {
-          type: "fill",
-          questionText,
-          isCorrect: false,
-          isSkipped: true,
-          userAnswers: userArr,
-          correctAnswers: correctStrings,
-          parts,
-          percent,
-          correctCount,
-          totalCount,
-          pointsEarned: 0,
-          pointsTotal,
-        } as ReviewItem;
-      }
-
-      const parts = buildParts(correctAnswers, userArr, totalCount);
-      const correctCount = parts.filter((p) => p.isCorrect).length;
-      const fraction = totalCount > 0 ? correctCount / totalCount : 0;
-      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
-
-      statsSum.pointsEarned += pointsEarned;
-
-      const isAllCorrect = correctCount === totalCount;
-      if (isAllCorrect) statsSum.correct++;
-      else statsSum.incorrect++;
-
-      return {
-        type: "fill",
-        questionText,
-        isCorrect: isAllCorrect,
-        isSkipped: false,
-        userAnswers: userArr,
-        correctAnswers: correctStrings,
-        parts,
-        percent: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0,
-        correctCount,
-        totalCount,
-        pointsEarned,
-        pointsTotal,
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // SENTENCE
-    // ---------------------------------------------------------------
-    if (q.type === "sentence") {
-      const gaps = (String(q.sentence || "").match(/___/g) || []).length;
-      const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
-      const totalCount = gaps;
-
-      if (totalCount === 0) {
-        statsSum.skipped++;
-        return {
-          type: "sentence",
-          questionText,
-          isCorrect: false,
-          isSkipped: true,
-          userAnswers: [],
-          correctAnswers: [],
-          parts: [],
-          percent: 0,
-          correctCount: 0,
-          totalCount: 0,
-          pointsEarned: 0,
-          pointsTotal,
-        } as ReviewItem;
-      }
-
-      const correctStrings = buildCorrectStrings(correctAnswers);
-      const userArr: string[] = Array.isArray(a)
-        ? (a as any[]).slice(0, gaps).map((x) => String(x ?? ""))
-        : [];
-
-      const answered =
-        Array.isArray(a) &&
-        a.length >= gaps &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
-
-      if (!answered) {
-        statsSum.skipped++;
-        const parts = buildParts(correctAnswers, userArr, totalCount);
-        const correctCount = parts.filter((p) => p.isCorrect).length;
-        const percent =
-          totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
-
-        return {
-          type: "sentence",
-          questionText,
-          isCorrect: false,
-          isSkipped: true,
-          userAnswers: userArr,
-          correctAnswers: correctStrings,
-          parts,
-          percent,
-          correctCount,
-          totalCount,
-          pointsEarned: 0,
-          pointsTotal,
-        } as ReviewItem;
-      }
-
-      const parts = buildParts(correctAnswers, userArr, totalCount);
-      const correctCount = parts.filter((p) => p.isCorrect).length;
-      const fraction = totalCount > 0 ? correctCount / totalCount : 0;
-      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
-
-      statsSum.pointsEarned += pointsEarned;
-
-      const isAllCorrect = correctCount === totalCount;
-      if (isAllCorrect) statsSum.correct++;
-      else statsSum.incorrect++;
-
-      return {
-        type: "sentence",
-        questionText,
-        isCorrect: isAllCorrect,
-        isSkipped: false,
-        userAnswers: userArr,
-        correctAnswers: correctStrings,
-        parts,
-        percent: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0,
-        correctCount,
-        totalCount,
-        pointsEarned,
-        pointsTotal,
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // MATCHING
-    // ---------------------------------------------------------------
-    if (q.type === "matching") {
-      const pairs = Array.isArray(q.pairs) ? q.pairs : [];
-      const totalPairsCount = pairs.length;
-
-      // Правильные соответствия: левый id пары -> такой же id (так как оба элемента пары имеют один id)
-      const correctMatches: Record<string, string> = {};
-      pairs.forEach((p: any) => {
-        correctMatches[p.id] = p.id;
-      });
-
-      const answered =
-        a && typeof a === "object" && Object.keys(a).length > 0;
-
-      if (!answered) {
-        statsSum.skipped++;
-        return {
-          type: "matching",
-          questionText,
-          isCorrect: false,
-          isSkipped: true,
-          correctPairsCount: 0,
-          totalPairsCount,
-          userMatches: {},
-          correctMatches,
-          pointsEarned: 0,
-          pointsTotal,
-        } as ReviewItem;
-      }
-
-      let correctPairsCount = 0;
-      const userMatches = a as Record<string, string>;
-
-      pairs.forEach((p: any) => {
-        if (userMatches[p.id] === correctMatches[p.id]) {
-          correctPairsCount++;
-        }
-      });
-
-      const fraction =
-        totalPairsCount > 0 ? correctPairsCount / totalPairsCount : 0;
-      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
-
-      statsSum.pointsEarned += pointsEarned;
-
-      const isAllCorrect = correctPairsCount === totalPairsCount;
-      if (isAllCorrect) statsSum.correct++;
-      else statsSum.incorrect++;
-
-      return {
-        type: "matching",
-        questionText,
-        isCorrect: isAllCorrect,
-        isSkipped: false,
-        correctPairsCount,
-        totalPairsCount,
-        userMatches,
-        correctMatches,
-        pointsEarned,
-        pointsTotal,
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // OTHER / CROSSWORD
-    // ---------------------------------------------------------------
-    statsSum.skipped++;
-    return {
-      type: "other",
-      questionText,
-      isCorrect: false,
-      isSkipped: true,
-      note: "Тип вопроса пока не поддержан в стандартном Review (отрабатывается отдельно).",
-      pointsEarned: 0,
-      pointsTotal,
-    } as ReviewItem;
-  }
-
-  // -----------------------------------------------------------------------
-  // Process each question
-  // -----------------------------------------------------------------------
-  questions.forEach((q, i) => {
-    review.push(processQ(q, answers[i], String(i + 1)));
-  });
-
-  const score =
-    statsSum.pointsTotal > 0
-      ? Math.round((statsSum.pointsEarned / statsSum.pointsTotal) * 100)
-      : 0;
-
-  return {
-    stats: {
-      score,
-      correct: statsSum.correct,
-      incorrect: statsSum.incorrect,
-      skipped: statsSum.skipped,
-      total: statsSum.total,
-      pointsEarned: Number(statsSum.pointsEarned.toFixed(2)),
-      pointsTotal: statsSum.pointsTotal,
-    },
-    review,
-  };
-}
-
-================
 File: app/api/admin/requests/sync-sheet/route.ts
 ================
 /* app/api/admin/requests/sync-sheet/route.ts */
@@ -42833,6 +41710,216 @@ export async function GET(req: NextRequest) {
   } catch (e: any) {
     return fail(e?.message || "Server error", 500, "SERVER_ERROR", noStoreInit());
   }
+}
+
+================
+File: app/api/admin/upload/route.ts
+================
+// app/api/admin/upload/route.ts
+import { ok, fail } from "@/lib/api/response";
+import { requireAdmin } from "@/lib/api/admin";
+import {
+  getFileExtension,
+  isAllowedMediaExtension,
+  normalizeStorageObjectPath,
+  safeStorageFileName,
+  uploadStorageObject,
+} from "@/lib/storage/server";
+import Busboy from "busboy";
+import { Readable } from "stream";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// Vercel Serverless: по умолчанию таймаут 10 сек — для загрузки 20 МБ не хватит.
+// Увеличиваем до 60 сек. На других платформах игнорируется.
+export const maxDuration = 60;
+
+// Максимальный размер одного файла (совпадает с serverBodySizeLimit в next.config.ts)
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 МБ
+
+function noStoreInit(): ResponseInit {
+  return {
+    headers: {
+      "cache-control": "no-store, max-age=0",
+    },
+  };
+}
+
+function randomId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  }
+  return Math.random().toString(36).slice(2, 14);
+}
+
+function cleanFolder(folder: string) {
+  const raw = folder.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  if (!raw) return "";
+  return raw
+    .split("/")
+    .map((part) => safeStorageFileName(part))
+    .filter(Boolean)
+    .join("/");
+}
+
+// mp4 добавлен: аудиофайлы с мобильных устройств часто приходят в формате .mp4
+function getMediaType(ext: string): "image" | "audio" | "pdf" | "unknown" {
+  if (["jpg", "jpeg", "png", "gif", "webp", "avif"].includes(ext)) return "image";
+  if (["mp3", "wav", "ogg", "m4a", "mp4"].includes(ext)) return "audio";
+  if (ext === "pdf") return "pdf";
+  return "unknown";
+}
+
+export async function POST(req: Request) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const headers: Record<string, string> = {};
+  req.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
+
+  const bodyStream = Readable.fromWeb(req.body as any);
+
+  // Лимиты Busboy: защита от слишком больших файлов и от злоупотреблений.
+  // fileSize — максимальный размер одного файла в байтах.
+  // Если файл превысит лимит, Busboy установит stream.truncated = true
+  // и прекратит читать данные (файл будет обрезан — мы это отловим ниже).
+  const busboy = Busboy({
+    headers,
+    limits: {
+      fileSize: MAX_FILE_SIZE_BYTES,
+      files: 10,
+      fields: 20,
+    },
+  });
+
+  const fields: Record<string, string> = {};
+  const files: Array<{
+    fieldname: string;
+    file: Buffer;
+    filename: string;
+    mimeType: string;
+    truncated: boolean;
+  }> = [];
+
+  const parsePromise = new Promise<void>((resolve, reject) => {
+    busboy.on("field", (name, val) => {
+      fields[name] = val;
+    });
+
+    busboy.on("file", (fieldname, stream, { filename, mimeType }) => {
+      const chunks: Buffer[] = [];
+      stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+      stream.on("end", () => {
+        // stream.truncated становится true, если Busboy обрезал файл из-за fileSize
+        const truncated = (stream as any).truncated === true;
+        files.push({
+          fieldname,
+          file: Buffer.concat(chunks),
+          filename,
+          mimeType,
+          truncated,
+        });
+      });
+    });
+
+    busboy.on("error", (err: Error) => reject(err));
+    busboy.on("finish", resolve);
+    bodyStream.pipe(busboy);
+  });
+
+  try {
+    await parsePromise;
+  } catch (err: any) {
+    return fail("Error parsing upload: " + String(err.message), 400, "PARSE_ERROR", noStoreInit());
+  }
+
+  // Проверяем обрезанные файлы — значит файл превысил MAX_FILE_SIZE_BYTES
+  for (const f of files) {
+    if (f.truncated) {
+      return fail(
+        `Файл "${f.filename}" превышает максимально допустимый размер ${MAX_FILE_SIZE_BYTES / 1024 / 1024} МБ`,
+        413,
+        "FILE_TOO_LARGE",
+        noStoreInit()
+      );
+    }
+  }
+
+  const bucket = String(fields.bucket || "media").trim();
+  const folder = cleanFolder(fields.folder || "");
+  const explicitPath = String(fields.path || "").trim();
+  const upsert = ["1", "true", "yes", "y", "да"].includes(String(fields.upsert || "").toLowerCase());
+
+  if (!bucket) {
+    return fail("Не указан bucket для загрузки", 400, "MISSING_BUCKET", noStoreInit());
+  }
+
+  // Валидация расширений
+  const validFiles: typeof files = [];
+  for (const f of files) {
+    const ext = getFileExtension(f.filename);
+
+    if (!isAllowedMediaExtension(ext)) {
+      return fail(
+        `Тип файла .${ext} не поддерживается. Разрешены: jpg, jpeg, png, gif, webp, avif, mp3, wav, ogg, m4a, mp4, pdf`,
+        400,
+        "INVALID_FILE",
+        noStoreInit()
+      );
+    }
+
+    validFiles.push(f);
+  }
+
+  if (validFiles.length === 0) {
+    return fail("Нет корректных файлов для загрузки", 400, "NO_FILES", noStoreInit());
+  }
+
+  const uploadPromises = validFiles.map(async (f) => {
+    const ext = getFileExtension(f.filename);
+    const path = explicitPath
+      ? normalizeStorageObjectPath(explicitPath)
+      : (() => {
+          const baseName = safeStorageFileName(f.filename.replace(/\.[^.]+$/, ""));
+          const fileName = `${Date.now()}_${randomId()}_${baseName}.${ext}`;
+          return folder ? `${folder}/${fileName}` : fileName;
+        })();
+
+    const result = await uploadStorageObject({
+      bucket,
+      path,
+      file: f.file,
+      contentType: f.mimeType || undefined,
+      upsert,
+      cacheControl: "31536000",
+    });
+
+    return {
+      bucket: result.bucket,
+      path: result.path,
+      publicUrl: result.publicUrl,
+      fileName: f.filename,
+      fileSize: f.file.length,
+      mimeType: f.mimeType,
+      mediaType: getMediaType(ext),
+    };
+  });
+
+  const results = await Promise.all(uploadPromises);
+
+  return ok(
+    {
+      files: results,
+      bucket: results[0]?.bucket ?? "",
+      path: results[0]?.path ?? "",
+      publicUrl: results[0]?.publicUrl ?? "",
+      fileName: results[0]?.fileName ?? "",
+    },
+    noStoreInit()
+  );
 }
 
 ================
@@ -43460,32 +42547,1283 @@ export async function deleteRequestRowByNumber(requestNumber: string) {
 }
 
 ================
-File: app/(app)/assignment/lib/image.ts
+File: next.config.ts
 ================
-// app/(app)/assignment/lib/image.ts
-import { rewriteSupabasePublicStorageUrl } from "@/lib/storage/publicUrl";
+// next.config.ts
+import type { NextConfig } from "next";
+
+function getSupabaseRemotePatterns(): NonNullable<NextConfig["images"]>["remotePatterns"] {
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!rawUrl) return [];
+
+  try {
+    const url = new URL(rawUrl);
+    if (!url.hostname) return [];
+
+    return [
+      {
+        protocol: url.protocol.replace(":", "") as "http" | "https",
+        hostname: url.hostname,
+        pathname: "/storage/v1/object/public/**",
+      },
+    ];
+  } catch {
+    return [];
+  }
+}
+
+function getYandexRemotePatterns(): NonNullable<NextConfig["images"]>["remotePatterns"] {
+  return [
+    {
+      protocol: "https" as const,
+      hostname: "storage.yandexcloud.net",
+    },
+  ];
+}
+
+const nextConfig: NextConfig = {
+  poweredByHeader: false,
+
+  // serverBodySizeLimit существует в рантайме Next.js 13.4.4+, но отсутствует
+  // в типах старых версий пакета — поэтому приводим к any.
+  // Без этого Next.js обрезает тело запроса на 4 МБ до попадания в route handler,
+  // что даёт 413 на аудиофайлах ≥ 5 МБ.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  experimental: {
+    serverBodySizeLimit: "20mb",
+  } as any,
+
+  images: {
+    remotePatterns: [
+      ...(getSupabaseRemotePatterns() ?? []),
+      ...(getYandexRemotePatterns() ?? []),
+    ],
+  },
+
+  async redirects() {
+    return [
+      {
+        source: "/:path*.html",
+        destination: "/:path*",
+        permanent: true,
+      },
+    ];
+  },
+};
+
+export default nextConfig;
+
+================
+File: app/(app)/assignment/components/MediaRenderer.tsx
+================
+"use client";
+
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
+import type { MediaAttachment } from "../lib/types";
+import { getImageUrl } from "../lib/image";
+
+// ============================================================================
+// Глобальная синхронизация громкости между всеми плеерами на странице
+// ============================================================================
+
+const VOLUME_KEY = "hippo_audio_volume";
+const VOLUME_EVENT = "hippo:volume-change";
+
+function getInitialVolume(): number {
+  try {
+    const v = parseFloat(localStorage.getItem(VOLUME_KEY) ?? "1");
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+function broadcastVolume(v: number): void {
+  try {
+    localStorage.setItem(VOLUME_KEY, String(v));
+    window.dispatchEvent(
+      new CustomEvent(VOLUME_EVENT, { detail: { volume: v } })
+    );
+  } catch {}
+}
+
+// ============================================================================
+// Утилита форматирования времени
+// ============================================================================
+
+function formatTime(sec: number): string {
+  if (!Number.isFinite(sec) || isNaN(sec)) return "00:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+// ============================================================================
+// КАСТОМНЫЙ АУДИОПЛЕЕР
+// ============================================================================
+
+function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const isMounted = useRef(false);
+
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [audioError, setAudioError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Громкость — читаем из localStorage после mount (SSR-safe)
+  const [volume, setVolume] = useState(1);
+
+  const finalUrl = useMemo(() => getImageUrl(url), [url]);
+
+  // Инициализация громкости после mount
+  useEffect(() => {
+    const v = getInitialVolume();
+    setVolume(v);
+    if (audioRef.current) audioRef.current.volume = v;
+    isMounted.current = true;
+  }, []);
+
+  // Сброс при смене трека
+  useEffect(() => {
+    setIsPlaying(false);
+    setProgress(0);
+    setCurrentTime(0);
+    setDuration(0);
+    setAudioError(false);
+    setLoading(true);
+  }, [url]);
+
+  // Применяем громкость к audio-элементу
+  useEffect(() => {
+    if (audioRef.current && isMounted.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
+  // Синхронизация с другими плеерами через window event
+  useEffect(() => {
+    function onVolumeSync(e: Event) {
+      const v = (e as CustomEvent).detail?.volume;
+      if (typeof v === "number" && Number.isFinite(v)) setVolume(v);
+    }
+    window.addEventListener(VOLUME_EVENT, onVolumeSync);
+    return () => window.removeEventListener(VOLUME_EVENT, onVolumeSync);
+  }, []);
+
+  // Подписка на события audio-элемента
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      setProgress(
+        audio.duration > 0 ? (audio.currentTime / audio.duration) * 100 : 0
+      );
+    };
+    const onLoaded = () => {
+      setDuration(audio.duration);
+      setLoading(false);
+    };
+    const onEnded = () => setIsPlaying(false);
+    const onError = () => {
+      setAudioError(true);
+      setLoading(false);
+    };
+    const onCanPlay = () => setLoading(false);
+
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("loadedmetadata", onLoaded);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
+    audio.addEventListener("canplay", onCanPlay);
+
+    return () => {
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("loadedmetadata", onLoaded);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
+      audio.removeEventListener("canplay", onCanPlay);
+    };
+  }, []);
+
+  const togglePlay = () => {
+    if (!audioRef.current || audioError) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().catch(() => setAudioError(true));
+      setIsPlaying(true);
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!audioRef.current || audioError || !duration) return;
+    audioRef.current.currentTime = (Number(e.target.value) / 100) * duration;
+  };
+
+  const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value) / 100;
+    setVolume(v);
+    broadcastVolume(v); // обновляет все плееры на странице + localStorage
+  };
+
+  const volIcon = volume === 0 ? "🔇" : volume < 0.4 ? "🔈" : volume < 0.75 ? "🔉" : "🔊";
+
+  return (
+    <div
+      className="media-item-fade"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        padding: "12px 16px",
+        borderRadius: "20px",
+        background: "rgba(255,255,255,0.8)",
+        backdropFilter: "blur(12px)",
+        border: "1px solid rgba(0,0,0,0.05)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
+        width: "100%",
+        maxWidth: "520px",
+        margin: "10px 0",
+      }}
+    >
+      <audio ref={audioRef} src={finalUrl} preload="metadata" />
+
+      {/* ── Кнопка Play / Pause ── */}
+      <button
+        onClick={togglePlay}
+        disabled={audioError || loading}
+        style={{
+          width: 46,
+          height: 46,
+          minWidth: 46,
+          borderRadius: "50%",
+          background: isPlaying ? "rgba(0,123,255,0.1)" : "#007bff",
+          color: isPlaying ? "#007bff" : "#fff",
+          border: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: audioError || loading ? "not-allowed" : "pointer",
+          transition: "all 0.2s ease",
+          boxShadow: isPlaying ? "none" : "0 6px 15px rgba(0,123,255,0.3)",
+          opacity: audioError || loading ? 0.6 : 1,
+          flexShrink: 0,
+        }}
+      >
+        {loading ? (
+          <div
+            style={{
+              width: 18,
+              height: 18,
+              border: "2px solid rgba(255,255,255,0.3)",
+              borderTopColor: "#fff",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+            }}
+          />
+        ) : audioError ? (
+          <span style={{ fontSize: 16 }}>⚠️</span>
+        ) : isPlaying ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          </svg>
+        ) : (
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            style={{ marginLeft: 3 }}
+          >
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        )}
+      </button>
+
+      {/* ── Прогресс-бар + время ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {audioError ? (
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#c62828" }}>
+            Не удалось загрузить аудио
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                minWidth: 35,
+                color: "#475569",
+                flexShrink: 0,
+              }}
+            >
+              {formatTime(currentTime)}
+            </span>
+
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={progress || 0}
+              onChange={handleSeek}
+              style={{ flex: 1, cursor: "pointer", accentColor: "#007bff" }}
+            />
+
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                minWidth: 35,
+                textAlign: "right",
+                color: "#475569",
+                flexShrink: 0,
+              }}
+            >
+              {formatTime(duration)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Регулятор громкости ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          flexShrink: 0,
+        }}
+        title={`Громкость: ${Math.round(volume * 100)}%`}
+      >
+        <span style={{ fontSize: 14, lineHeight: 1, userSelect: "none" }}>
+          {volIcon}
+        </span>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={Math.round(volume * 100)}
+          onChange={handleVolume}
+          style={{ width: 60, cursor: "pointer", accentColor: "#007bff" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ИЗОБРАЖЕНИЕ С ZOOM
+// ============================================================================
+
+function ZoomableImage({ url, name }: { url: string; name?: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // При retry добавляем ?retry=N — ломает браузерный кеш ошибки
+  const finalUrl = useMemo(() => {
+    const base = getImageUrl(url);
+    if (!base) return "";
+    if (retryCount === 0) return base;
+    return `${base}${base.includes("?") ? "&" : "?"}retry=${retryCount}`;
+  }, [url, retryCount]);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setHasError(false);
+  }, [finalUrl]);
+
+  const handleRetry = useCallback(() => setRetryCount((c) => c + 1), []);
+
+  return (
+    <>
+      <div
+        className="media-item-fade"
+        style={{
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: isLoading ? "default" : "zoom-in",
+          margin: "12px 0",
+          borderRadius: "20px",
+          overflow: "hidden",
+          background: "#f8fafc",
+          minHeight: "200px",
+          width: "100%",
+          maxWidth: "600px",
+          border: "1px solid rgba(0,0,0,0.06)",
+        }}
+        onClick={() => !isLoading && !hasError && setIsOpen(true)}
+      >
+        {isLoading && !hasError && (
+          <div className="media-loader">
+            <div className="spinner" />
+          </div>
+        )}
+
+        {hasError ? (
+          <div
+            style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}
+          >
+            <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
+              Не удалось загрузить фото
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRetry();
+              }}
+              style={{
+                padding: "8px 16px",
+                background: "#007bff",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: 13,
+              }}
+            >
+              Повторить загрузку
+            </button>
+          </div>
+        ) : (
+          <img
+            src={finalUrl}
+            alt={name || "Task Image"}
+            onLoad={() => setIsLoading(false)}
+            onError={() => {
+              setHasError(true);
+              setIsLoading(false);
+            }}
+            loading="lazy"
+            decoding="async"
+            style={{
+              width: "100%",
+              maxHeight: "400px",
+              objectFit: "contain",
+              display: "block",
+              transition: "opacity 0.4s ease",
+              opacity: isLoading ? 0 : 1,
+            }}
+          />
+        )}
+
+        {!isLoading && !hasError && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 12,
+              right: 12,
+              background: "rgba(0,0,0,0.5)",
+              color: "#fff",
+              padding: "5px 10px",
+              borderRadius: 10,
+              backdropFilter: "blur(4px)",
+              fontSize: 11,
+              fontWeight: 800,
+              pointerEvents: "none",
+              textTransform: "uppercase",
+            }}
+          >
+            🔍 Увеличить
+          </div>
+        )}
+      </div>
+
+      {isOpen && !hasError && (
+        <div
+          onClick={() => setIsOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.9)",
+            backdropFilter: "blur(10px)",
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "zoom-out",
+            padding: 20,
+          }}
+        >
+          <img
+            src={finalUrl}
+            alt="Full"
+            style={{
+              maxWidth: "100%",
+              maxHeight: "100%",
+              borderRadius: 12,
+              boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+            }}
+          />
+          <button
+            onClick={() => setIsOpen(false)}
+            style={{
+              position: "absolute",
+              top: 20,
+              right: 30,
+              background: "none",
+              border: "none",
+              color: "#fff",
+              fontSize: 40,
+              cursor: "pointer",
+            }}
+          >
+            &times;
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ============================================================================
+// PDF VIEWER
+// ============================================================================
+
+function PdfViewer({ url, name }: { url: string; name?: string }) {
+  const finalUrl = useMemo(() => getImageUrl(url), [url]);
+
+  return (
+    <div
+      className="media-item-fade"
+      style={{ margin: "16px 0", width: "100%", maxWidth: 800 }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "#f1f5f9",
+          padding: "12px 18px",
+          borderRadius: "16px 16px 0 0",
+          border: "1px solid #e2e8f0",
+          borderBottom: "none",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            overflow: "hidden",
+          }}
+        >
+          <span style={{ fontSize: 18 }}>📄</span>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#475569",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {name || "PDF Document"}
+          </span>
+        </div>
+        
+        <a
+          href={finalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 11,
+            color: "#007bff",
+            fontWeight: 800,
+            textDecoration: "none",
+            background: "#fff",
+            padding: "6px 12px",
+            borderRadius: 12,
+            boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+          }}
+        >
+          ОТКРЫТЬ ↗
+        </a>
+      </div>
+      <div
+        style={{
+          height: 500,
+          borderRadius: "0 0 16px 16px",
+          overflow: "hidden",
+          border: "1px solid #e2e8f0",
+          background: "#fff",
+        }}
+      >
+        <iframe
+          src={`${finalUrl}#toolbar=0`}
+          width="100%"
+          height="100%"
+          style={{ border: "none" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ГЛАВНЫЙ РЕНДЕРЕР
+// ============================================================================
+
+export default function MediaRenderer({
+  media,
+}: {
+  media?: MediaAttachment[];
+}) {
+  if (!media || media.length === 0) return null;
+
+  return (
+    <div
+      style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}
+    >
+      {media.map((m) => {
+        if (!m.url) return null;
+        const key = `${m.id}-${m.url}`;
+        if (m.type === "audio")
+          return <CustomAudioPlayer key={key} url={m.url} name={m.name} />;
+        if (m.type === "image")
+          return <ZoomableImage key={key} url={m.url} name={m.name} />;
+        if (m.type === "pdf")
+          return <PdfViewer key={key} url={m.url} name={m.name} />;
+        return null;
+      })}
+
+      <style jsx global>{`
+        .media-item-fade {
+          animation: mediaAppear 0.4s ease-out forwards;
+        }
+        @keyframes mediaAppear {
+          from { opacity: 0; transform: translateY(5px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .media-loader {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 5;
+        }
+        .spinner {
+          width: 30px;
+          height: 30px;
+          border: 3px solid rgba(0, 123, 255, 0.1);
+          border-top-color: #007bff;
+          border-radius: 50%;
+          animation: mediaSpin 0.8s linear infinite;
+        }
+        @keyframes mediaSpin { to { transform: rotate(360deg); } }
+        @keyframes spin      { to { transform: rotate(360deg); } }
+      `}</style>
+    </div>
+  );
+}
+
+================
+File: app/(app)/assignment/lib/scoring.ts
+================
+// app/(app)/assignment/lib/scoring.ts
+import { normalizeText } from "./normalize";
+import type { FinalStats, ReviewItem } from "./types";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function buildCorrectStrings(arr: any[]): string[] {
+  return (arr || []).map((variants: any) =>
+    (Array.isArray(variants) ? variants : [variants]).map(String).join(" или ")
+  );
+}
+
+function getPointsTotal(q: any): number {
+  const p = Number(q?.points);
+  return Number.isFinite(p) && p > 0 ? p : 1;
+}
+
+function buildParts(correctAnswers: any[], userArr: string[], totalCount: number) {
+  const parts: any[] = [];
+  for (let idx = 0; idx < totalCount; idx++) {
+    const variants = correctAnswers[idx];
+    const userRaw = String(userArr[idx] ?? "");
+    const userNorm = normalizeText(userRaw);
+
+    const varsNorm = (Array.isArray(variants) ? variants : [variants]).map((v: any) =>
+      normalizeText(String(v))
+    );
+
+    const ok = userNorm.length > 0 && varsNorm.some((v) => v === userNorm);
+
+    parts.push({
+      index: idx,
+      isCorrect: ok,
+      user: userRaw,
+      correct: (Array.isArray(variants) ? variants : [variants]).map(String),
+    });
+  }
+  return parts;
+}
 
 /**
- * Возвращает URL для источника медиа в задании.
- *
- * Если путь уже data: или начинается с /api/storage/public – возвращает как есть.
- * Иначе пропускает через rewriteSupabasePublicStorageUrl,
- * которая преобразует Supabase/Yandex прямые ссылки в наш прокси.
+ * Безопасно клампает финальный score в диапазон 0–100.
+ * Защита от NaN / Infinity / отрицательных значений.
  */
-export function getImageUrl(imagePath: unknown) {
-  if (imagePath == null) return "";
+function clampScore(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
 
-  const raw = String(imagePath).trim();
-  if (!raw) return "";
+/**
+ * Безопасно вычисляет долю: earned / total.
+ * Возвращает 0 если total <= 0 или результат не конечный.
+ */
+function safeFraction(earned: number, total: number): number {
+  if (total <= 0 || !Number.isFinite(earned) || !Number.isFinite(total)) return 0;
+  const f = earned / total;
+  return Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : 0;
+}
 
-  // data: или уже наш прокси – не трогаем
-  if (raw.startsWith("data:") || raw.startsWith("/api/storage/public")) {
-    return raw;
+// ---------------------------------------------------------------------------
+// Validate
+// ---------------------------------------------------------------------------
+
+export function validateAllAnswered(
+  questions: any[],
+  answers: any
+): { ok: boolean; index: number; subIndex?: number } {
+  // Defensive guard: если questions не массив — считаем что всё ок (нечего валидировать)
+  if (!Array.isArray(questions)) return { ok: true, index: -1 };
+
+  // Defensive guard: если answers не объект — считаем что ничего не отвечено
+  const safeAnswers = answers && typeof answers === "object" ? answers : {};
+
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    if (!q || typeof q !== "object") continue;
+
+    const a = (safeAnswers as any)[i];
+
+    if (q.type === "test") {
+      if (q.multiple) {
+        const has = Array.isArray(a) && a.length > 0;
+        if (!has) return { ok: false, index: i };
+      } else {
+        const has = a !== undefined && a !== null && a !== "";
+        if (!has) return { ok: false, index: i };
+      }
+    } else if (q.type === "fill") {
+      const correctCount = (q.answers || []).length;
+      const has =
+        Array.isArray(a) &&
+        a.length >= correctCount &&
+        a.every((x: any) => String(x ?? "").trim() !== "");
+      if (!has) return { ok: false, index: i };
+    } else if (q.type === "sentence") {
+      const gaps = (String(q.sentence || "").match(/___/g) || []).length;
+      const has =
+        Array.isArray(a) &&
+        a.length >= gaps &&
+        a.every((x: any) => String(x ?? "").trim() !== "");
+      if (!has) return { ok: false, index: i };
+    } else if (q.type === "complex") {
+      const subQs = q.subQuestions || [];
+      const subAns = Array.isArray(a) ? a : [];
+      const subRes = validateAllAnswered(subQs, subAns);
+      if (!subRes.ok) return { ok: false, index: i, subIndex: subRes.index };
+    } else if (q.type === "matching") {
+      const pairs = q.pairs || [];
+      const has =
+        a && typeof a === "object" && Object.keys(a).length === pairs.length;
+      if (!has) return { ok: false, index: i };
+    }
+  }
+  return { ok: true, index: -1 };
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+export function calcAndBuildReview(
+  questions: any[],
+  answers: any
+): { stats: FinalStats; review: ReviewItem[] } {
+  // Defensive guard: если пришёл мусор — возвращаем пустой результат
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return {
+      stats: {
+        score: 0,
+        correct: 0,
+        incorrect: 0,
+        skipped: 0,
+        total: 0,
+        pointsEarned: 0,
+        pointsTotal: 0,
+      },
+      review: [],
+    };
   }
 
-  // Всё остальное (HTTP-ссылки Supabase/Yandex, относительные пути)
-  // прогоняем через универсальный конвертер, который строит прокси-путь.
-  return rewriteSupabasePublicStorageUrl(raw);
+  // Defensive guard: answers должен быть объектом (массивом или обычным объектом)
+  const safeAnswers =
+    answers !== null && answers !== undefined && typeof answers === "object"
+      ? answers
+      : {};
+
+  const statsSum = {
+    correct: 0,
+    incorrect: 0,
+    skipped: 0,
+    total: 0,
+    pointsEarned: 0,
+    pointsTotal: 0,
+  };
+
+  const review: ReviewItem[] = [];
+
+  function processQ(q: any, a: any, idxText: string): ReviewItem {
+    // Defensive guard: если вопрос битый — возвращаем skipped
+    if (!q || typeof q !== "object") {
+      statsSum.skipped++;
+      statsSum.total++;
+      return {
+        type: "other",
+        questionText: `Вопрос ${idxText}`,
+        isCorrect: false,
+        isSkipped: true,
+        note: "Некорректная структура вопроса.",
+        pointsEarned: 0,
+        pointsTotal: 1,
+      } as ReviewItem;
+    }
+
+    const questionText = String(q?.q ?? "").trim() || `Вопрос ${idxText}`;
+    const pointsTotal = getPointsTotal(q);
+
+    // ---------------------------------------------------------------
+    // COMPLEX
+    // ---------------------------------------------------------------
+    if (q.type === "complex") {
+      const subQs = Array.isArray(q.subQuestions) ? q.subQuestions : [];
+      const subAns = Array.isArray(a) ? a : [];
+
+      const subReviews: ReviewItem[] = [];
+      let complexEarned = 0;
+      let complexTotal = 0;
+      let complexAllSkipped = true;
+      let complexAllCorrect = true;
+
+      subQs.forEach((sq: any, subI: number) => {
+        const sr = processQ(sq, subAns[subI], `${idxText}.${subI + 1}`);
+        subReviews.push(sr);
+        complexEarned += Number.isFinite(sr.pointsEarned) ? sr.pointsEarned : 0;
+        complexTotal += Number.isFinite(sr.pointsTotal) ? sr.pointsTotal : 0;
+        if (!sr.isSkipped) complexAllSkipped = false;
+        if (!sr.isCorrect) complexAllCorrect = false;
+      });
+
+      return {
+        type: "complex",
+        questionText,
+        isCorrect: complexTotal > 0 && complexEarned === complexTotal,
+        isSkipped: complexAllSkipped,
+        pointsEarned: Number(complexEarned.toFixed(2)),
+        pointsTotal: complexTotal,
+        subReviews,
+      } as ReviewItem;
+    }
+
+    // ---------------------------------------------------------------
+    // COUNT TOTALS
+    // ---------------------------------------------------------------
+    statsSum.total++;
+    statsSum.pointsTotal += pointsTotal;
+
+    // ---------------------------------------------------------------
+    // TEST
+    // ---------------------------------------------------------------
+    if (q.type === "test") {
+      const isMultiple = !!q.multiple;
+      const opts: any[] = Array.isArray(q.options) ? q.options : [];
+
+      const getOptText = (idx: number) => {
+        const opt = opts[idx];
+        if (!opt) return "—";
+        return typeof opt === "string" ? opt : opt.text || `Вариант ${idx + 1}`;
+      };
+
+      const correctArr = Array.isArray(q.correct)
+        ? q.correct
+        : typeof q.correct === "number"
+          ? [q.correct]
+          : [];
+      const correctLabels = correctArr.map((c: any) => getOptText(Number(c)));
+
+      const answered = isMultiple
+        ? Array.isArray(a) && a.length > 0
+        : a !== undefined && a !== null && a !== "";
+
+      if (!answered) {
+        statsSum.skipped++;
+        return {
+          type: "test",
+          questionText,
+          isCorrect: false,
+          isSkipped: true,
+          userLabel: isMultiple ? [] : "Не отвечено",
+          correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
+          isMultiple,
+          fraction: 0,
+          pointsEarned: 0,
+          pointsTotal,
+        } as ReviewItem;
+      }
+
+      let fraction = 0;
+      let isCorrect = false;
+      let userLabels: string | string[] = [];
+
+      if (isMultiple) {
+        const userArr = Array.isArray(a) ? a.map(Number) : [];
+        userLabels = userArr.map((c: number) => getOptText(c));
+
+        const correctSet = new Set(correctArr.map(Number));
+        const userSet = new Set(userArr);
+
+        let correctSelected = 0;
+        let wrongSelected = 0;
+
+        userSet.forEach((val: number) => {
+          if (correctSet.has(val)) correctSelected++;
+          else wrongSelected++;
+        });
+
+        const totalCorrect = correctSet.size || 1;
+        fraction = Math.max(0, correctSelected - wrongSelected) / totalCorrect;
+        // Дополнительная защита: fraction должен быть в [0, 1]
+        fraction = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
+        isCorrect = fraction === 1;
+      } else {
+        const userIdx = Number(a);
+        userLabels = getOptText(userIdx);
+        const correctIdx = Number(correctArr[0]);
+        isCorrect = userIdx === correctIdx;
+        fraction = isCorrect ? 1 : 0;
+      }
+
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+      statsSum.pointsEarned += pointsEarned;
+
+      if (isCorrect) statsSum.correct++;
+      else statsSum.incorrect++;
+
+      return {
+        type: "test",
+        questionText,
+        isCorrect,
+        isSkipped: false,
+        userLabel: userLabels,
+        correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
+        fraction,
+        isMultiple,
+        pointsEarned,
+        pointsTotal,
+      } as ReviewItem;
+    }
+
+    // ---------------------------------------------------------------
+    // FILL
+    // ---------------------------------------------------------------
+    if (q.type === "fill") {
+      const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
+      const totalCount = correctAnswers.length;
+
+      if (totalCount === 0) {
+        statsSum.skipped++;
+        return {
+          type: "fill",
+          questionText,
+          isCorrect: false,
+          isSkipped: true,
+          userAnswers: [],
+          correctAnswers: [],
+          parts: [],
+          percent: 0,
+          correctCount: 0,
+          totalCount: 0,
+          pointsEarned: 0,
+          pointsTotal,
+        } as ReviewItem;
+      }
+
+      const correctStrings = buildCorrectStrings(correctAnswers);
+      const userArr: string[] = Array.isArray(a)
+        ? (a as any[]).map((x) => String(x ?? ""))
+        : [];
+
+      const answered =
+        Array.isArray(a) &&
+        a.length >= totalCount &&
+        a.every((x: any) => String(x ?? "").trim() !== "");
+
+      if (!answered) {
+        statsSum.skipped++;
+        const parts = buildParts(correctAnswers, userArr, totalCount);
+        const correctCount = parts.filter((p) => p.isCorrect).length;
+        const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+
+        return {
+          type: "fill",
+          questionText,
+          isCorrect: false,
+          isSkipped: true,
+          userAnswers: userArr,
+          correctAnswers: correctStrings,
+          parts,
+          percent,
+          correctCount,
+          totalCount,
+          pointsEarned: 0,
+          pointsTotal,
+        } as ReviewItem;
+      }
+
+      const parts = buildParts(correctAnswers, userArr, totalCount);
+      const correctCount = parts.filter((p) => p.isCorrect).length;
+      const fraction = safeFraction(correctCount, totalCount);
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+
+      statsSum.pointsEarned += pointsEarned;
+
+      const isAllCorrect = correctCount === totalCount;
+      if (isAllCorrect) statsSum.correct++;
+      else statsSum.incorrect++;
+
+      return {
+        type: "fill",
+        questionText,
+        isCorrect: isAllCorrect,
+        isSkipped: false,
+        userAnswers: userArr,
+        correctAnswers: correctStrings,
+        parts,
+        percent: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0,
+        correctCount,
+        totalCount,
+        pointsEarned,
+        pointsTotal,
+      } as ReviewItem;
+    }
+
+    // ---------------------------------------------------------------
+    // SENTENCE
+    // ---------------------------------------------------------------
+    if (q.type === "sentence") {
+      const gaps = (String(q.sentence || "").match(/___/g) || []).length;
+      const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
+      const totalCount = gaps;
+
+      if (totalCount === 0) {
+        statsSum.skipped++;
+        return {
+          type: "sentence",
+          questionText,
+          isCorrect: false,
+          isSkipped: true,
+          userAnswers: [],
+          correctAnswers: [],
+          parts: [],
+          percent: 0,
+          correctCount: 0,
+          totalCount: 0,
+          pointsEarned: 0,
+          pointsTotal,
+        } as ReviewItem;
+      }
+
+      const correctStrings = buildCorrectStrings(correctAnswers);
+      const userArr: string[] = Array.isArray(a)
+        ? (a as any[]).slice(0, gaps).map((x) => String(x ?? ""))
+        : [];
+
+      const answered =
+        Array.isArray(a) &&
+        a.length >= gaps &&
+        a.every((x: any) => String(x ?? "").trim() !== "");
+
+      if (!answered) {
+        statsSum.skipped++;
+        const parts = buildParts(correctAnswers, userArr, totalCount);
+        const correctCount = parts.filter((p) => p.isCorrect).length;
+        const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+
+        return {
+          type: "sentence",
+          questionText,
+          isCorrect: false,
+          isSkipped: true,
+          userAnswers: userArr,
+          correctAnswers: correctStrings,
+          parts,
+          percent,
+          correctCount,
+          totalCount,
+          pointsEarned: 0,
+          pointsTotal,
+        } as ReviewItem;
+      }
+
+      const parts = buildParts(correctAnswers, userArr, totalCount);
+      const correctCount = parts.filter((p) => p.isCorrect).length;
+      const fraction = safeFraction(correctCount, totalCount);
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+
+      statsSum.pointsEarned += pointsEarned;
+
+      const isAllCorrect = correctCount === totalCount;
+      if (isAllCorrect) statsSum.correct++;
+      else statsSum.incorrect++;
+
+      return {
+        type: "sentence",
+        questionText,
+        isCorrect: isAllCorrect,
+        isSkipped: false,
+        userAnswers: userArr,
+        correctAnswers: correctStrings,
+        parts,
+        percent: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0,
+        correctCount,
+        totalCount,
+        pointsEarned,
+        pointsTotal,
+      } as ReviewItem;
+    }
+
+    // ---------------------------------------------------------------
+    // MATCHING
+    // ---------------------------------------------------------------
+    if (q.type === "matching") {
+      const pairs = Array.isArray(q.pairs) ? q.pairs : [];
+      const totalPairsCount = pairs.length;
+
+      const correctMatches: Record<string, string> = {};
+      pairs.forEach((p: any) => {
+        if (p?.id != null) {
+          correctMatches[String(p.id)] = String(p.id);
+        }
+      });
+
+      const answered =
+        a && typeof a === "object" && Object.keys(a).length > 0;
+
+      if (!answered) {
+        statsSum.skipped++;
+        return {
+          type: "matching",
+          questionText,
+          isCorrect: false,
+          isSkipped: true,
+          correctPairsCount: 0,
+          totalPairsCount,
+          userMatches: {},
+          correctMatches,
+          pointsEarned: 0,
+          pointsTotal,
+        } as ReviewItem;
+      }
+
+      let correctPairsCount = 0;
+      const userMatches = a as Record<string, string>;
+
+      pairs.forEach((p: any) => {
+        if (p?.id != null) {
+          const key = String(p.id);
+          if (userMatches[key] === correctMatches[key]) {
+            correctPairsCount++;
+          }
+        }
+      });
+
+      const fraction = safeFraction(correctPairsCount, totalPairsCount);
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+
+      statsSum.pointsEarned += pointsEarned;
+
+      const isAllCorrect = correctPairsCount === totalPairsCount;
+      if (isAllCorrect) statsSum.correct++;
+      else statsSum.incorrect++;
+
+      return {
+        type: "matching",
+        questionText,
+        isCorrect: isAllCorrect,
+        isSkipped: false,
+        correctPairsCount,
+        totalPairsCount,
+        userMatches,
+        correctMatches,
+        pointsEarned,
+        pointsTotal,
+      } as ReviewItem;
+    }
+
+    // ---------------------------------------------------------------
+    // OTHER / CROSSWORD
+    // ---------------------------------------------------------------
+    statsSum.skipped++;
+    return {
+      type: "other",
+      questionText,
+      isCorrect: false,
+      isSkipped: true,
+      note: "Тип вопроса пока не поддержан в стандартном Review (отрабатывается отдельно).",
+      pointsEarned: 0,
+      pointsTotal,
+    } as ReviewItem;
+  }
+
+  // -----------------------------------------------------------------------
+  // Process each question
+  // -----------------------------------------------------------------------
+  questions.forEach((q, i) => {
+    review.push(processQ(q, (safeAnswers as any)[i], String(i + 1)));
+  });
+
+  // Финальный score клампаем в [0, 100] — защита от деления на 0 и NaN
+  const score = clampScore(
+    safeFraction(statsSum.pointsEarned, statsSum.pointsTotal) * 100
+  );
+
+  return {
+    stats: {
+      score,
+      correct: statsSum.correct,
+      incorrect: statsSum.incorrect,
+      skipped: statsSum.skipped,
+      total: statsSum.total,
+      pointsEarned: Number(statsSum.pointsEarned.toFixed(2)),
+      pointsTotal: statsSum.pointsTotal,
+    },
+    review,
+  };
 }
 
 ================
@@ -44488,6 +44826,75 @@ export async function PATCH(req: NextRequest) {
   } catch (e: any) {
     return fail(e?.message || "Server error", 500, "SERVER_ERROR", noStoreInit());
   }
+}
+
+================
+File: app/(app)/assignment/lib/image.ts
+================
+// app/(app)/assignment/lib/image.ts
+import { getStoragePublicUrl, rewriteSupabasePublicStorageUrl } from "@/lib/storage/publicUrl";
+
+// Список известных бакетов хранилища — дублирует DEFAULT_PUBLIC_BUCKETS из
+// lib/storage/server.ts. Нельзя импортировать напрямую (server-only).
+// При добавлении нового бакета — обновить оба места.
+const KNOWN_STORAGE_BUCKETS = [
+  "covers",
+  "question-images",
+  "help-images",
+  "backgrounds",
+  "streak-icons",
+  "streak_icon_assets",
+  "streak-roadmap-bg",
+  "profile-backgrounds",
+];
+
+/**
+ * Возвращает URL для источника медиа в задании.
+ *
+ * Порядок проверок:
+ * 1. data: — base64, возвращаем как есть.
+ * 2. /api/storage/public — уже наш прокси, возвращаем как есть.
+ * 3. https://... — Supabase или Yandex URL → конвертируем через rewriteSupabasePublicStorageUrl.
+ * 4. bucket/path/... — "голый" путь без домена, первый сегмент является известным бакетом →
+ *    строим прокси-URL через getStoragePublicUrl.
+ * 5. Всё остальное — возвращаем как есть (внешние URL и т.п.).
+ */
+export function getImageUrl(imagePath: unknown): string {
+  if (imagePath == null) return "";
+
+  const raw = String(imagePath).trim();
+  if (!raw) return "";
+
+  // 1. data: URI — base64-контент, не трогаем
+  if (raw.startsWith("data:")) {
+    return raw;
+  }
+
+  // 2. Уже наш прокси — не трогаем
+  if (raw.startsWith("/api/storage/public")) {
+    return raw;
+  }
+
+  // 3. Абсолютный HTTP(S) URL — Supabase или Yandex → конвертируем в прокси
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    return rewriteSupabasePublicStorageUrl(raw);
+  }
+
+  // 4. "Голый" путь формата "bucket/path/to/file.ext" — старые записи в БД,
+  //    где сохранялся относительный путь без домена.
+  //    Определяем по первому сегменту: если это известный бакет — строим прокси.
+  if (raw.includes("/")) {
+    const slashIdx = raw.indexOf("/");
+    const maybeBucket = raw.slice(0, slashIdx);
+    const objectPath = raw.slice(slashIdx + 1);
+
+    if (objectPath && KNOWN_STORAGE_BUCKETS.includes(maybeBucket)) {
+      return getStoragePublicUrl(maybeBucket, objectPath);
+    }
+  }
+
+  // 5. Неизвестный формат — возвращаем как есть
+  return raw;
 }
 
 ================

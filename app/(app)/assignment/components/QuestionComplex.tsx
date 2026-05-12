@@ -7,6 +7,7 @@ import QuestionTest from "./QuestionTest";
 import QuestionFill from "./QuestionFill";
 import QuestionSentence from "./QuestionSentence";
 import QuestionMatching from "./QuestionMatching";
+import QuestionImageMap from "./QuestionImageMap";
 
 type Props = {
   question: QuestionComplex;
@@ -65,6 +66,17 @@ export default function QuestionComplex({
       case "matching":
         return (
           <QuestionMatching
+            question={subQ as any}
+            value={subValue || {}}
+            onChange={(v: Record<string, string>) =>
+              handleSubChange(index, v)
+            }
+            disabled={disabled}
+          />
+        );
+      case "imagemap":
+        return (
+          <QuestionImageMap
             question={subQ as any}
             value={subValue || {}}
             onChange={(v: Record<string, string>) =>

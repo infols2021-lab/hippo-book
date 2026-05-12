@@ -1,3 +1,5 @@
+// app/(app)/assignment/lib/types.ts
+
 export type AssignmentBranchType = "olympiad" | "gatehouse";
 
 export type AssignmentSource =
@@ -82,6 +84,31 @@ export type QuestionMatching = QuestionBase & {
   pairs?: MatchingPair[];
 };
 
+// ==================== Image Map Types ====================
+
+export type ImageMapPoint = {
+  id: string;
+  x: number; // 0..100 (% от ширины)
+  y: number; // 0..100 (% от высоты)
+  correctAnswerId: string;
+  label?: string; // вспомогательная подпись для админа/ученика
+};
+
+export type ImageMapAnswer = {
+  id: string;
+  text?: string;
+  media?: MediaAttachment[];   // может быть картинкой
+};
+
+export type QuestionImageMap = QuestionBase & {
+  type: "imagemap";
+  image: string;              // URL центральной картинки
+  points: ImageMapPoint[];
+  answers: ImageMapAnswer[];
+};
+
+// ==================== Updated Any Type ====================
+
 export type QuestionAny =
   | QuestionTest
   | QuestionFill
@@ -89,6 +116,7 @@ export type QuestionAny =
   | QuestionCrossword
   | QuestionComplex
   | QuestionMatching
+  | QuestionImageMap
   | (QuestionBase & Record<string, any>);
 
 export type Progress = {
@@ -157,6 +185,16 @@ export type ReviewItem =
       correctMatches: Record<string, string>;
       /** Читаемые названия правых элементов (ключ – ID элемента, значение – текст). */
       rightLabels?: Record<string, string>;
+    })
+  | (ReviewBase & {
+      type: "imagemap";
+      correctPairsCount: number;
+      totalPairsCount: number;
+      userMatches: Record<string, string>;
+      correctMatches: Record<string, string>;
+      /** Читаемые названия ответов/точек, например { answerId: "Apple" }, { pointId: "Точка 1" } */
+      answerLabels?: Record<string, string>;
+      pointLabels?: Record<string, string>;
     })
   | (ReviewBase & {
       type: "complex";

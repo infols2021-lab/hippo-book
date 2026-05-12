@@ -14,6 +14,7 @@ export default function QuestionTypeSwitch({ value, onChange, disabled }: Props)
     { t: "fill", label: "✍️ Вписать" },
     { t: "sentence", label: "📝 Предложение" },
     { t: "matching", label: "🔗 Сопоставление" },
+    { t: "imagemap", label: "🗺 Карта" },
     { t: "complex", label: "📚 Комплексный" },
     { t: "crossword", label: "🧩 Кроссворд" },
   ];
