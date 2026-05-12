@@ -92,7 +92,6 @@ export default function QuestionImageMap({
     const containerRect = container.getBoundingClientRect();
 
     // ---- points ----
-    // we look for the image element inside the map-area to get its dimensions
     const imgEl = container.querySelector<HTMLImageElement>(".imagemap-image");
     if (imgEl) {
       const imgRect = imgEl.getBoundingClientRect();
@@ -117,7 +116,6 @@ export default function QuestionImageMap({
       const el = answerElRefs.current.get(ans.id);
       if (el) {
         const rect = el.getBoundingClientRect();
-        // anchor: center bottom of the element
         newAnchors.push({
           answerId: ans.id,
           x: rect.left + rect.width / 2 - containerRect.left,
@@ -128,12 +126,14 @@ export default function QuestionImageMap({
     setAnswerAnchors(newAnchors);
   }, [points, answers]);
 
-  // recalc on mount and resize
+  // recalc on mount, resize, and whenever connections change
   useEffect(() => {
     recalc();
+  }, [recalc, value]);
+
+  useEffect(() => {
     const onResize = () => recalc();
     window.addEventListener("resize", onResize);
-    // also observe container size changes
     const observer = new ResizeObserver(() => recalc());
     if (containerRef.current) {
       observer.observe(containerRef.current);
@@ -144,7 +144,6 @@ export default function QuestionImageMap({
     };
   }, [recalc]);
 
-  // also recalc when image loads
   const handleImageLoad = useCallback(() => recalc(), [recalc]);
 
   // ---- interactions ----
@@ -152,7 +151,7 @@ export default function QuestionImageMap({
     (answerId: string) => {
       if (disabled) return;
 
-      // if this answer already has a connection, remove it and select this answer for new connection
+      // if this answer already has a connection, remove it and prepare to reconnect
       if (value[answerId]) {
         const next = { ...value };
         delete next[answerId];
@@ -161,7 +160,6 @@ export default function QuestionImageMap({
         return;
       }
 
-      // toggle selection
       setSelectedAnswerId((prev) => (prev === answerId ? null : answerId));
     },
     [disabled, value, onChange],
@@ -174,12 +172,11 @@ export default function QuestionImageMap({
 
       if (!selectedAnswerId) return;
 
-      // check if this point is already connected to another answer
+      // if this point is already connected to another answer, remove that link
       const existingAnswerForPoint = Object.entries(value).find(
         ([, pid]) => pid === pointId,
       )?.[0];
       if (existingAnswerForPoint) {
-        // remove old connection
         const next = { ...value };
         delete next[existingAnswerForPoint];
         onChange(next);
@@ -193,10 +190,15 @@ export default function QuestionImageMap({
     [disabled, selectedAnswerId, value, onChange],
   );
 
-  const handleMapBackgroundClick = useCallback(() => {
-    // deselect answer when clicking on empty area of the map
-    setSelectedAnswerId(null);
-  }, []);
+  const handleMapBackgroundClick = useCallback(
+    (e: React.MouseEvent) => {
+      // deselect only when clicking exactly on the background, not on points or cards
+      if (e.target === e.currentTarget) {
+        setSelectedAnswerId(null);
+      }
+    },
+    [],
+  );
 
   // ---- render helpers ----
   const getAnswerPoint = (answerId: string): PointPixel | undefined => {
@@ -208,11 +210,6 @@ export default function QuestionImageMap({
   const getAnchor = (answerId: string): AnswerAnchor | undefined =>
     answerAnchors.find((a) => a.answerId === answerId);
 
-  // ---- SVG line generation ----
-  const linePath = (anchor: AnswerAnchor, point: PointPixel) =>
-    `M ${anchor.x} ${anchor.y} L ${point.x} ${point.y}`;
-
-  // ---- collect refs for answers ----
   const setAnswerRef = useCallback(
     (ansId: string, el: HTMLElement | null) => {
       if (el) {
@@ -220,7 +217,6 @@ export default function QuestionImageMap({
       } else {
         answerElRefs.current.delete(ansId);
       }
-      // recalc anchors after render
       setTimeout(recalc, 0);
     },
     [recalc],
@@ -282,9 +278,6 @@ export default function QuestionImageMap({
             />
           );
         })}
-
-        {/* dashed line from selected answer to mouse (we'll handle in a moment, but here we can't track mouse without state; we'll skip the preview line for simplicity, but we can add a simple approach if needed) */}
-        {/* For now, no preview line for simplicity; they just click point and it connects */}
       </svg>
 
       {/* ====== Central Image + Points ====== */}
@@ -318,13 +311,16 @@ export default function QuestionImageMap({
             <div
               key={pt.id}
               data-point-id={pt.id}
-              onPointerDown={(e) => handlePointClick(pt.id, e)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePointClick(pt.id, e);
+              }}
               style={{
                 position: "absolute",
-                left: pt.x - 12,
-                top: pt.y - 12,
-                width: 24,
-                height: 24,
+                left: pt.x - 16,
+                top: pt.y - 16,
+                width: 32,
+                height: 32,
                 borderRadius: "50%",
                 background: isConnected
                   ? "#6366f1"
@@ -337,7 +333,6 @@ export default function QuestionImageMap({
                 transition: "background 0.15s ease",
                 boxSizing: "border-box",
                 zIndex: 10,
-                pointerEvents: disabled ? "none" : "auto",
               }}
             >
               {pt.label && (
@@ -370,9 +365,9 @@ export default function QuestionImageMap({
         style={{
           display: "flex",
           flexWrap: "wrap",
-          gap: "12px",
+          gap: "16px",
           justifyContent: "center",
-          marginTop: "8px",
+          marginTop: "12px",
         }}
       >
         {answers.map((ans) => {
@@ -401,10 +396,11 @@ export default function QuestionImageMap({
                 borderRadius: "16px",
                 padding: "12px 16px",
                 minWidth: "100px",
+                maxWidth: "180px",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: "6px",
+                gap: "8px",
                 cursor: disabled ? "not-allowed" : "pointer",
                 transition: "all 0.2s ease",
                 boxShadow: isSelected
@@ -417,8 +413,16 @@ export default function QuestionImageMap({
             >
               {/* media thumbnail */}
               {ans.media && ans.media.length > 0 && (
-                <div style={{ width: "100%", maxWidth: 120 }}>
-                  <MediaRenderer media={ans.media} />
+                <div
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    justifyContent: "center",
+                  }}
+                >
+                  <div style={{ maxWidth: 80, maxHeight: 80, overflow: "hidden" }}>
+                    <MediaRenderer media={ans.media} />
+                  </div>
                 </div>
               )}
 
@@ -429,6 +433,8 @@ export default function QuestionImageMap({
                     fontWeight: 700,
                     fontSize: 14,
                     color: isSelected ? "#6366f1" : "#334155",
+                    textAlign: "center",
+                    wordBreak: "break-word",
                   }}
                 >
                   {ans.text}
@@ -447,7 +453,7 @@ export default function QuestionImageMap({
                     fontWeight: 600,
                   }}
                 >
-                  Выберите точку
+                  Выберите точку на карте
                 </span>
               )}
             </div>

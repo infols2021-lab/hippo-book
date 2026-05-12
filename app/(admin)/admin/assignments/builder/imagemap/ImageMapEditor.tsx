@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ImageMapQuestion, ImageMapPoint, ImageMapAnswer, MediaAttachment } from "../types";
+import ImageUpload from "../ImageUpload";
 import MediaUpload from "../MediaUpload";
 
 type Props = {
@@ -40,7 +41,7 @@ export default function ImageMapEditor({ value, onChange, disabled }: Props) {
     [value, onChange],
   );
 
-  // ---------- Central Image ----------
+  // ---------- Central Image (используем ImageUpload для поля image) ----------
   const handleImageChange = useCallback(
     (url: string) => {
       patch({ image: url || "" });
@@ -188,21 +189,17 @@ export default function ImageMapEditor({ value, onChange, disabled }: Props) {
         🗺️ Редактор карты изображения
       </label>
 
-      {/* ---------- Image upload ---------- */}
+      {/* ---------- Image upload (ImageUpload, поле image) ---------- */}
       <div className="card" style={{ padding: 12, marginBottom: 14 }}>
         <label className="small-muted" style={{ fontWeight: 800, marginBottom: 6 }}>
           Центральное изображение:
         </label>
-        <MediaUpload
-          value={
-            value.image
-              ? [{ id: "central", url: value.image, type: "image", name: "central-image" }]
-              : []
-          }
-          onChange={(media) => handleImageChange(media.length > 0 ? media[0].url : "")}
+        <ImageUpload
+          value={value.image || ""}
+          onChange={(nextUrl) => handleImageChange(nextUrl || "")}
           disabled={disabled}
           bucket="question-images"
-          label="Загрузить изображение (перетащить / выбрать):"
+          label="Загрузить изображение (можно перетаскиванием):"
         />
 
         {value.image && (

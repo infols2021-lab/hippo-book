@@ -317,7 +317,7 @@ export default function QuestionItem({
       <div style={{ height: 12 }} />
 
       {/* ===== ТЕКСТ ВОПРОСА (НЕ ДЛЯ КРОССВОРДА) ===== */}
-      {q.type !== "crossword" ? (
+      {q.type !== "crossword" && q.type !== "imagemap" ? (
         <div className="form-group">
           <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Текст вопроса:</label>
           <textarea
@@ -331,8 +331,8 @@ export default function QuestionItem({
         </div>
       ) : null}
 
-      {/* ===== НОВЫЙ МУЛЬТИ-МЕДИА ЗАГРУЗЧИК (НЕ ДЛЯ КРОССВОРДА) ===== */}
-      {q.type !== "crossword" ? (
+      {/* ===== НОВЫЙ МУЛЬТИ-МЕДИА ЗАГРУЗЧИК (НЕ ДЛЯ КРОССВОРДА И НЕ ДЛЯ IMAGEMAP) ===== */}
+      {q.type !== "crossword" && q.type !== "imagemap" ? (
         <>
           {/* Оставлено для обратной совместимости старых данных (единичная картинка) */}
           {q.image && typeof q.image === "string" && !q.media?.length && (
