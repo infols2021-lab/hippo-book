@@ -394,7 +394,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         {/* ЭКРАН ВЫБОРА РЕЖИМА (ЕСЛИ УЖЕ ПРОЙДЕНО) */}
         {showChoice && (
           <div className="premium-card animate-in" style={{ background: theme.cardBg }}>
-            <h2 className="card-title">📊 Предыдущий результат</h2>
+            <h2 className="card-title">Предыдущий результат</h2>
             <p className="card-subtitle">У вас уже есть сохраненный прогресс. Хотите начать с чистого листа или просто посмотреть ошибки?</p>
             <div className="button-group">
               <button className="btn-premium primary" style={{ background: theme.primary }} onClick={startFresh}>Начать заново</button>
@@ -413,7 +413,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
             {gatehouseRecommendation && (
               <div className="recommendation-box">
-                <h3>🎯 Рекомендация: {gatehouseRecommendation.recommendedLevelLabel}</h3>
+                <h3>Рекомендация: {gatehouseRecommendation.recommendedLevelLabel}</h3>
                 <p>{gatehouseRecommendation.message}</p>
                 <div className="badge-wrap">{getGatehouseRecommendationBadge(gatehouseRecommendation.band)}</div>
               </div>
@@ -438,7 +438,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         )}
 
         {/* ПРОЦЕСС ВЫПОЛНЕНИЯ ЗАДАНИЯ */}
-        {!showChoice && !completedScreen && assignment && (
+        {!showChoice && !completedScreen && assignment && questions.length > 0 && (
           <div className="assignment-layout animate-in">
             {/* PROGRESS BAR */}
             <div className="progress-container">
@@ -450,52 +450,69 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
               </div>
               <div className="progress-info">
                 <span>Вопрос {currentIndex + 1} из {questions.length}</span>
-                {isViewMode && <span className="view-mode-tag">👀 РЕЖИМ ПРОСМОТРА</span>}
+                {isViewMode && <span className="view-mode-tag">РЕЖИМ ПРОСМОТРА</span>}
               </div>
             </div>
 
-            <div key={currentIndex} className="premium-card active-question" style={{ background: theme.cardBg }}>
-              <h2 className="question-title">{currentIndex + 1}. {questions[currentIndex]?.q}</h2>
-
-              <div className="media-section">
-                <MediaRenderer media={questions[currentIndex]?.media} />
-                {!questions[currentIndex]?.media?.length && questions[currentIndex]?.image && questions[currentIndex]?.type !== 'crossword' && (
-                  <img 
-                    className="legacy-image" 
-                    src={getImageUrl(questions[currentIndex].image!)} 
-                    alt="task-media" 
-                    onClick={() => openImage(getImageUrl(questions[currentIndex].image!))} 
-                  />
+            {questions[currentIndex] && (
+              <div key={currentIndex} className="premium-card active-question" style={{ background: theme.cardBg }}>
+                {/* ======== ЗАГОЛОВОК ВОПРОСА ======== */}
+                {questions[currentIndex]!.q && (
+                  <h2 className="question-title">{currentIndex + 1}. {questions[currentIndex]!.q}</h2>
                 )}
-              </div>
 
-              <div className="question-content">
-                {renderQuestionComponent(questions[currentIndex], currentIndex)}
-              </div>
+                {/* ======== МАТЕРИАЛЫ К ВОПРОСУ ======== */}
+                {((questions[currentIndex]!.media?.length ?? 0) > 0 || (questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword')) && (
+                  <div className="materials-block">
+                    <div className="materials-label">МАТЕРИАЛЫ К ВОПРОСУ</div>
+                    {(questions[currentIndex]!.media?.length ?? 0) > 0 && (
+                      <MediaRenderer media={questions[currentIndex]!.media} />
+                    )}
+                    {!(questions[currentIndex]!.media?.length ?? 0) && questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword' && (
+                      <img 
+                        className="legacy-image" 
+                        src={getImageUrl(questions[currentIndex]!.image!)} 
+                        alt="task-media" 
+                        onClick={() => openImage(getImageUrl(questions[currentIndex]!.image!))} 
+                      />
+                    )}
+                  </div>
+                )}
 
-              <div className="navigation-footer">
-                <button 
-                  className="nav-btn" 
-                  disabled={currentIndex === 0} 
-                  onClick={() => setCurrentIndex(i => i - 1)}
-                  style={{ opacity: currentIndex === 0 ? 0.3 : 1 }}
-                >
-                  ← Назад
-                </button>
-                
-                {currentIndex < questions.length - 1 ? (
-                  <button className="btn-premium primary" style={{ flex: 1, background: theme.primary }} onClick={() => setCurrentIndex(i => i + 1)}>
-                    Далее →
+                {/* ======== СОДЕРЖИМОЕ ВОПРОСА ======== */}
+                <div className="answer-block">
+                  {((questions[currentIndex]!.media?.length ?? 0) > 0 || (questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword') || questions[currentIndex]!.q) ? (
+                    <div className="answer-label">СОДЕРЖИМОЕ ЗАДАНИЯ</div>
+                  ) : null}
+                  <div className="question-content">
+                    {renderQuestionComponent(questions[currentIndex]!, currentIndex)}
+                  </div>
+                </div>
+
+                <div className="navigation-footer">
+                  <button 
+                    className="nav-btn" 
+                    disabled={currentIndex === 0} 
+                    onClick={() => setCurrentIndex(i => i - 1)}
+                    style={{ opacity: currentIndex === 0 ? 0.3 : 1 }}
+                  >
+                    Назад
                   </button>
-                ) : (
-                  !isViewMode && (
-                    <button className="btn-premium finish" style={{ flex: 1 }} onClick={finish}>
-                      Завершить и проверить ✨
+                  
+                  {currentIndex < questions.length - 1 ? (
+                    <button className="btn-premium primary" style={{ flex: 1, background: theme.primary }} onClick={() => setCurrentIndex(i => i + 1)}>
+                      Далее
                     </button>
-                  )
-                )}
+                  ) : (
+                    !isViewMode && (
+                      <button className="btn-premium finish" style={{ flex: 1 }} onClick={finish}>
+                        Завершить и проверить
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </main>
@@ -547,6 +564,36 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         .question-title { font-size: 24px; font-weight: 800; line-height: 1.4; margin-bottom: 30px; color: #111827; }
         .media-section { margin-bottom: 35px; border-radius: 24px; overflow: hidden; }
         .legacy-image { width: 100%; border-radius: 20px; cursor: zoom-in; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+
+        /* Новые блоки для визуального разделения */
+        .materials-block {
+          background: #f8fafc;
+          border: 1px solid rgba(0,0,0,0.04);
+          border-radius: 20px;
+          padding: 20px;
+          margin-bottom: 28px;
+        }
+        .materials-label, .answer-label {
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 1.2px;
+          color: #94a3b8;
+          margin-bottom: 16px;
+          text-transform: uppercase;
+        }
+        .answer-block {
+          background: #ffffff;
+          border: 1px solid rgba(0,0,0,0.04);
+          border-radius: 24px;
+          padding: 24px;
+          box-shadow: 0 6px 24px rgba(0,0,0,0.03);
+        }
+        .answer-block .answer-label {
+          margin-bottom: 12px;
+        }
+        .question-content {
+          padding: 0;
+        }
 
         .navigation-footer { display: flex; gap: 20px; margin-top: 50px; padding-top: 35px; border-top: 2px solid rgba(0,0,0,0.03); }
         .nav-btn { background: rgba(0,0,0,0.03); border: none; font-weight: 800; cursor: pointer; padding: 16px 25px; border-radius: 18px; color: inherit; transition: all 0.2s; }
