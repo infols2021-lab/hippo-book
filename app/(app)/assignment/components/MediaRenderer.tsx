@@ -19,10 +19,10 @@ const VOLUME_EVENT = "hippo:volume-change";
 
 function getInitialVolume(): number {
   try {
-    const v = parseFloat(localStorage.getItem(VOLUME_KEY) ?? "1");
-    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
+    const v = parseFloat(localStorage.getItem(VOLUME_KEY) ?? "0.5");
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
   } catch {
-    return 1;
+    return 0.5;
   }
 }
 
@@ -61,8 +61,8 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
   const [audioError, setAudioError] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Громкость — читаем из localStorage после mount (SSR-safe)
-  const [volume, setVolume] = useState(1);
+  // Громкость — изначально половина (тише)
+  const [volume, setVolume] = useState(0.5);
 
   const finalUrl = useMemo(() => getImageUrl(url), [url]);
 

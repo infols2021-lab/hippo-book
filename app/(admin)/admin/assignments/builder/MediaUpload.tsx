@@ -24,8 +24,6 @@ export default function MediaUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Ref-флаг защиты от race condition при двойном клике / двойном drop:
-  // useState асинхронен и не успевает заблокировать второй вызов handleFiles
-  // до следующего рендера. useRef проверяется синхронно — мгновенно.
   const uploadingRef = useRef(false);
 
   async function parseServerResponse(response: Response) {
@@ -83,72 +81,68 @@ export default function MediaUpload({
     setUploading(true);
     setUploadError(null);
 
-    try {
-      const formData = new FormData();
-      formData.append("bucket", bucket);
-      formData.append("kind", "image"); // исторический флаг, сервер его игнорирует
-      validFiles.forEach((file) => formData.append("file", file));
+    const newMediaAttachments: MediaAttachment[] = [];
 
-      const response = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: formData,
-      });
+    for (const file of validFiles) {
+      try {
+        const formData = new FormData();
+        formData.append("bucket", bucket);
+        formData.append("file", file);
 
-      const data = await parseServerResponse(response);
+        const response = await fetch("/api/admin/upload", {
+          method: "POST",
+          body: formData,
+        });
 
-      const uploadedFiles: Array<{
-        publicUrl: string;
-        mediaType: string;
-        fileName: string;
-      }> = (() => {
-        if (Array.isArray(data.files) && data.files.length > 0) {
-          return data.files;
-        }
-        if (data.publicUrl) {
-          return [
-            {
+        const data = await parseServerResponse(response);
+
+        // Извлекаем данные загруженного файла
+        const fileData = Array.isArray(data.files) && data.files.length > 0
+          ? data.files[0]
+          : {
               publicUrl: data.publicUrl,
               mediaType: data.mediaType || "image",
-              fileName: data.fileName || "file",
-            },
-          ];
+              fileName: data.fileName || file.name,
+            };
+
+        if (!fileData?.publicUrl) {
+          throw new Error("Сервер не вернул publicUrl для файла " + file.name);
         }
-        return [];
-      })();
 
-      if (uploadedFiles.length === 0) {
-        throw new Error("Сервер не вернул ни одного загруженного файла.");
-      }
-
-      const newMedia: MediaAttachment[] = uploadedFiles.map((uf: any) => ({
-        id: crypto.randomUUID(),
-        url: uf.publicUrl,
-        type: uf.mediaType || "image",
-        name: uf.fileName || "Без имени",
-      }));
-
-      onChange([...value, ...newMedia]);
-    } catch (err: any) {
-      let message = "Ошибка при загрузке файлов.";
-      if (err instanceof Error) {
-        if (
-          err.message.includes("Failed to fetch") ||
-          err.message.includes("NetworkError")
-        ) {
-          message = "Ошибка соединения с сервером. Проверьте интернет и попробуйте снова.";
-        } else {
-          message = err.message;
+        newMediaAttachments.push({
+          id: crypto.randomUUID(),
+          url: fileData.publicUrl,
+          type: fileData.mediaType || "image",
+          name: fileData.fileName || file.name,
+        });
+      } catch (err: any) {
+        // Останавливаемся при первой ошибке
+        let message = "Ошибка при загрузке файлов.";
+        if (err instanceof Error) {
+          if (
+            err.message.includes("Failed to fetch") ||
+            err.message.includes("NetworkError")
+          ) {
+            message = "Ошибка соединения с сервером. Проверьте интернет и попробуйте снова.";
+          } else {
+            message = err.message;
+          }
+        } else if (typeof err === "string") {
+          message = err;
         }
-      } else if (typeof err === "string") {
-        message = err;
+        setUploadError(message);
+        break;
       }
-      setUploadError(message);
-    } finally {
-      uploadingRef.current = false;
-      setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+    }
+
+    uploadingRef.current = false;
+    setUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+
+    if (newMediaAttachments.length > 0) {
+      onChange([...value, ...newMediaAttachments]);
     }
   }
 

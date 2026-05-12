@@ -14,6 +14,17 @@ import { Readable } from "stream";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// ====== КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ДЛЯ 413 ======
+// Говорим Next.js принимать тела запросов до 20 МБ,
+// чтобы API-роут не резал файлы до того, как Busboy их прочитает.
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '20mb',
+    },
+  },
+};
+
 // Vercel Serverless: по умолчанию таймаут 10 сек — для загрузки 20 МБ не хватит.
 // Увеличиваем до 60 сек. На других платформах игнорируется.
 export const maxDuration = 60;
