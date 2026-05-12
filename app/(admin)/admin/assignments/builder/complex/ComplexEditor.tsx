@@ -110,6 +110,7 @@ export default function ComplexEditor({ value, onChange, disabled }: Props) {
         <button type="button" className="btn small secondary" disabled={disabled} onClick={() => addSubQuestion("fill")}>✍️ Вписать</button>
         <button type="button" className="btn small secondary" disabled={disabled} onClick={() => addSubQuestion("sentence")}>📝 Предложение</button>
         <button type="button" className="btn small secondary" disabled={disabled} onClick={() => addSubQuestion("matching")}>🔗 Сопоставление</button>
+        <button type="button" className="btn small secondary" disabled={disabled} onClick={() => addSubQuestion("imagemap")}>🗺 Карта</button>
       </div>
     </div>
   );

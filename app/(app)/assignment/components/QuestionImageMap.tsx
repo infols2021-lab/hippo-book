@@ -9,7 +9,6 @@ import React, {
   useState,
 } from "react";
 import type { QuestionImageMap } from "../lib/types";
-import MediaRenderer from "./MediaRenderer";
 import { getImageUrl } from "../lib/image";
 
 // ---------------------------------------------------------------------------
@@ -457,7 +456,7 @@ export default function QuestionImageMap({
                   borderRadius: "16px",
                   padding: "12px 16px",
                   minWidth: "120px",
-                  maxWidth: "200px",
+                  maxWidth: "220px",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -472,18 +471,29 @@ export default function QuestionImageMap({
                   opacity: disabled && !isConnected ? 0.6 : 1,
                 }}
               >
-                {/* media thumbnail */}
+                {/* media thumbnail — рендерим простое изображение без MediaRenderer */}
                 {ans.media && ans.media.length > 0 && (
                   <div
                     style={{
-                      width: "100%",
+                      width: "120px",
+                      height: "120px",
                       display: "flex",
+                      alignItems: "center",
                       justifyContent: "center",
+                      borderRadius: "12px",
+                      overflow: "hidden",
+                      backgroundColor: "#f8fafc",
                     }}
                   >
-                    <div style={{ width: 100, height: 100, overflow: "hidden" }}>
-                      <MediaRenderer media={ans.media} />
-                    </div>
+                    <img
+                      src={getImageUrl(ans.media[0].url)}
+                      alt={ans.text || "Ответ"}
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: "100%",
+                        objectFit: "contain",
+                      }}
+                    />
                   </div>
                 )}
 
