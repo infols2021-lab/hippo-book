@@ -1,5 +1,5 @@
 // app/(admin)/admin/assignments/builder/validate.ts
-import type { Question } from "./types";
+import type { Question, TestQuestion } from "./types";
 
 export type ValidationIssue = {
   index: number; // -1 для общих ошибок
@@ -20,8 +20,8 @@ export function validateQuestions(questions: Question[]): ValidationResult {
   }
 
   questions.forEach((q, index) => {
-    // Текст или медиа обязательны (кроме кроссворда и imagemap)
-    if (q.type !== "crossword" && q.type !== "imagemap" && !q.q?.trim() && (!q.media || q.media.length === 0)) {
+    // Текст или медиа обязательны (кроме кроссворда, imagemap и reading)
+    if (q.type !== "crossword" && q.type !== "imagemap" && q.type !== "reading" && !q.q?.trim() && (!q.media || q.media.length === 0)) {
       issues.push({ index, message: "Добавьте текст вопроса или прикрепите медиа-файл" });
     }
 
@@ -77,22 +77,18 @@ export function validateQuestions(questions: Question[]): ValidationResult {
     }
 
     if (q.type === "imagemap") {
-      // Проверка наличия центральной картинки
       if (!q.image || !String(q.image).trim()) {
         issues.push({ index, message: "Загрузите центральное изображение для карты" });
       }
 
-      // Проверка наличия точек
       if (!q.points || q.points.length === 0) {
         issues.push({ index, message: "Добавьте хотя бы одну точку на изображении" });
       }
 
-      // Проверка наличия ответов
       if (!q.answers || q.answers.length === 0) {
         issues.push({ index, message: "Добавьте хотя бы один вариант ответа" });
       }
 
-      // Проверка, что каждая точка ссылается на существующий ответ
       if (q.points && q.answers) {
         const answerIds = new Set(q.answers.map(a => a.id));
         for (const point of q.points) {
@@ -103,7 +99,6 @@ export function validateQuestions(questions: Question[]): ValidationResult {
           }
         }
 
-        // Проверка 1:1 (дублирование)
         const pointToAnswer = new Map<string, string>();
         for (const point of q.points) {
           if (point.correctAnswerId) {
@@ -118,6 +113,27 @@ export function validateQuestions(questions: Question[]): ValidationResult {
             pointToAnswer.set(point.correctAnswerId, point.id);
           }
         }
+      }
+    }
+
+    if (q.type === "reading") {
+      // Общий текст или медиа должны быть
+      if (!q.text?.trim() && (!q.media || q.media.length === 0)) {
+        issues.push({ index, message: "Добавьте текст для чтения или прикрепите медиа" });
+      }
+
+      if (!q.subQuestions?.length) {
+        issues.push({ index, message: "Добавьте хотя бы один подвопрос" });
+      } else {
+        // Каждый подвопрос — TestQuestion, проверяем как обычный тест
+        (q.subQuestions as TestQuestion[]).forEach((subQ: TestQuestion, subIdx: number) => {
+          if (!subQ.options || subQ.options.length < 2) {
+            issues.push({ index, message: `Подвопрос ${subIdx + 1}: минимум 2 варианта ответа` });
+          }
+          if (!subQ.correct || subQ.correct.length === 0) {
+            issues.push({ index, message: `Подвопрос ${subIdx + 1}: выберите хотя бы один правильный ответ` });
+          }
+        });
       }
     }
   });

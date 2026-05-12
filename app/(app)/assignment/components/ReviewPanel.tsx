@@ -87,7 +87,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
     const status = getStatusConfig(r);
     const scorePercent =
       r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
-    const itemMedia = r.media; // теперь типизировано
+    const itemMedia = r.media;
 
     return (
       <div
@@ -254,7 +254,6 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               background: "#ffffff",
             }}
           >
-            {/* Заголовок колонок */}
             <div
               style={{
                 display: "grid",
@@ -274,7 +273,6 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               <div>Ваш ответ</div>
               <div>Верный ответ</div>
             </div>
-            {/* Строки */}
             {(r.parts ?? []).map((p, pI) => (
               <FillRow
                 key={pI}
@@ -392,7 +390,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           </div>
         )}
 
-        {/* ===== CROSSWORD – новый полноценный вывод ===== */}
+        {/* ===== CROSSWORD ===== */}
         {r.type === "crossword" && (
           <div
             style={{
@@ -420,7 +418,6 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
 
             {r.wordReview && (
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                {/* Правильные слова */}
                 {r.wordReview.correct.length > 0 && (
                   <div>
                     <div style={{ fontSize: "13px", fontWeight: 700, color: "#166534", marginBottom: "8px", textTransform: "uppercase" }}>
@@ -454,7 +451,6 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                   </div>
                 )}
 
-                {/* Неправильные слова */}
                 {r.wordReview.wrong.length > 0 && (
                   <div>
                     <div style={{ fontSize: "13px", fontWeight: 700, color: "#991b1b", marginBottom: "8px", textTransform: "uppercase" }}>
@@ -497,7 +493,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           </div>
         )}
 
-        {/* ===== COMPLEX ===== */}
+        {/* ===== COMPLEX / READING ===== */}
         {r.type === "complex" && r.subReviews && (
           <div style={{ marginTop: "16px" }}>
             <div
@@ -512,6 +508,31 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               }}
             >
               Вложенные задания
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {r.subReviews.map((sr, srI) => (
+                <div key={srI} style={{ paddingLeft: "12px", borderLeft: "3px solid rgba(99,102,241,0.2)" }}>
+                  {renderItem(sr, srI)}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {r.type === "reading" && r.subReviews && (
+          <div style={{ marginTop: "16px" }}>
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: 800,
+                color: "#94a3b8",
+                textTransform: "uppercase",
+                letterSpacing: "1px",
+                marginBottom: "16px",
+                textAlign: "center",
+              }}
+            >
+              Результаты по подвопросам
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               {r.subReviews.map((sr, srI) => (

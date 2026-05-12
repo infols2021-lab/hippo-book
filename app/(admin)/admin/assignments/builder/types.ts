@@ -2,7 +2,15 @@
 export type EditorMode = "visual" | "json";
 
 // ===== Question types =====
-export type QuestionType = "test" | "fill" | "sentence" | "crossword" | "complex" | "matching" | "imagemap";
+export type QuestionType =
+  | "test"
+  | "fill"
+  | "sentence"
+  | "crossword"
+  | "complex"
+  | "matching"
+  | "imagemap"
+  | "reading";
 
 // ===== Media =====
 export type MediaType = "image" | "audio" | "pdf";
@@ -35,6 +43,7 @@ export type TestQuestion = BaseQuestion & {
   multiple?: boolean; // Чекбокс для множественного выбора
   options: TestOption[]; // Обновленная структура опций с поддержкой медиа
   correct: number[]; // Массив индексов правильных ответов (даже если один)
+  layout?: "vertical" | "horizontal"; // раскладка вариантов: вертикально (по умолчанию) или сеткой до 3 в ряд
 };
 
 // ===== Fill =====
@@ -72,6 +81,15 @@ export type MatchingQuestion = BaseQuestion & {
   type: "matching";
   centerImage?: MediaAttachment; // То самое "центральное изображение"
   pairs: MatchingPair[];
+};
+
+// ===== Reading =====
+export type ReadingQuestion = BaseQuestion & {
+  type: "reading";
+  /** общий текст или инструкция */
+  text?: string;
+  /** серия тестовых подвопросов */
+  subQuestions: TestQuestion[];
 };
 
 // ===== Crossword (editor helpers) =====
@@ -144,7 +162,8 @@ export type Question =
   | CrosswordQuestion
   | ComplexQuestion
   | MatchingQuestion
-  | ImageMapQuestion;
+  | ImageMapQuestion
+  | ReadingQuestion;
 
 // ===== Helpers =====
 export function deepClone<T>(v: T): T {
@@ -161,6 +180,7 @@ export function newQuestion(type: QuestionType): Question {
       q: "",
       multiple: false,
       media: [],
+      layout: "vertical",
       options: [
         { id: crypto.randomUUID(), text: "", media: [] },
         { id: crypto.randomUUID(), text: "", media: [] },
@@ -239,6 +259,32 @@ export function newQuestion(type: QuestionType): Question {
           id: firstAnswerId,
           text: "Ответ 1",
           media: [],
+        },
+      ],
+    };
+  }
+
+  if (type === "reading") {
+    const subId = crypto.randomUUID();
+    return {
+      id,
+      type: "reading",
+      q: "",
+      media: [],
+      text: "",
+      subQuestions: [
+        {
+          id: subId,
+          type: "test",
+          q: "",
+          multiple: false,
+          media: [],
+          layout: "vertical",
+          options: [
+            { id: crypto.randomUUID(), text: "", media: [] },
+            { id: crypto.randomUUID(), text: "", media: [] },
+          ],
+          correct: [0],
         },
       ],
     };

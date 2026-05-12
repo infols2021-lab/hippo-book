@@ -106,6 +106,11 @@ export function validateAllAnswered(
       const subAns = Array.isArray(a) ? a : [];
       const subRes = validateAllAnswered(subQs, subAns);
       if (!subRes.ok) return { ok: false, index: i, subIndex: subRes.index };
+    } else if (q.type === "reading") {
+      const subQs = q.subQuestions || [];
+      const subAns = Array.isArray(a) ? a : [];
+      const subRes = validateAllAnswered(subQs, subAns);
+      if (!subRes.ok) return { ok: false, index: i, subIndex: subRes.index };
     } else if (q.type === "matching") {
       const pairs = q.pairs || [];
       const has =
@@ -210,6 +215,39 @@ export function calcAndBuildReview(
         isSkipped: complexAllSkipped,
         pointsEarned: Number(complexEarned.toFixed(2)),
         pointsTotal: complexTotal,
+        subReviews,
+      } as ReviewItem;
+    }
+
+    // ---------------------------------------------------------------
+    // READING (аналогично COMPLEX)
+    // ---------------------------------------------------------------
+    if (q.type === "reading") {
+      const subQs = Array.isArray(q.subQuestions) ? q.subQuestions : [];
+      const subAns = Array.isArray(a) ? a : [];
+
+      const subReviews: ReviewItem[] = [];
+      let readingEarned = 0;
+      let readingTotal = 0;
+      let readingAllSkipped = true;
+      let readingAllCorrect = true;
+
+      subQs.forEach((sq: any, subI: number) => {
+        const sr = processQ(sq, subAns[subI], `${idxText}.${subI + 1}`);
+        subReviews.push(sr);
+        readingEarned += Number.isFinite(sr.pointsEarned) ? sr.pointsEarned : 0;
+        readingTotal += Number.isFinite(sr.pointsTotal) ? sr.pointsTotal : 0;
+        if (!sr.isSkipped) readingAllSkipped = false;
+        if (!sr.isCorrect) readingAllCorrect = false;
+      });
+
+      return {
+        type: "reading",
+        questionText,
+        isCorrect: readingTotal > 0 && readingEarned === readingTotal,
+        isSkipped: readingAllSkipped,
+        pointsEarned: Number(readingEarned.toFixed(2)),
+        pointsTotal: readingTotal,
         subReviews,
       } as ReviewItem;
     }

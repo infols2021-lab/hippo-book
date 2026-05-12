@@ -40,6 +40,7 @@ export type QuestionTest = QuestionBase & {
   multiple?: boolean;
   options?: TestOption[] | string[]; // Совместимость со старым форматом
   correct?: number[] | number; // Массив индексов (или число для старых)
+  layout?: "vertical" | "horizontal"; // раскладка вариантов
 };
 
 export type QuestionFill = QuestionBase & {
@@ -107,6 +108,16 @@ export type QuestionImageMap = QuestionBase & {
   answers: ImageMapAnswer[];
 };
 
+// ==================== Reading Type ====================
+
+export type QuestionReading = QuestionBase & {
+  type: "reading";
+  /** общий текст для чтения */
+  text?: string;
+  /** тестовые подвопросы */
+  subQuestions?: QuestionTest[];
+};
+
 // ==================== Updated Any Type ====================
 
 export type QuestionAny =
@@ -117,6 +128,7 @@ export type QuestionAny =
   | QuestionComplex
   | QuestionMatching
   | QuestionImageMap
+  | QuestionReading
   | (QuestionBase & Record<string, any>);
 
 export type Progress = {
@@ -197,7 +209,7 @@ export type ReviewItem =
       pointLabels?: Record<string, string>;
     })
   | (ReviewBase & {
-      type: "complex";
+      type: "complex" | "reading"; // <-- добавили reading
       subReviews: ReviewItem[]; // Результаты по каждому подвопросу
     })
   | (ReviewBase & {

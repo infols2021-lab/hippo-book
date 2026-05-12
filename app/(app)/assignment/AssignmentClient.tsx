@@ -11,6 +11,7 @@ import QuestionSentence from "./components/QuestionSentence";
 import QuestionMatching from "./components/QuestionMatching";
 import QuestionComplex from "./components/QuestionComplex";
 import QuestionImageMap from "./components/QuestionImageMap";
+import QuestionReading from "./components/QuestionReading";
 import MediaRenderer from "./components/MediaRenderer";
 import ReviewPanel from "./components/ReviewPanel";
 
@@ -333,6 +334,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       case "matching": return <QuestionMatching question={q as any} value={val} {...sharedProps} />;
       case "complex": return <QuestionComplex question={q as any} value={val} {...sharedProps} />;
       case "imagemap": return <QuestionImageMap question={q as any} value={val || {}} {...sharedProps} />;
+      case "reading": return <QuestionReading question={q as any} value={val || []} {...sharedProps} />;
       case "crossword":
         return (
           <QuestionCrossword

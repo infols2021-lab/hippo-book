@@ -14,6 +14,7 @@ import CrosswordEditor from "./crossword/CrosswordEditor";
 import ComplexEditor from "./complex/ComplexEditor";
 import MatchingEditor from "./matching/MatchingEditor";
 import ImageMapEditor from "./imagemap/ImageMapEditor";
+import ReadingEditor from "./reading/ReadingEditor";
 
 type Props = {
   index: number;
@@ -36,6 +37,7 @@ function typeLabel(t: QuestionType) {
   if (t === "complex") return "📚 Комплексный вопрос";
   if (t === "matching") return "🔗 Сопоставление";
   if (t === "imagemap") return "🗺 Карта";
+  if (t === "reading") return "📖 Чтение + тест";
   return t;
 }
 
@@ -88,6 +90,8 @@ export default function QuestionItem({
       ? "qtype-matching"
       : q.type === "imagemap"
       ? "qtype-imagemap"
+      : q.type === "reading"
+      ? "qtype-reading"
       : "qtype-crossword";
 
   // ====== Zoomable image state (for crossword) ======
@@ -316,8 +320,8 @@ export default function QuestionItem({
 
       <div style={{ height: 12 }} />
 
-      {/* ===== ТЕКСТ ВОПРОСА (ПОКАЗЫВАЕМ ДЛЯ ВСЕХ, КРОМЕ КРОССВОРДА) ===== */}
-      {q.type !== "crossword" ? (
+      {/* ===== ТЕКСТ ВОПРОСА (ПОКАЗЫВАЕМ ДЛЯ ВСЕХ, КРОМЕ КРОССВОРДА, IMAGEMAP, READING) ===== */}
+      {q.type !== "crossword" && q.type !== "imagemap" && q.type !== "reading" ? (
         <div className="form-group">
           <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Текст вопроса:</label>
           <textarea
@@ -334,8 +338,8 @@ export default function QuestionItem({
       {/* ===== ОБЩИЙ ЗАГРУЗЧИК МЕДИА (ПОКАЗЫВАЕМ ДЛЯ ВСЕХ, КРОМЕ КРОССВОРДА) ===== */}
       {q.type !== "crossword" ? (
         <>
-          {/* Оставлено для обратной совместимости старых данных (единичная картинка) – скрыто для imagemap */}
-          {q.type !== "imagemap" && q.image && typeof q.image === "string" && !q.media?.length && (
+          {/* Оставлено для обратной совместимости старых данных (единичная картинка) – скрыто для imagemap и reading */}
+          {q.type !== "imagemap" && q.type !== "reading" && q.image && typeof q.image === "string" && !q.media?.length && (
              <div className="form-group" style={{ marginBottom: "16px" }}>
                <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Устаревшее изображение:</label>
                <img src={q.image} alt="old media" style={{ maxWidth: 200, borderRadius: 8 }} />
@@ -487,6 +491,9 @@ export default function QuestionItem({
         ) : q.type === "imagemap" ? (
           // @ts-ignore
           <ImageMapEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
+        ) : q.type === "reading" ? (
+          // @ts-ignore
+          <ReadingEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
         ) : null}
       </div>
     </div>

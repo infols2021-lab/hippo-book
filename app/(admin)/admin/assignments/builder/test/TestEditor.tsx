@@ -16,7 +16,7 @@ export default function TestEditor({ value, onChange, disabled }: Props) {
 
   // ==== Нормализация старых данных для обратной совместимости ====
   const isMultiple = !!value.multiple;
-  
+
   const options: TestOption[] = Array.isArray(value.options)
     ? value.options.map((opt: any) => {
         // Если старый формат (просто строка)
@@ -32,7 +32,8 @@ export default function TestEditor({ value, onChange, disabled }: Props) {
     : typeof value.correct === "number"
     ? [value.correct]
     : [];
-  // ================================================================
+
+  const layout = value.layout ?? "vertical"; // по умолчанию вертикально
 
   function handleOptionChange(index: number, updatedOption: Partial<TestOption>) {
     const nextOptions = [...options];
@@ -48,8 +49,6 @@ export default function TestEditor({ value, onChange, disabled }: Props) {
 
   function handleRemoveOption(index: number) {
     const nextOptions = options.filter((_, i) => i !== index);
-    
-    // Корректируем индексы правильных ответов при удалении
     const nextCorrect = correctIndices
       .filter((c) => c !== index)
       .map((c) => (c > index ? c - 1 : c));
@@ -72,30 +71,99 @@ export default function TestEditor({ value, onChange, disabled }: Props) {
   return (
     <div>
       {/* Настройка типа выбора */}
-      <div className="form-group" style={{ marginBottom: "20px", padding: "12px", background: "rgba(0,123,255,0.05)", borderRadius: "8px" }}>
-        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 600, cursor: "pointer" }}>
+      <div
+        className="form-group"
+        style={{
+          marginBottom: "20px",
+          padding: "12px",
+          background: "rgba(0,123,255,0.05)",
+          borderRadius: "8px",
+        }}
+      >
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
           <input
             type="checkbox"
             checked={isMultiple}
             disabled={disabled}
             onChange={(e) => {
               const multiple = e.target.checked;
-              // Если переключаем на одиночный, оставляем только первый правильный ответ (если есть)
-              const nextCorrect = !multiple && correctIndices.length > 1 ? [correctIndices[0]] : correctIndices;
+              const nextCorrect =
+                !multiple && correctIndices.length > 1
+                  ? [correctIndices[0]]
+                  : correctIndices;
               patch({ multiple, correct: nextCorrect });
             }}
             style={{ width: "18px", height: "18px" }}
           />
           Множественный выбор (несколько правильных вариантов)
         </label>
-        <div style={{ fontSize: "12px", color: "rgba(0,0,0,0.5)", marginTop: "4px", paddingLeft: "26px" }}>
+        <div
+          style={{
+            fontSize: "12px",
+            color: "rgba(0,0,0,0.5)",
+            marginTop: "4px",
+            paddingLeft: "26px",
+          }}
+        >
           При множественном выборе баллы будут начисляться пропорционально правильным ответам (например, 2/3 = 0.66 балла).
         </div>
       </div>
 
+      {/* ===== НОВОЕ: выбор раскладки вариантов ===== */}
+      <div
+        className="form-group"
+        style={{
+          marginBottom: "20px",
+          padding: "12px",
+          background: "rgba(245,158,11,0.05)",
+          borderRadius: "8px",
+        }}
+      >
+        <label style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}>
+          Раскладка вариантов ответа на странице ученика:
+        </label>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
+            <input
+              type="radio"
+              name={`layout-${value.id}`}
+              value="vertical"
+              checked={layout === "vertical"}
+              onChange={() => patch({ layout: "vertical" })}
+              disabled={disabled}
+            />
+            Вертикально (друг под другом)
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
+            <input
+              type="radio"
+              name={`layout-${value.id}`}
+              value="horizontal"
+              checked={layout === "horizontal"}
+              onChange={() => patch({ layout: "horizontal" })}
+              disabled={disabled}
+            />
+            Горизонтально (до 3 в ряд)
+          </label>
+        </div>
+        <div style={{ fontSize: "12px", color: "rgba(0,0,0,0.5)", marginTop: "6px" }}>
+          Для горизонтальной раскладки варианты выстроятся сеткой, максимум три в строке. Это удобно для картинок и коротких текстов.
+        </div>
+      </div>
+
       <div className="form-group">
-        <label style={{ display: "block", marginBottom: "12px", fontWeight: 600 }}>Варианты ответов:</label>
-        
+        <label style={{ display: "block", marginBottom: "12px", fontWeight: 600 }}>
+          Варианты ответов:
+        </label>
+
         {options.map((opt, index) => {
           const isCorrect = correctIndices.includes(index);
 
@@ -111,7 +179,7 @@ export default function TestEditor({ value, onChange, disabled }: Props) {
                 border: `2px solid ${isCorrect ? "#28a745" : "rgba(0,0,0,0.1)"}`,
                 borderRadius: "12px",
                 background: isCorrect ? "rgba(40,167,69,0.02)" : "#fff",
-                transition: "all 0.2s ease"
+                transition: "all 0.2s ease",
               }}
             >
               {/* Радио или Чекбокс для выбора правильного ответа */}
