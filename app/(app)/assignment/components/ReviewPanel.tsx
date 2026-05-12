@@ -392,6 +392,111 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           </div>
         )}
 
+        {/* ===== CROSSWORD – новый полноценный вывод ===== */}
+        {r.type === "crossword" && (
+          <div
+            style={{
+              background: "#f8fafc",
+              borderRadius: "16px",
+              padding: "16px",
+            }}
+          >
+            {r.note && (
+              <div style={{ fontSize: "14px", fontWeight: 600, color: "#334155", marginBottom: "12px" }}>
+                {r.note}
+              </div>
+            )}
+
+            {r.crosswordStats && (
+              <div style={{ display: "flex", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
+                <span className="badge-pill">
+                  Заполнено клеток: <b>{r.crosswordStats.filled}/{r.crosswordStats.total}</b>
+                </span>
+                <span className="badge-pill">
+                  Точность заполнения: <b>{r.crosswordStats.percent}%</b>
+                </span>
+              </div>
+            )}
+
+            {r.wordReview && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {/* Правильные слова */}
+                {r.wordReview.correct.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#166534", marginBottom: "8px", textTransform: "uppercase" }}>
+                      Правильные слова ({r.wordReview.correct.length})
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {r.wordReview.correct.map((w, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            padding: "8px 12px",
+                            background: "#f0fdf4",
+                            border: "1px solid rgba(16,185,129,0.2)",
+                            borderRadius: "10px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            fontSize: "14px",
+                          }}
+                        >
+                          <span style={{ fontWeight: 800, color: "#10b981", minWidth: "28px" }}>✓</span>
+                          <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "80px" }}>
+                            №{w.number} {w.direction === "across" ? "→" : "↓"}
+                          </span>
+                          <span style={{ fontWeight: 700, color: "#10b981", wordBreak: "break-word" }}>
+                            {w.word}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Неправильные слова */}
+                {r.wordReview.wrong.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#991b1b", marginBottom: "8px", textTransform: "uppercase" }}>
+                      Неправильные слова ({r.wordReview.wrong.length})
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {r.wordReview.wrong.map((w, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            padding: "10px 12px",
+                            background: "#fef2f2",
+                            border: "1px solid rgba(239,68,68,0.2)",
+                            borderRadius: "10px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "4px",
+                            fontSize: "14px",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <span style={{ fontWeight: 800, color: "#ef4444", minWidth: "28px" }}>✗</span>
+                            <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "80px" }}>
+                              №{w.number} {w.direction === "across" ? "→" : "↓"}
+                            </span>
+                            <span style={{ fontWeight: 700, color: "#ef4444", wordBreak: "break-word" }}>
+                              Ваш ответ: {w.user}
+                            </span>
+                          </div>
+                          <div style={{ marginLeft: "40px", color: "#166534", fontWeight: 700 }}>
+                            Правильно: {w.correct}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ===== COMPLEX ===== */}
         {r.type === "complex" && r.subReviews && (
           <div style={{ marginTop: "16px" }}>
@@ -418,30 +523,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           </div>
         )}
 
-        {/* ===== CROSSWORD / OTHER ===== */}
-        {r.type === "crossword" && (
-          <div
-            style={{
-              background: "#f8fafc",
-              borderRadius: "16px",
-              padding: "16px",
-              fontSize: "14px",
-              fontWeight: 600,
-              color: "#334155",
-            }}
-          >
-            {r.note}
-            <div style={{ display: "flex", gap: "12px", marginTop: "10px" }}>
-              <span className="badge-pill">
-                Заполнено: <b>{r.crosswordStats?.filled}/{r.crosswordStats?.total}</b>
-              </span>
-              <span className="badge-pill">
-                Точность: <b>{r.crosswordStats?.percent}%</b>
-              </span>
-            </div>
-          </div>
-        )}
-
+        {/* ===== OTHER ===== */}
         {r.type === "other" && r.note && (
           <div
             style={{
@@ -518,6 +600,12 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           border-radius: 12px;
           border: 1px solid rgba(0, 0, 0, 0.04);
           color: #475569;
+        }
+        @media (max-width: 640px) {
+          .review-card {
+            padding: 16px;
+            margin-bottom: 16px;
+          }
         }
       `}</style>
     </section>

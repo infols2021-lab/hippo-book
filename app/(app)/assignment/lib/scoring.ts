@@ -673,7 +673,153 @@ export function calcAndBuildReview(
     }
 
     // ---------------------------------------------------------------
-    // OTHER / CROSSWORD
+    // CROSSWORD – полноценная проверка по словам
+    // ---------------------------------------------------------------
+    if (q.type === "crossword") {
+      const grid: string[][] = Array.isArray(q.grid) ? q.grid as string[][] : [];
+      const words: any[] = Array.isArray(q.words) ? q.words : [];
+      const blocks: any[] = Array.isArray(q.blocks) ? q.blocks : [];
+      const userGrid: unknown = a;
+
+      // --- 1. Сбор активных клеток (не заблокированных) ---
+      const rows = grid.length;
+      const cols = rows > 0 ? Math.max(...grid.map(r => r?.length ?? 0)) : 0;
+
+      // Множество заблокированных клеток
+      const blockedSet = new Set<string>();
+      for (const b of blocks) {
+        if (b && typeof b === "object") {
+          blockedSet.add(`${b.row},${b.col}`);
+        }
+      }
+
+      // Множество клеток, принадлежащих словам
+      const wordCells = new Set<string>();
+      for (const w of words) {
+        if (!w || typeof w !== "object") continue;
+        const len = Number(w.length ?? 0);
+        const dir = w.direction as string;
+        const start = w.start as { row: number; col: number } | undefined;
+        if (!start || !Number.isFinite(len) || len <= 0) continue;
+
+        for (let i = 0; i < len; i++) {
+          const r = dir === "across" ? start.row : start.row + i;
+          const c = dir === "across" ? start.col + i : start.col;
+          wordCells.add(`${r},${c}`);
+        }
+      }
+
+      // --- 2. Статистика заполнения ---
+      let totalActiveCells = 0;
+      let filledCells = 0;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const key = `${r},${c}`;
+          if (blockedSet.has(key)) continue;
+          totalActiveCells++;
+          const userLetter = (
+            Array.isArray(userGrid) && Array.isArray(userGrid[r])
+              ? String(userGrid[r][c] ?? "").trim()
+              : ""
+          );
+          if (userLetter !== "") filledCells++;
+        }
+      }
+
+      const percent = totalActiveCells > 0 ? Math.round((filledCells / totalActiveCells) * 100) : 0;
+
+      // --- 3. Проверка по словам ---
+      const correctWords: Array<{ number: number; direction: string; word: string }> = [];
+      const wrongWords: Array<{ number: number; direction: string; user: string; correct: string }> = [];
+      let totalWords = words.length;
+
+      for (const w of words) {
+        if (!w || typeof w !== "object") continue;
+        const number = Number(w.number ?? 0);
+        const dir = String(w.direction ?? "");
+        const start = w.start as { row: number; col: number } | undefined;
+        const len = Number(w.length ?? 0);
+
+        if (!start || !Number.isFinite(len) || len <= 0) continue;
+
+        // Собираем правильное слово из эталонной сетки
+        let correctWord = "";
+        let userWord = "";
+
+        for (let i = 0; i < len; i++) {
+          const r = dir === "across" ? start.row : start.row + i;
+          const c = dir === "across" ? start.col + i : start.col;
+
+          const correctLetter = String(grid?.[r]?.[c] ?? "");
+          const userLetter = (
+            Array.isArray(userGrid) && Array.isArray(userGrid[r])
+              ? String(userGrid[r][c] ?? "")
+              : ""
+          ).trim();
+
+          correctWord += correctLetter;
+          userWord += userLetter;
+        }
+
+        const isCorrect = userWord.toUpperCase() === correctWord.toUpperCase() && userWord !== "";
+
+        if (isCorrect) {
+          correctWords.push({
+            number,
+            direction: dir,
+            word: correctWord.toUpperCase(),
+          });
+        } else {
+          wrongWords.push({
+            number,
+            direction: dir,
+            user: userWord || "(пусто)",
+            correct: correctWord.toUpperCase(),
+          });
+        }
+      }
+
+      // --- 4. Подсчёт баллов ---
+      const answered = filledCells > 0;
+      let correctPairsCount = correctWords.length;
+      let fraction = safeFraction(correctPairsCount, totalWords);
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+      statsSum.pointsEarned += pointsEarned;
+
+      if (correctPairsCount === totalWords && totalWords > 0) {
+        statsSum.correct++;
+      } else if (answered) {
+        statsSum.incorrect++;
+      } else {
+        statsSum.skipped++;
+      }
+
+      return {
+        type: "crossword",
+        questionText,
+        isCorrect: correctPairsCount === totalWords && totalWords > 0,
+        isSkipped: !answered,
+        pointsEarned,
+        pointsTotal,
+        note: answered
+          ? `Правильно слов: ${correctPairsCount} из ${totalWords}`
+          : "Кроссворд не заполнен",
+        crosswordStats: {
+          filled: filledCells,
+          total: totalActiveCells,
+          percent,
+        },
+        wordReview: {
+          wrong: wrongWords,
+          correct: correctWords,
+        },
+        media: q.media || undefined,
+      } as ReviewItem;
+    }
+
+    // ---------------------------------------------------------------
+    // OTHER
     // ---------------------------------------------------------------
     statsSum.skipped++;
     return {

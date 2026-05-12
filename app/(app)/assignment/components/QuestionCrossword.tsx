@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { getImageUrl } from "../lib/image";
 
 type Dir = "across" | "down";
@@ -15,7 +15,7 @@ type Word = {
 
 type Props = {
   question: any;
-  value: string[][] | undefined; // user grid
+  value: string[][] | undefined;
   disabled?: boolean;
   onChange: (grid: string[][]) => void;
   onOpenImage?: (src: string) => void;
@@ -42,10 +42,13 @@ export default function QuestionCrossword({
   const rows = Number(question?.metadata?.rows ?? correctGrid.length ?? 0);
   const cols = Number(question?.metadata?.cols ?? (correctGrid?.[0]?.length ?? 0));
 
-  const blocks: { row: number; col: number }[] = Array.isArray(question?.blocks) ? question.blocks : [];
+  const blocks: { row: number; col: number }[] = Array.isArray(question?.blocks)
+    ? question.blocks
+    : [];
   const words: Word[] = Array.isArray(question?.words) ? question.words : [];
   const cellNumbers: Record<string, number> = question?.cellNumbers || {};
 
+  // responsive size: for very large grids (> 20 cols) we always use "size-large"
   const sizeClass = useMemo(() => {
     if (rows > 15 || cols > 15) return "size-large";
     if (rows > 12 || cols > 12) return "size-medium";
@@ -76,9 +79,26 @@ export default function QuestionCrossword({
     Array.from({ length: rows }, () => Array.from({ length: cols }, () => null))
   );
 
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
+
   const [focused, setFocused] = useState<{ r: number; c: number } | null>(null);
   const [dir, setDir] = useState<Dir>("across");
   const lastClickRef = useRef<{ r: number; c: number; t: number } | null>(null);
+
+  // --- Scroll focused cell into view (mobile-friendly) ---
+  useEffect(() => {
+    if (!focused) return;
+    const r = focused.r;
+    const c = focused.c;
+    const el = inputRefs.current?.[r]?.[c];
+    if (!el) return;
+
+    // small delay to let keyboard / layout settle on mobile
+    const timer = setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [focused]);
 
   function isHardBlocked(r: number, c: number) {
     return blocks.some((b) => b.row === r && b.col === c);
@@ -110,7 +130,10 @@ export default function QuestionCrossword({
 
   function focusCell(r: number, c: number) {
     const el = inputRefs.current?.[r]?.[c];
-    if (el) el.focus();
+    if (el) {
+      el.focus();
+      setFocused({ r, c });
+    }
   }
 
   function findWordContainingCell(d: Dir, r: number, c: number): Word | null {
@@ -211,6 +234,10 @@ export default function QuestionCrossword({
     lastClickRef.current = { r, c, t: now };
   }
 
+  // ------------------------------------------------------------------
+  // RENDER
+  // ------------------------------------------------------------------
+
   return (
     <div className="crossword-container">
       {question?.image ? (
@@ -222,12 +249,12 @@ export default function QuestionCrossword({
             onClick={() => onOpenImage?.(getImageUrl(question.image))}
             onError={(e) => (e.currentTarget.style.display = "none")}
           />
-          <div className="cw-image-hint">🔍 Нажмите на изображение для увеличения</div>
+          <div className="cw-image-hint">Нажмите на изображение для увеличения</div>
         </div>
       ) : null}
 
       <div className="cw-card">
-        <div className="cw-grid-wrap">
+        <div className="cw-grid-wrap" ref={gridContainerRef}>
           <div className={`cw-grid ${sizeClass}`}>
             {Array.from({ length: rows }).map((_, r) => (
               <div className="cw-row" key={r}>
@@ -279,7 +306,10 @@ export default function QuestionCrossword({
                               if (!inRange(rr, cc, rows, cols)) return;
                               if (cellKind(rr, cc) !== "active") return;
                               const el = inputRefs.current?.[rr]?.[cc];
-                              if (el) el.focus();
+                              if (el) {
+                                el.focus();
+                                setFocused({ r: rr, c: cc });
+                              }
                             };
 
                             if (e.key === "ArrowLeft") {
@@ -328,7 +358,6 @@ export default function QuestionCrossword({
                         />
                       ) : null}
 
-                      {/* ✅ номер без обводки/фона, просто внутри клетки сверху-слева */}
                       {kind === "active" && n !== undefined ? <div className="cw-num">{n}</div> : null}
                     </div>
                   );
