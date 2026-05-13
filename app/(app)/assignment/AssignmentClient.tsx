@@ -283,6 +283,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
     const { stats, review } = calcAndBuildReview(questions, answers);
     console.log("[DEBUG] Stats from scoring:", stats);
+    console.log("[DEBUG] Review from scoring:", review);
 
     if (isGatehouse) {
       const recommendation = recommendGatehouseLevel({
