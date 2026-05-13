@@ -14,6 +14,7 @@ import QuestionImageMap from "./components/QuestionImageMap";
 import QuestionReading from "./components/QuestionReading";
 import MediaRenderer from "./components/MediaRenderer";
 import ReviewPanel from "./components/ReviewPanel";
+import ImageModal from "./components/ImageModal"; // <-- используем существующий компонент
 
 // === ЛОГИКА И ТИПЫ ===
 import { getImageUrl } from "./lib/image";
@@ -464,13 +465,13 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                 )}
 
                 {/* ======== МАТЕРИАЛЫ К ВОПРОСУ ======== */}
-                {((questions[currentIndex]!.media?.length ?? 0) > 0 || (questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword')) && (
+                {((questions[currentIndex]!.media?.length ?? 0) > 0 || (questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword' && questions[currentIndex]!.type !== 'imagemap')) && (
                   <div className="materials-block">
                     <div className="materials-label">МАТЕРИАЛЫ К ВОПРОСУ</div>
                     {(questions[currentIndex]!.media?.length ?? 0) > 0 && (
                       <MediaRenderer media={questions[currentIndex]!.media} />
                     )}
-                    {!(questions[currentIndex]!.media?.length ?? 0) && questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword' && (
+                    {!(questions[currentIndex]!.media?.length ?? 0) && questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword' && questions[currentIndex]!.type !== 'imagemap' && (
                       <img 
                         className="legacy-image" 
                         src={getImageUrl(questions[currentIndex]!.image!)} 
@@ -483,7 +484,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
                 {/* ======== СОДЕРЖИМОЕ ВОПРОСА ======== */}
                 <div className="answer-block">
-                  {((questions[currentIndex]!.media?.length ?? 0) > 0 || (questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword') || questions[currentIndex]!.q) ? (
+                  {((questions[currentIndex]!.media?.length ?? 0) > 0 || (questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword' && questions[currentIndex]!.type !== 'imagemap') || questions[currentIndex]!.q) ? (
                     <div className="answer-label">СОДЕРЖИМОЕ ЗАДАНИЯ</div>
                   ) : null}
                   <div className="question-content">
@@ -519,23 +520,14 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         )}
       </main>
 
-      {/* МОДАЛКА ЗУМА ИЗОБРАЖЕНИЙ */}
-      {imageModalOpen && (
-        <div className="modal-overlay" onClick={closeImage}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={closeImage}>×</button>
-            <div className="modal-scroll-wrap">
-               <img src={modalSrc} style={{ transform: `scale(${zoom})`, transition: 'transform 0.2s ease' }} alt="Zoomed" />
-            </div>
-            <div className="modal-controls">
-              <button onClick={() => setZoom(z => Math.max(0.5, z - 0.2))}>−</button>
-              <span>{Math.round(zoom * 100)}%</span>
-              <button onClick={() => setZoom(z => Math.min(4, z + 0.2))}>+</button>
-              <button onClick={() => setZoom(1)}>⟲</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* МОДАЛКА ЗУМА ИЗОБРАЖЕНИЙ – теперь используем готовый компонент */}
+      <ImageModal
+        open={imageModalOpen}
+        src={modalSrc}
+        zoom={zoom}
+        setZoom={setZoom}
+        onClose={closeImage}
+      />
 
       {/* CSS STYLES */}
       <style jsx>{`
@@ -626,13 +618,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .animate-in { animation: fadeIn 0.7s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
-
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.92); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 30px; backdrop-filter: blur(10px); }
-        .modal-content { position: relative; max-width: 95%; max-height: 90%; display: flex; flex-direction: column; align-items: center; }
-        .modal-close { position: absolute; top: -60px; right: 0; background: rgba(255,255,255,0.1); border: none; color: #fff; width: 44px; height: 44px; border-radius: 50%; font-size: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .modal-scroll-wrap { overflow: auto; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
-        .modal-controls { margin-top: 25px; display: flex; gap: 25px; align-items: center; color: #fff; background: rgba(255,255,255,0.1); padding: 10px 30px; border-radius: 30px; }
-        .modal-controls button { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #fff; background: none; color: #fff; font-size: 22px; cursor: pointer; transition: all 0.2s; }
 
         /* ============ АДАПТИВНОСТЬ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ============ */
         @media (max-width: 768px) {
