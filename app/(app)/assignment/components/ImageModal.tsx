@@ -21,17 +21,27 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
   const translate = useRef({ x: 0, y: 0 });
-  const initialFit = useRef(false); // чтобы при открытии сбросить translate и подогнать размер
 
-  // Сброс перемещения при закрытии / смене src
+  // Блокируем прокрутку страницы при открытии модалки
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  // Сброс перемещения и автоподгон размера при открытии / смене src
   useEffect(() => {
     if (open) {
       translate.current = { x: 0, y: 0 };
-      initialFit.current = false;
       if (imageRef.current) {
         imageRef.current.style.transform = `translate(0px, 0px) scale(${zoom})`;
         imageRef.current.style.transition = "transform 0.2s ease";
-        // Автоподгон размера при первом открытии: масштаб под экран, но не меньше 1
+        // Автоподгон размера под экран, но не меньше 1
         const fitZoom = calculateFitZoom(imageRef.current, containerRef.current);
         setZoom(Math.min(MAX_ZOOM, Math.max(1, fitZoom)));
       }
@@ -105,7 +115,7 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
-      // пинч — не будем реализовывать полноценно, достаточно колёсика/кнопок
+      // пинч — не реализуем, достаточно колёсика/кнопок
       return;
     }
     if (zoom <= 1) return;
