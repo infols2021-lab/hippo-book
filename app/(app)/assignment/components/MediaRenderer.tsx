@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import type { MediaAttachment } from "../lib/types";
 import { getImageUrl } from "../lib/image";
+import ImageModal from "./ImageModal"; // <-- новый импорт
 
 // ============================================================================
 // Глобальная синхронизация громкости между всеми плеерами на странице
@@ -306,16 +307,22 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
 }
 
 // ============================================================================
-// ИЗОБРАЖЕНИЕ С ZOOM
+// ИЗОБРАЖЕНИЕ (без встроенной модалки, открывает ImageModal из родителя)
 // ============================================================================
 
-function ZoomableImage({ url, name }: { url: string; name?: string }) {
-  const [isOpen, setIsOpen] = useState(false);
+function ZoomableImage({
+  url,
+  name,
+  onZoom, // <-- колбэк для открытия общей модалки
+}: {
+  url: string;
+  name?: string;
+  onZoom?: (imageUrl: string) => void;
+}) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
-  // При retry добавляем ?retry=N — ломает браузерный кеш ошибки
   const finalUrl = useMemo(() => {
     const base = getImageUrl(url);
     if (!base) return "";
@@ -330,153 +337,111 @@ function ZoomableImage({ url, name }: { url: string; name?: string }) {
 
   const handleRetry = useCallback(() => setRetryCount((c) => c + 1), []);
 
+  const handleClick = () => {
+    if (!isLoading && !hasError && onZoom) {
+      onZoom(finalUrl);
+    }
+  };
+
   return (
-    <>
-      <div
-        className="media-item-fade"
-        style={{
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: isLoading ? "default" : "zoom-in",
-          margin: "12px 0",
-          borderRadius: "20px",
-          overflow: "hidden",
-          background: "#f8fafc",
-          minHeight: "200px",
-          width: "100%",
-          maxWidth: "600px",
-          border: "1px solid rgba(0,0,0,0.06)",
-        }}
-        onClick={() => !isLoading && !hasError && setIsOpen(true)}
-      >
-        {isLoading && !hasError && (
-          <div className="media-loader">
-            <div className="spinner" />
-          </div>
-        )}
-
-        {hasError ? (
-          <div
-            style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}
-          >
-            <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
-              Не удалось загрузить фото
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRetry();
-              }}
-              style={{
-                padding: "8px 16px",
-                background: "#007bff",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                cursor: "pointer",
-                fontWeight: 600,
-                fontSize: 13,
-              }}
-            >
-              Повторить загрузку
-            </button>
-          </div>
-        ) : (
-          <img
-            src={finalUrl}
-            alt={name || "Task Image"}
-            onLoad={() => setIsLoading(false)}
-            onError={() => {
-              setHasError(true);
-              setIsLoading(false);
-            }}
-            loading="lazy"
-            decoding="async"
-            style={{
-              width: "100%",
-              maxHeight: "400px",
-              objectFit: "contain",
-              display: "block",
-              transition: "opacity 0.4s ease",
-              opacity: isLoading ? 0 : 1,
-            }}
-          />
-        )}
-
-        {!isLoading && !hasError && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: 12,
-              right: 12,
-              background: "rgba(0,0,0,0.5)",
-              color: "#fff",
-              padding: "5px 10px",
-              borderRadius: 10,
-              backdropFilter: "blur(4px)",
-              fontSize: 11,
-              fontWeight: 800,
-              pointerEvents: "none",
-              textTransform: "uppercase",
-            }}
-          >
-            🔍 Увеличить
-          </div>
-        )}
-      </div>
-
-      {isOpen && !hasError && (
-        <div
-          onClick={() => setIsOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.9)",
-            backdropFilter: "blur(10px)",
-            zIndex: 99999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "zoom-out",
-            padding: 20,
-          }}
-        >
-          <img
-            src={finalUrl}
-            alt="Full"
-            style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
-              borderRadius: 12,
-              boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
-            }}
-          />
-          <button
-            onClick={() => setIsOpen(false)}
-            style={{
-              position: "absolute",
-              top: 20,
-              right: 30,
-              background: "none",
-              border: "none",
-              color: "#fff",
-              fontSize: 40,
-              cursor: "pointer",
-            }}
-          >
-            &times;
-          </button>
+    <div
+      className="media-item-fade"
+      style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: isLoading ? "default" : "zoom-in",
+        margin: "12px 0",
+        borderRadius: "20px",
+        overflow: "hidden",
+        background: "#f8fafc",
+        minHeight: "200px",
+        width: "100%",
+        maxWidth: "600px",
+        border: "1px solid rgba(0,0,0,0.06)",
+      }}
+      onClick={handleClick}
+    >
+      {isLoading && !hasError && (
+        <div className="media-loader">
+          <div className="spinner" />
         </div>
       )}
-    </>
+
+      {hasError ? (
+        <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
+            Не удалось загрузить фото
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRetry();
+            }}
+            style={{
+              padding: "8px 16px",
+              background: "#007bff",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 13,
+            }}
+          >
+            Повторить загрузку
+          </button>
+        </div>
+      ) : (
+        <img
+          src={finalUrl}
+          alt={name || "Task Image"}
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setHasError(true);
+            setIsLoading(false);
+          }}
+          loading="lazy"
+          decoding="async"
+          style={{
+            width: "100%",
+            maxHeight: "400px",
+            objectFit: "contain",
+            display: "block",
+            transition: "opacity 0.4s ease",
+            opacity: isLoading ? 0 : 1,
+          }}
+        />
+      )}
+
+      {!isLoading && !hasError && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 12,
+            right: 12,
+            background: "rgba(0,0,0,0.5)",
+            color: "#fff",
+            padding: "5px 10px",
+            borderRadius: 10,
+            backdropFilter: "blur(4px)",
+            fontSize: 11,
+            fontWeight: 800,
+            pointerEvents: "none",
+            textTransform: "uppercase",
+          }}
+        >
+          🔍 Увеличить
+        </div>
+      )}
+    </div>
   );
 }
 
 // ============================================================================
-// PDF VIEWER
+// PDF VIEWER (без изменений)
 // ============================================================================
 
 function PdfViewer({ url, name }: { url: string; name?: string }) {
@@ -499,14 +464,7 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
           borderBottom: "none",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            overflow: "hidden",
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
           <span style={{ fontSize: 18 }}>📄</span>
           <span
             style={{
@@ -521,7 +479,6 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
             {name || "PDF Document"}
           </span>
         </div>
-        
         <a
           href={finalUrl}
           target="_blank"
@@ -549,12 +506,7 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
           background: "#fff",
         }}
       >
-        <iframe
-          src={`${finalUrl}#toolbar=0`}
-          width="100%"
-          height="100%"
-          style={{ border: "none" }}
-        />
+        <iframe src={`${finalUrl}#toolbar=0`} width="100%" height="100%" style={{ border: "none" }} />
       </div>
     </div>
   );
@@ -564,56 +516,76 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
 // ГЛАВНЫЙ РЕНДЕРЕР
 // ============================================================================
 
-export default function MediaRenderer({
-  media,
-}: {
-  media?: MediaAttachment[];
-}) {
+export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) {
+  // Состояние для общего ImageModal
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [imageModalSrc, setImageModalSrc] = useState("");
+  const [imageModalZoom, setImageModalZoom] = useState(1);
+
+  const handleZoom = useCallback((src: string) => {
+    setImageModalSrc(src);
+    setImageModalZoom(1);
+    setImageModalOpen(true);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setImageModalOpen(false);
+  }, []);
+
   if (!media || media.length === 0) return null;
 
   return (
-    <div
-      style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}
-    >
-      {media.map((m) => {
-        if (!m.url) return null;
-        const key = `${m.id}-${m.url}`;
-        if (m.type === "audio")
-          return <CustomAudioPlayer key={key} url={m.url} name={m.name} />;
-        if (m.type === "image")
-          return <ZoomableImage key={key} url={m.url} name={m.name} />;
-        if (m.type === "pdf")
-          return <PdfViewer key={key} url={m.url} name={m.name} />;
-        return null;
-      })}
+    <>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+        {media.map((m) => {
+          if (!m.url) return null;
+          const key = `${m.id}-${m.url}`;
+          if (m.type === "audio")
+            return <CustomAudioPlayer key={key} url={m.url} name={m.name} />;
+          if (m.type === "image")
+            return <ZoomableImage key={key} url={m.url} name={m.name} onZoom={handleZoom} />;
+          if (m.type === "pdf")
+            return <PdfViewer key={key} url={m.url} name={m.name} />;
+          return null;
+        })}
 
-      <style jsx global>{`
-        .media-item-fade {
-          animation: mediaAppear 0.4s ease-out forwards;
-        }
-        @keyframes mediaAppear {
-          from { opacity: 0; transform: translateY(5px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .media-loader {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 5;
-        }
-        .spinner {
-          width: 30px;
-          height: 30px;
-          border: 3px solid rgba(0, 123, 255, 0.1);
-          border-top-color: #007bff;
-          border-radius: 50%;
-          animation: mediaSpin 0.8s linear infinite;
-        }
-        @keyframes mediaSpin { to { transform: rotate(360deg); } }
-        @keyframes spin      { to { transform: rotate(360deg); } }
-      `}</style>
-    </div>
+        <style jsx global>{`
+          .media-item-fade {
+            animation: mediaAppear 0.4s ease-out forwards;
+          }
+          @keyframes mediaAppear {
+            from { opacity: 0; transform: translateY(5px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          .media-loader {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+          }
+          .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(0, 123, 255, 0.1);
+            border-top-color: #007bff;
+            border-radius: 50%;
+            animation: mediaSpin 0.8s linear infinite;
+          }
+          @keyframes mediaSpin { to { transform: rotate(360deg); } }
+          @keyframes spin      { to { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+
+      {/* Единый ImageModal для всех картинок */}
+      <ImageModal
+        open={imageModalOpen}
+        src={imageModalSrc}
+        zoom={imageModalZoom}
+        setZoom={setImageModalZoom}
+        onClose={handleCloseModal}
+      />
+    </>
   );
 }
