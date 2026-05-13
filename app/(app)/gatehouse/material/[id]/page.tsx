@@ -112,17 +112,32 @@ export default async function GatehouseMaterialByIdPage({
 
   const hasAccess = Boolean(material.is_available || accessRow);
 
+  // ✅ Сортировка записей прогресса: завершённые идут первыми (свежие сверху),
+  // чтобы в Map попала последняя запись – самая свежая завершённая
+  const rawProgress = Array.isArray(progressRows) ? progressRows : [];
+  const sortedProgress = [...rawProgress].sort((a, b) => {
+    const aCompleted = Boolean(a.is_completed) && !!a.completed_at;
+    const bCompleted = Boolean(b.is_completed) && !!b.completed_at;
+
+    // Завершённые записи всегда выше незавершённых
+    if (aCompleted && !bCompleted) return -1;
+    if (!aCompleted && bCompleted) return 1;
+
+    // Если обе завершены или обе не завершены – по дате (свежие выше)
+    const aTime = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+    const bTime = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+    return bTime - aTime;
+  });
+
   const progressByAssignment = new Map(
-    Array.isArray(progressRows)
-      ? progressRows.map((item: any) => [
-          String(item?.assignment_id ?? ""),
-          {
-            is_completed: Boolean(item?.is_completed),
-            score: normalizeScore(item?.score),
-            completed_at: typeof item?.completed_at === "string" ? item.completed_at : null,
-          },
-        ])
-      : [],
+    sortedProgress.map((item: any) => [
+      String(item?.assignment_id ?? ""),
+      {
+        is_completed: Boolean(item?.is_completed),
+        score: normalizeScore(item?.score),
+        completed_at: typeof item?.completed_at === "string" ? item.completed_at : null,
+      },
+    ])
   );
 
   const assignments: GatehouseAssignmentPreview[] = Array.isArray(assignmentsRows)

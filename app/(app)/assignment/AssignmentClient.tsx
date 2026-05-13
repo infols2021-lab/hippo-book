@@ -14,11 +14,10 @@ import QuestionImageMap from "./components/QuestionImageMap";
 import QuestionReading from "./components/QuestionReading";
 import MediaRenderer from "./components/MediaRenderer";
 import ReviewPanel from "./components/ReviewPanel";
-import ImageModal from "./components/ImageModal"; // <-- используем существующий компонент
+import ImageModal from "./components/ImageModal";
 
 // === ЛОГИКА И ТИПЫ ===
 import { getImageUrl } from "./lib/image";
-import { normalizeText } from "./lib/normalize";
 import type { FinalStats, ReviewItem, QuestionAny } from "./lib/types";
 import { validateAllAnswered, calcAndBuildReview } from "./lib/scoring";
 
@@ -57,32 +56,6 @@ function normalizeQuestions(qs: unknown): QuestionAny[] {
     if (!base.id) base.id = crypto.randomUUID();
     return base as QuestionAny;
   });
-}
-
-function ensureGrid(rows: number, cols: number, prev?: string[][]) {
-  const g: string[][] = Array.from({ length: rows }, (_, r) =>
-    Array.from({ length: cols }, (_, c) => prev?.[r]?.[c] ?? ""),
-  );
-  return g;
-}
-
-function getCrosswordActiveCells(question: any) {
-  const words: any[] = Array.isArray(question?.words) ? question.words : [];
-  const active = new Set<string>();
-
-  for (const w of words) {
-    const len = Number(w?.length ?? 0);
-    const dir = w?.direction;
-    const start = w?.start;
-    if (!start || !Number.isFinite(len)) continue;
-
-    for (let i = 0; i < len; i++) {
-      const r = dir === "across" ? start.row : start.row + i;
-      const c = dir === "across" ? start.col + i : start.col;
-      active.add(`${r},${c}`);
-    }
-  }
-  return active;
 }
 
 function normalizeStringArray(value: unknown): string[] {
@@ -128,7 +101,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [modalSrc, setModalSrc] = useState<string>("");
-  const [zoom, setZoom] = useState(1);
 
   const saveBusyRef = useRef(false);
 
@@ -223,14 +195,12 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
   function openImage(src: string) {
     setModalSrc(src);
-    setZoom(1);
     setImageModalOpen(true);
   }
 
   function closeImage() {
     setImageModalOpen(false);
     setModalSrc("");
-    setZoom(1);
   }
 
   useEffect(() => {
@@ -379,7 +349,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
               {back.headerLabel}
             </button>
 
-            {/* КНОПКА СМЕНЫ РЕЖИМА ПРЯМО ВО ВРЕМЯ ПРОХОЖДЕНИЯ */}
             {previousProgress?.is_completed && !showChoice && !completedScreen && (
                <button className="mode-switch-button" onClick={switchMode}>
                  ↶ Сменить режим
@@ -520,16 +489,14 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         )}
       </main>
 
-      {/* МОДАЛКА ЗУМА ИЗОБРАЖЕНИЙ – теперь используем готовый компонент */}
+      {/* МОДАЛКА ЗУМА ИЗОБРАЖЕНИЙ – теперь без пропсов zoom/setZoom */}
       <ImageModal
         open={imageModalOpen}
         src={modalSrc}
-        zoom={zoom}
-        setZoom={setZoom}
         onClose={closeImage}
       />
 
-      {/* CSS STYLES */}
+      {/* CSS STYLES (без изменений) */}
       <style jsx>{`
         .premium-header { padding: 30px 20px; }
         .header-content { max-width: 900px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
@@ -559,7 +526,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         .media-section { margin-bottom: 35px; border-radius: 24px; overflow: hidden; }
         .legacy-image { width: 100%; border-radius: 20px; cursor: zoom-in; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
 
-        /* Новые блоки для визуального разделения */
         .materials-block {
           background: #f8fafc;
           border: 1px solid rgba(0,0,0,0.04);
@@ -619,7 +585,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .animate-in { animation: fadeIn 0.7s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
 
-        /* ============ АДАПТИВНОСТЬ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ============ */
         @media (max-width: 768px) {
           .premium-header { padding: 18px 12px; }
           .header-content { flex-direction: column; align-items: flex-start; gap: 12px; }

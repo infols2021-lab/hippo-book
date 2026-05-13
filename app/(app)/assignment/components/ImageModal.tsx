@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   open: boolean;
   src: string;
-  zoom: number;
-  setZoom: (z: number) => void;
   onClose: () => void;
 };
 
@@ -15,24 +13,37 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 5;
 const WHEEL_ZOOM_FACTOR = 0.1;
 
-export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props) {
+export default function ImageModal({ open, src, onClose }: Props) {
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const translate = useRef({ x: 0, y: 0 });
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
-  const translate = useRef({ x: 0, y: 0 });
 
-  // При открытии: запрет скролла body + моментальный прыжок в верх страницы
+  // Блокируем скролл body при открытии, сбрасываем трансформацию
   useEffect(() => {
     if (open) {
-      // Фиксируем текущую позицию скролла, но модалка всё равно fixed – не нужно.
       document.body.style.overflow = "hidden";
       document.body.style.overscrollBehavior = "contain";
-      // Мгновенный прыжок в начало, чтобы модалка всегда была видна
-      window.scrollTo(0, 0);
+      translate.current = { x: 0, y: 0 };
+      setZoom(1);
+      if (imageRef.current) {
+        imageRef.current.style.transform = "translate(0px, 0px) scale(1)";
+        imageRef.current.style.transition = "transform 0.2s ease";
+      }
+      // Автоподгон размера после загрузки изображения
+      setTimeout(() => {
+        if (imageRef.current && containerRef.current) {
+          const fit = calculateFitZoom(imageRef.current, containerRef.current);
+          setZoom(Math.min(MAX_ZOOM, Math.max(1, fit)));
+        }
+      }, 50);
     } else {
       document.body.style.overflow = "";
       document.body.style.overscrollBehavior = "";
+      setZoom(1);
+      translate.current = { x: 0, y: 0 };
     }
     return () => {
       document.body.style.overflow = "";
@@ -40,24 +51,11 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
     };
   }, [open]);
 
-  // Автоподгон размера изображения при открытии
-  useEffect(() => {
-    if (open) {
-      translate.current = { x: 0, y: 0 };
-      if (imageRef.current) {
-        imageRef.current.style.transform = `translate(0px, 0px) scale(${zoom})`;
-        imageRef.current.style.transition = "transform 0.2s ease";
-        const fitZoom = calculateFitZoom(imageRef.current, containerRef.current);
-        setZoom(Math.min(MAX_ZOOM, Math.max(1, fitZoom)));
-      }
-    }
-  }, [open, src]);
-
-  // Обновление transform при изменении zoom
+  // Применяем трансформацию при каждом изменении зума или переводе
   useEffect(() => {
     if (!imageRef.current) return;
     imageRef.current.style.transform = `translate(${translate.current.x}px, ${translate.current.y}px) scale(${zoom})`;
-    imageRef.current.style.transition = "transform 0.15s ease";
+    imageRef.current.style.transition = "transform 0.15s cubic-bezier(0.2, 0.9, 0.4, 1.1)";
   }, [zoom]);
 
   // Закрытие по Escape
@@ -70,7 +68,20 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  // Прокрутка колёсиком
+  // Подгонка размера под экран
+  function calculateFitZoom(img: HTMLImageElement, container: HTMLElement | null) {
+    if (!container) return 1;
+    const containerW = container.clientWidth * 0.9;
+    const containerH = container.clientHeight * 0.85;
+    const imgW = img.naturalWidth || img.width;
+    const imgH = img.naturalHeight || img.height;
+    if (!imgW || !imgH) return 1;
+    const scaleW = containerW / imgW;
+    const scaleH = containerH / imgH;
+    return Math.min(scaleW, scaleH);
+  }
+
+  // Колёсико мыши / тачпад
   const handleWheel = (e: React.WheelEvent) => {
     if (!imageRef.current) return;
     e.preventDefault();
@@ -118,7 +129,7 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
     }
   };
 
-  // Touch drag
+  // Touch drag (один палец)
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) return;
     if (zoom <= 1) return;
@@ -158,17 +169,37 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
     }
   };
 
-  function calculateFitZoom(img: HTMLImageElement, container: HTMLElement | null) {
-    if (!container) return 1;
-    const containerW = container.clientWidth * 0.9;
-    const containerH = container.clientHeight * 0.85;
-    const imgW = img.naturalWidth || img.width;
-    const imgH = img.naturalHeight || img.height;
-    if (!imgW || !imgH) return 1;
-    const scaleW = containerW / imgW;
-    const scaleH = containerH / imgH;
-    return Math.min(scaleW, scaleH);
-  }
+  // Пинч (двумя пальцами) – простейшая реализация через отслеживание расстояния
+  const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
+  const handleTouchStartPinch = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      pinchRef.current = { dist, zoom };
+    }
+  };
+  const handleTouchMovePinch = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      const ratio = newDist / pinchRef.current.dist;
+      let newZoom = pinchRef.current.zoom * ratio;
+      newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoom));
+      setZoom(newZoom);
+    }
+  };
+  const handleTouchEndPinch = () => {
+    pinchRef.current = null;
+  };
+
+  // Сброс (центр + масштаб 1)
+  const resetTransform = () => {
+    translate.current = { x: 0, y: 0 };
+    setZoom(1);
+  };
 
   if (!open) return null;
 
@@ -179,20 +210,30 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      onTouchStart={(e) => {
+        handleTouchStart(e);
+        handleTouchStartPinch(e);
+      }}
+      onTouchMove={(e) => {
+        handleTouchMove(e);
+        handleTouchMovePinch(e);
+      }}
+      onTouchEnd={() => {
+        handleTouchEnd();
+        handleTouchEndPinch();
+      }}
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 9999,
-        background: "rgba(0,0,0,0.92)",
-        backdropFilter: "blur(10px)",
+        background: "rgba(0,0,0,0.94)",
+        backdropFilter: "blur(12px)",
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",
         touchAction: "none",
+        willChange: "transform",
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -201,26 +242,28 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
       {/* Кнопка закрытия */}
       <button
         onClick={onClose}
+        className="image-modal-close-btn"
+        aria-label="Закрыть"
         style={{
           position: "absolute",
-          top: 18,
-          right: 22,
+          top: 20,
+          right: 24,
           width: 48,
           height: 48,
           borderRadius: "50%",
-          border: "2px solid rgba(255,255,255,0.2)",
-          background: "rgba(255,255,255,0.1)",
+          border: "none",
+          background: "rgba(255,255,255,0.15)",
+          backdropFilter: "blur(8px)",
           color: "#fff",
           fontSize: 28,
           fontWeight: 300,
           cursor: "pointer",
-          backdropFilter: "blur(14px)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          zIndex: 10,
+          transition: "transform 0.2s, background 0.2s",
+          zIndex: 20,
         }}
-        aria-label="Закрыть"
       >
         ✕
       </button>
@@ -230,88 +273,83 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
         src={src}
         alt=""
         onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
         draggable={false}
         style={{
           maxWidth: "90vw",
           maxHeight: "85vh",
           objectFit: "contain",
-          borderRadius: 12,
-          boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+          borderRadius: 16,
+          boxShadow: "0 30px 60px rgba(0,0,0,0.5)",
           cursor: zoom > 1 ? "grab" : "default",
           userSelect: "none",
-          transition: "transform 0.15s ease",
+          transition: "transform 0.15s cubic-bezier(0.2, 0.9, 0.4, 1.1)",
         }}
       />
 
-      {/* Панель управления зумом */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 28,
-          left: "50%",
-          transform: "translateX(-50%)",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          background: "rgba(0,0,0,0.75)",
-          backdropFilter: "blur(18px)",
-          padding: "10px 18px",
-          borderRadius: 30,
-          border: "1px solid rgba(255,255,255,0.15)",
-          zIndex: 10,
-        }}
-      >
-        <button
-          onClick={() => setZoom(Math.max(MIN_ZOOM, +(zoom - ZOOM_STEP).toFixed(2)))}
-          style={btnStyle}
-          type="button"
-        >
+      {/* Панель управления */}
+      <div className="image-modal-controls" style={{
+        position: "absolute",
+        bottom: 30,
+        left: "50%",
+        transform: "translateX(-50%)",
+        display: "flex",
+        gap: 16,
+        background: "rgba(20,20,30,0.8)",
+        backdropFilter: "blur(20px)",
+        padding: "12px 20px",
+        borderRadius: 60,
+        border: "1px solid rgba(255,255,255,0.2)",
+        zIndex: 20,
+      }}>
+        <button onClick={() => setZoom(Math.max(MIN_ZOOM, +(zoom - ZOOM_STEP).toFixed(2)))} style={ctrlBtnStyle}>
           −
         </button>
-
-        <span style={{ color: "#fff", fontWeight: 700, minWidth: 56, textAlign: "center", fontSize: 15 }}>
+        <span style={{ color: "#fff", fontWeight: 700, minWidth: 60, textAlign: "center" }}>
           {Math.round(zoom * 100)}%
         </span>
-
-        <button
-          onClick={() => setZoom(Math.min(MAX_ZOOM, +(zoom + ZOOM_STEP).toFixed(2)))}
-          style={btnStyle}
-          type="button"
-        >
+        <button onClick={() => setZoom(Math.min(MAX_ZOOM, +(zoom + ZOOM_STEP).toFixed(2)))} style={ctrlBtnStyle}>
           +
         </button>
-
-        <button
-          onClick={() => {
-            translate.current = { x: 0, y: 0 };
-            setZoom(1);
-            if (imageRef.current) {
-              imageRef.current.style.transform = "translate(0px, 0px) scale(1)";
-            }
-          }}
-          style={{ ...btnStyle, fontSize: 18 }}
-          type="button"
-        >
+        <button onClick={resetTransform} style={{ ...ctrlBtnStyle, fontSize: 18 }}>
           ⟲
         </button>
+      </div>
+
+      {/* Инструкция для мобильных */}
+      <div className="image-modal-hint" style={{
+        position: "absolute",
+        bottom: 100,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(8px)",
+        padding: "8px 16px",
+        borderRadius: 30,
+        color: "rgba(255,255,255,0.7)",
+        fontSize: 12,
+        fontWeight: 500,
+        pointerEvents: "none",
+        whiteSpace: "nowrap",
+        zIndex: 20,
+      }}>
+        🖱️ Колесо — зум • Перетаскивание
       </div>
     </div>
   );
 }
 
-const btnStyle: React.CSSProperties = {
-  width: 46,
-  height: 46,
+const ctrlBtnStyle: React.CSSProperties = {
+  width: 48,
+  height: 48,
   borderRadius: "50%",
-  border: "2px solid rgba(255,255,255,0.25)",
-  background: "rgba(255,255,255,0.12)",
+  border: "1px solid rgba(255,255,255,0.3)",
+  background: "rgba(255,255,255,0.1)",
   color: "#fff",
-  fontSize: 24,
-  fontWeight: 400,
+  fontSize: 26,
+  fontWeight: 500,
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  transition: "background 0.15s",
+  transition: "transform 0.15s, background 0.2s",
 };

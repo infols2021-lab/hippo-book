@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import type { MediaAttachment } from "../lib/types";
 import { getImageUrl } from "../lib/image";
-import ImageModal from "./ImageModal"; // <-- новый импорт
+import ImageModal from "./ImageModal";
 
 // ============================================================================
 // Глобальная синхронизация громкости между всеми плеерами на странице
@@ -158,7 +158,7 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
   const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value) / 100;
     setVolume(v);
-    broadcastVolume(v); // обновляет все плееры на странице + localStorage
+    broadcastVolume(v);
   };
 
   const volIcon = volume === 0 ? "🔇" : volume < 0.4 ? "🔈" : volume < 0.75 ? "🔉" : "🔊";
@@ -313,7 +313,7 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
 function ZoomableImage({
   url,
   name,
-  onZoom, // <-- колбэк для открытия общей модалки
+  onZoom,
 }: {
   url: string;
   name?: string;
@@ -441,7 +441,7 @@ function ZoomableImage({
 }
 
 // ============================================================================
-// PDF VIEWER (без изменений)
+// PDF VIEWER
 // ============================================================================
 
 function PdfViewer({ url, name }: { url: string; name?: string }) {
@@ -517,19 +517,17 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
 // ============================================================================
 
 export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) {
-  // Состояние для общего ImageModal
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [imageModalSrc, setImageModalSrc] = useState("");
-  const [imageModalZoom, setImageModalZoom] = useState(1);
 
   const handleZoom = useCallback((src: string) => {
     setImageModalSrc(src);
-    setImageModalZoom(1);
     setImageModalOpen(true);
   }, []);
 
   const handleCloseModal = useCallback(() => {
     setImageModalOpen(false);
+    setImageModalSrc("");
   }, []);
 
   if (!media || media.length === 0) return null;
@@ -578,12 +576,9 @@ export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) 
         `}</style>
       </div>
 
-      {/* Единый ImageModal для всех картинок */}
       <ImageModal
         open={imageModalOpen}
         src={imageModalSrc}
-        zoom={imageModalZoom}
-        setZoom={setImageModalZoom}
         onClose={handleCloseModal}
       />
     </>
