@@ -574,7 +574,7 @@ export function calcAndBuildReview(
     }
 
     // ---------------------------------------------------------------
-    // IMAGEMAP
+    // IMAGEMAP – добавлены поля для визуализации (imageUrl, points, answers)
     // ---------------------------------------------------------------
     if (q.type === "imagemap") {
       const answersArr = Array.isArray(q.answers) ? q.answers : [];
@@ -592,6 +592,9 @@ export function calcAndBuildReview(
           totalPairsCount: 0,
           userMatches: {},
           correctMatches: {},
+          imageUrl: q.image || "",
+          points: [],
+          answers: [],
           pointsEarned: 0,
           pointsTotal,
         } as ReviewItem;
@@ -617,6 +620,9 @@ export function calcAndBuildReview(
           totalPairsCount,
           userMatches: {},
           correctMatches,
+          imageUrl: q.image || "",
+          points: pointsArr,
+          answers: answersArr,
           pointsEarned: 0,
           pointsTotal,
         } as ReviewItem;
@@ -647,6 +653,9 @@ export function calcAndBuildReview(
         totalPairsCount,
         userMatches,
         correctMatches,
+        imageUrl: q.image || "",
+        points: pointsArr,
+        answers: answersArr,
         pointsEarned,
         pointsTotal,
       } as ReviewItem;

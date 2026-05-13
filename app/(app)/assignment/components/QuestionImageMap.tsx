@@ -1,3 +1,4 @@
+// файл app/(app)/assignment/components/QuestionImageMap.tsx (исправленная версия)
 "use client";
 
 import React, {
@@ -8,7 +9,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import type { QuestionImageMap } from "../lib/types";
+import type { QuestionImageMap, ImageMapPoint, ImageMapAnswer } from "../lib/types";
 import { getImageUrl } from "../lib/image";
 
 // ---------------------------------------------------------------------------
@@ -57,7 +58,152 @@ function buildCurvePath(x1: number, y1: number, x2: number, y2: number): string 
 }
 
 // ---------------------------------------------------------------------------
-// Component
+// 🎯 ВЫНЕСЕННАЯ ФУНКЦИЯ ДЛЯ ВИЗУАЛИЗАЦИИ (используется в ReviewPanel)
+// ---------------------------------------------------------------------------
+
+export type ImageMapMatch = Record<string, string>; // answerId -> pointId
+
+export type ImageMapRendererProps = {
+  imageUrl: string;
+  points: ImageMapPoint[];
+  answers: ImageMapAnswer[];
+  matches: ImageMapMatch; // связи (могут быть userMatches или correctMatches)
+  highlightConnected?: boolean; // подсвечивать только те точки, которые имеют связь
+  pointColorConnected?: string;
+  pointColorUnconnected?: string;
+  pointSize?: number;
+  strokeColor?: string; // цвет линий (можно не использовать, если линии не рисуем)
+  strokeWidth?: number;
+  showLabels?: boolean;
+};
+
+/**
+ * Компонент для статической визуализации карты изображения с точками и связями.
+ * Используется в разборе (ReviewPanel).
+ */
+export function ImageMapRenderer({
+  imageUrl,
+  points,
+  answers,
+  matches,
+  highlightConnected = false,
+  pointColorConnected = "#10b981",
+  pointColorUnconnected = "#94a3b8",
+  pointSize = 20,
+  showLabels = true,
+}: ImageMapRendererProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [pointPixels, setPointPixels] = useState<PointPixel[]>([]);
+
+  // строим маппинг answerId -> label для отображения подписей
+  const answerLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const ans of answers) {
+      map[ans.id] = ans.text || ans.id.slice(0, 6);
+    }
+    return map;
+  }, [answers]);
+
+  // пересчёт пиксельных координат
+  const recalc = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const imgEl = container.querySelector<HTMLImageElement>(".imagemap-renderer-image");
+    if (!imgEl) return;
+    const imgRect = imgEl.getBoundingClientRect();
+    const imgWidth = imgRect.width;
+    const imgHeight = imgRect.height;
+    const imgLeft = imgRect.left - containerRect.left;
+    const imgTop = imgRect.top - containerRect.top;
+
+    const newPoints: PointPixel[] = points.map((p) => ({
+      id: p.id,
+      x: imgLeft + (clamp(p.x, 0, 100) / 100) * imgWidth,
+      y: imgTop + (clamp(p.y, 0, 100) / 100) * imgHeight,
+      correctAnswerId: p.correctAnswerId,
+      label: p.label,
+    }));
+    setPointPixels(newPoints);
+  }, [points]);
+
+  useEffect(() => {
+    recalc();
+    window.addEventListener("resize", recalc);
+    return () => window.removeEventListener("resize", recalc);
+  }, [recalc]);
+
+  const handleImageLoad = () => recalc();
+
+  // для каждой точки определяем, соединена ли она с каким-либо ответом
+  const pointToAnswerMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [answerId, pointId] of Object.entries(matches)) {
+      map[pointId] = answerId;
+    }
+    return map;
+  }, [matches]);
+
+  return (
+    <div ref={containerRef} style={{ position: "relative", display: "inline-block", width: "100%" }}>
+      <img
+        className="imagemap-renderer-image"
+        src={getImageUrl(imageUrl)}
+        alt=""
+        onLoad={handleImageLoad}
+        style={{ width: "100%", height: "auto", display: "block", borderRadius: 12 }}
+      />
+      {/* SVG для линий (пока не используем, но можно добавить при необходимости) */}
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+        }}
+      />
+      {/* Точки */}
+      {pointPixels.map((pt) => {
+        const isConnected = !!pointToAnswerMap[pt.id];
+        if (highlightConnected && !isConnected) return null;
+        const answerId = pointToAnswerMap[pt.id];
+        const answerLabel = answerId ? answerLabelMap[answerId] : undefined;
+        const color = isConnected ? pointColorConnected : pointColorUnconnected;
+        return (
+          <div
+            key={pt.id}
+            style={{
+              position: "absolute",
+              left: pt.x - pointSize/2,
+              top: pt.y - pointSize/2,
+              width: pointSize,
+              height: pointSize,
+              borderRadius: "50%",
+              background: color,
+              border: `2px solid white`,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+              boxSizing: "border-box",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: pointSize * 0.5,
+              fontWeight: "bold",
+              color: "#fff",
+            }}
+            title={pt.label || pt.id}
+          >
+            {showLabels && answerLabel ? answerLabel.slice(0, 2) : ""}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ОСНОВНОЙ КОМПОНЕНТ ДЛЯ РЕДАКТИРОВАНИЯ (без изменений)
 // ---------------------------------------------------------------------------
 
 export default function QuestionImageMap({
@@ -69,7 +215,6 @@ export default function QuestionImageMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const filterId = useId();
 
-  // ---- data normalization ----
   const points = useMemo(
     () => (Array.isArray(question.points) ? question.points : []),
     [question.points],
@@ -82,26 +227,17 @@ export default function QuestionImageMap({
 
   const imageUrl = useMemo(() => getImageUrl(question.image), [question.image]);
 
-  // ---- UI state ----
   const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
-
-  // ---- pixel positions (recalculated on resize) ----
   const [pointPixels, setPointPixels] = useState<PointPixel[]>([]);
   const [answerAnchors, setAnswerAnchors] = useState<AnswerAnchor[]>([]);
-
-  // ---- Refs for answer elements (to measure anchors) ----
   const answerElRefs = useRef<Map<string, HTMLElement>>(new Map());
-
   const recalcRequestedRef = useRef(false);
 
-  // ---- calculate pixel positions (debounced) ----
   const recalc = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
-
     const containerRect = container.getBoundingClientRect();
 
-    // ---- points ----
     const imgEl = container.querySelector<HTMLImageElement>(".imagemap-image");
     if (imgEl) {
       const imgRect = imgEl.getBoundingClientRect();
@@ -123,7 +259,6 @@ export default function QuestionImageMap({
       });
     }
 
-    // ---- answer anchors ----
     const newAnchors: AnswerAnchor[] = [];
     for (const ans of answers) {
       const el = answerElRefs.current.get(ans.id);
@@ -142,7 +277,6 @@ export default function QuestionImageMap({
     });
   }, [points, answers]);
 
-  // recalc on mount, resize, and whenever connections change
   useEffect(() => {
     recalc();
   }, [recalc, value]);
@@ -167,9 +301,7 @@ export default function QuestionImageMap({
         });
       }
     });
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
+    if (containerRef.current) observer.observe(containerRef.current);
     return () => {
       window.removeEventListener("resize", onResize);
       observer.disconnect();
@@ -178,12 +310,9 @@ export default function QuestionImageMap({
 
   const handleImageLoad = useCallback(() => recalc(), [recalc]);
 
-  // ---- interactions ----
   const handleAnswerClick = useCallback(
     (answerId: string) => {
       if (disabled) return;
-
-      // если у этого ответа уже есть связь – удаляем её и переходим в режим выбора
       if (value[answerId]) {
         const next = { ...value };
         delete next[answerId];
@@ -191,8 +320,6 @@ export default function QuestionImageMap({
         setSelectedAnswerId(answerId);
         return;
       }
-
-      // иначе просто выбираем ответ (или снимаем выбор, если кликнули на уже выбранный)
       setSelectedAnswerId((prev) => (prev === answerId ? null : answerId));
     },
     [disabled, value, onChange],
@@ -202,19 +329,13 @@ export default function QuestionImageMap({
     (pointId: string, e: React.MouseEvent | React.PointerEvent) => {
       if (disabled) return;
       e.stopPropagation();
-
       if (!selectedAnswerId) return;
 
-      // если эта точка уже привязана к другому ответу – удаляем ту связь
       const existingAnswerForPoint = Object.entries(value).find(
         ([, pid]) => pid === pointId,
       )?.[0];
       let next = { ...value };
-      if (existingAnswerForPoint) {
-        delete next[existingAnswerForPoint];
-      }
-
-      // соединяем выбранный ответ с этой точкой
+      if (existingAnswerForPoint) delete next[existingAnswerForPoint];
       next = { ...next, [selectedAnswerId]: pointId };
       onChange(next);
       setSelectedAnswerId(null);
@@ -222,16 +343,10 @@ export default function QuestionImageMap({
     [disabled, selectedAnswerId, value, onChange],
   );
 
-  const handleMapBackgroundClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) {
-        setSelectedAnswerId(null);
-      }
-    },
-    [],
-  );
+  const handleMapBackgroundClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) setSelectedAnswerId(null);
+  }, []);
 
-  // ---- render helpers ----
   const getAnswerPoint = (answerId: string): PointPixel | undefined => {
     const pointId = value[answerId];
     if (!pointId) return undefined;
@@ -253,13 +368,8 @@ export default function QuestionImageMap({
     [recalc],
   );
 
-  // ============================================================
-  // RENDER
-  // ============================================================
-
   return (
     <div>
-      {/* Подсказка сверху */}
       <div
         style={{
           textAlign: "center",
@@ -284,7 +394,6 @@ export default function QuestionImageMap({
           touchAction: "none",
         }}
       >
-        {/* ====== SVG overlay ====== */}
         <svg
           className="imagemap-svg"
           style={{
@@ -305,8 +414,6 @@ export default function QuestionImageMap({
               </feMerge>
             </filter>
           </defs>
-
-          {/* existing connections */}
           {Object.entries(value).map(([ansId, pointId]) => {
             const anchor = getAnchor(ansId);
             const point = getAnswerPoint(ansId);
@@ -325,7 +432,6 @@ export default function QuestionImageMap({
           })}
         </svg>
 
-        {/* ====== Central Image + Points ====== */}
         <div
           className="imagemap-map-area"
           style={{ position: "relative", width: "100%", marginBottom: "16px" }}
@@ -345,13 +451,10 @@ export default function QuestionImageMap({
             }}
           />
 
-          {/* clickable points */}
           {pointPixels.map((pt) => {
             const isConnected = Object.values(value).includes(pt.id);
             const isSelectable = !!selectedAnswerId;
-            const cursor =
-              disabled ? "not-allowed" : isSelectable ? "pointer" : "default";
-
+            const cursor = disabled ? "not-allowed" : isSelectable ? "pointer" : "default";
             return (
               <div
                 key={pt.id}
@@ -360,9 +463,7 @@ export default function QuestionImageMap({
                   e.stopPropagation();
                   handlePointClick(pt.id, e);
                 }}
-                className={
-                  isSelectable && !isConnected ? "imagemap-point-pulse" : ""
-                }
+                className={isSelectable && !isConnected ? "imagemap-point-pulse" : ""}
                 style={{
                   position: "absolute",
                   left: pt.x - 16,
@@ -376,9 +477,7 @@ export default function QuestionImageMap({
                     ? "rgba(99,102,241,0.35)"
                     : "rgba(0,0,0,0.2)",
                   border: "3px solid #fff",
-                  boxShadow: isSelectable
-                    ? "0 0 0 4px rgba(99,102,241,0.2)"
-                    : "0 2px 8px rgba(0,0,0,0.15)",
+                  boxShadow: isSelectable ? "0 0 0 4px rgba(99,102,241,0.2)" : "0 2px 8px rgba(0,0,0,0.15)",
                   cursor,
                   transition: "background 0.15s ease, box-shadow 0.15s ease",
                   boxSizing: "border-box",
@@ -409,7 +508,6 @@ export default function QuestionImageMap({
           })}
         </div>
 
-        {/* ====== Answer Cards ====== */}
         <div
           className="imagemap-answers"
           style={{
@@ -423,7 +521,6 @@ export default function QuestionImageMap({
           {answers.map((ans) => {
             const isConnected = !!value[ans.id];
             const isSelected = selectedAnswerId === ans.id;
-
             return (
               <div
                 key={ans.id}
@@ -461,7 +558,6 @@ export default function QuestionImageMap({
                   opacity: disabled && !isConnected ? 0.6 : 1,
                 }}
               >
-                {/* media thumbnail — рендерим простое изображение без MediaRenderer */}
                 {ans.media && ans.media.length > 0 && (
                   <div
                     style={{
@@ -486,8 +582,6 @@ export default function QuestionImageMap({
                     />
                   </div>
                 )}
-
-                {/* text */}
                 {ans.text && (
                   <span
                     style={{
@@ -501,19 +595,9 @@ export default function QuestionImageMap({
                     {ans.text}
                   </span>
                 )}
-
-                {/* indicator */}
-                {isConnected && (
-                  <span style={{ fontSize: 20, lineHeight: 1 }}>✅</span>
-                )}
+                {isConnected && <span style={{ fontSize: 20, lineHeight: 1 }}>✅</span>}
                 {isSelected && !isConnected && (
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: "#6366f1",
-                      fontWeight: 600,
-                    }}
-                  >
+                  <span style={{ fontSize: 12, color: "#6366f1", fontWeight: 600 }}>
                     Теперь выберите точку
                   </span>
                 )}
@@ -530,18 +614,10 @@ export default function QuestionImageMap({
         .imagemap-answer-card:active {
           transform: translateY(0);
         }
-
-        /* pulse animation for available points */
         @keyframes pulse {
-          0% {
-            transform: translate(-50%, -50%) scale(1);
-          }
-          50% {
-            transform: translate(-50%, -50%) scale(1.15);
-          }
-          100% {
-            transform: translate(-50%, -50%) scale(1);
-          }
+          0% { transform: translate(-50%, -50%) scale(1); }
+          50% { transform: translate(-50%, -50%) scale(1.15); }
+          100% { transform: translate(-50%, -50%) scale(1); }
         }
         .imagemap-point-pulse {
           animation: pulse 1.2s ease-in-out infinite;

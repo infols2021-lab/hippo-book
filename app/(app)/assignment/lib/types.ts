@@ -207,6 +207,10 @@ export type ReviewItem =
       /** Читаемые названия ответов/точек, например { answerId: "Apple" }, { pointId: "Точка 1" } */
       answerLabels?: Record<string, string>;
       pointLabels?: Record<string, string>;
+      // === Дополнительные поля для визуализации карты ===
+      imageUrl: string;               // URL изображения
+      points: ImageMapPoint[];        // исходные точки (с координатами и правильными ответами)
+      answers: ImageMapAnswer[];      // исходные ответы
     })
   | (ReviewBase & {
       type: "complex" | "reading"; // <-- добавили reading
