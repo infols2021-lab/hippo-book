@@ -320,8 +320,8 @@ export default function QuestionItem({
 
       <div style={{ height: 12 }} />
 
-      {/* ===== ТЕКСТ ВОПРОСА (ПОКАЗЫВАЕМ ДЛЯ ВСЕХ, КРОМЕ КРОССВОРДА, IMAGEMAP, READING) ===== */}
-      {q.type !== "crossword" && q.type !== "imagemap" && q.type !== "reading" ? (
+      {/* ===== ТЕКСТ ВОПРОСА — показываем для всех, кроме кроссворда ===== */}
+      {q.type !== "crossword" ? (
         <div className="form-group">
           <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Текст вопроса:</label>
           <textarea
@@ -335,16 +335,16 @@ export default function QuestionItem({
         </div>
       ) : null}
 
-      {/* ===== ОБЩИЙ ЗАГРУЗЧИК МЕДИА (ПОКАЗЫВАЕМ ДЛЯ ВСЕХ, КРОМЕ КРОССВОРДА) ===== */}
+      {/* ===== ОБЩИЙ ЗАГРУЗЧИК МЕДИА — показываем для всех, кроме кроссворда ===== */}
       {q.type !== "crossword" ? (
         <>
-          {/* Оставлено для обратной совместимости старых данных (единичная картинка) – скрыто для imagemap и reading */}
-          {q.type !== "imagemap" && q.type !== "reading" && q.image && typeof q.image === "string" && !q.media?.length && (
-             <div className="form-group" style={{ marginBottom: "16px" }}>
-               <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Устаревшее изображение:</label>
-               <img src={q.image} alt="old media" style={{ maxWidth: 200, borderRadius: 8 }} />
-               <button className="btn btn-small btn-danger" style={{ marginTop: 8 }} onClick={() => patch({ image: "" })}>Удалить</button>
-             </div>
+          {/* Устаревшее изображение: показываем только если это не imagemap (у карт своя центральная картинка) */}
+          {q.type !== "imagemap" && q.image && typeof q.image === "string" && !q.media?.length && (
+            <div className="form-group" style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Устаревшее изображение:</label>
+              <img src={q.image} alt="old media" style={{ maxWidth: 200, borderRadius: 8 }} />
+              <button className="btn btn-small btn-danger" style={{ marginTop: 8 }} onClick={() => patch({ image: "" })}>Удалить</button>
+            </div>
           )}
 
           <MediaUpload

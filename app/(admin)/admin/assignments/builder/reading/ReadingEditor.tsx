@@ -3,7 +3,6 @@
 import { useCallback } from "react";
 import type { ReadingQuestion, TestQuestion } from "../types";
 import { newQuestion } from "../types";
-import MediaUpload from "../MediaUpload";
 import TestEditor from "../test/TestEditor";
 
 type Props = {
@@ -24,10 +23,6 @@ export default function ReadingEditor({ value, onChange, disabled }: Props) {
     [value, onChange],
   );
 
-  const handleTextChange = (text: string) => patch({ text });
-
-  const handleMediaChange = (media: any[]) => patch({ media });
-
   const updateSubQuestion = (index: number, nextQ: TestQuestion) => {
     const nextList = [...subQuestions];
     nextList[index] = nextQ;
@@ -36,7 +31,6 @@ export default function ReadingEditor({ value, onChange, disabled }: Props) {
 
   const addSubQuestion = () => {
     const newQ = newQuestion("test") as TestQuestion;
-    // зададим пустой вопрос, чтобы не было дефолтного текста
     newQ.q = "";
     patch({ subQuestions: [...subQuestions, newQ] });
   };
@@ -51,32 +45,6 @@ export default function ReadingEditor({ value, onChange, disabled }: Props) {
       <label style={{ fontWeight: 800, display: "block", marginBottom: 8 }}>
         📖 Редактор типа «Чтение + тестовые вопросы»
       </label>
-
-      {/* Общий текст / инструкция */}
-      <div className="card" style={{ padding: 12, marginBottom: 14 }}>
-        <label className="small-muted" style={{ fontWeight: 800, marginBottom: 6 }}>
-          Текст или инструкция (общий для всех подвопросов):
-        </label>
-        <textarea
-          className="question-textarea"
-          rows={6}
-          value={value.text ?? ""}
-          placeholder="Введите текст для чтения или инструкцию..."
-          disabled={disabled}
-          onChange={(e) => handleTextChange(e.target.value)}
-        />
-      </div>
-
-      {/* Общие медиа */}
-      <div className="card" style={{ padding: 12, marginBottom: 14 }}>
-        <MediaUpload
-          value={value.media || []}
-          onChange={handleMediaChange}
-          disabled={disabled}
-          bucket="question-images"
-          label="Общие медиа для блока чтения (картинка, аудио, PDF):"
-        />
-      </div>
 
       {/* Подвопросы */}
       <div className="card" style={{ padding: 12, marginBottom: 14 }}>

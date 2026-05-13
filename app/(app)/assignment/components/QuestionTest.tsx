@@ -141,10 +141,10 @@ export default function QuestionTest({ question, value, onChange, disabled }: Pr
                   </div>
                 )}
 
-                {/* Картинки в ответах ограничены по размеру */}
+                {/* Картинки в ответах теперь отображаются с увеличенным размером и без обрезки */}
                 {opt.media && opt.media.length > 0 && (
                   <div style={{ marginTop: opt.text ? "4px" : "0" }}>
-                    <div style={{ maxWidth: "120px", maxHeight: "120px", overflow: "hidden" }}>
+                    <div style={{ maxWidth: "200px", maxHeight: "200px", overflow: "hidden" }}>
                       <MediaRenderer media={opt.media} />
                     </div>
                   </div>

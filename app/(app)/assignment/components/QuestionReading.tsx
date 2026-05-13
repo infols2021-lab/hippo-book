@@ -22,9 +22,6 @@ export default function QuestionReading({
     ? question.subQuestions
     : [];
 
-  const media: any[] = Array.isArray(question.media) ? question.media : [];
-  const text: string = question.text ?? "";
-
   function handleSubChange(index: number, subVal: any) {
     if (disabled) return;
     const next = [...(Array.isArray(value) ? value : [])];
@@ -41,40 +38,7 @@ export default function QuestionReading({
         gap: "32px",
       }}
     >
-      {/* Общий текст / медиа */}
-      {(text || media.length > 0) && (
-        <div
-          className="reading-passage"
-          style={{
-            background: "#ffffff",
-            border: "1px solid rgba(0,0,0,0.06)",
-            borderRadius: "16px",
-            padding: "20px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
-          }}
-        >
-          {text && (
-            <div
-              style={{
-                fontSize: "16px",
-                fontWeight: 500,
-                lineHeight: 1.6,
-                color: "#1e293b",
-                whiteSpace: "pre-wrap",
-                marginBottom: media.length > 0 ? "16px" : 0,
-              }}
-            >
-              {text}
-            </div>
-          )}
-
-          {media.length > 0 && (
-            <MediaRenderer media={media} />
-          )}
-        </div>
-      )}
-
-      {/* Подвопросы */}
+      {/* Текст и медиа берутся из самого вопроса (q и media), поэтому отдельный блок не нужен */}
       {subQuestions.length > 0 && (
         <div
           style={{
