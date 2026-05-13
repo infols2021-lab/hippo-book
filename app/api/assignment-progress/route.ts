@@ -177,6 +177,9 @@ export async function POST(req: Request) {
   const { stats } = calcAndBuildReview(questions, body.answers);
   const realScore = normalizeScore(stats.score);
 
+  console.log("[DEBUG] assignment-progress stats.score:", stats.score, "realScore:", realScore);
+  console.log("[DEBUG] assignment-progress answers received:", JSON.stringify(body.answers, null, 2));
+
   const payload = {
     user_id: auth.user.id,
     assignment_id: body.assignmentId,
@@ -192,8 +195,11 @@ export async function POST(req: Request) {
     .upsert(payload, { onConflict: "user_id,assignment_id" });
 
   if (upsertError) {
+    console.error("[DEBUG] upsert error:", upsertError);
     return NextResponse.json({ ok: false, error: upsertError.message }, { status: 500 });
   }
+
+  console.log("[DEBUG] upsert success for assignment", body.assignmentId);
 
   const counters = await recalcCompletedCounters(supabase, auth.user.id);
 

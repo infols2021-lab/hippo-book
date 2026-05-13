@@ -5,6 +5,10 @@ import GatehouseMaterialClient, {
   type GatehouseMaterialPageData,
 } from "../GatehouseMaterialClient";
 
+// Отключаем кеширование страницы, чтобы всегда показывать актуальные данные
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type MaybePromise<T> = T | Promise<T>;
 
 function normalizeArray(value: unknown): string[] {
@@ -112,7 +116,7 @@ export default async function GatehouseMaterialByIdPage({
 
   const hasAccess = Boolean(material.is_available || accessRow);
 
-  // ✅ Сортировка записей прогресса: завершённые идут первыми (свежие сверху),
+  // Сортировка записей прогресса: завершённые идут первыми (свежие сверху),
   // чтобы в Map попала последняя запись – самая свежая завершённая
   const rawProgress = Array.isArray(progressRows) ? progressRows : [];
   const sortedProgress = [...rawProgress].sort((a, b) => {

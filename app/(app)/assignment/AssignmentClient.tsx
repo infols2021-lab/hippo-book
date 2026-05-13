@@ -48,7 +48,7 @@ type Props = {
   sourceId?: string;
 };
 
-// ===================== HELPERS (ORIGINAL LOGIC) =====================
+// ===================== HELPERS =====================
 function normalizeQuestions(qs: unknown): QuestionAny[] {
   if (!Array.isArray(qs)) return [];
   return qs.map((q) => {
@@ -241,22 +241,27 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     if (saveBusyRef.current) return;
     saveBusyRef.current = true;
     try {
+      const payload = {
+        assignmentId,
+        answers,
+        isCompleted: true,
+        score,
+        source,
+        sourceId,
+        branchType: isGatehouse ? "gatehouse" : "olympiad",
+      };
+      console.log("[DEBUG] Sending to API:", payload);
       const res = await fetch("/api/assignment-progress", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          assignmentId,
-          answers,
-          isCompleted: true,
-          score,
-          source,
-          sourceId,
-          branchType: isGatehouse ? "gatehouse" : "olympiad",
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (res.ok && json?.ok) {
+        console.log("[DEBUG] Progress saved successfully, score:", score);
         window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
+      } else {
+        console.error("[DEBUG] Failed to save progress:", json);
       }
     } finally {
       saveBusyRef.current = false;
@@ -266,6 +271,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   async function finish() {
     if (isViewMode) return;
     
+    console.log("[DEBUG] === FINISH ===");
+    console.log("[DEBUG] Answers object:", answers);
+    
     const v = validateAllAnswered(questions, answers);
     if (!v.ok) {
       alert(`❌ Заполните вопрос №${v.index + 1}`);
@@ -274,6 +282,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     }
 
     const { stats, review } = calcAndBuildReview(questions, answers);
+    console.log("[DEBUG] Stats from scoring:", stats);
 
     if (isGatehouse) {
       const recommendation = recommendGatehouseLevel({
@@ -489,7 +498,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         )}
       </main>
 
-      {/* МОДАЛКА ЗУМА ИЗОБРАЖЕНИЙ – теперь без пропсов zoom/setZoom */}
+      {/* МОДАЛКА ЗУМА ИЗОБРАЖЕНИЙ */}
       <ImageModal
         open={imageModalOpen}
         src={modalSrc}

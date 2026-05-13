@@ -45,16 +45,10 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /** Генератор плавной кривой от ответа к точке */
-function buildCurvePath(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-): string {
+function buildCurvePath(x1: number, y1: number, x2: number, y2: number): string {
   const dx = x2 - x1;
   const dy = y2 - y1;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  // контрольные точки: первая идёт вверх от ответа, вторая — вниз к точке
   const cp1x = x1;
   const cp1y = y1 - Math.min(50, dist * 0.4);
   const cp2x = x2;
@@ -86,10 +80,7 @@ export default function QuestionImageMap({
     [question.answers],
   );
 
-  const imageUrl = useMemo(
-    () => getImageUrl(question.image),
-    [question.image],
-  );
+  const imageUrl = useMemo(() => getImageUrl(question.image), [question.image]);
 
   // ---- UI state ----
   const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
@@ -192,7 +183,7 @@ export default function QuestionImageMap({
     (answerId: string) => {
       if (disabled) return;
 
-      // if this answer already has a connection, remove it and prepare to reconnect
+      // если у этого ответа уже есть связь – удаляем её и переходим в режим выбора
       if (value[answerId]) {
         const next = { ...value };
         delete next[answerId];
@@ -201,6 +192,7 @@ export default function QuestionImageMap({
         return;
       }
 
+      // иначе просто выбираем ответ (или снимаем выбор, если кликнули на уже выбранный)
       setSelectedAnswerId((prev) => (prev === answerId ? null : answerId));
     },
     [disabled, value, onChange],
@@ -213,18 +205,17 @@ export default function QuestionImageMap({
 
       if (!selectedAnswerId) return;
 
-      // if this point is already connected to another answer, remove that link
+      // если эта точка уже привязана к другому ответу – удаляем ту связь
       const existingAnswerForPoint = Object.entries(value).find(
         ([, pid]) => pid === pointId,
       )?.[0];
+      let next = { ...value };
       if (existingAnswerForPoint) {
-        const next = { ...value };
         delete next[existingAnswerForPoint];
-        onChange(next);
       }
 
-      // connect selected answer to this point
-      const next = { ...value, [selectedAnswerId]: pointId };
+      // соединяем выбранный ответ с этой точкой
+      next = { ...next, [selectedAnswerId]: pointId };
       onChange(next);
       setSelectedAnswerId(null);
     },
@@ -233,7 +224,6 @@ export default function QuestionImageMap({
 
   const handleMapBackgroundClick = useCallback(
     (e: React.MouseEvent) => {
-      // deselect only when clicking exactly on the background, not on points or cards
       if (e.target === e.currentTarget) {
         setSelectedAnswerId(null);
       }
