@@ -165,21 +165,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Запрещаем повторное завершение
-  const { data: existing } = await supabase
-    .from("user_progress")
-    .select("id, is_completed, score")
-    .eq("user_id", auth.user.id)
-    .eq("assignment_id", body.assignmentId)
-    .maybeSingle();
-
-  if (existing?.is_completed) {
-    return NextResponse.json(
-      { ok: false, error: "Задание уже было завершено ранее" },
-      { status: 409 }
-    );
-  }
-
   // Серверный пересчёт баллов
   const questions = assignment.content?.questions;
   if (!Array.isArray(questions)) {
@@ -198,15 +183,16 @@ export async function POST(req: Request) {
     answers: body.answers ?? {},
     is_completed: true,
     completed_at: new Date().toISOString(),
-    score: realScore, // <-- только серверное значение
+    score: realScore,
   };
 
-  const res = existing?.id
-    ? await supabase.from("user_progress").update(payload).eq("id", existing.id)
-    : await supabase.from("user_progress").insert(payload);
+  // Используем upsert: если запись существует, обновляем, иначе вставляем
+  const { error: upsertError } = await supabase
+    .from("user_progress")
+    .upsert(payload, { onConflict: "user_id,assignment_id" });
 
-  if (res.error) {
-    return NextResponse.json({ ok: false, error: res.error.message }, { status: 500 });
+  if (upsertError) {
+    return NextResponse.json({ ok: false, error: upsertError.message }, { status: 500 });
   }
 
   const counters = await recalcCompletedCounters(supabase, auth.user.id);
