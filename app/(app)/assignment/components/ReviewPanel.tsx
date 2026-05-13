@@ -3,6 +3,7 @@
 import React from "react";
 import type { ReviewItem } from "../lib/types";
 import MediaRenderer from "./MediaRenderer";
+import { ImageMapRenderer } from "./QuestionImageMap";
 
 // Форматирование баллов
 function fmtPoints(x: number) {
@@ -88,6 +89,25 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
     const scorePercent =
       r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
     const itemMedia = r.media;
+
+    // Для imagemap готовим правильные и пользовательские соответствия
+    let correctMatchesMap: Record<string, string> = {};
+    let userMatchesMap: Record<string, string> = {};
+    let answerLabelsMap: Record<string, string> = {};
+    let pointLabelsMap: Record<string, string> = {};
+    let imageUrl = "";
+    let points: any[] = [];
+    let answers: any[] = [];
+
+    if (r.type === "imagemap") {
+      correctMatchesMap = (r as any).correctMatches || {};
+      userMatchesMap = (r as any).userMatches || {};
+      answerLabelsMap = (r as any).answerLabels || {};
+      pointLabelsMap = (r as any).pointLabels || {};
+      imageUrl = (r as any).imageUrl || "";
+      points = (r as any).points || [];
+      answers = (r as any).answers || [];
+    }
 
     return (
       <div
@@ -338,8 +358,8 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           </div>
         )}
 
-        {/* ===== IMAGEMAP ===== */}
-        {r.type === "imagemap" && (
+        {/* ===== IMAGEMAP с визуализацией ===== */}
+        {r.type === "imagemap" && imageUrl && points.length && answers.length && (
           <div
             style={{
               background: "#f8fafc",
@@ -347,45 +367,86 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               padding: "16px",
             }}
           >
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "12px" }}>
-              РЕЗУЛЬТАТЫ КАРТЫ ИЗОБРАЖЕНИЯ
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "16px" }}>
+              ВИЗУАЛИЗАЦИЯ КАРТЫ
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {Object.entries(r.correctMatches).map(([answerId, correctPointId], mI) => {
-                const userPointId = r.userMatches?.[answerId];
-                const isCorrect = userPointId === correctPointId;
-                const answerLabel = r.answerLabels?.[answerId] || `Ответ`;
-                const pointLabel = r.pointLabels?.[correctPointId] || `Точка`;
-                return (
-                  <div
-                    key={mI}
-                    style={{
-                      padding: "12px 16px",
-                      borderRadius: "12px",
-                      border: `1px solid ${isCorrect ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
-                      background: isCorrect ? "#f0fdf4" : "#fef2f2",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "4px",
-                    }}
-                  >
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: isCorrect ? "#166534" : "#991b1b" }}>
-                      Связь {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
-                    </div>
-                    <div style={{ fontSize: "14px", color: "#1e293b" }}>
-                      {answerLabel} → указана точка:{" "}
-                      <span style={{ fontWeight: 700 }}>
-                        {r.pointLabels?.[userPointId] || "—"}
-                      </span>
-                    </div>
-                    {!isCorrect && (
-                      <div style={{ fontSize: "14px", color: "#10b981" }}>
-                        Правильно: {answerLabel} → {pointLabel}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              {/* Ваш результат */}
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>Ваши ответы</div>
+                <ImageMapRenderer
+                  imageUrl={imageUrl}
+                  points={points}
+                  answers={answers}
+                  matches={userMatchesMap}
+                  pointColorConnected="#ef4444"   // красный для неправильных связей (но на самом деле это цвет для связанных точек)
+                  pointColorUnconnected="#94a3b8"
+                  pointSize={20}
+                  showLabels
+                />
+                <div style={{ fontSize: "12px", marginTop: "8px", color: "#64748b", textAlign: "center" }}>
+                  🟢 Зелёные точки — правильные связи (если они совпадают с правильными),<br />
+                  🔴 Красные — неправильные (или отсутствие связи)
+                </div>
+              </div>
+
+              {/* Правильные ответы */}
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>Правильные ответы</div>
+                <ImageMapRenderer
+                  imageUrl={imageUrl}
+                  points={points}
+                  answers={answers}
+                  matches={correctMatchesMap}
+                  pointColorConnected="#10b981"
+                  pointColorUnconnected="#94a3b8"
+                  pointSize={20}
+                  showLabels
+                />
+              </div>
+            </div>
+
+            {/* Текстовый список связей (как было) */}
+            <div style={{ marginTop: "20px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "12px" }}>
+                РЕЗУЛЬТАТЫ КАРТЫ ИЗОБРАЖЕНИЯ
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {Object.entries(correctMatchesMap).map(([answerId, correctPointId], mI) => {
+                  const userPointId = userMatchesMap[answerId];
+                  const isCorrect = userPointId === correctPointId;
+                  const answerLabel = answerLabelsMap[answerId] || `Ответ`;
+                  const pointLabel = pointLabelsMap[correctPointId] || `Точка`;
+                  return (
+                    <div
+                      key={mI}
+                      style={{
+                        padding: "12px 16px",
+                        borderRadius: "12px",
+                        border: `1px solid ${isCorrect ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
+                        background: isCorrect ? "#f0fdf4" : "#fef2f2",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "4px",
+                      }}
+                    >
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: isCorrect ? "#166534" : "#991b1b" }}>
+                        Связь {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                      <div style={{ fontSize: "14px", color: "#1e293b" }}>
+                        {answerLabel} → указана точка:{" "}
+                        <span style={{ fontWeight: 700 }}>{pointLabelsMap[userPointId] || "—"}</span>
+                      </div>
+                      {!isCorrect && (
+                        <div style={{ fontSize: "14px", color: "#10b981" }}>
+                          Правильно: {answerLabel} → {pointLabel}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -494,7 +555,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
         )}
 
         {/* ===== COMPLEX / READING ===== */}
-        {r.type === "complex" && r.subReviews && (
+        {(r.type === "complex" || r.type === "reading") && r.subReviews && (
           <div style={{ marginTop: "16px" }}>
             <div
               style={{
@@ -507,32 +568,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                 textAlign: "center",
               }}
             >
-              Вложенные задания
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              {r.subReviews.map((sr, srI) => (
-                <div key={srI} style={{ paddingLeft: "12px", borderLeft: "3px solid rgba(99,102,241,0.2)" }}>
-                  {renderItem(sr, srI)}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {r.type === "reading" && r.subReviews && (
-          <div style={{ marginTop: "16px" }}>
-            <div
-              style={{
-                fontSize: "12px",
-                fontWeight: 800,
-                color: "#94a3b8",
-                textTransform: "uppercase",
-                letterSpacing: "1px",
-                marginBottom: "16px",
-                textAlign: "center",
-              }}
-            >
-              Результаты по подвопросам
+              {r.type === "complex" ? "Вложенные задания" : "Результаты по подвопросам"}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               {r.subReviews.map((sr, srI) => (
