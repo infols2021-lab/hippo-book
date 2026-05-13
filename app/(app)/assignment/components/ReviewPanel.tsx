@@ -107,6 +107,11 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
       imageUrl = (r as any).imageUrl || "";
       points = (r as any).points || [];
       answers = (r as any).answers || [];
+
+      // Отладка – если нет точек или ответов, выводим предупреждение
+      if (imageUrl && (points.length === 0 || answers.length === 0)) {
+        console.warn("[ReviewPanel] Imagemap data incomplete", { points, answers });
+      }
     }
 
     return (
@@ -358,8 +363,8 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           </div>
         )}
 
-        {/* ===== IMAGEMAP с визуализацией ===== */}
-        {r.type === "imagemap" && imageUrl && points.length && answers.length && (
+        {/* ===== IMAGEMAP с визуализацией (исправлено) ===== */}
+        {r.type === "imagemap" && imageUrl && (
           <div
             style={{
               background: "#f8fafc",
@@ -380,7 +385,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                   points={points}
                   answers={answers}
                   matches={userMatchesMap}
-                  pointColorConnected="#ef4444"   // красный для неправильных связей (но на самом деле это цвет для связанных точек)
+                  pointColorConnected="#ef4444"
                   pointColorUnconnected="#94a3b8"
                   pointSize={20}
                   showLabels
@@ -416,8 +421,8 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                 {Object.entries(correctMatchesMap).map(([answerId, correctPointId], mI) => {
                   const userPointId = userMatchesMap[answerId];
                   const isCorrect = userPointId === correctPointId;
-                  const answerLabel = answerLabelsMap[answerId] || `Ответ`;
-                  const pointLabel = pointLabelsMap[correctPointId] || `Точка`;
+                  const answerLabel = answerLabelsMap[answerId] || `Ответ ${answerId.slice(0,4)}`;
+                  const pointLabel = pointLabelsMap[correctPointId] || `Точка ${correctPointId.slice(0,4)}`;
                   return (
                     <div
                       key={mI}
