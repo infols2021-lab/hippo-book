@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import type { ReviewItem } from "../lib/types";
+import type { ReviewItem, QuestionAny } from "../lib/types";
 import MediaRenderer from "./MediaRenderer";
 import { ImageMapRenderer } from "./QuestionImageMap";
 
@@ -83,34 +83,36 @@ function FillRow({
   );
 }
 
-export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
-  function renderItem(r: ReviewItem, idx?: number) {
+export default function ReviewPanel({
+  items,
+  questions,
+}: {
+  items: ReviewItem[];
+  questions: QuestionAny[];
+}) {
+  function renderItem(r: ReviewItem, idx: number) {
     const status = getStatusConfig(r);
     const scorePercent =
       r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
     const itemMedia = r.media;
 
-    // Для imagemap готовим правильные и пользовательские соответствия
-    let correctMatchesMap: Record<string, string> = {};
-    let userMatchesMap: Record<string, string> = {};
-    let answerLabelsMap: Record<string, string> = {};
-    let pointLabelsMap: Record<string, string> = {};
+    // Для imagemap берём данные из вопроса, а не из r
     let imageUrl = "";
     let points: any[] = [];
     let answers: any[] = [];
+    let userMatches: Record<string, string> = {};
+    let correctMatches: Record<string, string> = {};
 
     if (r.type === "imagemap") {
-      correctMatchesMap = (r as any).correctMatches || {};
-      userMatchesMap = (r as any).userMatches || {};
-      answerLabelsMap = (r as any).answerLabels || {};
-      pointLabelsMap = (r as any).pointLabels || {};
-      imageUrl = (r as any).imageUrl || "";
-      points = (r as any).points || [];
-      answers = (r as any).answers || [];
-
-      // Отладка – если нет точек или ответов, выводим предупреждение
-      if (imageUrl && (points.length === 0 || answers.length === 0)) {
-        console.warn("[ReviewPanel] Imagemap data incomplete", { points, answers });
+      const q = questions[idx];
+      if (q && q.type === "imagemap") {
+        imageUrl = q.image || "";
+        points = q.points || [];
+        answers = q.answers || [];
+        userMatches = (r as any).userMatches || {};
+        correctMatches = (r as any).correctMatches || {};
+      } else {
+        console.warn("[ReviewPanel] No question data for imagemap at index", idx);
       }
     }
 
@@ -152,7 +154,14 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           }}
         >
           <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "6px",
+              }}
+            >
               <span
                 style={{
                   fontSize: "12px",
@@ -162,7 +171,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                   letterSpacing: "0.5px",
                 }}
               >
-                {idx !== undefined ? `Вопрос ${idx + 1}` : "Подвопрос"}
+                {`Вопрос ${idx + 1}`}
               </span>
               <span
                 style={{
@@ -226,7 +235,13 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
 
         {/* Медиа (если есть) */}
         {itemMedia && itemMedia.length > 0 && (
-          <div style={{ marginBottom: "20px", borderRadius: "14px", overflow: "hidden" }}>
+          <div
+            style={{
+              marginBottom: "20px",
+              borderRadius: "14px",
+              overflow: "hidden",
+            }}
+          >
             <MediaRenderer media={itemMedia} />
           </div>
         )}
@@ -242,7 +257,14 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
             }}
           >
             <div style={{ marginBottom: "12px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "4px" }}>
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#64748b",
+                  marginBottom: "4px",
+                }}
+              >
                 ВАШ ОТВЕТ
               </div>
               <div
@@ -253,16 +275,34 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                   wordBreak: "break-word",
                 }}
               >
-                {Array.isArray(r.userLabel) ? r.userLabel.join(", ") : r.userLabel || "—"}
+                {Array.isArray(r.userLabel)
+                  ? r.userLabel.join(", ")
+                  : r.userLabel || "—"}
               </div>
             </div>
             {!r.isCorrect && (
               <div>
-                <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "4px" }}>
+                <div
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    color: "#64748b",
+                    marginBottom: "4px",
+                  }}
+                >
                   ПРАВИЛЬНЫЙ ОТВЕТ
                 </div>
-                <div style={{ fontSize: "16px", fontWeight: 700, color: "#10b981", wordBreak: "break-word" }}>
-                  {Array.isArray(r.correctLabel) ? r.correctLabel.join(", ") : r.correctLabel}
+                <div
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    color: "#10b981",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {Array.isArray(r.correctLabel)
+                    ? r.correctLabel.join(", ")
+                    : r.correctLabel}
                 </div>
               </div>
             )}
@@ -319,51 +359,73 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               padding: "16px",
             }}
           >
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "12px" }}>
+            <div
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#64748b",
+                marginBottom: "12px",
+              }}
+            >
               РЕЗУЛЬТАТЫ СОПОСТАВЛЕНИЯ
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {Object.entries(r.correctMatches).map(([leftId, correctRightId], mI) => {
-                const userRightId = r.userMatches?.[leftId];
-                const isCorrect = userRightId === correctRightId;
-                const rightText = r.rightLabels?.[correctRightId] || `Элемент ${correctRightId}`;
-                const userRightText = userRightId
-                  ? r.rightLabels?.[userRightId] || `Элемент ${userRightId}`
-                  : "—";
-                return (
-                  <div
-                    key={mI}
-                    style={{
-                      padding: "12px 16px",
-                      borderRadius: "12px",
-                      border: `1px solid ${isCorrect ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
-                      background: isCorrect ? "#f0fdf4" : "#fef2f2",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "4px",
-                    }}
-                  >
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: isCorrect ? "#166534" : "#991b1b" }}>
-                      Пара {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
-                    </div>
-                    <div style={{ fontSize: "14px", color: "#1e293b" }}>
-                      Ваш выбор:{" "}
-                      <span style={{ fontWeight: 700 }}>{userRightText}</span>
-                    </div>
-                    {!isCorrect && (
-                      <div style={{ fontSize: "14px", color: "#10b981" }}>
-                        Правильно:{" "}
-                        <span style={{ fontWeight: 700 }}>{rightText}</span>
+              {Object.entries(r.correctMatches).map(
+                ([leftId, correctRightId], mI) => {
+                  const userRightId = r.userMatches?.[leftId];
+                  const isCorrect = userRightId === correctRightId;
+                  const rightText =
+                    r.rightLabels?.[correctRightId] ||
+                    `Элемент ${correctRightId}`;
+                  const userRightText = userRightId
+                    ? r.rightLabels?.[userRightId] ||
+                      `Элемент ${userRightId}`
+                    : "—";
+                  return (
+                    <div
+                      key={mI}
+                      style={{
+                        padding: "12px 16px",
+                        borderRadius: "12px",
+                        border: `1px solid ${
+                          isCorrect
+                            ? "rgba(16,185,129,0.2)"
+                            : "rgba(239,68,68,0.2)"
+                        }`,
+                        background: isCorrect ? "#f0fdf4" : "#fef2f2",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "4px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: isCorrect ? "#166534" : "#991b1b",
+                        }}
+                      >
+                        Пара {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                      <div style={{ fontSize: "14px", color: "#1e293b" }}>
+                        Ваш выбор:{" "}
+                        <span style={{ fontWeight: 700 }}>{userRightText}</span>
+                      </div>
+                      {!isCorrect && (
+                        <div style={{ fontSize: "14px", color: "#10b981" }}>
+                          Правильно:{" "}
+                          <span style={{ fontWeight: 700 }}>{rightText}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+              )}
             </div>
           </div>
         )}
 
-        {/* ===== IMAGEMAP с визуализацией (исправлено) ===== */}
+        {/* ===== IMAGEMAP с визуализацией (теперь используем вопросы) ===== */}
         {r.type === "imagemap" && imageUrl && (
           <div
             style={{
@@ -372,38 +434,63 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               padding: "16px",
             }}
           >
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "16px" }}>
+            <div
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#64748b",
+                marginBottom: "16px",
+              }}
+            >
               ВИЗУАЛИЗАЦИЯ КАРТЫ
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "20px",
+              }}
+            >
               {/* Ваш результат */}
               <div>
-                <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>Ваши ответы</div>
+                <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>
+                  Ваши ответы
+                </div>
                 <ImageMapRenderer
                   imageUrl={imageUrl}
                   points={points}
                   answers={answers}
-                  matches={userMatchesMap}
+                  matches={userMatches}
                   pointColorConnected="#ef4444"
                   pointColorUnconnected="#94a3b8"
                   pointSize={20}
                   showLabels
                 />
-                <div style={{ fontSize: "12px", marginTop: "8px", color: "#64748b", textAlign: "center" }}>
-                  🟢 Зелёные точки — правильные связи (если они совпадают с правильными),<br />
+                <div
+                  style={{
+                    fontSize: "12px",
+                    marginTop: "8px",
+                    color: "#64748b",
+                    textAlign: "center",
+                  }}
+                >
+                  🟢 Зелёные точки — правильные связи (если они совпадают с правильными),
+                  <br />
                   🔴 Красные — неправильные (или отсутствие связи)
                 </div>
               </div>
 
               {/* Правильные ответы */}
               <div>
-                <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>Правильные ответы</div>
+                <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>
+                  Правильные ответы
+                </div>
                 <ImageMapRenderer
                   imageUrl={imageUrl}
                   points={points}
                   answers={answers}
-                  matches={correctMatchesMap}
+                  matches={correctMatches}
                   pointColorConnected="#10b981"
                   pointColorUnconnected="#94a3b8"
                   pointSize={20}
@@ -414,43 +501,68 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
 
             {/* Текстовый список связей (как было) */}
             <div style={{ marginTop: "20px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "12px" }}>
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#64748b",
+                  marginBottom: "12px",
+                }}
+              >
                 РЕЗУЛЬТАТЫ КАРТЫ ИЗОБРАЖЕНИЯ
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {Object.entries(correctMatchesMap).map(([answerId, correctPointId], mI) => {
-                  const userPointId = userMatchesMap[answerId];
-                  const isCorrect = userPointId === correctPointId;
-                  const answerLabel = answerLabelsMap[answerId] || `Ответ ${answerId.slice(0,4)}`;
-                  const pointLabel = pointLabelsMap[correctPointId] || `Точка ${correctPointId.slice(0,4)}`;
-                  return (
-                    <div
-                      key={mI}
-                      style={{
-                        padding: "12px 16px",
-                        borderRadius: "12px",
-                        border: `1px solid ${isCorrect ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
-                        background: isCorrect ? "#f0fdf4" : "#fef2f2",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "4px",
-                      }}
-                    >
-                      <div style={{ fontSize: "13px", fontWeight: 700, color: isCorrect ? "#166534" : "#991b1b" }}>
-                        Связь {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
-                      </div>
-                      <div style={{ fontSize: "14px", color: "#1e293b" }}>
-                        {answerLabel} → указана точка:{" "}
-                        <span style={{ fontWeight: 700 }}>{pointLabelsMap[userPointId] || "—"}</span>
-                      </div>
-                      {!isCorrect && (
-                        <div style={{ fontSize: "14px", color: "#10b981" }}>
-                          Правильно: {answerLabel} → {pointLabel}
+                {Object.entries(correctMatches).map(
+                  ([answerId, correctPointId], mI) => {
+                    const userPointId = userMatches[answerId];
+                    const isCorrect = userPointId === correctPointId;
+                    const answerLabel =
+                      answers.find((a) => a.id === answerId)?.text || answerId;
+                    const pointLabel =
+                      points.find((p) => p.id === correctPointId)?.label ||
+                      correctPointId;
+                    return (
+                      <div
+                        key={mI}
+                        style={{
+                          padding: "12px 16px",
+                          borderRadius: "12px",
+                          border: `1px solid ${
+                            isCorrect
+                              ? "rgba(16,185,129,0.2)"
+                              : "rgba(239,68,68,0.2)"
+                          }`,
+                          background: isCorrect ? "#f0fdf4" : "#fef2f2",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            color: isCorrect ? "#166534" : "#991b1b",
+                          }}
+                        >
+                          Связь {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        <div style={{ fontSize: "14px", color: "#1e293b" }}>
+                          {answerLabel} → указана точка:{" "}
+                          <span style={{ fontWeight: 700 }}>
+                            {points.find((p) => p.id === userPointId)?.label ||
+                              "—"}
+                          </span>
+                        </div>
+                        {!isCorrect && (
+                          <div style={{ fontSize: "14px", color: "#10b981" }}>
+                            Правильно: {answerLabel} → {pointLabel}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                )}
               </div>
             </div>
           </div>
@@ -466,15 +578,32 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
             }}
           >
             {r.note && (
-              <div style={{ fontSize: "14px", fontWeight: 600, color: "#334155", marginBottom: "12px" }}>
+              <div
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#334155",
+                  marginBottom: "12px",
+                }}
+              >
                 {r.note}
               </div>
             )}
 
             {r.crosswordStats && (
-              <div style={{ display: "flex", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  marginBottom: "20px",
+                  flexWrap: "wrap",
+                }}
+              >
                 <span className="badge-pill">
-                  Заполнено клеток: <b>{r.crosswordStats.filled}/{r.crosswordStats.total}</b>
+                  Заполнено клеток:{" "}
+                  <b>
+                    {r.crosswordStats.filled}/{r.crosswordStats.total}
+                  </b>
                 </span>
                 <span className="badge-pill">
                   Точность заполнения: <b>{r.crosswordStats.percent}%</b>
@@ -483,13 +612,33 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
             )}
 
             {r.wordReview && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "16px",
+                }}
+              >
                 {r.wordReview.correct.length > 0 && (
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#166534", marginBottom: "8px", textTransform: "uppercase" }}>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: "#166534",
+                        marginBottom: "8px",
+                        textTransform: "uppercase",
+                      }}
+                    >
                       Правильные слова ({r.wordReview.correct.length})
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "6px",
+                      }}
+                    >
                       {r.wordReview.correct.map((w, i) => (
                         <div
                           key={i}
@@ -504,11 +653,31 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                             fontSize: "14px",
                           }}
                         >
-                          <span style={{ fontWeight: 800, color: "#10b981", minWidth: "28px" }}>✓</span>
-                          <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "80px" }}>
+                          <span
+                            style={{
+                              fontWeight: 800,
+                              color: "#10b981",
+                              minWidth: "28px",
+                            }}
+                          >
+                            ✓
+                          </span>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color: "#1e293b",
+                              minWidth: "80px",
+                            }}
+                          >
                             №{w.number} {w.direction === "across" ? "→" : "↓"}
                           </span>
-                          <span style={{ fontWeight: 700, color: "#10b981", wordBreak: "break-word" }}>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color: "#10b981",
+                              wordBreak: "break-word",
+                            }}
+                          >
                             {w.word}
                           </span>
                         </div>
@@ -519,10 +688,24 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
 
                 {r.wordReview.wrong.length > 0 && (
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#991b1b", marginBottom: "8px", textTransform: "uppercase" }}>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: "#991b1b",
+                        marginBottom: "8px",
+                        textTransform: "uppercase",
+                      }}
+                    >
                       Неправильные слова ({r.wordReview.wrong.length})
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "6px",
+                      }}
+                    >
                       {r.wordReview.wrong.map((w, i) => (
                         <div
                           key={i}
@@ -537,16 +720,49 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                             fontSize: "14px",
                           }}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                            <span style={{ fontWeight: 800, color: "#ef4444", minWidth: "28px" }}>✗</span>
-                            <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "80px" }}>
-                              №{w.number} {w.direction === "across" ? "→" : "↓"}
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "12px",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontWeight: 800,
+                                color: "#ef4444",
+                                minWidth: "28px",
+                              }}
+                            >
+                              ✗
                             </span>
-                            <span style={{ fontWeight: 700, color: "#ef4444", wordBreak: "break-word" }}>
+                            <span
+                              style={{
+                                fontWeight: 700,
+                                color: "#1e293b",
+                                minWidth: "80px",
+                              }}
+                            >
+                              №{w.number}{" "}
+                              {w.direction === "across" ? "→" : "↓"}
+                            </span>
+                            <span
+                              style={{
+                                fontWeight: 700,
+                                color: "#ef4444",
+                                wordBreak: "break-word",
+                              }}
+                            >
                               Ваш ответ: {w.user}
                             </span>
                           </div>
-                          <div style={{ marginLeft: "40px", color: "#166534", fontWeight: 700 }}>
+                          <div
+                            style={{
+                              marginLeft: "40px",
+                              color: "#166534",
+                              fontWeight: 700,
+                            }}
+                          >
                             Правильно: {w.correct}
                           </div>
                         </div>
@@ -575,9 +791,21 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
             >
               {r.type === "complex" ? "Вложенные задания" : "Результаты по подвопросам"}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+              }}
+            >
               {r.subReviews.map((sr, srI) => (
-                <div key={srI} style={{ paddingLeft: "12px", borderLeft: "3px solid rgba(99,102,241,0.2)" }}>
+                <div
+                  key={srI}
+                  style={{
+                    paddingLeft: "12px",
+                    borderLeft: "3px solid rgba(99,102,241,0.2)",
+                  }}
+                >
                   {renderItem(sr, srI)}
                 </div>
               ))}
@@ -640,10 +868,24 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           </svg>
         </div>
         <div>
-          <h3 style={{ fontSize: "24px", fontWeight: 800, margin: 0, color: "#1e293b" }}>
+          <h3
+            style={{
+              fontSize: "24px",
+              fontWeight: 800,
+              margin: 0,
+              color: "#1e293b",
+            }}
+          >
             Разбор прохождения
           </h3>
-          <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#94a3b8", fontWeight: 600 }}>
+          <p
+            style={{
+              margin: "4px 0 0",
+              fontSize: "14px",
+              color: "#94a3b8",
+              fontWeight: 600,
+            }}
+          >
             Изучите свои ошибки, чтобы улучшить результат в следующий раз
           </p>
         </div>
