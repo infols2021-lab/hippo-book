@@ -26,11 +26,14 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
+      document.body.style.overscrollBehavior = "contain"; // дополнительная защита на мобильных
     } else {
       document.body.style.overflow = "";
+      document.body.style.overscrollBehavior = "";
     }
     return () => {
       document.body.style.overflow = "";
+      document.body.style.overscrollBehavior = "";
     };
   }, [open]);
 
