@@ -1,14 +1,16 @@
 "use client";
 
-import type { FinalStats, ReviewItem } from "../lib/types";
+import type { FinalStats, ReviewItem, QuestionAny } from "../lib/types";
 import ReviewPanel from "./ReviewPanel";
 
 export default function CompletionScreen({
   stats,
   reviewItems,
+  questions,
 }: {
   stats: FinalStats;
   reviewItems: ReviewItem[];
+  questions: QuestionAny[];
 }) {
   const showReview = stats.incorrect > 0 || stats.skipped > 0;
 
@@ -50,7 +52,7 @@ export default function CompletionScreen({
           </div>
         </div>
 
-        {showReview ? <ReviewPanel items={reviewItems} /> : null}
+        {showReview ? <ReviewPanel items={reviewItems} questions={questions} /> : null}
 
         <div style={{ marginTop: 30 }}>
           <button className="btn" onClick={() => (location.href = "/materials")} type="button">
