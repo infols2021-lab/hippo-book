@@ -13,7 +13,7 @@ type Props = {
 const ZOOM_STEP = 0.25;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 5;
-const WHEEL_ZOOM_FACTOR = 0.1; // чувствительность колёсика
+const WHEEL_ZOOM_FACTOR = 0.1;
 
 export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props) {
   const imageRef = useRef<HTMLImageElement>(null);
@@ -22,11 +22,14 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
   const dragStart = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
   const translate = useRef({ x: 0, y: 0 });
 
-  // Блокируем прокрутку страницы при открытии модалки
+  // При открытии: запрет скролла body + моментальный прыжок в верх страницы
   useEffect(() => {
     if (open) {
+      // Фиксируем текущую позицию скролла, но модалка всё равно fixed – не нужно.
       document.body.style.overflow = "hidden";
-      document.body.style.overscrollBehavior = "contain"; // дополнительная защита на мобильных
+      document.body.style.overscrollBehavior = "contain";
+      // Мгновенный прыжок в начало, чтобы модалка всегда была видна
+      window.scrollTo(0, 0);
     } else {
       document.body.style.overflow = "";
       document.body.style.overscrollBehavior = "";
@@ -37,21 +40,20 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
     };
   }, [open]);
 
-  // Сброс перемещения и автоподгон размера при открытии / смене src
+  // Автоподгон размера изображения при открытии
   useEffect(() => {
     if (open) {
       translate.current = { x: 0, y: 0 };
       if (imageRef.current) {
         imageRef.current.style.transform = `translate(0px, 0px) scale(${zoom})`;
         imageRef.current.style.transition = "transform 0.2s ease";
-        // Автоподгон размера под экран, но не меньше 1
         const fitZoom = calculateFitZoom(imageRef.current, containerRef.current);
         setZoom(Math.min(MAX_ZOOM, Math.max(1, fitZoom)));
       }
     }
   }, [open, src]);
 
-  // При изменении zoom обновляем transform с учётом translate
+  // Обновление transform при изменении zoom
   useEffect(() => {
     if (!imageRef.current) return;
     imageRef.current.style.transform = `translate(${translate.current.x}px, ${translate.current.y}px) scale(${zoom})`;
@@ -68,7 +70,7 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  // Прокрутка колёсиком мыши / жесты на тачпаде
+  // Прокрутка колёсиком
   const handleWheel = (e: React.WheelEvent) => {
     if (!imageRef.current) return;
     e.preventDefault();
@@ -77,7 +79,7 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
     setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoom)));
   };
 
-  // Начало перетаскивания
+  // Drag мышью
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom <= 1) return;
     e.preventDefault();
@@ -116,11 +118,9 @@ export default function ImageModal({ open, src, zoom, setZoom, onClose }: Props)
     }
   };
 
+  // Touch drag
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      // пинч — не реализуем, достаточно колёсика/кнопок
-      return;
-    }
+    if (e.touches.length === 2) return;
     if (zoom <= 1) return;
     const touch = e.touches[0];
     dragging.current = true;
