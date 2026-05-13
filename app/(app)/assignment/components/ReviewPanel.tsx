@@ -462,8 +462,11 @@ export default function ReviewPanel({
                   points={points}
                   answers={answers}
                   matches={userMatches}
+                  correctMatches={correctMatches}
                   pointColorConnected="#ef4444"
                   pointColorUnconnected="#94a3b8"
+                  lineColorCorrect="#10b981"
+                  lineColorIncorrect="#ef4444"
                   pointSize={20}
                   showLabels
                 />
@@ -475,9 +478,7 @@ export default function ReviewPanel({
                     textAlign: "center",
                   }}
                 >
-                  🟢 Зелёные точки — правильные связи (если они совпадают с правильными),
-                  <br />
-                  🔴 Красные — неправильные (или отсутствие связи)
+                  🟢 Зелёные линии — правильные связи, 🔴 Красные — ошибочные.
                 </div>
               </div>
 
@@ -491,8 +492,11 @@ export default function ReviewPanel({
                   points={points}
                   answers={answers}
                   matches={correctMatches}
+                  correctMatches={correctMatches}
                   pointColorConnected="#10b981"
                   pointColorUnconnected="#94a3b8"
+                  lineColorCorrect="#10b981"
+                  lineColorIncorrect="#ef4444"
                   pointSize={20}
                   showLabels
                 />

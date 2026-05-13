@@ -1,4 +1,5 @@
-// файл app/(app)/assignment/components/QuestionImageMap.tsx (исправленная версия)
+// файл app/(app)/assignment/components/QuestionImageMap.tsx
+// Исправленная версия с визуализацией карточек и линий для ReviewPanel
 "use client";
 
 import React, {
@@ -67,18 +68,19 @@ export type ImageMapRendererProps = {
   imageUrl: string;
   points: ImageMapPoint[];
   answers: ImageMapAnswer[];
-  matches: ImageMapMatch; // связи (могут быть userMatches или correctMatches)
-  highlightConnected?: boolean; // подсвечивать только те точки, которые имеют связь
+  matches: ImageMapMatch;          // фактические связи (пользовательские или правильные)
+  correctMatches: ImageMapMatch;   // правильные связи (для определения цвета)
   pointColorConnected?: string;
   pointColorUnconnected?: string;
   pointSize?: number;
-  strokeColor?: string; // цвет линий (можно не использовать, если линии не рисуем)
+  lineColorCorrect?: string;
+  lineColorIncorrect?: string;
   strokeWidth?: number;
   showLabels?: boolean;
 };
 
 /**
- * Компонент для статической визуализации карты изображения с точками и связями.
+ * Компонент для статической визуализации карты изображения с точками и линиями.
  * Используется в разборе (ReviewPanel).
  */
 export function ImageMapRenderer({
@@ -86,46 +88,62 @@ export function ImageMapRenderer({
   points,
   answers,
   matches,
-  highlightConnected = false,
+  correctMatches,
   pointColorConnected = "#10b981",
   pointColorUnconnected = "#94a3b8",
   pointSize = 20,
+  lineColorCorrect = "#10b981",
+  lineColorIncorrect = "#ef4444",
+  strokeWidth = 3,
   showLabels = true,
 }: ImageMapRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pointPixels, setPointPixels] = useState<PointPixel[]>([]);
+  const [answerAnchors, setAnswerAnchors] = useState<AnswerAnchor[]>([]);
 
-  // строим маппинг answerId -> label для отображения подписей
-  const answerLabelMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const ans of answers) {
-      map[ans.id] = ans.text || ans.id.slice(0, 6);
-    }
-    return map;
-  }, [answers]);
+  // Маппинг для быстрого доступа
+  const answerMap = useMemo(() => new Map(answers.map(a => [a.id, a])), [answers]);
+  const pointMap = useMemo(() => new Map(points.map(p => [p.id, p])), [points]);
 
-  // пересчёт пиксельных координат
+  // пересчёт пиксельных координат точек и карточек
   const recalc = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
     const containerRect = container.getBoundingClientRect();
-    const imgEl = container.querySelector<HTMLImageElement>(".imagemap-renderer-image");
-    if (!imgEl) return;
-    const imgRect = imgEl.getBoundingClientRect();
-    const imgWidth = imgRect.width;
-    const imgHeight = imgRect.height;
-    const imgLeft = imgRect.left - containerRect.left;
-    const imgTop = imgRect.top - containerRect.top;
 
-    const newPoints: PointPixel[] = points.map((p) => ({
-      id: p.id,
-      x: imgLeft + (clamp(p.x, 0, 100) / 100) * imgWidth,
-      y: imgTop + (clamp(p.y, 0, 100) / 100) * imgHeight,
-      correctAnswerId: p.correctAnswerId,
-      label: p.label,
-    }));
-    setPointPixels(newPoints);
-  }, [points]);
+    // точки
+    const imgEl = container.querySelector<HTMLImageElement>(".imagemap-renderer-image");
+    if (imgEl) {
+      const imgRect = imgEl.getBoundingClientRect();
+      const imgWidth = imgRect.width;
+      const imgHeight = imgRect.height;
+      const imgLeft = imgRect.left - containerRect.left;
+      const imgTop = imgRect.top - containerRect.top;
+      const newPoints: PointPixel[] = points.map((p) => ({
+        id: p.id,
+        x: imgLeft + (clamp(p.x, 0, 100) / 100) * imgWidth,
+        y: imgTop + (clamp(p.y, 0, 100) / 100) * imgHeight,
+        correctAnswerId: p.correctAnswerId,
+        label: p.label,
+      }));
+      setPointPixels(newPoints);
+    }
+
+    // карточки ответов (снизу)
+    const answerCards = container.querySelectorAll<HTMLElement>(".imagemap-answer-card");
+    const newAnchors: AnswerAnchor[] = [];
+    answerCards.forEach((card) => {
+      const answerId = card.dataset.answerId;
+      if (!answerId) return;
+      const rect = card.getBoundingClientRect();
+      newAnchors.push({
+        answerId,
+        x: rect.left + rect.width / 2 - containerRect.left,
+        y: rect.top - containerRect.top,
+      });
+    });
+    setAnswerAnchors(newAnchors);
+  }, [points, answers]);
 
   useEffect(() => {
     recalc();
@@ -135,17 +153,13 @@ export function ImageMapRenderer({
 
   const handleImageLoad = () => recalc();
 
-  // для каждой точки определяем, соединена ли она с каким-либо ответом
-  const pointToAnswerMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const [answerId, pointId] of Object.entries(matches)) {
-      map[pointId] = answerId;
-    }
-    return map;
-  }, [matches]);
+  // вспомогательная функция: правильная ли связь
+  const isMatchCorrect = (answerId: string, pointId: string) => {
+    return correctMatches[answerId] === pointId;
+  };
 
   return (
-    <div ref={containerRef} style={{ position: "relative", display: "inline-block", width: "100%" }}>
+    <div ref={containerRef} style={{ position: "relative", width: "100%" }}>
       <img
         className="imagemap-renderer-image"
         src={getImageUrl(imageUrl)}
@@ -153,7 +167,8 @@ export function ImageMapRenderer({
         onLoad={handleImageLoad}
         style={{ width: "100%", height: "auto", display: "block", borderRadius: 12 }}
       />
-      {/* SVG для линий (пока не используем, но можно добавить при необходимости) */}
+
+      {/* Слой для линий */}
       <svg
         style={{
           position: "absolute",
@@ -163,14 +178,34 @@ export function ImageMapRenderer({
           height: "100%",
           pointerEvents: "none",
         }}
-      />
+      >
+        {answerAnchors.map((anchor) => {
+          const pointId = matches[anchor.answerId];
+          if (!pointId) return null;
+          const point = pointPixels.find(p => p.id === pointId);
+          if (!point) return null;
+          const isCorrect = isMatchCorrect(anchor.answerId, pointId);
+          return (
+            <path
+              key={`line-${anchor.answerId}`}
+              d={buildCurvePath(anchor.x, anchor.y, point.x, point.y)}
+              fill="none"
+              stroke={isCorrect ? lineColorCorrect : lineColorIncorrect}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              opacity={0.85}
+            />
+          );
+        })}
+      </svg>
+
       {/* Точки */}
       {pointPixels.map((pt) => {
-        const isConnected = !!pointToAnswerMap[pt.id];
-        if (highlightConnected && !isConnected) return null;
-        const answerId = pointToAnswerMap[pt.id];
-        const answerLabel = answerId ? answerLabelMap[answerId] : undefined;
-        const color = isConnected ? pointColorConnected : pointColorUnconnected;
+        const connectedAnswerId = Object.entries(matches).find(([, pid]) => pid === pt.id)?.[0];
+        const isConnected = !!connectedAnswerId;
+        const isCorrect = isConnected ? isMatchCorrect(connectedAnswerId, pt.id) : false;
+        const color = isConnected ? (isCorrect ? pointColorConnected : lineColorIncorrect) : pointColorUnconnected;
+        const answerLabel = connectedAnswerId ? answerMap.get(connectedAnswerId)?.text : undefined;
         return (
           <div
             key={pt.id}
@@ -182,9 +217,8 @@ export function ImageMapRenderer({
               height: pointSize,
               borderRadius: "50%",
               background: color,
-              border: `2px solid white`,
+              border: "2px solid white",
               boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-              boxSizing: "border-box",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -198,6 +232,40 @@ export function ImageMapRenderer({
           </div>
         );
       })}
+
+      {/* Карточки ответов внизу */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "16px",
+          justifyContent: "center",
+          marginTop: "20px",
+        }}
+      >
+        {answers.map((ans) => {
+          const pointId = matches[ans.id];
+          const isConnected = !!pointId;
+          const isCorrect = isConnected ? isMatchCorrect(ans.id, pointId) : false;
+          return (
+            <div
+              key={ans.id}
+              data-answer-id={ans.id}
+              className="imagemap-answer-card"
+              style={{
+                background: isConnected ? (isCorrect ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)") : "#fff",
+                border: `2px solid ${isConnected ? (isCorrect ? "#10b981" : "#ef4444") : "#e2e8f0"}`,
+                borderRadius: "16px",
+                padding: "8px 12px",
+                minWidth: "80px",
+                textAlign: "center",
+              }}
+            >
+              {ans.text || ans.id.slice(0,4)}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
