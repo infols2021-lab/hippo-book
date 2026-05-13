@@ -1,5 +1,7 @@
 // файл app/(app)/assignment/components/QuestionImageMap.tsx
 // Улучшенная версия с визуализацией карточек, линий и медиа
+// Исправлена проблема мелких картинок в прохождении задания: убран фиксированный размер 120x120,
+// теперь картинки отображаются с max-width 180px и max-height 140px, сохраняя пропорции.
 "use client";
 
 import React, {
@@ -287,7 +289,7 @@ export function ImageMapRenderer({
 }
 
 // ---------------------------------------------------------------------------
-// ОСНОВНОЙ КОМПОНЕНТ ДЛЯ РЕДАКТИРОВАНИЯ (без изменений)
+// ОСНОВНОЙ КОМПОНЕНТ ДЛЯ РЕДАКТИРОВАНИЯ (исправлен: картинки больше не мелкие)
 // ---------------------------------------------------------------------------
 
 export default function QuestionImageMap({
@@ -642,25 +644,27 @@ export default function QuestionImageMap({
                   opacity: disabled && !isConnected ? 0.6 : 1,
                 }}
               >
+                {/* 🔧 ИСПРАВЛЕНО: убран фиксированный размер 120x120, теперь картинка занимает разумное место */}
                 {ans.media && ans.media.length > 0 && (
                   <div
                     style={{
-                      width: "120px",
-                      height: "120px",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       borderRadius: "12px",
                       overflow: "hidden",
                       backgroundColor: "#f8fafc",
+                      maxWidth: "100%",
                     }}
                   >
                     <img
                       src={getImageUrl(ans.media[0].url)}
                       alt={ans.text || "Ответ"}
                       style={{
-                        maxWidth: "100%",
-                        maxHeight: "100%",
+                        width: "auto",
+                        height: "auto",
+                        maxWidth: "180px",
+                        maxHeight: "140px",
                         objectFit: "contain",
                       }}
                     />
