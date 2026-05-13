@@ -1,5 +1,5 @@
 // файл app/(app)/assignment/components/QuestionImageMap.tsx
-// Исправленная версия с визуализацией карточек и линий для ReviewPanel
+// Улучшенная версия с визуализацией карточек, линий и медиа
 "use client";
 
 import React, {
@@ -89,12 +89,12 @@ export function ImageMapRenderer({
   answers,
   matches,
   correctMatches,
-  pointColorConnected = "#10b981",
+  pointColorConnected = "#22c55e",   // ярко-зелёный
   pointColorUnconnected = "#94a3b8",
   pointSize = 20,
-  lineColorCorrect = "#10b981",
-  lineColorIncorrect = "#ef4444",
-  strokeWidth = 3,
+  lineColorCorrect = "#22c55e",      // ярко-зелёный
+  lineColorIncorrect = "#ef4444",    // ярко-красный
+  strokeWidth = 4,
   showLabels = true,
 }: ImageMapRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -193,7 +193,8 @@ export function ImageMapRenderer({
               stroke={isCorrect ? lineColorCorrect : lineColorIncorrect}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
-              opacity={0.85}
+              strokeDasharray={isCorrect ? "none" : "6,6"}
+              opacity={0.9}
             />
           );
         })}
@@ -217,14 +218,15 @@ export function ImageMapRenderer({
               height: pointSize,
               borderRadius: "50%",
               background: color,
-              border: "2px solid white",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+              border: "3px solid white",
+              boxShadow: "0 0 0 2px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.15)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontSize: pointSize * 0.5,
               fontWeight: "bold",
               color: "#fff",
+              textShadow: "0 1px 1px rgba(0,0,0,0.3)",
             }}
             title={pt.label || pt.id}
           >
@@ -240,7 +242,7 @@ export function ImageMapRenderer({
           flexWrap: "wrap",
           gap: "16px",
           justifyContent: "center",
-          marginTop: "20px",
+          marginTop: "24px",
         }}
       >
         {answers.map((ans) => {
@@ -253,15 +255,29 @@ export function ImageMapRenderer({
               data-answer-id={ans.id}
               className="imagemap-answer-card"
               style={{
-                background: isConnected ? (isCorrect ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)") : "#fff",
-                border: `2px solid ${isConnected ? (isCorrect ? "#10b981" : "#ef4444") : "#e2e8f0"}`,
+                background: isConnected ? (isCorrect ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)") : "#fff",
+                border: `2px solid ${isConnected ? (isCorrect ? "#22c55e" : "#ef4444") : "#e2e8f0"}`,
                 borderRadius: "16px",
                 padding: "8px 12px",
-                minWidth: "80px",
+                minWidth: "100px",
                 textAlign: "center",
+                cursor: "default",
+                transition: "all 0.2s",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
               }}
             >
-              {ans.text || ans.id.slice(0,4)}
+              {ans.media && ans.media.length > 0 ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
+                  <img
+                    src={getImageUrl(ans.media[0].url)}
+                    alt=""
+                    style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 8 }}
+                  />
+                  {ans.text && <span style={{ fontWeight: "bold", color: "#1e293b" }}>{ans.text}</span>}
+                </div>
+              ) : (
+                <span style={{ fontWeight: "bold", color: "#1e293b" }}>{ans.text || ans.id.slice(0,4)}</span>
+              )}
             </div>
           );
         })}

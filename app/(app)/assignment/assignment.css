@@ -1295,3 +1295,80 @@
     padding: 18px;
   }
 }
+/* =========================================================
+   УЛУЧШЕННЫЙ СТИЛЬ ДЛЯ КАРТОЧЕК ОТВЕТОВ И ТОЧЕК (ImageMapRenderer)
+   ========================================================= */
+
+/* Карточки ответов в разборе */
+.imagemap-answer-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: default;
+  font-weight: bold;
+  color: #1e293b;
+  background-color: #fff;
+  border-radius: 16px;
+  padding: 8px 12px;
+  min-width: 100px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border: 2px solid #e2e8f0;
+}
+
+.imagemap-answer-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+/* Контейнер для карточек в разборе */
+.imagemap-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+/* Точки на карте в разборе */
+.imagemap-renderer-point {
+  transition: transform 0.1s ease;
+  cursor: default;
+  position: absolute;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.imagemap-renderer-point:hover {
+  transform: scale(1.2);
+}
+
+/* Линии между карточками и точками */
+.imagemap-line {
+  transition: stroke-width 0.2s ease;
+}
+
+/* Миниатюры изображений в карточках ответов */
+.imagemap-answer-card img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 8px;
+  margin-right: 8px;
+}
+
+/* Для мобильных устройств */
+@media (max-width: 640px) {
+  .imagemap-answer-card {
+    min-width: 70px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .imagemap-answer-card img {
+    width: 24px;
+    height: 24px;
+  }
+}
