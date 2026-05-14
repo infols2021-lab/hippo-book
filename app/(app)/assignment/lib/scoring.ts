@@ -6,16 +6,32 @@ import type { FinalStats, ReviewItem, TestOption, MatchingPair } from "./types";
 // Helpers
 // ---------------------------------------------------------------------------
 
+// УМНЫЙ ЭКСТРАКТОР: Достает текст из любых объектов, строк или массивов.
+// Если структура неизвестна, выводит JSON на экран, чтобы мы поняли, где спрятан текст!
+function extractCorrectValue(v: any): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+    return String(v);
+  }
+  if (typeof v === "object") {
+    if ("text" in v && v.text) return String(v.text);
+    if ("value" in v && v.value) return String(v.value);
+    if ("answer" in v && v.answer) return String(v.answer);
+    if ("label" in v && v.label) return String(v.label);
+    if ("word" in v && v.word) return String(v.word);
+    if ("correct" in v && v.correct) return String(v.correct);
+    
+    // Если ключа нет в списке выше, возвращаем сам объект в виде строки, 
+    // чтобы он отрендерился на экране и мы увидели его структуру!
+    return JSON.stringify(v);
+  }
+  return String(v);
+}
+
 function buildCorrectStrings(arr: any[]): string[] {
   return (arr || []).map((variants: any) =>
     (Array.isArray(variants) ? variants : [variants])
-      .map((v: any) => {
-        // Если вариант - объект (например, { text: "ответ" }), достаем текст
-        if (typeof v === "object" && v !== null && "text" in v) {
-          return String(v.text);
-        }
-        return String(v);
-      })
+      .map(extractCorrectValue)
       .join(" или ")
   );
 }
@@ -32,31 +48,24 @@ function buildParts(correctAnswers: any[], userArr: string[], totalCount: number
     const userRaw = String(userArr[idx] ?? "");
     const userNorm = normalizeText(userRaw);
 
-    const varsNorm = (Array.isArray(variants) ? variants : [variants]).map((v: any) => {
-      // Поддержка объектов { text: "слово" }
-      if (typeof v === "object" && v !== null && "text" in v) {
-        return normalizeText(String(v.text));
-      }
-      return normalizeText(String(v));
+    const variantsArray = Array.isArray(variants) ? variants : [variants];
+
+    const varsNorm = variantsArray.map((v: any) => {
+      return normalizeText(extractCorrectValue(v));
     });
 
     const ok = userNorm.length > 0 && varsNorm.some((v) => v === userNorm);
 
-    // Подготавливаем красивую строку правильных ответов для UI
-    const correctString = (Array.isArray(variants) ? variants : [variants])
-      .map((v: any) => {
-        if (typeof v === "object" && v !== null && "text" in v) {
-          return String(v.text);
-        }
-        return String(v);
-      })
+    // Собираем красивую строку через наш экстрактор
+    const correctDisplay = variantsArray
+      .map(extractCorrectValue)
       .join(" или ");
 
     parts.push({
       index: idx,
       isCorrect: ok,
       user: userRaw,
-      correct: correctString, // Возвращаем уже собранную строку
+      correct: correctDisplay, 
     });
   }
   return parts;
