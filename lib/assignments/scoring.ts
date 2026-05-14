@@ -3,7 +3,7 @@
 // Полностью синхронизирована с клиентской логикой, поддерживает все типы вопросов:
 // test, fill, sentence, matching, complex, reading, imagemap, crossword.
 
-import type { FinalStats, ReviewItem } from "@/app/(app)/assignment/lib/types";
+import type { FinalStats, ReviewItem, TestOption, MatchingPair } from "@/app/(app)/assignment/lib/types";
 
 // ---------------------------------------------------------------------------
 // Нормализация текста (копия из клиентской normalize.ts)
@@ -173,13 +173,12 @@ export function calcAndBuildReview(
         note: "Некорректная структура вопроса.",
         pointsEarned: 0,
         pointsTotal: 1,
-        media: undefined,
       } as ReviewItem;
     }
 
     const questionText = String(q?.q ?? "").trim() || `Вопрос ${idxText}`;
     const pointsTotal = getPointsTotal(q);
-    const media = q.media || undefined; // сохраняем медиа вопроса
+    const media = q.media && Array.isArray(q.media) ? q.media : undefined;
 
     // ---------------------------------------------------------------
     // COMPLEX
@@ -216,7 +215,7 @@ export function calcAndBuildReview(
     }
 
     // ---------------------------------------------------------------
-    // READING (аналогично COMPLEX)
+    // READING
     // ---------------------------------------------------------------
     if (q.type === "reading") {
       const subQs = Array.isArray(q.subQuestions) ? q.subQuestions : [];
@@ -246,6 +245,7 @@ export function calcAndBuildReview(
         pointsTotal: readingTotal,
         subReviews,
         media,
+        readingText: q.text || "",
       } as ReviewItem;
     }
 
@@ -260,12 +260,20 @@ export function calcAndBuildReview(
     // ---------------------------------------------------------------
     if (q.type === "test") {
       const isMultiple = !!q.multiple;
-      const opts: any[] = Array.isArray(q.options) ? q.options : [];
+      let options: TestOption[] = [];
+      if (Array.isArray(q.options)) {
+        options = q.options.map((opt: any, idx: number) => {
+          if (typeof opt === "string") {
+            return { id: `opt-${idx}`, text: opt, media: [] };
+          }
+          return opt as TestOption;
+        });
+      }
 
       const getOptText = (idx: number) => {
-        const opt = opts[idx];
+        const opt = options[idx];
         if (!opt) return "—";
-        return typeof opt === "string" ? opt : opt.text || `Вариант ${idx + 1}`;
+        return opt.text || `Вариант ${idx + 1}`;
       };
 
       const correctArr = Array.isArray(q.correct)
@@ -292,6 +300,7 @@ export function calcAndBuildReview(
           fraction: 0,
           pointsEarned: 0,
           pointsTotal,
+          options,
           media,
         } as ReviewItem;
       }
@@ -344,6 +353,7 @@ export function calcAndBuildReview(
         isMultiple,
         pointsEarned,
         pointsTotal,
+        options,
         media,
       } as ReviewItem;
     }
@@ -459,6 +469,7 @@ export function calcAndBuildReview(
           pointsEarned: 0,
           pointsTotal,
           media,
+          sentenceTemplate: String(q.sentence || ""),
         } as ReviewItem;
       }
 
@@ -492,6 +503,7 @@ export function calcAndBuildReview(
           pointsEarned: 0,
           pointsTotal,
           media,
+          sentenceTemplate: String(q.sentence || ""),
         } as ReviewItem;
       }
 
@@ -520,6 +532,7 @@ export function calcAndBuildReview(
         pointsEarned,
         pointsTotal,
         media,
+        sentenceTemplate: String(q.sentence || ""),
       } as ReviewItem;
     }
 
@@ -531,8 +544,35 @@ export function calcAndBuildReview(
       const totalPairsCount = pairs.length;
 
       const correctMatches: Record<string, string> = {};
+      const rightLabels: Record<string, string> = {};
+      const leftLabels: Record<string, string> = {};
+
       pairs.forEach((p: any) => {
-        if (p?.id != null) correctMatches[String(p.id)] = String(p.id);
+        if (p?.id != null) {
+          correctMatches[String(p.id)] = String(p.id);
+          const left = p.left;
+          if (left) {
+            if (left.text && String(left.text).trim()) {
+              leftLabels[String(p.id)] = String(left.text).trim();
+            } else if (Array.isArray(left.media) && left.media.length > 0) {
+              const firstName = left.media[0]?.name?.trim();
+              leftLabels[String(p.id)] = firstName || `Изображение`;
+            } else {
+              leftLabels[String(p.id)] = `Элемент ${String(p.id)}`;
+            }
+          }
+          const right = p.right;
+          if (right) {
+            if (right.text && String(right.text).trim()) {
+              rightLabels[String(p.id)] = String(right.text).trim();
+            } else if (Array.isArray(right.media) && right.media.length > 0) {
+              const firstName = right.media[0]?.name?.trim();
+              rightLabels[String(p.id)] = firstName || `Изображение`;
+            } else {
+              rightLabels[String(p.id)] = `Элемент ${String(p.id)}`;
+            }
+          }
+        }
       });
 
       const answered = a && typeof a === "object" && Object.keys(a).length > 0;
@@ -548,6 +588,9 @@ export function calcAndBuildReview(
           totalPairsCount,
           userMatches: {},
           correctMatches,
+          rightLabels,
+          leftLabels,
+          pairs,
           pointsEarned: 0,
           pointsTotal,
           media,
@@ -581,6 +624,9 @@ export function calcAndBuildReview(
         totalPairsCount,
         userMatches,
         correctMatches,
+        rightLabels,
+        leftLabels,
+        pairs,
         pointsEarned,
         pointsTotal,
         media,
@@ -588,7 +634,7 @@ export function calcAndBuildReview(
     }
 
     // ---------------------------------------------------------------
-    // IMAGEMAP – добавлены поля для визуализации (imageUrl, points, answers)
+    // IMAGEMAP
     // ---------------------------------------------------------------
     if (q.type === "imagemap") {
       const answersArr = Array.isArray(q.answers) ? q.answers : [];
@@ -616,9 +662,23 @@ export function calcAndBuildReview(
       }
 
       const correctMatches: Record<string, string> = {};
+      const answerLabels: Record<string, string> = {};
+      const pointLabels: Record<string, string> = {};
+
       for (const ans of answersArr) {
         const point = pointsArr.find((p: any) => p.correctAnswerId === ans.id);
         if (point) correctMatches[ans.id] = point.id;
+        if (ans.text && String(ans.text).trim()) {
+          answerLabels[ans.id] = String(ans.text).trim();
+        } else if (Array.isArray(ans.media) && ans.media.length > 0) {
+          const firstName = ans.media[0]?.name?.trim();
+          answerLabels[ans.id] = firstName || `Ответ`;
+        } else {
+          answerLabels[ans.id] = `Ответ #${ans.id}`;
+        }
+      }
+      for (const point of pointsArr) {
+        pointLabels[point.id] = point.label || `Точка ${point.id}`;
       }
 
       const userMatches = (a && typeof a === "object" ? a : {}) as Record<string, string>;
@@ -635,6 +695,8 @@ export function calcAndBuildReview(
           totalPairsCount,
           userMatches: {},
           correctMatches,
+          answerLabels,
+          pointLabels,
           imageUrl: q.image || "",
           points: pointsArr,
           answers: answersArr,
@@ -669,6 +731,8 @@ export function calcAndBuildReview(
         totalPairsCount,
         userMatches,
         correctMatches,
+        answerLabels,
+        pointLabels,
         imageUrl: q.image || "",
         points: pointsArr,
         answers: answersArr,
@@ -679,24 +743,23 @@ export function calcAndBuildReview(
     }
 
     // ---------------------------------------------------------------
-    // CROSSWORD (полная проверка по словам)
+    // CROSSWORD
     // ---------------------------------------------------------------
     if (q.type === "crossword") {
       const grid: string[][] = Array.isArray(q.grid) ? q.grid : [];
       const words: any[] = Array.isArray(q.words) ? q.words : [];
       const blocks: any[] = Array.isArray(q.blocks) ? q.blocks : [];
+      const cellNumbers: Record<string, number> = q.cellNumbers || {};
       const userGrid: unknown = a;
 
       const rows = grid.length;
       const cols = rows > 0 ? Math.max(...grid.map(r => r?.length ?? 0)) : 0;
 
-      // Заблокированные клетки
       const blockedSet = new Set<string>();
       for (const b of blocks) {
         if (b && typeof b === "object") blockedSet.add(`${b.row},${b.col}`);
       }
 
-      // Клетки, принадлежащие словам
       const wordCells = new Set<string>();
       for (const w of words) {
         if (!w || typeof w !== "object") continue;
@@ -711,7 +774,6 @@ export function calcAndBuildReview(
         }
       }
 
-      // Статистика заполнения
       let totalActiveCells = 0;
       let filledCells = 0;
       for (let r = 0; r < rows; r++) {
@@ -727,7 +789,6 @@ export function calcAndBuildReview(
       }
       const percent = totalActiveCells > 0 ? Math.round((filledCells / totalActiveCells) * 100) : 0;
 
-      // Проверка слов
       const correctWordsList: Array<{ number: number; direction: string; word: string }> = [];
       const wrongWordsList: Array<{ number: number; direction: string; user: string; correct: string }> = [];
       let totalWords = words.length;
@@ -791,12 +852,17 @@ export function calcAndBuildReview(
           : "Кроссворд не заполнен",
         crosswordStats: { filled: filledCells, total: totalActiveCells, percent },
         wordReview: { wrong: wrongWordsList, correct: correctWordsList },
+        grid,
+        userGrid: (userGrid as string[][]) || [],
+        cellNumbers,
+        blocks,
+        words,
         media,
       } as ReviewItem;
     }
 
     // ---------------------------------------------------------------
-    // OTHER (неподдерживаемый тип)
+    // OTHER
     // ---------------------------------------------------------------
     statsSum.skipped++;
     return {
