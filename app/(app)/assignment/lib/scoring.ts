@@ -8,7 +8,15 @@ import type { FinalStats, ReviewItem, TestOption, MatchingPair } from "./types";
 
 function buildCorrectStrings(arr: any[]): string[] {
   return (arr || []).map((variants: any) =>
-    (Array.isArray(variants) ? variants : [variants]).map(String).join(" или ")
+    (Array.isArray(variants) ? variants : [variants])
+      .map((v: any) => {
+        // Если вариант - объект (например, { text: "ответ" }), достаем текст
+        if (typeof v === "object" && v !== null && "text" in v) {
+          return String(v.text);
+        }
+        return String(v);
+      })
+      .join(" или ")
   );
 }
 
@@ -24,18 +32,31 @@ function buildParts(correctAnswers: any[], userArr: string[], totalCount: number
     const userRaw = String(userArr[idx] ?? "");
     const userNorm = normalizeText(userRaw);
 
-    const varsNorm = (Array.isArray(variants) ? variants : [variants]).map((v: any) =>
-      normalizeText(String(v))
-    );
+    const varsNorm = (Array.isArray(variants) ? variants : [variants]).map((v: any) => {
+      // Поддержка объектов { text: "слово" }
+      if (typeof v === "object" && v !== null && "text" in v) {
+        return normalizeText(String(v.text));
+      }
+      return normalizeText(String(v));
+    });
 
     const ok = userNorm.length > 0 && varsNorm.some((v) => v === userNorm);
+
+    // Подготавливаем красивую строку правильных ответов для UI
+    const correctString = (Array.isArray(variants) ? variants : [variants])
+      .map((v: any) => {
+        if (typeof v === "object" && v !== null && "text" in v) {
+          return String(v.text);
+        }
+        return String(v);
+      })
+      .join(" или ");
 
     parts.push({
       index: idx,
       isCorrect: ok,
       user: userRaw,
-      // Исправлено: объединяем варианты через "или", чтобы в UI они читались корректно
-      correct: (Array.isArray(variants) ? variants : [variants]).map(String).join(" или "),
+      correct: correctString, // Возвращаем уже собранную строку
     });
   }
   return parts;
@@ -272,7 +293,7 @@ export function calcAndBuildReview(
           ? [q.correct]
           : [];
       const correctLabels = correctArr.map((c: any) => getOptText(Number(c)));
-      const correctIndices = correctArr.map(Number); // Исправление: отдаем точные индексы
+      const correctIndices = correctArr.map(Number);
 
       const answered = isMultiple
         ? Array.isArray(a) && a.length > 0
@@ -289,8 +310,8 @@ export function calcAndBuildReview(
           isSkipped: true,
           userLabel: isMultiple ? [] : "Не отвечено",
           correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
-          userIndices: [], // Исправление: пустой выбор пользователя
-          correctIndices, // Исправление: точные правильные индексы
+          userIndices: [], 
+          correctIndices, 
           isMultiple,
           fraction: 0,
           pointsEarned: 0,
@@ -349,8 +370,8 @@ export function calcAndBuildReview(
         isSkipped: false,
         userLabel: userLabels,
         correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
-        userIndices: userArrForIndices, // Исправление: отдаем точные индексы пользователя
-        correctIndices, // Исправление: отдаем точные правильные индексы
+        userIndices: userArrForIndices, 
+        correctIndices, 
         fraction,
         isMultiple,
         pointsEarned,
