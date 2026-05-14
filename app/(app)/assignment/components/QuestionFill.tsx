@@ -13,6 +13,9 @@ type Props = {
 // Функция для безопасного извлечения текста ответа (на случай, если из базы пришел объект)
 function extractCorrectValue(v: any): string {
   if (v === null || v === undefined) return "";
+  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+    return String(v);
+  }
   if (typeof v === "object") {
     if ("text" in v && v.text) return String(v.text);
     if ("value" in v && v.value) return String(v.value);
@@ -26,7 +29,12 @@ function extractCorrectValue(v: any): string {
 }
 
 export default function QuestionFill({ question, value = [], onChange, disabled }: Props) {
-  const answersCount = (question.answers || []).length;
+  // ИЩЕМ ОТВЕТЫ ВЕЗДЕ: и в answers, и в correct, указываем явный тип any[] для TypeScript
+  const rawAnswers: any[] = (Array.isArray(question.answers) && question.answers.length > 0)
+    ? question.answers
+    : (Array.isArray((question as any).correct) ? (question as any).correct : []);
+
+  const answersCount = rawAnswers.length;
 
   const handleInputChange = (index: number, text: string) => {
     if (disabled) return;
@@ -39,8 +47,8 @@ export default function QuestionFill({ question, value = [], onChange, disabled 
 
   // Вытаскиваем правильный ответ для конкретного поля
   const getCorrectString = (index: number) => {
-    const variants = question.answers?.[index];
-    if (!variants) return "";
+    const variants = rawAnswers[index];
+    if (!variants) return "Ответ не найден";
     const vArr = Array.isArray(variants) ? variants : [variants];
     return vArr.map(extractCorrectValue).filter(Boolean).join(" или ");
   };
@@ -48,7 +56,8 @@ export default function QuestionFill({ question, value = [], onChange, disabled 
   return (
     <div className="fill-container" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       <div className="fill-inputs-container" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        {(question.answers || []).map((_, idx) => {
+        {/* Исправлено: явно указаны типы _: any, idx: number, чтобы TS не ругался */}
+        {rawAnswers.map((_: any, idx: number) => {
           const uAns = String(value?.[idx] ?? "").trim();
           const cAns = getCorrectString(idx);
           

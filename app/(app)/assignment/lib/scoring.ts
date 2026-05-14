@@ -7,13 +7,15 @@ import type { FinalStats, ReviewItem, TestOption, MatchingPair } from "./types";
 // ---------------------------------------------------------------------------
 
 // УМНЫЙ ЭКСТРАКТОР: Достает текст из любых объектов, строк или массивов.
-// Если структура неизвестна, выводит JSON на экран, чтобы мы поняли, где спрятан текст!
 function extractCorrectValue(v: any): string {
-  if (v === null || v === undefined) return "";
+  if (v === null || v === undefined || v === "") return "";
   if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
     return String(v);
   }
   if (typeof v === "object") {
+    if (Array.isArray(v)) {
+      return v.map(extractCorrectValue).filter(Boolean).join(" или ");
+    }
     if ("text" in v && v.text) return String(v.text);
     if ("value" in v && v.value) return String(v.value);
     if ("answer" in v && v.answer) return String(v.answer);
@@ -21,8 +23,7 @@ function extractCorrectValue(v: any): string {
     if ("word" in v && v.word) return String(v.word);
     if ("correct" in v && v.correct) return String(v.correct);
     
-    // Если ключа нет в списке выше, возвращаем сам объект в виде строки, 
-    // чтобы он отрендерился на экране и мы увидели его структуру!
+    // Если структура неизвестна, выводит JSON на экран
     return JSON.stringify(v);
   }
   return String(v);
@@ -30,9 +31,10 @@ function extractCorrectValue(v: any): string {
 
 function buildCorrectStrings(arr: any[]): string[] {
   return (arr || []).map((variants: any) =>
-    (Array.isArray(variants) ? variants : [variants])
+    (Array.isArray(variants) ? variants : (variants !== undefined && variants !== null ? [variants] : []))
       .map(extractCorrectValue)
-      .join(" или ")
+      .filter(Boolean)
+      .join(" или ") || "Ответ не задан"
   );
 }
 
@@ -48,7 +50,7 @@ function buildParts(correctAnswers: any[], userArr: string[], totalCount: number
     const userRaw = String(userArr[idx] ?? "");
     const userNorm = normalizeText(userRaw);
 
-    const variantsArray = Array.isArray(variants) ? variants : [variants];
+    const variantsArray = Array.isArray(variants) ? variants : (variants !== undefined && variants !== null ? [variants] : []);
 
     const varsNorm = variantsArray.map((v: any) => {
       return normalizeText(extractCorrectValue(v));
@@ -56,16 +58,17 @@ function buildParts(correctAnswers: any[], userArr: string[], totalCount: number
 
     const ok = userNorm.length > 0 && varsNorm.some((v) => v === userNorm);
 
-    // Собираем красивую строку через наш экстрактор
+    // Собираем красивую строку через экстрактор
     const correctDisplay = variantsArray
       .map(extractCorrectValue)
+      .filter(Boolean)
       .join(" или ");
 
     parts.push({
       index: idx,
       isCorrect: ok,
       user: userRaw,
-      correct: correctDisplay, 
+      correct: correctDisplay || "Ответ не задан", 
     });
   }
   return parts;
@@ -109,7 +112,8 @@ export function validateAllAnswered(
         if (!has) return { ok: false, index: i };
       }
     } else if (q.type === "fill") {
-      const correctCount = (q.answers || []).length;
+      const correctAnswers = (Array.isArray(q.answers) && q.answers.length > 0) ? q.answers : (Array.isArray(q.correct) ? q.correct : []);
+      const correctCount = correctAnswers.length;
       const has =
         Array.isArray(a) &&
         a.length >= correctCount &&
@@ -231,7 +235,7 @@ export function calcAndBuildReview(
       return {
         type: "complex",
         questionText,
-        isCorrect: complexTotal > 0 && complexEarned === complexTotal,
+        isCorrect: complexTotal > 0 && complexEarned >= complexTotal,
         isSkipped: complexAllSkipped,
         pointsEarned: Number(complexEarned.toFixed(2)),
         pointsTotal: complexTotal,
@@ -265,7 +269,7 @@ export function calcAndBuildReview(
       return {
         type: "reading",
         questionText,
-        isCorrect: readingTotal > 0 && readingEarned === readingTotal,
+        isCorrect: readingTotal > 0 && readingEarned >= readingTotal,
         isSkipped: readingAllSkipped,
         pointsEarned: Number(readingEarned.toFixed(2)),
         pointsTotal: readingTotal,
@@ -394,19 +398,28 @@ export function calcAndBuildReview(
     // FILL
     // ---------------------------------------------------------------
     if (q.type === "fill") {
-      const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
+      // ИЩЕМ ОТВЕТЫ ВЕЗДЕ, И В ANSWERS И В CORRECT
+      const correctAnswers = (Array.isArray(q.answers) && q.answers.length > 0) 
+        ? q.answers 
+        : (Array.isArray(q.correct) ? q.correct : []);
       const totalCount = correctAnswers.length;
 
+      const userArr: string[] = Array.isArray(a)
+        ? (a as any[]).map((x) => String(x ?? ""))
+        : [];
+      
+      const isSkipped = userArr.length === 0 || userArr.every(x => !x.trim());
+
       if (totalCount === 0) {
-        statsSum.skipped++;
+        if (isSkipped) statsSum.skipped++; else statsSum.incorrect++;
         statsSum.total++;
         statsSum.pointsTotal += pointsTotal;
         return {
           type: "fill",
           questionText,
           isCorrect: false,
-          isSkipped: true,
-          userAnswers: [],
+          isSkipped,
+          userAnswers: userArr,
           correctAnswers: [],
           parts: [],
           percent: 0,
@@ -419,14 +432,11 @@ export function calcAndBuildReview(
       }
 
       const correctStrings = buildCorrectStrings(correctAnswers);
-      const userArr: string[] = Array.isArray(a)
-        ? (a as any[]).map((x) => String(x ?? ""))
-        : [];
 
       const answered =
         Array.isArray(a) &&
-        a.length >= totalCount &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
+        a.length > 0 &&
+        a.some((x: any) => String(x ?? "").trim() !== "");
 
       if (!answered) {
         statsSum.skipped++;
@@ -489,19 +499,28 @@ export function calcAndBuildReview(
     // ---------------------------------------------------------------
     if (q.type === "sentence") {
       const gaps = (String(q.sentence || "").match(/___/g) || []).length;
-      const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
+      // ИЩЕМ ОТВЕТЫ ВЕЗДЕ, И В ANSWERS И В CORRECT
+      const correctAnswers = (Array.isArray(q.answers) && q.answers.length > 0) 
+        ? q.answers 
+        : (Array.isArray(q.correct) ? q.correct : []);
       const totalCount = gaps;
 
+      const userArr: string[] = Array.isArray(a)
+        ? (a as any[]).slice(0, gaps).map((x) => String(x ?? ""))
+        : [];
+
+      const isSkipped = userArr.length === 0 || userArr.every(x => !x.trim());
+
       if (totalCount === 0) {
-        statsSum.skipped++;
+        if (isSkipped) statsSum.skipped++; else statsSum.incorrect++;
         statsSum.total++;
         statsSum.pointsTotal += pointsTotal;
         return {
           type: "sentence",
           questionText,
           isCorrect: false,
-          isSkipped: true,
-          userAnswers: [],
+          isSkipped,
+          userAnswers: userArr,
           correctAnswers: [],
           parts: [],
           percent: 0,
@@ -515,14 +534,11 @@ export function calcAndBuildReview(
       }
 
       const correctStrings = buildCorrectStrings(correctAnswers);
-      const userArr: string[] = Array.isArray(a)
-        ? (a as any[]).slice(0, gaps).map((x) => String(x ?? ""))
-        : [];
 
       const answered =
         Array.isArray(a) &&
-        a.length >= gaps &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
+        a.length > 0 &&
+        a.some((x: any) => String(x ?? "").trim() !== "");
 
       if (!answered) {
         statsSum.skipped++;
