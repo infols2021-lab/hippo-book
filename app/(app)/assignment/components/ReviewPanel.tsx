@@ -310,10 +310,12 @@ export default function ReviewPanel({
       }
     }
 
-    // Для test вычисляем правильные индексы и индексы выбранных пользователем
-    let userIndices: number[] = [];
-    let correctIndices: number[] = [];
-    if (r.type === "test" && r.options) {
+    // Для test вычисляем правильные индексы и индексы выбранных пользователем из новых свойств
+    let userIndices: number[] = Array.isArray((r as any).userIndices) ? (r as any).userIndices : [];
+    let correctIndices: number[] = Array.isArray((r as any).correctIndices) ? (r as any).correctIndices : [];
+    
+    // Fallback на старую логику по тексту, если новых массивов почему-то нет
+    if (r.type === "test" && r.options && correctIndices.length === 0) {
       const options = r.options;
       if (Array.isArray(r.correctLabel)) {
         correctIndices = (r.correctLabel as string[])
@@ -824,8 +826,7 @@ export default function ReviewPanel({
                                 minWidth: "80px",
                               }}
                             >
-                              №{w.number}{" "}
-                              {w.direction === "across" ? "→" : "↓"}
+                              №{w.number} {w.direction === "across" ? "→" : "↓"}
                             </span>
                             <span
                               style={{

@@ -34,7 +34,8 @@ function buildParts(correctAnswers: any[], userArr: string[], totalCount: number
       index: idx,
       isCorrect: ok,
       user: userRaw,
-      correct: (Array.isArray(variants) ? variants : [variants]).map(String),
+      // Исправлено: объединяем варианты через "или", чтобы в UI они читались корректно
+      correct: (Array.isArray(variants) ? variants : [variants]).map(String).join(" или "),
     });
   }
   return parts;
@@ -271,6 +272,7 @@ export function calcAndBuildReview(
           ? [q.correct]
           : [];
       const correctLabels = correctArr.map((c: any) => getOptText(Number(c)));
+      const correctIndices = correctArr.map(Number); // Исправление: отдаем точные индексы
 
       const answered = isMultiple
         ? Array.isArray(a) && a.length > 0
@@ -287,6 +289,8 @@ export function calcAndBuildReview(
           isSkipped: true,
           userLabel: isMultiple ? [] : "Не отвечено",
           correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
+          userIndices: [], // Исправление: пустой выбор пользователя
+          correctIndices, // Исправление: точные правильные индексы
           isMultiple,
           fraction: 0,
           pointsEarned: 0,
@@ -299,9 +303,11 @@ export function calcAndBuildReview(
       let fraction = 0;
       let isCorrect = false;
       let userLabels: string | string[] = [];
+      let userArrForIndices: number[] = [];
 
       if (isMultiple) {
         const userArr = Array.isArray(a) ? a.map(Number) : [];
+        userArrForIndices = userArr;
         userLabels = userArr.map((c: number) => getOptText(c));
 
         const correctSet = new Set(correctArr.map(Number));
@@ -321,6 +327,7 @@ export function calcAndBuildReview(
         isCorrect = fraction === 1;
       } else {
         const userIdx = Number(a);
+        userArrForIndices = [userIdx];
         userLabels = getOptText(userIdx);
         const correctIdx = Number(correctArr[0]);
         isCorrect = userIdx === correctIdx;
@@ -342,6 +349,8 @@ export function calcAndBuildReview(
         isSkipped: false,
         userLabel: userLabels,
         correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
+        userIndices: userArrForIndices, // Исправление: отдаем точные индексы пользователя
+        correctIndices, // Исправление: отдаем точные правильные индексы
         fraction,
         isMultiple,
         pointsEarned,
