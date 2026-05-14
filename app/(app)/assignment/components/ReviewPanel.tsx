@@ -101,7 +101,7 @@ function TestOptionsReview({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
         gap: "12px",
         marginTop: "12px",
       }}
@@ -157,8 +157,17 @@ function TestOptionsReview({
               <div style={{ fontWeight: 600, marginBottom: "8px" }}>{opt.text}</div>
             )}
             {opt.media && opt.media.length > 0 && (
-              <div style={{ marginTop: "8px" }}>
-                <MediaRenderer media={opt.media} />
+              <div style={{ marginTop: "8px", display: "flex", justifyContent: "center" }}>
+                <img
+                  src={opt.media[0].url}
+                  alt=""
+                  style={{
+                    maxWidth: "80px",
+                    maxHeight: "80px",
+                    objectFit: "contain",
+                    borderRadius: "8px",
+                  }}
+                />
               </div>
             )}
           </div>
@@ -245,7 +254,7 @@ export default function ReviewPanel({
       r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
     const itemMedia = r.media;
 
-    // Для imagemap берём данные из вопроса, а не из r (на всякий случай)
+    // Для imagemap берём данные из вопроса
     let imageUrl = "";
     let points: any[] = [];
     let answers: any[] = [];
@@ -260,6 +269,31 @@ export default function ReviewPanel({
         answers = q.answers || [];
         userMatches = (r as any).userMatches || {};
         correctMatches = (r as any).correctMatches || {};
+      }
+    }
+
+    // Для test вычисляем правильные индексы и индексы выбранных пользователем
+    let userIndices: number[] = [];
+    let correctIndices: number[] = [];
+    if (r.type === "test" && r.options) {
+      const options = r.options;
+      // Правильные индексы
+      if (Array.isArray(r.correctLabel)) {
+        correctIndices = (r.correctLabel as string[])
+          .map(text => options.findIndex(opt => opt.text === text))
+          .filter(i => i !== -1);
+      } else if (typeof r.correctLabel === "string") {
+        const idxFound = options.findIndex(opt => opt.text === r.correctLabel);
+        if (idxFound !== -1) correctIndices = [idxFound];
+      }
+      // Выбранные пользователем индексы
+      if (Array.isArray(r.userLabel)) {
+        userIndices = (r.userLabel as string[])
+          .map(text => options.findIndex(opt => opt.text === text))
+          .filter(i => i !== -1);
+      } else if (typeof r.userLabel === "string" && r.userLabel !== "Не отвечено") {
+        const idxFound = options.findIndex(opt => opt.text === r.userLabel);
+        if (idxFound !== -1) userIndices = [idxFound];
       }
     }
 
@@ -414,20 +448,8 @@ export default function ReviewPanel({
             </div>
             <TestOptionsReview
               options={r.options}
-              userSelectedIndices={
-                Array.isArray(r.userLabel)
-                  ? (r.userLabel as string[]).map((_, i) => i)
-                  : typeof r.userLabel === "number"
-                  ? [r.userLabel as number]
-                  : []
-              }
-              correctIndices={
-                Array.isArray(r.correctLabel)
-                  ? (r.correctLabel as string[]).map((_, i) => i)
-                  : typeof r.correctLabel === "string"
-                  ? [parseInt(r.correctLabel)]
-                  : []
-              }
+              userSelectedIndices={userIndices}
+              correctIndices={correctIndices}
               isMultiple={r.isMultiple || false}
             />
           </div>
@@ -601,73 +623,6 @@ export default function ReviewPanel({
                   pointSize={20}
                   showLabels
                 />
-              </div>
-            </div>
-
-            {/* Текстовый список связей (как было) */}
-            <div style={{ marginTop: "20px" }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#64748b",
-                  marginBottom: "12px",
-                }}
-              >
-                РЕЗУЛЬТАТЫ КАРТЫ ИЗОБРАЖЕНИЯ
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {Object.entries(correctMatches).map(
-                  ([answerId, correctPointId], mI) => {
-                    const userPointId = userMatches[answerId];
-                    const isCorrect = userPointId === correctPointId;
-                    const answerLabel =
-                      answers.find((a) => a.id === answerId)?.text || answerId;
-                    const pointLabel =
-                      points.find((p) => p.id === correctPointId)?.label ||
-                      correctPointId;
-                    return (
-                      <div
-                        key={mI}
-                        style={{
-                          padding: "12px 16px",
-                          borderRadius: "12px",
-                          border: `1px solid ${
-                            isCorrect
-                              ? "rgba(16,185,129,0.2)"
-                              : "rgba(239,68,68,0.2)"
-                          }`,
-                          background: isCorrect ? "#f0fdf4" : "#fef2f2",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "4px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: "13px",
-                            fontWeight: 700,
-                            color: isCorrect ? "#166534" : "#991b1b",
-                          }}
-                        >
-                          Связь {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
-                        </div>
-                        <div style={{ fontSize: "14px", color: "#1e293b" }}>
-                          {answerLabel} → указана точка:{" "}
-                          <span style={{ fontWeight: 700 }}>
-                            {points.find((p) => p.id === userPointId)?.label ||
-                              "—"}
-                          </span>
-                        </div>
-                        {!isCorrect && (
-                          <div style={{ fontSize: "14px", color: "#10b981" }}>
-                            Правильно: {answerLabel} → {pointLabel}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                )}
               </div>
             </div>
           </div>
