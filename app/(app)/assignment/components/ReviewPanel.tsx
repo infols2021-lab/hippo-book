@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import type { ReviewItem } from "../lib/types";
+import type { ReviewItem, QuestionAny, QuestionTest, TestOption } from "../lib/types";
 import MediaRenderer from "./MediaRenderer";
+import { getImageUrl } from "../lib/image";
 
 // Форматирование баллов
 function fmtPoints(x: number) {
@@ -82,13 +83,194 @@ function FillRow({
   );
 }
 
-export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
-  function renderItem(r: ReviewItem, idx?: number) {
+/** Отображает все варианты тестового подвопроса (для reading/complex) */
+function TestOptionsReview({
+  question,
+  userAnswer,
+  isMultiple,
+}: {
+  question: QuestionTest;
+  userAnswer: number | number[];
+  isMultiple: boolean;
+}) {
+  const options = (question.options || []) as TestOption[];
+  const correctIndices = Array.isArray(question.correct)
+    ? question.correct
+    : typeof question.correct === "number"
+      ? [question.correct]
+      : [];
+
+  const selectedIndices = Array.isArray(userAnswer)
+    ? userAnswer
+    : typeof userAnswer === "number" || typeof userAnswer === "string"
+      ? [Number(userAnswer)]
+      : [];
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+        gap: "12px",
+        marginTop: "12px",
+      }}
+    >
+      {options.map((opt, idx) => {
+        const isSelected = selectedIndices.includes(idx);
+        const isCorrectOption = correctIndices.includes(idx);
+        let borderColor = "#e2e8f0";
+        let bgColor = "#fff";
+        if (isSelected && isCorrectOption) {
+          borderColor = "#22c55e";
+          bgColor = "#f0fdf4";
+        } else if (isSelected && !isCorrectOption) {
+          borderColor = "#ef4444";
+          bgColor = "#fef2f2";
+        } else if (!isSelected && isCorrectOption) {
+          borderColor = "#22c55e";
+          bgColor = "#f0fdf4";
+        }
+        return (
+          <div
+            key={opt.id || idx}
+            style={{
+              border: `2px solid ${borderColor}`,
+              borderRadius: "16px",
+              padding: "12px",
+              background: bgColor,
+              transition: "all 0.2s",
+            }}
+          >
+            {opt.media && opt.media.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  marginBottom: "8px",
+                }}
+              >
+                <img
+                  src={getImageUrl(opt.media[0].url)}
+                  alt=""
+                  style={{
+                    maxWidth: "120px",
+                    maxHeight: "120px",
+                    objectFit: "contain",
+                    borderRadius: "8px",
+                  }}
+                />
+              </div>
+            )}
+            {opt.text && (
+              <div
+                style={{
+                  fontWeight: 600,
+                  textAlign: "center",
+                  color: "#1e293b",
+                }}
+              >
+                {opt.text}
+              </div>
+            )}
+            <div
+              style={{
+                fontSize: "12px",
+                marginTop: "8px",
+                textAlign: "center",
+                fontWeight: 700,
+                color: isSelected ? (isCorrectOption ? "#15803d" : "#b91c1c") : "#64748b",
+              }}
+            >
+              {isSelected ? (isCorrectOption ? "✅ Верно" : "❌ Неверно") : isCorrectOption ? "✔️ Правильный ответ" : ""}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function ReviewPanel({ items, questions }: { items: ReviewItem[]; questions: QuestionAny[] }) {
+  function renderItem(r: ReviewItem, idx: number, parentType?: string) {
     const status = getStatusConfig(r);
-    const scorePercent =
-      r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
+    const scorePercent = r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
     const itemMedia = r.media;
 
+    // Для обычного test (не подвопроса) используем старый краткий разбор
+    if (r.type === "test" && parentType !== "reading" && parentType !== "complex") {
+      return (
+        <div
+          key={idx}
+          className="review-card"
+          style={{
+            background: "#ffffff",
+            borderRadius: "24px",
+            padding: "24px",
+            marginBottom: "20px",
+            border: "1px solid rgba(0,0,0,0.06)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.02)",
+            position: "relative",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: "5px",
+              background: status.color,
+              borderRadius: "24px 0 0 24px",
+            }}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", marginBottom: "18px" }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                <span style={{ fontSize: "12px", fontWeight: 800, color: status.color, textTransform: "uppercase" }}>
+                  {parentType === "reading" ? "Подвопрос" : `Вопрос ${idx + 1}`}
+                </span>
+                <span style={{ padding: "3px 10px", borderRadius: "8px", background: status.bg, color: status.color, fontSize: "12px", fontWeight: 800 }}>
+                  {status.label}
+                </span>
+              </div>
+              <h4 style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b", margin: 0 }}>{r.questionText}</h4>
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontSize: "16px", fontWeight: 900 }}>
+                <span style={{ color: status.color }}>{fmtPoints(r.pointsEarned)}</span>
+                <span style={{ opacity: 0.3 }}> / {r.pointsTotal}</span>
+              </div>
+              <div style={{ width: "80px", height: "5px", background: "rgba(0,0,0,0.05)", borderRadius: "10px", marginTop: "8px", overflow: "hidden" }}>
+                <div style={{ width: `${scorePercent}%`, height: "100%", background: status.color }} />
+              </div>
+            </div>
+          </div>
+          {itemMedia && itemMedia.length > 0 && (
+            <div style={{ marginBottom: "20px" }}>
+              <MediaRenderer media={itemMedia} />
+            </div>
+          )}
+          <div style={{ background: "#f8fafc", borderRadius: "16px", padding: "16px" }}>
+            <div style={{ marginBottom: "12px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b" }}>ВАШ ОТВЕТ</div>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: r.isCorrect ? "#10b981" : "#ef4444" }}>
+                {Array.isArray(r.userLabel) ? r.userLabel.join(", ") : r.userLabel || "—"}
+              </div>
+            </div>
+            {!r.isCorrect && (
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b" }}>ПРАВИЛЬНЫЙ ОТВЕТ</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: "#10b981" }}>
+                  {Array.isArray(r.correctLabel) ? r.correctLabel.join(", ") : r.correctLabel}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Основная карточка для всех типов (включая test-подвопросы, которые будут обработаны отдельно ниже)
     return (
       <div
         key={idx}
@@ -103,7 +285,6 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           position: "relative",
         }}
       >
-        {/* Цветная полоса слева */}
         <div
           style={{
             position: "absolute",
@@ -116,133 +297,56 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
           }}
         />
 
-        {/* Заголовок */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: "16px",
-            marginBottom: "18px",
-          }}
-        >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", marginBottom: "18px" }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-              <span
-                style={{
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  color: status.color,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                }}
-              >
-                {idx !== undefined ? `Вопрос ${idx + 1}` : "Подвопрос"}
+              <span style={{ fontSize: "12px", fontWeight: 800, color: status.color, textTransform: "uppercase" }}>
+                {parentType === "reading" ? "Подвопрос" : `Вопрос ${idx + 1}`}
               </span>
-              <span
-                style={{
-                  padding: "3px 10px",
-                  borderRadius: "8px",
-                  background: status.bg,
-                  color: status.color,
-                  fontSize: "12px",
-                  fontWeight: 800,
-                }}
-              >
+              <span style={{ padding: "3px 10px", borderRadius: "8px", background: status.bg, color: status.color, fontSize: "12px", fontWeight: 800 }}>
                 {status.label}
               </span>
             </div>
-            <h4
-              style={{
-                fontSize: "18px",
-                fontWeight: 700,
-                color: "#1e293b",
-                margin: 0,
-                lineHeight: 1.35,
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {r.questionText}
-            </h4>
+            <h4 style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b", margin: 0 }}>{r.questionText}</h4>
           </div>
-
-          {/* Баллы */}
           <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontSize: "16px", fontWeight: 900, color: "#1e293b" }}>
+            <div style={{ fontSize: "16px", fontWeight: 900 }}>
               <span style={{ color: status.color }}>{fmtPoints(r.pointsEarned)}</span>
-              <span style={{ opacity: 0.3, fontWeight: 500 }}>
-                {" "}
-                / {r.pointsTotal}
-              </span>
+              <span style={{ opacity: 0.3 }}> / {r.pointsTotal}</span>
             </div>
-            <div
-              style={{
-                width: "80px",
-                height: "5px",
-                background: "rgba(0,0,0,0.05)",
-                borderRadius: "10px",
-                marginTop: "8px",
-                overflow: "hidden",
-                marginLeft: "auto",
-              }}
-            >
-              <div
-                style={{
-                  width: `${scorePercent}%`,
-                  height: "100%",
-                  background: status.color,
-                  borderRadius: "10px",
-                  transition: "width 0.6s ease",
-                }}
-              />
+            <div style={{ width: "80px", height: "5px", background: "rgba(0,0,0,0.05)", borderRadius: "10px", marginTop: "8px", overflow: "hidden" }}>
+              <div style={{ width: `${scorePercent}%`, height: "100%", background: status.color }} />
             </div>
           </div>
         </div>
 
-        {/* Медиа (если есть) */}
         {itemMedia && itemMedia.length > 0 && (
-          <div style={{ marginBottom: "20px", borderRadius: "14px", overflow: "hidden" }}>
+          <div style={{ marginBottom: "20px" }}>
             <MediaRenderer media={itemMedia} />
           </div>
         )}
 
-        {/* ===== ТЕСТ ===== */}
-        {r.type === "test" && (
-          <div
-            style={{
-              background: "#f8fafc",
-              borderRadius: "16px",
-              padding: "16px",
-              minWidth: 0,
-            }}
-          >
-            <div style={{ marginBottom: "12px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "4px" }}>
-                ВАШ ОТВЕТ
-              </div>
-              <div
-                style={{
-                  fontSize: "16px",
-                  fontWeight: 700,
-                  color: r.isCorrect ? "#10b981" : "#ef4444",
-                  wordBreak: "break-word",
-                }}
-              >
-                {Array.isArray(r.userLabel) ? r.userLabel.join(", ") : r.userLabel || "—"}
-              </div>
-            </div>
-            {!r.isCorrect && (
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "4px" }}>
-                  ПРАВИЛЬНЫЙ ОТВЕТ
-                </div>
-                <div style={{ fontSize: "16px", fontWeight: 700, color: "#10b981", wordBreak: "break-word" }}>
-                  {Array.isArray(r.correctLabel) ? r.correctLabel.join(", ") : r.correctLabel}
-                </div>
-              </div>
-            )}
-          </div>
+        {/* ===== ТЕСТ (подвопрос внутри reading/complex) ===== */}
+        {r.type === "test" && (parentType === "reading" || parentType === "complex") && (
+          (() => {
+            const originalQuestion = questions?.[idx] as QuestionTest;
+            if (!originalQuestion || originalQuestion.type !== "test") return null;
+            const userAnswerVal = (r as any).userLabel;
+            const isMultiple = originalQuestion.multiple || false;
+            let userIndices: number[] = [];
+            if (isMultiple && Array.isArray(userAnswerVal)) {
+              const opts = originalQuestion.options as TestOption[];
+              userIndices = (userAnswerVal as string[]).map(text => opts.findIndex(opt => opt.text === text)).filter(i => i !== -1);
+            } else if (!isMultiple && typeof userAnswerVal === "string") {
+              const opts = originalQuestion.options as TestOption[];
+              const idxFound = opts.findIndex(opt => opt.text === userAnswerVal);
+              if (idxFound !== -1) userIndices = [idxFound];
+            }
+            return <TestOptionsReview question={originalQuestion} userAnswer={userIndices} isMultiple={isMultiple} />;
+          })()
         )}
+
+        {/* ===== ТЕСТ (обычный, не подвопрос) – уже обработан выше, сюда не попадает ===== */}
 
         {/* ===== FILL / SENTENCE ===== */}
         {(r.type === "fill" || r.type === "sentence") && (
@@ -494,7 +598,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
         )}
 
         {/* ===== COMPLEX / READING ===== */}
-        {r.type === "complex" && r.subReviews && (
+        {(r.type === "complex" || r.type === "reading") && r.subReviews && (
           <div style={{ marginTop: "16px" }}>
             <div
               style={{
@@ -507,37 +611,12 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                 textAlign: "center",
               }}
             >
-              Вложенные задания
+              {r.type === "complex" ? "Вложенные задания" : "Результаты по подвопросам"}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               {r.subReviews.map((sr, srI) => (
                 <div key={srI} style={{ paddingLeft: "12px", borderLeft: "3px solid rgba(99,102,241,0.2)" }}>
-                  {renderItem(sr, srI)}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {r.type === "reading" && r.subReviews && (
-          <div style={{ marginTop: "16px" }}>
-            <div
-              style={{
-                fontSize: "12px",
-                fontWeight: 800,
-                color: "#94a3b8",
-                textTransform: "uppercase",
-                letterSpacing: "1px",
-                marginBottom: "16px",
-                textAlign: "center",
-              }}
-            >
-              Результаты по подвопросам
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              {r.subReviews.map((sr, srI) => (
-                <div key={srI} style={{ paddingLeft: "12px", borderLeft: "3px solid rgba(99,102,241,0.2)" }}>
-                  {renderItem(sr, srI)}
+                  {renderItem(sr, srI, r.type)}
                 </div>
               ))}
             </div>
