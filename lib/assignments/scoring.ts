@@ -18,13 +18,61 @@ function normalizeText(text: any) {
 }
 
 // ---------------------------------------------------------------------------
-// Вспомогательные функции
+// Helpers
 // ---------------------------------------------------------------------------
 
+// УЛЬТРА-САНИТАЙЗЕР: Спасает, если JSONB в БД сохранил массивы как объекты или строки
+function ensureArray(val: any): any[] {
+  if (val === null || val === undefined || val === "") return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+      if (typeof parsed === "object" && parsed !== null) {
+        return Object.keys(parsed).sort().map(k => parsed[k]);
+      }
+    } catch (e) {
+      return [val];
+    }
+    return [val];
+  }
+  if (typeof val === "object") {
+    return Object.keys(val).sort().map(k => val[k]);
+  }
+  return [val];
+}
+
+// УМНЫЙ ЭКСТРАКТОР: Достает текст из любых объектов, строк или массивов.
+function extractCorrectValue(v: any): string {
+  if (v === null || v === undefined || v === "") return "";
+  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+    return String(v);
+  }
+  if (typeof v === "object") {
+    if (Array.isArray(v)) {
+      return v.map(extractCorrectValue).filter(Boolean).join(" или ");
+    }
+    if ("text" in v && v.text) return String(v.text);
+    if ("value" in v && v.value) return String(v.value);
+    if ("answer" in v && v.answer) return String(v.answer);
+    if ("label" in v && v.label) return String(v.label);
+    if ("word" in v && v.word) return String(v.word);
+    if ("correct" in v && v.correct) return String(v.correct);
+    if ("variants" in v && v.variants) return extractCorrectValue(v.variants);
+    
+    // Если структура неизвестна, выводит JSON на экран
+    return JSON.stringify(v);
+  }
+  return String(v);
+}
+
 function buildCorrectStrings(arr: any[]): string[] {
-  return (arr || []).map((variants: any) =>
-    (Array.isArray(variants) ? variants : [variants]).map(String).join(" или ")
-  );
+  return ensureArray(arr).map((variants: any) => {
+    const vArr = ensureArray(variants);
+    const text = vArr.map(extractCorrectValue).filter(Boolean).join(" или ");
+    return text || "Ответ не задан";
+  });
 }
 
 function getPointsTotal(q: any): number {
@@ -38,16 +86,26 @@ function buildParts(correctAnswers: any[], userArr: string[], totalCount: number
     const variants = correctAnswers[idx];
     const userRaw = String(userArr[idx] ?? "");
     const userNorm = normalizeText(userRaw);
-    const varsNorm = (Array.isArray(variants) ? variants : [variants]).map((v: any) =>
-      normalizeText(String(v))
-    );
+
+    const variantsArray = ensureArray(variants);
+
+    const varsNorm = variantsArray.map((v: any) => {
+      return normalizeText(extractCorrectValue(v));
+    });
+
     const ok = userNorm.length > 0 && varsNorm.some((v) => v === userNorm);
+
+    // Собираем красивую строку через экстрактор
+    const correctDisplay = variantsArray
+      .map(extractCorrectValue)
+      .filter(Boolean)
+      .join(" или ");
 
     parts.push({
       index: idx,
       isCorrect: ok,
       user: userRaw,
-      correct: (Array.isArray(variants) ? variants : [variants]).map(String),
+      correct: correctDisplay || "Ответ не задан", 
     });
   }
   return parts;
@@ -72,52 +130,49 @@ export function validateAllAnswered(
   questions: any[],
   answers: any
 ): { ok: boolean; index: number; subIndex?: number } {
-  if (!Array.isArray(questions)) return { ok: true, index: -1 };
+  const qs = ensureArray(questions);
+  if (qs.length === 0) return { ok: true, index: -1 };
+
   const safeAnswers = answers && typeof answers === "object" ? answers : {};
 
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
+  for (let i = 0; i < qs.length; i++) {
+    const q = qs[i];
     if (!q || typeof q !== "object") continue;
+
     const a = (safeAnswers as any)[i];
 
     if (q.type === "test") {
       if (q.multiple) {
-        const has = Array.isArray(a) && a.length > 0;
+        const has = ensureArray(a).length > 0;
         if (!has) return { ok: false, index: i };
       } else {
         const has = a !== undefined && a !== null && a !== "";
         if (!has) return { ok: false, index: i };
       }
     } else if (q.type === "fill") {
-      const correctCount = (q.answers || []).length;
-      const has =
-        Array.isArray(a) &&
-        a.length >= correctCount &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
+      let correctAnswers = ensureArray(q.answers);
+      if (correctAnswers.length === 0) correctAnswers = ensureArray(q.correct);
+      
+      const correctCount = correctAnswers.length;
+      const arrA = ensureArray(a);
+      const has = arrA.length >= correctCount && arrA.every((x: any) => String(x ?? "").trim() !== "");
       if (!has) return { ok: false, index: i };
     } else if (q.type === "sentence") {
       const gaps = (String(q.sentence || "").match(/___/g) || []).length;
-      const has =
-        Array.isArray(a) &&
-        a.length >= gaps &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
+      const arrA = ensureArray(a);
+      const has = arrA.length >= gaps && arrA.every((x: any) => String(x ?? "").trim() !== "");
       if (!has) return { ok: false, index: i };
-    } else if (q.type === "complex") {
-      const subQs = q.subQuestions || [];
-      const subAns = Array.isArray(a) ? a : [];
-      const subRes = validateAllAnswered(subQs, subAns);
-      if (!subRes.ok) return { ok: false, index: i, subIndex: subRes.index };
-    } else if (q.type === "reading") {
-      const subQs = q.subQuestions || [];
-      const subAns = Array.isArray(a) ? a : [];
+    } else if (q.type === "complex" || q.type === "reading") {
+      const subQs = ensureArray(q.subQuestions);
+      const subAns = ensureArray(a);
       const subRes = validateAllAnswered(subQs, subAns);
       if (!subRes.ok) return { ok: false, index: i, subIndex: subRes.index };
     } else if (q.type === "matching") {
-      const pairs = q.pairs || [];
+      const pairs = ensureArray(q.pairs);
       const has = a && typeof a === "object" && Object.keys(a).length === pairs.length;
       if (!has) return { ok: false, index: i };
     } else if (q.type === "imagemap") {
-      const answersCount = (q.answers || []).length;
+      const answersCount = ensureArray(q.answers).length;
       const has = a && typeof a === "object" && Object.keys(a).length === answersCount;
       if (!has) return { ok: false, index: i };
     }
@@ -133,142 +188,75 @@ export function calcAndBuildReview(
   questions: any[],
   answers: any
 ): { stats: FinalStats; review: ReviewItem[] } {
-  if (!Array.isArray(questions) || questions.length === 0) {
+  const qs = ensureArray(questions);
+
+  if (qs.length === 0) {
     return {
-      stats: {
-        score: 0,
-        correct: 0,
-        incorrect: 0,
-        skipped: 0,
-        total: 0,
-        pointsEarned: 0,
-        pointsTotal: 0,
-      },
+      stats: { score: 0, correct: 0, incorrect: 0, skipped: 0, total: 0, pointsEarned: 0, pointsTotal: 0 },
       review: [],
     };
   }
 
-  const safeAnswers = answers && typeof answers === "object" ? answers : {};
-
-  const statsSum = {
-    correct: 0,
-    incorrect: 0,
-    skipped: 0,
-    total: 0,
-    pointsEarned: 0,
-    pointsTotal: 0,
-  };
-
+  const safeAnswers = answers !== null && answers !== undefined && typeof answers === "object" ? answers : {};
+  const statsSum = { correct: 0, incorrect: 0, skipped: 0, total: 0, pointsEarned: 0, pointsTotal: 0 };
   const review: ReviewItem[] = [];
 
   function processQ(q: any, a: any, idxText: string): ReviewItem {
     if (!q || typeof q !== "object") {
-      statsSum.skipped++;
-      statsSum.total++;
-      return {
-        type: "other",
-        questionText: `Вопрос ${idxText}`,
-        isCorrect: false,
-        isSkipped: true,
-        note: "Некорректная структура вопроса.",
-        pointsEarned: 0,
-        pointsTotal: 1,
-      } as ReviewItem;
+      statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += 1;
+      return { type: "other", questionText: `Вопрос ${idxText}`, isCorrect: false, isSkipped: true, pointsEarned: 0, pointsTotal: 1 } as ReviewItem;
     }
 
     const questionText = String(q?.q ?? "").trim() || `Вопрос ${idxText}`;
     const pointsTotal = getPointsTotal(q);
-    const media = q.media && Array.isArray(q.media) ? q.media : undefined;
+    const media = ensureArray(q.media).length > 0 ? ensureArray(q.media) : undefined;
 
     // ---------------------------------------------------------------
-    // COMPLEX
+    // COMPLEX / READING
     // ---------------------------------------------------------------
-    if (q.type === "complex") {
-      const subQs = Array.isArray(q.subQuestions) ? q.subQuestions : [];
-      const subAns = Array.isArray(a) ? a : [];
+    if (q.type === "complex" || q.type === "reading") {
+      const subQs = ensureArray(q.subQuestions);
+      const subAns = ensureArray(a);
 
       const subReviews: ReviewItem[] = [];
-      let complexEarned = 0;
-      let complexTotal = 0;
-      let complexAllSkipped = true;
-      let complexAllCorrect = true;
+      let earned = 0;
+      let total = 0;
+      let allSkipped = true;
 
       subQs.forEach((sq: any, subI: number) => {
         const sr = processQ(sq, subAns[subI], `${idxText}.${subI + 1}`);
         subReviews.push(sr);
-        complexEarned += Number.isFinite(sr.pointsEarned) ? sr.pointsEarned : 0;
-        complexTotal += Number.isFinite(sr.pointsTotal) ? sr.pointsTotal : 0;
-        if (!sr.isSkipped) complexAllSkipped = false;
-        if (!sr.isCorrect) complexAllCorrect = false;
+        earned += Number.isFinite(sr.pointsEarned) ? sr.pointsEarned : 0;
+        total += Number.isFinite(sr.pointsTotal) ? sr.pointsTotal : 0;
+        if (!sr.isSkipped) allSkipped = false;
       });
 
       return {
-        type: "complex",
+        type: q.type,
         questionText,
-        isCorrect: complexTotal > 0 && complexEarned === complexTotal,
-        isSkipped: complexAllSkipped,
-        pointsEarned: Number(complexEarned.toFixed(2)),
-        pointsTotal: complexTotal,
+        isCorrect: total > 0 && earned >= total,
+        isSkipped: allSkipped,
+        pointsEarned: Number(earned.toFixed(2)),
+        pointsTotal: total,
         subReviews,
         media,
+        readingText: q.type === "reading" ? (q.text || "") : undefined
       } as ReviewItem;
     }
-
-    // ---------------------------------------------------------------
-    // READING
-    // ---------------------------------------------------------------
-    if (q.type === "reading") {
-      const subQs = Array.isArray(q.subQuestions) ? q.subQuestions : [];
-      const subAns = Array.isArray(a) ? a : [];
-
-      const subReviews: ReviewItem[] = [];
-      let readingEarned = 0;
-      let readingTotal = 0;
-      let readingAllSkipped = true;
-      let readingAllCorrect = true;
-
-      subQs.forEach((sq: any, subI: number) => {
-        const sr = processQ(sq, subAns[subI], `${idxText}.${subI + 1}`);
-        subReviews.push(sr);
-        readingEarned += Number.isFinite(sr.pointsEarned) ? sr.pointsEarned : 0;
-        readingTotal += Number.isFinite(sr.pointsTotal) ? sr.pointsTotal : 0;
-        if (!sr.isSkipped) readingAllSkipped = false;
-        if (!sr.isCorrect) readingAllCorrect = false;
-      });
-
-      return {
-        type: "reading",
-        questionText,
-        isCorrect: readingTotal > 0 && readingEarned === readingTotal,
-        isSkipped: readingAllSkipped,
-        pointsEarned: Number(readingEarned.toFixed(2)),
-        pointsTotal: readingTotal,
-        subReviews,
-        media,
-        readingText: q.text || "",
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // Базовые вопросы – добавляем в общую статистику
-    // ---------------------------------------------------------------
-    statsSum.total++;
-    statsSum.pointsTotal += pointsTotal;
 
     // ---------------------------------------------------------------
     // TEST
     // ---------------------------------------------------------------
     if (q.type === "test") {
       const isMultiple = !!q.multiple;
-      let options: TestOption[] = [];
-      if (Array.isArray(q.options)) {
-        options = q.options.map((opt: any, idx: number) => {
-          if (typeof opt === "string") {
-            return { id: `opt-${idx}`, text: opt, media: [] };
-          }
-          return opt as TestOption;
-        });
-      }
+      const optionsArr = ensureArray(q.options || q.answers);
+      
+      const options: TestOption[] = optionsArr.map((opt: any, idx: number) => {
+        if (typeof opt === "string") {
+          return { id: `opt-${idx}`, text: opt, media: [] };
+        }
+        return opt as TestOption;
+      });
 
       const getOptText = (idx: number) => {
         const opt = options[idx];
@@ -276,19 +264,16 @@ export function calcAndBuildReview(
         return opt.text || `Вариант ${idx + 1}`;
       };
 
-      const correctArr = Array.isArray(q.correct)
-        ? q.correct
-        : typeof q.correct === "number"
-          ? [q.correct]
-          : [];
-      const correctLabels = correctArr.map((c: any) => getOptText(Number(c)));
+      let correctArr = ensureArray(q.correct);
+      if (correctArr.length === 0) correctArr = ensureArray(q.answer);
 
-      const answered = isMultiple
-        ? Array.isArray(a) && a.length > 0
-        : a !== undefined && a !== null && a !== "";
+      const correctLabels = correctArr.map((c: any) => getOptText(Number(c)));
+      const correctIndices = correctArr.map(Number);
+
+      const answered = isMultiple ? ensureArray(a).length > 0 : (a !== undefined && a !== null && a !== "");
 
       if (!answered) {
-        statsSum.skipped++;
+        statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
         return {
           type: "test",
           questionText,
@@ -296,6 +281,8 @@ export function calcAndBuildReview(
           isSkipped: true,
           userLabel: isMultiple ? [] : "Не отвечено",
           correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
+          userIndices: [], 
+          correctIndices, 
           isMultiple,
           fraction: 0,
           pointsEarned: 0,
@@ -306,14 +293,15 @@ export function calcAndBuildReview(
       }
 
       let fraction = 0;
-      let isCorrect = false;
       let userLabels: string | string[] = [];
+      let userArrForIndices: number[] = [];
 
       if (isMultiple) {
-        const userArr = Array.isArray(a) ? a.map(Number) : [];
+        const userArr = ensureArray(a).map(Number);
+        userArrForIndices = userArr;
         userLabels = userArr.map((c: number) => getOptText(c));
 
-        const correctSet = new Set(correctArr.map(Number));
+        const correctSet = new Set(correctIndices);
         const userSet = new Set(userArr);
 
         let correctSelected = 0;
@@ -327,18 +315,21 @@ export function calcAndBuildReview(
         const totalCorrect = correctSet.size || 1;
         fraction = Math.max(0, correctSelected - wrongSelected) / totalCorrect;
         fraction = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
-        isCorrect = fraction === 1;
       } else {
         const userIdx = Number(a);
+        userArrForIndices = [userIdx];
         userLabels = getOptText(userIdx);
-        const correctIdx = Number(correctArr[0]);
-        isCorrect = userIdx === correctIdx;
-        fraction = isCorrect ? 1 : 0;
+        const correctIdx = correctIndices[0];
+        fraction = userIdx === correctIdx ? 1 : 0;
       }
 
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+      const isCorrect = pointsEarned === pointsTotal;
+      
       statsSum.pointsEarned += pointsEarned;
-
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
+      
       if (isCorrect) statsSum.correct++;
       else statsSum.incorrect++;
 
@@ -349,6 +340,8 @@ export function calcAndBuildReview(
         isSkipped: false,
         userLabel: userLabels,
         correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
+        userIndices: userArrForIndices, 
+        correctIndices, 
         fraction,
         isMultiple,
         pointsEarned,
@@ -362,17 +355,24 @@ export function calcAndBuildReview(
     // FILL
     // ---------------------------------------------------------------
     if (q.type === "fill") {
-      const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
+      let correctAnswers = ensureArray(q.answers);
+      if (correctAnswers.length === 0) correctAnswers = ensureArray(q.correct);
+
       const totalCount = correctAnswers.length;
 
+      const userArr: string[] = ensureArray(a).map((x) => String(x ?? ""));
+      const isSkipped = userArr.length === 0 || userArr.every(x => !x.trim());
+
       if (totalCount === 0) {
-        statsSum.skipped++;
+        if (isSkipped) statsSum.skipped++; else statsSum.incorrect++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
         return {
           type: "fill",
           questionText,
           isCorrect: false,
-          isSkipped: true,
-          userAnswers: [],
+          isSkipped,
+          userAnswers: userArr,
           correctAnswers: [],
           parts: [],
           percent: 0,
@@ -385,17 +385,13 @@ export function calcAndBuildReview(
       }
 
       const correctStrings = buildCorrectStrings(correctAnswers);
-      const userArr: string[] = Array.isArray(a)
-        ? (a as any[]).map((x) => String(x ?? ""))
-        : [];
-
-      const answered =
-        Array.isArray(a) &&
-        a.length >= totalCount &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
+      const answered = userArr.length > 0 && userArr.some((x: any) => String(x ?? "").trim() !== "");
 
       if (!answered) {
         statsSum.skipped++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
+        
         const parts = buildParts(correctAnswers, userArr, totalCount);
         const correctCount = parts.filter((p) => p.isCorrect).length;
         const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
@@ -423,6 +419,8 @@ export function calcAndBuildReview(
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
 
       const isAllCorrect = correctCount === totalCount;
       if (isAllCorrect) statsSum.correct++;
@@ -450,17 +448,25 @@ export function calcAndBuildReview(
     // ---------------------------------------------------------------
     if (q.type === "sentence") {
       const gaps = (String(q.sentence || "").match(/___/g) || []).length;
-      const correctAnswers = Array.isArray(q.answers) ? q.answers : [];
+      
+      let correctAnswers = ensureArray(q.answers);
+      if (correctAnswers.length === 0) correctAnswers = ensureArray(q.correct);
+      
       const totalCount = gaps;
 
+      const userArr: string[] = ensureArray(a).slice(0, gaps).map((x) => String(x ?? ""));
+      const isSkipped = userArr.length === 0 || userArr.every(x => !x.trim());
+
       if (totalCount === 0) {
-        statsSum.skipped++;
+        if (isSkipped) statsSum.skipped++; else statsSum.incorrect++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
         return {
           type: "sentence",
           questionText,
           isCorrect: false,
-          isSkipped: true,
-          userAnswers: [],
+          isSkipped,
+          userAnswers: userArr,
           correctAnswers: [],
           parts: [],
           percent: 0,
@@ -474,17 +480,13 @@ export function calcAndBuildReview(
       }
 
       const correctStrings = buildCorrectStrings(correctAnswers);
-      const userArr: string[] = Array.isArray(a)
-        ? (a as any[]).slice(0, gaps).map((x) => String(x ?? ""))
-        : [];
-
-      const answered =
-        Array.isArray(a) &&
-        a.length >= gaps &&
-        a.every((x: any) => String(x ?? "").trim() !== "");
+      const answered = userArr.length > 0 && userArr.some((x: any) => String(x ?? "").trim() !== "");
 
       if (!answered) {
         statsSum.skipped++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
+        
         const parts = buildParts(correctAnswers, userArr, totalCount);
         const correctCount = parts.filter((p) => p.isCorrect).length;
         const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
@@ -513,6 +515,8 @@ export function calcAndBuildReview(
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
 
       const isAllCorrect = correctCount === totalCount;
       if (isAllCorrect) statsSum.correct++;
@@ -540,7 +544,7 @@ export function calcAndBuildReview(
     // MATCHING
     // ---------------------------------------------------------------
     if (q.type === "matching") {
-      const pairs = Array.isArray(q.pairs) ? q.pairs : [];
+      const pairs = ensureArray(q.pairs);
       const totalPairsCount = pairs.length;
 
       const correctMatches: Record<string, string> = {};
@@ -550,27 +554,19 @@ export function calcAndBuildReview(
       pairs.forEach((p: any) => {
         if (p?.id != null) {
           correctMatches[String(p.id)] = String(p.id);
+
           const left = p.left;
           if (left) {
-            if (left.text && String(left.text).trim()) {
-              leftLabels[String(p.id)] = String(left.text).trim();
-            } else if (Array.isArray(left.media) && left.media.length > 0) {
-              const firstName = left.media[0]?.name?.trim();
-              leftLabels[String(p.id)] = firstName || `Изображение`;
-            } else {
-              leftLabels[String(p.id)] = `Элемент ${String(p.id)}`;
-            }
+            if (left.text && String(left.text).trim()) leftLabels[String(p.id)] = String(left.text).trim();
+            else if (ensureArray(left.media).length > 0) leftLabels[String(p.id)] = left.media[0]?.name?.trim() || `Изображение`;
+            else leftLabels[String(p.id)] = `Элемент ${String(p.id)}`;
           }
+
           const right = p.right;
           if (right) {
-            if (right.text && String(right.text).trim()) {
-              rightLabels[String(p.id)] = String(right.text).trim();
-            } else if (Array.isArray(right.media) && right.media.length > 0) {
-              const firstName = right.media[0]?.name?.trim();
-              rightLabels[String(p.id)] = firstName || `Изображение`;
-            } else {
-              rightLabels[String(p.id)] = `Элемент ${String(p.id)}`;
-            }
+            if (right.text && String(right.text).trim()) rightLabels[String(p.id)] = String(right.text).trim();
+            else if (ensureArray(right.media).length > 0) rightLabels[String(p.id)] = right.media[0]?.name?.trim() || `Изображение`;
+            else rightLabels[String(p.id)] = `Элемент ${String(p.id)}`;
           }
         }
       });
@@ -579,6 +575,8 @@ export function calcAndBuildReview(
 
       if (!answered) {
         statsSum.skipped++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
         return {
           type: "matching",
           questionText,
@@ -601,8 +599,11 @@ export function calcAndBuildReview(
       const userMatches = a as Record<string, string>;
 
       pairs.forEach((p: any) => {
-        if (p?.id != null && userMatches[String(p.id)] === correctMatches[String(p.id)]) {
-          correctPairsCount++;
+        if (p?.id != null) {
+          const key = String(p.id);
+          if (userMatches[key] === correctMatches[key]) {
+            correctPairsCount++;
+          }
         }
       });
 
@@ -610,6 +611,8 @@ export function calcAndBuildReview(
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
 
       const isAllCorrect = correctPairsCount === totalPairsCount;
       if (isAllCorrect) statsSum.correct++;
@@ -637,29 +640,9 @@ export function calcAndBuildReview(
     // IMAGEMAP
     // ---------------------------------------------------------------
     if (q.type === "imagemap") {
-      const answersArr = Array.isArray(q.answers) ? q.answers : [];
-      const pointsArr = Array.isArray(q.points) ? q.points : [];
+      const answersArr = ensureArray(q.answers);
+      const pointsArr = ensureArray(q.points);
       const totalPairsCount = answersArr.length;
-
-      if (totalPairsCount === 0) {
-        statsSum.skipped++;
-        return {
-          type: "imagemap",
-          questionText,
-          isCorrect: false,
-          isSkipped: true,
-          correctPairsCount: 0,
-          totalPairsCount: 0,
-          userMatches: {},
-          correctMatches: {},
-          imageUrl: q.image || "",
-          points: [],
-          answers: [],
-          pointsEarned: 0,
-          pointsTotal,
-          media,
-        } as ReviewItem;
-      }
 
       const correctMatches: Record<string, string> = {};
       const answerLabels: Record<string, string> = {};
@@ -668,15 +651,12 @@ export function calcAndBuildReview(
       for (const ans of answersArr) {
         const point = pointsArr.find((p: any) => p.correctAnswerId === ans.id);
         if (point) correctMatches[ans.id] = point.id;
-        if (ans.text && String(ans.text).trim()) {
-          answerLabels[ans.id] = String(ans.text).trim();
-        } else if (Array.isArray(ans.media) && ans.media.length > 0) {
-          const firstName = ans.media[0]?.name?.trim();
-          answerLabels[ans.id] = firstName || `Ответ`;
-        } else {
-          answerLabels[ans.id] = `Ответ #${ans.id}`;
-        }
+        
+        if (ans.text && String(ans.text).trim()) answerLabels[ans.id] = String(ans.text).trim();
+        else if (ensureArray(ans.media).length > 0) answerLabels[ans.id] = ans.media[0]?.name?.trim() || `Ответ`;
+        else answerLabels[ans.id] = `Ответ #${ans.id}`;
       }
+
       for (const point of pointsArr) {
         pointLabels[point.id] = point.label || `Точка ${point.id}`;
       }
@@ -686,6 +666,8 @@ export function calcAndBuildReview(
 
       if (!answered) {
         statsSum.skipped++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
         return {
           type: "imagemap",
           questionText,
@@ -707,8 +689,11 @@ export function calcAndBuildReview(
       }
 
       let correctPairsCount = 0;
+
       for (const ans of answersArr) {
-        if (userMatches[ans.id] === correctMatches[ans.id]) {
+        const userPointId = userMatches[ans.id];
+        const correctPointId = correctMatches[ans.id];
+        if (userPointId === correctPointId) {
           correctPairsCount++;
         }
       }
@@ -717,6 +702,8 @@ export function calcAndBuildReview(
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
 
       const isAllCorrect = correctPairsCount === totalPairsCount;
       if (isAllCorrect) statsSum.correct++;
@@ -746,14 +733,14 @@ export function calcAndBuildReview(
     // CROSSWORD
     // ---------------------------------------------------------------
     if (q.type === "crossword") {
-      const grid: string[][] = Array.isArray(q.grid) ? q.grid : [];
-      const words: any[] = Array.isArray(q.words) ? q.words : [];
-      const blocks: any[] = Array.isArray(q.blocks) ? q.blocks : [];
+      const grid: string[][] = ensureArray(q.grid);
+      const words: any[] = ensureArray(q.words);
+      const blocks: any[] = ensureArray(q.blocks);
       const cellNumbers: Record<string, number> = q.cellNumbers || {};
-      const userGrid: unknown = a;
+      const userGrid = ensureArray(a);
 
       const rows = grid.length;
-      const cols = rows > 0 ? Math.max(...grid.map(r => r?.length ?? 0)) : 0;
+      const cols = rows > 0 ? Math.max(...grid.map(r => ensureArray(r).length)) : 0;
 
       const blockedSet = new Set<string>();
       for (const b of blocks) {
@@ -764,9 +751,10 @@ export function calcAndBuildReview(
       for (const w of words) {
         if (!w || typeof w !== "object") continue;
         const len = Number(w.length ?? 0);
-        const dir = w.direction;
-        const start = w.start;
+        const dir = w.direction as string;
+        const start = w.start as { row: number; col: number } | undefined;
         if (!start || !Number.isFinite(len) || len <= 0) continue;
+
         for (let i = 0; i < len; i++) {
           const r = dir === "across" ? start.row : start.row + i;
           const c = dir === "across" ? start.col + i : start.col;
@@ -776,61 +764,64 @@ export function calcAndBuildReview(
 
       let totalActiveCells = 0;
       let filledCells = 0;
+
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const key = `${r},${c}`;
           if (blockedSet.has(key)) continue;
           totalActiveCells++;
-          const userLetter = (Array.isArray(userGrid) && Array.isArray(userGrid[r])
-            ? String(userGrid[r][c] ?? "").trim()
-            : "");
+          const userArrRow = ensureArray(userGrid[r]);
+          const userLetter = String(userArrRow[c] ?? "").trim();
           if (userLetter !== "") filledCells++;
         }
       }
+
       const percent = totalActiveCells > 0 ? Math.round((filledCells / totalActiveCells) * 100) : 0;
 
-      const correctWordsList: Array<{ number: number; direction: string; word: string }> = [];
-      const wrongWordsList: Array<{ number: number; direction: string; user: string; correct: string }> = [];
+      const correctWords: Array<{ number: number; direction: string; word: string }> = [];
+      const wrongWords: Array<{ number: number; direction: string; user: string; correct: string }> = [];
       let totalWords = words.length;
 
       for (const w of words) {
         if (!w || typeof w !== "object") continue;
         const number = Number(w.number ?? 0);
         const dir = String(w.direction ?? "");
-        const start = w.start;
+        const start = w.start as { row: number; col: number } | undefined;
         const len = Number(w.length ?? 0);
+
         if (!start || !Number.isFinite(len) || len <= 0) continue;
 
         let correctWord = "";
         let userWord = "";
+
         for (let i = 0; i < len; i++) {
           const r = dir === "across" ? start.row : start.row + i;
           const c = dir === "across" ? start.col + i : start.col;
-          const correctLetter = String(grid?.[r]?.[c] ?? "");
-          const userLetter = (Array.isArray(userGrid) && Array.isArray(userGrid[r])
-            ? String(userGrid[r][c] ?? "").trim()
-            : "");
+
+          const correctLetter = String(ensureArray(grid[r])[c] ?? "");
+          const userLetter = String(ensureArray(userGrid[r])[c] ?? "").trim();
+
           correctWord += correctLetter;
           userWord += userLetter;
         }
+
         const isCorrect = userWord.toUpperCase() === correctWord.toUpperCase() && userWord !== "";
+
         if (isCorrect) {
-          correctWordsList.push({ number, direction: dir, word: correctWord.toUpperCase() });
+          correctWords.push({ number, direction: dir, word: correctWord.toUpperCase() });
         } else {
-          wrongWordsList.push({
-            number,
-            direction: dir,
-            user: userWord || "(пусто)",
-            correct: correctWord.toUpperCase(),
-          });
+          wrongWords.push({ number, direction: dir, user: userWord || "(пусто)", correct: correctWord.toUpperCase() });
         }
       }
 
       const answered = filledCells > 0;
-      let correctPairsCount = correctWordsList.length;
+      let correctPairsCount = correctWords.length;
       let fraction = safeFraction(correctPairsCount, totalWords);
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+      
       statsSum.pointsEarned += pointsEarned;
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
 
       if (correctPairsCount === totalWords && totalWords > 0) {
         statsSum.correct++;
@@ -847,11 +838,9 @@ export function calcAndBuildReview(
         isSkipped: !answered,
         pointsEarned,
         pointsTotal,
-        note: answered
-          ? `Правильно слов: ${correctPairsCount} из ${totalWords}`
-          : "Кроссворд не заполнен",
+        note: answered ? `Правильно слов: ${correctPairsCount} из ${totalWords}` : "Кроссворд не заполнен",
         crosswordStats: { filled: filledCells, total: totalActiveCells, percent },
-        wordReview: { wrong: wrongWordsList, correct: correctWordsList },
+        wordReview: { wrong: wrongWords, correct: correctWords },
         grid,
         userGrid: (userGrid as string[][]) || [],
         cellNumbers,
@@ -865,6 +854,9 @@ export function calcAndBuildReview(
     // OTHER
     // ---------------------------------------------------------------
     statsSum.skipped++;
+    statsSum.total++;
+    statsSum.pointsTotal += pointsTotal;
+    
     return {
       type: "other",
       questionText,
@@ -877,7 +869,7 @@ export function calcAndBuildReview(
     } as ReviewItem;
   }
 
-  questions.forEach((q, i) => {
+  qs.forEach((q, i) => {
     review.push(processQ(q, (safeAnswers as any)[i], String(i + 1)));
   });
 
