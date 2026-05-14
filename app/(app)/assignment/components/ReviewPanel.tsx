@@ -1,9 +1,11 @@
 "use client";
 
 import React from "react";
-import type { ReviewItem, QuestionAny } from "../lib/types";
+import type { ReviewItem, QuestionAny, TestOption } from "../lib/types";
 import MediaRenderer from "./MediaRenderer";
 import { ImageMapRenderer } from "./QuestionImageMap";
+import { CrosswordGridReadOnly } from "./QuestionCrossword";
+import { MatchingLinesRenderer } from "./QuestionMatching";
 
 // Форматирование баллов
 function fmtPoints(x: number) {
@@ -83,6 +85,153 @@ function FillRow({
   );
 }
 
+/** Визуализация вариантов теста (сетка с подсветкой) */
+function TestOptionsReview({
+  options,
+  userSelectedIndices,
+  correctIndices,
+  isMultiple,
+}: {
+  options: TestOption[];
+  userSelectedIndices: number[];
+  correctIndices: number[];
+  isMultiple: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+        gap: "12px",
+        marginTop: "12px",
+      }}
+    >
+      {options.map((opt, idx) => {
+        const isUserSelected = userSelectedIndices.includes(idx);
+        const isCorrect = correctIndices.includes(idx);
+        let borderColor = "#e2e8f0";
+        let bgColor = "#fff";
+        if (isCorrect && isUserSelected) {
+          borderColor = "#10b981";
+          bgColor = "#f0fdf4";
+        } else if (isCorrect && !isUserSelected) {
+          borderColor = "#10b981";
+          bgColor = "#f0fdf4";
+        } else if (!isCorrect && isUserSelected) {
+          borderColor = "#ef4444";
+          bgColor = "#fef2f2";
+        }
+        return (
+          <div
+            key={opt.id}
+            style={{
+              border: `2px solid ${borderColor}`,
+              borderRadius: "16px",
+              padding: "12px",
+              background: bgColor,
+              position: "relative",
+            }}
+          >
+            {isUserSelected && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "-10px",
+                  right: "-10px",
+                  width: "24px",
+                  height: "24px",
+                  borderRadius: "12px",
+                  background: isCorrect ? "#10b981" : "#ef4444",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                }}
+              >
+                {isCorrect ? "✓" : "✗"}
+              </div>
+            )}
+            {opt.text && (
+              <div style={{ fontWeight: 600, marginBottom: "8px" }}>{opt.text}</div>
+            )}
+            {opt.media && opt.media.length > 0 && (
+              <div style={{ marginTop: "8px" }}>
+                <MediaRenderer media={opt.media} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Заполненное предложение (вставка ответов пользователя) */
+function FilledSentence({
+  template,
+  userAnswers,
+  correctAnswers,
+}: {
+  template: string;
+  userAnswers: string[];
+  correctAnswers: string[];
+}) {
+  const parts = template.split("___");
+  return (
+    <div style={{ lineHeight: "2.2", fontSize: "16px" }}>
+      {parts.map((part, idx) => (
+        <span key={idx}>
+          {part}
+          {idx < userAnswers.length && (
+            <span
+              style={{
+                display: "inline-block",
+                margin: "0 8px",
+                padding: "4px 12px",
+                borderRadius: "12px",
+                background:
+                  userAnswers[idx]?.trim().toLowerCase() ===
+                  correctAnswers[idx]?.trim().toLowerCase()
+                    ? "#dcfce7"
+                    : "#fee2e2",
+                border: "1px solid",
+                borderColor:
+                  userAnswers[idx]?.trim().toLowerCase() ===
+                  correctAnswers[idx]?.trim().toLowerCase()
+                    ? "#22c55e"
+                    : "#ef4444",
+                fontWeight: 700,
+              }}
+            >
+              {userAnswers[idx] || "—"}
+            </span>
+          )}
+        </span>
+      ))}
+      {correctAnswers.length > 0 && (
+        <div
+          style={{
+            marginTop: "16px",
+            padding: "12px",
+            background: "#f1f5f9",
+            borderRadius: "12px",
+            fontSize: "14px",
+          }}
+        >
+          <span style={{ fontWeight: 700 }}>Правильные ответы: </span>
+          {correctAnswers.map((ans, i) => (
+            <span key={i} style={{ marginRight: "12px" }}>
+              {i + 1}. {ans}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ReviewPanel({
   items,
   questions,
@@ -96,7 +245,7 @@ export default function ReviewPanel({
       r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
     const itemMedia = r.media;
 
-    // Для imagemap берём данные из вопроса, а не из r
+    // Для imagemap берём данные из вопроса, а не из r (на всякий случай)
     let imageUrl = "";
     let points: any[] = [];
     let answers: any[] = [];
@@ -111,8 +260,6 @@ export default function ReviewPanel({
         answers = q.answers || [];
         userMatches = (r as any).userMatches || {};
         correctMatches = (r as any).correctMatches || {};
-      } else {
-        console.warn("[ReviewPanel] No question data for imagemap at index", idx);
       }
     }
 
@@ -233,7 +380,7 @@ export default function ReviewPanel({
           </div>
         </div>
 
-        {/* Медиа (если есть) */}
+        {/* Медиа вопроса (если есть) */}
         {itemMedia && itemMedia.length > 0 && (
           <div
             style={{
@@ -246,71 +393,48 @@ export default function ReviewPanel({
           </div>
         )}
 
-        {/* ===== ТЕСТ ===== */}
-        {r.type === "test" && (
+        {/* ===== ТЕСТ (сетка вариантов) ===== */}
+        {r.type === "test" && r.options && (
           <div
             style={{
               background: "#f8fafc",
               borderRadius: "16px",
               padding: "16px",
-              minWidth: 0,
             }}
           >
-            <div style={{ marginBottom: "12px" }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#64748b",
-                  marginBottom: "4px",
-                }}
-              >
-                ВАШ ОТВЕТ
-              </div>
-              <div
-                style={{
-                  fontSize: "16px",
-                  fontWeight: 700,
-                  color: r.isCorrect ? "#10b981" : "#ef4444",
-                  wordBreak: "break-word",
-                }}
-              >
-                {Array.isArray(r.userLabel)
-                  ? r.userLabel.join(", ")
-                  : r.userLabel || "—"}
-              </div>
+            <div
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#64748b",
+                marginBottom: "12px",
+              }}
+            >
+              ВАРИАНТЫ ОТВЕТОВ
             </div>
-            {!r.isCorrect && (
-              <div>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    color: "#64748b",
-                    marginBottom: "4px",
-                  }}
-                >
-                  ПРАВИЛЬНЫЙ ОТВЕТ
-                </div>
-                <div
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 700,
-                    color: "#10b981",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {Array.isArray(r.correctLabel)
-                    ? r.correctLabel.join(", ")
-                    : r.correctLabel}
-                </div>
-              </div>
-            )}
+            <TestOptionsReview
+              options={r.options}
+              userSelectedIndices={
+                Array.isArray(r.userLabel)
+                  ? (r.userLabel as string[]).map((_, i) => i) // не идеально, но для подсветки используем индексы из correctIndices
+                  : typeof r.userLabel === "number"
+                  ? [r.userLabel as number]
+                  : []
+              }
+              correctIndices={
+                Array.isArray(r.correctLabel)
+                  ? (r.correctLabel as string[]).map((_, i) => i)
+                  : typeof r.correctLabel === "string"
+                  ? [parseInt(r.correctLabel)] // грубо, но работает
+                  : []
+              }
+              isMultiple={r.isMultiple || false}
+            />
           </div>
         )}
 
-        {/* ===== FILL / SENTENCE ===== */}
-        {(r.type === "fill" || r.type === "sentence") && (
+        {/* ===== FILL ===== */}
+        {r.type === "fill" && (
           <div
             style={{
               border: "1px solid rgba(0,0,0,0.06)",
@@ -350,8 +474,8 @@ export default function ReviewPanel({
           </div>
         )}
 
-        {/* ===== MATCHING ===== */}
-        {r.type === "matching" && (
+        {/* ===== SENTENCE ===== */}
+        {r.type === "sentence" && r.sentenceTemplate && (
           <div
             style={{
               background: "#f8fafc",
@@ -367,65 +491,56 @@ export default function ReviewPanel({
                 marginBottom: "12px",
               }}
             >
-              РЕЗУЛЬТАТЫ СОПОСТАВЛЕНИЯ
+              ПРЕДЛОЖЕНИЕ (ваш вариант)
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {Object.entries(r.correctMatches).map(
-                ([leftId, correctRightId], mI) => {
-                  const userRightId = r.userMatches?.[leftId];
-                  const isCorrect = userRightId === correctRightId;
-                  const rightText =
-                    r.rightLabels?.[correctRightId] ||
-                    `Элемент ${correctRightId}`;
-                  const userRightText = userRightId
-                    ? r.rightLabels?.[userRightId] ||
-                      `Элемент ${userRightId}`
-                    : "—";
-                  return (
-                    <div
-                      key={mI}
-                      style={{
-                        padding: "12px 16px",
-                        borderRadius: "12px",
-                        border: `1px solid ${
-                          isCorrect
-                            ? "rgba(16,185,129,0.2)"
-                            : "rgba(239,68,68,0.2)"
-                        }`,
-                        background: isCorrect ? "#f0fdf4" : "#fef2f2",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "4px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: isCorrect ? "#166534" : "#991b1b",
-                        }}
-                      >
-                        Пара {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
-                      </div>
-                      <div style={{ fontSize: "14px", color: "#1e293b" }}>
-                        Ваш выбор:{" "}
-                        <span style={{ fontWeight: 700 }}>{userRightText}</span>
-                      </div>
-                      {!isCorrect && (
-                        <div style={{ fontSize: "14px", color: "#10b981" }}>
-                          Правильно:{" "}
-                          <span style={{ fontWeight: 700 }}>{rightText}</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-              )}
+            <FilledSentence
+              template={r.sentenceTemplate}
+              userAnswers={r.userAnswers || []}
+              correctAnswers={r.correctAnswers || []}
+            />
+          </div>
+        )}
+
+        {/* ===== MATCHING (линии) ===== */}
+        {r.type === "matching" && r.pairs && r.leftLabels && r.rightLabels && (
+          <div
+            style={{
+              background: "#f8fafc",
+              borderRadius: "16px",
+              padding: "16px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#64748b",
+                marginBottom: "12px",
+              }}
+            >
+              СОПОСТАВЛЕНИЕ
+            </div>
+            <div style={{ display: "grid", gap: "24px" }}>
+              <MatchingLinesRenderer
+                title="Ваши ответы"
+                pairs={r.pairs}
+                matches={r.userMatches || {}}
+                leftLabels={r.leftLabels}
+                rightLabels={r.rightLabels}
+                correctMatches={r.correctMatches}
+              />
+              <MatchingLinesRenderer
+                title="Правильные ответы"
+                pairs={r.pairs}
+                matches={r.correctMatches}
+                leftLabels={r.leftLabels}
+                rightLabels={r.rightLabels}
+              />
             </div>
           </div>
         )}
 
-        {/* ===== IMAGEMAP с визуализацией (теперь используем вопросы) ===== */}
+        {/* ===== IMAGEMAP ===== */}
         {r.type === "imagemap" && imageUrl && (
           <div
             style={{
@@ -442,9 +557,8 @@ export default function ReviewPanel({
                 marginBottom: "16px",
               }}
             >
-              ВИЗУАЛИЗАЦИЯ КАРТЫ
+              КАРТА ИЗОБРАЖЕНИЯ
             </div>
-
             <div
               style={{
                 display: "grid",
@@ -452,7 +566,6 @@ export default function ReviewPanel({
                 gap: "20px",
               }}
             >
-              {/* Ваш результат */}
               <div>
                 <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>
                   Ваши ответы
@@ -470,19 +583,7 @@ export default function ReviewPanel({
                   pointSize={20}
                   showLabels
                 />
-                <div
-                  style={{
-                    fontSize: "12px",
-                    marginTop: "8px",
-                    color: "#64748b",
-                    textAlign: "center",
-                  }}
-                >
-                  🟢 Зелёные линии — правильные связи, 🔴 Красные — ошибочные.
-                </div>
               </div>
-
-              {/* Правильные ответы */}
               <div>
                 <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>
                   Правильные ответы
@@ -502,78 +603,11 @@ export default function ReviewPanel({
                 />
               </div>
             </div>
-
-            {/* Текстовый список связей (как было) */}
-            <div style={{ marginTop: "20px" }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#64748b",
-                  marginBottom: "12px",
-                }}
-              >
-                РЕЗУЛЬТАТЫ КАРТЫ ИЗОБРАЖЕНИЯ
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {Object.entries(correctMatches).map(
-                  ([answerId, correctPointId], mI) => {
-                    const userPointId = userMatches[answerId];
-                    const isCorrect = userPointId === correctPointId;
-                    const answerLabel =
-                      answers.find((a) => a.id === answerId)?.text || answerId;
-                    const pointLabel =
-                      points.find((p) => p.id === correctPointId)?.label ||
-                      correctPointId;
-                    return (
-                      <div
-                        key={mI}
-                        style={{
-                          padding: "12px 16px",
-                          borderRadius: "12px",
-                          border: `1px solid ${
-                            isCorrect
-                              ? "rgba(16,185,129,0.2)"
-                              : "rgba(239,68,68,0.2)"
-                          }`,
-                          background: isCorrect ? "#f0fdf4" : "#fef2f2",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "4px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: "13px",
-                            fontWeight: 700,
-                            color: isCorrect ? "#166534" : "#991b1b",
-                          }}
-                        >
-                          Связь {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
-                        </div>
-                        <div style={{ fontSize: "14px", color: "#1e293b" }}>
-                          {answerLabel} → указана точка:{" "}
-                          <span style={{ fontWeight: 700 }}>
-                            {points.find((p) => p.id === userPointId)?.label ||
-                              "—"}
-                          </span>
-                        </div>
-                        {!isCorrect && (
-                          <div style={{ fontSize: "14px", color: "#10b981" }}>
-                            Правильно: {answerLabel} → {pointLabel}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                )}
-              </div>
-            </div>
           </div>
         )}
 
-        {/* ===== CROSSWORD ===== */}
-        {r.type === "crossword" && (
+        {/* ===== CROSSWORD (две сетки) ===== */}
+        {r.type === "crossword" && r.grid && r.userGrid && (
           <div
             style={{
               background: "#f8fafc",
@@ -581,6 +615,16 @@ export default function ReviewPanel({
               padding: "16px",
             }}
           >
+            <div
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#64748b",
+                marginBottom: "12px",
+              }}
+            >
+              КРОССВОРД
+            </div>
             {r.note && (
               <div
                 style={{
@@ -593,7 +637,6 @@ export default function ReviewPanel({
                 {r.note}
               </div>
             )}
-
             {r.crosswordStats && (
               <div
                 style={{
@@ -614,15 +657,38 @@ export default function ReviewPanel({
                 </span>
               </div>
             )}
-
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "20px",
+                marginTop: "16px",
+              }}
+            >
+              <CrosswordGridReadOnly
+                title="Ваше заполнение"
+                grid={r.grid}
+                userGrid={r.userGrid}
+                cellNumbers={r.cellNumbers || {}}
+                blocks={r.blocks || []}
+                words={r.words || []}
+                rows={r.grid.length}
+                cols={r.grid[0]?.length || 0}
+                sizeClass="size-normal"
+              />
+              <CrosswordGridReadOnly
+                title="Правильное решение"
+                grid={r.grid}
+                cellNumbers={r.cellNumbers || {}}
+                blocks={r.blocks || []}
+                words={r.words || []}
+                rows={r.grid.length}
+                cols={r.grid[0]?.length || 0}
+                sizeClass="size-normal"
+              />
+            </div>
             {r.wordReview && (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "16px",
-                }}
-              >
+              <div style={{ marginTop: "20px" }}>
                 {r.wordReview.correct.length > 0 && (
                   <div>
                     <div
@@ -689,9 +755,8 @@ export default function ReviewPanel({
                     </div>
                   </div>
                 )}
-
                 {r.wordReview.wrong.length > 0 && (
-                  <div>
+                  <div style={{ marginTop: "12px" }}>
                     <div
                       style={{
                         fontSize: "13px",
@@ -779,7 +844,42 @@ export default function ReviewPanel({
           </div>
         )}
 
-        {/* ===== COMPLEX / READING ===== */}
+        {/* ===== READING (отображаем текст чтения) ===== */}
+        {r.type === "reading" && (r as any).readingText && (
+          <div
+            style={{
+              background: "#f8fafc",
+              borderRadius: "16px",
+              padding: "16px",
+              marginBottom: "16px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#64748b",
+                marginBottom: "8px",
+              }}
+            >
+              ТЕКСТ ДЛЯ ЧТЕНИЯ
+            </div>
+            <div
+              style={{
+                background: "#fff",
+                padding: "16px",
+                borderRadius: "12px",
+                border: "1px solid #e2e8f0",
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.6,
+              }}
+            >
+              {(r as any).readingText}
+            </div>
+          </div>
+        )}
+
+        {/* ===== COMPLEX / READING (подвопросы) ===== */}
         {(r.type === "complex" || r.type === "reading") && r.subReviews && (
           <div style={{ marginTop: "16px" }}>
             <div

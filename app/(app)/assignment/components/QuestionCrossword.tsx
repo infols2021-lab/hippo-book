@@ -21,6 +21,134 @@ type Props = {
   onOpenImage?: (src: string) => void;
 };
 
+// ============================================================================
+// Read-only компонент для отображения сетки кроссворда (без ввода)
+// ============================================================================
+
+export type CrosswordGridReadOnlyProps = {
+  title?: string;
+  grid: string[][];           // эталонная сетка (правильные буквы)
+  userGrid?: string[][];      // сетка пользователя (если передана, будет подсветка ошибок)
+  cellNumbers: Record<string, number>;
+  blocks: { row: number; col: number }[];
+  words: Word[];
+  rows: number;
+  cols: number;
+  sizeClass?: string;
+};
+
+export function CrosswordGridReadOnly({
+  title,
+  grid,
+  userGrid,
+  cellNumbers,
+  blocks,
+  words,
+  rows,
+  cols,
+  sizeClass = "size-normal",
+}: CrosswordGridReadOnlyProps) {
+  // Множество заблокированных клеток
+  const blockedSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of blocks) {
+      if (b && typeof b === "object") set.add(`${b.row},${b.col}`);
+    }
+    return set;
+  }, [blocks]);
+
+  // Множество клеток, принадлежащих словам (активные)
+  const activeCells = useMemo(() => {
+    const s = new Set<string>();
+    for (const w of words) {
+      const len = Number(w?.length ?? 0);
+      const dir = w?.direction;
+      const start = w?.start;
+      if (!start || !dir || !Number.isFinite(len) || len <= 0) continue;
+      for (let i = 0; i < len; i++) {
+        const r = dir === "across" ? start.row : start.row + i;
+        const c = dir === "across" ? start.col + i : start.col;
+        s.add(`${r},${c}`);
+      }
+    }
+    return s;
+  }, [words]);
+
+  // Определяем тип клетки: blocked, active, empty
+  const cellKind = (r: number, c: number): "blocked" | "active" | "empty" => {
+    if (blockedSet.has(`${r},${c}`)) return "blocked";
+    const inWords = activeCells.has(`${r},${c}`);
+    const hasCorrect = !!String(grid?.[r]?.[c] ?? "").trim();
+    if (inWords || hasCorrect) return "active";
+    return "empty";
+  };
+
+  const getCellNumber = (r: number, c: number): number | undefined => {
+    return (
+      cellNumbers[`${r}-${c}`] ??
+      cellNumbers[`${r},${c}`] ??
+      cellNumbers[`${r}_${c}`] ??
+      cellNumbers[`${r}:${c}`] ??
+      undefined
+    );
+  };
+
+  // Определяем, является ли буква пользователя правильной
+  const isUserLetterCorrect = (r: number, c: number): boolean => {
+    if (!userGrid || !grid) return true;
+    const correctChar = String(grid?.[r]?.[c] ?? "").trim().toUpperCase();
+    const userChar = String(userGrid?.[r]?.[c] ?? "").trim().toUpperCase();
+    if (!correctChar) return true; // пустая клетка в эталоне – не проверяем
+    return userChar === correctChar;
+  };
+
+  return (
+    <div className="cw-card" style={{ marginBottom: 0 }}>
+      {title && <div style={{ fontWeight: 800, marginBottom: 12, textAlign: "center" }}>{title}</div>}
+      <div className="cw-grid-wrap">
+        <div className={`cw-grid ${sizeClass}`}>
+          {Array.from({ length: rows }).map((_, r) => (
+            <div className="cw-row" key={r}>
+              {Array.from({ length: cols }).map((__, c) => {
+                const kind = cellKind(r, c);
+                const n = getCellNumber(r, c);
+                const userChar = userGrid?.[r]?.[c] ?? "";
+                const correctChar = grid?.[r]?.[c] ?? "";
+                const showUser = userGrid !== undefined;
+                const displayChar = showUser ? userChar : correctChar;
+                const isCorrect = showUser ? isUserLetterCorrect(r, c) : true;
+
+                let cellClassName = `cw-cell ${kind}`;
+                if (showUser && kind === "active" && displayChar && !isCorrect) {
+                  cellClassName += " cw-cell-error";
+                }
+                if (showUser && kind === "active" && displayChar && isCorrect && correctChar) {
+                  cellClassName += " cw-cell-correct";
+                }
+
+                return (
+                  <div key={c} className={cellClassName}>
+                    {kind === "active" ? (
+                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {String(displayChar).toUpperCase()}
+                      </div>
+                    ) : null}
+                    {kind === "active" && n !== undefined ? <div className="cw-num">{n}</div> : null}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Основной интерактивный компонент
+// ============================================================================
+
 function ensureGrid(rows: number, cols: number, prev?: string[][]) {
   return Array.from({ length: rows }, (_, r) =>
     Array.from({ length: cols }, (_, c) => prev?.[r]?.[c] ?? "")

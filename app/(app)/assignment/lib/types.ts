@@ -151,9 +151,10 @@ export type ReviewBase = {
   isSkipped: boolean;
   pointsEarned: number;
   pointsTotal: number;
-  media?: MediaAttachment[]; // <-- поддержка медиа в ревью
+  media?: MediaAttachment[]; // поддержка медиа в ревью
 };
 
+// Расширенные типы для каждого подтипа
 export type ReviewItem =
   | (ReviewBase & {
       type: "test";
@@ -161,15 +162,30 @@ export type ReviewItem =
       correctLabel: string | string[];
       fraction?: number; // 0..1 для дробных баллов
       isMultiple?: boolean;
+      // ДОБАВЛЕНО: полный массив вариантов для визуального рендера
+      options: TestOption[];
     })
   | (ReviewBase & {
-      type: "fill" | "sentence";
+      type: "fill";
       userAnswers: string[];
       correctAnswers: string[];
       parts: ReviewPart[];
       percent: number;
       correctCount: number;
       totalCount: number;
+      // ДОБАВЛЕНО: текст вопроса (может быть пустым)
+      questionText?: string;
+    })
+  | (ReviewBase & {
+      type: "sentence";
+      userAnswers: string[];
+      correctAnswers: string[];
+      parts: ReviewPart[];
+      percent: number;
+      correctCount: number;
+      totalCount: number;
+      // ДОБАВЛЕНО: оригинальный шаблон с ___
+      sentenceTemplate: string;
     })
   | (ReviewBase & {
       type: "crossword";
@@ -188,6 +204,12 @@ export type ReviewItem =
           word: string;
         }>;
       };
+      // ДОБАВЛЕНО: данные сеток для визуализации
+      grid: string[][];
+      userGrid: string[][];
+      cellNumbers: Record<string, number>;
+      blocks: any[];
+      words: any[];
     })
   | (ReviewBase & {
       type: "matching";
@@ -197,6 +219,9 @@ export type ReviewItem =
       correctMatches: Record<string, string>;
       /** Читаемые названия правых элементов (ключ – ID элемента, значение – текст). */
       rightLabels?: Record<string, string>;
+      // ДОБАВЛЕНО: для визуализации линий и левых элементов
+      leftLabels: Record<string, string>;
+      pairs: MatchingPair[];
     })
   | (ReviewBase & {
       type: "imagemap";
@@ -213,8 +238,10 @@ export type ReviewItem =
       answers: ImageMapAnswer[];      // исходные ответы
     })
   | (ReviewBase & {
-      type: "complex" | "reading"; // <-- добавили reading
+      type: "complex" | "reading";
       subReviews: ReviewItem[]; // Результаты по каждому подвопросу
+      // ДОБАВЛЕНО: для reading – текст самого задания (чтение)
+      readingText?: string;
     })
   | (ReviewBase & {
       type: "other";
