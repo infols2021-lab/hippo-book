@@ -239,7 +239,7 @@ export default function ReviewPanel({
   items: ReviewItem[];
   questions: QuestionAny[];
 }) {
-  function renderItem(r: ReviewItem, idx: number) {
+  function renderItem(r: ReviewItem, idx: number, parentType?: string) {
     const status = getStatusConfig(r);
     const scorePercent =
       r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
@@ -318,7 +318,7 @@ export default function ReviewPanel({
                   letterSpacing: "0.5px",
                 }}
               >
-                {`Вопрос ${idx + 1}`}
+                {parentType === "reading" ? "Подвопрос" : `Вопрос ${idx + 1}`}
               </span>
               <span
                 style={{
@@ -416,7 +416,7 @@ export default function ReviewPanel({
               options={r.options}
               userSelectedIndices={
                 Array.isArray(r.userLabel)
-                  ? (r.userLabel as string[]).map((_, i) => i) // не идеально, но для подсветки используем индексы из correctIndices
+                  ? (r.userLabel as string[]).map((_, i) => i)
                   : typeof r.userLabel === "number"
                   ? [r.userLabel as number]
                   : []
@@ -425,7 +425,7 @@ export default function ReviewPanel({
                 Array.isArray(r.correctLabel)
                   ? (r.correctLabel as string[]).map((_, i) => i)
                   : typeof r.correctLabel === "string"
-                  ? [parseInt(r.correctLabel)] // грубо, но работает
+                  ? [parseInt(r.correctLabel)]
                   : []
               }
               isMultiple={r.isMultiple || false}
@@ -601,6 +601,73 @@ export default function ReviewPanel({
                   pointSize={20}
                   showLabels
                 />
+              </div>
+            </div>
+
+            {/* Текстовый список связей (как было) */}
+            <div style={{ marginTop: "20px" }}>
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#64748b",
+                  marginBottom: "12px",
+                }}
+              >
+                РЕЗУЛЬТАТЫ КАРТЫ ИЗОБРАЖЕНИЯ
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {Object.entries(correctMatches).map(
+                  ([answerId, correctPointId], mI) => {
+                    const userPointId = userMatches[answerId];
+                    const isCorrect = userPointId === correctPointId;
+                    const answerLabel =
+                      answers.find((a) => a.id === answerId)?.text || answerId;
+                    const pointLabel =
+                      points.find((p) => p.id === correctPointId)?.label ||
+                      correctPointId;
+                    return (
+                      <div
+                        key={mI}
+                        style={{
+                          padding: "12px 16px",
+                          borderRadius: "12px",
+                          border: `1px solid ${
+                            isCorrect
+                              ? "rgba(16,185,129,0.2)"
+                              : "rgba(239,68,68,0.2)"
+                          }`,
+                          background: isCorrect ? "#f0fdf4" : "#fef2f2",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            color: isCorrect ? "#166534" : "#991b1b",
+                          }}
+                        >
+                          Связь {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
+                        </div>
+                        <div style={{ fontSize: "14px", color: "#1e293b" }}>
+                          {answerLabel} → указана точка:{" "}
+                          <span style={{ fontWeight: 700 }}>
+                            {points.find((p) => p.id === userPointId)?.label ||
+                              "—"}
+                          </span>
+                        </div>
+                        {!isCorrect && (
+                          <div style={{ fontSize: "14px", color: "#10b981" }}>
+                            Правильно: {answerLabel} → {pointLabel}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                )}
               </div>
             </div>
           </div>
@@ -910,7 +977,7 @@ export default function ReviewPanel({
                     borderLeft: "3px solid rgba(99,102,241,0.2)",
                   }}
                 >
-                  {renderItem(sr, srI)}
+                  {renderItem(sr, srI, r.type)}
                 </div>
               ))}
             </div>

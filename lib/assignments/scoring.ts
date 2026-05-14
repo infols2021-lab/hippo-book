@@ -173,11 +173,13 @@ export function calcAndBuildReview(
         note: "Некорректная структура вопроса.",
         pointsEarned: 0,
         pointsTotal: 1,
+        media: undefined,
       } as ReviewItem;
     }
 
     const questionText = String(q?.q ?? "").trim() || `Вопрос ${idxText}`;
     const pointsTotal = getPointsTotal(q);
+    const media = q.media || undefined; // сохраняем медиа вопроса
 
     // ---------------------------------------------------------------
     // COMPLEX
@@ -209,6 +211,7 @@ export function calcAndBuildReview(
         pointsEarned: Number(complexEarned.toFixed(2)),
         pointsTotal: complexTotal,
         subReviews,
+        media,
       } as ReviewItem;
     }
 
@@ -242,6 +245,7 @@ export function calcAndBuildReview(
         pointsEarned: Number(readingEarned.toFixed(2)),
         pointsTotal: readingTotal,
         subReviews,
+        media,
       } as ReviewItem;
     }
 
@@ -288,6 +292,7 @@ export function calcAndBuildReview(
           fraction: 0,
           pointsEarned: 0,
           pointsTotal,
+          media,
         } as ReviewItem;
       }
 
@@ -339,6 +344,7 @@ export function calcAndBuildReview(
         isMultiple,
         pointsEarned,
         pointsTotal,
+        media,
       } as ReviewItem;
     }
 
@@ -364,6 +370,7 @@ export function calcAndBuildReview(
           totalCount: 0,
           pointsEarned: 0,
           pointsTotal,
+          media,
         } as ReviewItem;
       }
 
@@ -396,6 +403,7 @@ export function calcAndBuildReview(
           totalCount,
           pointsEarned: 0,
           pointsTotal,
+          media,
         } as ReviewItem;
       }
 
@@ -423,6 +431,7 @@ export function calcAndBuildReview(
         totalCount,
         pointsEarned,
         pointsTotal,
+        media,
       } as ReviewItem;
     }
 
@@ -449,6 +458,7 @@ export function calcAndBuildReview(
           totalCount: 0,
           pointsEarned: 0,
           pointsTotal,
+          media,
         } as ReviewItem;
       }
 
@@ -481,6 +491,7 @@ export function calcAndBuildReview(
           totalCount,
           pointsEarned: 0,
           pointsTotal,
+          media,
         } as ReviewItem;
       }
 
@@ -508,6 +519,7 @@ export function calcAndBuildReview(
         totalCount,
         pointsEarned,
         pointsTotal,
+        media,
       } as ReviewItem;
     }
 
@@ -538,6 +550,7 @@ export function calcAndBuildReview(
           correctMatches,
           pointsEarned: 0,
           pointsTotal,
+          media,
         } as ReviewItem;
       }
 
@@ -570,6 +583,7 @@ export function calcAndBuildReview(
         correctMatches,
         pointsEarned,
         pointsTotal,
+        media,
       } as ReviewItem;
     }
 
@@ -597,6 +611,7 @@ export function calcAndBuildReview(
           answers: [],
           pointsEarned: 0,
           pointsTotal,
+          media,
         } as ReviewItem;
       }
 
@@ -625,6 +640,7 @@ export function calcAndBuildReview(
           answers: answersArr,
           pointsEarned: 0,
           pointsTotal,
+          media,
         } as ReviewItem;
       }
 
@@ -658,6 +674,7 @@ export function calcAndBuildReview(
         answers: answersArr,
         pointsEarned,
         pointsTotal,
+        media,
       } as ReviewItem;
     }
 
@@ -774,6 +791,7 @@ export function calcAndBuildReview(
           : "Кроссворд не заполнен",
         crosswordStats: { filled: filledCells, total: totalActiveCells, percent },
         wordReview: { wrong: wrongWordsList, correct: correctWordsList },
+        media,
       } as ReviewItem;
     }
 
@@ -789,6 +807,7 @@ export function calcAndBuildReview(
       note: "Тип вопроса пока не поддержан в стандартном Review (отрабатывается отдельно).",
       pointsEarned: 0,
       pointsTotal,
+      media,
     } as ReviewItem;
   }
 
