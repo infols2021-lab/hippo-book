@@ -104,8 +104,8 @@ export function CrosswordGridReadOnly({
 
   return (
     <div className="cw-card" style={{ marginBottom: 0 }}>
-      {title && <div style={{ fontWeight: 800, marginBottom: 12, textAlign: "center" }}>{title}</div>}
-      <div className="cw-grid-wrap">
+      {title && <div style={{ fontWeight: 800, marginBottom: 12, textAlign: "center", color: "#1e293b" }}>{title}</div>}
+      <div className="cw-grid-wrap" style={{ maxWidth: "100%", overflowX: "auto", paddingBottom: "8px" }}>
         <div className={`cw-grid ${sizeClass}`}>
           {Array.from({ length: rows }).map((_, r) => (
             <div className="cw-row" key={r}>
@@ -129,7 +129,17 @@ export function CrosswordGridReadOnly({
                 return (
                   <div key={c} className={cellClassName}>
                     {kind === "active" ? (
-                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div 
+                        style={{ 
+                          width: "100%", 
+                          height: "100%", 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "center",
+                          fontWeight: 900, // Делаем буквы жирными
+                          color: "#000"    // Делаем буквы черными для идеальной читаемости
+                        }}
+                      >
                         {String(displayChar).toUpperCase()}
                       </div>
                     ) : null}
@@ -360,7 +370,8 @@ export default function QuestionCrossword({
       ) : null}
 
       <div className="cw-card">
-        <div className="cw-grid-wrap">
+        {/* Добавлен горизонтальный скролл для защиты от слишком широких сеток */}
+        <div className="cw-grid-wrap" style={{ maxWidth: "100%", overflowX: "auto", paddingBottom: "8px" }}>
           <div className={`cw-grid ${sizeClass}`}>
             {Array.from({ length: rows }).map((_, r) => (
               <div className="cw-row" key={r}>
@@ -384,6 +395,10 @@ export default function QuestionCrossword({
                           disabled={disabled}
                           value={(userGrid?.[r]?.[c] ?? "").toUpperCase()}
                           maxLength={1}
+                          style={{
+                            fontWeight: 900, // Жирный шрифт во время ввода
+                            color: "#000",   // Черный цвет
+                          }}
                           onFocus={() => {
                             setFocused({ r, c });
                             setDir((d) => {

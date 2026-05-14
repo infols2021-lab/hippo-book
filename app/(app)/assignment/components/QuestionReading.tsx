@@ -2,7 +2,6 @@
 
 import React from "react";
 import type { QuestionReading as QuestionReadingType, QuestionTest as QuestionTestType } from "../lib/types";
-import MediaRenderer from "./MediaRenderer";
 import QuestionTestComponent from "./QuestionTest";
 
 type Props = {
@@ -90,9 +89,9 @@ export default function QuestionReading({
                   {sq.q && (
                     <div
                       style={{
-                        fontSize: "15px",
-                        fontWeight: 600,
-                        color: "#1e293b",
+                        fontSize: "16px",
+                        fontWeight: 900, // Сделали текст жирным, как просили
+                        color: "#000",   // Сделали текст чисто черным
                         lineHeight: 1.4,
                         flex: 1,
                       }}
@@ -102,7 +101,7 @@ export default function QuestionReading({
                   )}
                 </div>
 
-                {/* Тестовые варианты */}
+                {/* Тестовые варианты (уже обновленные с маленькими картинками) */}
                 <QuestionTestComponent
                   question={sq}
                   value={subValue}

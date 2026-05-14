@@ -132,21 +132,34 @@ export default function QuestionTest({ question, value, onChange, disabled }: Pr
                   <div
                     style={{
                       fontSize: "16px",
-                      color: "#333",
+                      color: "#000",
                       lineHeight: 1.4,
-                      fontWeight: isSelected ? 600 : 400,
+                      fontWeight: isSelected ? 800 : 600,
                     }}
                   >
                     {opt.text}
                   </div>
                 )}
 
-                {/* Картинки в ответах теперь отображаются с увеличенным размером и без обрезки */}
+                {/* Ограничиваем размер картинок до 120px, как в ReviewPanel */}
                 {opt.media && opt.media.length > 0 && (
-                  <div style={{ marginTop: opt.text ? "4px" : "0" }}>
-                    <div style={{ maxWidth: "200px", maxHeight: "200px", overflow: "hidden" }}>
-                      <MediaRenderer media={opt.media} />
-                    </div>
+                  <div style={{ marginTop: opt.text ? "4px" : "0", display: "flex", justifyContent: "flex-start" }}>
+                    {opt.media[0].url?.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) || opt.media[0].type?.startsWith("image") ? (
+                      <img
+                        src={opt.media[0].url}
+                        alt=""
+                        style={{
+                          maxWidth: "120px",
+                          maxHeight: "120px",
+                          objectFit: "contain",
+                          borderRadius: "8px",
+                        }}
+                      />
+                    ) : (
+                      <div style={{ maxWidth: "300px" }}>
+                        <MediaRenderer media={opt.media} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

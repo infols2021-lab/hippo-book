@@ -61,22 +61,22 @@ function FillRow({
       </div>
       <div
         style={{
-          fontWeight: 700,
-          color: isCorrect ? "#1e293b" : "#ef4444",
+          fontWeight: 900,
+          color: "#000",
           wordBreak: "break-word",
           lineHeight: "1.5",
-          fontSize: "14px",
+          fontSize: "15px",
         }}
       >
         {userAnswer || "—"}
       </div>
       <div
         style={{
-          fontWeight: 700,
-          color: "#10b981",
+          fontWeight: 900,
+          color: "#000",
           wordBreak: "break-word",
           lineHeight: "1.5",
-          fontSize: "14px",
+          fontSize: "15px",
         }}
       >
         {correctAnswer}
@@ -111,6 +111,7 @@ function TestOptionsReview({
         const isCorrect = correctIndices.includes(idx);
         let borderColor = "#e2e8f0";
         let bgColor = "#fff";
+        
         if (isCorrect && isUserSelected) {
           borderColor = "#10b981";
           bgColor = "#f0fdf4";
@@ -121,6 +122,7 @@ function TestOptionsReview({
           borderColor = "#ef4444";
           bgColor = "#fef2f2";
         }
+
         return (
           <div
             key={opt.id}
@@ -132,7 +134,7 @@ function TestOptionsReview({
               position: "relative",
             }}
           >
-            {isUserSelected && (
+            {(isUserSelected || isCorrect) && (
               <div
                 style={{
                   position: "absolute",
@@ -148,13 +150,16 @@ function TestOptionsReview({
                   justifyContent: "center",
                   fontSize: "14px",
                   fontWeight: "bold",
+                  zIndex: 2,
                 }}
               >
                 {isCorrect ? "✓" : "✗"}
               </div>
             )}
             {opt.text && (
-              <div style={{ fontWeight: 600, marginBottom: "8px" }}>{opt.text}</div>
+              <div style={{ fontWeight: 900, color: "#000", marginBottom: "8px", fontSize: "15px" }}>
+                {opt.text}
+              </div>
             )}
             {opt.media && opt.media.length > 0 && (
               <div style={{ marginTop: "8px", display: "flex", justifyContent: "center" }}>
@@ -162,8 +167,8 @@ function TestOptionsReview({
                   src={opt.media[0].url}
                   alt=""
                   style={{
-                    maxWidth: "80px",
-                    maxHeight: "80px",
+                    maxWidth: "120px",
+                    maxHeight: "120px",
                     objectFit: "contain",
                     borderRadius: "8px",
                   }}
@@ -189,7 +194,7 @@ function FilledSentence({
 }) {
   const parts = template.split("___");
   return (
-    <div style={{ lineHeight: "2.2", fontSize: "16px" }}>
+    <div style={{ lineHeight: "2.2", fontSize: "16px", color: "#1e293b" }}>
       {parts.map((part, idx) => (
         <span key={idx}>
           {part}
@@ -211,7 +216,8 @@ function FilledSentence({
                   correctAnswers[idx]?.trim().toLowerCase()
                     ? "#22c55e"
                     : "#ef4444",
-                fontWeight: 700,
+                fontWeight: 900,
+                color: "#000",
               }}
             >
               {userAnswers[idx] || "—"}
@@ -226,12 +232,12 @@ function FilledSentence({
             padding: "12px",
             background: "#f1f5f9",
             borderRadius: "12px",
-            fontSize: "14px",
+            fontSize: "15px",
           }}
         >
-          <span style={{ fontWeight: 700 }}>Правильные ответы: </span>
+          <span style={{ fontWeight: 700, color: "#64748b" }}>Правильные ответы: </span>
           {correctAnswers.map((ans, i) => (
-            <span key={i} style={{ marginRight: "12px" }}>
+            <span key={i} style={{ marginRight: "12px", fontWeight: 900, color: "#000" }}>
               {i + 1}. {ans}
             </span>
           ))}
@@ -681,33 +687,37 @@ export default function ReviewPanel({
             )}
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "32px",
                 marginTop: "16px",
               }}
             >
-              <CrosswordGridReadOnly
-                title="Ваше заполнение"
-                grid={r.grid}
-                userGrid={r.userGrid}
-                cellNumbers={r.cellNumbers || {}}
-                blocks={r.blocks || []}
-                words={r.words || []}
-                rows={r.grid.length}
-                cols={r.grid[0]?.length || 0}
-                sizeClass="size-normal"
-              />
-              <CrosswordGridReadOnly
-                title="Правильное решение"
-                grid={r.grid}
-                cellNumbers={r.cellNumbers || {}}
-                blocks={r.blocks || []}
-                words={r.words || []}
-                rows={r.grid.length}
-                cols={r.grid[0]?.length || 0}
-                sizeClass="size-normal"
-              />
+              <div>
+                <CrosswordGridReadOnly
+                  title="Ваше заполнение"
+                  grid={r.grid}
+                  userGrid={r.userGrid}
+                  cellNumbers={r.cellNumbers || {}}
+                  blocks={r.blocks || []}
+                  words={r.words || []}
+                  rows={r.grid.length}
+                  cols={r.grid[0]?.length || 0}
+                  sizeClass="size-normal"
+                />
+              </div>
+              <div>
+                <CrosswordGridReadOnly
+                  title="Правильное решение"
+                  grid={r.grid}
+                  cellNumbers={r.cellNumbers || {}}
+                  blocks={r.blocks || []}
+                  words={r.words || []}
+                  rows={r.grid.length}
+                  cols={r.grid[0]?.length || 0}
+                  sizeClass="size-normal"
+                />
+              </div>
             </div>
             {r.wordReview && (
               <div style={{ marginTop: "20px" }}>
@@ -765,8 +775,8 @@ export default function ReviewPanel({
                           </span>
                           <span
                             style={{
-                              fontWeight: 700,
-                              color: "#10b981",
+                              fontWeight: 900,
+                              color: "#000",
                               wordBreak: "break-word",
                             }}
                           >
@@ -839,8 +849,8 @@ export default function ReviewPanel({
                             </span>
                             <span
                               style={{
-                                fontWeight: 700,
-                                color: "#ef4444",
+                                fontWeight: 900,
+                                color: "#000",
                                 wordBreak: "break-word",
                               }}
                             >
@@ -850,8 +860,8 @@ export default function ReviewPanel({
                           <div
                             style={{
                               marginLeft: "40px",
-                              color: "#166534",
-                              fontWeight: 700,
+                              color: "#000",
+                              fontWeight: 900,
                             }}
                           >
                             Правильно: {w.correct}
@@ -894,6 +904,8 @@ export default function ReviewPanel({
                 border: "1px solid #e2e8f0",
                 whiteSpace: "pre-wrap",
                 lineHeight: 1.6,
+                color: "#000",
+                fontWeight: 600,
               }}
             >
               {(r as any).readingText}

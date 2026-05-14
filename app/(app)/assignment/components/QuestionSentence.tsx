@@ -97,13 +97,13 @@ export default function QuestionSentence({
                     width: "130px",
                     padding: "6px 10px",
                     fontSize: "16px",
-                    fontWeight: 600,
+                    fontWeight: 900, // Максимально жирный шрифт для ответа
                     textAlign: "center",
                     border: "none",
                     borderBottom: "3px solid #cbd5e1",
                     borderRadius: "4px 4px 0 0",
                     background: disabled ? "#f1f5f9" : "#ffffff",
-                    color: disabled ? "#94a3b8" : "#1e293b",
+                    color: disabled ? "#94a3b8" : "#000", // Черный цвет для ответа
                     outline: "none",
                     transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                     boxShadow: "none",

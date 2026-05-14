@@ -1372,3 +1372,52 @@
     height: 24px;
   }
 }
+/* ==========================================================================
+   ГЛОБАЛЬНЫЕ СТИЛИ ДЛЯ РЕЖИМА РЕВЬЮ (ПОВЫШЕНИЕ ЧИТАЕМОСТИ ОТВЕТОВ)
+   ========================================================================== */
+
+/* 1. Принудительно делаем текст во всех заблокированных инпутах черным и жирным.
+  WebKit-свойства критически важны для iOS/Safari, иначе браузер сделает текст серым и прозрачным.
+*/
+.review-card input:disabled,
+.fill-input-item input:disabled,
+.sentence-container input:disabled,
+.cw-cell input:disabled {
+  color: #000000 !important;
+  font-weight: 900 !important;
+  opacity: 1 !important; /* Убираем браузерное выцветание */
+  -webkit-text-fill-color: #000000 !important; /* Форсируем цвет в Safari */
+  -webkit-opacity: 1 !important;
+}
+
+/* 2. Улучшение читаемости букв внутри сетки кроссворда (как введенных, так и правильных) */
+.cw-cell.active {
+  color: #000000 !important;
+  font-weight: 900 !important;
+}
+.cw-cell.active input {
+  color: #000000 !important;
+  font-weight: 900 !important;
+}
+
+/* 3. Делаем текст в карточках сопоставления (Matching) более выразительным */
+.matching-card-static,
+.matching-card {
+  color: #000000 !important;
+}
+.matching-card-static div,
+.matching-card div {
+  /* Защита от наследования светлых оттенков серого */
+  text-shadow: 0px 0px 1px rgba(0,0,0,0.1); 
+}
+
+/* 4. Глобальные классы подсветки (убеждаемся, что бейджи и тексты не сливаются) */
+.text-correct-bold {
+  color: #000000 !important;
+  font-weight: 900 !important;
+}
+
+/* 5. Убираем стандартное выделение инпутов при клике в режиме ревью */
+.review-card input {
+  cursor: default !important;
+}

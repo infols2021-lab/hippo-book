@@ -14,6 +14,36 @@ type Props = {
 type DotNode = { id: string; x: number; y: number; side: "left" | "right" };
 
 // ============================================================================
+// Вспомогательный компонент для аккуратного вывода медиа-вложений (до 120px)
+// ============================================================================
+function SmallMedia({ media }: { media?: any[] }) {
+  if (!media || media.length === 0) return null;
+  const m = media[0];
+  const isImg = m.url?.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) || m.type?.startsWith("image");
+
+  return (
+    <div style={{ display: "flex", justifyContent: "flex-start", marginTop: "4px" }}>
+      {isImg ? (
+        <img
+          src={m.url}
+          alt=""
+          style={{
+            maxWidth: "120px",
+            maxHeight: "120px",
+            objectFit: "contain",
+            borderRadius: "8px",
+          }}
+        />
+      ) : (
+        <div style={{ maxWidth: "120px", maxHeight: "120px", overflow: "hidden" }}>
+          <MediaRenderer media={media} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // Read-only компонент для отображения линий сопоставления в ревью
 // ============================================================================
 
@@ -108,7 +138,7 @@ export function MatchingLinesRenderer({
       }}
     >
       {title && (
-        <div style={{ fontWeight: 800, marginBottom: 16, textAlign: "center" }}>{title}</div>
+        <div style={{ fontWeight: 800, marginBottom: 16, textAlign: "center", color: "#1e293b" }}>{title}</div>
       )}
 
       <svg
@@ -181,10 +211,12 @@ export function MatchingLinesRenderer({
                 }}
               >
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "8px" }}>
-                    {leftText}
-                  </div>
-                  <MediaRenderer media={p.left.media} />
+                  {leftText !== "—" && (
+                    <div style={{ fontWeight: 900, fontSize: "15px", marginBottom: "8px", color: "#000" }}>
+                      {leftText}
+                    </div>
+                  )}
+                  <SmallMedia media={p.left?.media} />
                 </div>
                 <div
                   className="matching-dot-static"
@@ -245,10 +277,12 @@ export function MatchingLinesRenderer({
                   }}
                 />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "8px" }}>
-                    {rightText}
-                  </div>
-                  <MediaRenderer media={p.right.media} />
+                  {rightText !== "—" && (
+                    <div style={{ fontWeight: 900, fontSize: "15px", marginBottom: "8px", color: "#000" }}>
+                      {rightText}
+                    </div>
+                  )}
+                  <SmallMedia media={p.right?.media} />
                 </div>
               </div>
             );
@@ -495,11 +529,11 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
             >
               <div style={{ flex: 1 }}>
                 {p.left.text && (
-                  <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "8px" }}>
+                  <div style={{ fontWeight: 900, fontSize: "15px", marginBottom: "8px", color: "#000" }}>
                     {p.left.text}
                   </div>
                 )}
-                <MediaRenderer media={p.left.media} />
+                <SmallMedia media={p.left?.media} />
               </div>
               <div
                 className="matching-dot"
@@ -564,11 +598,11 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
                 />
                 <div style={{ flex: 1 }}>
                   {p.right.text && (
-                    <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "8px" }}>
+                    <div style={{ fontWeight: 900, fontSize: "15px", marginBottom: "8px", color: "#000" }}>
                       {p.right.text}
                     </div>
                   )}
-                  <MediaRenderer media={p.right.media} />
+                  <SmallMedia media={p.right?.media} />
                 </div>
               </div>
             );

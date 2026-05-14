@@ -159,6 +159,7 @@ export function calcAndBuildReview(
     if (!q || typeof q !== "object") {
       statsSum.skipped++;
       statsSum.total++;
+      statsSum.pointsTotal += 1;
       return {
         type: "other",
         questionText: `Вопрос ${idxText}`,
@@ -248,7 +249,6 @@ export function calcAndBuildReview(
     // ---------------------------------------------------------------
     if (q.type === "test") {
       const isMultiple = !!q.multiple;
-      // Нормализуем options в массив TestOption
       let options: TestOption[] = [];
       if (Array.isArray(q.options)) {
         options = q.options.map((opt: any, idx: number) => {
@@ -278,6 +278,8 @@ export function calcAndBuildReview(
 
       if (!answered) {
         statsSum.skipped++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
         return {
           type: "test",
           questionText,
@@ -326,8 +328,10 @@ export function calcAndBuildReview(
       }
 
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+      
       statsSum.pointsEarned += pointsEarned;
-
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
       if (isCorrect) statsSum.correct++;
       else statsSum.incorrect++;
 
@@ -356,6 +360,8 @@ export function calcAndBuildReview(
 
       if (totalCount === 0) {
         statsSum.skipped++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
         return {
           type: "fill",
           questionText,
@@ -385,6 +391,9 @@ export function calcAndBuildReview(
 
       if (!answered) {
         statsSum.skipped++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
+        
         const parts = buildParts(correctAnswers, userArr, totalCount);
         const correctCount = parts.filter((p) => p.isCorrect).length;
         const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
@@ -412,6 +421,8 @@ export function calcAndBuildReview(
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
 
       const isAllCorrect = correctCount === totalCount;
       if (isAllCorrect) statsSum.correct++;
@@ -444,6 +455,8 @@ export function calcAndBuildReview(
 
       if (totalCount === 0) {
         statsSum.skipped++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
         return {
           type: "sentence",
           questionText,
@@ -474,6 +487,9 @@ export function calcAndBuildReview(
 
       if (!answered) {
         statsSum.skipped++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
+        
         const parts = buildParts(correctAnswers, userArr, totalCount);
         const correctCount = parts.filter((p) => p.isCorrect).length;
         const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
@@ -502,6 +518,8 @@ export function calcAndBuildReview(
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
 
       const isAllCorrect = correctCount === totalCount;
       if (isAllCorrect) statsSum.correct++;
@@ -573,6 +591,8 @@ export function calcAndBuildReview(
 
       if (!answered) {
         statsSum.skipped++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
         return {
           type: "matching",
           questionText,
@@ -607,6 +627,8 @@ export function calcAndBuildReview(
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
 
       const isAllCorrect = correctPairsCount === totalPairsCount;
       if (isAllCorrect) statsSum.correct++;
@@ -666,6 +688,8 @@ export function calcAndBuildReview(
 
       if (!answered) {
         statsSum.skipped++;
+        statsSum.total++;
+        statsSum.pointsTotal += pointsTotal;
         return {
           type: "imagemap",
           questionText,
@@ -700,6 +724,8 @@ export function calcAndBuildReview(
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
 
       statsSum.pointsEarned += pointsEarned;
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
 
       const isAllCorrect = correctPairsCount === totalPairsCount;
       if (isAllCorrect) statsSum.correct++;
@@ -821,7 +847,10 @@ export function calcAndBuildReview(
       let correctPairsCount = correctWords.length;
       let fraction = safeFraction(correctPairsCount, totalWords);
       const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+      
       statsSum.pointsEarned += pointsEarned;
+      statsSum.pointsTotal += pointsTotal;
+      statsSum.total++;
 
       if (correctPairsCount === totalWords && totalWords > 0) {
         statsSum.correct++;
@@ -854,6 +883,9 @@ export function calcAndBuildReview(
     // OTHER
     // ---------------------------------------------------------------
     statsSum.skipped++;
+    statsSum.total++;
+    statsSum.pointsTotal += pointsTotal;
+    
     return {
       type: "other",
       questionText,
