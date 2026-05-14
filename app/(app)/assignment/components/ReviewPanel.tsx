@@ -24,7 +24,7 @@ function getStatusConfig(item: ReviewItem) {
   return { key: "incorrect", label: "Неправильно", color: "#ef4444", bg: "#fef2f2" };
 }
 
-/** Маленькая карточка для одного поля ввода (fill/sentence) */
+/** Маленькая карточка для одного поля ввода (fill) */
 function FillRow({
   index,
   userAnswer,
@@ -62,18 +62,18 @@ function FillRow({
       <div
         style={{
           fontWeight: 900,
-          color: "#000",
+          color: isCorrect ? "#10b981" : "#ef4444", // Зеленый если верно, красный если ошибка
           wordBreak: "break-word",
           lineHeight: "1.5",
           fontSize: "15px",
         }}
       >
-        {userAnswer || "—"}
+        {userAnswer || "—"} {userAnswer ? (isCorrect ? "✓" : "✗") : ""}
       </div>
       <div
         style={{
           fontWeight: 900,
-          color: "#000",
+          color: "#10b981", // Правильный ответ всегда зеленый
           wordBreak: "break-word",
           lineHeight: "1.5",
           fontSize: "15px",
@@ -85,7 +85,7 @@ function FillRow({
   );
 }
 
-/** Визуализация вариантов теста (сетка с подсветкой) */
+/** Визуализация вариантов теста (сетка с галочками и крестиками) */
 function TestOptionsReview({
   options,
   userSelectedIndices,
@@ -102,25 +102,72 @@ function TestOptionsReview({
       style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-        gap: "12px",
+        gap: "16px",
         marginTop: "12px",
       }}
     >
       {options.map((opt, idx) => {
         const isUserSelected = userSelectedIndices.includes(idx);
         const isCorrect = correctIndices.includes(idx);
+        
         let borderColor = "#e2e8f0";
         let bgColor = "#fff";
-        
-        if (isCorrect && isUserSelected) {
+        let icon = null;
+
+        if (isCorrect) {
+          // Правильный ответ всегда обводим зеленым и ставим галочку
           borderColor = "#10b981";
           bgColor = "#f0fdf4";
-        } else if (isCorrect && !isUserSelected) {
-          borderColor = "#10b981";
-          bgColor = "#f0fdf4";
-        } else if (!isCorrect && isUserSelected) {
+          icon = (
+            <div
+              style={{
+                position: "absolute",
+                top: "-10px",
+                right: "-10px",
+                width: "26px",
+                height: "26px",
+                borderRadius: "13px",
+                background: "#10b981",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "14px",
+                fontWeight: "bold",
+                zIndex: 2,
+                boxShadow: "0 2px 4px rgba(16,185,129,0.3)"
+              }}
+            >
+              ✓
+            </div>
+          );
+        } else if (isUserSelected) {
+          // Неправильный выбор пользователя обводим красным и ставим крестик
           borderColor = "#ef4444";
           bgColor = "#fef2f2";
+          icon = (
+            <div
+              style={{
+                position: "absolute",
+                top: "-10px",
+                right: "-10px",
+                width: "26px",
+                height: "26px",
+                borderRadius: "13px",
+                background: "#ef4444",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "14px",
+                fontWeight: "bold",
+                zIndex: 2,
+                boxShadow: "0 2px 4px rgba(239,68,68,0.3)"
+              }}
+            >
+              ✗
+            </div>
+          );
         }
 
         return (
@@ -129,50 +176,36 @@ function TestOptionsReview({
             style={{
               border: `2px solid ${borderColor}`,
               borderRadius: "16px",
-              padding: "12px",
+              padding: "16px",
               background: bgColor,
               position: "relative",
+              opacity: (!isCorrect && !isUserSelected) ? 0.6 : 1, // Немного гасим невыбранные неверные варианты
             }}
           >
-            {(isUserSelected || isCorrect) && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "-10px",
-                  right: "-10px",
-                  width: "24px",
-                  height: "24px",
-                  borderRadius: "12px",
-                  background: isCorrect ? "#10b981" : "#ef4444",
-                  color: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "14px",
-                  fontWeight: "bold",
-                  zIndex: 2,
-                }}
-              >
-                {isCorrect ? "✓" : "✗"}
-              </div>
-            )}
+            {icon}
             {opt.text && (
               <div style={{ fontWeight: 900, color: "#000", marginBottom: "8px", fontSize: "15px" }}>
                 {opt.text}
               </div>
             )}
             {opt.media && opt.media.length > 0 && (
-              <div style={{ marginTop: "8px", display: "flex", justifyContent: "center" }}>
-                <img
-                  src={opt.media[0].url}
-                  alt=""
-                  style={{
-                    maxWidth: "120px",
-                    maxHeight: "120px",
-                    objectFit: "contain",
-                    borderRadius: "8px",
-                  }}
-                />
+              <div style={{ marginTop: "8px", display: "flex", justifyContent: "flex-start" }}>
+                {opt.media[0].url?.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) || opt.media[0].type?.startsWith("image") ? (
+                  <img
+                    src={opt.media[0].url}
+                    alt=""
+                    style={{
+                      maxWidth: "120px",
+                      maxHeight: "120px",
+                      objectFit: "contain",
+                      borderRadius: "8px",
+                    }}
+                  />
+                ) : (
+                  <div style={{ maxWidth: "200px" }}>
+                    <MediaRenderer media={opt.media} />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -194,51 +227,50 @@ function FilledSentence({
 }) {
   const parts = template.split("___");
   return (
-    <div style={{ lineHeight: "2.2", fontSize: "16px", color: "#1e293b" }}>
-      {parts.map((part, idx) => (
-        <span key={idx}>
-          {part}
-          {idx < userAnswers.length && (
-            <span
-              style={{
-                display: "inline-block",
-                margin: "0 8px",
-                padding: "4px 12px",
-                borderRadius: "12px",
-                background:
-                  userAnswers[idx]?.trim().toLowerCase() ===
-                  correctAnswers[idx]?.trim().toLowerCase()
-                    ? "#dcfce7"
-                    : "#fee2e2",
-                border: "1px solid",
-                borderColor:
-                  userAnswers[idx]?.trim().toLowerCase() ===
-                  correctAnswers[idx]?.trim().toLowerCase()
-                    ? "#22c55e"
-                    : "#ef4444",
-                fontWeight: 900,
-                color: "#000",
-              }}
-            >
-              {userAnswers[idx] || "—"}
-            </span>
-          )}
-        </span>
-      ))}
+    <div style={{ lineHeight: "2.4", fontSize: "16px", color: "#1e293b" }}>
+      {parts.map((part, idx) => {
+        const uAns = userAnswers[idx]?.trim().toLowerCase();
+        const cAns = correctAnswers[idx]?.trim().toLowerCase();
+        const isCorrect = uAns === cAns;
+
+        return (
+          <span key={idx}>
+            {part}
+            {idx < userAnswers.length && (
+              <span
+                style={{
+                  display: "inline-block",
+                  margin: "0 8px",
+                  padding: "4px 12px",
+                  borderRadius: "12px",
+                  background: isCorrect ? "#dcfce7" : "#fee2e2",
+                  border: "2px solid",
+                  borderColor: isCorrect ? "#22c55e" : "#ef4444",
+                  fontWeight: 900,
+                  color: isCorrect ? "#166534" : "#991b1b",
+                }}
+              >
+                {userAnswers[idx] || "—"} {isCorrect ? "✓" : "✗"}
+              </span>
+            )}
+          </span>
+        );
+      })}
       {correctAnswers.length > 0 && (
         <div
           style={{
-            marginTop: "16px",
-            padding: "12px",
-            background: "#f1f5f9",
+            marginTop: "20px",
+            padding: "16px",
+            background: "#f0fdf4",
+            border: "1px solid #bbf7d0",
             borderRadius: "12px",
             fontSize: "15px",
           }}
         >
-          <span style={{ fontWeight: 700, color: "#64748b" }}>Правильные ответы: </span>
+          <span style={{ fontWeight: 800, color: "#166534" }}>Правильные ответы: </span>
           {correctAnswers.map((ans, i) => (
-            <span key={i} style={{ marginRight: "12px", fontWeight: 900, color: "#000" }}>
-              {i + 1}. {ans}
+            <span key={i} style={{ marginRight: "16px", fontWeight: 900, color: "#000" }}>
+              {i + 1}. <span style={{ color: "#10b981" }}>{ans}</span>
             </span>
           ))}
         </div>
@@ -283,22 +315,20 @@ export default function ReviewPanel({
     let correctIndices: number[] = [];
     if (r.type === "test" && r.options) {
       const options = r.options;
-      // Правильные индексы
       if (Array.isArray(r.correctLabel)) {
         correctIndices = (r.correctLabel as string[])
-          .map(text => options.findIndex(opt => opt.text === text))
-          .filter(i => i !== -1);
+          .map((text) => options.findIndex((opt) => opt.text === text))
+          .filter((i) => i !== -1);
       } else if (typeof r.correctLabel === "string") {
-        const idxFound = options.findIndex(opt => opt.text === r.correctLabel);
+        const idxFound = options.findIndex((opt) => opt.text === r.correctLabel);
         if (idxFound !== -1) correctIndices = [idxFound];
       }
-      // Выбранные пользователем индексы
       if (Array.isArray(r.userLabel)) {
         userIndices = (r.userLabel as string[])
-          .map(text => options.findIndex(opt => opt.text === text))
-          .filter(i => i !== -1);
+          .map((text) => options.findIndex((opt) => opt.text === text))
+          .filter((i) => i !== -1);
       } else if (typeof r.userLabel === "string" && r.userLabel !== "Не отвечено") {
-        const idxFound = options.findIndex(opt => opt.text === r.userLabel);
+        const idxFound = options.findIndex((opt) => opt.text === r.userLabel);
         if (idxFound !== -1) userIndices = [idxFound];
       }
     }
@@ -420,7 +450,7 @@ export default function ReviewPanel({
           </div>
         </div>
 
-        {/* Медиа вопроса (если есть) */}
+        {/* Медиа вопроса */}
         {itemMedia && itemMedia.length > 0 && (
           <div
             style={{
@@ -442,16 +472,6 @@ export default function ReviewPanel({
               padding: "16px",
             }}
           >
-            <div
-              style={{
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "#64748b",
-                marginBottom: "12px",
-              }}
-            >
-              ВАРИАНТЫ ОТВЕТОВ
-            </div>
             <TestOptionsReview
               options={r.options}
               userSelectedIndices={userIndices}
@@ -508,19 +528,9 @@ export default function ReviewPanel({
             style={{
               background: "#f8fafc",
               borderRadius: "16px",
-              padding: "16px",
+              padding: "20px",
             }}
           >
-            <div
-              style={{
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "#64748b",
-                marginBottom: "12px",
-              }}
-            >
-              ПРЕДЛОЖЕНИЕ (ваш вариант)
-            </div>
             <FilledSentence
               template={r.sentenceTemplate}
               userAnswers={r.userAnswers || []}
@@ -529,7 +539,7 @@ export default function ReviewPanel({
           </div>
         )}
 
-        {/* ===== MATCHING (линии) ===== */}
+        {/* ===== MATCHING ===== */}
         {r.type === "matching" && r.pairs && r.leftLabels && r.rightLabels && (
           <div
             style={{
@@ -538,16 +548,6 @@ export default function ReviewPanel({
               padding: "16px",
             }}
           >
-            <div
-              style={{
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "#64748b",
-                marginBottom: "12px",
-              }}
-            >
-              СОПОСТАВЛЕНИЕ
-            </div>
             <div style={{ display: "grid", gap: "24px" }}>
               <MatchingLinesRenderer
                 title="Ваши ответы"
@@ -579,23 +579,13 @@ export default function ReviewPanel({
           >
             <div
               style={{
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "#64748b",
-                marginBottom: "16px",
-              }}
-            >
-              КАРТА ИЗОБРАЖЕНИЯ
-            </div>
-            <div
-              style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
                 gap: "20px",
               }}
             >
               <div>
-                <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>
+                <div style={{ fontWeight: 800, marginBottom: "12px", color: "#1e293b", textAlign: "center" }}>
                   Ваши ответы
                 </div>
                 <ImageMapRenderer
@@ -613,7 +603,7 @@ export default function ReviewPanel({
                 />
               </div>
               <div>
-                <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>
+                <div style={{ fontWeight: 800, marginBottom: "12px", color: "#1e293b", textAlign: "center" }}>
                   Правильные ответы
                 </div>
                 <ImageMapRenderer
@@ -634,7 +624,7 @@ export default function ReviewPanel({
           </div>
         )}
 
-        {/* ===== CROSSWORD (две сетки) ===== */}
+        {/* ===== CROSSWORD ===== */}
         {r.type === "crossword" && r.grid && r.userGrid && (
           <div
             style={{
@@ -643,16 +633,6 @@ export default function ReviewPanel({
               padding: "16px",
             }}
           >
-            <div
-              style={{
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "#64748b",
-                marginBottom: "12px",
-              }}
-            >
-              КРОССВОРД
-            </div>
             {r.note && (
               <div
                 style={{
@@ -876,7 +856,7 @@ export default function ReviewPanel({
           </div>
         )}
 
-        {/* ===== READING (отображаем текст чтения) ===== */}
+        {/* ===== READING (текст) ===== */}
         {r.type === "reading" && (r as any).readingText && (
           <div
             style={{
@@ -913,22 +893,9 @@ export default function ReviewPanel({
           </div>
         )}
 
-        {/* ===== COMPLEX / READING (подвопросы) ===== */}
+        {/* ===== COMPLEX / READING (вложенные) ===== */}
         {(r.type === "complex" || r.type === "reading") && r.subReviews && (
           <div style={{ marginTop: "16px" }}>
-            <div
-              style={{
-                fontSize: "12px",
-                fontWeight: 800,
-                color: "#94a3b8",
-                textTransform: "uppercase",
-                letterSpacing: "1px",
-                marginBottom: "16px",
-                textAlign: "center",
-              }}
-            >
-              {r.type === "complex" ? "Вложенные задания" : "Результаты по подвопросам"}
-            </div>
             <div
               style={{
                 display: "flex",
@@ -976,7 +943,7 @@ export default function ReviewPanel({
           display: "flex",
           alignItems: "center",
           gap: "16px",
-          marginBottom: "28px",
+          marginBottom: "20px",
         }}
       >
         <div
@@ -1026,6 +993,29 @@ export default function ReviewPanel({
           >
             Изучите свои ошибки, чтобы улучшить результат в следующий раз
           </p>
+        </div>
+      </div>
+
+      {/* ГЛОБАЛЬНАЯ ЛЕГЕНДА ЦВЕТОВ */}
+      <div 
+        style={{ 
+          display: "flex", 
+          flexWrap: "wrap",
+          gap: "24px", 
+          marginBottom: "32px", 
+          padding: "20px", 
+          background: "#f8fafc", 
+          borderRadius: "16px", 
+          border: "2px solid #e2e8f0" 
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "15px", fontWeight: 800, color: "#1e293b" }}>
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "13px", background: "#10b981", color: "#fff", fontSize: "14px", boxShadow: "0 2px 4px rgba(16,185,129,0.3)" }}>✓</span>
+          Зеленым цветом выделены правильные ответы
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "15px", fontWeight: 800, color: "#1e293b" }}>
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "13px", background: "#ef4444", color: "#fff", fontSize: "14px", boxShadow: "0 2px 4px rgba(239,68,68,0.3)" }}>✗</span>
+          Красным цветом выделены ваши ошибки
         </div>
       </div>
 
