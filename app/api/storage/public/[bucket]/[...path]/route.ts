@@ -7,13 +7,6 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // Разрешаем Next.js принимать тела запросов до 50 МБ для этого прокси-роута
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '50mb',
-    },
-  },
-};
 
 // Vercel: увеличиваем таймаут — крупные файлы (аудио, PDF) могут грузиться дольше 10 сек
 export const maxDuration = 30;
