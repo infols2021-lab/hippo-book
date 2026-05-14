@@ -283,6 +283,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
     const { stats, review } = calcAndBuildReview(questions, answers);
     console.log("[DEBUG] Stats from scoring:", stats);
+    console.log("[DEBUG] Review from scoring:", review);
 
     if (isGatehouse) {
       const recommendation = recommendGatehouseLevel({
@@ -407,8 +408,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
               <div className="stat-item"><span>Ошибки:</span> <b style={{color: '#ef4444'}}>{finalStats.incorrect}</b></div>
             </div>
 
+            {/* ✅ Передаём questions в ReviewPanel */}
             <div className="review-section">
-              <ReviewPanel items={reviewItems} />
+              <ReviewPanel items={reviewItems} questions={questions} />
             </div>
 
             <div className="button-group" style={{ marginTop: "40px" }}>

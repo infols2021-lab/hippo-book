@@ -4,6 +4,7 @@ import React from "react";
 import type { ReviewItem, QuestionAny, QuestionTest, TestOption } from "../lib/types";
 import MediaRenderer from "./MediaRenderer";
 import { getImageUrl } from "../lib/image";
+import { ImageMapRenderer } from "./QuestionImageMap";
 
 // Форматирование баллов
 function fmtPoints(x: number) {
@@ -270,7 +271,26 @@ export default function ReviewPanel({ items, questions }: { items: ReviewItem[];
       );
     }
 
-    // Основная карточка для всех типов (включая test-подвопросы, которые будут обработаны отдельно ниже)
+    // Для imagemap берём данные из вопроса, а не из r
+    let imageUrl = "";
+    let points: any[] = [];
+    let answers: any[] = [];
+    let userMatches: Record<string, string> = {};
+    let correctMatches: Record<string, string> = {};
+
+    if (r.type === "imagemap") {
+      const q = questions[idx];
+      if (q && q.type === "imagemap") {
+        imageUrl = q.image || "";
+        points = q.points || [];
+        answers = q.answers || [];
+        userMatches = (r as any).userMatches || {};
+        correctMatches = (r as any).correctMatches || {};
+      } else {
+        console.warn("[ReviewPanel] No question data for imagemap at index", idx);
+      }
+    }
+
     return (
       <div
         key={idx}
@@ -346,8 +366,6 @@ export default function ReviewPanel({ items, questions }: { items: ReviewItem[];
           })()
         )}
 
-        {/* ===== ТЕСТ (обычный, не подвопрос) – уже обработан выше, сюда не попадает ===== */}
-
         {/* ===== FILL / SENTENCE ===== */}
         {(r.type === "fill" || r.type === "sentence") && (
           <div
@@ -406,9 +424,7 @@ export default function ReviewPanel({ items, questions }: { items: ReviewItem[];
                 const userRightId = r.userMatches?.[leftId];
                 const isCorrect = userRightId === correctRightId;
                 const rightText = r.rightLabels?.[correctRightId] || `Элемент ${correctRightId}`;
-                const userRightText = userRightId
-                  ? r.rightLabels?.[userRightId] || `Элемент ${userRightId}`
-                  : "—";
+                const userRightText = userRightId ? r.rightLabels?.[userRightId] || `Элемент ${userRightId}` : "—";
                 return (
                   <div
                     key={mI}
@@ -426,13 +442,11 @@ export default function ReviewPanel({ items, questions }: { items: ReviewItem[];
                       Пара {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
                     </div>
                     <div style={{ fontSize: "14px", color: "#1e293b" }}>
-                      Ваш выбор:{" "}
-                      <span style={{ fontWeight: 700 }}>{userRightText}</span>
+                      Ваш выбор: <span style={{ fontWeight: 700 }}>{userRightText}</span>
                     </div>
                     {!isCorrect && (
                       <div style={{ fontSize: "14px", color: "#10b981" }}>
-                        Правильно:{" "}
-                        <span style={{ fontWeight: 700 }}>{rightText}</span>
+                        Правильно: <span style={{ fontWeight: 700 }}>{rightText}</span>
                       </div>
                     )}
                   </div>
@@ -443,7 +457,7 @@ export default function ReviewPanel({ items, questions }: { items: ReviewItem[];
         )}
 
         {/* ===== IMAGEMAP ===== */}
-        {r.type === "imagemap" && (
+        {r.type === "imagemap" && imageUrl && (
           <div
             style={{
               background: "#f8fafc",
@@ -451,45 +465,84 @@ export default function ReviewPanel({ items, questions }: { items: ReviewItem[];
               padding: "16px",
             }}
           >
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "12px" }}>
-              РЕЗУЛЬТАТЫ КАРТЫ ИЗОБРАЖЕНИЯ
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "16px" }}>
+              ВИЗУАЛИЗАЦИЯ КАРТЫ
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {Object.entries(r.correctMatches).map(([answerId, correctPointId], mI) => {
-                const userPointId = r.userMatches?.[answerId];
-                const isCorrect = userPointId === correctPointId;
-                const answerLabel = r.answerLabels?.[answerId] || `Ответ`;
-                const pointLabel = r.pointLabels?.[correctPointId] || `Точка`;
-                return (
-                  <div
-                    key={mI}
-                    style={{
-                      padding: "12px 16px",
-                      borderRadius: "12px",
-                      border: `1px solid ${isCorrect ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
-                      background: isCorrect ? "#f0fdf4" : "#fef2f2",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "4px",
-                    }}
-                  >
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: isCorrect ? "#166534" : "#991b1b" }}>
-                      Связь {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
-                    </div>
-                    <div style={{ fontSize: "14px", color: "#1e293b" }}>
-                      {answerLabel} → указана точка:{" "}
-                      <span style={{ fontWeight: 700 }}>
-                        {r.pointLabels?.[userPointId] || "—"}
-                      </span>
-                    </div>
-                    {!isCorrect && (
-                      <div style={{ fontSize: "14px", color: "#10b981" }}>
-                        Правильно: {answerLabel} → {pointLabel}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>Ваши ответы</div>
+                <ImageMapRenderer
+                  imageUrl={imageUrl}
+                  points={points}
+                  answers={answers}
+                  matches={userMatches}
+                  correctMatches={correctMatches}
+                  pointColorConnected="#ef4444"
+                  pointColorUnconnected="#94a3b8"
+                  lineColorCorrect="#10b981"
+                  lineColorIncorrect="#ef4444"
+                  pointSize={20}
+                  showLabels
+                />
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: "8px", color: "#1e293b" }}>Правильные ответы</div>
+                <ImageMapRenderer
+                  imageUrl={imageUrl}
+                  points={points}
+                  answers={answers}
+                  matches={correctMatches}
+                  correctMatches={correctMatches}
+                  pointColorConnected="#10b981"
+                  pointColorUnconnected="#94a3b8"
+                  lineColorCorrect="#10b981"
+                  lineColorIncorrect="#ef4444"
+                  pointSize={20}
+                  showLabels
+                />
+              </div>
+            </div>
+
+            <div style={{ marginTop: "20px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#64748b", marginBottom: "12px" }}>
+                РЕЗУЛЬТАТЫ КАРТЫ ИЗОБРАЖЕНИЯ
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {Object.entries(correctMatches).map(([answerId, correctPointId], mI) => {
+                  const userPointId = userMatches[answerId];
+                  const isCorrect = userPointId === correctPointId;
+                  const answerLabel = answers.find((a) => a.id === answerId)?.text || answerId;
+                  const pointLabel = points.find((p) => p.id === correctPointId)?.label || correctPointId;
+                  return (
+                    <div
+                      key={mI}
+                      style={{
+                        padding: "12px 16px",
+                        borderRadius: "12px",
+                        border: `1px solid ${isCorrect ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
+                        background: isCorrect ? "#f0fdf4" : "#fef2f2",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "4px",
+                      }}
+                    >
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: isCorrect ? "#166534" : "#991b1b" }}>
+                        Связь {mI + 1}: {isCorrect ? "✅ Верно" : "❌ Ошибка"}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                      <div style={{ fontSize: "14px", color: "#1e293b" }}>
+                        {answerLabel} → указана точка:{" "}
+                        <span style={{ fontWeight: 700 }}>{points.find((p) => p.id === userPointId)?.label || "—"}</span>
+                      </div>
+                      {!isCorrect && (
+                        <div style={{ fontSize: "14px", color: "#10b981" }}>
+                          Правильно: {answerLabel} → {pointLabel}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -503,93 +556,40 @@ export default function ReviewPanel({ items, questions }: { items: ReviewItem[];
               padding: "16px",
             }}
           >
-            {r.note && (
-              <div style={{ fontSize: "14px", fontWeight: 600, color: "#334155", marginBottom: "12px" }}>
-                {r.note}
-              </div>
-            )}
-
+            {r.note && <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px" }}>{r.note}</div>}
             {r.crosswordStats && (
               <div style={{ display: "flex", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
-                <span className="badge-pill">
-                  Заполнено клеток: <b>{r.crosswordStats.filled}/{r.crosswordStats.total}</b>
-                </span>
-                <span className="badge-pill">
-                  Точность заполнения: <b>{r.crosswordStats.percent}%</b>
-                </span>
+                <span className="badge-pill">Заполнено клеток: <b>{r.crosswordStats.filled}/{r.crosswordStats.total}</b></span>
+                <span className="badge-pill">Точность: <b>{r.crosswordStats.percent}%</b></span>
               </div>
             )}
-
             {r.wordReview && (
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 {r.wordReview.correct.length > 0 && (
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#166534", marginBottom: "8px", textTransform: "uppercase" }}>
-                      Правильные слова ({r.wordReview.correct.length})
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      {r.wordReview.correct.map((w, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            padding: "8px 12px",
-                            background: "#f0fdf4",
-                            border: "1px solid rgba(16,185,129,0.2)",
-                            borderRadius: "10px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            fontSize: "14px",
-                          }}
-                        >
-                          <span style={{ fontWeight: 800, color: "#10b981", minWidth: "28px" }}>✓</span>
-                          <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "80px" }}>
-                            №{w.number} {w.direction === "across" ? "→" : "↓"}
-                          </span>
-                          <span style={{ fontWeight: 700, color: "#10b981", wordBreak: "break-word" }}>
-                            {w.word}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#166534", marginBottom: "8px" }}>Правильные слова ({r.wordReview.correct.length})</div>
+                    {r.wordReview.correct.map((w, i) => (
+                      <div key={i} style={{ padding: "8px 12px", background: "#f0fdf4", borderRadius: "10px", display: "flex", alignItems: "center", gap: "12px" }}>
+                        <span style={{ fontWeight: 800, color: "#10b981" }}>✓</span>
+                        <span>№{w.number} {w.direction === "across" ? "→" : "↓"}</span>
+                        <span style={{ fontWeight: 700 }}>{w.word}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
-
                 {r.wordReview.wrong.length > 0 && (
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#991b1b", marginBottom: "8px", textTransform: "uppercase" }}>
-                      Неправильные слова ({r.wordReview.wrong.length})
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      {r.wordReview.wrong.map((w, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            padding: "10px 12px",
-                            background: "#fef2f2",
-                            border: "1px solid rgba(239,68,68,0.2)",
-                            borderRadius: "10px",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "4px",
-                            fontSize: "14px",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                            <span style={{ fontWeight: 800, color: "#ef4444", minWidth: "28px" }}>✗</span>
-                            <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "80px" }}>
-                              №{w.number} {w.direction === "across" ? "→" : "↓"}
-                            </span>
-                            <span style={{ fontWeight: 700, color: "#ef4444", wordBreak: "break-word" }}>
-                              Ваш ответ: {w.user}
-                            </span>
-                          </div>
-                          <div style={{ marginLeft: "40px", color: "#166534", fontWeight: 700 }}>
-                            Правильно: {w.correct}
-                          </div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#991b1b", marginBottom: "8px" }}>Неправильные слова ({r.wordReview.wrong.length})</div>
+                    {r.wordReview.wrong.map((w, i) => (
+                      <div key={i} style={{ padding: "10px 12px", background: "#fef2f2", borderRadius: "10px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <span style={{ fontWeight: 800, color: "#ef4444" }}>✗</span>
+                          <span>№{w.number} {w.direction === "across" ? "→" : "↓"}</span>
+                          <span style={{ fontWeight: 700, color: "#ef4444" }}>Ваш ответ: {w.user}</span>
                         </div>
-                      ))}
-                    </div>
+                        <div style={{ marginLeft: "40px", color: "#166534" }}>Правильно: {w.correct}</div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -597,20 +597,9 @@ export default function ReviewPanel({ items, questions }: { items: ReviewItem[];
           </div>
         )}
 
-        {/* ===== COMPLEX / READING ===== */}
         {(r.type === "complex" || r.type === "reading") && r.subReviews && (
           <div style={{ marginTop: "16px" }}>
-            <div
-              style={{
-                fontSize: "12px",
-                fontWeight: 800,
-                color: "#94a3b8",
-                textTransform: "uppercase",
-                letterSpacing: "1px",
-                marginBottom: "16px",
-                textAlign: "center",
-              }}
-            >
+            <div style={{ fontSize: "12px", fontWeight: 800, color: "#94a3b8", textAlign: "center", marginBottom: "16px" }}>
               {r.type === "complex" ? "Вложенные задания" : "Результаты по подвопросам"}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -623,17 +612,8 @@ export default function ReviewPanel({ items, questions }: { items: ReviewItem[];
           </div>
         )}
 
-        {/* ===== OTHER ===== */}
         {r.type === "other" && r.note && (
-          <div
-            style={{
-              background: "#f8fafc",
-              borderRadius: "16px",
-              padding: "16px",
-              fontStyle: "italic",
-              color: "#64748b",
-            }}
-          >
+          <div style={{ background: "#f8fafc", borderRadius: "16px", padding: "16px", fontStyle: "italic", color: "#64748b" }}>
             {r.note}
           </div>
         )}
@@ -643,54 +623,16 @@ export default function ReviewPanel({ items, questions }: { items: ReviewItem[];
 
   return (
     <section style={{ marginTop: "40px" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "16px",
-          marginBottom: "28px",
-        }}
-      >
-        <div
-          style={{
-            width: "52px",
-            height: "52px",
-            background: "#6366f1",
-            borderRadius: "16px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "0 8px 20px rgba(99,102,241,0.25)",
-          }}
-        >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#fff"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
+      <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "28px" }}>
+        <div style={{ width: "52px", height: "52px", background: "#6366f1", borderRadius: "16px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 20px rgba(99,102,241,0.25)" }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         </div>
         <div>
-          <h3 style={{ fontSize: "24px", fontWeight: 800, margin: 0, color: "#1e293b" }}>
-            Разбор прохождения
-          </h3>
-          <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#94a3b8", fontWeight: 600 }}>
-            Изучите свои ошибки, чтобы улучшить результат в следующий раз
-          </p>
+          <h3 style={{ fontSize: "24px", fontWeight: 800, margin: 0, color: "#1e293b" }}>Разбор прохождения</h3>
+          <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#94a3b8", fontWeight: 600 }}>Изучите свои ошибки, чтобы улучшить результат</p>
         </div>
       </div>
-
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        {items.map((r, idx) => renderItem(r, idx))}
-      </div>
-
+      <div style={{ display: "flex", flexDirection: "column" }}>{items.map((r, idx) => renderItem(r, idx))}</div>
       <style jsx>{`
         .badge-pill {
           font-size: 12px;
