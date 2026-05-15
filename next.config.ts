@@ -33,6 +33,8 @@ function getYandexRemotePatterns(): NonNullable<NextConfig["images"]>["remotePat
 const nextConfig: NextConfig = {
   poweredByHeader: false,
 
+  serverExternalPackages: ['sharp'],
+
   // serverBodySizeLimit существует в рантайме Next.js 13.4.4+, но отсутствует
   // в типах старых версий пакета — поэтому приводим к any.
   // Без этого Next.js обрезает тело запроса на 4 МБ до попадания в route handler,

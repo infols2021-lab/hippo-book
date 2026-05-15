@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import LoadingBlock from "@/components/LoadingBlock";
 import ErrorBox from "@/components/ErrorBox";
+import Modal from "@/components/Modal";
+import Dropzone from "@/components/Admin/ImageOptimizer/Dropzone";
+import SettingsPanel from "@/components/Admin/ImageOptimizer/SettingsPanel";
+import { processImages } from "@/lib/imageOptimizer";
 
 import MaterialsManagementTab from "./materials/MaterialsManagementTab";
 import AssignmentsTab from "./assignments/AssignmentsTab";
@@ -91,6 +95,12 @@ export default function AdminClient() {
   const [statsErr, setStatsErr] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState(0);
 
+  // Состояния для инструмента сжатия
+  const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
+  const [optimizerFiles, setOptimizerFiles] = useState<File[]>([]);
+  const [optimizerQuality, setOptimizerQuality] = useState(80);
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const tabs = useMemo(
     () => [
       { key: "materials" as const, label: "📦 Управление материалами" },
@@ -163,6 +173,16 @@ export default function AdminClient() {
     }
   }
 
+  // Обработчик сжатия
+  const handleOptimize = async () => {
+    if (optimizerFiles.length === 0) return;
+    setIsProcessing(true);
+    await processImages(optimizerFiles, optimizerQuality);
+    setOptimizerFiles([]);
+    setIsProcessing(false);
+    setIsOptimizerOpen(false);
+  };
+
   useEffect(() => {
     void loadStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,6 +210,15 @@ export default function AdminClient() {
 
             <button className="btn small" type="button" onClick={() => void loadStats()}>
               🔄 Обновить статистику
+            </button>
+
+            {/* Новая кнопка сжатия файлов */}
+            <button
+              className="btn small"
+              type="button"
+              onClick={() => setIsOptimizerOpen(true)}
+            >
+              🖼️ Сжатие файлов
             </button>
 
             <button className="btn small secondary" type="button" onClick={() => void logout()} disabled={loggingOut}>
@@ -294,6 +323,37 @@ export default function AdminClient() {
       {tab === "assignments" ? <AssignmentsTab /> : null}
       {tab === "users" ? <UsersTab /> : null}
       {tab === "requests" ? <RequestsTab onPendingChanged={(p) => setPendingRequests(p)} /> : null}
+
+      {/* Модальное окно инструмента сжатия */}
+      <Modal
+        open={isOptimizerOpen}
+        onClose={() => {
+          setIsOptimizerOpen(false);
+          setOptimizerFiles([]);
+        }}
+        title="🖼️ Сжатие изображений в WebP"
+        maxWidth={720}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <SettingsPanel quality={optimizerQuality} setQuality={setOptimizerQuality} />
+          <Dropzone files={optimizerFiles} setFiles={setOptimizerFiles} />
+
+          {optimizerFiles.length > 0 && (
+            <button
+              onClick={handleOptimize}
+              disabled={isProcessing}
+              className="btn"
+              style={{
+                width: "100%",
+                marginTop: "1rem",
+                background: isProcessing ? "#475569" : "linear-gradient(135deg, var(--accent2), #6dd3c0)",
+              }}
+            >
+              {isProcessing ? "⚡ Обработка и сжатие..." : "Скачать готовый ZIP архив"}
+            </button>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
