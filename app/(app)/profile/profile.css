@@ -5,7 +5,7 @@ html,
 body {
   margin: 0 !important;
   padding: 0 !important;
-  background: #c9efff; /* ультра ярче база */
+  background: #c9efff;
 }
 
 body {
@@ -18,7 +18,6 @@ body {
   padding: 0;
   min-height: 100vh;
 
-  /* ✅ НОВЫЕ ШРИФТЫ (читабельно на мобиле и ПК) */
   font-family:
     "Inter",
     ui-sans-serif,
@@ -39,10 +38,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* ✅ текст ещё темнее */
   color: #07172e;
-
-  /* ✅ фон ярче и насыщеннее */
   background-color: #c9efff;
   background-image:
     var(--profile-overlay, none),
@@ -55,7 +51,6 @@ body {
   background-attachment: fixed, fixed, fixed, fixed;
 }
 
-/* ✅ почти убрали “вуаль” */
 #profileBody::after {
   content: "";
   position: fixed;
@@ -65,7 +60,6 @@ body {
   z-index: 0;
 }
 
-/* ✅ анти-слипание мелкого текста */
 .brand-subtitle,
 .streak-chip-sub,
 .profile-email,
@@ -79,7 +73,6 @@ body {
   letter-spacing: 0.02em;
 }
 
-/* ✅ основной текст — мягче трекинг */
 .progress-title,
 .mini-val,
 .brand-title,
@@ -106,12 +99,10 @@ body {
   padding: 14px 16px;
   border-radius: 22px;
 
-  /* ✅ больше “чистого белого”, меньше тумана */
   background: rgba(255, 255, 255, 0.90);
   border: 1px solid rgba(255, 255, 255, 0.96);
   box-shadow: 0 18px 55px rgba(6, 30, 58, 0.14);
 
-  /* ✅ меньше blur => чётче */
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -134,7 +125,6 @@ body {
   letter-spacing: 0.5px;
   color: white;
 
-  /* ✅ ещё более сочный градиент */
   background: linear-gradient(135deg, rgba(20, 140, 255, 0.99), rgba(0, 235, 200, 0.99));
   box-shadow: 0 14px 34px rgba(0, 235, 200, 0.24);
 }
@@ -164,9 +154,9 @@ body {
 .nav-pill {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 
-  padding: 10px 16px;
+  padding: 10px 18px;
   border-radius: 16px;
   border: 0;
   cursor: pointer;
@@ -204,7 +194,7 @@ body {
   background: linear-gradient(135deg, rgba(255, 70, 70, 0.99), rgba(255, 140, 140, 0.99));
 }
 
-/* ===== Streak chip in topbar (larger + clickable) ===== */
+/* ===== Streak chip in topbar ===== */
 .streak-chip {
   min-width: 156px;
   height: 52px;
@@ -214,7 +204,7 @@ body {
   display: inline-grid;
   grid-template-columns: 32px auto;
   grid-template-rows: 1fr 1fr;
-  column-gap: 9px;
+  column-gap: 10px;
   align-items: center;
 
   color: #fff;
@@ -259,7 +249,8 @@ body {
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.2);
-  font-size: 17px;
+  font-size: 16px;
+  font-weight: 1000;
   line-height: 1;
   overflow: hidden;
 }
@@ -299,27 +290,22 @@ body {
   background: linear-gradient(135deg, rgba(148, 163, 184, 0.95), rgba(176, 190, 208, 0.95));
 }
 
-/* ✅ BRONZE — жирная бронза */
 .streak-chip--bronze {
   background: linear-gradient(135deg, rgba(184, 115, 51, 0.98), rgba(224, 169, 109, 0.96));
 }
 
-/* silver — как было */
 .streak-chip--silver {
   background: linear-gradient(135deg, rgba(148, 163, 184, 0.95), rgba(203, 213, 225, 0.95));
 }
 
-/* ✅ GOLD — прям золото */
 .streak-chip--gold {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.98), rgba(255, 215, 102, 0.98));
 }
 
-/* platinum — как было */
 .streak-chip--platinum {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(129, 140, 248, 0.95));
 }
 
-/* ✅ DIAMOND — алмаз, чтобы светилось */
 .streak-chip--diamond {
   background: linear-gradient(135deg, rgba(6, 182, 212, 0.98), rgba(59, 130, 246, 0.98));
   box-shadow:
@@ -328,7 +314,6 @@ body {
     0 0 28px rgba(59, 130, 246, 0.18);
 }
 
-/* ✅ LEGENDARY — разноцветный градиент + свечение */
 @keyframes legendaryShift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -361,12 +346,9 @@ body {
 
 .panel {
   border-radius: 26px;
-
-  /* ✅ ещё менее “молочное” стекло */
   background: rgba(255, 255, 255, 0.86);
   border: 1px solid rgba(255, 255, 255, 0.97);
   box-shadow: 0 22px 70px rgba(6, 30, 58, 0.14);
-
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   padding: 16px;
@@ -378,15 +360,15 @@ body {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.98);
   box-shadow: inset 0 0 0 1px rgba(25, 145, 255, 0.10);
-  padding: 18px 16px 16px;
+  padding: 24px 16px;
   text-align: center;
 }
 
-/* ✅ Bigger avatar circle (как на твоём скрине) */
+/* ===== Avatar ===== */
 .avatar-circle {
   width: 268px;
   height: 268px;
-  margin: 6px auto 16px;
+  margin: 6px auto 20px;
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(110, 190, 255, 0.25), rgba(78, 205, 196, 0.18));
   display: grid;
@@ -395,76 +377,37 @@ body {
   border: 8px solid rgba(255, 255, 255, 0.95);
 }
 
-/* ─────────────────────────────────────────────────────────────
-   Avatar outer circle theming by tier
-   ───────────────────────────────────────────────────────────── */
 .avatar-circle--none {
   background: inherit;
 }
 
 .avatar-circle.avatar-circle--bronze {
-  background: radial-gradient(
-    circle at 35% 30%,
-    rgba(255, 232, 204, 0.58),
-    rgba(184, 115, 51, 0.24) 55%,
-    rgba(224, 169, 109, 0.20) 100%
-  );
-  box-shadow:
-    0 24px 62px rgba(184, 115, 51, 0.16),
-    0 0 0 6px rgba(224, 169, 109, 0.10);
+  background: radial-gradient(circle at 35% 30%, rgba(255, 232, 204, 0.58), rgba(184, 115, 51, 0.24) 55%, rgba(224, 169, 109, 0.20) 100%);
+  box-shadow: 0 24px 62px rgba(184, 115, 51, 0.16), 0 0 0 6px rgba(224, 169, 109, 0.10);
 }
 
 .avatar-circle.avatar-circle--gold {
-  background: radial-gradient(
-    circle at 35% 30%,
-    rgba(255, 246, 214, 0.60),
-    rgba(245, 158, 11, 0.26) 55%,
-    rgba(255, 215, 102, 0.20) 100%
-  );
-  box-shadow:
-    0 24px 62px rgba(245, 158, 11, 0.16),
-    0 0 0 6px rgba(255, 215, 102, 0.12);
+  background: radial-gradient(circle at 35% 30%, rgba(255, 246, 214, 0.60), rgba(245, 158, 11, 0.26) 55%, rgba(255, 215, 102, 0.20) 100%);
+  box-shadow: 0 24px 62px rgba(245, 158, 11, 0.16), 0 0 0 6px rgba(255, 215, 102, 0.12);
 }
 
 .avatar-circle.avatar-circle--diamond {
-  background: radial-gradient(
-    circle at 35% 30%,
-    rgba(219, 255, 255, 0.60),
-    rgba(6, 182, 212, 0.24) 50%,
-    rgba(59, 130, 246, 0.20) 100%
-  );
-  box-shadow:
-    0 24px 68px rgba(59, 130, 246, 0.18),
-    0 0 0 6px rgba(6, 182, 212, 0.14),
-    0 0 50px rgba(59, 130, 246, 0.16);
+  background: radial-gradient(circle at 35% 30%, rgba(219, 255, 255, 0.60), rgba(6, 182, 212, 0.24) 50%, rgba(59, 130, 246, 0.20) 100%);
+  box-shadow: 0 24px 68px rgba(59, 130, 246, 0.18), 0 0 0 6px rgba(6, 182, 212, 0.14), 0 0 50px rgba(59, 130, 246, 0.16);
 }
 
 .avatar-circle.avatar-circle--legendary {
-  background: linear-gradient(
-    135deg,
-    rgba(124, 58, 237, 0.32),
-    rgba(37, 99, 235, 0.28),
-    rgba(6, 182, 212, 0.24),
-    rgba(236, 72, 153, 0.28)
-  );
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.32), rgba(37, 99, 235, 0.28), rgba(6, 182, 212, 0.24), rgba(236, 72, 153, 0.28));
   background-size: 220% 220%;
   animation: legendaryShift 6s ease-in-out infinite;
-  box-shadow:
-    0 26px 74px rgba(124, 58, 237, 0.18),
-    0 0 0 6px rgba(6, 182, 212, 0.14),
-    0 0 58px rgba(236, 72, 153, 0.14);
+  box-shadow: 0 26px 74px rgba(124, 58, 237, 0.18), 0 0 0 6px rgba(6, 182, 212, 0.14), 0 0 58px rgba(236, 72, 153, 0.14);
 }
 
 .avatar-inner {
   width: 228px;
   height: 228px;
   border-radius: 999px;
-  background: radial-gradient(
-    circle at 40% 30%,
-    #ffffff 0%,
-    rgba(255, 255, 255, 0.90) 65%,
-    rgba(255, 255, 255, 0.84) 100%
-  );
+  background: radial-gradient(circle at 40% 30%, #ffffff 0%, rgba(255, 255, 255, 0.90) 65%, rgba(255, 255, 255, 0.84) 100%);
   display: grid;
   place-items: center;
   border: 1px solid rgba(25, 145, 255, 0.16);
@@ -487,35 +430,29 @@ body {
   position: absolute;
   inset: 22px;
   border-radius: 999px;
-  background: radial-gradient(
-    circle at 32% 28%,
-    rgba(255, 255, 255, 0.98),
-    rgba(225, 250, 255, 0.78) 55%,
-    rgba(190, 235, 255, 0.56) 100%
-  );
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.98), rgba(225, 250, 255, 0.78) 55%, rgba(190, 235, 255, 0.56) 100%);
   filter: blur(0.12px);
   z-index: 0;
 }
 
 .profile-name {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 1000;
   color: #07172e;
   margin-top: 8px;
 }
 
-/* ===== title slot under name ===== */
 .profile-title-slot {
-  margin-top: 8px;
+  margin-top: 10px;
   margin-left: auto;
   margin-right: auto;
   max-width: 290px;
 
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 
-  padding: 7px 12px;
+  padding: 8px 16px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(25, 145, 255, 0.22);
@@ -523,19 +460,21 @@ body {
 }
 
 .profile-title-slot-icon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   background: rgba(25, 145, 255, 0.16);
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--accent-blue);
   flex: 0 0 auto;
 }
 
 .profile-title-slot-text {
   min-width: 0;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
   color: rgba(7, 23, 46, 0.82);
   white-space: nowrap;
@@ -544,13 +483,14 @@ body {
 }
 
 .profile-email {
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
   font-weight: 900;
   color: rgba(7, 23, 46, 0.60);
 }
 
-/* ===== Generic visual renderer for streak icon (image -> emoji fallback) ===== */
+/* ===== Visual Renderers ===== */
 .streak-visual {
   display: inline-grid;
   place-items: center;
@@ -576,9 +516,10 @@ body {
   width: 100%;
   height: 100%;
   line-height: 1;
+  font-weight: 1000;
+  color: var(--text-main);
 }
 
-/* avatar version */
 .streak-visual--avatar {
   position: relative;
   z-index: 1;
@@ -592,7 +533,6 @@ body {
   align-self: stretch;
 }
 
-/* ✅ Тут ключ: меньше padding => картинка реально большая */
 .avatar-icon .streak-visual__img--avatar {
   width: 100%;
   height: 100%;
@@ -612,7 +552,6 @@ body {
   transform: none;
 }
 
-/* top chip version */
 .streak-visual--chip {
   width: 100%;
   height: 100%;
@@ -626,10 +565,10 @@ body {
 }
 
 .streak-visual__emoji--chip {
-  font-size: 17px;
+  font-size: 16px;
+  color: white;
 }
 
-/* badge version */
 .streak-mini-badge-icon {
   width: 18px;
   height: 18px;
@@ -639,14 +578,13 @@ body {
   line-height: 1;
 }
 
-.streak-visual--badge {
+.streak-visual--badge,
+.streak-visual__img--badge {
   width: 18px;
   height: 18px;
 }
 
 .streak-visual__img--badge {
-  width: 18px;
-  height: 18px;
   object-fit: contain;
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.14));
 }
@@ -702,7 +640,7 @@ body {
 }
 
 .streak-mini-badge b {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 1000;
   letter-spacing: 0.2px;
 }
@@ -710,60 +648,34 @@ body {
 .streak-mini-badge--none {
   background: linear-gradient(135deg, rgba(148, 163, 184, 0.95), rgba(176, 190, 208, 0.95));
 }
-
-/* ✅ BRONZE */
 .streak-mini-badge--bronze {
   background: linear-gradient(135deg, rgba(184, 115, 51, 0.98), rgba(224, 169, 109, 0.96));
-  box-shadow:
-    0 10px 22px rgba(184, 115, 51, 0.22),
-    0 0 0 4px rgba(224, 169, 109, 0.10);
+  box-shadow: 0 10px 22px rgba(184, 115, 51, 0.22), 0 0 0 4px rgba(224, 169, 109, 0.10);
 }
-
 .streak-mini-badge--silver {
   background: linear-gradient(135deg, rgba(148, 163, 184, 0.95), rgba(203, 213, 225, 0.95));
 }
-
-/* ✅ GOLD */
 .streak-mini-badge--gold {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.98), rgba(255, 215, 102, 0.98));
-  box-shadow:
-    0 10px 22px rgba(245, 158, 11, 0.22),
-    0 0 0 4px rgba(255, 215, 102, 0.12);
+  box-shadow: 0 10px 22px rgba(245, 158, 11, 0.22), 0 0 0 4px rgba(255, 215, 102, 0.12);
 }
-
 .streak-mini-badge--platinum {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(129, 140, 248, 0.95));
 }
-
-/* ✅ DIAMOND glow */
 .streak-mini-badge--diamond {
   background: linear-gradient(135deg, rgba(6, 182, 212, 0.98), rgba(59, 130, 246, 0.98));
-  box-shadow:
-    0 12px 26px rgba(59, 130, 246, 0.25),
-    0 0 0 4px rgba(6, 182, 212, 0.16),
-    0 0 30px rgba(59, 130, 246, 0.20);
+  box-shadow: 0 12px 26px rgba(59, 130, 246, 0.25), 0 0 0 4px rgba(6, 182, 212, 0.16), 0 0 30px rgba(59, 130, 246, 0.20);
 }
-
-/* ✅ LEGENDARY rainbow */
 .streak-mini-badge--legendary {
-  background: linear-gradient(
-    135deg,
-    rgba(124, 58, 237, 0.98),
-    rgba(37, 99, 235, 0.98),
-    rgba(6, 182, 212, 0.98),
-    rgba(236, 72, 153, 0.98)
-  );
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.98), rgba(37, 99, 235, 0.98), rgba(6, 182, 212, 0.98), rgba(236, 72, 153, 0.98));
   background-size: 220% 220%;
   animation: legendaryShift 6s ease-in-out infinite;
-  box-shadow:
-    0 14px 28px rgba(124, 58, 237, 0.22),
-    0 0 0 4px rgba(6, 182, 212, 0.14),
-    0 0 36px rgba(236, 72, 153, 0.18);
+  box-shadow: 0 14px 28px rgba(124, 58, 237, 0.22), 0 0 0 4px rgba(6, 182, 212, 0.14), 0 0 36px rgba(236, 72, 153, 0.18);
 }
 
-/* phone/region mini card */
+/* ===== Info Mini Cards ===== */
 .profile-mini {
-  margin: 14px auto 14px;
+  margin: 14px auto 20px;
   max-width: 320px;
 
   display: grid;
@@ -782,7 +694,7 @@ body {
 }
 
 .mini-col {
-  padding: 12px 12px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -793,9 +705,9 @@ body {
   gap: 8px;
   align-items: center;
 
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 1000;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.8px;
   color: rgba(7, 23, 46, 0.56);
   text-transform: uppercase;
 }
@@ -806,17 +718,65 @@ body {
   color: #07172e;
 }
 
-.mini-ico {
-  width: 18px;
-  height: 18px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 6px;
-  background: rgba(25, 145, 255, 0.18);
-  color: rgba(7, 23, 46, 0.86);
+/* ===== Support Tech Card (NEW) ===== */
+.support-card {
+  width: 100%;
+  max-width: 320px;
+  margin: 16px auto 16px;
+  padding: 16px;
+
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow: 0 14px 30px rgba(6, 30, 58, 0.06);
 }
 
-/* Pills */
+.support-title {
+  font-weight: 1000;
+  font-size: 13px;
+  color: var(--text-soft);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.support-links {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.support-link {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 12px;
+  font-weight: 900;
+  font-size: 13px;
+  text-decoration: none;
+  transition: transform 0.12s ease, filter 0.12s ease;
+  color: white;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(6, 30, 58, 0.1);
+}
+
+.support-link--tg {
+  background: linear-gradient(135deg, #2AABEE, #229ED9);
+}
+
+.support-link--vk {
+  background: linear-gradient(135deg, #0077FF, #0055FF);
+}
+
+.support-link:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+
+.support-link:active {
+  transform: translateY(0);
+}
+
+/* ===== Pills & Summaries ===== */
 .pill {
   width: 100%;
   max-width: 320px;
@@ -827,7 +787,7 @@ body {
   justify-content: center;
   gap: 10px;
 
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-radius: 18px;
   border: 0;
 
@@ -847,21 +807,11 @@ body {
   background: linear-gradient(135deg, rgba(255, 70, 70, 0.99), rgba(255, 150, 150, 0.98));
 }
 
-.pill-icon {
-  width: 22px;
-  height: 22px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.22);
-  display: grid;
-  place-items: center;
-}
-
-/* ===== Streak summary under title (clickable rows) ===== */
 .streak-summary-card {
   width: 100%;
   max-width: 320px;
-  margin: 12px auto 8px;
-  padding: 8px 10px;
+  margin: 16px auto 16px;
+  padding: 8px 12px;
 
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.94);
@@ -888,7 +838,7 @@ body {
   -webkit-appearance: none;
   background: transparent;
   border: 0;
-  padding: 2px 2px;
+  padding: 4px 6px;
   border-radius: 10px;
   cursor: pointer;
   transition: background-color 0.12s ease, transform 0.12s ease;
@@ -908,19 +858,19 @@ body {
 }
 
 .streak-summary-key {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 1000;
   color: rgba(7, 23, 46, 0.70);
 }
 
 .streak-summary-value {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 1000;
   color: rgba(7, 23, 46, 0.94);
   white-space: nowrap;
 }
 
-/* Action buttons */
+/* ===== Action buttons ===== */
 .action-btn {
   width: 100%;
   max-width: 320px;
@@ -931,7 +881,7 @@ body {
   justify-content: center;
   gap: 10px;
 
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-radius: 18px;
   border: 0;
 
@@ -958,6 +908,7 @@ body {
   color: white;
   background: linear-gradient(135deg, rgba(0, 235, 200, 0.99), rgba(25, 145, 255, 0.99));
   box-shadow: 0 18px 40px rgba(0, 235, 200, 0.16);
+  margin-top: 20px;
 }
 
 .action-btn--soft {
@@ -979,34 +930,28 @@ body {
   background: rgba(255, 255, 255, 0.90);
   border: 1px solid rgba(255, 255, 255, 0.98);
   box-shadow: inset 0 0 0 1px rgba(25, 145, 255, 0.08);
-  padding: 16px;
+  padding: 24px;
 }
 
 .section + .section {
-  margin-top: 14px;
+  margin-top: 18px;
 }
 
 .section-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 
+  font-size: 18px;
   font-weight: 1000;
   color: rgba(7, 23, 46, 0.92);
-  margin: 2px 0 14px;
+  margin: 2px 0 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .section-title b {
   color: rgba(0, 210, 185, 1);
-}
-
-.section-ico {
-  width: 22px;
-  height: 22px;
-  border-radius: 8px;
-  background: rgba(25, 145, 255, 0.18);
-  display: grid;
-  place-items: center;
 }
 
 /* mini stats row */
@@ -1021,29 +966,31 @@ body {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.98);
   box-shadow: 0 14px 30px rgba(6, 30, 58, 0.06);
-  padding: 16px 14px;
+  padding: 20px 16px;
   text-align: center;
 }
 
 .mini-stat-number {
-  font-size: 34px;
+  font-size: 38px;
   font-weight: 1000;
   color: rgba(0, 210, 185, 1);
   line-height: 1;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .mini-stat-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
   color: rgba(7, 23, 46, 0.64);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* progress list */
 .progress-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .progress-row {
@@ -1051,7 +998,7 @@ body {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.98);
   box-shadow: 0 14px 28px rgba(6, 30, 58, 0.06);
-  padding: 12px 14px;
+  padding: 16px 18px;
 
   display: flex;
   align-items: center;
@@ -1077,13 +1024,13 @@ body {
   align-items: center;
   gap: 8px;
 
-  padding: 5px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
 
   font-size: 11px;
   font-weight: 1000;
-  letter-spacing: 0.3px;
-  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
   user-select: none;
 }
 
@@ -1100,13 +1047,13 @@ body {
 .progress-title {
   font-weight: 1000;
   color: rgba(7, 23, 46, 0.94);
-  font-size: 15px;
-  line-height: 1.2;
-  margin-bottom: 3px;
+  font-size: 16px;
+  line-height: 1.3;
+  margin-bottom: 4px;
 }
 
 .progress-sub {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
   color: rgba(7, 23, 46, 0.66);
 }
@@ -1114,7 +1061,7 @@ body {
 .progress-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .progress-bar {
@@ -1138,6 +1085,7 @@ body {
   text-align: right;
   font-weight: 1000;
   color: rgba(0, 210, 185, 1);
+  font-size: 16px;
 }
 
 /* info list */
@@ -1148,28 +1096,26 @@ body {
 
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .info-li {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: flex-start;
   color: rgba(7, 23, 46, 0.78);
   font-weight: 900;
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .info-bullet {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
-  background: rgba(25, 145, 255, 0.18);
-  display: grid;
-  place-items: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-blue);
   flex: 0 0 auto;
-  margin-top: 1px;
+  margin-top: 6px;
 }
 
 /* ===== Background loading badge ===== */
@@ -1179,9 +1125,10 @@ body {
   right: 18px;
   background: rgba(0, 0, 0, 0.65);
   color: white;
-  padding: 8px 12px;
+  padding: 8px 16px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 900;
   z-index: 1000;
 }
 
@@ -1204,16 +1151,18 @@ body {
 
 /* ===== Modal form polish (profile edit) ===== */
 #profileBody .form-group {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   text-align: left;
 }
 
 #profileBody .form-group label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-weight: 1000;
   font-size: 13px;
   color: rgba(7, 23, 46, 0.86);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 #profileBody .form-group input,
@@ -1221,7 +1170,7 @@ body {
 #profileBody .form-group textarea {
   width: 100%;
   box-sizing: border-box;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-radius: 14px;
   border: 1px solid rgba(25, 145, 255, 0.28);
   background: rgba(255, 255, 255, 0.96);
@@ -1229,6 +1178,7 @@ body {
   font-weight: 900;
   color: rgba(7, 23, 46, 0.95);
   outline: none;
+  font-size: 15px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -1251,255 +1201,11 @@ body {
 #profileBody .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 16px;
+  gap: 12px;
+  margin-top: 24px;
   flex-wrap: wrap;
-  padding-top: 12px;
+  padding-top: 16px;
   border-top: 1px solid rgba(7, 23, 46, 0.12);
-}
-
-/* ===== Streak placeholder modal content ===== */
-.streak-placeholder-modal {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.streak-placeholder-hero {
-  border-radius: 16px;
-  padding: 12px;
-  color: #fff;
-  display: grid;
-  grid-template-columns: 46px 1fr;
-  gap: 12px;
-  align-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 14px 30px rgba(15, 65, 95, 0.12);
-}
-
-.streak-placeholder-hero-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  font-size: 22px;
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.streak-placeholder-hero-main {
-  min-width: 0;
-}
-
-.streak-placeholder-hero-value {
-  font-size: 24px;
-  font-weight: 1000;
-  line-height: 1;
-}
-
-.streak-placeholder-hero-value span {
-  font-size: 13px;
-  font-weight: 900;
-  opacity: 0.95;
-}
-
-.streak-placeholder-hero-label {
-  margin-top: 5px;
-  font-size: 12px;
-  font-weight: 900;
-  opacity: 0.95;
-}
-
-.streak-placeholder-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.streak-placeholder-item {
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.98);
-  box-shadow: 0 12px 24px rgba(6, 30, 58, 0.06);
-  padding: 10px 12px;
-}
-
-.streak-placeholder-item-key {
-  font-size: 11px;
-  font-weight: 1000;
-  color: rgba(7, 23, 46, 0.58);
-}
-
-.streak-placeholder-item-value {
-  margin-top: 4px;
-  font-size: 14px;
-  font-weight: 1000;
-  color: rgba(7, 23, 46, 0.95);
-  line-height: 1.2;
-}
-
-.streak-placeholder-note {
-  border-radius: 14px;
-  background: rgba(25, 145, 255, 0.10);
-  border: 1px dashed rgba(25, 145, 255, 0.26);
-  padding: 10px 12px;
-  font-size: 12px;
-  font-weight: 900;
-  color: rgba(7, 23, 46, 0.80);
-  line-height: 1.35;
-}
-
-/* =======================================================================
-   STREAK LEADERBOARD MODAL (Top / Around + highlight "you")
-   ======================================================================= */
-.streak-leaderboard,
-.streak-leaderboard-modal {
-  display: grid;
-  gap: 12px;
-}
-
-.streak-lb-topline {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.streak-lb-title {
-  font-weight: 1000;
-  font-size: 16px;
-  letter-spacing: 0.01em;
-  color: rgba(7, 23, 46, 0.95);
-}
-
-.streak-lb-sub {
-  font-size: 12px;
-  font-weight: 900;
-  color: rgba(7, 23, 46, 0.68);
-}
-
-.streak-lb-note {
-  border-radius: 14px;
-  background: rgba(25, 145, 255, 0.10);
-  border: 1px dashed rgba(25, 145, 255, 0.26);
-  padding: 10px 12px;
-  font-size: 12px;
-  font-weight: 900;
-  color: rgba(7, 23, 46, 0.82);
-  line-height: 1.35;
-}
-
-.streak-lb-block {
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.98);
-  box-shadow: 0 14px 30px rgba(6, 30, 58, 0.06);
-  padding: 10px 10px;
-}
-
-.streak-lb-head {
-  display: grid;
-  grid-template-columns: 84px 1fr 1fr;
-  gap: 10px;
-  padding: 6px 10px 8px;
-  font-size: 11px;
-  font-weight: 1000;
-  letter-spacing: 0.4px;
-  color: rgba(7, 23, 46, 0.62);
-  text-transform: uppercase;
-}
-
-.streak-lb-row {
-  display: grid;
-  grid-template-columns: 84px 1fr 1fr;
-  gap: 10px;
-  align-items: center;
-
-  margin-top: 8px;
-  padding: 10px 10px;
-
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(25, 145, 255, 0.14);
-  box-shadow: 0 12px 24px rgba(6, 30, 58, 0.05);
-}
-
-.streak-lb-place {
-  font-weight: 1000;
-  color: rgba(7, 23, 46, 0.92);
-}
-
-.streak-lb-val {
-  font-weight: 1000;
-  color: rgba(7, 23, 46, 0.92);
-}
-
-.streak-lb-hint {
-  font-size: 11px;
-  font-weight: 900;
-  color: rgba(7, 23, 46, 0.62);
-  margin-top: 2px;
-}
-
-/* highlight "you" */
-.streak-lb-row--me {
-  background: linear-gradient(135deg, rgba(0, 235, 200, 0.16), rgba(25, 145, 255, 0.16));
-  border: 1px solid rgba(0, 210, 185, 0.28);
-  box-shadow:
-    0 14px 30px rgba(0, 235, 200, 0.08),
-    0 0 0 3px rgba(25, 145, 255, 0.10);
-}
-
-.streak-lb-youchip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-
-  padding: 4px 10px;
-  border-radius: 999px;
-
-  font-size: 11px;
-  font-weight: 1000;
-  color: rgba(7, 23, 46, 0.92);
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(25, 145, 255, 0.18);
-}
-
-/* loading/error rows */
-.streak-lb-state {
-  border-radius: 14px;
-  padding: 12px 12px;
-  font-weight: 900;
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.streak-lb-state--loading {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.92);
-  color: rgba(7, 23, 46, 0.78);
-}
-
-.streak-lb-state--error {
-  background: rgba(244, 67, 54, 0.08);
-  border: 1px solid rgba(244, 67, 54, 0.18);
-  color: #7f1d1d;
-}
-
-.streak-lb-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-@media (max-width: 520px) {
-  .streak-lb-head,
-  .streak-lb-row {
-    grid-template-columns: 70px 1fr 1fr;
-  }
 }
 
 /* ===== Responsive ===== */
@@ -1514,10 +1220,6 @@ body {
 
   .progress-bar {
     width: 140px;
-  }
-
-  .streak-placeholder-grid {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -1552,6 +1254,7 @@ body {
 
   .progress-right {
     justify-content: space-between;
+    margin-top: 10px;
   }
 
   .progress-bar {
@@ -1573,7 +1276,10 @@ body {
     inset: 20px;
   }
 
-  /* ✅ на очень узких — чуть крупнее мелкие подписи */
+  .support-links {
+    flex-direction: column;
+  }
+
   @media (max-width: 420px) {
     .brand-subtitle,
     .mini-cap,
@@ -1587,18 +1293,17 @@ body {
 }
 
 /* =======================================================================
-   HIGH-CONTRAST TEXT OVERRIDE (убираем серый/бледно-зелёный, всё читаемо)
+   HIGH-CONTRAST TEXT OVERRIDE
    ======================================================================= */
 #profileBody{
-  --text-strong: #04162f;  /* самый тёмный */
-  --text-main:   #07224a;  /* основной текст */
-  --text-soft:   #0b3563;  /* подписи/вторичный текст (НЕ серый) */
+  --text-strong: #04162f;
+  --text-main:   #07224a;
+  --text-soft:   #0b3563;
 
-  --accent-teal: #008a7a;  /* акцент (замена бледно-зелёному) */
-  --accent-blue: #0d63ff;  /* акцент-синий */
+  --accent-teal: #008a7a;
+  --accent-blue: #0d63ff;
 }
 
-/* Базовый цвет текста в контентных блоках */
 .panel,
 .profile-card,
 .section,
@@ -1609,7 +1314,6 @@ body {
   color: var(--text-main);
 }
 
-/* Заголовки/основные строки — максимально читаемо */
 .brand-title,
 .profile-name,
 .section-title,
@@ -1620,7 +1324,6 @@ body {
   color: var(--text-strong) !important;
 }
 
-/* Все “мелкие” подписи — НЕ серые, а тёмно-синие */
 .brand-subtitle,
 .profile-email,
 .mini-cap,
@@ -1633,29 +1336,19 @@ body {
 .progress-type--textbook,
 .progress-type--crossword {
   color: var(--text-soft) !important;
-  opacity: 1 !important; /* чтобы не выглядело “в тумане” */
+  opacity: 1 !important;
 }
 
-/* Акценты: вместо светло-зелёного — насыщенный тёмный teal */
 .section-title b,
 .mini-stat-number,
 .progress-percent {
   color: var(--accent-teal) !important;
 }
 
-/* Иконки-квадратики/плашки — чуть контрастнее, но без трогания твоих иконок */
-.section-ico,
-.mini-ico,
-.info-bullet {
-  color: var(--text-strong) !important;
-}
-
-/* Прогресс-бар фон — чуть темнее, чтобы было видно на ярком фоне */
 .progress-bar {
   background: rgba(4, 22, 47, 0.14) !important;
 }
 
-/* Текст в карточках прогресса — чётче */
 .progress-title { letter-spacing: 0.005em; }
 .progress-sub,
 .mini-cap,
@@ -1666,7 +1359,6 @@ body {
   line-height: 1.38;
 }
 
-/* leaderboard text uses the same vars */
 .streak-lb-title,
 .streak-lb-place,
 .streak-lb-val {

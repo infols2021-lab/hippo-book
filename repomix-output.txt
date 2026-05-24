@@ -1,4 +1,4 @@
-This file is a merged representation of a subset of the codebase, containing files not matching ignore patterns, combined into a single document by Repomix.
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
 
 ================================================================
 File Summary
@@ -6,7 +6,7 @@ File Summary
 
 Purpose:
 --------
-This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+This file contains a packed representation of the entire repository's contents.
 It is designed to be easily consumable by AI systems for analysis, code review,
 or other automated processes.
 
@@ -37,7 +37,6 @@ Notes:
 ------
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Files matching these patterns are excluded: dist/**, *.log
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -180,6 +179,7 @@ app/api/crossword-data/route.ts
 app/api/gatehouse/profile-progress/route.ts
 app/api/material-data/[id]/route.ts
 app/api/materials-data/route.ts
+app/api/optimize/route.ts
 app/api/profile-progress/route.ts
 app/api/profile-streak-icon/route.ts
 app/api/profile-streak-leaderboard/route.ts
@@ -215,6 +215,8 @@ components/Admin/AdminModal.tsx
 components/Admin/AdminTable.tsx
 components/Admin/AdminToolbar.tsx
 components/Admin/EmptyState.tsx
+components/Admin/ImageOptimizer/Dropzone.tsx
+components/Admin/ImageOptimizer/SettingsPanel.tsx
 components/Admin/LoadingState.tsx
 components/AppHeader.tsx
 components/BackToSourceButton.tsx
@@ -253,6 +255,7 @@ lib/data/profile.ts
 lib/data/requests.ts
 lib/exams/levels.ts
 lib/exams/recommendLevel.ts
+lib/imageOptimizer.ts
 lib/integrations/googleSheets.ts
 lib/materials/format.ts
 lib/materials/types.ts
@@ -5105,6 +5108,70 @@ export function GET(req: NextRequest) {
 }
 
 ================
+File: app/api/optimize/route.ts
+================
+import JSZip from 'jszip';
+import sharp from 'sharp';
+
+export async function POST(req: Request) {
+  try {
+    const formData = await req.formData();
+    const files = formData.getAll('files') as File[];
+    const quality = parseInt(formData.get('quality') as string) || 80;
+
+    // Проверка наличия файлов [cite: 16]
+    if (!files || files.length === 0) {
+      return new Response(JSON.stringify({ error: 'Файлы не найдены' }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const zip = new JSZip();
+
+    // Параллельная обработка всех изображений через sharp 
+    await Promise.all(
+      files.map(async (file) => {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        
+        // Конвертируем в WebP с заданным качеством
+        const webpBuffer = await sharp(buffer)
+          .webp({ quality })
+          .toBuffer();
+
+        // Убираем старое расширение и добавляем .webp
+        const newName = file.name.replace(/\.[^/.]+$/, '') + '.webp';
+        
+        // Добавляем файл в ZIP-архив
+        zip.file(newName, webpBuffer);
+      })
+    );
+
+    // Генерируем бинарные данные архива
+    const zipData = await zip.generateAsync({ type: 'uint8array' });
+
+    /**
+     * РЕШЕНИЕ ОШИБКИ ТИПИЗАЦИИ:
+     * Мы используем 'as unknown as BodyInit', чтобы TypeScript в Next.js 16 
+     * принял Uint8Array как валидное тело ответа Response.
+     */
+    return new Response(zipData as unknown as BodyInit, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': 'attachment; filename="optimized_images.zip"',
+      },
+    });
+
+  } catch (error) {
+    console.error('Критическая ошибка сервера:', error);
+    return new Response(JSON.stringify({ error: 'Ошибка сервера' }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+================
 File: app/api/profile-streak-leaderboard/route.ts
 ================
 // app/api/profile-streak-leaderboard/route.ts
@@ -7394,6 +7461,152 @@ File: components/Admin/AdminToolbar.tsx
 File: components/Admin/EmptyState.tsx
 ================
 
+
+================
+File: components/Admin/ImageOptimizer/Dropzone.tsx
+================
+'use client';
+
+import { useState, useRef, DragEvent, ChangeEvent, Dispatch, SetStateAction } from 'react';
+import { formatSize } from '@/lib/imageOptimizer';
+
+interface DropzoneProps {
+  files: File[];
+  setFiles: Dispatch<SetStateAction<File[]>>;
+}
+
+export default function Dropzone({ files, setFiles }: DropzoneProps) {
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(file => 
+      file.type.startsWith('image/')
+    );
+    
+    if (droppedFiles.length > 0) {
+      setFiles(prev => [...prev, ...droppedFiles]);
+    }
+  };
+
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files).filter(file => 
+        file.type.startsWith('image/')
+      );
+      setFiles(prev => [...prev, ...selectedFiles]);
+    }
+  };
+
+  const removeFile = (indexToRemove: number) => {
+    setFiles(files.filter((_, index) => index !== indexToRemove));
+  };
+
+  return (
+    <div>
+      <div 
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={`border-2 border-dashed rounded-3xl p-10 sm:p-16 text-center cursor-pointer transition-all duration-300 ease-out flex flex-col items-center justify-center gap-5
+          ${isDragging 
+            ? 'border-blue-500 bg-blue-500/10 scale-[1.02]' 
+            : 'border-slate-600 hover:border-slate-400 hover:bg-slate-800/40'}`}
+      >
+        <input 
+          type="file" 
+          multiple 
+          accept="image/*" 
+          className="hidden" 
+          ref={fileInputRef}
+          onChange={handleFileSelect}
+        />
+        <div className="text-7xl drop-shadow-lg transition-transform duration-300 hover:scale-110">📦</div>
+        <div>
+          <p className="text-2xl font-bold text-slate-100">Перетащи картинки сюда</p>
+          <p className="text-slate-400 mt-2 font-medium">или кликни, чтобы выбрать исходники</p>
+        </div>
+      </div>
+
+      {files.length > 0 && (
+        <div className="mt-8">
+          <div className="flex justify-between items-center mb-4 px-2">
+            <h3 className="text-lg font-bold text-slate-200">
+              Выбрано файлов
+            </h3>
+            <span className="bg-slate-700 text-slate-200 py-1 px-3 rounded-full text-sm font-bold">
+              {files.length} шт.
+            </span>
+          </div>
+          
+          <div className="max-h-[280px] overflow-y-auto space-y-2.5 pr-3 custom-scrollbar">
+            {files.map((file, index) => (
+              <div key={index} className="flex justify-between items-center bg-slate-950/50 p-4 rounded-xl border border-slate-700/60 hover:border-slate-500/60 transition-colors group">
+                <span className="truncate max-w-[50%] sm:max-w-[65%] text-slate-300 font-medium">
+                  {file.name}
+                </span>
+                <div className="flex items-center gap-4">
+                  <span className="text-slate-500 text-sm font-mono">{formatSize(file.size)}</span>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); removeFile(index); }}
+                    className="text-slate-400 hover:text-rose-400 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/10 transition-all opacity-100 sm:opacity-50 sm:group-hover:opacity-100"
+                  >
+                    Удалить
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+================
+File: components/Admin/ImageOptimizer/SettingsPanel.tsx
+================
+'use client';
+
+interface SettingsPanelProps {
+  quality: number;
+  setQuality: (value: number) => void;
+}
+
+export default function SettingsPanel({ quality, setQuality }: SettingsPanelProps) {
+  return (
+    <div className="mb-8 p-5 bg-slate-800/40 rounded-2xl border border-slate-700/50 hover:border-slate-600/50 transition-colors">
+      <div className="flex justify-between items-center mb-4">
+        <label className="font-semibold text-slate-300">Качество сжатия (WEBP)</label>
+        <span className="text-emerald-400 font-bold bg-emerald-400/10 px-4 py-1.5 rounded-xl border border-emerald-400/20">
+          {quality}%
+        </span>
+      </div>
+      <input 
+        type="range" 
+        min="10" 
+        max="100" 
+        value={quality}
+        onChange={(e) => setQuality(parseInt(e.target.value))}
+        className="w-full h-2.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-emerald-500 hover:accent-emerald-400 transition-all"
+      />
+    </div>
+  );
+}
 
 ================
 File: components/Admin/LoadingState.tsx
@@ -11374,6 +11587,48 @@ export function getGatehouseRecommendationShortMessage(
     recommendation.band,
   )}`;
 }
+
+================
+File: lib/imageOptimizer.ts
+================
+export const formatSize = (bytes: number) => {
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+};
+
+export const processImages = async (files: File[], quality: number) => {
+  if (files.length === 0) return;
+  
+  const formData = new FormData();
+  files.forEach(file => formData.append('files', file));
+  formData.append('quality', quality.toString());
+
+  try {
+    const response = await fetch('/api/optimize', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) throw new Error('Ошибка при сжатии сервером');
+
+    // Получаем архив в виде бинарных данных
+    const blob = await response.blob();
+    
+    // Создаем ссылку и триггерим скачивание файла
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'optimized_images.zip';
+    document.body.appendChild(a);
+    a.click();
+    
+    // Очищаем память браузера от ссылки
+    window.URL.revokeObjectURL(url);
+    a.remove();
+  } catch (error) {
+    console.error('Ошибка на клиенте:', error);
+    alert('Произошла ошибка при обработке изображений. Проверь консоль.');
+  }
+};
 
 ================
 File: lib/materials/format.ts
@@ -23530,23 +23785,6 @@ export async function POST(req: Request) {
 }
 
 ================
-File: app/globals.css
-================
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-================
 File: app/login/login.css
 ================
 /* app/login/login.css */
@@ -26454,309 +26692,6 @@ File: tsconfig.json
   ],
   "exclude": ["node_modules", ".next"]
   
-}
-
-================
-File: app/(admin)/admin/AdminClient.tsx
-================
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import LoadingBlock from "@/components/LoadingBlock";
-import ErrorBox from "@/components/ErrorBox";
-
-import MaterialsManagementTab from "./materials/MaterialsManagementTab";
-import AssignmentsTab from "./assignments/AssignmentsTab";
-import UsersTab from "./users/UsersTab";
-import RequestsTab from "./requests/RequestsTab";
-
-type Stats = {
-  textbooks: number;
-  crosswords: number;
-  assignments: number;
-  users: number;
-};
-
-type ReqStats = {
-  total: number;
-  pending: number;
-  processed: number;
-};
-
-type AdminTab = "materials" | "assignments" | "users" | "requests";
-
-type ApiOkStats = {
-  ok: true;
-  stats: Stats;
-};
-
-type ApiOkReqStats = {
-  ok: true;
-  stats: ReqStats;
-};
-
-type ApiErr = {
-  ok: false;
-  error: string;
-  code?: string;
-};
-
-async function safeJson(res: Response) {
-  const text = await res.text();
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-function normalizeUiErrorMessage(error: unknown, fallback = "Произошла ошибка") {
-  const raw =
-    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
-
-  const msg = raw.trim();
-
-  if (!msg) return fallback;
-
-  const lower = msg.toLowerCase();
-
-  if (
-    lower.includes("failed to fetch") ||
-    lower.includes("networkerror") ||
-    lower.includes("network request failed") ||
-    lower.includes("load failed")
-  ) {
-    return "Ошибка соединения с сервером";
-  }
-
-  return msg;
-}
-
-export default function AdminClient() {
-  const router = useRouter();
-
-  const [loggingOut, setLoggingOut] = useState(false);
-  const [tab, setTab] = useState<AdminTab>("materials");
-
-  const [stats, setStats] = useState<Stats>({
-    textbooks: 0,
-    crosswords: 0,
-    assignments: 0,
-    users: 0,
-  });
-
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [statsErr, setStatsErr] = useState<string | null>(null);
-  const [pendingRequests, setPendingRequests] = useState(0);
-
-  const tabs = useMemo(
-    () => [
-      { key: "materials" as const, label: "📦 Управление материалами" },
-      { key: "assignments" as const, label: "📝 Задания" },
-      { key: "users" as const, label: "👥 Пользователи" },
-      { key: "requests" as const, label: "📋 Заявки" },
-    ],
-    [],
-  );
-
-  async function loadStats() {
-    setLoadingStats(true);
-    setStatsErr(null);
-
-    try {
-      const [res1, res2] = await Promise.all([
-        fetch("/api/admin/stats", { cache: "no-store" }),
-        fetch("/api/admin/requests/stats", { cache: "no-store" }),
-      ]);
-
-      const json1 = (await safeJson(res1)) as ApiOkStats | ApiErr | null;
-      const json2 = (await safeJson(res2)) as ApiOkReqStats | ApiErr | null;
-
-      if (!res1.ok || !json1) {
-        throw new Error(`HTTP ${res1.status}`);
-      }
-
-      if (!json1.ok) {
-        throw new Error((json1 as ApiErr).error || "Не удалось загрузить статистику");
-      }
-
-      setStats(json1.stats);
-
-      if (res2.ok && json2 && json2.ok) {
-        setPendingRequests(json2.stats.pending || 0);
-      } else {
-        setPendingRequests(0);
-      }
-    } catch (e: any) {
-      setStatsErr(normalizeUiErrorMessage(e, "Не удалось загрузить статистику"));
-      setStats({
-        textbooks: 0,
-        crosswords: 0,
-        assignments: 0,
-        users: 0,
-      });
-      setPendingRequests(0);
-    } finally {
-      setLoadingStats(false);
-    }
-  }
-
-  async function logout() {
-    if (loggingOut) return;
-
-    const confirmed = window.confirm("Выйти из аккаунта?");
-    if (!confirmed) return;
-
-    try {
-      setLoggingOut(true);
-
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        cache: "no-store",
-      });
-    } finally {
-      router.push("/login");
-      router.refresh();
-      setLoggingOut(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const totalLegacyMaterials = Number(stats.textbooks || 0) + Number(stats.crosswords || 0);
-
-  return (
-    <div className="admin-container">
-      <div className="card" style={{ marginBottom: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <div>
-            <h2 style={{ margin: 0 }}>⚙️ Панель администратора</h2>
-            <div className="small-muted">Статистика + управление платформой.</div>
-          </div>
-
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <button className="btn small" type="button" onClick={() => router.push("/portal")}>
-              🏠 Портал
-            </button>
-
-            <button className="btn small" type="button" onClick={() => router.push("/profile")}>
-              👤 Профиль
-            </button>
-
-            <button className="btn small" type="button" onClick={() => void loadStats()}>
-              🔄 Обновить статистику
-            </button>
-
-            <button className="btn small secondary" type="button" onClick={() => void logout()} disabled={loggingOut}>
-              {loggingOut ? "Выходим..." : "🚪 Выйти"}
-            </button>
-          </div>
-        </div>
-
-        <div style={{ height: 10 }} />
-
-        {loadingStats ? <LoadingBlock text="Загружаем статистику..." /> : null}
-        {statsErr ? <ErrorBox message={statsErr} /> : null}
-
-        {!loadingStats && !statsErr ? (
-          <div className="admin-stats-grid">
-            <div className="admin-stat">
-              <div className="num">{totalLegacyMaterials}</div>
-              <div className="lbl">Олимп. материалов</div>
-            </div>
-
-            <div className="admin-stat">
-              <div className="num">{stats.textbooks}</div>
-              <div className="lbl">Учебников</div>
-            </div>
-
-            <div className="admin-stat">
-              <div className="num">{stats.crosswords}</div>
-              <div className="lbl">Кроссвордов</div>
-            </div>
-
-            <div className="admin-stat">
-              <div className="num">{stats.assignments}</div>
-              <div className="lbl">Заданий</div>
-            </div>
-
-            <div className="admin-stat">
-              <div className="num">{stats.users}</div>
-              <div className="lbl">Пользователей</div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-        {tabs.map((t) => {
-          const isActive = tab === t.key;
-          const isRequests = t.key === "requests";
-          const showBadge = isRequests && pendingRequests > 0;
-
-          return (
-            <button
-              key={t.key}
-              type="button"
-              className={isActive ? "btn" : "btn ghost"}
-              onClick={() => setTab(t.key)}
-              style={{
-                borderRadius: 14,
-                padding: "10px 14px",
-                fontWeight: 900,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                position: "relative",
-                ...(isRequests && pendingRequests > 0
-                  ? {
-                      border: "2px solid var(--accent)",
-                      boxShadow: "0 0 0 4px rgba(255,107,107,0.12)",
-                    }
-                  : {}),
-              }}
-            >
-              {t.label}
-
-              {showBadge ? (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: -8,
-                    right: -8,
-                    width: 22,
-                    height: 22,
-                    borderRadius: 999,
-                    background: "var(--accent)",
-                    color: "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 12,
-                    fontWeight: 900,
-                    boxShadow: "0 6px 12px rgba(255,107,107,0.22)",
-                  }}
-                >
-                  {pendingRequests > 99 ? "99" : pendingRequests}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-
-      {tab === "materials" ? <MaterialsManagementTab onChanged={loadStats} /> : null}
-      {tab === "assignments" ? <AssignmentsTab /> : null}
-      {tab === "users" ? <UsersTab /> : null}
-      {tab === "requests" ? <RequestsTab onPendingChanged={(p) => setPendingRequests(p)} /> : null}
-    </div>
-  );
 }
 
 ================
@@ -31044,6 +30979,42 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 }
 
 ================
+File: app/globals.css
+================
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+/* Кастомный скроллбар для компонентов инструмента сжатия */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.8);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 1);
+}
+
+================
 File: components/BackToSourceButton.tsx
 ================
 "use client";
@@ -32135,6 +32106,369 @@ export async function createSupabaseServerClient() {
       },
     },
   });
+}
+
+================
+File: app/(admin)/admin/AdminClient.tsx
+================
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import LoadingBlock from "@/components/LoadingBlock";
+import ErrorBox from "@/components/ErrorBox";
+import Modal from "@/components/Modal";
+import Dropzone from "@/components/Admin/ImageOptimizer/Dropzone";
+import SettingsPanel from "@/components/Admin/ImageOptimizer/SettingsPanel";
+import { processImages } from "@/lib/imageOptimizer";
+
+import MaterialsManagementTab from "./materials/MaterialsManagementTab";
+import AssignmentsTab from "./assignments/AssignmentsTab";
+import UsersTab from "./users/UsersTab";
+import RequestsTab from "./requests/RequestsTab";
+
+type Stats = {
+  textbooks: number;
+  crosswords: number;
+  assignments: number;
+  users: number;
+};
+
+type ReqStats = {
+  total: number;
+  pending: number;
+  processed: number;
+};
+
+type AdminTab = "materials" | "assignments" | "users" | "requests";
+
+type ApiOkStats = {
+  ok: true;
+  stats: Stats;
+};
+
+type ApiOkReqStats = {
+  ok: true;
+  stats: ReqStats;
+};
+
+type ApiErr = {
+  ok: false;
+  error: string;
+  code?: string;
+};
+
+async function safeJson(res: Response) {
+  const text = await res.text();
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeUiErrorMessage(error: unknown, fallback = "Произошла ошибка") {
+  const raw =
+    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
+
+  const msg = raw.trim();
+
+  if (!msg) return fallback;
+
+  const lower = msg.toLowerCase();
+
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network request failed") ||
+    lower.includes("load failed")
+  ) {
+    return "Ошибка соединения с сервером";
+  }
+
+  return msg;
+}
+
+export default function AdminClient() {
+  const router = useRouter();
+
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [tab, setTab] = useState<AdminTab>("materials");
+
+  const [stats, setStats] = useState<Stats>({
+    textbooks: 0,
+    crosswords: 0,
+    assignments: 0,
+    users: 0,
+  });
+
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [statsErr, setStatsErr] = useState<string | null>(null);
+  const [pendingRequests, setPendingRequests] = useState(0);
+
+  // Состояния для инструмента сжатия
+  const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
+  const [optimizerFiles, setOptimizerFiles] = useState<File[]>([]);
+  const [optimizerQuality, setOptimizerQuality] = useState(80);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const tabs = useMemo(
+    () => [
+      { key: "materials" as const, label: "📦 Управление материалами" },
+      { key: "assignments" as const, label: "📝 Задания" },
+      { key: "users" as const, label: "👥 Пользователи" },
+      { key: "requests" as const, label: "📋 Заявки" },
+    ],
+    [],
+  );
+
+  async function loadStats() {
+    setLoadingStats(true);
+    setStatsErr(null);
+
+    try {
+      const [res1, res2] = await Promise.all([
+        fetch("/api/admin/stats", { cache: "no-store" }),
+        fetch("/api/admin/requests/stats", { cache: "no-store" }),
+      ]);
+
+      const json1 = (await safeJson(res1)) as ApiOkStats | ApiErr | null;
+      const json2 = (await safeJson(res2)) as ApiOkReqStats | ApiErr | null;
+
+      if (!res1.ok || !json1) {
+        throw new Error(`HTTP ${res1.status}`);
+      }
+
+      if (!json1.ok) {
+        throw new Error((json1 as ApiErr).error || "Не удалось загрузить статистику");
+      }
+
+      setStats(json1.stats);
+
+      if (res2.ok && json2 && json2.ok) {
+        setPendingRequests(json2.stats.pending || 0);
+      } else {
+        setPendingRequests(0);
+      }
+    } catch (e: any) {
+      setStatsErr(normalizeUiErrorMessage(e, "Не удалось загрузить статистику"));
+      setStats({
+        textbooks: 0,
+        crosswords: 0,
+        assignments: 0,
+        users: 0,
+      });
+      setPendingRequests(0);
+    } finally {
+      setLoadingStats(false);
+    }
+  }
+
+  async function logout() {
+    if (loggingOut) return;
+
+    const confirmed = window.confirm("Выйти из аккаунта?");
+    if (!confirmed) return;
+
+    try {
+      setLoggingOut(true);
+
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        cache: "no-store",
+      });
+    } finally {
+      router.push("/login");
+      router.refresh();
+      setLoggingOut(false);
+    }
+  }
+
+  // Обработчик сжатия
+  const handleOptimize = async () => {
+    if (optimizerFiles.length === 0) return;
+    setIsProcessing(true);
+    await processImages(optimizerFiles, optimizerQuality);
+    setOptimizerFiles([]);
+    setIsProcessing(false);
+    setIsOptimizerOpen(false);
+  };
+
+  useEffect(() => {
+    void loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const totalLegacyMaterials = Number(stats.textbooks || 0) + Number(stats.crosswords || 0);
+
+  return (
+    <div className="admin-container">
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{ margin: 0 }}>⚙️ Панель администратора</h2>
+            <div className="small-muted">Статистика + управление платформой.</div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <button className="btn small" type="button" onClick={() => router.push("/portal")}>
+              🏠 Портал
+            </button>
+
+            <button className="btn small" type="button" onClick={() => router.push("/profile")}>
+              👤 Профиль
+            </button>
+
+            <button className="btn small" type="button" onClick={() => void loadStats()}>
+              🔄 Обновить статистику
+            </button>
+
+            {/* Новая кнопка сжатия файлов */}
+            <button
+              className="btn small"
+              type="button"
+              onClick={() => setIsOptimizerOpen(true)}
+            >
+              🖼️ Сжатие файлов
+            </button>
+
+            <button className="btn small secondary" type="button" onClick={() => void logout()} disabled={loggingOut}>
+              {loggingOut ? "Выходим..." : "🚪 Выйти"}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ height: 10 }} />
+
+        {loadingStats ? <LoadingBlock text="Загружаем статистику..." /> : null}
+        {statsErr ? <ErrorBox message={statsErr} /> : null}
+
+        {!loadingStats && !statsErr ? (
+          <div className="admin-stats-grid">
+            <div className="admin-stat">
+              <div className="num">{totalLegacyMaterials}</div>
+              <div className="lbl">Олимп. материалов</div>
+            </div>
+
+            <div className="admin-stat">
+              <div className="num">{stats.textbooks}</div>
+              <div className="lbl">Учебников</div>
+            </div>
+
+            <div className="admin-stat">
+              <div className="num">{stats.crosswords}</div>
+              <div className="lbl">Кроссвордов</div>
+            </div>
+
+            <div className="admin-stat">
+              <div className="num">{stats.assignments}</div>
+              <div className="lbl">Заданий</div>
+            </div>
+
+            <div className="admin-stat">
+              <div className="num">{stats.users}</div>
+              <div className="lbl">Пользователей</div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+        {tabs.map((t) => {
+          const isActive = tab === t.key;
+          const isRequests = t.key === "requests";
+          const showBadge = isRequests && pendingRequests > 0;
+
+          return (
+            <button
+              key={t.key}
+              type="button"
+              className={isActive ? "btn" : "btn ghost"}
+              onClick={() => setTab(t.key)}
+              style={{
+                borderRadius: 14,
+                padding: "10px 14px",
+                fontWeight: 900,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                position: "relative",
+                ...(isRequests && pendingRequests > 0
+                  ? {
+                      border: "2px solid var(--accent)",
+                      boxShadow: "0 0 0 4px rgba(255,107,107,0.12)",
+                    }
+                  : {}),
+              }}
+            >
+              {t.label}
+
+              {showBadge ? (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -8,
+                    right: -8,
+                    width: 22,
+                    height: 22,
+                    borderRadius: 999,
+                    background: "var(--accent)",
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    boxShadow: "0 6px 12px rgba(255,107,107,0.22)",
+                  }}
+                >
+                  {pendingRequests > 99 ? "99" : pendingRequests}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "materials" ? <MaterialsManagementTab onChanged={loadStats} /> : null}
+      {tab === "assignments" ? <AssignmentsTab /> : null}
+      {tab === "users" ? <UsersTab /> : null}
+      {tab === "requests" ? <RequestsTab onPendingChanged={(p) => setPendingRequests(p)} /> : null}
+
+      {/* Модальное окно инструмента сжатия */}
+      <Modal
+        open={isOptimizerOpen}
+        onClose={() => {
+          setIsOptimizerOpen(false);
+          setOptimizerFiles([]);
+        }}
+        title="🖼️ Сжатие изображений в WebP"
+        maxWidth={720}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <SettingsPanel quality={optimizerQuality} setQuality={setOptimizerQuality} />
+          <Dropzone files={optimizerFiles} setFiles={setOptimizerFiles} />
+
+          {optimizerFiles.length > 0 && (
+            <button
+              onClick={handleOptimize}
+              disabled={isProcessing}
+              className="btn"
+              style={{
+                width: "100%",
+                marginTop: "1rem",
+                background: isProcessing ? "#475569" : "linear-gradient(135deg, var(--accent2), #6dd3c0)",
+              }}
+            >
+              {isProcessing ? "⚡ Обработка и сжатие..." : "Скачать готовый ZIP архив"}
+            </button>
+          )}
+        </div>
+      </Modal>
+    </div>
+  );
 }
 
 ================
@@ -41184,73 +41518,6 @@ export async function uploadStorageObject(input: UploadStorageObjectInput) {
 }
 
 ================
-File: next.config.ts
-================
-// next.config.ts
-import type { NextConfig } from "next";
-
-function getSupabaseRemotePatterns(): NonNullable<NextConfig["images"]>["remotePatterns"] {
-  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!rawUrl) return [];
-
-  try {
-    const url = new URL(rawUrl);
-    if (!url.hostname) return [];
-
-    return [
-      {
-        protocol: url.protocol.replace(":", "") as "http" | "https",
-        hostname: url.hostname,
-        pathname: "/storage/v1/object/public/**",
-      },
-    ];
-  } catch {
-    return [];
-  }
-}
-
-function getYandexRemotePatterns(): NonNullable<NextConfig["images"]>["remotePatterns"] {
-  return [
-    {
-      protocol: "https" as const,
-      hostname: "storage.yandexcloud.net",
-    },
-  ];
-}
-
-const nextConfig: NextConfig = {
-  poweredByHeader: false,
-
-  // serverBodySizeLimit существует в рантайме Next.js 13.4.4+, но отсутствует
-  // в типах старых версий пакета — поэтому приводим к any.
-  // Без этого Next.js обрезает тело запроса на 4 МБ до попадания в route handler,
-  // что даёт 413 на аудиофайлах ≥ 5 МБ.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  experimental: {
-    serverBodySizeLimit: "20mb",
-  } as any,
-
-  images: {
-    remotePatterns: [
-      ...(getSupabaseRemotePatterns() ?? []),
-      ...(getYandexRemotePatterns() ?? []),
-    ],
-  },
-
-  async redirects() {
-    return [
-      {
-        source: "/:path*.html",
-        destination: "/:path*",
-        permanent: true,
-      },
-    ];
-  },
-};
-
-export default nextConfig;
-
-================
 File: app/(app)/assignment/components/ImageModal.tsx
 ================
 "use client";
@@ -43739,6 +44006,75 @@ export function calcAndBuildReview(
     review,
   };
 }
+
+================
+File: next.config.ts
+================
+// next.config.ts
+import type { NextConfig } from "next";
+
+function getSupabaseRemotePatterns(): NonNullable<NextConfig["images"]>["remotePatterns"] {
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!rawUrl) return [];
+
+  try {
+    const url = new URL(rawUrl);
+    if (!url.hostname) return [];
+
+    return [
+      {
+        protocol: url.protocol.replace(":", "") as "http" | "https",
+        hostname: url.hostname,
+        pathname: "/storage/v1/object/public/**",
+      },
+    ];
+  } catch {
+    return [];
+  }
+}
+
+function getYandexRemotePatterns(): NonNullable<NextConfig["images"]>["remotePatterns"] {
+  return [
+    {
+      protocol: "https" as const,
+      hostname: "storage.yandexcloud.net",
+    },
+  ];
+}
+
+const nextConfig: NextConfig = {
+  poweredByHeader: false,
+
+  serverExternalPackages: ['sharp'],
+
+  // serverBodySizeLimit существует в рантайме Next.js 13.4.4+, но отсутствует
+  // в типах старых версий пакета — поэтому приводим к any.
+  // Без этого Next.js обрезает тело запроса на 4 МБ до попадания в route handler,
+  // что даёт 413 на аудиофайлах ≥ 5 МБ.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  experimental: {
+    serverBodySizeLimit: "20mb",
+  } as any,
+
+  images: {
+    remotePatterns: [
+      ...(getSupabaseRemotePatterns() ?? []),
+      ...(getYandexRemotePatterns() ?? []),
+    ],
+  },
+
+  async redirects() {
+    return [
+      {
+        source: "/:path*.html",
+        destination: "/:path*",
+        permanent: true,
+      },
+    ];
+  },
+};
+
+export default nextConfig;
 
 ================
 File: app/(app)/assignment/components/QuestionMatching.tsx
@@ -46578,46 +46914,6 @@ export type AssignmentProgressRequestBody = {
 };
 
 ================
-File: package.json
-================
-{
-  "name": "test_hippo_book",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.1045.0",
-    "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.91.0",
-    "busboy": "^1.6.0",
-    "directory-tree": "^3.6.0",
-    "googleapis": "^171.2.0",
-    "next": "16.1.4",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "sharp": "^0.34.5",
-    "undici": "^7.25.0",
-    "xml-js": "^1.6.11"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/busboy": "^1.5.4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.4",
-    "tailwindcss": "^4",
-    "typescript": "^5"
-  }
-}
-
-================
 File: app/(app)/assignment/components/MediaRenderer.tsx
 ================
 "use client";
@@ -47205,6 +47501,48 @@ export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) 
       />
     </>
   );
+}
+
+================
+File: package.json
+================
+{
+  "name": "test_hippo_book",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1045.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.91.0",
+    "busboy": "^1.6.0",
+    "directory-tree": "^3.6.0",
+    "googleapis": "^171.2.0",
+    "jszip": "^3.10.1",
+    "next": "16.1.4",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "sharp": "^0.34.5",
+    "undici": "^7.25.0",
+    "xml-js": "^1.6.11"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/busboy": "^1.5.4",
+    "@types/jszip": "^3.4.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
 }
 
 ================

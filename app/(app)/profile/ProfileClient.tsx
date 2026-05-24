@@ -477,49 +477,49 @@ function getStreakTierUi(tierCode?: string, streakValue?: number) {
   switch (tierCode) {
     case "legendary":
       return {
-        icon: "👑",
+        icon: "Л",
         label: "Легендарный",
         className: "streak-chip--legendary",
         ringClassName: "streak-mini-badge--legendary",
       };
     case "diamond":
       return {
-        icon: "💎",
+        icon: "А",
         label: "Алмазный",
         className: "streak-chip--diamond",
         ringClassName: "streak-mini-badge--diamond",
       };
     case "platinum":
       return {
-        icon: "🌌",
+        icon: "П",
         label: "Платиновый",
         className: "streak-chip--platinum",
         ringClassName: "streak-mini-badge--platinum",
       };
     case "gold":
       return {
-        icon: "🥇",
+        icon: "З",
         label: "Золотой",
         className: "streak-chip--gold",
         ringClassName: "streak-mini-badge--gold",
       };
     case "silver":
       return {
-        icon: "🥈",
+        icon: "С",
         label: "Серебряный",
         className: "streak-chip--silver",
         ringClassName: "streak-mini-badge--silver",
       };
     case "bronze":
       return {
-        icon: "🥉",
+        icon: "Б",
         label: "Бронзовый",
         className: "streak-chip--bronze",
         ringClassName: "streak-mini-badge--bronze",
       };
     default:
       return {
-        icon: v > 0 ? "🔥" : "✨",
+        icon: v > 0 ? "С" : "",
         label: v > 0 ? "Серия" : "Нет серии",
         className: "streak-chip--none",
         ringClassName: "streak-mini-badge--none",
@@ -991,7 +991,7 @@ export default function ProfileClient({
       if (e) return e;
     }
 
-    return streakUiBase.icon || "✨";
+    return streakUiBase.icon || "С";
   }, [effectiveSelectedStreakIconCode, appliedIconCodeState, appliedIconEmojiFallbackState, streakUiBase.icon]);
 
   const avatarEmojiFallback = emojiFallbackForCurrentIcon;
@@ -1474,7 +1474,7 @@ export default function ProfileClient({
     const region = editRegion.trim();
 
     if (!fullName || !phone || !region) {
-      showNotification("❌ Заполните все поля", "error");
+      showNotification("Заполните все поля", "error");
       return;
     }
 
@@ -1516,10 +1516,10 @@ export default function ProfileClient({
         is_admin: typeof updated?.is_admin === "boolean" ? updated.is_admin : p.is_admin,
       }));
 
-      showNotification("✅ Профиль успешно обновлён!");
+      showNotification("Профиль успешно обновлён!");
       closeEdit();
     } catch (e: any) {
-      showNotification("❌ Ошибка обновления профиля: " + normalizeUiErrorMessage(e), "error");
+      showNotification("Ошибка обновления профиля: " + normalizeUiErrorMessage(e), "error");
     } finally {
       setSaving(false);
     }
@@ -1540,14 +1540,14 @@ export default function ProfileClient({
     const normalized = normalizeDbIconCode(iconCodeRaw);
 
     if (!normalized) {
-      showNotification("❌ Некорректный код иконки", "error");
+      showNotification("Некорректный код иконки", "error");
       return;
     }
 
     if (!options?.force && (savingStreakIcon || savingTitle || customUpdateDialog.open)) return;
 
     if (unlockedIconCodesForUi.length && !unlockedIconCodesForUi.includes(normalized)) {
-      showNotification("🔒 Иконка ещё не разблокирована", "error");
+      showNotification("Иконка ещё не разблокирована", "error");
       return;
     }
 
@@ -1593,7 +1593,7 @@ export default function ProfileClient({
       setSelectedStreakIconCodeLocal(null);
       setCustomUpdateDialog(getClosedCustomUpdateDialog());
 
-      showNotification("✅ Иконка серии успешно обновлена");
+      showNotification("Иконка серии успешно обновлена");
 
       void refreshStreakFromApi({ silent: true, force: true });
     } catch (e: any) {
@@ -1650,7 +1650,7 @@ export default function ProfileClient({
       setEquippedTitleLabelState(savedLabel);
       setCustomUpdateDialog(getClosedCustomUpdateDialog());
 
-      showNotification("✅ Титул успешно обновлён");
+      showNotification("Титул успешно обновлён");
 
       setTitleModalOpen(false);
 
@@ -1701,7 +1701,7 @@ export default function ProfileClient({
       setEquippedTitleLabelState(null);
       setCustomUpdateDialog(getClosedCustomUpdateDialog());
 
-      showNotification("✅ Титул успешно сброшен");
+      showNotification("Титул успешно сброшен");
 
       setTitleModalOpen(false);
 
@@ -1734,7 +1734,7 @@ export default function ProfileClient({
   const streakChipSub = streakLoading
     ? "серия"
     : streak?.done_today
-      ? "сегодня ✅"
+      ? "сделано сегодня"
       : streakDisplay > 0
         ? "сохранить сегодня"
         : "начни серию";
@@ -1770,7 +1770,7 @@ export default function ProfileClient({
         </div>
       ) : null}
 
-      <Modal open={editOpen} onClose={closeEdit} title="✏️ Редактирование профиля" maxWidth={520}>
+      <Modal open={editOpen} onClose={closeEdit} title="Редактирование профиля" maxWidth={520}>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -1816,11 +1816,11 @@ export default function ProfileClient({
 
           <div className="modal-actions">
             <button type="button" className="btn secondary" onClick={closeEdit}>
-              ❌ Отмена
+              Отмена
             </button>
 
             <button type="submit" className="btn" disabled={saving}>
-              {saving ? "Сохранение..." : "💾 Сохранить изменения"}
+              {saving ? "Сохранение..." : "Сохранить изменения"}
             </button>
           </div>
         </form>
@@ -1908,7 +1908,7 @@ export default function ProfileClient({
 
               <div className="modal-actions" style={{ justifyContent: "flex-end" }}>
                 <button type="button" className="btn secondary" disabled>
-                  ⏳ Обновление...
+                  Обновление...
                 </button>
               </div>
             </>
@@ -1925,7 +1925,7 @@ export default function ProfileClient({
                   padding: "12px 14px",
                 }}
               >
-                <span style={{ fontSize: 20, lineHeight: 1 }}>❌</span>
+                <span style={{ fontSize: 20, lineHeight: 1, fontWeight: 900 }}>!</span>
 
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ fontWeight: 900, color: "#b71c1c" }}>Не удалось обновить</div>
@@ -1937,11 +1937,11 @@ export default function ProfileClient({
 
               <div className="modal-actions">
                 <button type="button" className="btn secondary" onClick={closeCustomUpdateDialog}>
-                  ✖ Закрыть
+                  Закрыть
                 </button>
 
                 <button type="button" className="btn" onClick={() => void retryCustomUpdateDialogAction()}>
-                  🔄 Повторить
+                  Повторить
                 </button>
               </div>
             </>
@@ -1955,7 +1955,7 @@ export default function ProfileClient({
             <div className="brand-mark">EK</div>
             <div>
               <div className="brand-title">Учебники Хиппоши</div>
-              <div className="brand-subtitle">☕ Образовательная платформа</div>
+              <div className="brand-subtitle">Образовательная платформа</div>
             </div>
           </div>
 
@@ -1998,19 +1998,19 @@ export default function ProfileClient({
               title="Открыть топ по сериям"
               aria-label="Открыть топ по сериям"
             >
-              <span>🏅</span>Топ
+              Топ серий
             </button>
 
             <Link className="nav-pill nav-pill--info" href="/info">
-              <span>📄</span>Информация
+              Информация
             </Link>
 
             <Link className="nav-pill nav-pill--materials" href="/materials">
-              <span>📚</span>Материалы
+              Материалы
             </Link>
 
             <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}>
-              <span>⏻</span>Выйти
+              Выйти
             </button>
           </div>
         </div>
@@ -2073,44 +2073,10 @@ export default function ProfileClient({
                   opacity: customUpdateDialog.open ? 0.88 : 1,
                 }}
               >
-                <div
-                  className="profile-title-slot"
-                  style={{
-                    position: "relative",
-                    minHeight: 44,
-                    paddingTop: 8,
-                    paddingBottom: 8,
-                    paddingLeft: 12,
-                    paddingRight: 12,
-                    borderRadius: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <span
-                    className="profile-title-slot-icon"
-                    style={{
-                      fontSize: 16,
-                      lineHeight: 1,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    🏷️
-                  </span>
+                <div className="profile-title-slot">
+                  <span className="profile-title-slot-icon">Т</span>
 
-                  <span
-                    className="profile-title-slot-text"
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 900,
-                      lineHeight: 1.15,
-                      letterSpacing: "0.01em",
-                      color: "#4f6276",
-                    }}
-                  >
+                  <span className="profile-title-slot-text">
                     {titleText}
                   </span>
 
@@ -2120,12 +2086,13 @@ export default function ProfileClient({
                       marginLeft: "auto",
                       opacity: 0.9,
                       fontWeight: 900,
-                      fontSize: 16,
+                      fontSize: 12,
                       paddingLeft: 10,
                       lineHeight: 1,
+                      color: "var(--accent-blue)"
                     }}
                   >
-                    {titleSavingNow ? "⏳" : "✨"}
+                    {titleSavingNow ? "Ожидание..." : "Изменить"}
                   </span>
                 </div>
               </button>
@@ -2137,7 +2104,7 @@ export default function ProfileClient({
                   onClick={openStreakModal}
                   title="Открыть подробности серии"
                 >
-                  <span className="streak-summary-key">🔥 Текущая серия</span>
+                  <span className="streak-summary-key">Текущая серия</span>
                   <span className="streak-summary-value">{streakLoading ? "…" : `${streakDisplay} дн.`}</span>
                 </button>
 
@@ -2147,7 +2114,7 @@ export default function ProfileClient({
                   onClick={openStreakModal}
                   title="Открыть подробности серии"
                 >
-                  <span className="streak-summary-key">🏆 Рекорд</span>
+                  <span className="streak-summary-key">Рекорд</span>
                   <span className="streak-summary-value">{streakLoading ? "…" : `${longestStreakDisplay} дн.`}</span>
                 </button>
               </div>
@@ -2156,32 +2123,51 @@ export default function ProfileClient({
 
               <div className="profile-mini">
                 <div className="mini-col">
-                  <div className="mini-cap">
-                    <span className="mini-ico">📞</span> ТЕЛЕФОН
-                  </div>
+                  <div className="mini-cap">ТЕЛЕФОН</div>
                   <div className="mini-val">{phoneLabel(profile.contact_phone)}</div>
                 </div>
 
                 <div className="profile-mini-divider" />
 
                 <div className="mini-col">
-                  <div className="mini-cap">
-                    <span className="mini-ico">📍</span> РЕГИОН
-                  </div>
+                  <div className="mini-cap">РЕГИОН</div>
                   <div className="mini-val">{regionLabel(profile.region)}</div>
                 </div>
               </div>
 
               <div className="pill pill--teal">
-                <span className="pill-icon">📘</span>Доступно заданий: {stats?.totalAvailableAssignments ?? "—"}
+                Доступно заданий: {stats?.totalAvailableAssignments ?? "—"}
               </div>
 
               <div className="pill pill--red">
-                <span className="pill-icon">✅</span>Выполнено: {stats?.completedAvailableAssignments ?? "—"}
+                Выполнено: {stats?.completedAvailableAssignments ?? "—"}
+              </div>
+
+              {/* БЛОК ПОДДЕРЖКИ */}
+              <div className="support-card">
+                <div className="support-title">Служба поддержки</div>
+                <div className="support-links">
+                  <a 
+                    href="https://t.me/skebobingg" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="support-link support-link--tg"
+                  >
+                    Telegram
+                  </a>
+                  <a 
+                    href="https://vk.com/bluntokyr" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="support-link support-link--vk"
+                  >
+                    ВКонтакте
+                  </a>
+                </div>
               </div>
 
               <button className="action-btn action-btn--primary" onClick={openEdit} type="button">
-                <span>✏️</span> Редактировать профиль
+                Редактировать профиль
               </button>
 
               <button
@@ -2191,7 +2177,7 @@ export default function ProfileClient({
                 title="Открыть топ по сериям"
                 aria-label="Открыть топ по сериям"
               >
-                <span>🏅</span> Топ по сериям
+                Топ по сериям
               </button>
 
               <button
@@ -2201,12 +2187,12 @@ export default function ProfileClient({
                 }}
                 type="button"
               >
-                <span>📝</span> Заявки на покупку
+                Заявки на покупку
               </button>
 
               {profile.is_admin ? (
                 <Link className="action-btn action-btn--soft" href="/admin">
-                  <span>⚙️</span> Админка
+                  Панель управления
                 </Link>
               ) : null}
             </div>
@@ -2215,7 +2201,7 @@ export default function ProfileClient({
           <main className="panel">
             <section className="section">
               <div className="section-title">
-                <span className="section-ico">📊</span>Статистика по доступным <b>материалам</b>
+                Статистика по доступным <b>материалам</b>
               </div>
 
               <div className="mini-stats">
@@ -2237,27 +2223,27 @@ export default function ProfileClient({
 
               {progressLoading ? (
                 <div style={{ marginTop: 12, fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>
-                  🔄 Подгружаем прогресс...
+                  Подгружаем прогресс...
                 </div>
               ) : null}
 
               {progressError ? (
                 <div style={{ marginTop: 12, fontWeight: 900, color: "#c62828" }}>
-                  ❌ Прогресс не загрузился: {progressError}
+                  Прогресс не загрузился: {progressError}
                 </div>
               ) : null}
             </section>
 
             <section className="section">
               <div className="section-title">
-                <span className="section-ico">📁</span>Прогресс по доступным <b>материалам</b>
+                Прогресс по доступным <b>материалам</b>
               </div>
 
               {!materialsProgress ? (
-                <div style={{ fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>📚 Загрузка материалов...</div>
+                <div style={{ fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>Загрузка материалов...</div>
               ) : materialsProgress.length === 0 ? (
                 <div style={{ fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>
-                  📚 Материалы пока не доступны
+                  Материалы пока не доступны
                   <div style={{ marginTop: 6, fontWeight: 700 }}>Обратитесь к администратору для получения доступа</div>
                 </div>
               ) : (
@@ -2277,7 +2263,7 @@ export default function ProfileClient({
                             (m.kind === "textbook" ? "progress-type--textbook" : "progress-type--crossword")
                           }
                         >
-                          {m.kind === "textbook" ? "📗 УЧЕБНИК" : "🧩 КРОССВОРД"}
+                          {m.kind === "textbook" ? "УЧЕБНИК" : "КРОССВОРД"}
                         </div>
 
                         <div className="progress-title">{m.title}</div>
@@ -2305,23 +2291,22 @@ export default function ProfileClient({
 
             <section className="section">
               <div className="section-title">
-                <span className="section-ico">💡</span>
                 <b>Информация</b>
               </div>
 
               <ul className="info-list">
                 <li className="info-li">
-                  <span className="info-bullet">▢</span>
+                  <span className="info-bullet" />
                   На этой странице отображается ваш прогресс по доступным учебникам и кроссвордам.
                 </li>
 
                 <li className="info-li">
-                  <span className="info-bullet">▢</span>В разделе "Прогресс по материалам" показаны все учебники и кроссворды,
-                  к которым у вас есть доступ.
+                  <span className="info-bullet" />
+                  В разделе "Прогресс по материалам" показаны все учебники и кроссворды, к которым у вас есть доступ.
                 </li>
 
                 <li className="info-li">
-                  <span className="info-bullet">▢</span>
+                  <span className="info-bullet" />
                   <span>
                     <b>Совет:</b> регулярно занимайтесь для достижения лучших результатов!
                   </span>
