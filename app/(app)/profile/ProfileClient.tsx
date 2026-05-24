@@ -2018,6 +2018,8 @@ export default function ProfileClient({
         <div className="profile-layout">
           <aside className="panel">
             <div className="profile-card">
+              
+              {/* Аватар теперь кликабельный */}
               <div
                 className={(() => {
                   const allowed = new Set(["none", "bronze", "silver", "gold", "platinum", "diamond", "legendary"]);
@@ -2025,8 +2027,12 @@ export default function ProfileClient({
 
                   return `avatar-circle avatar-circle--${t}`;
                 })()}
-                role="img"
+                role="button"
+                tabIndex={0}
+                onClick={openStreakModal}
+                style={{ cursor: "pointer" }}
                 aria-label="Иконка награды профиля"
+                title="Открыть серию активности"
               >
                 <div className="avatar-inner">
                   <div className="avatar-icon" aria-hidden="true">
@@ -2097,12 +2103,36 @@ export default function ProfileClient({
                 </div>
               </button>
 
-              <div className="streak-summary-card">
+              {/* БЛОК 2: Контакты (Почта, Телефон, Регион) */}
+              <div className="profile-mini" style={{ display: "flex", flexDirection: "column", padding: "4px 0", maxWidth: "100%" }}>
+                <div className="mini-col" style={{ padding: "10px 16px" }}>
+                  <div className="mini-cap">EMAIL</div>
+                  <div className="mini-val" style={{ wordBreak: "break-all" }}>{userEmail || "—"}</div>
+                </div>
+                
+                <div className="profile-mini-divider" style={{ width: "100%", height: "1px" }} />
+                
+                <div className="mini-col" style={{ padding: "10px 16px" }}>
+                  <div className="mini-cap">ТЕЛЕФОН</div>
+                  <div className="mini-val">{phoneLabel(profile.contact_phone)}</div>
+                </div>
+                
+                <div className="profile-mini-divider" style={{ width: "100%", height: "1px" }} />
+                
+                <div className="mini-col" style={{ padding: "10px 16px" }}>
+                  <div className="mini-cap">РЕГИОН</div>
+                  <div className="mini-val">{regionLabel(profile.region)}</div>
+                </div>
+              </div>
+
+              {/* БЛОК 3: Статистика текстом (Серии и Задания) */}
+              <div className="streak-summary-card" style={{ padding: "12px 16px", maxWidth: "100%" }}>
                 <button
                   type="button"
                   className="streak-summary-row streak-summary-row--button"
                   onClick={openStreakModal}
                   title="Открыть подробности серии"
+                  style={{ padding: "6px" }}
                 >
                   <span className="streak-summary-key">Текущая серия</span>
                   <span className="streak-summary-value">{streakLoading ? "…" : `${streakDisplay} дн.`}</span>
@@ -2113,38 +2143,29 @@ export default function ProfileClient({
                   className="streak-summary-row streak-summary-row--button"
                   onClick={openStreakModal}
                   title="Открыть подробности серии"
+                  style={{ padding: "6px" }}
                 >
                   <span className="streak-summary-key">Рекорд</span>
                   <span className="streak-summary-value">{streakLoading ? "…" : `${longestStreakDisplay} дн.`}</span>
                 </button>
-              </div>
 
-              <div className="profile-email">{userEmail || "—"}</div>
-
-              <div className="profile-mini">
-                <div className="mini-col">
-                  <div className="mini-cap">ТЕЛЕФОН</div>
-                  <div className="mini-val">{phoneLabel(profile.contact_phone)}</div>
+                <div className="streak-summary-row" style={{ padding: "6px" }}>
+                  <span className="streak-summary-key">Доступно заданий</span>
+                  <span className="streak-summary-value">{stats?.totalAvailableAssignments ?? "—"}</span>
                 </div>
 
-                <div className="profile-mini-divider" />
-
-                <div className="mini-col">
-                  <div className="mini-cap">РЕГИОН</div>
-                  <div className="mini-val">{regionLabel(profile.region)}</div>
+                <div className="streak-summary-row" style={{ padding: "6px" }}>
+                  <span className="streak-summary-key">Выполнено</span>
+                  <span className="streak-summary-value">{stats?.completedAvailableAssignments ?? "—"}</span>
                 </div>
               </div>
 
-              <div className="pill pill--teal">
-                Доступно заданий: {stats?.totalAvailableAssignments ?? "—"}
-              </div>
+              {/* БЛОК 4: Управление и поддержка */}
+              <button className="action-btn action-btn--soft" onClick={openEdit} type="button">
+                Редактировать профиль
+              </button>
 
-              <div className="pill pill--red">
-                Выполнено: {stats?.completedAvailableAssignments ?? "—"}
-              </div>
-
-              {/* БЛОК ПОДДЕРЖКИ */}
-              <div className="support-card">
+              <div className="support-card" style={{ maxWidth: "100%" }}>
                 <div className="support-title">Служба поддержки</div>
                 <div className="support-links">
                   <a 
@@ -2165,20 +2186,6 @@ export default function ProfileClient({
                   </a>
                 </div>
               </div>
-
-              <button className="action-btn action-btn--primary" onClick={openEdit} type="button">
-                Редактировать профиль
-              </button>
-
-              <button
-                className="action-btn action-btn--soft"
-                onClick={openLeaderboardModal}
-                type="button"
-                title="Открыть топ по сериям"
-                aria-label="Открыть топ по сериям"
-              >
-                Топ по сериям
-              </button>
 
               <button
                 className="action-btn action-btn--dangerSoft"
