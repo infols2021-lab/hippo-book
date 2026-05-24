@@ -1,6 +1,9 @@
+// app/(app)/portal/PortalClient.tsx
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState, MouseEvent } from "react";
 import PortalCard from "@/components/portal/PortalCard";
 import LogoutButton from "@/components/LogoutButton";
 import { BRANCH_CONFIGS } from "@/lib/branches/config";
@@ -23,9 +26,22 @@ function getDisplayName(userName: string, userEmail: string): string {
 
 export default function PortalClient({ userName, userEmail, isAdmin }: PortalClientProps) {
   const displayName = getDisplayName(userName, userEmail);
+  const router = useRouter();
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Кастомный перехват клика для запуска анимации портала перед редиректом
+  const handleBranchClick = (e: MouseEvent<HTMLDivElement>, href: string) => {
+    e.preventDefault();
+    if (isTransitioning) return;
+    
+    setIsTransitioning(true);
+    setTimeout(() => {
+      router.push(href);
+    }, 600000000000); // 600мс на красивый эффект затягивания
+  };
 
   return (
-    <main className="portal-page">
+    <main className={`portal-page ${isTransitioning ? "portal-active-warp" : ""}`}>
       <div className="portal-bg" aria-hidden="true">
         <div className="portal-bg__half portal-bg__half--olympiad" />
         <div className="portal-bg__half portal-bg__half--gatehouse" />
@@ -41,14 +57,14 @@ export default function PortalClient({ userName, userEmail, isAdmin }: PortalCli
             <p className="portal-eyebrow">Выберите направление</p>
             <h1 className="portal-title">Добро пожаловать, {displayName}</h1>
             <p className="portal-subtitle">
-              Один аккаунт, два пространства: олимпиада и экзамены Gatehouse Awards.
+              One account, two spaces: olympiad and Gatehouse Awards exams.
             </p>
           </div>
 
           <div className="portal-header__actions">
             {isAdmin ? (
               <Link className="portal-header__link portal-header__link--admin" href="/admin">
-                Админка
+                Панель управления
               </Link>
             ) : null}
 
@@ -57,11 +73,19 @@ export default function PortalClient({ userName, userEmail, isAdmin }: PortalCli
         </header>
 
         <div className="portal-split" aria-label="Выбор раздела платформы">
-          <div className="portal-split__side portal-split__side--olympiad">
+          <div 
+            className="portal-split__side portal-split__side--olympiad"
+            onClick={(e) => handleBranchClick(e, "/profile")}
+            style={{ cursor: "pointer" }}
+          >
             <PortalCard branch="olympiad" card={BRANCH_CONFIGS.olympiad.portalCard} side="left" />
           </div>
 
-          <div className="portal-split__side portal-split__side--gatehouse">
+          <div 
+            className="portal-split__side portal-split__side--gatehouse"
+            onClick={(e) => handleBranchClick(e, "/gatehouse/profile")}
+            style={{ cursor: "pointer" }}
+          >
             <PortalCard branch="gatehouse" card={BRANCH_CONFIGS.gatehouse.portalCard} side="right" />
           </div>
         </div>
