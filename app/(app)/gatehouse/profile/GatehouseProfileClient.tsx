@@ -137,6 +137,7 @@ export default function GatehouseProfileClient({
     region: normalizeRegionValue(initialProfile.region),
   });
 
+  const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -144,6 +145,17 @@ export default function GatehouseProfileClient({
   const displayName = getDisplayName(profile);
 
   const hasCurrentRegionOption = !form.region || REGION_OPTIONS.some((region) => region.value === form.region);
+
+  function handleCancel() {
+    setForm({
+      full_name: profile.full_name,
+      contact_phone: profile.contact_phone,
+      region: profile.region,
+    });
+    setIsEditing(false);
+    setSuccessMessage("");
+    setErrorMessage("");
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -197,6 +209,7 @@ export default function GatehouseProfileClient({
       });
 
       setSuccessMessage("Профиль обновлён. Эти данные также обновятся в олимпиаде.");
+      setIsEditing(false);
     } catch (error: any) {
       setErrorMessage(normalizeUiErrorMessage(error, "Не удалось сохранить профиль."));
     } finally {
@@ -245,10 +258,22 @@ export default function GatehouseProfileClient({
           <div className="gatehouse-profile__grid">
             <section className="gatehouse-card">
               <div className="gatehouse-card__inner">
-                <h2 className="gatehouse-card__title">Профиль ученика</h2>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <h2 className="gatehouse-card__title" style={{ margin: 0 }}>Профиль ученика</h2>
+                  {!isEditing && (
+                    <button 
+                      type="button" 
+                      className="gatehouse-button" 
+                      style={{ margin: 0, padding: "6px 14px", width: "auto", fontSize: "13px" }}
+                      onClick={() => setIsEditing(true)}
+                    >
+                      Редактировать
+                    </button>
+                  )}
+                </div>
 
                 <p className="gatehouse-card__subtitle">
-                  ФИО, телефон и регион общие для олимпиады и экзаменов. Если изменить их здесь,
+                  ФИО, telephone и регион общие для олимпиады и экзаменов. Если изменить их здесь,
                   они сразу изменятся и в профиле олимпиады.
                 </p>
 
@@ -269,6 +294,7 @@ export default function GatehouseProfileClient({
                       className="gatehouse-input"
                       value={form.full_name}
                       placeholder="Введите ФИО"
+                      disabled={!isEditing}
                       onChange={(event) =>
                         setForm((current) => ({
                           ...current,
@@ -287,6 +313,7 @@ export default function GatehouseProfileClient({
                       className="gatehouse-input"
                       value={form.contact_phone}
                       placeholder="+7..."
+                      disabled={!isEditing}
                       onChange={(event) =>
                         setForm((current) => ({
                           ...current,
@@ -304,6 +331,7 @@ export default function GatehouseProfileClient({
                       id="gatehouse-region"
                       className="gatehouse-input gatehouse-select"
                       value={form.region}
+                      disabled={!isEditing}
                       onChange={(event) =>
                         setForm((current) => ({
                           ...current,
@@ -324,16 +352,29 @@ export default function GatehouseProfileClient({
                   </div>
 
                   {successMessage ? (
-                    <div className="gatehouse-message gatehouse-message--success">{successMessage}</div>
+                    <div className="gatehouse-message gatehouse-message--success" style={{ marginBottom: "14px" }}>{successMessage}</div>
                   ) : null}
 
                   {errorMessage ? (
-                    <div className="gatehouse-message gatehouse-message--error">{errorMessage}</div>
+                    <div className="gatehouse-message gatehouse-message--error" style={{ marginBottom: "14px" }}>{errorMessage}</div>
                   ) : null}
 
-                  <button className="gatehouse-button" type="submit" disabled={saving}>
-                    {saving ? "Сохраняем..." : "Сохранить профиль"}
-                  </button>
+                  {isEditing && (
+                    <div style={{ display: "flex", gap: "10px", marginTop: "18px" }}>
+                      <button 
+                        className="gatehouse-button" 
+                        type="button" 
+                        style={{ backgroundColor: "rgba(7, 23, 46, 0.08)", color: "#07172e", margin: 0 }}
+                        onClick={handleCancel}
+                        disabled={saving}
+                      >
+                        Отмена
+                      </button>
+                      <button className="gatehouse-button" type="submit" style={{ margin: 0 }} disabled={saving}>
+                        {saving ? "Сохраняем..." : "Сохранить изменения"}
+                      </button>
+                    </div>
+                  )}
                 </form>
               </div>
             </section>
