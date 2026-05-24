@@ -1,3 +1,4 @@
+// app/(app)/gatehouse/profile/GatehouseProfileClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -206,7 +207,6 @@ export default function GatehouseProfileClient({
   return (
     <main className="gatehouse-page">
       <div className="gatehouse-container">
-        {/* ✅ новый текст описания */}
         <GatehouseHeader
           title={`Экзамены, ${displayName}`}
           description="Здесь отображаются данные для подготовки к экзаменам Gatehouse Awards."
@@ -216,12 +216,10 @@ export default function GatehouseProfileClient({
             {
               href: "/gatehouse/materials",
               label: "Материалы",
-              icon: "📝",
             },
             {
               href: "/gatehouse/requests",
               label: "Заявки",
-              icon: "📋",
             },
           ]}
         />
@@ -229,25 +227,16 @@ export default function GatehouseProfileClient({
         <section className="gatehouse-profile">
           <div className="gatehouse-stats" aria-label="Статистика Gatehouse Awards">
             <article className="gatehouse-stat">
-              <span className="gatehouse-stat__icon" aria-hidden="true">
-                🧭
-              </span>
               <span className="gatehouse-stat__value">{initialStats.availableMaterials}</span>
               <span className="gatehouse-stat__label">доступных материалов</span>
             </article>
 
             <article className="gatehouse-stat">
-              <span className="gatehouse-stat__icon" aria-hidden="true">
-                📝
-              </span>
               <span className="gatehouse-stat__value">{initialStats.completedAssignments}</span>
               <span className="gatehouse-stat__label">пройденных заданий</span>
             </article>
 
             <article className="gatehouse-stat">
-              <span className="gatehouse-stat__icon" aria-hidden="true">
-                ✨
-              </span>
               <span className="gatehouse-stat__value">{initialStats.totalMaterials}</span>
               <span className="gatehouse-stat__label">материалов в разделе</span>
             </article>
@@ -268,16 +257,13 @@ export default function GatehouseProfileClient({
                     <label className="gatehouse-label" htmlFor="gatehouse-email">
                       Email
                     </label>
-
                     <input id="gatehouse-email" className="gatehouse-input" value={profile.email} disabled readOnly />
                   </div>
 
-                  {/* ... остальные поля формы без изменений ... */}
                   <div className="gatehouse-form__row">
                     <label className="gatehouse-label" htmlFor="gatehouse-full-name">
                       ФИО
                     </label>
-
                     <input
                       id="gatehouse-full-name"
                       className="gatehouse-input"
@@ -296,7 +282,6 @@ export default function GatehouseProfileClient({
                     <label className="gatehouse-label" htmlFor="gatehouse-phone">
                       Телефон
                     </label>
-
                     <input
                       id="gatehouse-phone"
                       className="gatehouse-input"
@@ -315,7 +300,6 @@ export default function GatehouseProfileClient({
                     <label className="gatehouse-label" htmlFor="gatehouse-region">
                       Область проживания
                     </label>
-
                     <select
                       id="gatehouse-region"
                       className="gatehouse-input gatehouse-select"
@@ -354,7 +338,6 @@ export default function GatehouseProfileClient({
               </div>
             </section>
 
-            {/* ✅ Быстрые действия с новым описанием */}
             <aside className="gatehouse-card">
               <div className="gatehouse-card__inner">
                 <h2 className="gatehouse-card__title">Быстрые действия</h2>
@@ -366,16 +349,11 @@ export default function GatehouseProfileClient({
                 <div className="gatehouse-quick-actions">
                   <Link className="gatehouse-quick-action" href="/gatehouse/materials">
                     <span className="gatehouse-quick-action__main">
-                      <span className="gatehouse-quick-action__icon" aria-hidden="true">
-                        📝
-                      </span>
-
                       <span>
                         <span className="gatehouse-quick-action__title">Пробные тесты</span>
                         <span className="gatehouse-quick-action__text">Открыть экзаменационные материалы</span>
                       </span>
                     </span>
-
                     <span className="gatehouse-quick-action__arrow" aria-hidden="true">
                       →
                     </span>
@@ -383,16 +361,11 @@ export default function GatehouseProfileClient({
 
                   <Link className="gatehouse-quick-action" href="/gatehouse/requests">
                     <span className="gatehouse-quick-action__main">
-                      <span className="gatehouse-quick-action__icon" aria-hidden="true">
-                        📋
-                      </span>
-
                       <span>
                         <span className="gatehouse-quick-action__title">Заявки</span>
                         <span className="gatehouse-quick-action__text">Запросить доступ к нужному уровню</span>
                       </span>
                     </span>
-
                     <span className="gatehouse-quick-action__arrow" aria-hidden="true">
                       →
                     </span>
@@ -400,16 +373,11 @@ export default function GatehouseProfileClient({
 
                   <Link className="gatehouse-quick-action" href="/portal">
                     <span className="gatehouse-quick-action__main">
-                      <span className="gatehouse-quick-action__icon" aria-hidden="true">
-                        🏠
-                      </span>
-
                       <span>
                         <span className="gatehouse-quick-action__title">Портал</span>
                         <span className="gatehouse-quick-action__text">Вернуться к выбору направления</span>
                       </span>
                     </span>
-
                     <span className="gatehouse-quick-action__arrow" aria-hidden="true">
                       →
                     </span>
@@ -419,7 +387,6 @@ export default function GatehouseProfileClient({
             </aside>
           </div>
 
-          {/* ✅ Сообщение в пустом списке результатов */}
           <section className="gatehouse-card">
             <div className="gatehouse-card__inner">
               <h2 className="gatehouse-card__title">Последние результаты</h2>
@@ -434,26 +401,19 @@ export default function GatehouseProfileClient({
                     <article className="gatehouse-recent__item" key={item.id}>
                       <div>
                         <h3 className="gatehouse-recent__title">{item.assignmentTitle}</h3>
-
                         <p className="gatehouse-recent__meta">
                           {item.materialTitle} · {item.completedAtLabel}
                         </p>
                       </div>
-
                       <div className="gatehouse-recent__score">{item.score}%</div>
                     </article>
                   ))}
                 </div>
               ) : (
                 <div className="gatehouse-empty">
-                  <span className="gatehouse-empty__icon" aria-hidden="true">
-                    🎓
-                  </span>
-
                   <h3 className="gatehouse-empty__title">Результатов пока нет</h3>
-
                   <p className="gatehouse-empty__text">
-                    Когда вы пройдёте задание, здесь появится результат и дальнейшая рекомендация.
+                    When you pass an assignment, your score and further recommendation will be shown here.
                   </p>
                 </div>
               )}
