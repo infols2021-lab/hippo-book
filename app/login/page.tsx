@@ -321,7 +321,7 @@ export default function LoginPage() {
       >
         <div className="help-modal-content">
           <div className="help-modal-header">
-            <h3>Справочный центр</h3>
+            <h3>Справочный中心</h3>
             <button className="help-close" onClick={closeHelp} type="button">
               ✕
             </button>
@@ -333,29 +333,29 @@ export default function LoginPage() {
               onClick={() => setActiveTab("registration")}
               type="button"
             >
-              Руководство по регистрации
+              Регистрация
             </button>
             <button
               className={"help-tab " + (activeTab === "rules" ? "active" : "")}
               onClick={() => setActiveTab("rules")}
               type="button"
             >
-              Правила платформы
+              Правила
             </button>
           </div>
 
           <div className={"help-tab-content " + (activeTab === "registration" ? "active" : "")}>
             <div className="help-html-inner">
-              <h4 className="help-section-title">Инструкция по созданию профиля</h4>
+              <h4 className="help-section-title">Как создать профиль и войти</h4>
               
               <div className="registration-guide">
                 <div className="guide-step">
                   <div className="step-badge">1</div>
                   <div className="step-body">
-                    <h5>Заполнение формы</h5>
+                    <h5>Заполните анкету</h5>
                     <p>
-                      Нажмите на ссылку <Link href="/register" onClick={closeHelp}>«Зарегистрироваться»</Link> в нижней части окна авторизации. 
-                      Введите ваш действующий адрес электронной почты и установите надежный пароль. Пароль должен быть запоминающимся, но исключать простые комбинации.
+                      Нажмите кнопку <Link href="/register" onClick={closeHelp}>«Зарегистрироваться»</Link> в самом низу. 
+                      Внимательно введите ваш настоящий рабочий Email и придумайте безопасный пароль.
                     </p>
                   </div>
                 </div>
@@ -363,10 +363,10 @@ export default function LoginPage() {
                 <div className="guide-step">
                   <div className="step-badge">2</div>
                   <div className="step-body">
-                    <h5>Ожидание системного уведомления</h5>
+                    <h5>Отправка ссылки на почту</h5>
                     <p>
-                      После отправки формы на указанный вами Email автоматически отправляется письмо со специальной защищенной ссылкой для верификации. 
-                      Процесс доставки письма сервером обычно занимает от 10 секунд до 2 минут.
+                      Сразу после регистрации наша система отправит вам автоматическое письмо. 
+                      Обычно оно долетает быстро — в течение пары минут.
                     </p>
                   </div>
                 </div>
@@ -374,9 +374,9 @@ export default function LoginPage() {
                 <div className="guide-step">
                   <div className="step-badge">3</div>
                   <div className="step-body">
-                    <h5>Проверка почтового ящика</h5>
+                    <h5>Проверьте все папки</h5>
                     <p>
-                      Откройте вашу почту. Ищите письмо от отправителя <strong>Учебники Хиппоши</strong>. Если во входящих сообщениях письма нет, обязательно проверьте вкладку <strong>«Промоакции»</strong> или системную папку <strong>«Спам»</strong>, так как почтовые фильтры иногда ошибочно распределяют новые автоматические уведомления.
+                      Откройте ваш почтовый ящик. Если во «Входящих» пусто, не пугайтесь — обязательно загляните в папки <strong>«Спам»</strong> и <strong>«Промоакции»</strong>. Фильтры почты иногда путают автоматические письма.
                     </p>
                   </div>
                 </div>
@@ -384,9 +384,9 @@ export default function LoginPage() {
                 <div className="guide-step">
                   <div className="step-badge">4</div>
                   <div className="step-body">
-                    <h5>Активация и первый вход</h5>
+                    <h5>Подтвердите и учитесь</h5>
                     <p>
-                      Перейдите по ссылке внутри полученного письма. Произойдет автоматическое подтверждение вашего профиля, и система перенаправит вас обратно на страницу авторизации. Вы увидите зеленый баннер об успешной активации. Теперь вы можете использовать свои Email и пароль для входа.
+                      Кликните по ссылке в письме. Ваш аккаунт мгновенно активируется, вас вернет сюда, и вы сможете спокойно зайти под своим логином и паролем.
                     </p>
                   </div>
                 </div>
@@ -395,47 +395,39 @@ export default function LoginPage() {
           </div>
 
           <div className={"help-tab-content " + (activeTab === "rules" ? "active" : "")}>
-            <div className="help-html-inner">
-              <h4 className="help-section-title">Условия использования и регламент</h4>
+            <div className="help-html-inner rules-tab-bg">
+              <h4 className="rules-main-title">правила</h4>
               
               <div className="help-rules-grid">
                 <div className="rule-card">
-                  <div className="rule-card-num">01</div>
-                  <div className="rule-card-content">
-                    <h5>Конфиденциальность учетных данных</h5>
-                    <p>
-                      Передача индивидуального логина и пароля третьим лицам категорически запрещена. Профиль пользователя предназначен исключительно для персонального обучения одного студента. При обнаружении параллельных сессий доступ может быть заблокирован.
-                    </p>
-                  </div>
+                  <p>
+                    Количество попыток не ограничено. Мы верим, что вы сможете! 
+                    Система будет хранить ваш лучший (последний) результат.
+                  </p>
                 </div>
 
                 <div className="rule-card">
-                  <div className="rule-card-num">02</div>
-                  <div className="rule-card-content">
-                    <h5>Защита интеллектуальной собственности</h5>
-                    <p>
-                      Все представленные на платформе интерактивные материалы, учебные пособия, тесты и методические алгоритмы являются объектами авторского права. Любое копирование, скачивание, тиражирование или публикация контента в открытых источниках преследуется по закону.
-                    </p>
-                  </div>
+                  <p>
+                    Полный доступ к учебным модулям откроется после покупки.
+                  </p>
                 </div>
 
                 <div className="rule-card">
-                  <div className="rule-card-num">03</div>
-                  <div className="rule-card-content">
-                    <h5>Автоматическая фиксация прогресса</h5>
-                    <p>
-                      Система осуществляет непрерывный мониторинг и сохранение динамики выполнения заданий. Прохождение тестов должно осуществляться лично учащимся без применения сторонних скриптов, расширений или искусственного вмешательства для обеспечения корректной работы адаптивного обучения.
-                    </p>
-                  </div>
+                  <p>
+                    Ваша цель — не просто пройти, а понять. Подходите к каждому уроку осознанно, 
+                    чтобы извлечь максимальную пользу.
+                  </p>
                 </div>
 
-                <div className="rule-card">
-                  <div className="rule-card-num">04</div>
-                  <div className="rule-card-content">
-                    <h5>Технический регламент сессий</h5>
-                    <p>
-                      Авторизационная сессия сохраняется в локальном кэше вашего браузера. При использовании публичных или чужих устройств всегда используйте ручной выход из аккаунта во избежание несанкционированного доступа к вашей статистике и личным данным со стороны третьих лиц.
-                    </p>
+                <div className="rule-card trophy-card">
+                  <p>
+                    Помните, главное — это ваше развитие. Этот учебник — ваш инструмент. 
+                    Используйте его по максимуму!
+                  </p>
+                  <div className="trophy-vector">
+                    <svg viewBox="0 0 24 24" width="64" height="64" fill="#f59e0b">
+                      <path d="M18 2H6v2H2v5c0 2.21 1.79 4 4 4h2c.75 2.15 2.6 3.71 4.88 3.97V19H7v2h10v-2h-4.12v-2.03C15.16 16.71 17 15.15 17.75 13h2.25c2.21 0 4-1.79 4-4V4h-4V2zM4 6h2v5c-1.1 0-2-.9-2-2V6zm16 3c0 1.1-.9 2-2 2V6h2v3z"/>
+                    </svg>
                   </div>
                 </div>
               </div>
@@ -509,7 +501,7 @@ export default function LoginPage() {
           </div>
 
           <button className="btn student" onClick={() => void doLogin(false)} disabled={busy}>
-            👨‍🎓 Войти как ученик
+            Войти как ученик
           </button>
 
           <div className="link">
@@ -522,11 +514,11 @@ export default function LoginPage() {
 
             <div className="bottom-actions">
               <Link className="btn info" href="/info">
-                📄 Информация
+                Информация
               </Link>
 
               <button className="btn help" onClick={openHelp} type="button">
-                ❓ Помощь
+                Помощь
               </button>
             </div>
           </div>
