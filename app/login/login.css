@@ -20,7 +20,6 @@
   overflow-x: hidden;
 }
 
-/* Элемент глубины заднего фона */
 .page-login::after {
   content: "";
   position: fixed;
@@ -68,7 +67,7 @@
   gap: 16px;
   justify-content: center;
   padding-bottom: 20px;
-  border-bottom: 1px solid rgba(44, 62, 80, 0.06);
+  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
   margin-bottom: 20px;
 }
 
@@ -90,7 +89,6 @@
   overflow: hidden;
 }
 
-/* Световой блик на логотипе */
 .brand-mark::before {
   content: "";
   position: absolute;
@@ -150,6 +148,13 @@
   padding-left: 4px;
 }
 
+.input-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
 .login-card input {
   width: 100%;
   padding: 14px 16px;
@@ -167,6 +172,11 @@
   box-shadow: inset 0 2px 4px rgba(15, 65, 95, 0.03);
 }
 
+/* Доп. отступ справа для инпута пароля, чтобы текст не заезжал под глаз */
+.input-wrapper input {
+  padding-right: 48px;
+}
+
 .login-card input::placeholder {
   color: rgba(30, 41, 59, 0.35);
   font-weight: 400;
@@ -180,6 +190,33 @@
     0 8px 20px rgba(78, 205, 196, 0.15),
     inset 0 1px 2px rgba(255,255,255,1);
   transform: translateY(-1px);
+}
+
+/* Кнопка показа пароля */
+.toggle-password {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(30, 41, 59, 0.4);
+  transition: transform 0.1s ease, color 0.2s ease;
+  user-select: none;
+  z-index: 2;
+}
+
+.toggle-password:hover {
+  color: #2eb4aa;
+  transform: scale(1.1);
+}
+
+.toggle-password:active {
+  transform: scale(0.95);
 }
 
 /* ===== Buttons ===== */
@@ -231,6 +268,7 @@
   text-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
+/* Блок нижних кнопок */
 .bottom-actions {
   display: flex;
   gap: 12px;
@@ -240,18 +278,26 @@
 .btn.info, .btn.help {
   flex: 1;
   margin-top: 0;
-  padding: 12px 14px;
-  font-size: 13px;
-  border-radius: 14px;
+  padding: 14px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 16px;
 }
 
+/* Полный редизайн уёбищной кнопки Информация -> теперь премиальный читаемый контраст */
 .btn.info {
-  background: linear-gradient(135deg, rgba(110, 190, 255, 0.9) 0%, rgba(130, 205, 255, 0.9) 100%);
-  box-shadow: 0 6px 16px rgba(110, 190, 255, 0.25);
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(3, 105, 161, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.btn.info:hover {
+  box-shadow: 0 12px 24px rgba(3, 105, 161, 0.45);
 }
 
 .btn.help {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.45);
   color: #1e293b;
   border: 1px solid rgba(110, 190, 255, 0.25);
   box-shadow: 0 6px 16px rgba(15, 65, 95, 0.05);
@@ -259,7 +305,7 @@
 }
 
 .btn.help:hover {
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.65);
 }
 
 /* ===== Links ===== */
@@ -377,7 +423,7 @@
   box-shadow: 0 8px 20px rgba(0,0,0,0.02);
 }
 
-/* ===== Help Modal Liquid Glass ===== */
+/* ===== Help Modal ===== */
 .help-modal {
   position: fixed;
   inset: 0;
@@ -508,6 +554,6 @@
   .brand-title { font-size: 19px; }
   .brand-mark { width: 48px; height: 48px; font-size: 18px; }
   .btn { padding: 14px 16px; }
-  .bottom-actions { flex-direction: column; gap: 8px; }
+  .bottom-actions { flex-direction: column; gap: 10px; }
   .btn.info, .btn.help { width: 100%; }
 }

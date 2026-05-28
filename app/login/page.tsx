@@ -72,6 +72,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const [bannerType, setBannerType] = useState<BannerType>(null);
   const [bannerText, setBannerText] = useState("");
@@ -478,21 +479,32 @@ export default function LoginPage() {
 
           <div className="form-group">
             <label htmlFor="password">Пароль</label>
-            <input
-              type="password"
-              id="password"
-              placeholder="Введите ваш пароль"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void doLogin(false);
-              }}
-            />
+            <div className="input-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                placeholder="Введите ваш пароль"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void doLogin(false);
+                }}
+              />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                title={showPassword ? "Скрыть пароль" : "Показать пароль"}
+              >
+                {showPassword ? "👁️‍🗨️" : "👁️"}
+              </button>
+            </div>
           </div>
 
           <button className="btn student" onClick={() => void doLogin(false)} disabled={busy}>
-            👨‍🎓 Войти как ученик
+            Войти как ученик
           </button>
 
           <div className="link">
@@ -505,11 +517,11 @@ export default function LoginPage() {
 
             <div className="bottom-actions">
               <Link className="btn info" href="/info">
-                📄 Информация
+                Информация
               </Link>
 
               <button className="btn help" onClick={openHelp} type="button">
-                ❓ Помощь
+                Помощь
               </button>
             </div>
           </div>
