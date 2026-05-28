@@ -405,7 +405,7 @@ export default function LoginPage() {
       >
         <div className="help-modal-content">
           <div className="help-modal-header">
-            <h3 style={{ margin: 0, color: "#2c3e50", fontWeight: 1000 }}>📚 Помощь</h3>
+            <h3 style={{ margin: 0, color: "#1e293b", fontWeight: 1000 }}>📚 Помощь</h3>
             <button className="help-close" onClick={closeHelp} type="button">
               ✕
             </button>
@@ -460,7 +460,7 @@ export default function LoginPage() {
           {renderExistingAccountHelp()}
 
           <div className="form-group">
-            <label htmlFor="email">Email:</label>
+            <label htmlFor="email">Email</label>
             <input
               type="email"
               id="email"
@@ -477,7 +477,7 @@ export default function LoginPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Пароль:</label>
+            <label htmlFor="password">Пароль</label>
             <input
               type="password"
               id="password"
@@ -495,10 +495,6 @@ export default function LoginPage() {
             👨‍🎓 Войти как ученик
           </button>
 
-          <button className="btn admin" onClick={() => void doLogin(true)} disabled={busy}>
-            🛠️ Войти как администратор
-          </button>
-
           <div className="link">
             <p>
               Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
@@ -507,13 +503,15 @@ export default function LoginPage() {
               <Link href="/reset">Забыли пароль?</Link>
             </p>
 
-            <Link className="btn info" href="/info">
-              📄 Информация
-            </Link>
+            <div className="bottom-actions">
+              <Link className="btn info" href="/info">
+                📄 Информация
+              </Link>
 
-            <button className="btn help" onClick={openHelp} type="button">
-              ❓ Помощь
-            </button>
+              <button className="btn help" onClick={openHelp} type="button">
+                ❓ Помощь
+              </button>
+            </div>
           </div>
         </div>
       </div>
