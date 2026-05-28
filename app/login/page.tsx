@@ -2,8 +2,7 @@
 
 import "./login.css";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
+import { useEffect, useMemo, useState } from "react";
 
 type BannerType = "error" | "success" | "warning" | null;
 
@@ -21,12 +20,6 @@ type ApiPayload = {
 function isValidEmail(email: string) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
-}
-
-function buildHelpImageUrl(imageName: string, cacheBust?: string) {
-  return getStoragePublicUrl("help-images", imageName, {
-    cacheBust,
-  });
 }
 
 function looksLikeNetworkError(err: unknown) {
@@ -64,12 +57,6 @@ function unwrapApiData(json: ApiPayload | null) {
 }
 
 export default function LoginPage() {
-  const [cacheBust, setCacheBust] = useState<string | null>(null);
-
-  useEffect(() => {
-    setCacheBust(String(Date.now()));
-  }, []);
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -82,12 +69,6 @@ export default function LoginPage() {
 
   const [helpOpen, setHelpOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"registration" | "rules">("registration");
-
-  const [preloadVisible, setPreloadVisible] = useState(false);
-  const [preloadCount, setPreloadCount] = useState(0);
-  const totalToPreload = 2;
-
-  const preloaded = useRef<{ registration?: HTMLImageElement; rules?: HTMLImageElement }>({});
 
   const msgParam = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -108,45 +89,6 @@ export default function LoginPage() {
       "Если проблема повторяется — попробуйте открыть сайт позже.";
     showBanner("error", extra ? `${base}\n\nДетали: ${extra}` : base);
   }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function preloadOne(key: "registration" | "rules", file: string) {
-      return new Promise<void>((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          if (!cancelled) preloaded.current[key] = img;
-          resolve();
-        };
-        img.onerror = () => resolve();
-        img.src = buildHelpImageUrl(file);
-      });
-    }
-
-    async function run() {
-      setPreloadVisible(true);
-      setPreloadCount(0);
-
-      await preloadOne("registration", "registration-help.png").then(() => {
-        if (!cancelled) setPreloadCount((c) => c + 1);
-      });
-
-      await preloadOne("rules", "rules-help.png").then(() => {
-        if (!cancelled) setPreloadCount((c) => c + 1);
-      });
-
-      setTimeout(() => {
-        if (!cancelled) setPreloadVisible(false);
-      }, 2000);
-    }
-
-    run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!msgParam) return;
@@ -368,35 +310,8 @@ export default function LoginPage() {
     );
   }
 
-  function renderHelpImage(tab: "registration" | "rules") {
-    const cached = preloaded.current[tab];
-    const file = tab === "registration" ? "registration-help.png" : "rules-help.png";
-    const alt = tab === "registration" ? "Инструкция по регистрации" : "Правила платформы";
-
-    if (cached) {
-      return <img className="help-image" src={buildHelpImageUrl(file, cacheBust || undefined)} alt={alt} />;
-    }
-
-    return <img className="help-image" src={buildHelpImageUrl(file)} alt={alt} />;
-  }
-
   return (
     <div className="page-login">
-      <div className="preload-status" style={{ display: preloadVisible ? "block" : "none" }}>
-        <span
-          className="spinner"
-          style={{
-            width: 16,
-            height: 16,
-            borderWidth: 2,
-            display: "inline-block",
-            verticalAlign: "middle",
-            marginRight: 5,
-          }}
-        />
-        Помощь: {Math.min(preloadCount, totalToPreload)}/{totalToPreload}
-      </div>
-
       <div
         className="help-modal"
         style={{ display: helpOpen ? "flex" : "none" }}
@@ -406,7 +321,7 @@ export default function LoginPage() {
       >
         <div className="help-modal-content">
           <div className="help-modal-header">
-            <h3 style={{ margin: 0, color: "#1e293b", fontWeight: 1000 }}>📚 Помощь</h3>
+            <h3>Справочный центр</h3>
             <button className="help-close" onClick={closeHelp} type="button">
               ✕
             </button>
@@ -418,23 +333,113 @@ export default function LoginPage() {
               onClick={() => setActiveTab("registration")}
               type="button"
             >
-              📝 Регистрация
+              Руководство по регистрации
             </button>
             <button
               className={"help-tab " + (activeTab === "rules" ? "active" : "")}
               onClick={() => setActiveTab("rules")}
               type="button"
             >
-              📋 Правила
+              Правила платформы
             </button>
           </div>
 
           <div className={"help-tab-content " + (activeTab === "registration" ? "active" : "")}>
-            {renderHelpImage("registration")}
+            <div className="help-html-inner">
+              <h4 className="help-section-title">Инструкция по созданию профиля</h4>
+              
+              <div className="registration-guide">
+                <div className="guide-step">
+                  <div className="step-badge">1</div>
+                  <div className="step-body">
+                    <h5>Заполнение формы</h5>
+                    <p>
+                      Нажмите на ссылку <Link href="/register" onClick={closeHelp}>«Зарегистрироваться»</Link> в нижней части окна авторизации. 
+                      Введите ваш действующий адрес электронной почты и установите надежный пароль. Пароль должен быть запоминающимся, но исключать простые комбинации.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="guide-step">
+                  <div className="step-badge">2</div>
+                  <div className="step-body">
+                    <h5>Ожидание системного уведомления</h5>
+                    <p>
+                      После отправки формы на указанный вами Email автоматически отправляется письмо со специальной защищенной ссылкой для верификации. 
+                      Процесс доставки письма сервером обычно занимает от 10 секунд до 2 минут.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="guide-step">
+                  <div className="step-badge">3</div>
+                  <div className="step-body">
+                    <h5>Проверка почтового ящика</h5>
+                    <p>
+                      Откройте вашу почту. Ищите письмо от отправителя <strong>Учебники Хиппоши</strong>. Если во входящих сообщениях письма нет, обязательно проверьте вкладку <strong>«Промоакции»</strong> или системную папку <strong>«Спам»</strong>, так как почтовые фильтры иногда ошибочно распределяют новые автоматические уведомления.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="guide-step">
+                  <div className="step-badge">4</div>
+                  <div className="step-body">
+                    <h5>Активация и первый вход</h5>
+                    <p>
+                      Перейдите по ссылке внутри полученного письма. Произойдет автоматическое подтверждение вашего профиля, и система перенаправит вас обратно на страницу авторизации. Вы увидите зеленый баннер об успешной активации. Теперь вы можете использовать свои Email и пароль для входа.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className={"help-tab-content " + (activeTab === "rules" ? "active" : "")}>
-            {renderHelpImage("rules")}
+            <div className="help-html-inner">
+              <h4 className="help-section-title">Условия использования и регламент</h4>
+              
+              <div className="help-rules-grid">
+                <div className="rule-card">
+                  <div className="rule-card-num">01</div>
+                  <div className="rule-card-content">
+                    <h5>Конфиденциальность учетных данных</h5>
+                    <p>
+                      Передача индивидуального логина и пароля третьим лицам категорически запрещена. Профиль пользователя предназначен исключительно для персонального обучения одного студента. При обнаружении параллельных сессий доступ может быть заблокирован.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rule-card">
+                  <div className="rule-card-num">02</div>
+                  <div className="rule-card-content">
+                    <h5>Защита интеллектуальной собственности</h5>
+                    <p>
+                      Все представленные на платформе интерактивные материалы, учебные пособия, тесты и методические алгоритмы являются объектами авторского права. Любое копирование, скачивание, тиражирование или публикация контента в открытых источниках преследуется по закону.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rule-card">
+                  <div className="rule-card-num">03</div>
+                  <div className="rule-card-content">
+                    <h5>Автоматическая фиксация прогресса</h5>
+                    <p>
+                      Система осуществляет непрерывный мониторинг и сохранение динамики выполнения заданий. Прохождение тестов должно осуществляться лично учащимся без применения сторонних скриптов, расширений или искусственного вмешательства для обеспечения корректной работы адаптивного обучения.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rule-card">
+                  <div className="rule-card-num">04</div>
+                  <div className="rule-card-content">
+                    <h5>Технический регламент сессий</h5>
+                    <p>
+                      Авторизационная сессия сохраняется в локальном кэше вашего браузера. При использовании публичных или чужих устройств всегда используйте ручной выход из аккаунта во избежание несанкционированного доступа к вашей статистике и личным данным со стороны третьих лиц.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -504,7 +509,7 @@ export default function LoginPage() {
           </div>
 
           <button className="btn student" onClick={() => void doLogin(false)} disabled={busy}>
-            Войти как ученик
+            👨‍🎓 Войти как ученик
           </button>
 
           <div className="link">
@@ -517,11 +522,11 @@ export default function LoginPage() {
 
             <div className="bottom-actions">
               <Link className="btn info" href="/info">
-                Информация
+                📄 Информация
               </Link>
 
               <button className="btn help" onClick={openHelp} type="button">
-                Помощь
+                ❓ Помощь
               </button>
             </div>
           </div>
