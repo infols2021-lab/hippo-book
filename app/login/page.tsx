@@ -321,7 +321,7 @@ export default function LoginPage() {
       >
         <div className="help-modal-content">
           <div className="help-modal-header">
-            <h3>Справочный中心</h3>
+            <h3>Помощь</h3>
             <button className="help-close" onClick={closeHelp} type="button">
               ✕
             </button>
