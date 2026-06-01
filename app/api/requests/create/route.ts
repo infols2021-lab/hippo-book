@@ -157,7 +157,7 @@ function formatClassLevel(classLevel: string) {
     "7": "7 класс",
     "8-9": "8-9 класс",
     "10-11": "10-11 класс (Техникум, колледж - 1й курс)",
-    "12": "12 класс (Техникум, колледж)",
+    "12": "12 класс (Техникум, college)",
   };
 
   return classMap[classLevel] || classLevel;

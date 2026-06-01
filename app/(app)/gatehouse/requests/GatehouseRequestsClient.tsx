@@ -1,3 +1,4 @@
+/* app/(app)/gatehouse/requests/GatehouseRequestsClient.tsx */
 "use client";
 
 import Link from "next/link";
@@ -179,12 +180,12 @@ function createInitialForm(): FormState {
     id: null,
     request_number: createClientRequestNumber({ prefix: "GA" }),
     created_at: new Date().toISOString(),
-    selectedLevel: "",
+    selectedLevel: "stage_1", // По умолчанию подставляем первый уровень, чтобы не ломать отправку формы
   };
 }
 
 function getRequestAmount(_request?: GatehousePurchaseRequest | null): number {
-  return 1000;
+  return 199; // Меняем цену с 1000 на 199 рублей
 }
 
 function safeDisplayName(profile: GatehouseRequestProfile): string {
@@ -314,7 +315,7 @@ export default function GatehouseRequestsClient({
       return;
     }
 
-    const firstLevel = getRequestLevels(request)[0] ?? "";
+    const firstLevel = getRequestLevels(request)[0] ?? "stage_1";
 
     setForm({
       id: request.id,
@@ -607,34 +608,18 @@ export default function GatehouseRequestsClient({
 
                     <div className="gatehouse-form__row">
                       <span className="gatehouse-label">Уровень</span>
-
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-                          gap: 10,
+                      {/* Убрали возможность выбирать уровни и добавили текст о разработке */}
+                      <div 
+                        className="gatehouse-message" 
+                        style={{ 
+                          background: "rgba(239, 68, 68, 0.08)", 
+                          color: "#ef4444", 
+                          borderColor: "rgba(239, 68, 68, 0.3)", 
+                          fontWeight: 600,
+                          lineHeight: "1.5"
                         }}
                       >
-                        {GATEHOUSE_LEVELS.map((level) => {
-                          const active = form.selectedLevel === level.code;
-
-                          return (
-                            <button
-                              key={level.code}
-                              className={["gatehouse-button", active ? "" : "gatehouse-button--ghost"].join(" ")}
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                setForm((current) => ({
-                                  ...current,
-                                  selectedLevel: level.code,
-                                }))
-                              }
-                            >
-                              {level.label}
-                            </button>
-                          );
-                        })}
+                        В данный момент пробные тесты на финальном этапе разработки, приобрести их можно будет начиная с 20 июня.
                       </div>
                     </div>
 
