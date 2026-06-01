@@ -79,15 +79,7 @@ function normalizeAccountingValues(values: AccountingRowValue[]) {
       return value;
     }
 
-    let clearedValue = norm(value);
-    
-    // Полностью убираем кубок и слово Олимпиада в любом регистре
-    clearedValue = clearedValue.replace(/🏆/g, "").replace(/Олимпиада/gi, "");
-    
-    // Вычищаем оставшийся по краям мусор (тире, дефисы, скобки, пробелы), чтобы остался только чистый класс
-    clearedValue = clearedValue.replace(/^[\s\-\—\–\(\)]+|[\s\-\—\–\(\)]+$/g, "").trim();
-    
-    return clearedValue;
+    return norm(value);
   });
 }
 

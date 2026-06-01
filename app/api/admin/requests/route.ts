@@ -357,14 +357,11 @@ function buildSheetValues(row: any) {
   return [
     String(row.request_number || ""),
     formatDateTimeRU(String(row.created_at || "")),
-    formatBranchLabel(branchType),
     formatTarget(branchType, row.class_level, getSheetTargetSource(row, branchType)),
     formatMaterialTypes(branchType, getSheetMaterialTypesSource(row, branchType)),
     String(row.email || ""),
     String(row.full_name || ""),
-    String(row.contact_phone || ""),
     formatStatus(Boolean(row.is_processed), row.processed_at ?? null),
-    formatProcessedInfo(row),
   ];
 }
 
