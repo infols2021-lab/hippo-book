@@ -33024,569 +33024,6 @@ export async function POST(req: Request) {
 }
 
 ================
-File: app/login/login.css
-================
-/* app/login/login.css */
-
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap');
-
-.page-login {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-
-  font-family: "Montserrat", "Poppins", sans-serif;
-  color: #1e293b;
-
-  background-color: #eaf7ff;
-  background-image:
-    radial-gradient(1200px 700px at 10% 10%, rgba(78, 205, 196, 0.25), transparent 60%),
-    radial-gradient(1100px 700px at 90% 20%, rgba(110, 190, 255, 0.3), transparent 62%),
-    linear-gradient(135deg, #f0f9ff 0%, #d2edf1 50%, #e0f2fe 100%);
-  background-attachment: fixed;
-  overflow-x: hidden;
-}
-
-.page-login::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(1000px 600px at 50% 40%, rgba(255, 255, 255, 0.2), transparent 70%);
-  z-index: 0;
-}
-
-.login-container {
-  width: 100%;
-  max-width: 440px;
-  position: relative;
-  z-index: 1;
-  perspective: 1000px;
-}
-
-/* ===== Liquid Glass Card ===== */
-.login-card {
-  border-radius: 32px;
-  padding: 32px 28px;
-
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.25) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 
-    0 24px 60px rgba(15, 65, 95, 0.12),
-    inset 0 1px 2px rgba(255, 255, 255, 0.7),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.02);
-  backdrop-filter: blur(24px) saturate(170%);
-  -webkit-backdrop-filter: blur(24px) saturate(170%);
-  
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.login-card:hover {
-  box-shadow: 
-    0 28px 70px rgba(15, 65, 95, 0.16),
-    inset 0 1px 3px rgba(255, 255, 255, 0.8);
-}
-
-/* ===== Brand ===== */
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  justify-content: center;
-  padding-bottom: 20px;
-  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
-  margin-bottom: 20px;
-}
-
-.brand-mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-
-  font-size: 20px;
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  color: #ffffff;
-
-  background: linear-gradient(135deg, #6ebeff 0%, #4ecdc4 100%);
-  box-shadow: 0 8px 24px rgba(78, 205, 196, 0.35);
-  position: relative;
-  overflow: hidden;
-}
-
-.brand-mark::before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
-  transform: rotate(45deg);
-  animation: shine 4s infinite linear;
-}
-
-@keyframes shine {
-  0% { transform: translate(-50%, -50%) rotate(45deg); }
-  100% { transform: translate(50%, 50%) rotate(45deg); }
-}
-
-.brand-title {
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1.1;
-  color: #1e293b;
-  letter-spacing: -0.5px;
-}
-
-.brand-subtitle {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(30, 41, 59, 0.6);
-  margin-top: 4px;
-}
-
-/* ===== Headline ===== */
-.login-card h2 {
-  margin: 10px 0 24px 0;
-  text-align: center;
-  font-size: 20px;
-  font-weight: 800;
-  color: #1e293b;
-  letter-spacing: -0.3px;
-}
-
-/* ===== Form ===== */
-.form-group {
-  margin-bottom: 18px;
-  text-align: left;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 700;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: rgba(30, 41, 59, 0.7);
-  padding-left: 4px;
-}
-
-.input-wrapper {
-  position: relative;
-  width: 100%;
-  display: flex;
-  align-items: center;
-}
-
-.login-card input {
-  width: 100%;
-  padding: 14px 16px;
-
-  border-radius: 16px;
-  border: 1px solid rgba(110, 190, 255, 0.3);
-  background: rgba(255, 255, 255, 0.5);
-
-  font-size: 15px;
-  font-weight: 600;
-  color: #1e293b;
-
-  box-sizing: border-box;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: inset 0 2px 4px rgba(15, 65, 95, 0.03);
-}
-
-/* Доп. отступ справа для инпута пароля, чтобы текст не заезжал под глаз */
-.input-wrapper input {
-  padding-right: 48px;
-}
-
-.login-card input::placeholder {
-  color: rgba(30, 41, 59, 0.35);
-  font-weight: 400;
-}
-
-.login-card input:focus {
-  border-color: #4ecdc4;
-  outline: none;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 
-    0 8px 20px rgba(78, 205, 196, 0.15),
-    inset 0 1px 2px rgba(255,255,255,1);
-  transform: translateY(-1px);
-}
-
-/* Кнопка показа пароля */
-.toggle-password {
-  position: absolute;
-  right: 14px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(30, 41, 59, 0.4);
-  transition: transform 0.1s ease, color 0.2s ease;
-  user-select: none;
-  z-index: 2;
-}
-
-.toggle-password:hover {
-  color: #2eb4aa;
-  transform: scale(1.1);
-}
-
-.toggle-password:active {
-  transform: scale(0.95);
-}
-
-/* ===== Buttons ===== */
-.btn {
-  width: 100%;
-  margin-top: 14px;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-
-  border: 0;
-  cursor: pointer;
-  user-select: none;
-  text-decoration: none;
-
-  padding: 15px 20px;
-  border-radius: 18px;
-
-  font-size: 15px;
-  font-weight: 700;
-  color: white;
-
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 12px 24px rgba(15, 65, 95, 0.15);
-}
-
-.btn:hover { 
-  transform: translateY(-2px); 
-  box-shadow: 0 16px 32px rgba(15, 65, 95, 0.2);
-  filter: brightness(1.04);
-}
-
-.btn:active { 
-  transform: translateY(0px); 
-  filter: brightness(0.96);
-}
-
-.btn:disabled { 
-  opacity: 0.5; 
-  cursor: not-allowed; 
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-.btn.student {
-  background: linear-gradient(135deg, #4ecdc4 0%, #5bbbe2 100%);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
-}
-
-/* Блок нижних кнопок */
-.bottom-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.btn.info, .btn.help {
-  flex: 1;
-  margin-top: 0;
-  padding: 14px 14px;
-  font-size: 14px;
-  font-weight: 700;
-  border-radius: 16px;
-}
-
-/* Полный редизайн уёбищной кнопки Информация -> теперь премиальный читаемый контраст */
-.btn.info {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  color: #ffffff;
-  box-shadow: 0 8px 20px rgba(3, 105, 161, 0.3);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-}
-
-.btn.info:hover {
-  box-shadow: 0 12px 24px rgba(3, 105, 161, 0.45);
-}
-
-.btn.help {
-  background: rgba(255, 255, 255, 0.45);
-  color: #1e293b;
-  border: 1px solid rgba(110, 190, 255, 0.25);
-  box-shadow: 0 6px 16px rgba(15, 65, 95, 0.05);
-  backdrop-filter: blur(8px);
-}
-
-.btn.help:hover {
-  background: rgba(255, 255, 255, 0.65);
-}
-
-/* ===== Links ===== */
-.link {
-  margin-top: 24px;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(30, 41, 59, 0.6);
-}
-
-.link p {
-  margin: 12px 0;
-}
-
-.link a {
-  color: #2eb4aa;
-  text-decoration: none;
-  font-weight: 700;
-  transition: color 0.15s ease;
-  display: inline-block;
-  position: relative;
-}
-
-.link a::after {
-  content: "";
-  position: absolute;
-  width: 100%;
-  transform: scaleX(0);
-  height: 2px;
-  bottom: -2px;
-  left: 0;
-  background-color: #2eb4aa;
-  transform-origin: bottom right;
-  transition: transform 0.25s ease-out;
-}
-
-.link a:hover::after {
-  transform: scaleX(1);
-  transform-origin: bottom left;
-}
-
-/* ===== Banners ===== */
-.error, .success, .warning {
-  padding: 14px 16px;
-  border-radius: 16px;
-  margin: 16px 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  line-height: 1.4;
-  border: 1px solid rgba(255,255,255,0.5);
-  box-shadow: 0 10px 25px rgba(15, 65, 95, 0.06);
-  backdrop-filter: blur(8px);
-}
-
-.error {
-  background: rgba(255, 107, 107, 0.12);
-  color: #991b1b;
-  border-left: 4px solid #ff6b6b;
-}
-
-.success {
-  background: rgba(78, 205, 196, 0.12);
-  color: #065f46;
-  border-left: 4px solid #4ecdc4;
-}
-
-.warning {
-  background: rgba(245, 158, 11, 0.12);
-  color: #92400e;
-  border-left: 4px solid #f59e0b;
-}
-
-/* ===== Loading ===== */
-.loading {
-  margin: 14px 0;
-  text-align: center;
-  font-weight: 700;
-  font-size: 14px;
-  color: #1a7bb9;
-  background: rgba(110, 190, 255, 0.1);
-  padding: 10px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.spinner {
-  border: 3px solid rgba(78, 205, 196, 0.2);
-  border-top: 3px solid #4ecdc4;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.existing-account-help {
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(78, 205, 196, 0.3);
-  border-left: 4px solid #4ecdc4;
-  border-radius: 16px;
-  padding: 14px;
-  margin: 16px 0;
-  font-size: 13.5px;
-  font-weight: 500;
-  text-align: left;
-  color: #1e293b;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.02);
-}
-
-/* ===== Help Modal ===== */
-.help-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 32, 45, 0.4);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  display: none;
-  justify-content: center;
-  align-items: center;
-  z-index: 10000;
-  padding: 20px;
-  animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.help-modal-content {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.75) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 28px;
-  max-width: 800px;
-  width: 100%;
-  max-height: 85vh;
-  overflow: hidden;
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(30px);
-  display: flex;
-  flex-direction: column;
-}
-
-.help-modal-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.help-modal-tabs {
-  display: flex;
-  background: rgba(255, 255, 255, 0.4);
-  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
-}
-
-.help-tab {
-  flex: 1;
-  padding: 16px;
-  border: none;
-  background: none;
-  font-size: 15px;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: rgba(30, 41, 59, 0.5);
-}
-
-.help-tab:hover {
-  color: #1e293b;
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.help-tab.active {
-  background: rgba(255, 255, 255, 0.7);
-  color: #2eb4aa;
-  box-shadow: inset 0 -3px 0 #4ecdc4;
-}
-
-.help-tab-content {
-  display: none;
-  padding: 0;
-  overflow-y: auto;
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.help-tab-content.active { 
-  display: block; 
-}
-
-.help-image {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.help-close {
-  background: rgba(30, 41, 59, 0.05);
-  border: none;
-  font-size: 16px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  cursor: pointer;
-  color: #1e293b;
-  display: grid;
-  place-items: center;
-  transition: all 0.2s ease;
-}
-
-.help-close:hover {
-  background: rgba(255, 107, 107, 0.2);
-  color: #991b1b;
-}
-
-/* Preload status */
-.preload-status {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  background: rgba(30, 41, 59, 0.85);
-  backdrop-filter: blur(6px);
-  color: white;
-  padding: 10px 16px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  z-index: 9999;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-}
-
-/* ===== Mobile Adaptive ===== */
-@media (max-width: 480px) {
-  .page-login { padding: 16px; }
-  .login-card { padding: 24px 20px; border-radius: 24px; }
-  .brand-title { font-size: 19px; }
-  .brand-mark { width: 48px; height: 48px; font-size: 18px; }
-  .btn { padding: 14px 16px; }
-  .bottom-actions { flex-direction: column; gap: 10px; }
-  .btn.info, .btn.help { width: 100%; }
-}
-
-================
 File: components/gatehouse/GatehouseHeader.tsx
 ================
 "use client";
@@ -41859,539 +41296,745 @@ export async function GET(req: NextRequest) {
 }
 
 ================
-File: app/login/page.tsx
+File: app/login/login.css
 ================
-"use client";
+/* app/login/login.css */
 
-import "./login.css";
-import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap');
 
-type BannerType = "error" | "success" | "warning" | null;
+.page-login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
 
-type ApiPayload = {
-  ok?: boolean;
-  error?: string;
-  message?: string;
-  code?: string;
-  data?: any;
-  authenticated?: boolean;
-  profile?: any;
-  redirectTo?: string;
-};
+  font-family: "Montserrat", "Poppins", sans-serif;
+  color: #1e293b;
 
-function isValidEmail(email: string) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  background-color: #eaf7ff;
+  background-image:
+    radial-gradient(1200px 700px at 10% 10%, rgba(78, 205, 196, 0.25), transparent 60%),
+    radial-gradient(1100px 700px at 90% 20%, rgba(110, 190, 255, 0.3), transparent 62%),
+    linear-gradient(135deg, #f0f9ff 0%, #d2edf1 50%, #e0f2fe 100%);
+  background-attachment: fixed;
+  overflow-x: hidden;
 }
 
-function buildHelpImageUrl(imageName: string, cacheBust?: string) {
-  return getStoragePublicUrl("help-images", imageName, {
-    cacheBust,
-  });
+.page-login::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(1000px 600px at 50% 40%, rgba(255, 255, 255, 0.2), transparent 70%);
+  z-index: 0;
 }
 
-function looksLikeNetworkError(err: unknown) {
-  const msg = String((err as any)?.message ?? err ?? "").toLowerCase().trim();
-  return (
-    msg.includes("failed to fetch") ||
-    msg.includes("fetch failed") ||
-    msg.includes("networkerror") ||
-    msg.includes("network error") ||
-    msg.includes("load failed") ||
-    msg.includes("request failed") ||
-    msg.includes("typeerror: failed to fetch")
-  );
+.login-container {
+  width: 100%;
+  max-width: 440px;
+  position: relative;
+  z-index: 1;
+  perspective: 1000px;
 }
 
-async function readApiPayload(res: Response): Promise<ApiPayload | null> {
-  const text = await res.text();
+/* ===== Liquid Glass Card ===== */
+.login-card {
+  border-radius: 32px;
+  padding: 32px 28px;
 
-  if (!text) return null;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.25) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 
+    0 24px 60px rgba(15, 65, 95, 0.12),
+    inset 0 1px 2px rgba(255, 255, 255, 0.7),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.02);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
 
-  try {
-    return JSON.parse(text) as ApiPayload;
-  } catch {
-    return {
-      ok: false,
-      error: text,
-    };
+.login-card:hover {
+  box-shadow: 
+    0 28px 70px rgba(15, 65, 95, 0.16),
+    inset 0 1px 3px rgba(255, 255, 255, 0.8);
+}
+
+/* ===== Brand ===== */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: center;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
+  margin-bottom: 20px;
+}
+
+.brand-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+
+  background: linear-gradient(135deg, #6ebeff 0%, #4ecdc4 100%);
+  box-shadow: 0 8px 24px rgba(78, 205, 196, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-mark::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+  transform: rotate(45deg);
+  animation: shine 4s infinite linear;
+}
+
+@keyframes shine {
+  0% { transform: translate(-50%, -50%) rotate(45deg); }
+  100% { transform: translate(50%, 50%) rotate(45deg); }
+}
+
+.brand-title {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #1e293b;
+  letter-spacing: -0.5px;
+}
+
+.brand-subtitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(30, 41, 59, 0.6);
+  margin-top: 4px;
+}
+
+/* ===== Headline ===== */
+.login-card h2 {
+  margin: 10px 0 24px 0;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: -0.3px;
+}
+
+/* ===== Form ===== */
+.form-group {
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(30, 41, 59, 0.7);
+  padding-left: 4px;
+}
+
+.input-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 14px 16px;
+
+  border-radius: 16px;
+  border: 1px solid rgba(110, 190, 255, 0.3);
+  background: rgba(255, 255, 255, 0.5);
+
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+
+  box-sizing: border-box;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 2px 4px rgba(15, 65, 95, 0.03);
+}
+
+.input-wrapper input {
+  padding-right: 48px;
+}
+
+.login-card input::placeholder {
+  color: rgba(30, 41, 59, 0.35);
+  font-weight: 400;
+}
+
+.login-card input:focus {
+  border-color: #4ecdc4;
+  outline: none;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 
+    0 8px 20px rgba(78, 205, 196, 0.15),
+    inset 0 1px 2px rgba(255,255,255,1);
+  transform: translateY(-1px);
+}
+
+/* Кнопка показа пароля */
+.toggle-password {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(30, 41, 59, 0.4);
+  transition: transform 0.1s ease, color 0.2s ease;
+  user-select: none;
+  z-index: 2;
+}
+
+.toggle-password:hover {
+  color: #2eb4aa;
+  transform: scale(1.1);
+}
+
+.toggle-password:active {
+  transform: scale(0.95);
+}
+
+/* ===== Buttons ===== */
+.btn {
+  width: 100%;
+  margin-top: 14px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  border: 0;
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+
+  padding: 15px 20px;
+  border-radius: 18px;
+
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 12px 24px rgba(15, 65, 95, 0.15);
+}
+
+.btn:hover { 
+  transform: translateY(-2px); 
+  box-shadow: 0 16px 32px rgba(15, 65, 95, 0.2);
+  filter: brightness(1.04);
+}
+
+.btn:active { 
+  transform: translateY(0px); 
+  filter: brightness(0.96);
+}
+
+.btn:disabled { 
+  opacity: 0.5; 
+  cursor: not-allowed; 
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn.student {
+  background: linear-gradient(135deg, #4ecdc4 0%, #5bbbe2 100%);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Блок нижних кнопок */
+.bottom-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn.info, .btn.help {
+  flex: 1;
+  margin-top: 0;
+  padding: 14px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 16px;
+}
+
+.btn.info {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(3, 105, 161, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.btn.info:hover {
+  box-shadow: 0 12px 24px rgba(3, 105, 161, 0.45);
+}
+
+.btn.help {
+  background: rgba(255, 255, 255, 0.45);
+  color: #1e293b;
+  border: 1px solid rgba(110, 190, 255, 0.25);
+  box-shadow: 0 6px 16px rgba(15, 65, 95, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+.btn.help:hover {
+  background: rgba(255, 255, 255, 0.65);
+}
+
+/* ===== Links ===== */
+.link {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(30, 41, 59, 0.6);
+}
+
+.link p {
+  margin: 12px 0;
+}
+
+.link a {
+  color: #2eb4aa;
+  text-decoration: none;
+  font-weight: 700;
+  transition: color 0.15s ease;
+  display: inline-block;
+  position: relative;
+}
+
+.link a::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  transform: scaleX(0);
+  height: 2px;
+  bottom: -2px;
+  left: 0;
+  background-color: #2eb4aa;
+  transform-origin: bottom right;
+  transition: transform 0.25s ease-out;
+}
+
+.link a:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+/* ===== Banners ===== */
+.error, .success, .warning {
+  padding: 14px 16px;
+  border-radius: 16px;
+  margin: 16px 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  border: 1px solid rgba(255,255,255,0.5);
+  box-shadow: 0 10px 25px rgba(15, 65, 95, 0.06);
+  backdrop-filter: blur(8px);
+}
+
+.error {
+  background: rgba(255, 107, 107, 0.12);
+  color: #991b1b;
+  border-left: 4px solid #ff6b6b;
+}
+
+.success {
+  background: rgba(78, 205, 196, 0.12);
+  color: #065f46;
+  border-left: 4px solid #4ecdc4;
+}
+
+.warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #92400e;
+  border-left: 4px solid #f59e0b;
+}
+
+/* ===== Loading ===== */
+.loading {
+  margin: 14px 0;
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #1a7bb9;
+  background: rgba(110, 190, 255, 0.1);
+  padding: 10px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.spinner {
+  border: 3px solid rgba(78, 205, 196, 0.2);
+  border-top: 3px solid #4ecdc4;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.existing-account-help {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(78, 205, 196, 0.3);
+  border-left: 4px solid #4ecdc4;
+  border-radius: 16px;
+  padding: 14px;
+  margin: 16px 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  color: #1e293b;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.02);
+}
+
+/* ===== Help Modal Liquid Glass ===== */
+.help-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 32, 45, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.help-modal-content {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.86) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 28px;
+  max-width: 760px;
+  width: 100%;
+  max-height: 85vh;
+  overflow: hidden;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(30px);
+  display: flex;
+  flex-direction: column;
+}
+
+.help-modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.help-modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #0f172a;
+}
+
+.help-modal-tabs {
+  display: flex;
+  background: rgba(30, 41, 59, 0.03);
+  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
+}
+
+.help-tab {
+  flex: 1;
+  padding: 16px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: rgba(30, 41, 59, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.help-tab:hover {
+  color: #1e293b;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.help-tab.active {
+  background: rgba(255, 255, 255, 0.8);
+  color: #0284c7;
+  box-shadow: inset 0 -3px 0 #0284c7;
+}
+
+.help-tab-content {
+  display: none;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.help-tab-content.active { 
+  display: block; 
+}
+
+.help-html-inner {
+  padding: 28px 24px;
+}
+
+.help-section-title {
+  margin: 0 0 24px 0;
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  border-bottom: 2px solid rgba(30, 41, 59, 0.04);
+  padding-bottom: 8px;
+}
+
+/* ===== HTML Стили вёрстки: Вкладка Регистрация ===== */
+.registration-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.guide-step {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.step-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #0284c7;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3);
+}
+
+.step-body {
+  flex: 1;
+}
+
+.step-body h5 {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.step-body p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.step-body strong {
+  color: #0f172a;
+  background: rgba(15, 23, 42, 0.04);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.step-body a {
+  color: #0284c7;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.step-body a:hover {
+  text-decoration: underline;
+}
+
+/* ===== Новые Стили Вёрстки: Вкладка Правила (Один в один как на скрине image_cc4d3b.jpg) ===== */
+.rules-tab-bg {
+  background-color: #fefce8;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(14, 165, 233, 0.15), transparent 40%),
+    radial-gradient(circle at 90% 10%, rgba(234, 179, 8, 0.15), transparent 40%),
+    radial-gradient(circle at 85% 85%, rgba(34, 197, 94, 0.15), transparent 40%),
+    radial-gradient(circle at 15% 80%, rgba(236, 72, 153, 0.15), transparent 40%);
+  border-radius: 24px;
+  padding: 32px 24px !important;
+  position: relative;
+}
+
+/* Фоновые декоративные облака из скрипта */
+.rules-tab-bg::before {
+  content: "☁️";
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  font-size: 48px;
+  opacity: 0.15;
+  filter: grayscale(100%) brightness(2);
+}
+
+.rules-tab-bg::after {
+  content: "☁️";
+  position: absolute;
+  top: 40px;
+  right: 30px;
+  font-size: 42px;
+  opacity: 0.15;
+  filter: grayscale(100%) brightness(2);
+}
+
+.rules-main-title {
+  text-align: center;
+  font-size: 54px !important;
+  font-weight: 900 !important;
+  color: #000000;
+  margin: 0 0 36px 0 !important;
+  letter-spacing: -1px;
+  text-transform: lowercase;
+}
+
+.help-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.rule-card {
+  background: #ffffff;
+  border-radius: 36px;
+  padding: 32px 24px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.01);
+  min-height: 160px;
+}
+
+.rule-card p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: #000000;
+  text-align: center;
+  white-space: pre-line;
+}
+
+/* Особенная карточка с кубком */
+.trophy-card {
+  justify-content: space-between;
+  padding: 28px 24px 16px 24px;
+}
+
+.trophy-card p {
+  margin-bottom: 12px;
+}
+
+.trophy-vector {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: floatTrophy 4s ease-in-out infinite;
+}
+
+@keyframes floatTrophy {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Кнопка закрытия модалки */
+.help-close {
+  background: rgba(30, 41, 59, 0.05);
+  border: none;
+  font-size: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #1e293b;
+  display: grid;
+  place-items: center;
+  transition: all 0.2s ease;
+}
+
+.help-close:hover {
+  background: rgba(255, 107, 107, 0.15);
+  color: #991b1b;
+}
+
+/* ===== Mobile Adaptive ===== */
+@media (max-width: 768px) {
+  .help-rules-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .rules-main-title {
+    font-size: 42px !important;
+    margin-bottom: 24px !important;
+  }
+  .rule-card {
+    border-radius: 28px;
+    padding: 24px 20px;
+    min-height: auto;
   }
 }
 
-function unwrapApiData(json: ApiPayload | null) {
-  if (!json) return null;
-  if (json.data && typeof json.data === "object") return json.data;
-  return json;
-}
-
-export default function LoginPage() {
-  const [cacheBust, setCacheBust] = useState<string | null>(null);
-
-  useEffect(() => {
-    setCacheBust(String(Date.now()));
-  }, []);
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
-  const [bannerType, setBannerType] = useState<BannerType>(null);
-  const [bannerText, setBannerText] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const [networkIssue, setNetworkIssue] = useState(false);
-
-  const [helpOpen, setHelpOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"registration" | "rules">("registration");
-
-  const [preloadVisible, setPreloadVisible] = useState(false);
-  const [preloadCount, setPreloadCount] = useState(0);
-  const totalToPreload = 2;
-
-  const preloaded = useRef<{ registration?: HTMLImageElement; rules?: HTMLImageElement }>({});
-
-  const msgParam = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get("message");
-  }, []);
-
-  function showBanner(type: BannerType, text: string) {
-    setBannerType(type);
-    setBannerText(text);
-  }
-
-  function showNetworkBanner(extra?: string) {
-    setNetworkIssue(true);
-    const base =
-      "🌐 Не удалось подключиться к серверу входа.\n" +
-      "Проверьте интернет-соединение и попробуйте обновить страницу.\n" +
-      "Если проблема повторяется — попробуйте открыть сайт позже.";
-    showBanner("error", extra ? `${base}\n\nДетали: ${extra}` : base);
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function preloadOne(key: "registration" | "rules", file: string) {
-      return new Promise<void>((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          if (!cancelled) preloaded.current[key] = img;
-          resolve();
-        };
-        img.onerror = () => resolve();
-        img.src = buildHelpImageUrl(file);
-      });
-    }
-
-    async function run() {
-      setPreloadVisible(true);
-      setPreloadCount(0);
-
-      await preloadOne("registration", "registration-help.png").then(() => {
-        if (!cancelled) setPreloadCount((c) => c + 1);
-      });
-
-      await preloadOne("rules", "rules-help.png").then(() => {
-        if (!cancelled) setPreloadCount((c) => c + 1);
-      });
-
-      setTimeout(() => {
-        if (!cancelled) setPreloadVisible(false);
-      }, 2000);
-    }
-
-    run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!msgParam) return;
-
-    if (msgParam === "confirmed") {
-      setNetworkIssue(false);
-      showBanner("success", "✅ Email успешно подтвержден! Теперь вы можете войти в систему.");
-    } else if (msgParam === "check_email") {
-      setNetworkIssue(false);
-      showBanner("warning", "📧 Проверьте вашу почту для подтверждения регистрации.");
-    } else if (msgParam === "email_exists") {
-      setNetworkIssue(false);
-      showBanner(
-        "error",
-        "❌ Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.",
-      );
-    }
-  }, [msgParam]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function run() {
-      try {
-        const res = await fetch("/api/auth/session", {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        const json = await readApiPayload(res);
-        const payload = unwrapApiData(json);
-
-        if (cancelled) return;
-
-        if (res.ok && json?.ok && payload?.authenticated) {
-          const isAdmin = Boolean(payload?.profile?.is_admin);
-          window.location.href = isAdmin ? "/admin" : "/portal";
-        }
-      } catch (e: any) {
-        if (cancelled) return;
-        if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
-      }
-    }
-
-    run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function resendConfirmation(emailValue: string) {
-    try {
-      const res = await fetch("/api/auth/resend-confirmation", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          email: emailValue,
-        }),
-      });
-
-      const json = await readApiPayload(res);
-      const payload = unwrapApiData(json);
-
-      if (!res.ok || !json?.ok) {
-        showBanner(
-          "error",
-          payload?.error || payload?.message || json?.error || "Не удалось отправить письмо подтверждения.",
-        );
-        return;
-      }
-
-      showBanner(
-        "success",
-        payload?.message || json?.message || "📧 Письмо с подтверждением отправлено повторно. Проверьте почту.",
-      );
-    } catch (e: any) {
-      if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
-      else showBanner("error", "❌ Не удалось отправить письмо: " + (e?.message || String(e)));
-    }
-  }
-
-  async function doLogin(isAdmin: boolean) {
-    const e = email.trim().toLowerCase();
-
-    if (!e || !password) {
-      setNetworkIssue(false);
-      showBanner("error", "Введите email и пароль");
-      return;
-    }
-
-    if (!isValidEmail(e)) {
-      setNetworkIssue(false);
-      showBanner("error", "Неверный формат email");
-      return;
-    }
-
-    setNetworkIssue(false);
-
-    try {
-      setBusy(true);
-      showBanner("warning", "🔐 Проверяем данные...");
-
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          email: e,
-          password,
-          isAdmin,
-          mode: isAdmin ? "admin" : "student",
-        }),
-      });
-
-      const json = await readApiPayload(res);
-      const payload = unwrapApiData(json);
-
-      if (!res.ok || !json?.ok) {
-        const msg = String(payload?.error || payload?.message || json?.error || "Ошибка входа");
-        const code = String(payload?.code || json?.code || "").toUpperCase();
-
-        if (looksLikeNetworkError(msg)) {
-          showNetworkBanner(msg);
-          setBusy(false);
-          return;
-        }
-
-        if (code === "EMAIL_NOT_CONFIRMED" || msg.toLowerCase().includes("email не подтверж")) {
-          showBanner("error", "❌ Email не подтвержден. Проверьте вашу почту и подтвердите регистрацию.");
-
-          const resend = window.confirm("Отправить письмо с подтверждением повторно?");
-          if (resend) {
-            await resendConfirmation(e);
-          }
-        } else if (code === "INVALID_CREDENTIALS") {
-          showBanner("error", "❌ Неверный email или пароль. Если вы забыли пароль, воспользуйтесь восстановлением.");
-        } else if (code === "RATE_LIMIT") {
-          showBanner("error", "⚠️ Слишком много попыток. Попробуйте через несколько минут.");
-        } else if (code === "USER_NOT_FOUND") {
-          showBanner("error", "❌ Пользователь с таким email не найден. Проверьте email или зарегистрируйтесь.");
-        } else {
-          showBanner("error", msg);
-        }
-
-        setBusy(false);
-        return;
-      }
-
-      const redirectTo = String(payload?.redirectTo || (isAdmin ? "/admin" : "/portal"));
-      window.location.href = redirectTo;
-    } catch (err: any) {
-      if (looksLikeNetworkError(err)) showNetworkBanner(String(err?.message || err));
-      else showBanner("error", "❌ Неожиданная ошибка: " + (err?.message || String(err)));
-      setBusy(false);
-    }
-  }
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && helpOpen) {
-        setHelpOpen(false);
-        document.body.style.overflow = "";
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [helpOpen]);
-
-  function openHelp() {
-    setHelpOpen(true);
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeHelp() {
-    setHelpOpen(false);
-    document.body.style.overflow = "";
-  }
-
-  function renderBanner() {
-    if (!bannerType) return null;
-    const cls = bannerType === "error" ? "error" : bannerType === "success" ? "success" : "warning";
-
-    return (
-      <div className={cls} style={{ display: "block", whiteSpace: "pre-line" }}>
-        {bannerText}
-      </div>
-    );
-  }
-
-  function renderNetworkActions() {
-    if (!networkIssue) return null;
-
-    return (
-      <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button className="btn student" type="button" onClick={() => window.location.reload()}>
-          🔄 Обновить страницу
-        </button>
-        <Link className="btn info" href="/info">
-          📄 Информация
-        </Link>
-      </div>
-    );
-  }
-
-  function renderExistingAccountHelp() {
-    if (msgParam !== "confirmed") return null;
-
-    return (
-      <div className="existing-account-help">
-        <strong>🎉 Отлично! Ваш аккаунт активирован.</strong>
-        <br />
-        Теперь вы можете войти в систему используя ваш email и пароль.
-      </div>
-    );
-  }
-
-  function renderHelpImage(tab: "registration" | "rules") {
-    const cached = preloaded.current[tab];
-    const file = tab === "registration" ? "registration-help.png" : "rules-help.png";
-    const alt = tab === "registration" ? "Инструкция по регистрации" : "Правила платформы";
-
-    if (cached) {
-      return <img className="help-image" src={buildHelpImageUrl(file, cacheBust || undefined)} alt={alt} />;
-    }
-
-    return <img className="help-image" src={buildHelpImageUrl(file)} alt={alt} />;
-  }
-
-  return (
-    <div className="page-login">
-      <div className="preload-status" style={{ display: preloadVisible ? "block" : "none" }}>
-        <span
-          className="spinner"
-          style={{
-            width: 16,
-            height: 16,
-            borderWidth: 2,
-            display: "inline-block",
-            verticalAlign: "middle",
-            marginRight: 5,
-          }}
-        />
-        Помощь: {Math.min(preloadCount, totalToPreload)}/{totalToPreload}
-      </div>
-
-      <div
-        className="help-modal"
-        style={{ display: helpOpen ? "flex" : "none" }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) closeHelp();
-        }}
-      >
-        <div className="help-modal-content">
-          <div className="help-modal-header">
-            <h3 style={{ margin: 0, color: "#1e293b", fontWeight: 1000 }}>📚 Помощь</h3>
-            <button className="help-close" onClick={closeHelp} type="button">
-              ✕
-            </button>
-          </div>
-
-          <div className="help-modal-tabs">
-            <button
-              className={"help-tab " + (activeTab === "registration" ? "active" : "")}
-              onClick={() => setActiveTab("registration")}
-              type="button"
-            >
-              📝 Регистрация
-            </button>
-            <button
-              className={"help-tab " + (activeTab === "rules" ? "active" : "")}
-              onClick={() => setActiveTab("rules")}
-              type="button"
-            >
-              📋 Правила
-            </button>
-          </div>
-
-          <div className={"help-tab-content " + (activeTab === "registration" ? "active" : "")}>
-            {renderHelpImage("registration")}
-          </div>
-
-          <div className={"help-tab-content " + (activeTab === "rules" ? "active" : "")}>
-            {renderHelpImage("rules")}
-          </div>
-        </div>
-      </div>
-
-      <div className="login-container">
-        <div className="login-card">
-          <div className="brand">
-            <div className="brand-mark">HH</div>
-            <div>
-              <div className="brand-title">Учебники Хиппоши</div>
-              <div className="brand-subtitle">🎓 Образовательная платформа</div>
-            </div>
-          </div>
-
-          <h2>Вход в аккаунт</h2>
-
-          <div className="loading" style={{ display: busy ? "block" : "none" }}>
-            <div className="spinner" />
-            Проверяем данные...
-          </div>
-
-          {renderBanner()}
-          {renderNetworkActions()}
-          {renderExistingAccountHelp()}
-
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              placeholder="example@gmail.com"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  (document.getElementById("password") as HTMLInputElement | null)?.focus();
-                }
-              }}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password">Пароль</label>
-            <div className="input-wrapper">
-              <input
-                type={showPassword ? "text" : "password"}
-                id="password"
-                placeholder="Введите ваш пароль"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void doLogin(false);
-                }}
-              />
-              <button
-                type="button"
-                className="toggle-password"
-                onClick={() => setShowPassword(!showPassword)}
-                tabIndex={-1}
-                title={showPassword ? "Скрыть пароль" : "Показать пароль"}
-              >
-                {showPassword ? "👁️‍🗨️" : "👁️"}
-              </button>
-            </div>
-          </div>
-
-          <button className="btn student" onClick={() => void doLogin(false)} disabled={busy}>
-            Войти как ученик
-          </button>
-
-          <div className="link">
-            <p>
-              Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
-            </p>
-            <p>
-              <Link href="/reset">Забыли пароль?</Link>
-            </p>
-
-            <div className="bottom-actions">
-              <Link className="btn info" href="/info">
-                Информация
-              </Link>
-
-              <button className="btn help" onClick={openHelp} type="button">
-                Помощь
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+@media (max-width: 480px) {
+  .page-login { padding: 16px; }
+  .login-card { padding: 24px 20px; border-radius: 24px; }
+  .brand-title { font-size: 19px; }
+  .brand-mark { width: 48px; height: 48px; font-size: 18px; }
+  .btn { padding: 14px 16px; }
+  .bottom-actions { flex-direction: column; gap: 10px; }
+  .btn.info, .btn.help { width: 100%; }
+  
+  .help-modal-content { max-height: 90vh; border-radius: 24px; }
+  .help-modal-tabs { flex-direction: column; }
+  .help-tab { padding: 12px; font-size: 12px; }
+  .help-html-inner { padding: 16px 12px; }
 }
 
 ================
@@ -47158,6 +46801,539 @@ File: package.json
 }
 
 ================
+File: app/login/page.tsx
+================
+"use client";
+
+import "./login.css";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
+type BannerType = "error" | "success" | "warning" | null;
+
+type ApiPayload = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  code?: string;
+  data?: any;
+  authenticated?: boolean;
+  profile?: any;
+  redirectTo?: string;
+};
+
+function isValidEmail(email: string) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+function looksLikeNetworkError(err: unknown) {
+  const msg = String((err as any)?.message ?? err ?? "").toLowerCase().trim();
+  return (
+    msg.includes("failed to fetch") ||
+    msg.includes("fetch failed") ||
+    msg.includes("networkerror") ||
+    msg.includes("network error") ||
+    msg.includes("load failed") ||
+    msg.includes("request failed") ||
+    msg.includes("typeerror: failed to fetch")
+  );
+}
+
+async function readApiPayload(res: Response): Promise<ApiPayload | null> {
+  const text = await res.text();
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as ApiPayload;
+  } catch {
+    return {
+      ok: false,
+      error: text,
+    };
+  }
+}
+
+function unwrapApiData(json: ApiPayload | null) {
+  if (!json) return null;
+  if (json.data && typeof json.data === "object") return json.data;
+  return json;
+}
+
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [bannerType, setBannerType] = useState<BannerType>(null);
+  const [bannerText, setBannerText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const [networkIssue, setNetworkIssue] = useState(false);
+
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"registration" | "rules">("registration");
+
+  const msgParam = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get("message");
+  }, []);
+
+  function showBanner(type: BannerType, text: string) {
+    setBannerType(type);
+    setBannerText(text);
+  }
+
+  function showNetworkBanner(extra?: string) {
+    setNetworkIssue(true);
+    const base =
+      "🌐 Не удалось подключиться к серверу входа.\n" +
+      "Проверьте интернет-соединение и попробуйте обновить страницу.\n" +
+      "Если проблема повторяется — попробуйте открыть сайт позже.";
+    showBanner("error", extra ? `${base}\n\nДетали: ${extra}` : base);
+  }
+
+  useEffect(() => {
+    if (!msgParam) return;
+
+    if (msgParam === "confirmed") {
+      setNetworkIssue(false);
+      showBanner("success", "✅ Email успешно подтвержден! Теперь вы можете войти в систему.");
+    } else if (msgParam === "check_email") {
+      setNetworkIssue(false);
+      showBanner("warning", "📧 Проверьте вашу почту для подтверждения регистрации.");
+    } else if (msgParam === "email_exists") {
+      setNetworkIssue(false);
+      showBanner(
+        "error",
+        "❌ Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.",
+      );
+    }
+  }, [msgParam]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      try {
+        const res = await fetch("/api/auth/session", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        const json = await readApiPayload(res);
+        const payload = unwrapApiData(json);
+
+        if (cancelled) return;
+
+        if (res.ok && json?.ok && payload?.authenticated) {
+          const isAdmin = Boolean(payload?.profile?.is_admin);
+          window.location.href = isAdmin ? "/admin" : "/portal";
+        }
+      } catch (e: any) {
+        if (cancelled) return;
+        if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function resendConfirmation(emailValue: string) {
+    try {
+      const res = await fetch("/api/auth/resend-confirmation", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          email: emailValue,
+        }),
+      });
+
+      const json = await readApiPayload(res);
+      const payload = unwrapApiData(json);
+
+      if (!res.ok || !json?.ok) {
+        showBanner(
+          "error",
+          payload?.error || payload?.message || json?.error || "Не удалось отправить письмо подтверждения.",
+        );
+        return;
+      }
+
+      showBanner(
+        "success",
+        payload?.message || json?.message || "📧 Письмо с подтверждением отправлено повторно. Проверьте почту.",
+      );
+    } catch (e: any) {
+      if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
+      else showBanner("error", "❌ Не удалось отправить письмо: " + (e?.message || String(e)));
+    }
+  }
+
+  async function doLogin(isAdmin: boolean) {
+    const e = email.trim().toLowerCase();
+
+    if (!e || !password) {
+      setNetworkIssue(false);
+      showBanner("error", "Введите email и пароль");
+      return;
+    }
+
+    if (!isValidEmail(e)) {
+      setNetworkIssue(false);
+      showBanner("error", "Неверный формат email");
+      return;
+    }
+
+    setNetworkIssue(false);
+
+    try {
+      setBusy(true);
+      showBanner("warning", "🔐 Проверяем данные...");
+
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          email: e,
+          password,
+          isAdmin,
+          mode: isAdmin ? "admin" : "student",
+        }),
+      });
+
+      const json = await readApiPayload(res);
+      const payload = unwrapApiData(json);
+
+      if (!res.ok || !json?.ok) {
+        const msg = String(payload?.error || payload?.message || json?.error || "Ошибка входа");
+        const code = String(payload?.code || json?.code || "").toUpperCase();
+
+        if (looksLikeNetworkError(msg)) {
+          showNetworkBanner(msg);
+          setBusy(false);
+          return;
+        }
+
+        if (code === "EMAIL_NOT_CONFIRMED" || msg.toLowerCase().includes("email не подтверж")) {
+          showBanner("error", "❌ Email не подтвержден. Проверьте вашу почту и подтвердите регистрацию.");
+
+          const resend = window.confirm("Отправить письмо с подтверждением повторно?");
+          if (resend) {
+            await resendConfirmation(e);
+          }
+        } else if (code === "INVALID_CREDENTIALS") {
+          showBanner("error", "❌ Неверный email или пароль. Если вы забыли пароль, воспользуйтесь восстановлением.");
+        } else if (code === "RATE_LIMIT") {
+          showBanner("error", "⚠️ Слишком много попыток. Попробуйте через несколько минут.");
+        } else if (code === "USER_NOT_FOUND") {
+          showBanner("error", "❌ Пользователь с таким email не найден. Проверьте email или зарегистрируйтесь.");
+        } else {
+          showBanner("error", msg);
+        }
+
+        setBusy(false);
+        return;
+      }
+
+      const redirectTo = String(payload?.redirectTo || (isAdmin ? "/admin" : "/portal"));
+      window.location.href = redirectTo;
+    } catch (err: any) {
+      if (looksLikeNetworkError(err)) showNetworkBanner(String(err?.message || err));
+      else showBanner("error", "❌ Неожиданная ошибка: " + (err?.message || String(err)));
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && helpOpen) {
+        setHelpOpen(false);
+        document.body.style.overflow = "";
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [helpOpen]);
+
+  function openHelp() {
+    setHelpOpen(true);
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeHelp() {
+    setHelpOpen(false);
+    document.body.style.overflow = "";
+  }
+
+  function renderBanner() {
+    if (!bannerType) return null;
+    const cls = bannerType === "error" ? "error" : bannerType === "success" ? "success" : "warning";
+
+    return (
+      <div className={cls} style={{ display: "block", whiteSpace: "pre-line" }}>
+        {bannerText}
+      </div>
+    );
+  }
+
+  function renderNetworkActions() {
+    if (!networkIssue) return null;
+
+    return (
+      <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button className="btn student" type="button" onClick={() => window.location.reload()}>
+          🔄 Обновить страницу
+        </button>
+        <Link className="btn info" href="/info">
+          📄 Информация
+        </Link>
+      </div>
+    );
+  }
+
+  function renderExistingAccountHelp() {
+    if (msgParam !== "confirmed") return null;
+
+    return (
+      <div className="existing-account-help">
+        <strong>🎉 Отлично! Ваш аккаунт активирован.</strong>
+        <br />
+        Теперь вы можете войти в систему используя ваш email и пароль.
+      </div>
+    );
+  }
+
+  return (
+    <div className="page-login">
+      <div
+        className="help-modal"
+        style={{ display: helpOpen ? "flex" : "none" }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeHelp();
+        }}
+      >
+        <div className="help-modal-content">
+          <div className="help-modal-header">
+            <h3>Помощь</h3>
+            <button className="help-close" onClick={closeHelp} type="button">
+              ✕
+            </button>
+          </div>
+
+          <div className="help-modal-tabs">
+            <button
+              className={"help-tab " + (activeTab === "registration" ? "active" : "")}
+              onClick={() => setActiveTab("registration")}
+              type="button"
+            >
+              Регистрация
+            </button>
+            <button
+              className={"help-tab " + (activeTab === "rules" ? "active" : "")}
+              onClick={() => setActiveTab("rules")}
+              type="button"
+            >
+              Правила
+            </button>
+          </div>
+
+          <div className={"help-tab-content " + (activeTab === "registration" ? "active" : "")}>
+            <div className="help-html-inner">
+              <h4 className="help-section-title">Как создать профиль и войти</h4>
+              
+              <div className="registration-guide">
+                <div className="guide-step">
+                  <div className="step-badge">1</div>
+                  <div className="step-body">
+                    <h5>Заполните анкету</h5>
+                    <p>
+                      Нажмите кнопку <Link href="/register" onClick={closeHelp}>«Зарегистрироваться»</Link> в самом низу. 
+                      Внимательно введите ваш настоящий рабочий Email и придумайте безопасный пароль.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="guide-step">
+                  <div className="step-badge">2</div>
+                  <div className="step-body">
+                    <h5>Отправка ссылки на почту</h5>
+                    <p>
+                      Сразу после регистрации наша система отправит вам автоматическое письмо. 
+                      Обычно оно долетает быстро — в течение пары минут.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="guide-step">
+                  <div className="step-badge">3</div>
+                  <div className="step-body">
+                    <h5>Проверьте все папки</h5>
+                    <p>
+                      Откройте ваш почтовый ящик. Если во «Входящих» пусто, не пугайтесь — обязательно загляните в папки <strong>«Спам»</strong> и <strong>«Промоакции»</strong>. Фильтры почты иногда путают автоматические письма.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="guide-step">
+                  <div className="step-badge">4</div>
+                  <div className="step-body">
+                    <h5>Подтвердите и учитесь</h5>
+                    <p>
+                      Кликните по ссылке в письме. Ваш аккаунт мгновенно активируется, вас вернет сюда, и вы сможете спокойно зайти под своим логином и паролем.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={"help-tab-content " + (activeTab === "rules" ? "active" : "")}>
+            <div className="help-html-inner rules-tab-bg">
+              <h4 className="rules-main-title">правила</h4>
+              
+              <div className="help-rules-grid">
+                <div className="rule-card">
+                  <p>
+                    Количество попыток не ограничено. Мы верим, что вы сможете! 
+                    Система будет хранить ваш лучший (последний) результат.
+                  </p>
+                </div>
+
+                <div className="rule-card">
+                  <p>
+                    Полный доступ к учебным модулям откроется после покупки.
+                  </p>
+                </div>
+
+                <div className="rule-card">
+                  <p>
+                    Ваша цель — не просто пройти, а понять. Подходите к каждому уроку осознанно, 
+                    чтобы извлечь максимальную пользу.
+                  </p>
+                </div>
+
+                <div className="rule-card trophy-card">
+                  <p>
+                    Помните, главное — это ваше развитие. Этот учебник — ваш инструмент. 
+                    Используйте его по максимуму!
+                  </p>
+                  <div className="trophy-vector">
+                    <svg viewBox="0 0 24 24" width="64" height="64" fill="#f59e0b">
+                      <path d="M18 2H6v2H2v5c0 2.21 1.79 4 4 4h2c.75 2.15 2.6 3.71 4.88 3.97V19H7v2h10v-2h-4.12v-2.03C15.16 16.71 17 15.15 17.75 13h2.25c2.21 0 4-1.79 4-4V4h-4V2zM4 6h2v5c-1.1 0-2-.9-2-2V6zm16 3c0 1.1-.9 2-2 2V6h2v3z"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="login-container">
+        <div className="login-card">
+          <div className="brand">
+            <div className="brand-mark">HH</div>
+            <div>
+              <div className="brand-title">Учебники Хиппоши</div>
+              <div className="brand-subtitle">🎓 Образовательная платформа</div>
+            </div>
+          </div>
+
+          <h2>Вход в аккаунт</h2>
+
+          <div className="loading" style={{ display: busy ? "block" : "none" }}>
+            <div className="spinner" />
+            Проверяем данные...
+          </div>
+
+          {renderBanner()}
+          {renderNetworkActions()}
+          {renderExistingAccountHelp()}
+
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              placeholder="example@gmail.com"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  (document.getElementById("password") as HTMLInputElement | null)?.focus();
+                }
+              }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="password">Пароль</label>
+            <div className="input-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                placeholder="Введите ваш пароль"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void doLogin(false);
+                }}
+              />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                title={showPassword ? "Скрыть пароль" : "Показать пароль"}
+              >
+                {showPassword ? "👁️‍🗨️" : "👁️"}
+              </button>
+            </div>
+          </div>
+
+          <button className="btn student" onClick={() => void doLogin(false)} disabled={busy}>
+            Войти как ученик
+          </button>
+
+          <div className="link">
+            <p>
+              Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
+            </p>
+            <p>
+              <Link href="/reset">Забыли пароль?</Link>
+            </p>
+
+            <div className="bottom-actions">
+              <Link className="btn info" href="/info">
+                Информация
+              </Link>
+
+              <button className="btn help" onClick={openHelp} type="button">
+                Помощь
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+================
 File: app/(app)/assignment/components/MediaRenderer.tsx
 ================
 "use client";
@@ -47744,726 +47920,6 @@ export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) 
         onClose={handleCloseModal}
       />
     </>
-  );
-}
-
-================
-File: app/(app)/assignment/components/QuestionImageMap.tsx
-================
-// файл app/(app)/assignment/components/QuestionImageMap.tsx
-// Улучшенная версия с визуализацией карточек, линий и медиа
-// Исправлена проблема мелких картинок в прохождении задания: убран фиксированный размер 120x120,
-// теперь картинки отображаются с max-width 180px и max-height 140px, сохраняя пропорции.
-"use client";
-
-import React, {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import type { QuestionImageMap, ImageMapPoint, ImageMapAnswer } from "../lib/types";
-import { getImageUrl } from "../lib/image";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type PointPixel = {
-  id: string;
-  x: number;
-  y: number;
-  correctAnswerId: string;
-  label?: string;
-};
-
-type AnswerAnchor = {
-  answerId: string;
-  x: number;
-  y: number; // центр верхней грани карточки
-};
-
-type Props = {
-  question: QuestionImageMap;
-  value: Record<string, string>; // answerId -> pointId
-  onChange: (val: Record<string, string>) => void;
-  disabled?: boolean;
-};
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-/** Генератор плавной кривой от ответа к точке */
-function buildCurvePath(x1: number, y1: number, x2: number, y2: number): string {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  const cp1x = x1;
-  const cp1y = y1 - Math.min(50, dist * 0.4);
-  const cp2x = x2;
-  const cp2y = y2 + Math.min(50, dist * 0.4);
-  return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
-}
-
-// ---------------------------------------------------------------------------
-// 🎯 ВЫНЕСЕННАЯ ФУНКЦИЯ ДЛЯ ВИЗУАЛИЗАЦИИ (используется в ReviewPanel)
-// ---------------------------------------------------------------------------
-
-export type ImageMapMatch = Record<string, string>; // answerId -> pointId
-
-export type ImageMapRendererProps = {
-  imageUrl: string;
-  points: ImageMapPoint[];
-  answers: ImageMapAnswer[];
-  matches: ImageMapMatch;          // фактические связи (пользовательские или правильные)
-  correctMatches: ImageMapMatch;   // правильные связи (для определения цвета)
-  pointColorConnected?: string;
-  pointColorUnconnected?: string;
-  pointSize?: number;
-  lineColorCorrect?: string;
-  lineColorIncorrect?: string;
-  strokeWidth?: number;
-  showLabels?: boolean;
-};
-
-/**
- * Компонент для статической визуализации карты изображения с точками и линиями.
- * Используется в разборе (ReviewPanel).
- */
-export function ImageMapRenderer({
-  imageUrl,
-  points,
-  answers,
-  matches,
-  correctMatches,
-  pointColorConnected = "#22c55e",   // ярко-зелёный
-  pointColorUnconnected = "#94a3b8",
-  pointSize = 20,
-  lineColorCorrect = "#22c55e",      // ярко-зелёный
-  lineColorIncorrect = "#ef4444",    // ярко-красный
-  strokeWidth = 4,
-  showLabels = true,
-}: ImageMapRendererProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [pointPixels, setPointPixels] = useState<PointPixel[]>([]);
-  const [answerAnchors, setAnswerAnchors] = useState<AnswerAnchor[]>([]);
-
-  // Маппинг для быстрого доступа
-  const answerMap = useMemo(() => new Map(answers.map(a => [a.id, a])), [answers]);
-  const pointMap = useMemo(() => new Map(points.map(p => [p.id, p])), [points]);
-
-  // пересчёт пиксельных координат точек и карточек
-  const recalc = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const containerRect = container.getBoundingClientRect();
-
-    // точки
-    const imgEl = container.querySelector<HTMLImageElement>(".imagemap-renderer-image");
-    if (imgEl) {
-      const imgRect = imgEl.getBoundingClientRect();
-      const imgWidth = imgRect.width;
-      const imgHeight = imgRect.height;
-      const imgLeft = imgRect.left - containerRect.left;
-      const imgTop = imgRect.top - containerRect.top;
-      const newPoints: PointPixel[] = points.map((p) => ({
-        id: p.id,
-        x: imgLeft + (clamp(p.x, 0, 100) / 100) * imgWidth,
-        y: imgTop + (clamp(p.y, 0, 100) / 100) * imgHeight,
-        correctAnswerId: p.correctAnswerId,
-        label: p.label,
-      }));
-      setPointPixels(newPoints);
-    }
-
-    // карточки ответов (снизу)
-    const answerCards = container.querySelectorAll<HTMLElement>(".imagemap-answer-card");
-    const newAnchors: AnswerAnchor[] = [];
-    answerCards.forEach((card) => {
-      const answerId = card.dataset.answerId;
-      if (!answerId) return;
-      const rect = card.getBoundingClientRect();
-      newAnchors.push({
-        answerId,
-        x: rect.left + rect.width / 2 - containerRect.left,
-        y: rect.top - containerRect.top,
-      });
-    });
-    setAnswerAnchors(newAnchors);
-  }, [points, answers]);
-
-  useEffect(() => {
-    recalc();
-    window.addEventListener("resize", recalc);
-    return () => window.removeEventListener("resize", recalc);
-  }, [recalc]);
-
-  const handleImageLoad = () => recalc();
-
-  // вспомогательная функция: правильная ли связь
-  const isMatchCorrect = (answerId: string, pointId: string) => {
-    return correctMatches[answerId] === pointId;
-  };
-
-  return (
-    <div ref={containerRef} style={{ position: "relative", width: "100%" }}>
-      <img
-        className="imagemap-renderer-image"
-        src={getImageUrl(imageUrl)}
-        alt=""
-        onLoad={handleImageLoad}
-        style={{ width: "100%", height: "auto", display: "block", borderRadius: 12 }}
-      />
-
-      {/* Слой для линий */}
-      <svg
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          pointerEvents: "none",
-        }}
-      >
-        {answerAnchors.map((anchor) => {
-          const pointId = matches[anchor.answerId];
-          if (!pointId) return null;
-          const point = pointPixels.find(p => p.id === pointId);
-          if (!point) return null;
-          const isCorrect = isMatchCorrect(anchor.answerId, pointId);
-          return (
-            <path
-              key={`line-${anchor.answerId}`}
-              d={buildCurvePath(anchor.x, anchor.y, point.x, point.y)}
-              fill="none"
-              stroke={isCorrect ? lineColorCorrect : lineColorIncorrect}
-              strokeWidth={strokeWidth}
-              strokeLinecap="round"
-              strokeDasharray={isCorrect ? "none" : "6,6"}
-              opacity={0.9}
-            />
-          );
-        })}
-      </svg>
-
-      {/* Точки */}
-      {pointPixels.map((pt) => {
-        const connectedAnswerId = Object.entries(matches).find(([, pid]) => pid === pt.id)?.[0];
-        const isConnected = !!connectedAnswerId;
-        const isCorrect = isConnected ? isMatchCorrect(connectedAnswerId, pt.id) : false;
-        const color = isConnected ? (isCorrect ? pointColorConnected : lineColorIncorrect) : pointColorUnconnected;
-        const answerLabel = connectedAnswerId ? answerMap.get(connectedAnswerId)?.text : undefined;
-        return (
-          <div
-            key={pt.id}
-            style={{
-              position: "absolute",
-              left: pt.x - pointSize/2,
-              top: pt.y - pointSize/2,
-              width: pointSize,
-              height: pointSize,
-              borderRadius: "50%",
-              background: color,
-              border: "3px solid white",
-              boxShadow: "0 0 0 2px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.15)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: pointSize * 0.5,
-              fontWeight: "bold",
-              color: "#fff",
-              textShadow: "0 1px 1px rgba(0,0,0,0.3)",
-            }}
-            title={pt.label || pt.id}
-          >
-            {showLabels && answerLabel ? answerLabel.slice(0, 2) : ""}
-          </div>
-        );
-      })}
-
-      {/* Карточки ответов внизу */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "16px",
-          justifyContent: "center",
-          marginTop: "24px",
-        }}
-      >
-        {answers.map((ans) => {
-          const pointId = matches[ans.id];
-          const isConnected = !!pointId;
-          const isCorrect = isConnected ? isMatchCorrect(ans.id, pointId) : false;
-          return (
-            <div
-              key={ans.id}
-              data-answer-id={ans.id}
-              className="imagemap-answer-card"
-              style={{
-                background: isConnected ? (isCorrect ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)") : "#fff",
-                border: `2px solid ${isConnected ? (isCorrect ? "#22c55e" : "#ef4444") : "#e2e8f0"}`,
-                borderRadius: "16px",
-                padding: "8px 12px",
-                minWidth: "100px",
-                textAlign: "center",
-                cursor: "default",
-                transition: "all 0.2s",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-              }}
-            >
-              {ans.media && ans.media.length > 0 ? (
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
-                  <img
-                    src={getImageUrl(ans.media[0].url)}
-                    alt=""
-                    style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 8 }}
-                  />
-                  {ans.text && <span style={{ fontWeight: "bold", color: "#1e293b" }}>{ans.text}</span>}
-                </div>
-              ) : (
-                <span style={{ fontWeight: "bold", color: "#1e293b" }}>{ans.text || ans.id.slice(0,4)}</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// ОСНОВНОЙ КОМПОНЕНТ ДЛЯ РЕДАКТИРОВАНИЯ (исправлен: картинки больше не мелкие)
-// ---------------------------------------------------------------------------
-
-export default function QuestionImageMap({
-  question,
-  value = {},
-  onChange,
-  disabled,
-}: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const filterId = useId();
-
-  const points = useMemo(
-    () => (Array.isArray(question.points) ? question.points : []),
-    [question.points],
-  );
-
-  const answers = useMemo(
-    () => (Array.isArray(question.answers) ? question.answers : []),
-    [question.answers],
-  );
-
-  const imageUrl = useMemo(() => getImageUrl(question.image), [question.image]);
-
-  const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
-  const [pointPixels, setPointPixels] = useState<PointPixel[]>([]);
-  const [answerAnchors, setAnswerAnchors] = useState<AnswerAnchor[]>([]);
-  const answerElRefs = useRef<Map<string, HTMLElement>>(new Map());
-  const recalcRequestedRef = useRef(false);
-
-  const recalc = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const containerRect = container.getBoundingClientRect();
-
-    const imgEl = container.querySelector<HTMLImageElement>(".imagemap-image");
-    if (imgEl) {
-      const imgRect = imgEl.getBoundingClientRect();
-      const imgWidth = imgRect.width;
-      const imgHeight = imgRect.height;
-      const imgLeft = imgRect.left - containerRect.left;
-      const imgTop = imgRect.top - containerRect.top;
-
-      const newPoints: PointPixel[] = points.map((p) => ({
-        id: p.id,
-        x: imgLeft + (clamp(p.x, 0, 100) / 100) * imgWidth,
-        y: imgTop + (clamp(p.y, 0, 100) / 100) * imgHeight,
-        correctAnswerId: p.correctAnswerId,
-        label: p.label,
-      }));
-      setPointPixels((prev) => {
-        if (JSON.stringify(prev) === JSON.stringify(newPoints)) return prev;
-        return newPoints;
-      });
-    }
-
-    const newAnchors: AnswerAnchor[] = [];
-    for (const ans of answers) {
-      const el = answerElRefs.current.get(ans.id);
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        newAnchors.push({
-          answerId: ans.id,
-          x: rect.left + rect.width / 2 - containerRect.left,
-          y: rect.top - containerRect.top,
-        });
-      }
-    }
-    setAnswerAnchors((prev) => {
-      if (JSON.stringify(prev) === JSON.stringify(newAnchors)) return prev;
-      return newAnchors;
-    });
-  }, [points, answers]);
-
-  useEffect(() => {
-    recalc();
-  }, [recalc, value]);
-
-  useEffect(() => {
-    const onResize = () => {
-      if (!recalcRequestedRef.current) {
-        recalcRequestedRef.current = true;
-        requestAnimationFrame(() => {
-          recalc();
-          recalcRequestedRef.current = false;
-        });
-      }
-    };
-    window.addEventListener("resize", onResize);
-    const observer = new ResizeObserver(() => {
-      if (!recalcRequestedRef.current) {
-        recalcRequestedRef.current = true;
-        requestAnimationFrame(() => {
-          recalc();
-          recalcRequestedRef.current = false;
-        });
-      }
-    });
-    if (containerRef.current) observer.observe(containerRef.current);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      observer.disconnect();
-    };
-  }, [recalc]);
-
-  const handleImageLoad = useCallback(() => recalc(), [recalc]);
-
-  const handleAnswerClick = useCallback(
-    (answerId: string) => {
-      if (disabled) return;
-      if (value[answerId]) {
-        const next = { ...value };
-        delete next[answerId];
-        onChange(next);
-        setSelectedAnswerId(answerId);
-        return;
-      }
-      setSelectedAnswerId((prev) => (prev === answerId ? null : answerId));
-    },
-    [disabled, value, onChange],
-  );
-
-  const handlePointClick = useCallback(
-    (pointId: string, e: React.MouseEvent | React.PointerEvent) => {
-      if (disabled) return;
-      e.stopPropagation();
-      if (!selectedAnswerId) return;
-
-      const existingAnswerForPoint = Object.entries(value).find(
-        ([, pid]) => pid === pointId,
-      )?.[0];
-      let next = { ...value };
-      if (existingAnswerForPoint) delete next[existingAnswerForPoint];
-      next = { ...next, [selectedAnswerId]: pointId };
-      onChange(next);
-      setSelectedAnswerId(null);
-    },
-    [disabled, selectedAnswerId, value, onChange],
-  );
-
-  const handleMapBackgroundClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) setSelectedAnswerId(null);
-  }, []);
-
-  const getAnswerPoint = (answerId: string): PointPixel | undefined => {
-    const pointId = value[answerId];
-    if (!pointId) return undefined;
-    return pointPixels.find((p) => p.id === pointId);
-  };
-
-  const getAnchor = (answerId: string): AnswerAnchor | undefined =>
-    answerAnchors.find((a) => a.answerId === answerId);
-
-  const setAnswerRef = useCallback(
-    (ansId: string, el: HTMLElement | null) => {
-      if (el) {
-        answerElRefs.current.set(ansId, el);
-      } else {
-        answerElRefs.current.delete(ansId);
-      }
-      setTimeout(recalc, 0);
-    },
-    [recalc],
-  );
-
-  return (
-    <div>
-      <div
-        style={{
-          textAlign: "center",
-          marginBottom: 16,
-          color: "#475569",
-          fontWeight: 600,
-          fontSize: 14,
-        }}
-      >
-        {selectedAnswerId
-          ? "✅ Ответ выбран – нажмите на нужную точку на карте"
-          : "👆 Сначала нажмите на карточку ответа, затем – на точку на карте"}
-      </div>
-
-      <div
-        ref={containerRef}
-        onClick={handleMapBackgroundClick}
-        style={{
-          position: "relative",
-          width: "100%",
-          userSelect: "none",
-          touchAction: "none",
-        }}
-      >
-        <svg
-          className="imagemap-svg"
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            pointerEvents: "none",
-            zIndex: 5,
-          }}
-        >
-          <defs>
-            <filter id={filterId}>
-              <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          {Object.entries(value).map(([ansId, pointId]) => {
-            const anchor = getAnchor(ansId);
-            const point = getAnswerPoint(ansId);
-            if (!anchor || !point) return null;
-            return (
-              <path
-                key={`${ansId}-${pointId}`}
-                d={buildCurvePath(anchor.x, anchor.y, point.x, point.y)}
-                fill="none"
-                stroke="#6366f1"
-                strokeWidth="3"
-                strokeLinecap="round"
-                style={{ filter: `url(#${filterId})`, opacity: 0.85 }}
-              />
-            );
-          })}
-        </svg>
-
-        <div
-          className="imagemap-map-area"
-          style={{ position: "relative", width: "100%", marginBottom: "16px" }}
-        >
-          <img
-            className="imagemap-image"
-            src={imageUrl}
-            alt=""
-            onLoad={handleImageLoad}
-            draggable={false}
-            style={{
-              display: "block",
-              width: "100%",
-              height: "auto",
-              borderRadius: "16px",
-              boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
-            }}
-          />
-
-          {pointPixels.map((pt) => {
-            const isConnected = Object.values(value).includes(pt.id);
-            const isSelectable = !!selectedAnswerId;
-            const cursor = disabled ? "not-allowed" : isSelectable ? "pointer" : "default";
-            return (
-              <div
-                key={pt.id}
-                data-point-id={pt.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePointClick(pt.id, e);
-                }}
-                className={isSelectable && !isConnected ? "imagemap-point-pulse" : ""}
-                style={{
-                  position: "absolute",
-                  left: pt.x - 16,
-                  top: pt.y - 16,
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  background: isConnected
-                    ? "#6366f1"
-                    : isSelectable
-                    ? "rgba(99,102,241,0.35)"
-                    : "rgba(0,0,0,0.2)",
-                  border: "3px solid #fff",
-                  boxShadow: isSelectable ? "0 0 0 4px rgba(99,102,241,0.2)" : "0 2px 8px rgba(0,0,0,0.15)",
-                  cursor,
-                  transition: "background 0.15s ease, box-shadow 0.15s ease",
-                  boxSizing: "border-box",
-                  zIndex: 10,
-                }}
-              >
-                {pt.label && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: -20,
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      background: "rgba(0,0,0,0.6)",
-                      color: "#fff",
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      fontSize: 10,
-                      whiteSpace: "nowrap",
-                      pointerEvents: "none",
-                    }}
-                  >
-                    {pt.label}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <div
-          className="imagemap-answers"
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "16px",
-            justifyContent: "center",
-            marginTop: "12px",
-          }}
-        >
-          {answers.map((ans) => {
-            const isConnected = !!value[ans.id];
-            const isSelected = selectedAnswerId === ans.id;
-            return (
-              <div
-                key={ans.id}
-                ref={(el) => setAnswerRef(ans.id, el)}
-                className="imagemap-answer-card"
-                onClick={() => handleAnswerClick(ans.id)}
-                style={{
-                  background: isSelected
-                    ? "rgba(99,102,241,0.12)"
-                    : isConnected
-                    ? "rgba(99,102,241,0.05)"
-                    : "#fff",
-                  border: `2px solid ${
-                    isSelected
-                      ? "#6366f1"
-                      : isConnected
-                      ? "rgba(99,102,241,0.3)"
-                      : "#e2e8f0"
-                  }`,
-                  borderRadius: "16px",
-                  padding: "12px 16px",
-                  minWidth: "120px",
-                  maxWidth: "220px",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: "8px",
-                  cursor: disabled ? "not-allowed" : "pointer",
-                  transition: "all 0.2s ease",
-                  boxShadow: isSelected
-                    ? "0 4px 12px rgba(99,102,241,0.15)"
-                    : isConnected
-                    ? "0 2px 8px rgba(0,0,0,0.04)"
-                    : "0 1px 4px rgba(0,0,0,0.02)",
-                  opacity: disabled && !isConnected ? 0.6 : 1,
-                }}
-              >
-                {/* 🔧 ИСПРАВЛЕНО: убран фиксированный размер 120x120, теперь картинка занимает разумное место */}
-                {ans.media && ans.media.length > 0 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderRadius: "12px",
-                      overflow: "hidden",
-                      backgroundColor: "#f8fafc",
-                      maxWidth: "100%",
-                    }}
-                  >
-                    <img
-                      src={getImageUrl(ans.media[0].url)}
-                      alt={ans.text || "Ответ"}
-                      style={{
-                        width: "auto",
-                        height: "auto",
-                        maxWidth: "180px",
-                        maxHeight: "140px",
-                        objectFit: "contain",
-                      }}
-                    />
-                  </div>
-                )}
-                {ans.text && (
-                  <span
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 14,
-                      color: isSelected ? "#6366f1" : "#334155",
-                      textAlign: "center",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {ans.text}
-                  </span>
-                )}
-                {isConnected && <span style={{ fontSize: 20, lineHeight: 1 }}>✅</span>}
-                {isSelected && !isConnected && (
-                  <span style={{ fontSize: 12, color: "#6366f1", fontWeight: 600 }}>
-                    Теперь выберите точку
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <style jsx>{`
-        .imagemap-answer-card:hover {
-          transform: translateY(-2px);
-        }
-        .imagemap-answer-card:active {
-          transform: translateY(0);
-        }
-        @keyframes pulse {
-          0% { transform: translate(-50%, -50%) scale(1); }
-          50% { transform: translate(-50%, -50%) scale(1.15); }
-          100% { transform: translate(-50%, -50%) scale(1); }
-        }
-        .imagemap-point-pulse {
-          animation: pulse 1.2s ease-in-out infinite;
-        }
-      `}</style>
-    </div>
   );
 }
 
@@ -49841,6 +49297,726 @@ body {
 .streak-lb-head {
   color: var(--text-soft) !important;
   opacity: 1 !important;
+}
+
+================
+File: app/(app)/assignment/components/QuestionImageMap.tsx
+================
+// файл app/(app)/assignment/components/QuestionImageMap.tsx
+// Улучшенная версия с визуализацией карточек, линий и медиа
+// Исправлена проблема мелких картинок в прохождении задания: убран фиксированный размер 120x120,
+// теперь картинки отображаются с max-width 180px и max-height 140px, сохраняя пропорции.
+"use client";
+
+import React, {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { QuestionImageMap, ImageMapPoint, ImageMapAnswer } from "../lib/types";
+import { getImageUrl } from "../lib/image";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type PointPixel = {
+  id: string;
+  x: number;
+  y: number;
+  correctAnswerId: string;
+  label?: string;
+};
+
+type AnswerAnchor = {
+  answerId: string;
+  x: number;
+  y: number; // центр верхней грани карточки
+};
+
+type Props = {
+  question: QuestionImageMap;
+  value: Record<string, string>; // answerId -> pointId
+  onChange: (val: Record<string, string>) => void;
+  disabled?: boolean;
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+/** Генератор плавной кривой от ответа к точке */
+function buildCurvePath(x1: number, y1: number, x2: number, y2: number): string {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const cp1x = x1;
+  const cp1y = y1 - Math.min(50, dist * 0.4);
+  const cp2x = x2;
+  const cp2y = y2 + Math.min(50, dist * 0.4);
+  return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
+}
+
+// ---------------------------------------------------------------------------
+// 🎯 ВЫНЕСЕННАЯ ФУНКЦИЯ ДЛЯ ВИЗУАЛИЗАЦИИ (используется в ReviewPanel)
+// ---------------------------------------------------------------------------
+
+export type ImageMapMatch = Record<string, string>; // answerId -> pointId
+
+export type ImageMapRendererProps = {
+  imageUrl: string;
+  points: ImageMapPoint[];
+  answers: ImageMapAnswer[];
+  matches: ImageMapMatch;          // фактические связи (пользовательские или правильные)
+  correctMatches: ImageMapMatch;   // правильные связи (для определения цвета)
+  pointColorConnected?: string;
+  pointColorUnconnected?: string;
+  pointSize?: number;
+  lineColorCorrect?: string;
+  lineColorIncorrect?: string;
+  strokeWidth?: number;
+  showLabels?: boolean;
+};
+
+/**
+ * Компонент для статической визуализации карты изображения с точками и линиями.
+ * Используется в разборе (ReviewPanel).
+ */
+export function ImageMapRenderer({
+  imageUrl,
+  points,
+  answers,
+  matches,
+  correctMatches,
+  pointColorConnected = "#22c55e",   // ярко-зелёный
+  pointColorUnconnected = "#94a3b8",
+  pointSize = 20,
+  lineColorCorrect = "#22c55e",      // ярко-зелёный
+  lineColorIncorrect = "#ef4444",    // ярко-красный
+  strokeWidth = 4,
+  showLabels = true,
+}: ImageMapRendererProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [pointPixels, setPointPixels] = useState<PointPixel[]>([]);
+  const [answerAnchors, setAnswerAnchors] = useState<AnswerAnchor[]>([]);
+
+  // Маппинг для быстрого доступа
+  const answerMap = useMemo(() => new Map(answers.map(a => [a.id, a])), [answers]);
+  const pointMap = useMemo(() => new Map(points.map(p => [p.id, p])), [points]);
+
+  // пересчёт пиксельных координат точек и карточек
+  const recalc = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+
+    // точки
+    const imgEl = container.querySelector<HTMLImageElement>(".imagemap-renderer-image");
+    if (imgEl) {
+      const imgRect = imgEl.getBoundingClientRect();
+      const imgWidth = imgRect.width;
+      const imgHeight = imgRect.height;
+      const imgLeft = imgRect.left - containerRect.left;
+      const imgTop = imgRect.top - containerRect.top;
+      const newPoints: PointPixel[] = points.map((p) => ({
+        id: p.id,
+        x: imgLeft + (clamp(p.x, 0, 100) / 100) * imgWidth,
+        y: imgTop + (clamp(p.y, 0, 100) / 100) * imgHeight,
+        correctAnswerId: p.correctAnswerId,
+        label: p.label,
+      }));
+      setPointPixels(newPoints);
+    }
+
+    // карточки ответов (снизу)
+    const answerCards = container.querySelectorAll<HTMLElement>(".imagemap-answer-card");
+    const newAnchors: AnswerAnchor[] = [];
+    answerCards.forEach((card) => {
+      const answerId = card.dataset.answerId;
+      if (!answerId) return;
+      const rect = card.getBoundingClientRect();
+      newAnchors.push({
+        answerId,
+        x: rect.left + rect.width / 2 - containerRect.left,
+        y: rect.top - containerRect.top,
+      });
+    });
+    setAnswerAnchors(newAnchors);
+  }, [points, answers]);
+
+  useEffect(() => {
+    recalc();
+    window.addEventListener("resize", recalc);
+    return () => window.removeEventListener("resize", recalc);
+  }, [recalc]);
+
+  const handleImageLoad = () => recalc();
+
+  // вспомогательная функция: правильная ли связь
+  const isMatchCorrect = (answerId: string, pointId: string) => {
+    return correctMatches[answerId] === pointId;
+  };
+
+  return (
+    <div ref={containerRef} style={{ position: "relative", width: "100%" }}>
+      <img
+        className="imagemap-renderer-image"
+        src={getImageUrl(imageUrl)}
+        alt=""
+        onLoad={handleImageLoad}
+        style={{ width: "100%", height: "auto", display: "block", borderRadius: 12 }}
+      />
+
+      {/* Слой для линий */}
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+        }}
+      >
+        {answerAnchors.map((anchor) => {
+          const pointId = matches[anchor.answerId];
+          if (!pointId) return null;
+          const point = pointPixels.find(p => p.id === pointId);
+          if (!point) return null;
+          const isCorrect = isMatchCorrect(anchor.answerId, pointId);
+          return (
+            <path
+              key={`line-${anchor.answerId}`}
+              d={buildCurvePath(anchor.x, anchor.y, point.x, point.y)}
+              fill="none"
+              stroke={isCorrect ? lineColorCorrect : lineColorIncorrect}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              strokeDasharray={isCorrect ? "none" : "6,6"}
+              opacity={0.9}
+            />
+          );
+        })}
+      </svg>
+
+      {/* Точки */}
+      {pointPixels.map((pt) => {
+        const connectedAnswerId = Object.entries(matches).find(([, pid]) => pid === pt.id)?.[0];
+        const isConnected = !!connectedAnswerId;
+        const isCorrect = isConnected ? isMatchCorrect(connectedAnswerId, pt.id) : false;
+        const color = isConnected ? (isCorrect ? pointColorConnected : lineColorIncorrect) : pointColorUnconnected;
+        const answerLabel = connectedAnswerId ? answerMap.get(connectedAnswerId)?.text : undefined;
+        return (
+          <div
+            key={pt.id}
+            style={{
+              position: "absolute",
+              left: pt.x - pointSize/2,
+              top: pt.y - pointSize/2,
+              width: pointSize,
+              height: pointSize,
+              borderRadius: "50%",
+              background: color,
+              border: "3px solid white",
+              boxShadow: "0 0 0 2px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.15)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: pointSize * 0.5,
+              fontWeight: "bold",
+              color: "#fff",
+              textShadow: "0 1px 1px rgba(0,0,0,0.3)",
+            }}
+            title={pt.label || pt.id}
+          >
+            {showLabels && answerLabel ? answerLabel.slice(0, 2) : ""}
+          </div>
+        );
+      })}
+
+      {/* Карточки ответов внизу */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "16px",
+          justifyContent: "center",
+          marginTop: "24px",
+        }}
+      >
+        {answers.map((ans) => {
+          const pointId = matches[ans.id];
+          const isConnected = !!pointId;
+          const isCorrect = isConnected ? isMatchCorrect(ans.id, pointId) : false;
+          return (
+            <div
+              key={ans.id}
+              data-answer-id={ans.id}
+              className="imagemap-answer-card"
+              style={{
+                background: isConnected ? (isCorrect ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)") : "#fff",
+                border: `2px solid ${isConnected ? (isCorrect ? "#22c55e" : "#ef4444") : "#e2e8f0"}`,
+                borderRadius: "16px",
+                padding: "8px 12px",
+                minWidth: "100px",
+                textAlign: "center",
+                cursor: "default",
+                transition: "all 0.2s",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+              }}
+            >
+              {ans.media && ans.media.length > 0 ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
+                  <img
+                    src={getImageUrl(ans.media[0].url)}
+                    alt=""
+                    style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 8 }}
+                  />
+                  {ans.text && <span style={{ fontWeight: "bold", color: "#1e293b" }}>{ans.text}</span>}
+                </div>
+              ) : (
+                <span style={{ fontWeight: "bold", color: "#1e293b" }}>{ans.text || ans.id.slice(0,4)}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ОСНОВНОЙ КОМПОНЕНТ ДЛЯ РЕДАКТИРОВАНИЯ (исправлен: картинки больше не мелкие)
+// ---------------------------------------------------------------------------
+
+export default function QuestionImageMap({
+  question,
+  value = {},
+  onChange,
+  disabled,
+}: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const filterId = useId();
+
+  const points = useMemo(
+    () => (Array.isArray(question.points) ? question.points : []),
+    [question.points],
+  );
+
+  const answers = useMemo(
+    () => (Array.isArray(question.answers) ? question.answers : []),
+    [question.answers],
+  );
+
+  const imageUrl = useMemo(() => getImageUrl(question.image), [question.image]);
+
+  const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
+  const [pointPixels, setPointPixels] = useState<PointPixel[]>([]);
+  const [answerAnchors, setAnswerAnchors] = useState<AnswerAnchor[]>([]);
+  const answerElRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const recalcRequestedRef = useRef(false);
+
+  const recalc = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+
+    const imgEl = container.querySelector<HTMLImageElement>(".imagemap-image");
+    if (imgEl) {
+      const imgRect = imgEl.getBoundingClientRect();
+      const imgWidth = imgRect.width;
+      const imgHeight = imgRect.height;
+      const imgLeft = imgRect.left - containerRect.left;
+      const imgTop = imgRect.top - containerRect.top;
+
+      const newPoints: PointPixel[] = points.map((p) => ({
+        id: p.id,
+        x: imgLeft + (clamp(p.x, 0, 100) / 100) * imgWidth,
+        y: imgTop + (clamp(p.y, 0, 100) / 100) * imgHeight,
+        correctAnswerId: p.correctAnswerId,
+        label: p.label,
+      }));
+      setPointPixels((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(newPoints)) return prev;
+        return newPoints;
+      });
+    }
+
+    const newAnchors: AnswerAnchor[] = [];
+    for (const ans of answers) {
+      const el = answerElRefs.current.get(ans.id);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        newAnchors.push({
+          answerId: ans.id,
+          x: rect.left + rect.width / 2 - containerRect.left,
+          y: rect.top - containerRect.top,
+        });
+      }
+    }
+    setAnswerAnchors((prev) => {
+      if (JSON.stringify(prev) === JSON.stringify(newAnchors)) return prev;
+      return newAnchors;
+    });
+  }, [points, answers]);
+
+  useEffect(() => {
+    recalc();
+  }, [recalc, value]);
+
+  useEffect(() => {
+    const onResize = () => {
+      if (!recalcRequestedRef.current) {
+        recalcRequestedRef.current = true;
+        requestAnimationFrame(() => {
+          recalc();
+          recalcRequestedRef.current = false;
+        });
+      }
+    };
+    window.addEventListener("resize", onResize);
+    const observer = new ResizeObserver(() => {
+      if (!recalcRequestedRef.current) {
+        recalcRequestedRef.current = true;
+        requestAnimationFrame(() => {
+          recalc();
+          recalcRequestedRef.current = false;
+        });
+      }
+    });
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      observer.disconnect();
+    };
+  }, [recalc]);
+
+  const handleImageLoad = useCallback(() => recalc(), [recalc]);
+
+  const handleAnswerClick = useCallback(
+    (answerId: string) => {
+      if (disabled) return;
+      if (value[answerId]) {
+        const next = { ...value };
+        delete next[answerId];
+        onChange(next);
+        setSelectedAnswerId(answerId);
+        return;
+      }
+      setSelectedAnswerId((prev) => (prev === answerId ? null : answerId));
+    },
+    [disabled, value, onChange],
+  );
+
+  const handlePointClick = useCallback(
+    (pointId: string, e: React.MouseEvent | React.PointerEvent) => {
+      if (disabled) return;
+      e.stopPropagation();
+      if (!selectedAnswerId) return;
+
+      const existingAnswerForPoint = Object.entries(value).find(
+        ([, pid]) => pid === pointId,
+      )?.[0];
+      let next = { ...value };
+      if (existingAnswerForPoint) delete next[existingAnswerForPoint];
+      next = { ...next, [selectedAnswerId]: pointId };
+      onChange(next);
+      setSelectedAnswerId(null);
+    },
+    [disabled, selectedAnswerId, value, onChange],
+  );
+
+  const handleMapBackgroundClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) setSelectedAnswerId(null);
+  }, []);
+
+  const getAnswerPoint = (answerId: string): PointPixel | undefined => {
+    const pointId = value[answerId];
+    if (!pointId) return undefined;
+    return pointPixels.find((p) => p.id === pointId);
+  };
+
+  const getAnchor = (answerId: string): AnswerAnchor | undefined =>
+    answerAnchors.find((a) => a.answerId === answerId);
+
+  const setAnswerRef = useCallback(
+    (ansId: string, el: HTMLElement | null) => {
+      if (el) {
+        answerElRefs.current.set(ansId, el);
+      } else {
+        answerElRefs.current.delete(ansId);
+      }
+      setTimeout(recalc, 0);
+    },
+    [recalc],
+  );
+
+  return (
+    <div>
+      <div
+        style={{
+          textAlign: "center",
+          marginBottom: 16,
+          color: "#475569",
+          fontWeight: 600,
+          fontSize: 14,
+        }}
+      >
+        {selectedAnswerId
+          ? "✅ Ответ выбран – нажмите на нужную точку на карте"
+          : "👆 Сначала нажмите на карточку ответа, затем – на точку на карте"}
+      </div>
+
+      <div
+        ref={containerRef}
+        onClick={handleMapBackgroundClick}
+        style={{
+          position: "relative",
+          width: "100%",
+          userSelect: "none",
+          touchAction: "none",
+        }}
+      >
+        <svg
+          className="imagemap-svg"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+            zIndex: 5,
+          }}
+        >
+          <defs>
+            <filter id={filterId}>
+              <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          {Object.entries(value).map(([ansId, pointId]) => {
+            const anchor = getAnchor(ansId);
+            const point = getAnswerPoint(ansId);
+            if (!anchor || !point) return null;
+            return (
+              <path
+                key={`${ansId}-${pointId}`}
+                d={buildCurvePath(anchor.x, anchor.y, point.x, point.y)}
+                fill="none"
+                stroke="#6366f1"
+                strokeWidth="3"
+                strokeLinecap="round"
+                style={{ filter: `url(#${filterId})`, opacity: 0.85 }}
+              />
+            );
+          })}
+        </svg>
+
+        <div
+          className="imagemap-map-area"
+          style={{ position: "relative", width: "100%", marginBottom: "16px" }}
+        >
+          <img
+            className="imagemap-image"
+            src={imageUrl}
+            alt=""
+            onLoad={handleImageLoad}
+            draggable={false}
+            style={{
+              display: "block",
+              width: "100%",
+              height: "auto",
+              borderRadius: "16px",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
+            }}
+          />
+
+          {pointPixels.map((pt) => {
+            const isConnected = Object.values(value).includes(pt.id);
+            const isSelectable = !!selectedAnswerId;
+            const cursor = disabled ? "not-allowed" : isSelectable ? "pointer" : "default";
+            return (
+              <div
+                key={pt.id}
+                data-point-id={pt.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePointClick(pt.id, e);
+                }}
+                className={isSelectable && !isConnected ? "imagemap-point-pulse" : ""}
+                style={{
+                  position: "absolute",
+                  left: pt.x - 16,
+                  top: pt.y - 16,
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: isConnected
+                    ? "#6366f1"
+                    : isSelectable
+                    ? "rgba(99,102,241,0.35)"
+                    : "rgba(0,0,0,0.2)",
+                  border: "3px solid #fff",
+                  boxShadow: isSelectable ? "0 0 0 4px rgba(99,102,241,0.2)" : "0 2px 8px rgba(0,0,0,0.15)",
+                  cursor,
+                  transition: "background 0.15s ease, box-shadow 0.15s ease",
+                  boxSizing: "border-box",
+                  zIndex: 10,
+                }}
+              >
+                {pt.label && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -20,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      background: "rgba(0,0,0,0.6)",
+                      color: "#fff",
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      fontSize: 10,
+                      whiteSpace: "nowrap",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {pt.label}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div
+          className="imagemap-answers"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "16px",
+            justifyContent: "center",
+            marginTop: "12px",
+          }}
+        >
+          {answers.map((ans) => {
+            const isConnected = !!value[ans.id];
+            const isSelected = selectedAnswerId === ans.id;
+            return (
+              <div
+                key={ans.id}
+                ref={(el) => setAnswerRef(ans.id, el)}
+                className="imagemap-answer-card"
+                onClick={() => handleAnswerClick(ans.id)}
+                style={{
+                  background: isSelected
+                    ? "rgba(99,102,241,0.12)"
+                    : isConnected
+                    ? "rgba(99,102,241,0.05)"
+                    : "#fff",
+                  border: `2px solid ${
+                    isSelected
+                      ? "#6366f1"
+                      : isConnected
+                      ? "rgba(99,102,241,0.3)"
+                      : "#e2e8f0"
+                  }`,
+                  borderRadius: "16px",
+                  padding: "12px 16px",
+                  minWidth: "120px",
+                  maxWidth: "220px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "8px",
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  transition: "all 0.2s ease",
+                  boxShadow: isSelected
+                    ? "0 4px 12px rgba(99,102,241,0.15)"
+                    : isConnected
+                    ? "0 2px 8px rgba(0,0,0,0.04)"
+                    : "0 1px 4px rgba(0,0,0,0.02)",
+                  opacity: disabled && !isConnected ? 0.6 : 1,
+                }}
+              >
+                {/* 🔧 ИСПРАВЛЕНО: убран фиксированный размер 120x120, теперь картинка занимает разумное место */}
+                {ans.media && ans.media.length > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "12px",
+                      overflow: "hidden",
+                      backgroundColor: "#f8fafc",
+                      maxWidth: "100%",
+                    }}
+                  >
+                    <img
+                      src={getImageUrl(ans.media[0].url)}
+                      alt={ans.text || "Ответ"}
+                      style={{
+                        width: "auto",
+                        height: "auto",
+                        maxWidth: "180px",
+                        maxHeight: "140px",
+                        objectFit: "contain",
+                      }}
+                    />
+                  </div>
+                )}
+                {ans.text && (
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 14,
+                      color: isSelected ? "#6366f1" : "#334155",
+                      textAlign: "center",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {ans.text}
+                  </span>
+                )}
+                {isConnected && <span style={{ fontSize: 20, lineHeight: 1 }}>✅</span>}
+                {isSelected && !isConnected && (
+                  <span style={{ fontSize: 12, color: "#6366f1", fontWeight: 600 }}>
+                    Теперь выберите точку
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <style jsx>{`
+        .imagemap-answer-card:hover {
+          transform: translateY(-2px);
+        }
+        .imagemap-answer-card:active {
+          transform: translateY(0);
+        }
+        @keyframes pulse {
+          0% { transform: translate(-50%, -50%) scale(1); }
+          50% { transform: translate(-50%, -50%) scale(1.15); }
+          100% { transform: translate(-50%, -50%) scale(1); }
+        }
+        .imagemap-point-pulse {
+          animation: pulse 1.2s ease-in-out infinite;
+        }
+      `}</style>
+    </div>
+  );
 }
 
 ================

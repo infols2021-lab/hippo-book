@@ -79,7 +79,10 @@ function normalizeAccountingValues(values: AccountingRowValue[]) {
       return value;
     }
 
-    return norm(value);
+    let clearedValue = norm(value);
+    // Полностью убираем упоминание олимпиады и кубок из любых ячеек перед отправкой в таблицу
+    clearedValue = clearedValue.replace(/🏆\s*Олимпиада/gi, "").replace(/Олимпиада/gi, "").trim();
+    return clearedValue;
   });
 }
 
