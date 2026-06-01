@@ -4,12 +4,13 @@ type SP = { source?: string; sourceId?: string };
 
 export const metadata = {
   title: "Контакты",
-  description: "Контакты поддержки: почта и официальный Telegram-канал ЦФО.",
+  description: "Контакты поддержки: Telegram, ВКонтакте, почта и официальный Telegram-канал ЦФО.",
 };
 
 const SUPPORT_EMAIL = "info.ls.2021@gmail.com";
 const OFFICIAL_CHANNEL = "https://t.me/hippo_ga_cfo";
-const TG_ADMIN = ""; // по твоей просьбе: пока пусто
+const TG_ADMIN_LINK = "https://t.me/skebobingg";
+const VK_ADMIN_LINK = "https://vk.com/bluntokyr";
 
 function buildQs(sp: SP) {
   const q = new URLSearchParams();
@@ -41,13 +42,13 @@ export default async function ContactsPage({
             </div>
 
             <div className="info-note">
-              Если прошли сутки, а доступа нет — напишите на почту и укажите номер заявки + почту, на которую оформляли заявку.
+              Если прошли сутки, а доступ не появился — лучше сразу пишите в ВКонтакте или Telegram для максимально быстрого ответа, либо отправьте письмо на почту с номером заявки.
             </div>
           </div>
 
           <h1 className="info-title">Контакты</h1>
           <p className="info-subtitle">
-            Оплата по QR в заявке. Выдача доступа после проверки — обычно до 24 часов. По вопросам пишите ниже.
+            Оплата по QR в заявке. Выдача доступа после проверки — обычно до 24 часов. По любым вопросам пишите в личные сообщения администратору или на почту.
           </p>
 
           <div className="section-card">
@@ -58,21 +59,25 @@ export default async function ContactsPage({
 
             <div className="contacts-grid">
               <div className="contact-tile">
-                <div className="label">Email поддержки</div>
-                <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
-                <div className="info-note">В письме укажи: номер заявки, область, ФИО и дату оплаты.</div>
+                <div className="label">Telegram администратора</div>
+                <a href={TG_ADMIN_LINK} target="_blank" rel="noreferrer">
+                  Связаться с администратором в Telegram
+                </a>
+                <div className="info-note">Самый быстрый способ решения любых вопросов по материалам и оплате.</div>
               </div>
 
               <div className="contact-tile">
-                <div className="label">TG администратора</div>
-                {TG_ADMIN ? (
-                  <a href={TG_ADMIN} target="_blank" rel="noreferrer">
-                    {TG_ADMIN}
-                  </a>
-                ) : (
-                  <div style={{ fontWeight: 1000, color: "rgba(15,23,42,0.82)" }}>пока не указан</div>
-                )}
-                <div className="info-note">Позже можно добавить ссылку на администратора.</div>
+                <div className="label">ВКонтакте администратора</div>
+                <a href={VK_ADMIN_LINK} target="_blank" rel="noreferrer">
+                  Связаться с администратором в ВКонтакте
+                </a>
+                <div className="info-note">Оперативная поддержка пользователей, разбор ошибок и доступов.</div>
+              </div>
+
+              <div className="contact-tile">
+                <div className="label">Email поддержки</div>
+                <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+                <div className="info-note">В письме обязательно укажи: номер заявки, область, ФИО и дату оплаты.</div>
               </div>
 
               <div className="contact-tile">
@@ -80,13 +85,13 @@ export default async function ContactsPage({
                 <a href={OFFICIAL_CHANNEL} target="_blank" rel="noreferrer">
                   t.me/hippo_ga_cfo
                 </a>
-                <div className="info-note">Новости и объявления по региону.</div>
+                <div className="info-note">Официальные новости, важные объявления и графики проведения по региону.</div>
               </div>
 
               <div className="contact-tile">
                 <div className="label">Сроки проверки оплаты</div>
                 <div style={{ fontWeight: 1000, color: "rgba(15,23,42,0.92)" }}>обычно до 24 часов</div>
-                <div className="info-note">Если прошло больше — пишите в поддержку.</div>
+                <div className="info-note">Если этот срок прошел, а материалы не открылись — обязательно напишите нам.</div>
               </div>
             </div>
 

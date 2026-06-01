@@ -106,7 +106,7 @@ export default async function InfoPage({
               <span>
                 Контакты
                 <br />
-                <small>почта и Telegram</small>
+                <small>связаться с нами</small>
               </span>
               <span className="arrow">→</span>
             </Link>
