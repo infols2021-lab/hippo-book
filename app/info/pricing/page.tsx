@@ -87,7 +87,7 @@ export default async function PricingPage({
                 border: "1px solid rgba(15, 23, 42, 0.08)"
               }}
             >
-              🏆 Олимпиада
+              Олимпиада
             </Link>
             <Link 
               href={buildTabLink(sp, "exams")}
@@ -104,7 +104,7 @@ export default async function PricingPage({
                 border: "1px solid rgba(15, 23, 42, 0.08)"
               }}
             >
-              🎓 Экзамены
+              Экзамены
             </Link>
           </div>
 
@@ -113,7 +113,7 @@ export default async function PricingPage({
               <>
                 <div className="section-card">
                   <div className="section-head">
-                    <h2>📚 Учебники</h2>
+                    <h2>Учебники</h2>
                     <div className="pill">1000 ₽ / учебник</div>
                   </div>
 
@@ -137,7 +137,7 @@ export default async function PricingPage({
 
                 <div className="section-card">
                   <div className="section-head">
-                    <h2>🧩 Кроссворды</h2>
+                    <h2>Кроссворды</h2>
                     <div className="pill">1000 ₽ / кроссворд</div>
                   </div>
 
@@ -161,7 +161,7 @@ export default async function PricingPage({
 
                 <div className="section-card">
                   <div className="section-head">
-                    <h2>🧾 Как это работает</h2>
+                    <h2>Как это работает</h2>
                     <div className="pill">важно</div>
                   </div>
 
@@ -177,7 +177,7 @@ export default async function PricingPage({
 
                 <div className="section-card">
                   <div className="section-head">
-                    <h2>🧭 Соответствие по классам</h2>
+                    <h2>Соответствие по классам</h2>
                     <div className="pill">автовыдача после проверки</div>
                   </div>
 
@@ -256,7 +256,7 @@ export default async function PricingPage({
               <>
                 <div className="section-card">
                   <div className="section-head">
-                    <h2>📝 Пробные тестирования</h2>
+                    <h2>Пробные тестирования</h2>
                     <div className="pill">199 ₽ / тест</div>
                   </div>
 
@@ -278,7 +278,7 @@ export default async function PricingPage({
 
                 <div className="section-card">
                   <div className="section-head">
-                    <h2>📘 Подготовительные пособия</h2>
+                    <h2>Подготовительные пособия</h2>
                     <div className="pill" style={{ background: "rgba(245, 158, 11, 0.14)", color: "#b45309", border: "1px solid rgba(245, 158, 11, 0.26)" }}>в разработке</div>
                   </div>
 
@@ -300,7 +300,7 @@ export default async function PricingPage({
 
                 <div className="section-card">
                   <div className="section-head">
-                    <h2>🧾 Как это работает</h2>
+                    <h2>Как это работает</h2>
                     <div className="pill">важно</div>
                   </div>
 

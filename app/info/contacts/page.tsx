@@ -60,37 +60,111 @@ export default async function ContactsPage({
             <div className="contacts-grid">
               <div className="contact-tile">
                 <div className="label">Telegram администратора</div>
-                <a href={TG_ADMIN_LINK} target="_blank" rel="noreferrer">
-                  Связаться с администратором в Telegram
+                <a 
+                  href={TG_ADMIN_LINK} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-block",
+                    marginTop: "8px",
+                    marginBottom: "4px",
+                    padding: "12px 20px",
+                    borderRadius: "14px",
+                    background: "linear-gradient(135deg, #24a1de, #208ec4)",
+                    color: "#fff",
+                    fontWeight: 900,
+                    fontSize: "14px",
+                    textDecoration: "none",
+                    boxShadow: "0 6px 20px rgba(36, 161, 222, 0.3)",
+                    textAlign: "center",
+                    transition: "transform 0.1s ease"
+                  }}
+                >
+                  💬 Написать в Telegram
                 </a>
                 <div className="info-note">Самый быстрый способ решения любых вопросов по материалам и оплате.</div>
               </div>
 
               <div className="contact-tile">
                 <div className="label">ВКонтакте администратора</div>
-                <a href={VK_ADMIN_LINK} target="_blank" rel="noreferrer">
-                  Связаться с администратором в ВКонтакте
+                <a 
+                  href={VK_ADMIN_LINK} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-block",
+                    marginTop: "8px",
+                    marginBottom: "4px",
+                    padding: "12px 20px",
+                    borderRadius: "14px",
+                    background: "linear-gradient(135deg, #0077ff, #0066da)",
+                    color: "#fff",
+                    fontWeight: 900,
+                    fontSize: "14px",
+                    textDecoration: "none",
+                    boxShadow: "0 6px 20px rgba(0, 119, 255, 0.3)",
+                    textAlign: "center",
+                    transition: "transform 0.1s ease"
+                  }}
+                >
+                  👥 Написать во ВКонтакте
                 </a>
                 <div className="info-note">Оперативная поддержка пользователей, разбор ошибок и доступов.</div>
               </div>
 
               <div className="contact-tile">
                 <div className="label">Email поддержки</div>
-                <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+                <a 
+                  href={`mailto:${SUPPORT_EMAIL}`}
+                  style={{
+                    display: "inline-block",
+                    marginTop: "8px",
+                    marginBottom: "4px",
+                    padding: "11px 18px",
+                    borderRadius: "14px",
+                    background: "rgba(15, 23, 42, 0.05)",
+                    border: "1px solid rgba(15, 23, 42, 0.1)",
+                    color: "rgba(15, 23, 42, 0.9)",
+                    fontWeight: 900,
+                    fontSize: "14px",
+                    textDecoration: "none",
+                    textAlign: "center"
+                  }}
+                >
+                  ✉️ {SUPPORT_EMAIL}
+                </a>
                 <div className="info-note">В письме обязательно укажи: номер заявки, область, ФИО и дату оплаты.</div>
               </div>
 
               <div className="contact-tile">
                 <div className="label">Официальный канал олимпиады в ЦФО</div>
-                <a href={OFFICIAL_CHANNEL} target="_blank" rel="noreferrer">
-                  t.me/hippo_ga_cfo
+                <a 
+                  href={OFFICIAL_CHANNEL} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-block",
+                    marginTop: "8px",
+                    marginBottom: "4px",
+                    padding: "11px 18px",
+                    borderRadius: "14px",
+                    background: "rgba(78, 205, 196, 0.12)",
+                    border: "1px solid rgba(78, 205, 196, 0.25)",
+                    color: "#0f766e",
+                    fontWeight: 900,
+                    fontSize: "14px",
+                    textDecoration: "none",
+                    textAlign: "center"
+                  }}
+                >
+                  📢 Открыть Telegram-канал
                 </a>
                 <div className="info-note">Официальные новости, важные объявления и графики проведения по региону.</div>
               </div>
 
               <div className="contact-tile">
                 <div className="label">Сроки проверки оплаты</div>
-                <div style={{ fontWeight: 1000, color: "rgba(15,23,42,0.92)" }}>обычно до 24 часов</div>
+                <div style={{ fontWeight: 1000, color: "rgba(15,23,42,0.92)", marginTop: "6px", fontSize: "15px" }}>обычно до 24 часов</div>
                 <div className="info-note">Если этот срок прошел, а материалы не открылись — обязательно напишите нам.</div>
               </div>
             </div>
