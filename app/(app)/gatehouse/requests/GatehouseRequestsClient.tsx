@@ -619,12 +619,18 @@ export default function GatehouseRequestsClient({
                           lineHeight: "1.5"
                         }}
                       >
-                        В данный момент пробные тесты на финальном этапе разработки, приобрести их можно будет начиная с 20 июня.
+                        В данный момент пробные тесты на финальном этапе разработки, приобрести их можно будет начиная с 20 junho.
                       </div>
                     </div>
 
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      <button className="gatehouse-button" type="submit" disabled={busy}>
+                      {/* Кнопка создания новой заявки заблокирована (работает только сохранение редактируемой) */}
+                      <button 
+                        className="gatehouse-button" 
+                        type="submit" 
+                        disabled={busy || !form.id}
+                        style={!form.id ? { opacity: 0.55, cursor: "not-allowed" } : {}}
+                      >
                         {busy ? "Сохраняем..." : form.id ? "Сохранить заявку" : "Создать заявку"}
                       </button>
 
