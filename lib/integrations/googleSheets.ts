@@ -80,8 +80,13 @@ function normalizeAccountingValues(values: AccountingRowValue[]) {
     }
 
     let clearedValue = norm(value);
-    // Полностью убираем упоминание олимпиады и кубок из любых ячеек перед отправкой в таблицу
-    clearedValue = clearedValue.replace(/🏆\s*Олимпиада/gi, "").replace(/Олимпиада/gi, "").trim();
+    
+    // Полностью убираем кубок и слово Олимпиада в любом регистре
+    clearedValue = clearedValue.replace(/🏆/g, "").replace(/Олимпиада/gi, "");
+    
+    // Вычищаем оставшийся по краям мусор (тире, дефисы, скобки, пробелы), чтобы остался только чистый класс
+    clearedValue = clearedValue.replace(/^[\s\-\—\–\(\)]+|[\s\-\—\–\(\)]+$/g, "").trim();
+    
     return clearedValue;
   });
 }
