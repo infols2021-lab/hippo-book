@@ -53,7 +53,7 @@ export default async function ContactsPage({
 
           <div className="section-card">
             <div className="section-head">
-              <h2>📮 Связь</h2>
+              <h2>Связь</h2>
               <div className="pill">support</div>
             </div>
 
@@ -65,7 +65,9 @@ export default async function ContactsPage({
                   target="_blank" 
                   rel="noreferrer"
                   style={{
-                    display: "inline-block",
+                    display: "block",
+                    width: "100%",
+                    boxSizing: "border-box",
                     marginTop: "8px",
                     marginBottom: "4px",
                     padding: "12px 20px",
@@ -80,7 +82,7 @@ export default async function ContactsPage({
                     transition: "transform 0.1s ease"
                   }}
                 >
-                  💬 Написать в Telegram
+                  Написать в Telegram
                 </a>
                 <div className="info-note">Самый быстрый способ решения любых вопросов по материалам и оплате.</div>
               </div>
@@ -92,7 +94,9 @@ export default async function ContactsPage({
                   target="_blank" 
                   rel="noreferrer"
                   style={{
-                    display: "inline-block",
+                    display: "block",
+                    width: "100%",
+                    boxSizing: "border-box",
                     marginTop: "8px",
                     marginBottom: "4px",
                     padding: "12px 20px",
@@ -107,7 +111,7 @@ export default async function ContactsPage({
                     transition: "transform 0.1s ease"
                   }}
                 >
-                  👥 Написать во ВКонтакте
+                  Написать во ВКонтакте
                 </a>
                 <div className="info-note">Оперативная поддержка пользователей, разбор ошибок и доступов.</div>
               </div>
@@ -117,10 +121,12 @@ export default async function ContactsPage({
                 <a 
                   href={`mailto:${SUPPORT_EMAIL}`}
                   style={{
-                    display: "inline-block",
+                    display: "block",
+                    width: "100%",
+                    boxSizing: "border-box",
                     marginTop: "8px",
                     marginBottom: "4px",
-                    padding: "11px 18px",
+                    padding: "12px 20px",
                     borderRadius: "14px",
                     background: "rgba(15, 23, 42, 0.05)",
                     border: "1px solid rgba(15, 23, 42, 0.1)",
@@ -131,7 +137,7 @@ export default async function ContactsPage({
                     textAlign: "center"
                   }}
                 >
-                  ✉️ {SUPPORT_EMAIL}
+                  {SUPPORT_EMAIL}
                 </a>
                 <div className="info-note">В письме обязательно укажи: номер заявки, область, ФИО и дату оплаты.</div>
               </div>
@@ -143,10 +149,12 @@ export default async function ContactsPage({
                   target="_blank" 
                   rel="noreferrer"
                   style={{
-                    display: "inline-block",
+                    display: "block",
+                    width: "100%",
+                    boxSizing: "border-box",
                     marginTop: "8px",
                     marginBottom: "4px",
-                    padding: "11px 18px",
+                    padding: "12px 20px",
                     borderRadius: "14px",
                     background: "rgba(78, 205, 196, 0.12)",
                     border: "1px solid rgba(78, 205, 196, 0.25)",
@@ -157,14 +165,14 @@ export default async function ContactsPage({
                     textAlign: "center"
                   }}
                 >
-                  📢 Открыть Telegram-канал
+                  Открыть Telegram-канал
                 </a>
                 <div className="info-note">Официальные новости, важные объявления и графики проведения по региону.</div>
               </div>
 
               <div className="contact-tile">
                 <div className="label">Сроки проверки оплаты</div>
-                <div style={{ fontWeight: 1000, color: "rgba(15,23,42,0.92)", marginTop: "6px", fontSize: "15px" }}>обычно до 24 часов</div>
+                <div style={{ fontWeight: 1000, color: "rgba(15,23,42,0.92)", marginTop: "14px", fontSize: "15px" }}>обычно до 24 часов</div>
                 <div className="info-note">Если этот срок прошел, а материалы не открылись — обязательно напишите нам.</div>
               </div>
             </div>
