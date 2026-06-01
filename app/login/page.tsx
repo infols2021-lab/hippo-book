@@ -68,6 +68,7 @@ export default function LoginPage() {
   const [networkIssue, setNetworkIssue] = useState(false);
 
   const [helpOpen, setHelpOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"registration" | "rules">("registration");
 
   const msgParam = useMemo(() => {
@@ -252,15 +253,21 @@ export default function LoginPage() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && helpOpen) {
-        setHelpOpen(false);
-        document.body.style.overflow = "";
+      if (e.key === "Escape") {
+        if (helpOpen) {
+          setHelpOpen(false);
+          document.body.style.overflow = "";
+        }
+        if (supportOpen) {
+          setSupportOpen(false);
+          document.body.style.overflow = "";
+        }
       }
     }
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [helpOpen]);
+  }, [helpOpen, supportOpen]);
 
   function openHelp() {
     setHelpOpen(true);
@@ -269,6 +276,16 @@ export default function LoginPage() {
 
   function closeHelp() {
     setHelpOpen(false);
+    document.body.style.overflow = "";
+  }
+
+  function openSupport() {
+    setSupportOpen(true);
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeSupport() {
+    setSupportOpen(false);
     document.body.style.overflow = "";
   }
 
@@ -376,7 +393,7 @@ export default function LoginPage() {
                   <div className="step-body">
                     <h5>Проверьте все папки</h5>
                     <p>
-                      Откройте ваш почтовый ящик. Если во «Входящих» пусто, не пугайтесь — обязательно загляните в папки <strong>«Спам»</strong> и <strong>«Промоакции»</strong>. Фильтры почты иногда путают автоматические письма.
+                      Откройте ваш почтовый ящик. Если во «Входящих» пусто, не пугайтесь — обязательно загляните в папки <strong>«Спам»</strong> and <strong>«Промоакции»</strong>. Фильтры почты иногда путают автоматические письма.
                     </p>
                   </div>
                 </div>
@@ -431,6 +448,69 @@ export default function LoginPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Мини-модалка технической поддержки */}
+      <div
+        className="help-modal"
+        style={{ display: supportOpen ? "flex" : "none" }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeSupport();
+        }}
+      >
+        <div className="help-modal-content" style={{ maxWidth: "400px" }}>
+          <div className="help-modal-header">
+            <h3>Техническая поддержка</h3>
+            <button className="help-close" onClick={closeSupport} type="button">
+              ✕
+            </button>
+          </div>
+          <div style={{ padding: "20px 0", color: "rgba(15,23,42,0.9)" }}>
+            <p style={{ marginBottom: "20px", fontSize: "14px", lineHeight: "1.5", fontWeight: 600 }}>
+              Обычно администратор отвечает в течение 2 часов. Выберите любой удобный способ для быстрой связи:
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <a
+                href="https://t.me/skebobingg"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "block",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  background: "linear-gradient(135deg, #24a1de, #208ec4)",
+                  color: "#fff",
+                  fontWeight: 900,
+                  fontSize: "14px",
+                  textDecoration: "none",
+                  textAlign: "center",
+                  boxShadow: "0 4px 12px rgba(36, 161, 222, 0.2)"
+                }}
+              >
+                Написать в Telegram
+              </a>
+              <a
+                href="https://vk.com/bluntokyr"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "block",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  background: "linear-gradient(135deg, #0077ff, #0066da)",
+                  color: "#fff",
+                  fontWeight: 900,
+                  fontSize: "14px",
+                  textDecoration: "none",
+                  textAlign: "center",
+                  boxShadow: "0 4px 12px rgba(0, 119, 255, 0.2)"
+                }}
+              >
+                Написать во ВКонтакте
+              </a>
             </div>
           </div>
         </div>
@@ -521,6 +601,27 @@ export default function LoginPage() {
                 Помощь
               </button>
             </div>
+
+            {/* Кнопка техподдержки, расположенная под всеми кнопками */}
+            <button
+              className="btn support"
+              onClick={openSupport}
+              type="button"
+              style={{
+                marginTop: "12px",
+                width: "100%",
+                padding: "11px",
+                borderRadius: "12px",
+                background: "rgba(15, 23, 42, 0.05)",
+                border: "1px solid rgba(15, 23, 42, 0.08)",
+                color: "rgba(15, 23, 42, 0.8)",
+                fontWeight: 700,
+                fontSize: "14px",
+                cursor: "pointer"
+              }}
+            >
+              Техническая поддержка
+            </button>
           </div>
         </div>
       </div>
