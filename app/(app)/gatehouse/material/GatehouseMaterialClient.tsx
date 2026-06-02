@@ -70,9 +70,39 @@ export default function GatehouseMaterialClient({
           <div style={{ marginBottom: "24px" }}>
             <Link
               href="/gatehouse/materials"
-              style={{ color: "#a5b4fc", fontSize: "14px", textDecoration: "none" }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 16px",
+                backgroundColor: "#4f46e5",
+                color: "white",
+                fontSize: "14px",
+                fontWeight: 500,
+                textDecoration: "none",
+                borderRadius: "40px",
+                transition: "all 0.2s ease",
+                boxShadow: "0 2px 6px rgba(79, 70, 229, 0.3)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 6px 12px rgba(79, 70, 229, 0.4)";
+                e.currentTarget.style.backgroundColor = "#6366f1";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 2px 6px rgba(79, 70, 229, 0.3)";
+                e.currentTarget.style.backgroundColor = "#4f46e5";
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "translateY(1px)";
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+              }}
             >
-              ← Материалы
+              <span style={{ fontSize: "18px" }}>←</span>
+              <span>Материалы</span>
             </Link>
             <h1 style={{ margin: "12px 0 8px", color: "#f8fafc", fontWeight: 900 }}>
               Материал не найден
@@ -110,49 +140,59 @@ export default function GatehouseMaterialClient({
         <GatehouseHeader />
 
         <div style={{ marginBottom: "24px" }}>
+          {/* Новая стильная кнопка назад */}
           <Link
             href="/gatehouse/materials"
-            style={{ color: "#a5b4fc", fontSize: "14px", textDecoration: "none" }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 20px",
+              backgroundColor: "#4f46e5",
+              color: "white",
+              fontSize: "14px",
+              fontWeight: 500,
+              textDecoration: "none",
+              borderRadius: "40px",
+              transition: "all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1)",
+              boxShadow: "0 2px 8px rgba(79, 70, 229, 0.3)",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 8px 16px rgba(79, 70, 229, 0.4)";
+              e.currentTarget.style.backgroundColor = "#6366f1";
+              const arrow = e.currentTarget.querySelector(".back-arrow") as HTMLElement;
+              if (arrow) arrow.style.transform = "translateX(-3px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(79, 70, 229, 0.3)";
+              e.currentTarget.style.backgroundColor = "#4f46e5";
+              const arrow = e.currentTarget.querySelector(".back-arrow") as HTMLElement;
+              if (arrow) arrow.style.transform = "translateX(0)";
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = "translateY(1px)";
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+            }}
           >
-            ← Материалы
+            <span
+              className="back-arrow"
+              style={{
+                fontSize: "18px",
+                transition: "transform 0.2s ease",
+                display: "inline-block",
+              }}
+            >
+              ←
+            </span>
+            <span>Материалы</span>
           </Link>
-          <h1 style={{ margin: "12px 0 8px", color: "#f8fafc", fontWeight: 900 }}>
-            {material.title}
-          </h1>
-          <p style={{ color: "#94a3b8", margin: "0 0 16px" }}>
-            {material.description ||
-              "Пробный тест Gatehouse Awards. Пройдите задания, чтобы увидеть результат и рекомендацию уровня."}
-          </p>
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <Link
-              href="/gatehouse/profile"
-              style={{
-                padding: "6px 14px",
-                background: "rgba(99,102,241,0.15)",
-                color: "#a5b4fc",
-                borderRadius: "8px",
-                textDecoration: "none",
-                fontSize: "13px",
-                fontWeight: 700,
-              }}
-            >
-              👤 Профиль
-            </Link>
-            <Link
-              href="/gatehouse/requests"
-              style={{
-                padding: "6px 14px",
-                background: "rgba(99,102,241,0.15)",
-                color: "#a5b4fc",
-                borderRadius: "8px",
-                textDecoration: "none",
-                fontSize: "13px",
-                fontWeight: 700,
-              }}
-            >
-              📋 Заявки
-            </Link>
-          </div>
+
+          {/* Удалены h1 с material.title, p с description, div с кнопками Профиль/Заявки */}
         </div>
 
         <div className="gatehouse-stats" aria-label="Прогресс материала">
