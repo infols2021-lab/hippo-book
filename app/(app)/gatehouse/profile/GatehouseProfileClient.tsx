@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import GatehouseHeader from "@/components/gatehouse/GatehouseHeader";
+import LogoutButton from "@/components/LogoutButton";
 
 export type GatehouseProfileData = {
   id: string;
@@ -84,9 +84,7 @@ function getDisplayName(profile: GatehouseProfileData): string {
 
 async function safeReadJson<T>(res: Response): Promise<T | null> {
   const text = await res.text();
-
   if (!text) return null;
-
   try {
     return JSON.parse(text) as T;
   } catch {
@@ -97,13 +95,10 @@ async function safeReadJson<T>(res: Response): Promise<T | null> {
 function normalizeUiErrorMessage(error: unknown, fallback = "Не удалось выполнить действие") {
   const raw =
     error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
-
   const msg = raw.trim();
-
   if (!msg) return fallback;
 
   const lower = msg.toLowerCase();
-
   if (
     lower.includes("failed to fetch") ||
     lower.includes("networkerror") ||
@@ -143,6 +138,12 @@ export default function GatehouseProfileClient({
   const [errorMessage, setErrorMessage] = useState("");
 
   const displayName = getDisplayName(profile);
+  const initials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
 
   const hasCurrentRegionOption = !form.region || REGION_OPTIONS.some((region) => region.value === form.region);
 
@@ -208,7 +209,7 @@ export default function GatehouseProfileClient({
         region: nextProfile.region,
       });
 
-      setSuccessMessage("Профиль обновлён. Эти данные также обновятся в олимпиаде.");
+      setSuccessMessage("Профиль обновлён. Данные также применены к олимпиаде.");
       setIsEditing(false);
     } catch (error: any) {
       setErrorMessage(normalizeUiErrorMessage(error, "Не удалось сохранить профиль."));
@@ -218,250 +219,196 @@ export default function GatehouseProfileClient({
   }
 
   return (
-    <main className="gatehouse-page">
-      <div className="gatehouse-container">
-        <GatehouseHeader
-          title={`Экзамены, ${displayName}`}
-          description="Здесь отображаются данные для подготовки к экзаменам Gatehouse Awards."
-          backHref="/portal"
-          backLabel="Портал"
-          actions={[
-            {
-              href: "/gatehouse/materials",
-              label: "Материалы",
-            },
-            {
-              href: "/gatehouse/requests",
-              label: "Заявки",
-            },
-          ]}
-        />
-
-        <section className="gatehouse-profile">
-          <div className="gatehouse-stats" aria-label="Статистика Gatehouse Awards">
-            <article className="gatehouse-stat">
-              <span className="gatehouse-stat__value">{initialStats.availableMaterials}</span>
-              <span className="gatehouse-stat__label">доступных материалов</span>
-            </article>
-
-            <article className="gatehouse-stat">
-              <span className="gatehouse-stat__value">{initialStats.completedAssignments}</span>
-              <span className="gatehouse-stat__label">пройденных заданий</span>
-            </article>
-
-            <article className="gatehouse-stat">
-              <span className="gatehouse-stat__value">{initialStats.totalMaterials}</span>
-              <span className="gatehouse-stat__label">материалов в разделе</span>
-            </article>
+    <main className="gatehouse-page" style={{ minHeight: '100vh', padding: '24px 0', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', color: '#f8fafc' }}>
+      <div className="gatehouse-container" style={{ width: '95%', maxWidth: '1200px', margin: '0 auto' }}>
+        
+        {/* HEADER */}
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '14px', background: 'rgba(30, 41, 59, 0.7)', backdropFilter: 'blur(12px)', padding: '14px 20px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)', color: 'white', width: '42px', height: '42px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '18px', boxShadow: '0 8px 16px rgba(99,102,241,0.25)' }}>GA</div>
+            <div>
+              <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '18px', fontWeight: 800, letterSpacing: '-0.3px' }}>Экзамены Gatehouse</h3>
+              <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Образовательная платформа</div>
+            </div>
           </div>
+          
+          <div className="gatehouse-nav-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <a href="#info" className="btn ghost" style={{ margin: 0, color: '#e2e8f0', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>Информация</a>
+            <Link href="/gatehouse/materials" className="btn ghost" style={{ margin: 0, color: '#e2e8f0', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>Материалы</Link>
+            <Link href="/profile" className="btn primary" style={{ margin: 0, background: 'linear-gradient(135deg, #4ecdc4, #556270)', color: 'white', border: 'none', boxShadow: '0 8px 20px rgba(78,205,196,0.2)' }}>🏆 В Олимпиаду</Link>
+            <LogoutButton className="btn danger">Выйти</LogoutButton>
+          </div>
+        </header>
 
-          <div className="gatehouse-profile__grid">
-            <section className="gatehouse-card">
-              <div className="gatehouse-card__inner">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                  <h2 className="gatehouse-card__title" style={{ margin: 0 }}>Профиль ученика</h2>
-                  {!isEditing && (
-                    <button 
-                      type="button" 
-                      className="gatehouse-button" 
-                      style={{ margin: 0, padding: "6px 14px", width: "auto", fontSize: "13px" }}
-                      onClick={() => setIsEditing(true)}
-                    >
-                      Редактировать
-                    </button>
-                  )}
-                </div>
+        {/* 2-COLUMN LAYOUT */}
+        <div className="gatehouse-profile-grid" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px', alignItems: 'start' }}>
+          
+          {/* LEFT SIDEBAR */}
+          <aside style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            
+            {/* PROFILE CARD */}
+            <div className="gatehouse-card" style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '22px', padding: '28px 20px', textAlign: 'center' }}>
+              <div style={{ width: '110px', height: '110px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2))', border: '4px solid rgba(99,102,241,0.4)', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '38px', fontWeight: 900, color: '#c7d2fe', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+                {initials}
+              </div>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '20px', color: '#f8fafc', fontWeight: 800 }}>{displayName}</h2>
+              <div style={{ fontSize: '13px', color: '#818cf8', fontWeight: 800, marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Студент Gatehouse</div>
 
-                <p className="gatehouse-card__subtitle">
-                  ФИО, telephone и регион общие для олимпиады и экзаменов. Если изменить их здесь,
-                  они сразу изменятся и в профиле олимпиады.
-                </p>
-
-                <form className="gatehouse-form" onSubmit={handleSubmit}>
-                  <div className="gatehouse-form__row">
-                    <label className="gatehouse-label" htmlFor="gatehouse-email">
-                      Email
-                    </label>
-                    <input id="gatehouse-email" className="gatehouse-input" value={profile.email} disabled readOnly />
+              {/* FORM / INFO */}
+              {isEditing ? (
+                <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 800, color: '#94a3b8', marginBottom: '6px' }}>Email</label>
+                    <input value={profile.email} disabled readOnly style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#64748b', fontSize: '14px', outline: 'none' }} />
                   </div>
-
-                  <div className="gatehouse-form__row">
-                    <label className="gatehouse-label" htmlFor="gatehouse-full-name">
-                      ФИО
-                    </label>
-                    <input
-                      id="gatehouse-full-name"
-                      className="gatehouse-input"
-                      value={form.full_name}
-                      placeholder="Введите ФИО"
-                      disabled={!isEditing}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          full_name: event.target.value,
-                        }))
-                      }
-                    />
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 800, color: '#94a3b8', marginBottom: '6px' }}>ФИО</label>
+                    <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} placeholder="Введите ФИО" disabled={saving} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(99,102,241,0.4)', color: '#f8fafc', fontSize: '14px', outline: 'none' }} />
                   </div>
-
-                  <div className="gatehouse-form__row">
-                    <label className="gatehouse-label" htmlFor="gatehouse-phone">
-                      Телефон
-                    </label>
-                    <input
-                      id="gatehouse-phone"
-                      className="gatehouse-input"
-                      value={form.contact_phone}
-                      placeholder="+7..."
-                      disabled={!isEditing}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          contact_phone: event.target.value,
-                        }))
-                      }
-                    />
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 800, color: '#94a3b8', marginBottom: '6px' }}>Телефон</label>
+                    <input value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} placeholder="+7..." disabled={saving} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(99,102,241,0.4)', color: '#f8fafc', fontSize: '14px', outline: 'none' }} />
                   </div>
-
-                  <div className="gatehouse-form__row">
-                    <label className="gatehouse-label" htmlFor="gatehouse-region">
-                      Область проживания
-                    </label>
-                    <select
-                      id="gatehouse-region"
-                      className="gatehouse-input gatehouse-select"
-                      value={form.region}
-                      disabled={!isEditing}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          region: event.target.value,
-                        }))
-                      }
-                    >
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 800, color: '#94a3b8', marginBottom: '6px' }}>Область проживания</label>
+                    <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} disabled={saving} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(99,102,241,0.4)', color: '#f8fafc', fontSize: '14px', outline: 'none' }}>
                       <option value="">-- Выберите область --</option>
-
-                      {!hasCurrentRegionOption ? <option value={form.region}>{form.region}</option> : null}
-
-                      {REGION_OPTIONS.map((region) => (
-                        <option key={region.value} value={region.value}>
-                          {region.label}
-                        </option>
-                      ))}
+                      {!hasCurrentRegionOption && <option value={form.region}>{form.region}</option>}
+                      {REGION_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                     </select>
                   </div>
 
-                  {successMessage ? (
-                    <div className="gatehouse-message gatehouse-message--success" style={{ marginBottom: "14px" }}>{successMessage}</div>
-                  ) : null}
+                  {successMessage && <div style={{ padding: '10px', background: 'rgba(34,197,94,0.15)', color: '#4ade80', borderRadius: '10px', marginBottom: '14px', fontSize: '13px', fontWeight: 600, border: '1px solid rgba(34,197,94,0.3)' }}>{successMessage}</div>}
+                  {errorMessage && <div style={{ padding: '10px', background: 'rgba(239,68,68,0.15)', color: '#f87171', borderRadius: '10px', marginBottom: '14px', fontSize: '13px', fontWeight: 600, border: '1px solid rgba(239,68,68,0.3)' }}>{errorMessage}</div>}
 
-                  {errorMessage ? (
-                    <div className="gatehouse-message gatehouse-message--error" style={{ marginBottom: "14px" }}>{errorMessage}</div>
-                  ) : null}
-
-                  {isEditing && (
-                    <div style={{ display: "flex", gap: "10px", marginTop: "18px" }}>
-                      <button 
-                        className="gatehouse-button" 
-                        type="button" 
-                        style={{ backgroundColor: "rgba(7, 23, 46, 0.08)", color: "#07172e", margin: 0 }}
-                        onClick={handleCancel}
-                        disabled={saving}
-                      >
-                        Отмена
-                      </button>
-                      <button className="gatehouse-button" type="submit" style={{ margin: 0 }} disabled={saving}>
-                        {saving ? "Сохраняем..." : "Сохранить изменения"}
-                      </button>
-                    </div>
-                  )}
+                  <button type="submit" disabled={saving} style={{ width: '100%', padding: '12px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', marginBottom: '8px', boxShadow: '0 8px 16px rgba(99,102,241,0.25)' }}>
+                    {saving ? "Сохраняем..." : "Сохранить"}
+                  </button>
+                  <button type="button" onClick={handleCancel} disabled={saving} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer' }}>
+                    Отмена
+                  </button>
                 </form>
+              ) : (
+                <>
+                  <div style={{ textAlign: 'left', background: 'rgba(15,23,42,0.5)', padding: '18px', borderRadius: '16px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                    <div style={{ marginBottom: '14px' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, marginBottom: '4px', letterSpacing: '0.5px' }}>Email</div>
+                      <div style={{ fontSize: '14px', color: '#f8fafc', fontWeight: 600, wordBreak: 'break-all' }}>{profile.email}</div>
+                    </div>
+                    <div style={{ marginBottom: '14px' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, marginBottom: '4px', letterSpacing: '0.5px' }}>Телефон</div>
+                      <div style={{ fontSize: '14px', color: '#f8fafc', fontWeight: 600 }}>{profile.contact_phone || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, marginBottom: '4px', letterSpacing: '0.5px' }}>Регион</div>
+                      <div style={{ fontSize: '14px', color: '#f8fafc', fontWeight: 600 }}>{profile.region || "—"}</div>
+                    </div>
+                  </div>
+
+                  <button type="button" onClick={() => setIsEditing(true)} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px', fontWeight: 800, cursor: 'pointer', transition: 'background 0.2s' }}>
+                    Редактировать профиль
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* SUPPORT CARD */}
+            <div className="gatehouse-card" style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '22px', padding: '20px 20px', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '14px', letterSpacing: '0.5px' }}>Служба поддержки</div>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                <a href="#" style={{ flex: 1, padding: '10px', background: '#2AABEE', color: 'white', borderRadius: '10px', textDecoration: 'none', fontWeight: 800, fontSize: '13px', display: 'block', boxShadow: '0 4px 12px rgba(42,171,238,0.3)' }}>Telegram</a>
+                <a href="#" style={{ flex: 1, padding: '10px', background: '#0077FF', color: 'white', borderRadius: '10px', textDecoration: 'none', fontWeight: 800, fontSize: '13px', display: 'block', boxShadow: '0 4px 12px rgba(0,119,255,0.3)' }}>ВКонтакте</a>
+              </div>
+
+              <Link href="/gatehouse/requests" style={{ display: 'block', width: '100%', padding: '12px', background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white', borderRadius: '12px', textDecoration: 'none', fontWeight: 800, fontSize: '14px', boxShadow: '0 8px 20px rgba(239,68,68,0.25)' }}>
+                Заявки на покупку
+              </Link>
+            </div>
+          </aside>
+
+          {/* RIGHT MAIN CONTENT */}
+          <main style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* STATS BLOCKS */}
+            <section>
+              <h3 style={{ fontSize: '14px', fontWeight: 900, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '14px', marginTop: 0 }}>Статистика по доступным материалам</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                 <div style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '22px', padding: '24px', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>
+                   <div style={{ fontSize: '38px', fontWeight: 900, color: '#818cf8', marginBottom: '8px', lineHeight: 1 }}>{initialStats.availableMaterials}</div>
+                   <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Доступных<br/>материалов</div>
+                 </div>
+                 <div style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '22px', padding: '24px', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>
+                   <div style={{ fontSize: '38px', fontWeight: 900, color: '#c084fc', marginBottom: '8px', lineHeight: 1 }}>{initialStats.completedAssignments}</div>
+                   <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Пройденных<br/>заданий</div>
+                 </div>
+                 <div style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '22px', padding: '24px', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>
+                   <div style={{ fontSize: '38px', fontWeight: 900, color: '#38bdf8', marginBottom: '8px', lineHeight: 1 }}>{initialStats.totalMaterials}</div>
+                   <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Всего материалов<br/>в разделе</div>
+                 </div>
               </div>
             </section>
 
-            <aside className="gatehouse-card">
-              <div className="gatehouse-card__inner">
-                <h2 className="gatehouse-card__title">Быстрые действия</h2>
-
-                <p className="gatehouse-card__subtitle">
-                  Перейдите к материалам или создайте заявку на получение доступа к материалам.
-                </p>
-
-                <div className="gatehouse-quick-actions">
-                  <Link className="gatehouse-quick-action" href="/gatehouse/materials">
-                    <span className="gatehouse-quick-action__main">
-                      <span>
-                        <span className="gatehouse-quick-action__title">Пробные тесты</span>
-                        <span className="gatehouse-quick-action__text">Открыть экзаменационные материалы</span>
-                      </span>
-                    </span>
-                    <span className="gatehouse-quick-action__arrow" aria-hidden="true">
-                      →
-                    </span>
-                  </Link>
-
-                  <Link className="gatehouse-quick-action" href="/gatehouse/requests">
-                    <span className="gatehouse-quick-action__main">
-                      <span>
-                        <span className="gatehouse-quick-action__title">Заявки</span>
-                        <span className="gatehouse-quick-action__text">Запросить доступ к нужному уровню</span>
-                      </span>
-                    </span>
-                    <span className="gatehouse-quick-action__arrow" aria-hidden="true">
-                      →
-                    </span>
-                  </Link>
-
-                  <Link className="gatehouse-quick-action" href="/portal">
-                    <span className="gatehouse-quick-action__main">
-                      <span>
-                        <span className="gatehouse-quick-action__title">Портал</span>
-                        <span className="gatehouse-quick-action__text">Вернуться к выбору направления</span>
-                      </span>
-                    </span>
-                    <span className="gatehouse-quick-action__arrow" aria-hidden="true">
-                      →
-                    </span>
-                  </Link>
-                </div>
+            {/* PROGRESS LIST (RECENT) */}
+            <section>
+              <h3 style={{ fontSize: '14px', fontWeight: 900, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '14px', marginTop: 0 }}>Последние результаты</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {initialRecentProgress.length > 0 ? (
+                  initialRecentProgress.map((item) => (
+                    <div key={item.id} style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '20px 24px', display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+                       <div style={{ flex: '1 1 200px' }}>
+                         <div style={{ display: 'inline-block', padding: '4px 10px', background: 'rgba(99,102,241,0.15)', color: '#818cf8', borderRadius: '8px', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>Пробный тест</div>
+                         <div style={{ fontSize: '18px', fontWeight: 800, color: '#f8fafc', marginBottom: '6px' }}>{item.assignmentTitle}</div>
+                         <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 600 }}>{item.materialTitle} <span style={{ opacity: 0.5, margin: '0 4px' }}>•</span> {item.completedAtLabel}</div>
+                       </div>
+                       
+                       <div style={{ width: '100%', maxWidth: '200px', flexShrink: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 700 }}>Балл</span>
+                            <span style={{ fontSize: '18px', fontWeight: 900, color: '#c084fc', lineHeight: 1 }}>{item.score}%</span>
+                          </div>
+                          <div style={{ width: '100%', height: '10px', background: 'rgba(15,23,42,0.8)', borderRadius: '999px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ height: '100%', width: `${item.score}%`, background: 'linear-gradient(90deg, #818cf8, #c084fc)', borderRadius: '999px', transition: 'width 0.5s ease' }} />
+                          </div>
+                       </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ background: 'rgba(30, 41, 59, 0.4)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '22px', padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                     <div style={{ fontSize: '32px', marginBottom: '12px' }}>📝</div>
+                     <div style={{ fontWeight: 800, fontSize: '18px', color: '#cbd5e1', marginBottom: '6px' }}>Результатов пока нет</div>
+                     <div style={{ fontSize: '14px', fontWeight: 600 }}>Пройдите доступные пробные тесты, чтобы увидеть свою статистику.</div>
+                     <Link href="/gatehouse/materials" style={{ display: 'inline-block', marginTop: '16px', padding: '10px 20px', background: 'rgba(99,102,241,0.15)', color: '#818cf8', borderRadius: '10px', textDecoration: 'none', fontWeight: 800, fontSize: '13px' }}>Перейти к материалам</Link>
+                  </div>
+                )}
               </div>
-            </aside>
-          </div>
+            </section>
 
-          <section className="gatehouse-card">
-            <div className="gatehouse-card__inner">
-              <h2 className="gatehouse-card__title">Последние результаты</h2>
+            {/* INFO BLOCK */}
+            <section id="info">
+              <h3 style={{ fontSize: '14px', fontWeight: 900, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '14px', marginTop: 0 }}>Информация</h3>
+              <div style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '22px', padding: '24px 28px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>
+                <ul style={{ margin: 0, paddingLeft: '18px', color: '#cbd5e1', fontSize: '14px', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '12px', fontWeight: 500 }}>
+                  <li style={{ paddingLeft: '6px' }}>На этой странице отображается ваша статистика по экзаменационным материалам <strong style={{ color: '#f8fafc' }}>Gatehouse Awards</strong>.</li>
+                  <li style={{ paddingLeft: '6px' }}>В разделе <strong style={{ color: '#f8fafc' }}>«Последние результаты»</strong> показаны ваши баллы по недавно пройденным пробным тестам.</li>
+                  <li style={{ paddingLeft: '6px' }}><strong style={{ color: '#818cf8' }}>Совет:</strong> регулярно практикуйтесь для успешной сдачи экзаменов! Подавайте заявки на новые уровни в соответствующем разделе через кнопку слева.</li>
+                </ul>
+              </div>
+            </section>
 
-              <p className="gatehouse-card__subtitle">
-                Здесь будут отображаться только задания из раздела Gatehouse Awards.
-              </p>
-
-              {initialRecentProgress.length > 0 ? (
-                <div className="gatehouse-recent">
-                  {initialRecentProgress.map((item) => (
-                    <article className="gatehouse-recent__item" key={item.id}>
-                      <div>
-                        <h3 className="gatehouse-recent__title">{item.assignmentTitle}</h3>
-                        <p className="gatehouse-recent__meta">
-                          {item.materialTitle} · {item.completedAtLabel}
-                        </p>
-                      </div>
-                      <div className="gatehouse-recent__score">{item.score}%</div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="gatehouse-empty">
-                  <h3 className="gatehouse-empty__title">Результатов пока нет</h3>
-                  <p className="gatehouse-empty__text">
-                    When you pass an assignment, your score and further recommendation will be shown here.
-                  </p>
-                </div>
-              )}
-            </div>
-          </section>
-        </section>
+          </main>
+        </div>
       </div>
+
+      {/* Адаптивность для мобилок, чтобы всё не сломалось на узких экранах */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @media (max-width: 900px) {
+          .gatehouse-profile-grid { grid-template-columns: 1fr !important; }
+          .gatehouse-nav-actions { width: 100%; justify-content: flex-start; }
+        }
+        @media (max-width: 600px) {
+          .gatehouse-nav-actions .btn { flex: 1; text-align: center; justify-content: center; }
+        }
+      `}} />
     </main>
   );
 }

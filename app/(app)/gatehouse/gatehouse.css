@@ -1,3 +1,4 @@
+/* app/(app)/gatehouse/gatehouse.css */
 .gatehouse-root {
   --ga-page-bg: #070816;
   --ga-page-bg-2: #0b1028;
@@ -77,6 +78,60 @@
   padding: 28px 0 48px;
 }
 
+/* Навигация и кнопки (для новых воздушных шапок) */
+.gatehouse-nav-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  transition: all 0.3s ease;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn.ghost {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn.ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, #4ecdc4, #556270);
+  color: white;
+  box-shadow: 0 8px 20px rgba(78, 205, 196, 0.2);
+}
+
+.btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(78, 205, 196, 0.3);
+}
+
+.btn.danger {
+  background: #ef4444;
+  color: white;
+}
+
+.btn.danger:hover {
+  background: #dc2626;
+}
+
+/* Стили старого хедера (оставлены для обратной совместимости) */
 .gatehouse-header {
   position: relative;
   overflow: hidden;
@@ -244,10 +299,12 @@
   margin-top: 24px;
 }
 
-.gatehouse-profile__grid {
+/* Сетка для нового профиля (левый сайдбар + основной контент) */
+.gatehouse-profile__grid,
+.gatehouse-profile-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
-  gap: 22px;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
   align-items: start;
 }
 
@@ -288,7 +345,7 @@
 
 .gatehouse-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
 }
 
@@ -385,7 +442,6 @@
   opacity: 0.78;
 }
 
-/* ✅ FIX: нативный select в тёмной теме теперь читаемый */
 .gatehouse-select {
   appearance: auto;
   color-scheme: dark;
@@ -620,6 +676,7 @@
   font-weight: 650;
 }
 
+/* КАРТОЧКА МАТЕРИАЛОВ (Добавили "воздуха" и мягкости) */
 .gatehouse-material-card {
   position: relative;
   isolation: isolate;
@@ -627,27 +684,27 @@
   display: flex;
   flex-direction: column;
   min-height: 420px;
-  border: 1px solid var(--ga-border);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 28px;
   background:
-    radial-gradient(circle at 20% 0%, rgba(34, 211, 238, 0.13), transparent 30%),
-    linear-gradient(145deg, rgba(18, 24, 58, 0.88), rgba(7, 8, 22, 0.78));
+    radial-gradient(circle at 20% 0%, rgba(34, 211, 238, 0.1), transparent 30%),
+    linear-gradient(145deg, rgba(18, 24, 58, 0.7), rgba(7, 8, 22, 0.6));
   color: var(--ga-text);
   text-decoration: none;
-  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.26);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
   backdrop-filter: blur(20px);
   transition:
-    transform 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
+    transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .gatehouse-material-card--available:hover {
-  transform: translateY(-5px);
-  border-color: rgba(34, 211, 238, 0.42);
+  transform: translateY(-6px);
+  border-color: rgba(34, 211, 238, 0.35);
   box-shadow:
-    0 30px 90px rgba(0, 0, 0, 0.32),
-    0 0 64px rgba(99, 102, 241, 0.22);
+    0 24px 60px rgba(0, 0, 0, 0.25),
+    0 0 40px rgba(99, 102, 241, 0.15);
 }
 
 .gatehouse-material-card--locked {
@@ -831,13 +888,37 @@
   transform: translateX(4px);
 }
 
+/* Бургер-меню */
+.gatehouse-header__burger {
+  display: none;
+  border: 1px solid var(--ga-border);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ga-text);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(16px);
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.gatehouse-header__burger:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--ga-border-strong);
+}
+
+/* АДАПТИВ (Настройка сеток и мобильного выпадающего меню) */
 @media (max-width: 940px) {
-  .gatehouse-profile__grid {
-    grid-template-columns: 1fr;
+  .gatehouse-profile__grid,
+  .gatehouse-profile-grid {
+    grid-template-columns: 1fr !important;
   }
 
   .gatehouse-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   }
 }
 
@@ -859,10 +940,7 @@
     align-items: flex-start;
     flex-direction: column;
     margin-bottom: 34px;
-  }
-
-  .gatehouse-header__actions {
-    justify-content: flex-start;
+    position: relative;
   }
 
   .gatehouse-header__title {
@@ -888,35 +966,41 @@
   .gatehouse-recent__score {
     width: fit-content;
   }
-}
-/* Бургер-меню */
-.gatehouse-header__burger {
-  display: none; /* скрыт на десктопе */
-  border: 1px solid var(--ga-border);
-  border-radius: 999px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--ga-text);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-  backdrop-filter: blur(16px);
-  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
-}
 
-.gatehouse-header__burger:hover {
-  transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.12);
-  border-color: var(--ga-border-strong);
-}
-
-/* Мобильная версия */
-@media (max-width: 640px) {
+  /* Настройки мобильного меню для "воздушного" хедера */
   .gatehouse-header__burger {
-    display: inline-flex;
-    align-items: center;
+    display: inline-flex !important;
+  }
+
+  .gatehouse-nav-actions {
+    display: none !important;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch !important;
+    margin-top: 12px;
+    background: rgba(15, 20, 46, 0.95);
+    backdrop-filter: blur(20px);
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--ga-border-strong);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Применяется когда мобильное меню открыто */
+  .gatehouse-nav-actions.open,
+  .gatehouse-header__actions--open {
+    display: flex !important;
+  }
+
+  .gatehouse-nav-actions .btn {
+    text-align: center;
     justify-content: center;
+    width: 100%;
   }
 
   .gatehouse-header__actions {
@@ -933,14 +1017,5 @@
     backdrop-filter: blur(20px);
     border: 1px solid var(--ga-border-strong);
     border-top: none;
-  }
-
-  .gatehouse-header__actions--open {
-    display: flex;
-  }
-
-  /* Чтобы хедер не перекрывался */
-  .gatehouse-header__top {
-    position: relative;
   }
 }
