@@ -1,3 +1,4 @@
+// app/(app)/gatehouse/assignment/[id]/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -73,29 +74,34 @@ function ErrorState({
   actionLabel?: string;
 }) {
   return (
-    <main className="gatehouse-page">
-      <div className="gatehouse-container">
-        <GatehouseHeader
-          title={title}
-          description={description}
-          backHref="/gatehouse/materials"
-          backLabel="Материалы"
-        />
+    <main className="gatehouse-page" style={{ minHeight: '100vh', padding: '24px 0', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', color: '#f8fafc' }}>
+      <div className="gatehouse-container" style={{ width: '95%', maxWidth: '1200px', margin: '0 auto' }}>
+        
+        {/* НОВЫЙ ЕДИНЫЙ ХЕДЕР БЕЗ ПРОПСОВ */}
+        <GatehouseHeader />
+
+        {/* ЗАГОЛОВОК СТРАНИЦЫ ОШИБКИ */}
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ display: 'inline-block', padding: '6px 12px', background: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', borderRadius: '8px', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '1px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+            Внимание
+          </div>
+          <h1 style={{ margin: '0 0 12px 0', fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 950, letterSpacing: '-0.04em', color: '#f8fafc' }}>
+            {title}
+          </h1>
+        </div>
 
         <section className="gatehouse-profile">
-          <div className="gatehouse-card">
+          <div className="gatehouse-card" style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '22px' }}>
             <div className="gatehouse-card__inner">
-              <div className="gatehouse-empty">
-                <span className="gatehouse-empty__icon" aria-hidden="true">
+              <div className="gatehouse-empty" style={{ background: 'transparent', border: 'none', padding: '40px 20px' }}>
+                <span className="gatehouse-empty__icon" aria-hidden="true" style={{ fontSize: '48px', opacity: 0.8, marginBottom: '16px' }}>
                   📝
                 </span>
 
-                <h3 className="gatehouse-empty__title">{title}</h3>
+                <p className="gatehouse-empty__text" style={{ fontSize: '16px', color: '#94a3b8', maxWidth: '500px', margin: '0 auto 24px', lineHeight: 1.6 }}>{description}</p>
 
-                <p className="gatehouse-empty__text">{description}</p>
-
-                <div style={{ marginTop: 18 }}>
-                  <Link className="gatehouse-button" href={actionHref}>
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <Link href={actionHref} style={{ display: 'inline-block', padding: '12px 24px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', borderRadius: '12px', textDecoration: 'none', fontWeight: 800, fontSize: '15px', boxShadow: '0 8px 20px rgba(99,102,241,0.25)' }}>
                     {actionLabel}
                   </Link>
                 </div>
@@ -209,10 +215,11 @@ export default async function GatehouseAssignmentByIdPage({
         title="Задание пока закрыто"
         description="Чтобы пройти это задание, нужно получить доступ к пробному тесту через заявку."
         actionHref="/gatehouse/requests"
-        actionLabel="Создать заявку"
+        actionLabel="Перейти к заявкам"
       />
     );
   }
 
+  // Если всё ок, рендерим сам клиент задания
   return <AssignmentClient assignmentId={assignmentId} source="gatehouse-material" sourceId={materialId} />;
 }
