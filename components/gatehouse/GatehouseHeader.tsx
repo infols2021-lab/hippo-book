@@ -2,111 +2,84 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
+import LogoutButton from "@/components/LogoutButton";
 
-type GatehouseHeaderAction = {
-  href: string;
-  label: string;
-  icon?: ReactNode;
-};
-
-type GatehouseHeaderProps = {
-  eyebrow?: string;
-  title: string;
-  description?: string;
-  backHref?: string;
-  backLabel?: string;
-  actions?: GatehouseHeaderAction[];
-  children?: ReactNode;
-};
-
-export default function GatehouseHeader({
-  eyebrow = "Gatehouse Awards",
-  title,
-  description,
-  backHref,
-  backLabel = "Назад",
-  actions = [],
-  children,
-}: GatehouseHeaderProps) {
+export default function GatehouseHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname() || "";
+
+  // Функция для определения активного роута
+  const getLinkProps = (path: string) => {
+    // Проверяем, находимся ли мы на этой странице
+    const isActive = pathname === path || (path !== "/portal" && path !== "/info" && pathname.startsWith(`${path}/`));
+    
+    return {
+      href: path,
+      className: "btn ghost",
+      // Если страница активна, кнопка становится подсвеченной и некликабельной
+      style: isActive ? {
+        background: 'rgba(99,102,241,0.2)',
+        borderColor: 'rgba(99,102,241,0.4)',
+        color: '#818cf8',
+        pointerEvents: 'none' as const,
+        margin: 0
+      } : { margin: 0 },
+      onClick: () => setMobileMenuOpen(false)
+    };
+  };
 
   return (
-    <header className="gatehouse-header">
-      <div className="gatehouse-header__bg" aria-hidden="true">
-        <div className="gatehouse-header__orb gatehouse-header__orb--one" />
-        <div className="gatehouse-header__orb gatehouse-header__orb--two" />
-        <div className="gatehouse-header__grid" />
+    <header style={{ 
+      display: 'flex', 
+      justifyContent: 'space-between', 
+      alignItems: 'center', 
+      marginBottom: '32px', 
+      flexWrap: 'wrap', 
+      gap: '14px', 
+      background: 'rgba(30, 41, 59, 0.4)', 
+      backdropFilter: 'blur(12px)', 
+      padding: '14px 20px', 
+      borderRadius: '20px', 
+      border: '1px solid rgba(255,255,255,0.05)' 
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ 
+          background: 'linear-gradient(135deg, #6366f1, #a855f7)', 
+          color: 'white', 
+          width: '42px', 
+          height: '42px', 
+          borderRadius: '12px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          fontWeight: 900, 
+          fontSize: '18px', 
+          boxShadow: '0 8px 16px rgba(99,102,241,0.25)' 
+        }}>GA</div>
+        <div>
+          <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '18px', fontWeight: 800, letterSpacing: '-0.3px' }}>Экзамены Gatehouse</h3>
+          <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Образовательная платформа</div>
+        </div>
       </div>
+      
+      <button
+        className="gatehouse-header__burger"
+        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        aria-label="Открыть меню"
+      >
+        <span aria-hidden="true">☰</span>
+      </button>
 
-      <div className="gatehouse-header__inner">
-        <div className="gatehouse-header__top">
-          {backHref ? (
-            <Link href={backHref} className="gatehouse-header__back">
-              <span aria-hidden="true">←</span>
-              <span>{backLabel}</span>
-            </Link>
-          ) : (
-            <div />
-          )}
-
-          {/* Бургер-кнопка теперь отображается всегда на мобильных, так как навигация есть всегда */}
-          <button
-            className="gatehouse-header__burger"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Открыть меню"
-          >
-            <span aria-hidden="true">☰</span>
-          </button>
-
-          <div className={`gatehouse-header__actions ${mobileMenuOpen ? "gatehouse-header__actions--open" : ""}`}>
-            
-            {/* Глобальные кнопки навигации (присутствуют на всех страницах Gatehouse) */}
-            <Link href="/info" className="gatehouse-header__action" onClick={() => setMobileMenuOpen(false)}>
-              <span>Информация</span>
-            </Link>
-
-            <Link href="/gatehouse/profile" className="gatehouse-header__action" onClick={() => setMobileMenuOpen(false)}>
-              <span>Профиль экзаменов</span>
-            </Link>
-
-            <Link 
-              href="/profile" 
-              className="gatehouse-header__action" 
-              style={{ background: 'linear-gradient(135deg, #4ecdc4, #556270)', color: '#fff', borderColor: 'transparent' }} 
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <span>🏆 В Олимпиаду</span>
-            </Link>
-
-            {/* Специфичные кнопки для конкретной страницы, переданные через props */}
-            {actions.map((action) => (
-              <Link
-                key={`${action.href}-${action.label}`}
-                href={action.href}
-                className="gatehouse-header__action"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {action.icon ? <span className="gatehouse-header__action-icon">{action.icon}</span> : null}
-                <span>{action.label}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="gatehouse-header__main">
-          <div className="gatehouse-header__badge">
-            <span className="gatehouse-header__badge-dot" aria-hidden="true" />
-            <span>{eyebrow}</span>
-          </div>
-
-          <h1 className="gatehouse-header__title">{title}</h1>
-
-          {description ? <p className="gatehouse-header__description">{description}</p> : null}
-
-          {children ? <div className="gatehouse-header__content">{children}</div> : null}
-        </div>
+      {/* Контейнер ссылок */}
+      <div className={`gatehouse-nav-actions ${mobileMenuOpen ? "open" : ""}`}>
+        <Link {...getLinkProps("/info")}>Информация</Link>
+        <Link {...getLinkProps("/gatehouse/materials")}>Материалы</Link>
+        <Link {...getLinkProps("/gatehouse/profile")}>Профиль</Link>
+        <Link {...getLinkProps("/portal")}>Портал</Link>
+        
+        <LogoutButton className="btn danger">Выйти</LogoutButton>
       </div>
     </header>
   );

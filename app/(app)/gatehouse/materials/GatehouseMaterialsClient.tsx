@@ -2,8 +2,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
-import LogoutButton from "@/components/LogoutButton";
+import GatehouseHeader from "@/components/gatehouse/GatehouseHeader";
 import GatehouseMaterialCard from "@/components/gatehouse/GatehouseMaterialCard";
 import type { MaterialWithProgress } from "@/lib/materials/types";
 
@@ -27,7 +26,6 @@ export default function GatehouseMaterialsClient({
   initialError,
 }: GatehouseMaterialsClientProps) {
   const [tab, setTab] = useState<GatehouseMaterialsTab>("mock_tests");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const materials = useMemo(() => sortMaterials(initialMaterials), [initialMaterials]);
 
@@ -35,31 +33,8 @@ export default function GatehouseMaterialsClient({
     <main className="gatehouse-page" style={{ minHeight: '100vh', padding: '24px 0', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', color: '#f8fafc' }}>
       <div className="gatehouse-container" style={{ width: '95%', maxWidth: '1200px', margin: '0 auto' }}>
         
-        {/* ВОЗДУШНЫЙ ХЕДЕР */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '14px', background: 'rgba(30, 41, 59, 0.4)', backdropFilter: 'blur(12px)', padding: '14px 20px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Link href="/gatehouse/profile" className="btn ghost" style={{ margin: 0, color: '#94a3b8', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px' }}>
-              <span aria-hidden="true" style={{ marginRight: '6px' }}>←</span> Профиль
-            </Link>
-          </div>
-          
-          {/* Бургер для мобилок */}
-          <button
-            className="gatehouse-header__burger"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Открыть меню"
-            style={{ display: 'none' }} // Скрыт на десктопе, стили для него есть в gatehouse.css
-          >
-            <span aria-hidden="true">☰</span>
-          </button>
-
-          <div className={`gatehouse-nav-actions ${mobileMenuOpen ? "open" : ""}`} style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <Link href="/info" className="btn ghost" style={{ margin: 0, color: '#e2e8f0', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>Информация</Link>
-            <Link href="/portal" className="btn ghost" style={{ margin: 0, color: '#e2e8f0', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>Портал</Link>
-            <Link href="/profile" className="btn primary" style={{ margin: 0, background: 'linear-gradient(135deg, #4ecdc4, #556270)', color: 'white', border: 'none', boxShadow: '0 8px 20px rgba(78,205,196,0.2)' }}>🏆 В Олимпиаду</Link>
-            <LogoutButton className="btn danger">Выйти</LogoutButton>
-          </div>
-        </header>
+        {/* ИСПОЛЬЗУЕМ НАШ НОВЫЙ ЕДИНЫЙ ХЕДЕР */}
+        <GatehouseHeader />
 
         {/* ЗАГОЛОВОК И ТАБЫ */}
         <div style={{ marginBottom: '32px' }}>
@@ -157,15 +132,6 @@ export default function GatehouseMaterialsClient({
         </section>
 
       </div>
-
-      <style dangerouslySetInnerHTML={{__html: `
-        @media (max-width: 640px) {
-          .gatehouse-header__burger { display: inline-flex !important; }
-          .gatehouse-nav-actions { display: none !important; width: 100%; flex-direction: column; align-items: stretch !important; margin-top: 14px; }
-          .gatehouse-nav-actions.open { display: flex !important; }
-          .gatehouse-nav-actions .btn { text-align: center; justify-content: center; }
-        }
-      `}} />
     </main>
   );
 }

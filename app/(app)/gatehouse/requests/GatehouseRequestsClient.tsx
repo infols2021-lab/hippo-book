@@ -1,4 +1,4 @@
-/* app/(app)/gatehouse/requests/GatehouseRequestsClient.tsx */
+// app/(app)/gatehouse/requests/GatehouseRequestsClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -66,7 +66,6 @@ type RequestListApiResponse = {
 
 async function safeReadJson(res: Response) {
   const text = await res.text();
-
   try {
     return { text, json: text ? JSON.parse(text) : null };
   } catch {
@@ -77,15 +76,12 @@ async function safeReadJson(res: Response) {
 function getPaymentQRUrl(seed?: number): string {
   const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
   const t = encodeURIComponent(String(seed ?? Date.now()));
-
   if (!supabaseUrl) return "";
-
   return `${supabaseUrl}/storage/v1/object/public/help-images/oplata.png?t=${t}`;
 }
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
-
   try {
     return new Intl.DateTimeFormat("ru-RU", {
       day: "2-digit",
@@ -108,12 +104,9 @@ function toStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.map((item) => String(item ?? "").trim()).filter(Boolean);
   }
-
   if (typeof value === "string") {
     const text = value.trim();
-
     if (!text) return [];
-
     if (text.startsWith("[") && text.endsWith("]")) {
       try {
         return toStringArray(JSON.parse(text));
@@ -121,44 +114,29 @@ function toStringArray(value: unknown): string[] {
         return [];
       }
     }
-
-    return text
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
+    return text.split(",").map((item) => item.trim()).filter(Boolean);
   }
-
   const single = String(value ?? "").trim();
   return single ? [single] : [];
 }
 
 function getRequestLevels(request: GatehousePurchaseRequest): GatehouseLevelCode[] {
-  const source =
-    Array.isArray(request.target_levels) && request.target_levels.length ? request.target_levels : request.target_level;
-
+  const source = Array.isArray(request.target_levels) && request.target_levels.length ? request.target_levels : request.target_level;
   if (!Array.isArray(source)) return [];
-
   const levels: GatehouseLevelCode[] = [];
-
   for (const value of source) {
     const level = normalizeGatehouseLevel(value);
-
     if (level && !levels.includes(level)) {
       levels.push(level);
     }
   }
-
   return levels;
 }
 
 function getRequestMaterialLabel(request: GatehousePurchaseRequest): string {
-  const kinds =
-    Array.isArray(request.material_kinds) && request.material_kinds.length ? request.material_kinds : request.textbook_types;
-
+  const kinds = Array.isArray(request.material_kinds) && request.material_kinds.length ? request.material_kinds : request.textbook_types;
   if (!Array.isArray(kinds) || !kinds.length) return "📝 Пробные тесты";
-
   const normalized = kinds.map((kind) => String(kind).trim().toLowerCase());
-
   if (
     normalized.includes("mock_test") ||
     normalized.includes("mock_tests") ||
@@ -171,7 +149,6 @@ function getRequestMaterialLabel(request: GatehousePurchaseRequest): string {
   ) {
     return "📝 Пробные тесты";
   }
-
   return kinds.join(", ");
 }
 
@@ -180,21 +157,15 @@ function createInitialForm(): FormState {
     id: null,
     request_number: createClientRequestNumber({ prefix: "GA" }),
     created_at: new Date().toISOString(),
-    selectedLevel: "stage_1", // По умолчанию подставляем первый уровень, чтобы не ломать отправку формы
+    selectedLevel: "stage_1", 
   };
-}
-
-function getRequestAmount(_request?: GatehousePurchaseRequest | null): number {
-  return 199; // Меняем цену с 1000 на 199 рублей
 }
 
 function safeDisplayName(profile: GatehouseRequestProfile): string {
   const fullName = profile.full_name.trim();
   if (fullName) return fullName;
-
   const email = profile.email.trim();
   if (email) return email;
-
   return "Не указано";
 }
 
@@ -221,15 +192,10 @@ function normalizeRequests(rows: any[]): GatehousePurchaseRequest[] {
 }
 
 function normalizeUiErrorMessage(error: unknown, fallback = "Не удалось выполнить действие") {
-  const raw =
-    error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
-
+  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
   const msg = raw.trim();
-
   if (!msg) return fallback;
-
   const lower = msg.toLowerCase();
-
   if (
     lower.includes("failed to fetch") ||
     lower.includes("networkerror") ||
@@ -239,7 +205,6 @@ function normalizeUiErrorMessage(error: unknown, fallback = "Не удалось
   ) {
     return "Ошибка соединения с сервером";
   }
-
   return msg;
 }
 
@@ -256,12 +221,6 @@ export default function GatehouseRequestsClient({
   const [form, setForm] = useState<FormState>(() => createInitialForm());
   const [busy, setBusy] = useState(false);
 
-  const [qrSeed, setQrSeed] = useState(Date.now());
-  const [qrLoading, setQrLoading] = useState(false);
-  const [qrError, setQrError] = useState(false);
-
-  const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
-
   const pendingRequests = requests.filter((request) => !request.is_processed);
   const processedRequests = requests.filter((request) => request.is_processed);
   const lastPendingRequest = pendingRequests[0] ?? null;
@@ -272,16 +231,7 @@ export default function GatehouseRequestsClient({
   }
 
   function openPayment() {
-    setQrError(false);
-    setQrLoading(true);
-    setQrSeed(Date.now());
     setPaymentOpen(true);
-  }
-
-  function refreshQr() {
-    setQrError(false);
-    setQrLoading(true);
-    setQrSeed(Date.now());
   }
 
   async function reloadRequests() {
@@ -290,13 +240,10 @@ export default function GatehouseRequestsClient({
         method: "GET",
         cache: "no-store",
       });
-
       const json = (await res.json().catch(() => null)) as RequestListApiResponse | null;
-
       if (!res.ok || !json?.ok) {
         throw new Error(json?.error || `HTTP ${res.status}`);
       }
-
       setRequests(Array.isArray(json.requests) ? normalizeRequests(json.requests) : []);
     } catch (error: any) {
       showNotice(`Ошибка загрузки заявок: ${normalizeUiErrorMessage(error)}`, "error");
@@ -314,16 +261,13 @@ export default function GatehouseRequestsClient({
       showNotice("Обработанную заявку нельзя редактировать.", "error");
       return;
     }
-
     const firstLevel = getRequestLevels(request)[0] ?? "stage_1";
-
     setForm({
       id: request.id,
       request_number: request.request_number,
       created_at: request.created_at || new Date().toISOString(),
       selectedLevel: firstLevel,
     });
-
     setFormOpen(true);
     setPaymentOpen(false);
   }
@@ -335,84 +279,21 @@ export default function GatehouseRequestsClient({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (busy) return;
-
-    if (!form.selectedLevel) {
-      showNotice("Выберите уровень Gatehouse Awards.", "error");
-      return;
-    }
-
-    setBusy(true);
-
-    const fullName = safeDisplayName(profile);
-
-    const payload = {
-      id: form.id,
-      request_number: form.request_number,
-      created_at: form.created_at,
-      branch_type: "gatehouse",
-      class_level: null,
-      target_level: [form.selectedLevel],
-      target_levels: [form.selectedLevel],
-      textbook_types: ["mock_test"],
-      material_kinds: ["mock_test"],
-      email: profile.email,
-      full_name: fullName,
-      contact_phone: profile.contact_phone || null,
-      is_processed: false,
-      processed_at: null,
-    };
-
-    try {
-      const res = await fetch(form.id ? "/api/requests/update" : "/api/requests/create", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify(payload),
-      });
-
-      const { json } = await safeReadJson(res);
-
-      if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || `HTTP ${res.status}`);
-      }
-
-      setFormOpen(false);
-      openPayment();
-
-      if (json?.sheet?.ok === false) {
-        showNotice(
-          form.id
-            ? "Заявка обновлена, но синк в таблицу временно не удался."
-            : "Заявка создана, но запись в таблицу временно не удалась.",
-          "error",
-        );
-      } else {
-        showNotice(form.id ? "Заявка обновлена." : "Заявка создана.");
-      }
-
-      await reloadRequests();
-    } catch (error: any) {
-      showNotice(normalizeUiErrorMessage(error, "Не удалось сохранить заявку."), "error");
-    } finally {
-      setBusy(false);
-    }
+    
+    // ЖЕСТКАЯ БЛОКИРОВКА СОХРАНЕНИЯ ДО 20 ИЮНЯ
+    showNotice("Оформление заявок временно недоступно. Открытие 20 июня.", "error");
+    return;
   }
 
   async function deleteRequest(request: GatehousePurchaseRequest) {
     if (busy) return;
-
     if (request.is_processed) {
       showNotice("Обработанную заявку нельзя удалить.", "error");
       return;
     }
-
     const okConfirm = window.confirm(`Удалить заявку ${request.request_number}?`);
     if (!okConfirm) return;
-
     setBusy(true);
-
     try {
       const res = await fetch("/api/requests/delete", {
         method: "POST",
@@ -420,19 +301,15 @@ export default function GatehouseRequestsClient({
         cache: "no-store",
         body: JSON.stringify({ id: request.id }),
       });
-
       const { json } = await safeReadJson(res);
-
       if (!res.ok || !json?.ok) {
         throw new Error(json?.error || `HTTP ${res.status}`);
       }
-
       if (json?.sheet?.ok === false) {
         showNotice("Заявка удалена, но строку в таблице не удалось удалить сразу.", "error");
       } else {
         showNotice("Заявка удалена.");
       }
-
       await reloadRequests();
     } catch (error: any) {
       showNotice(normalizeUiErrorMessage(error, "Не удалось удалить заявку."), "error");
@@ -442,385 +319,197 @@ export default function GatehouseRequestsClient({
   }
 
   return (
-    <main className="gatehouse-page">
-      <div className="gatehouse-container">
-        <GatehouseHeader
-          title="Заявки Gatehouse Awards"
-          description="Создайте заявку на доступ к пробным тестам по нужному уровню. Данные профиля подтягиваются автоматически."
-          backHref="/gatehouse/profile"
-          backLabel="Профиль"
-          actions={[
-            {
-              href: "/gatehouse/materials",
-              label: "Материалы",
-              icon: "📝",
-            },
-            {
-              href: "/portal",
-              label: "Портал",
-              icon: "🏠",
-            },
-          ]}
-        >
-          <div className="gatehouse-stats" aria-label="Статистика заявок">
-            <article className="gatehouse-stat">
-              <span className="gatehouse-stat__icon" aria-hidden="true">
-                📋
-              </span>
-              <span className="gatehouse-stat__value">{requests.length}</span>
-              <span className="gatehouse-stat__label">всего заявок</span>
-            </article>
+    <main className="gatehouse-page" style={{ minHeight: '100vh', padding: '24px 0', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', color: '#f8fafc' }}>
+      <div className="gatehouse-container" style={{ width: '95%', maxWidth: '1200px', margin: '0 auto' }}>
+        
+        {/* ИСПОЛЬЗУЕМ НАШ НОВЫЙ ЕДИНЫЙ ХЕДЕР */}
+        <GatehouseHeader />
 
-            <article className="gatehouse-stat">
-              <span className="gatehouse-stat__icon" aria-hidden="true">
-                ⏳
-              </span>
-              <span className="gatehouse-stat__value">{pendingRequests.length}</span>
-              <span className="gatehouse-stat__label">ожидают обработки</span>
-            </article>
-
-            <article className="gatehouse-stat">
-              <span className="gatehouse-stat__icon" aria-hidden="true">
-                ✅
-              </span>
-              <span className="gatehouse-stat__value">{processedRequests.length}</span>
-              <span className="gatehouse-stat__label">обработано</span>
-            </article>
+        {/* ЗАГОЛОВОК СТРАНИЦЫ */}
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ display: 'inline-block', padding: '6px 12px', background: 'rgba(99,102,241,0.15)', color: '#818cf8', borderRadius: '8px', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '1px', border: '1px solid rgba(99,102,241,0.2)' }}>
+            Gatehouse Awards
           </div>
-        </GatehouseHeader>
+          <h1 style={{ margin: '0 0 12px 0', fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 950, letterSpacing: '-0.04em', color: '#f8fafc' }}>
+            Управление заяками
+          </h1>
+          <p style={{ margin: 0, color: '#94a3b8', fontSize: '15px', maxWidth: '600px', lineHeight: 1.5 }}>
+            Здесь вы можете создать заявку на получение доступа к экзаменационным материалам и отслеживать её статус.
+          </p>
+        </div>
 
-        <section className="gatehouse-profile">
-          {notice ? (
-            <div
-              className={[
-                "gatehouse-message",
-                notice.type === "success" ? "gatehouse-message--success" : "gatehouse-message--error",
-              ].join(" ")}
-            >
-              {notice.text}
-            </div>
-          ) : null}
+        {notice && (
+          <div className={`gatehouse-message ${notice.type === "success" ? "gatehouse-message--success" : "gatehouse-message--error"}`} style={{ marginBottom: '24px' }}>
+            {notice.text}
+          </div>
+        )}
 
-          <div className="gatehouse-profile__grid">
-            <section className="gatehouse-card">
-              <div className="gatehouse-card__inner">
-                <h2 className="gatehouse-card__title">Новая заявка</h2>
+        <div className="gatehouse-profile__grid" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px', alignItems: 'start' }}>
+          
+          {/* LEFT SIDEBAR (Создание и Оплата) */}
+          <aside style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* Карточка создания заявки */}
+            <div className="gatehouse-card" style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '22px', padding: '24px' }}>
+              <h2 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 900, color: '#f8fafc' }}>Новая заявка</h2>
+              <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#94a3b8', lineHeight: 1.5 }}>
+                Пробные тесты уже подготовлены и находятся на стадии финальной проверки. Оформление новых заявок откроется <strong>20 июня</strong>.
+              </p>
 
-                <p className="gatehouse-card__subtitle">
-                  Сейчас в экзаменах доступен один тип материала — пробные тесты. Позже сюда можно
-                  добавить новые типы без изменения формы профиля.
-                </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  onClick={openCreate} 
+                  disabled={busy}
+                  style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 800, cursor: busy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 8px 20px rgba(99,102,241,0.25)' }}
+                >
+                  <span>📝</span> Открыть форму заявки
+                </button>
 
-                <div className="gatehouse-quick-actions">
-                  <button className="gatehouse-quick-action" type="button" onClick={openCreate} disabled={busy}>
-                    <span className="gatehouse-quick-action__main">
-                      <span className="gatehouse-quick-action__icon" aria-hidden="true">
-                        📝
-                      </span>
-
-                      <span>
-                        <span className="gatehouse-quick-action__title">Создать заявку</span>
-                        <span className="gatehouse-quick-action__text">
-                          Выбрать уровень и запросить пробный тест
-                        </span>
-                      </span>
-                    </span>
-
-                    <span className="gatehouse-quick-action__arrow" aria-hidden="true">
-                      →
-                    </span>
+                {lastPendingRequest && (
+                  <button 
+                    type="button" 
+                    onClick={openPayment} 
+                    disabled={busy}
+                    style={{ width: '100%', padding: '14px', background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontWeight: 800, cursor: busy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  >
+                    <span>💳</span> Показать оплату
                   </button>
-
-                  {lastPendingRequest ? (
-                    <button className="gatehouse-quick-action" type="button" onClick={openPayment} disabled={busy}>
-                      <span className="gatehouse-quick-action__main">
-                        <span className="gatehouse-quick-action__icon" aria-hidden="true">
-                          💳
-                        </span>
-
-                        <span>
-                          <span className="gatehouse-quick-action__title">Показать QR</span>
-                          <span className="gatehouse-quick-action__text">
-                            Последняя заявка: {lastPendingRequest.request_number}
-                          </span>
-                        </span>
-                      </span>
-
-                      <span className="gatehouse-quick-action__arrow" aria-hidden="true">
-                        →
-                      </span>
-                    </button>
-                  ) : null}
-                </div>
-
-                {formOpen ? (
-                  <form className="gatehouse-form" onSubmit={handleSubmit}>
-                    <div className="gatehouse-form__row">
-                      <label className="gatehouse-label" htmlFor="ga-request-number">
-                        Номер заявки
-                      </label>
-
-                      <input id="ga-request-number" className="gatehouse-input" value={form.request_number} readOnly disabled />
-                    </div>
-
-                    <div className="gatehouse-form__row">
-                      <label className="gatehouse-label" htmlFor="ga-request-date">
-                        Дата создания
-                      </label>
-
-                      <input id="ga-request-date" className="gatehouse-input" value={formatDateTime(form.created_at)} readOnly disabled />
-                    </div>
-
-                    <div className="gatehouse-form__row">
-                      <label className="gatehouse-label" htmlFor="ga-request-email">
-                        Email
-                      </label>
-
-                      <input id="ga-request-email" className="gatehouse-input" value={profile.email} readOnly disabled />
-                    </div>
-
-                    <div className="gatehouse-form__row">
-                      <label className="gatehouse-label" htmlFor="ga-request-name">
-                        ФИО
-                      </label>
-
-                      <input id="ga-request-name" className="gatehouse-input" value={safeDisplayName(profile)} readOnly disabled />
-                    </div>
-
-                    <div className="gatehouse-form__row">
-                      <label className="gatehouse-label" htmlFor="ga-request-phone">
-                        Телефон
-                      </label>
-
-                      <input
-                        id="ga-request-phone"
-                        className="gatehouse-input"
-                        value={profile.contact_phone || "Не указан"}
-                        readOnly
-                        disabled
-                      />
-                    </div>
-
-                    <div className="gatehouse-form__row">
-                      <span className="gatehouse-label">Тип материала</span>
-                      <div className="gatehouse-message">📝 Пробные тесты · {getRequestAmount()} ₽</div>
-                    </div>
-
-                    <div className="gatehouse-form__row">
-                      <span className="gatehouse-label">Уровень</span>
-                      {/* Убрали возможность выбирать уровни и добавили текст о разработке */}
-                      <div 
-                        className="gatehouse-message" 
-                        style={{ 
-                          background: "rgba(239, 68, 68, 0.08)", 
-                          color: "#ef4444", 
-                          borderColor: "rgba(239, 68, 68, 0.3)", 
-                          fontWeight: 600,
-                          lineHeight: "1.5"
-                        }}
-                      >
-                        В данный момент пробные тесты на финальном этапе разработки, приобрести их можно будет начиная с 20 junho.
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {/* Кнопка создания новой заявки заблокирована (работает только сохранение редактируемой) */}
-                      <button 
-                        className="gatehouse-button" 
-                        type="submit" 
-                        disabled={busy || !form.id}
-                        style={!form.id ? { opacity: 0.55, cursor: "not-allowed" } : {}}
-                      >
-                        {busy ? "Сохраняем..." : form.id ? "Сохранить заявку" : "Создать заявку"}
-                      </button>
-
-                      <button className="gatehouse-button gatehouse-button--ghost" type="button" onClick={closeForm} disabled={busy}>
-                        Отмена
-                      </button>
-                    </div>
-                  </form>
-                ) : null}
-              </div>
-            </section>
-
-            <aside className="gatehouse-card">
-              <div className="gatehouse-card__inner">
-                <h2 className="gatehouse-card__title">Оплата</h2>
-
-                <p className="gatehouse-card__subtitle">
-                  После создания заявки можно открыть QR-код оплаты. Администратор обработает
-                  заявку и выдаст материалы по выбранному уровню.
-                </p>
-
-                {paymentOpen ? (
-                  <div style={{ marginTop: 20 }}>
-                    {qrUrl ? (
-                      <div
-                        style={{
-                          overflow: "hidden",
-                          borderRadius: 24,
-                          border: "1px solid var(--ga-border)",
-                          background: "rgba(255,255,255,0.08)",
-                          padding: 14,
-                          minHeight: 120,
-                          display: "grid",
-                          placeItems: "center",
-                        }}
-                      >
-                        {qrLoading ? <div style={{ fontWeight: 900, opacity: 0.85 }}>⏳ Загружаем QR...</div> : null}
-
-                        {qrError ? (
-                          <div className="gatehouse-message gatehouse-message--error" style={{ width: "100%" }}>
-                            Не удалось загрузить QR-код. Нажмите “Обновить QR”.
-                          </div>
-                        ) : null}
-
-                        <img
-                          key={qrUrl}
-                          src={qrUrl}
-                          alt="QR-код оплаты"
-                          onLoad={() => {
-                            setQrLoading(false);
-                            setQrError(false);
-                          }}
-                          onError={() => {
-                            setQrLoading(false);
-                            setQrError(true);
-                          }}
-                          style={{
-                            display: qrLoading || qrError ? "none" : "block",
-                            width: "100%",
-                            maxWidth: 360,
-                            margin: "0 auto",
-                            borderRadius: 18,
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="gatehouse-message gatehouse-message--error">Не удалось собрать ссылку на QR-код.</div>
-                    )}
-
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-                      <button className="gatehouse-button gatehouse-button--ghost" type="button" onClick={refreshQr}>
-                        Обновить QR
-                      </button>
-
-                      <button className="gatehouse-button gatehouse-button--ghost" type="button" onClick={() => setPaymentOpen(false)}>
-                        Скрыть
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="gatehouse-empty" style={{ marginTop: 20 }}>
-                    <span className="gatehouse-empty__icon" aria-hidden="true">
-                      💳
-                    </span>
-
-                    <h3 className="gatehouse-empty__title">QR появится после создания заявки</h3>
-
-                    <p className="gatehouse-empty__text">Стоимость текущего типа материала: {getRequestAmount()} ₽.</p>
-                  </div>
                 )}
               </div>
-            </aside>
-          </div>
 
-          <section className="gatehouse-card">
-            <div className="gatehouse-card__inner">
-              <h2 className="gatehouse-card__title">Мои заявки</h2>
+              {formOpen && (
+                <form onSubmit={handleSubmit} style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>Номер заявки</label>
+                    <input value={form.request_number} readOnly disabled style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#64748b', fontSize: '14px', outline: 'none' }} />
+                  </div>
+                  
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>Статус материалов</label>
+                    <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px', color: '#fca5a5', fontSize: '13px', lineHeight: 1.5, fontWeight: 600 }}>
+                      Пробные тесты проходят финальную проверку. Сохранение заявок временно заблокировано до 20 июня.
+                    </div>
+                  </div>
 
-              <p className="gatehouse-card__subtitle">Здесь отображаются только заявки на экзамены Gatehouse Awards.</p>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    {/* КНОПКА ЗАБЛОКИРОВАНА */}
+                    <button type="submit" disabled={true} style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.05)', color: '#64748b', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '10px', fontWeight: 800, cursor: 'not-allowed' }}>
+                      Откроется 20 июня
+                    </button>
+                    <button type="button" onClick={closeForm} disabled={busy} style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.1)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', fontWeight: 800, cursor: busy ? 'not-allowed' : 'pointer' }}>
+                      Скрыть
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Карточка Оплаты */}
+            <div className="gatehouse-card" style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '22px', padding: '24px' }}>
+              <h2 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 900, color: '#f8fafc' }}>Оплата по QR</h2>
+              <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#94a3b8', lineHeight: 1.5 }}>
+                После создания заявки и её подтверждения вы сможете оплатить материалы через СБП.
+              </p>
+
+              {paymentOpen ? (
+                <div>
+                  {/* ЗАГЛУШКА ОПЛАТЫ ДО 20 ИЮНЯ */}
+                  <div style={{ overflow: "hidden", borderRadius: '16px', background: "rgba(255,255,255,0.05)", padding: '24px 14px', border: '1px dashed rgba(255,255,255,0.1)', display: "flex", flexDirection: "column", alignItems: "center", gap: '10px', minHeight: '120px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', opacity: 0.5 }}>🔒</div>
+                    <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 700, lineHeight: 1.4 }}>
+                      Оплата временно закрыта.<br/>Прием платежей начнется 20 июня после завершения проверки материалов.
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+                    <button onClick={() => setPaymentOpen(false)} style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.1)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}>Скрыть</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ padding: '30px 20px', textAlign: 'center', background: 'rgba(15,23,42,0.4)', borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                  <div style={{ fontSize: '32px', marginBottom: '10px', opacity: 0.8 }}>💳</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8' }}>Скрыто до 20 июня</div>
+                </div>
+              )}
+            </div>
+          </aside>
+
+          {/* RIGHT MAIN CONTENT (Таблица заявок) */}
+          <main>
+            <div style={{ background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '28px', padding: 'clamp(20px, 4vw, 32px)', backdropFilter: 'blur(24px)' }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#f8fafc' }}>Мои заявки</h2>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}><span style={{ color: '#fbbf24' }}>⏳</span> {pendingRequests.length} ожидают</div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}><span style={{ color: '#34d399' }}>✅</span> {processedRequests.length} обработано</div>
+                </div>
+              </div>
 
               {requests.length > 0 ? (
-                <div className="gatehouse-recent">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {requests.map((request) => {
                     const levels = getRequestLevels(request);
+                    const isProcessed = request.is_processed;
 
                     return (
-                      <article className="gatehouse-recent__item" key={request.id}>
+                      <div key={request.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', background: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '16px 20px', transition: 'background 0.2s' }}>
+                        
+                        {/* Левая часть - Информация */}
                         <div>
-                          <h3 className="gatehouse-recent__title">
-                            {request.request_number} · {getRequestStatusLabel(request)}
-                            {formatProcessedAt(request.processed_at)}
-                          </h3>
-
-                          <p className="gatehouse-recent__meta">
-                            Gatehouse Awards · {getRequestMaterialLabel(request)} · {formatGatehouseLevels(levels)} ·{" "}
-                            {formatDateTime(request.created_at)}
-                          </p>
-
-                          <p className="gatehouse-recent__meta">
-                            {request.email} · {request.full_name}
-                            {request.contact_phone ? ` · ${request.contact_phone}` : ""}
-                          </p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '16px', fontWeight: 900, color: '#f8fafc' }}>{request.request_number}</span>
+                            <span style={{ padding: '4px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 800, background: isProcessed ? 'rgba(52,211,153,0.15)' : 'rgba(251,191,36,0.15)', color: isProcessed ? '#34d399' : '#fbbf24' }}>
+                              {isProcessed ? "Обработано" : "Ожидает оплаты"}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 600, display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                            <span>{formatDateTime(request.created_at)}</span>
+                            <span>•</span>
+                            <span style={{ color: '#c7d2fe' }}>{getRequestMaterialLabel(request)}</span>
+                            <span>•</span>
+                            <span>Уровни: {formatGatehouseLevels(levels) || "Не указаны"}</span>
+                          </div>
                         </div>
 
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "flex-end",
-                            gap: 8,
-                          }}
-                        >
-                          <div className="gatehouse-recent__score">{request.is_processed ? "✅" : "⏳"}</div>
-
-                          {!request.is_processed ? (
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 8,
-                                flexWrap: "wrap",
-                                justifyContent: "flex-end",
-                              }}
-                            >
-                              <button
-                                className="gatehouse-button gatehouse-button--ghost"
-                                type="button"
-                                onClick={() => openEdit(request)}
-                                disabled={busy}
-                                style={{ padding: "9px 12px", fontSize: 13 }}
-                              >
+                        {/* Правая часть - Кнопки управления */}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {!isProcessed && (
+                            <>
+                              <button onClick={() => openEdit(request)} disabled={busy} style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.05)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', fontWeight: 800, fontSize: '12px', cursor: busy ? 'not-allowed' : 'pointer' }}>
                                 Изменить
                               </button>
-
-                              <button
-                                className="gatehouse-button gatehouse-button--ghost"
-                                type="button"
-                                onClick={() => void deleteRequest(request)}
-                                disabled={busy}
-                                style={{ padding: "9px 12px", fontSize: 13 }}
-                              >
+                              <button onClick={() => void deleteRequest(request)} disabled={busy} style={{ padding: '8px 14px', background: 'rgba(239,68,68,0.1)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', fontWeight: 800, fontSize: '12px', cursor: busy ? 'not-allowed' : 'pointer' }}>
                                 Удалить
                               </button>
-                            </div>
-                          ) : null}
+                            </>
+                          )}
                         </div>
-                      </article>
+                      </div>
                     );
                   })}
                 </div>
               ) : (
-                <div className="gatehouse-empty" style={{ marginTop: 20 }}>
-                  <span className="gatehouse-empty__icon" aria-hidden="true">
-                    📋
-                  </span>
-
-                  <h3 className="gatehouse-empty__title">Заявок пока нет</h3>
-
-                  <p className="gatehouse-empty__text">Создайте заявку на пробный тест Gatehouse Awards, выбрав нужный уровень.</p>
+                <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8', background: 'rgba(30, 41, 59, 0.3)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.8 }}>📋</div>
+                  <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#f8fafc', marginBottom: '8px' }}>Заявок пока нет</h3>
+                  <p style={{ fontSize: '15px', maxWidth: '400px', margin: '0 auto', lineHeight: 1.5 }}>
+                    Форма подачи заявок откроется 20 июня, после финальной проверки материалов.
+                  </p>
                 </div>
               )}
-            </div>
-          </section>
 
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <Link className="gatehouse-button gatehouse-button--ghost" href="/gatehouse/profile">
-              Вернуться в профиль
-            </Link>
-          </div>
-        </section>
+            </div>
+          </main>
+        </div>
       </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @media (max-width: 900px) {
+          .gatehouse-profile__grid { grid-template-columns: 1fr !important; }
+        }
+      `}} />
     </main>
   );
 }

@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import LogoutButton from "@/components/LogoutButton";
+import GatehouseHeader from "@/components/gatehouse/GatehouseHeader";
 
 export type GatehouseProfileData = {
   id: string;
@@ -222,23 +222,8 @@ export default function GatehouseProfileClient({
     <main className="gatehouse-page" style={{ minHeight: '100vh', padding: '24px 0', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', color: '#f8fafc' }}>
       <div className="gatehouse-container" style={{ width: '95%', maxWidth: '1200px', margin: '0 auto' }}>
         
-        {/* HEADER */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '14px', background: 'rgba(30, 41, 59, 0.7)', backdropFilter: 'blur(12px)', padding: '14px 20px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)', color: 'white', width: '42px', height: '42px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '18px', boxShadow: '0 8px 16px rgba(99,102,241,0.25)' }}>GA</div>
-            <div>
-              <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '18px', fontWeight: 800, letterSpacing: '-0.3px' }}>Экзамены Gatehouse</h3>
-              <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Образовательная платформа</div>
-            </div>
-          </div>
-          
-          <div className="gatehouse-nav-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <a href="#info" className="btn ghost" style={{ margin: 0, color: '#e2e8f0', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>Информация</a>
-            <Link href="/gatehouse/materials" className="btn ghost" style={{ margin: 0, color: '#e2e8f0', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>Материалы</Link>
-            <Link href="/profile" className="btn primary" style={{ margin: 0, background: 'linear-gradient(135deg, #4ecdc4, #556270)', color: 'white', border: 'none', boxShadow: '0 8px 20px rgba(78,205,196,0.2)' }}>🏆 В Олимпиаду</Link>
-            <LogoutButton className="btn danger">Выйти</LogoutButton>
-          </div>
-        </header>
+        {/* ИСПОЛЬЗУЕМ НАШ НОВЫЙ ЕДИНЫЙ ХЕДЕР */}
+        <GatehouseHeader />
 
         {/* 2-COLUMN LAYOUT */}
         <div className="gatehouse-profile-grid" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px', alignItems: 'start' }}>
@@ -316,8 +301,8 @@ export default function GatehouseProfileClient({
             <div className="gatehouse-card" style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '22px', padding: '20px 20px', textAlign: 'center' }}>
               <div style={{ fontSize: '12px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '14px', letterSpacing: '0.5px' }}>Служба поддержки</div>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                <a href="#" style={{ flex: 1, padding: '10px', background: '#2AABEE', color: 'white', borderRadius: '10px', textDecoration: 'none', fontWeight: 800, fontSize: '13px', display: 'block', boxShadow: '0 4px 12px rgba(42,171,238,0.3)' }}>Telegram</a>
-                <a href="#" style={{ flex: 1, padding: '10px', background: '#0077FF', color: 'white', borderRadius: '10px', textDecoration: 'none', fontWeight: 800, fontSize: '13px', display: 'block', boxShadow: '0 4px 12px rgba(0,119,255,0.3)' }}>ВКонтакте</a>
+                <a href="https://t.me/skebobingg" target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: '10px', background: '#2AABEE', color: 'white', borderRadius: '10px', textDecoration: 'none', fontWeight: 800, fontSize: '13px', display: 'block', boxShadow: '0 4px 12px rgba(42,171,238,0.3)' }}>Telegram</a>
+                <a href="https://vk.com/bluntokyr" target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: '10px', background: '#0077FF', color: 'white', borderRadius: '10px', textDecoration: 'none', fontWeight: 800, fontSize: '13px', display: 'block', boxShadow: '0 4px 12px rgba(0,119,255,0.3)' }}>ВКонтакте</a>
               </div>
 
               <Link href="/gatehouse/requests" style={{ display: 'block', width: '100%', padding: '12px', background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white', borderRadius: '12px', textDecoration: 'none', fontWeight: 800, fontSize: '14px', boxShadow: '0 8px 20px rgba(239,68,68,0.25)' }}>
@@ -398,17 +383,6 @@ export default function GatehouseProfileClient({
           </main>
         </div>
       </div>
-
-      {/* Адаптивность для мобилок, чтобы всё не сломалось на узких экранах */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @media (max-width: 900px) {
-          .gatehouse-profile-grid { grid-template-columns: 1fr !important; }
-          .gatehouse-nav-actions { width: 100%; justify-content: flex-start; }
-        }
-        @media (max-width: 600px) {
-          .gatehouse-nav-actions .btn { flex: 1; text-align: center; justify-content: center; }
-        }
-      `}} />
     </main>
   );
 }
