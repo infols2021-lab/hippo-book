@@ -33,7 +33,7 @@ export default function GatehouseMaterialsClient({
     <main className="gatehouse-page" style={{ minHeight: '100vh', padding: '24px 0', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', color: '#f8fafc' }}>
       <div className="gatehouse-container" style={{ width: '95%', maxWidth: '1200px', margin: '0 auto' }}>
         
-        {/* Хедер теперь умный и сам знает свои пропсы */}
+        {/* ИСПОЛЬЗУЕМ НАШ НОВЫЙ ЕДИНЫЙ ХЕДЕР */}
         <GatehouseHeader />
 
         {/* ЗАГОЛОВОК И ТАБЫ */}
