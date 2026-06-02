@@ -1,5 +1,6 @@
+// app/info/page.tsx
 import Link from "next/link";
-import BackToSourceButton from "@/components/BackToSourceButton";
+import SmartBackButton from "@/components/SmartBackButton";
 
 type SP = { source?: string; sourceId?: string };
 
@@ -43,9 +44,9 @@ export default async function InfoPage({
         <section className="info-hero">
           <div className="info-topbar">
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              {/* Кнопка назад: решается через ?source=login|profile */}
-              <BackToSourceButton className="back-link" label="← Назад" fallbackHref="/login" />
-
+              
+              {/* Умная кнопка назад: сама вернет туда, откуда пришел юзер */}
+              <SmartBackButton />
 
               <div className="info-badge" aria-label="Дата обновления">
                 <span className="info-badge-dot" />
