@@ -31,20 +31,20 @@ type GatehouseMaterialClientProps = {
 };
 
 function formatScore(score: number | null): string {
-  if (typeof score !== "number" || !Number.isFinite(score)) return "-";
+  if (typeof score !== "number" || !Number.isFinite(score)) return "—";
   return `${Math.max(0, Math.min(100, Math.round(score)))}%`;
 }
 
 function getAssignmentStatusLabel(assignment: GatehouseAssignmentPreview): string {
-  if (assignment.isCompleted) return "ройдено";
+  if (assignment.isCompleted) return "Пройдено";
   if (assignment.questionsCount > 0) return `${assignment.questionsCount} вопросов`;
   return "Скоро будет доступно";
 }
 
 function getAssignmentIcon(assignment: GatehouseAssignmentPreview): string {
-  if (assignment.isCompleted) return "v";
-  if (assignment.questionsCount > 0) return "[]";
-  return "...";
+  if (assignment.isCompleted) return "✓";
+  if (assignment.questionsCount > 0) return "📝";
+  return "⏳";
 }
 
 export default function GatehouseMaterialClient({
@@ -68,14 +68,17 @@ export default function GatehouseMaterialClient({
           <GatehouseHeader />
 
           <div style={{ marginBottom: "24px" }}>
-            <Link href="/gatehouse/materials" style={{ color: "#a5b4fc", fontSize: "14px", textDecoration: "none" }}>
-              &larr; атериалы
+            <Link
+              href="/gatehouse/materials"
+              style={{ color: "#a5b4fc", fontSize: "14px", textDecoration: "none" }}
+            >
+              ← Материалы
             </Link>
             <h1 style={{ margin: "12px 0 8px", color: "#f8fafc", fontWeight: 900 }}>
-              атериал не найден
+              Материал не найден
             </h1>
             <p style={{ color: "#94a3b8", margin: 0 }}>
-              е удалось открыть пробный тест Gatehouse Awards.
+              Не удалось открыть пробный тест Gatehouse Awards.
             </p>
           </div>
 
@@ -83,11 +86,11 @@ export default function GatehouseMaterialClient({
             <div className="gatehouse-card">
               <div className="gatehouse-card__inner">
                 <div className="gatehouse-message gatehouse-message--error">
-                  {initialError || "атериал не найден или больше недоступен."}
+                  {initialError || "Материал не найден или больше недоступен."}
                 </div>
                 <div style={{ marginTop: 18 }}>
                   <Link className="gatehouse-button" href="/gatehouse/materials">
-                    ернуться к материалам
+                    Вернуться к материалам
                   </Link>
                 </div>
               </div>
@@ -107,26 +110,52 @@ export default function GatehouseMaterialClient({
         <GatehouseHeader />
 
         <div style={{ marginBottom: "24px" }}>
-          <Link href="/gatehouse/materials" style={{ color: "#a5b4fc", fontSize: "14px", textDecoration: "none" }}>
-            &larr; атериалы
+          <Link
+            href="/gatehouse/materials"
+            style={{ color: "#a5b4fc", fontSize: "14px", textDecoration: "none" }}
+          >
+            ← Материалы
           </Link>
           <h1 style={{ margin: "12px 0 8px", color: "#f8fafc", fontWeight: 900 }}>
             {material.title}
           </h1>
           <p style={{ color: "#94a3b8", margin: "0 0 16px" }}>
-            {material.description || "робный тест Gatehouse Awards. ройдите задания, чтобы увидеть результат и рекомендацию уровня."}
+            {material.description ||
+              "Пробный тест Gatehouse Awards. Пройдите задания, чтобы увидеть результат и рекомендацию уровня."}
           </p>
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <Link href="/gatehouse/profile" style={{ padding: "6px 14px", background: "rgba(99,102,241,0.15)", color: "#a5b4fc", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: 700 }}>
-              рофиль
+            <Link
+              href="/gatehouse/profile"
+              style={{
+                padding: "6px 14px",
+                background: "rgba(99,102,241,0.15)",
+                color: "#a5b4fc",
+                borderRadius: "8px",
+                textDecoration: "none",
+                fontSize: "13px",
+                fontWeight: 700,
+              }}
+            >
+              👤 Профиль
             </Link>
-            <Link href="/gatehouse/requests" style={{ padding: "6px 14px", background: "rgba(99,102,241,0.15)", color: "#a5b4fc", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: 700 }}>
-              аявки
+            <Link
+              href="/gatehouse/requests"
+              style={{
+                padding: "6px 14px",
+                background: "rgba(99,102,241,0.15)",
+                color: "#a5b4fc",
+                borderRadius: "8px",
+                textDecoration: "none",
+                fontSize: "13px",
+                fontWeight: 700,
+              }}
+            >
+              📋 Заявки
             </Link>
           </div>
         </div>
 
-        <div className="gatehouse-stats" aria-label="рогресс материала">
+        <div className="gatehouse-stats" aria-label="Прогресс материала">
           <article className="gatehouse-stat">
             <span className="gatehouse-stat__value">{levels}</span>
             <span className="gatehouse-stat__label">уровень</span>
@@ -137,7 +166,9 @@ export default function GatehouseMaterialClient({
           </article>
           <article className="gatehouse-stat">
             <span className="gatehouse-stat__value">{data.progress}%</span>
-            <span className="gatehouse-stat__label">{data.completedAssignments} из {data.totalAssignments} пройдено</span>
+            <span className="gatehouse-stat__label">
+              {data.completedAssignments} из {data.totalAssignments} пройдено
+            </span>
           </article>
         </div>
 
@@ -149,9 +180,9 @@ export default function GatehouseMaterialClient({
           {!data.hasAccess ? (
             <div className="gatehouse-card">
               <div className="gatehouse-card__inner">
-                <h2 className="gatehouse-card__title">атериал пока закрыт</h2>
+                <h2 className="gatehouse-card__title">Материал пока закрыт</h2>
                 <p className="gatehouse-card__subtitle">
-                  тобы открыть этот пробный тест, создайте заявку на нужный уровень Gatehouse Awards.
+                  Чтобы открыть этот пробный тест, создайте заявку на нужный уровень Gatehouse Awards.
                 </p>
                 <div style={{ marginTop: 18 }}>
                   <Link className="gatehouse-button" href="/gatehouse/requests">
@@ -164,9 +195,9 @@ export default function GatehouseMaterialClient({
 
           <div className="gatehouse-card">
             <div className="gatehouse-card__inner">
-              <h2 className="gatehouse-card__title">адания пробного теста</h2>
+              <h2 className="gatehouse-card__title">Задания пробного теста</h2>
               <p className="gatehouse-card__subtitle">
-                адания используют общий движок платформы.  экзаменах не начисляются олимпийские стрики.
+                Задания используют общий движок платформы. В экзаменах не начисляются олимпийские стрики.
               </p>
 
               {assignments.length > 0 ? (
@@ -174,32 +205,46 @@ export default function GatehouseMaterialClient({
                   {assignments.map((assignment, index) => {
                     const disabled = !data.hasAccess || assignment.questionsCount <= 0;
                     const href = getAssignmentHref("gatehouse", assignment.id);
+
                     const content = (
                       <>
                         <div>
                           <h3 className="gatehouse-recent__title">
-                            {getAssignmentIcon(assignment)} {index + 1}. {assignment.title}
+                            <span aria-hidden="true">{getAssignmentIcon(assignment)} </span>
+                            {index + 1}. {assignment.title}
                           </h3>
                           <p className="gatehouse-recent__meta">
                             {getAssignmentStatusLabel(assignment)}
-                            {assignment.isCompleted ? ` · результат ${formatScore(assignment.score)}` : ""}
+                            {assignment.isCompleted
+                              ? ` · результат ${formatScore(assignment.score)}`
+                              : ""}
                           </p>
                         </div>
                         <div className="gatehouse-recent__score">
-                          {assignment.isCompleted ? formatScore(assignment.score) : "->"}
+                          {assignment.isCompleted ? formatScore(assignment.score) : "→"}
                         </div>
                       </>
                     );
 
                     if (disabled) {
                       return (
-                        <article className="gatehouse-recent__item" key={assignment.id} style={{ opacity: 0.62 }}>
+                        <article
+                          className="gatehouse-recent__item"
+                          key={assignment.id}
+                          style={{ opacity: 0.62 }}
+                        >
                           {content}
                         </article>
                       );
                     }
+
                     return (
-                      <Link className="gatehouse-recent__item" key={assignment.id} href={href} style={{ color: "inherit", textDecoration: "none" }}>
+                      <Link
+                        className="gatehouse-recent__item"
+                        key={assignment.id}
+                        href={href}
+                        style={{ color: "inherit", textDecoration: "none" }}
+                      >
                         {content}
                       </Link>
                     );
@@ -207,9 +252,10 @@ export default function GatehouseMaterialClient({
                 </div>
               ) : (
                 <div className="gatehouse-empty" style={{ marginTop: 20 }}>
-                  <h3 className="gatehouse-empty__title">аданий пока нет</h3>
+                  <span className="gatehouse-empty__icon" aria-hidden="true">📝</span>
+                  <h3 className="gatehouse-empty__title">Заданий пока нет</h3>
                   <p className="gatehouse-empty__text">
-                    дминистратор уже создал материал, но задания для него ещё не добавлены.
+                    Администратор уже создал материал, но задания для него ещё не добавлены.
                   </p>
                 </div>
               )}
