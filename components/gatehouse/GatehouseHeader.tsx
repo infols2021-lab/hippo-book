@@ -9,19 +9,6 @@ export default function GatehouseHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname() || "";
 
-  // Стили для ссылок
-  const getLinkStyle = (isActive: boolean) => ({
-    padding: "10px 20px",
-    borderRadius: "12px",
-    fontSize: "14px",
-    fontWeight: 600,
-    textDecoration: "none",
-    transition: "all 0.25s ease",
-    color: isActive ? "#ffffff" : "#94a3b8",
-    background: isActive ? "#4338ca" : "transparent",
-    border: "1px solid transparent",
-  });
-
   return (
     <header style={{ 
       display: 'flex', 
@@ -69,7 +56,7 @@ export default function GatehouseHeader() {
       <nav className={`gatehouse-nav-actions ${mobileMenuOpen ? "open" : ""}`} style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '4px'
+        gap: '8px'
       }}>
         {[
           { href: "/info", label: "Информация" },
@@ -83,7 +70,7 @@ export default function GatehouseHeader() {
             <Link 
               key={item.href}
               href={item.href} 
-              style={getLinkStyle(isActive)}
+              className={`nav-btn ${isActive ? 'active' : ''}`}
               onClick={() => setMobileMenuOpen(false)}
             >
               {item.label}
@@ -91,20 +78,50 @@ export default function GatehouseHeader() {
           );
         })}
         
-        {/* Кнопка выхода без style, используем className для стилизации */}
-        <div style={{ marginLeft: "8px" }}>
-          <LogoutButton className="btn danger">
-            Выйти
-          </LogoutButton>
-        </div>
+        {/* Кнопка выхода (через класс, без style) */}
+        <LogoutButton className="btn danger logout-btn">
+          Выйти
+        </LogoutButton>
       </nav>
 
-      {/* CSS для мобильного отображения */}
       <style jsx>{`
+        /* Стили кнопок */
+        :global(.nav-btn) {
+          padding: 10px 20px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          text-decoration: none;
+          transition: all 0.2s ease;
+          color: #94a3b8;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        :global(.nav-btn:hover) {
+          background: rgba(255, 255, 255, 0.08);
+          color: #f8fafc;
+        }
+        :global(.nav-btn.active) {
+          background: #4f46e5;
+          color: #ffffff;
+          border-color: #6366f1;
+        }
+
+        /* Кнопка выхода */
+        :global(.logout-btn) {
+          padding: 10px 20px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          margin-left: 8px;
+        }
+
+        /* Мобильное отображение */
         .gatehouse-nav-actions { display: flex; align-items: center; }
         @media (max-width: 768px) {
           .gatehouse-nav-actions { display: ${mobileMenuOpen ? 'flex' : 'none'}; flex-direction: column; width: 100%; gap: 8px; }
           .gatehouse-header__burger { display: block; }
+          .logout-btn { margin-left: 0; width: 100%; }
         }
         @media (min-width: 769px) {
           .gatehouse-header__burger { display: none; }
