@@ -19,20 +19,18 @@ export type GatehouseProfileStats = {
   completedAssignments: number;
 };
 
-export type GatehouseProfileRecentProgress = {
+export type GatehouseMaterialProgress = {
   id: string;
-  assignmentId: string;
-  assignmentTitle: string;
-  materialTitle: string;
-  score: number;
-  completedAt: string | null;
-  completedAtLabel: string;
+  title: string;
+  totalAssignments: number;
+  completedAssignments: number;
+  percentage: number;
 };
 
 type GatehouseProfileClientProps = {
   initialProfile: GatehouseProfileData;
   initialStats: GatehouseProfileStats;
-  initialRecentProgress: GatehouseProfileRecentProgress[];
+  initialMaterialsProgress: GatehouseMaterialProgress[];
 };
 
 type ProfileUpdateApiResponse = {
@@ -119,7 +117,7 @@ function normalizeUiErrorMessage(error: unknown, fallback = "Не удалось
 export default function GatehouseProfileClient({
   initialProfile,
   initialStats,
-  initialRecentProgress,
+  initialMaterialsProgress,
 }: GatehouseProfileClientProps) {
   const [profile, setProfile] = useState<GatehouseProfileData>({
     ...initialProfile,
@@ -333,36 +331,65 @@ export default function GatehouseProfileClient({
               </div>
             </section>
 
-            {/* PROGRESS LIST (RECENT) */}
+            {/* PROGRESS LIST (В процентах, как в Олимпиаде, со ссылкой на страницу материалов) */}
             <section>
-              <h3 style={{ fontSize: '14px', fontWeight: 900, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '14px', marginTop: 0 }}>Последние результаты</h3>
+              <h3 style={{ fontSize: '14px', fontWeight: 900, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '14px', marginTop: 0 }}>Прогресс по доступным материалам</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {initialRecentProgress.length > 0 ? (
-                  initialRecentProgress.map((item) => (
-                    <div key={item.id} style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '20px 24px', display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+                {initialMaterialsProgress.length > 0 ? (
+                  initialMaterialsProgress.map((item) => (
+                    <Link 
+                      key={item.id} 
+                      href="/gatehouse/materials"
+                      style={{ 
+                        background: 'rgba(30, 41, 59, 0.6)', 
+                        backdropFilter: 'blur(12px)', 
+                        border: '1px solid rgba(255,255,255,0.05)', 
+                        borderRadius: '20px', 
+                        padding: '20px 24px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        gap: '20px', 
+                        flexWrap: 'wrap', 
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                        textDecoration: 'none',
+                        transition: 'transform 0.2s, background 0.2s, border-color 0.2s',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)';
+                        e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.background = 'rgba(30, 41, 59, 0.6)';
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
+                      }}
+                    >
                        <div style={{ flex: '1 1 200px' }}>
                          <div style={{ display: 'inline-block', padding: '4px 10px', background: 'rgba(99,102,241,0.15)', color: '#818cf8', borderRadius: '8px', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>Пробный тест</div>
-                         <div style={{ fontSize: '18px', fontWeight: 800, color: '#f8fafc', marginBottom: '6px' }}>{item.assignmentTitle}</div>
-                         <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 600 }}>{item.materialTitle} <span style={{ opacity: 0.5, margin: '0 4px' }}>•</span> {item.completedAtLabel}</div>
+                         <div style={{ fontSize: '18px', fontWeight: 800, color: '#f8fafc', marginBottom: '4px' }}>{item.title}</div>
+                         <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 600 }}>Выполнено: {item.completedAssignments} из {item.totalAssignments} заданий</div>
                        </div>
                        
                        <div style={{ width: '100%', maxWidth: '200px', flexShrink: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 700 }}>Балл</span>
-                            <span style={{ fontSize: '18px', fontWeight: 900, color: '#c084fc', lineHeight: 1 }}>{item.score}%</span>
+                            <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 700 }}>Прогресс</span>
+                            <span style={{ fontSize: '18px', fontWeight: 900, color: '#c084fc', lineHeight: 1 }}>{item.percentage}%</span>
                           </div>
                           <div style={{ width: '100%', height: '10px', background: 'rgba(15,23,42,0.8)', borderRadius: '999px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ height: '100%', width: `${item.score}%`, background: 'linear-gradient(90deg, #818cf8, #c084fc)', borderRadius: '999px', transition: 'width 0.5s ease' }} />
+                            <div style={{ height: '100%', width: `${item.percentage}%`, background: 'linear-gradient(90deg, #818cf8, #c084fc)', borderRadius: '999px', transition: 'width 0.5s ease' }} />
                           </div>
                        </div>
-                    </div>
+                    </Link>
                   ))
                 ) : (
                   <div style={{ background: 'rgba(30, 41, 59, 0.4)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '22px', padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
-                     <div style={{ fontSize: '32px', marginBottom: '12px' }}>📝</div>
-                     <div style={{ fontWeight: 800, fontSize: '18px', color: '#cbd5e1', marginBottom: '6px' }}>Результатов пока нет</div>
-                     <div style={{ fontSize: '14px', fontWeight: 600 }}>Пройдите доступные пробные тесты, чтобы увидеть свою статистику.</div>
-                     <Link href="/gatehouse/materials" style={{ display: 'inline-block', marginTop: '16px', padding: '10px 20px', background: 'rgba(99,102,241,0.15)', color: '#818cf8', borderRadius: '10px', textDecoration: 'none', fontWeight: 800, fontSize: '13px' }}>Перейти к материалам</Link>
+                     <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔒</div>
+                     <div style={{ fontWeight: 800, fontSize: '18px', color: '#cbd5e1', marginBottom: '6px' }}>Нет доступных тестов</div>
+                     <div style={{ fontSize: '14px', fontWeight: 600 }}>Подайте заявку на покупку уровней, чтобы открыть учебные материалы.</div>
+                     <Link href="/gatehouse/requests" style={{ display: 'inline-block', marginTop: '16px', padding: '10px 20px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#818cf8', borderRadius: '10px', textDecoration: 'none', fontWeight: 800, fontSize: '13px' }}>Перейти к заявкам</Link>
                   </div>
                 )}
               </div>
@@ -374,7 +401,7 @@ export default function GatehouseProfileClient({
               <div style={{ background: 'rgba(30, 41, 59, 0.6)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '22px', padding: '24px 28px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>
                 <ul style={{ margin: 0, paddingLeft: '18px', color: '#cbd5e1', fontSize: '14px', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '12px', fontWeight: 500 }}>
                   <li style={{ paddingLeft: '6px' }}>На этой странице отображается ваша статистика по экзаменационным материалам <strong style={{ color: '#f8fafc' }}>Gatehouse Awards</strong>.</li>
-                  <li style={{ paddingLeft: '6px' }}>В разделе <strong style={{ color: '#f8fafc' }}>«Последние результаты»</strong> показаны ваши баллы по недавно пройденным пробным тестам.</li>
+                  <li style={{ paddingLeft: '6px' }}>В разделе <strong style={{ color: '#f8fafc' }}>«Прогресс по доступным материалам»</strong> вы можете отслеживать степень завершенности тестов.</li>
                   <li style={{ paddingLeft: '6px' }}><strong style={{ color: '#818cf8' }}>Совет:</strong> регулярно практикуйтесь для успешной сдачи экзаменов! Подавайте заявки на новые уровни в соответствующем разделе через кнопку слева.</li>
                 </ul>
               </div>
@@ -383,6 +410,13 @@ export default function GatehouseProfileClient({
           </main>
         </div>
       </div>
+
+      {/* Адаптивность для мобилок */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @media (max-width: 900px) {
+          .gatehouse-profile-grid { grid-template-columns: 1fr !important; }
+        }
+      `}} />
     </main>
   );
 }

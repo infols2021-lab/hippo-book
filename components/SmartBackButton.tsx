@@ -9,23 +9,33 @@ export default function SmartBackButton() {
   return (
     <button 
       onClick={() => router.back()} 
-      className="back-link" // Используем твой класс из стилей
       style={{ 
         display: 'inline-flex', 
         alignItems: 'center', 
         gap: '8px',
-        padding: '8px 14px',
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        color: '#e2e8f0',
-        borderRadius: '10px',
-        fontWeight: 700,
-        fontSize: '14px',
+        padding: '10px 20px',
+        background: '#ffffff',
+        border: '2px solid #e2e8f0',
+        color: '#475569',
+        borderRadius: '12px',
+        fontWeight: 800,
+        fontSize: '15px',
         cursor: 'pointer',
-        transition: 'background 0.2s'
+        boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
+        transition: 'all 0.2s ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = '#f8fafc';
+        e.currentTarget.style.borderColor = '#cbd5e1';
+        e.currentTarget.style.color = '#0f172a';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = '#ffffff';
+        e.currentTarget.style.borderColor = '#e2e8f0';
+        e.currentTarget.style.color = '#475569';
       }}
     >
-      <span aria-hidden="true">←</span> Назад
+      <span aria-hidden="true" style={{ fontSize: '18px', lineHeight: 1 }}>←</span> Назад
     </button>
   );
 }
