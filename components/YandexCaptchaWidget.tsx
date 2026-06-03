@@ -5,13 +5,16 @@ import { useEffect, useRef } from "react";
 declare global {
   interface Window {
     ym?: {
-      init: (container: HTMLElement, params: {
-        sitekey: string;
-        theme?: 'light' | 'dark';
-        hl?: string;
-        callback?: (token: string) => void;
-        'error-callback'?: () => void;
-      }) => void;
+      init: (
+        container: HTMLElement,
+        params: {
+          sitekey: string;
+          theme?: "light" | "dark";
+          hl?: string;
+          callback?: (token: string) => void;
+          "error-callback"?: () => void;
+        }
+      ) => void;
     };
   }
 }
@@ -22,99 +25,103 @@ type Props = {
   onToken: (token: string | null) => void;
 };
 
-export default function YandexCaptchaWidget({ siteKey, reloadNonce, onToken }: Props) {
+export default function YandexCaptcha({
+  siteKey,
+  reloadNonce,
+  onToken,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
+  const scriptLoadedRef = useRef(false);
 
+  const initCaptcha = () => {
+    if (!containerRef.current || !window.ym) return;
+
+    try {
+      containerRef.current.innerHTML = "";
+
+      window.ym.init(containerRef.current, {
+        sitekey: siteKey,
+        theme: "light",
+        hl: "ru",
+        callback: (token: string) => {
+          onToken(token);
+        },
+        "error-callback": () => {
+          onToken(null);
+        },
+      });
+
+      initializedRef.current = true;
+    } catch (e) {
+      console.error("Captcha init error:", e);
+      onToken(null);
+    }
+  };
+
+  const loadScript = () => {
+    return new Promise<void>((resolve, reject) => {
+      if (scriptLoadedRef.current) return resolve();
+
+      if (document.getElementById("yandex-captcha-script")) {
+        scriptLoadedRef.current = true;
+        return resolve();
+      }
+
+      const script = document.createElement("script");
+      script.id = "yandex-captcha-script";
+      script.src = "https://captcha-api.yandex.ru/captcha.js";
+      script.async = true;
+
+      script.onload = () => {
+        scriptLoadedRef.current = true;
+        resolve();
+      };
+
+      script.onerror = () => {
+        reject("Failed to load captcha script");
+      };
+
+      document.head.appendChild(script);
+    });
+  };
+
+  // initial load
   useEffect(() => {
-    // Убедимся, что контейнер существует
+    let mounted = true;
+
+    loadScript()
+      .then(() => {
+        if (!mounted) return;
+        initCaptcha();
+      })
+      .catch((err) => {
+        console.error(err);
+        onToken(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [siteKey]);
+
+  // reload captcha
+  useEffect(() => {
+    if (!initializedRef.current) return;
     if (!containerRef.current) return;
 
-    // Функция инициализации капчи
-    const initCaptcha = () => {
-      if (!window.ym || !containerRef.current || initializedRef.current) return;
-      try {
-        // Очищаем контейнер перед инициализацией
-        containerRef.current.innerHTML = '';
-        window.ym.init(containerRef.current, {
-          sitekey: siteKey,
-          theme: 'light',
-          hl: 'ru',
-          callback: (token: string) => {
-            onToken(token);
-          },
-          'error-callback': () => {
-            onToken(null);
-          },
-        });
-        initializedRef.current = true;
-      } catch (err) {
-        console.error('Yandex Captcha init error:', err);
-        onToken(null);
-      }
-    };
+    initializedRef.current = false;
+    containerRef.current.innerHTML = "";
 
-    // Загружаем скрипт, если ещё не загружен
-    if (!document.querySelector('#yandex-captcha-script')) {
-      const script = document.createElement('script');
-      script.id = 'yandex-captcha-script';
-      script.src = 'https://captcha-api.yandex.ru/captcha.js';
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        // После загрузки скрипта пробуем инициализировать
-        initCaptcha();
-      };
-      script.onerror = () => {
-        console.error('Failed to load Yandex Captcha script');
-        onToken(null);
-      };
-      document.head.appendChild(script);
-    } else {
-      // Скрипт уже есть, инициализируем сразу
+    const t = setTimeout(() => {
       initCaptcha();
-    }
+    }, 200);
 
-    // Очистка при размонтировании
-    return () => {
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
-      }
-      initializedRef.current = false;
-    };
-    // Зависимость от siteKey и onToken, reloadNonce обрабатывается отдельно
-  }, [siteKey, onToken]);
-
-  // Перезагрузка капчи при изменении reloadNonce
-  useEffect(() => {
-    if (initializedRef.current && containerRef.current && window.ym) {
-      // Сбрасываем флаг и очищаем контейнер
-      initializedRef.current = false;
-      containerRef.current.innerHTML = '';
-      // Переинициализируем через таймаут
-      const timer = setTimeout(() => {
-        if (window.ym && containerRef.current && !initializedRef.current) {
-          try {
-            window.ym.init(containerRef.current, {
-              sitekey: siteKey,
-              theme: 'light',
-              hl: 'ru',
-              callback: (token: string) => onToken(token),
-              'error-callback': () => onToken(null),
-            });
-            initializedRef.current = true;
-          } catch (err) {
-            console.error('Yandex Captcha reinit error:', err);
-            onToken(null);
-          }
-        }
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [reloadNonce, siteKey, onToken]);
+    return () => clearTimeout(t);
+  }, [reloadNonce]);
 
   return (
-    <div style={{ marginTop: 10, minHeight: 80 }}>
+    <div style={{ width: "100%", minHeight: 160 }}>
       <div ref={containerRef} />
     </div>
   );
