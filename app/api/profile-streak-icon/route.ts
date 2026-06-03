@@ -24,29 +24,24 @@ type StreakIconAssetRow = {
 };
 
 type IconVisualPayload = {
-  code: string; // ✅ DB code
+  code: string;
   unlockAt: number;
-
   tierCode: string;
   label: string;
   emojiFallback: string;
-
   webpPath: string | null;
   pngPath: string | null;
-
   bucket: string;
-
   candidatePaths: string[];
   candidatePublicUrls: string[];
   publicUrl: string | null;
-
   cacheTag: string | null;
   dbUpdatedAt: string | null;
   sortOrder: number;
 };
 
 type Body = {
-  iconCode?: string | null; // ✅ ожидаем DB code (gold-1, diamond-1, ...)
+  iconCode?: string | null;
 };
 
 function toTrimmedStringOrNull(v: unknown): string | null {
@@ -81,21 +76,18 @@ function appendCacheTag(url: string | null, tag: string | null) {
 
 function buildCacheTagFromRow(row: StreakIconAssetRow | null): string | null {
   if (!row) return null;
-
   const meta = row.meta && typeof row.meta === "object" ? row.meta : null;
   const metaTag =
     (typeof meta?.cache_tag === "string" && meta.cache_tag.trim()) ||
     (typeof meta?.cacheTag === "string" && meta.cacheTag.trim()) ||
     null;
   if (metaTag) return metaTag;
-
   const updatedAt = typeof row.updated_at === "string" ? row.updated_at : null;
   if (updatedAt) {
     const ms = Date.parse(updatedAt);
     if (Number.isFinite(ms)) return String(ms);
     return updatedAt;
   }
-
   return typeof row.version === "string" && row.version.trim() ? row.version.trim() : null;
 }
 
@@ -109,7 +101,6 @@ function getDbUnlockAtForIcon(row: StreakIconAssetRow | null) {
     meta?.unlockDay ??
     meta?.unlock_day ??
     null;
-
   const parsed = toInt(v, 0);
   return parsed > 0 ? parsed : 0;
 }
@@ -117,24 +108,20 @@ function getDbUnlockAtForIcon(row: StreakIconAssetRow | null) {
 function buildIconCandidatePaths(dbRow: StreakIconAssetRow): string[] {
   const code = toTrimmedStringOrNull(dbRow.code) || "";
   const meta = dbRow.meta && typeof dbRow.meta === "object" ? dbRow.meta : null;
-
   const metaWebp =
     toTrimmedStringOrNull(meta?.webp_path) ||
     toTrimmedStringOrNull(meta?.webpPath) ||
     null;
-
   const metaPng =
     toTrimmedStringOrNull(meta?.png_path) ||
     toTrimmedStringOrNull(meta?.pngPath) ||
     null;
-
   const direct = dedupeStrings([
     toTrimmedStringOrNull(dbRow.webp_path),
     toTrimmedStringOrNull(dbRow.png_path),
     metaWebp,
     metaPng,
   ]);
-
   const fallbacks = code
     ? dedupeStrings([
         `${code}.webp`,
@@ -143,44 +130,35 @@ function buildIconCandidatePaths(dbRow: StreakIconAssetRow): string[] {
         `v1/defaults/${code}.png`,
       ])
     : [];
-
   return dedupeStrings([...direct, ...fallbacks]).map((p) => p.replace(/^\/+/, ""));
 }
 
 function buildIconVisualPayload(supabase: any, bucket: string, dbRow: StreakIconAssetRow): IconVisualPayload {
   const cacheTag = buildCacheTagFromRow(dbRow);
   const candidatePaths = buildIconCandidatePaths(dbRow);
-
   const candidatePublicUrls = dedupeStrings(
     candidatePaths.map((p) => {
       const raw = supabase.storage.from(bucket).getPublicUrl(p).data.publicUrl || null;
       return appendCacheTag(raw, cacheTag);
     })
   );
-
   const preferredPath = toTrimmedStringOrNull(dbRow.webp_path) || toTrimmedStringOrNull(dbRow.png_path) || candidatePaths[0] || null;
   const rawPublicUrl = preferredPath
     ? supabase.storage.from(bucket).getPublicUrl(preferredPath.replace(/^\/+/, "")).data.publicUrl || null
     : null;
-
   const publicUrl = appendCacheTag(rawPublicUrl, cacheTag);
-
   return {
     code: dbRow.code,
     unlockAt: getDbUnlockAtForIcon(dbRow),
-
     tierCode: toTrimmedStringOrNull(dbRow.tier_code) || "none",
     label: toTrimmedStringOrNull(dbRow.label) || dbRow.code,
     emojiFallback: toTrimmedStringOrNull(dbRow.emoji_fallback) || "🎖️",
-
     webpPath: toTrimmedStringOrNull(dbRow.webp_path),
     pngPath: toTrimmedStringOrNull(dbRow.png_path),
-
     bucket,
     candidatePaths,
     candidatePublicUrls,
     publicUrl,
-
     cacheTag,
     dbUpdatedAt: toTrimmedStringOrNull(dbRow.updated_at),
     sortOrder: toInt(dbRow.sort_order, 0),
@@ -262,24 +240,18 @@ export async function POST(req: Request) {
     const res = ok({
       saved: true,
       reset: true,
-
       streak,
       longestForUnlocks,
-
       iconCatalog,
       unlockedIconCodes,
-
       selectedIconCode: null,
       selectedIconDbCode: null,
       selectedIcon: null,
-
       effectiveIconCode: effectiveIconCode ?? null,
       effectiveIconDbCode: effectiveIconCode ?? null,
       effectiveIcon,
-
       appliedIconCode: effectiveIconCode ?? null,
       appliedIcon: effectiveIcon ?? null,
-
       bucket,
       serverTs: new Date().toISOString(),
     });
@@ -287,4 +259,46 @@ export async function POST(req: Request) {
     res.headers.set("Cache-Control", "no-store, max-age=0");
     return res;
   }
+
+  // 3) Сохранение выбранной иконки (requestedCode передан)
+  if (!unlockedIconCodes.includes(requestedCode)) {
+    return fail("Эта иконка ещё не разблокирована", 403, "ICON_NOT_UNLOCKED");
+  }
+
+  const { data: updatedProfile, error: updateError } = await supabase
+    .from("profiles")
+    .update({ selected_streak_icon_code: requestedCode })
+    .eq("id", user.id)
+    .select("id, selected_streak_icon_code")
+    .single();
+
+  if (updateError) {
+    return fail(updateError.message, 500, "PROFILE_ICON_UPDATE_FAILED");
+  }
+
+  const selectedIcon = iconByCode[requestedCode] ?? null;
+  const effectiveIconCode = resolveEffective(requestedCode);
+  const effectiveIcon = effectiveIconCode ? iconByCode[effectiveIconCode] ?? null : null;
+
+  const result = ok({
+    saved: true,
+    reset: false,
+    streak,
+    longestForUnlocks,
+    iconCatalog,
+    unlockedIconCodes,
+    selectedIconCode: requestedCode,
+    selectedIconDbCode: requestedCode,
+    selectedIcon,
+    effectiveIconCode,
+    effectiveIconDbCode: effectiveIconCode,
+    effectiveIcon,
+    appliedIconCode: requestedCode,
+    appliedIcon: selectedIcon,
+    bucket,
+    serverTs: new Date().toISOString(),
+  });
+
+  result.headers.set("Cache-Control", "no-store, max-age=0");
+  return result;
 }
