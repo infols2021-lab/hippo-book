@@ -27,56 +27,72 @@ export default function YandexCaptchaWidget({ siteKey, reloadNonce, onToken }: P
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    // Загружаем скрипт Яндекса, если ещё не загружен
+    // Убедимся, что контейнер существует
+    if (!containerRef.current) return;
+
+    // Функция инициализации капчи
+    const initCaptcha = () => {
+      if (!window.ym || !containerRef.current || initializedRef.current) return;
+      try {
+        // Очищаем контейнер перед инициализацией
+        containerRef.current.innerHTML = '';
+        window.ym.init(containerRef.current, {
+          sitekey: siteKey,
+          theme: 'light',
+          hl: 'ru',
+          callback: (token: string) => {
+            onToken(token);
+          },
+          'error-callback': () => {
+            onToken(null);
+          },
+        });
+        initializedRef.current = true;
+      } catch (err) {
+        console.error('Yandex Captcha init error:', err);
+        onToken(null);
+      }
+    };
+
+    // Загружаем скрипт, если ещё не загружен
     if (!document.querySelector('#yandex-captcha-script')) {
       const script = document.createElement('script');
       script.id = 'yandex-captcha-script';
       script.src = 'https://captcha-api.yandex.ru/captcha.js';
       script.async = true;
       script.defer = true;
+      script.onload = () => {
+        // После загрузки скрипта пробуем инициализировать
+        initCaptcha();
+      };
+      script.onerror = () => {
+        console.error('Failed to load Yandex Captcha script');
+        onToken(null);
+      };
       document.head.appendChild(script);
+    } else {
+      // Скрипт уже есть, инициализируем сразу
+      initCaptcha();
     }
 
-    // Ждём появления window.ym
-    const checkInterval = setInterval(() => {
-      if (window.ym && containerRef.current && !initializedRef.current) {
-        clearInterval(checkInterval);
-        initializedRef.current = true;
-
-        // Очищаем контейнер
+    // Очистка при размонтировании
+    return () => {
+      if (containerRef.current) {
         containerRef.current.innerHTML = '';
-
-        // Инициализируем капчу
-        try {
-          window.ym.init(containerRef.current, {
-            sitekey: siteKey,
-            theme: 'light',
-            hl: 'ru',
-            callback: (token: string) => {
-              onToken(token);
-            },
-            'error-callback': () => {
-              onToken(null);
-            },
-          });
-        } catch (err) {
-          console.error('Yandex Captcha init error:', err);
-          onToken(null);
-        }
       }
-    }, 100);
-
-    return () => clearInterval(checkInterval);
+      initializedRef.current = false;
+    };
+    // Зависимость от siteKey и onToken, reloadNonce обрабатывается отдельно
   }, [siteKey, onToken]);
 
   // Перезагрузка капчи при изменении reloadNonce
   useEffect(() => {
-    if (initializedRef.current && containerRef.current) {
-      // Удаляем старый виджет и пересоздаём
-      containerRef.current.innerHTML = '';
+    if (initializedRef.current && containerRef.current && window.ym) {
+      // Сбрасываем флаг и очищаем контейнер
       initializedRef.current = false;
-      // Заново инициализируем через небольшой таймаут
-      setTimeout(() => {
+      containerRef.current.innerHTML = '';
+      // Переинициализируем через таймаут
+      const timer = setTimeout(() => {
         if (window.ym && containerRef.current && !initializedRef.current) {
           try {
             window.ym.init(containerRef.current, {
@@ -93,11 +109,12 @@ export default function YandexCaptchaWidget({ siteKey, reloadNonce, onToken }: P
           }
         }
       }, 50);
+      return () => clearTimeout(timer);
     }
   }, [reloadNonce, siteKey, onToken]);
 
   return (
-    <div style={{ marginTop: 10 }}>
+    <div style={{ marginTop: 10, minHeight: 80 }}>
       <div ref={containerRef} />
     </div>
   );
