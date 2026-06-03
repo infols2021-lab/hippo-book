@@ -44,9 +44,8 @@ export default function TurnstileWidget(props: {
     onStatus?.(s);
   }
 
-  // ✅ ИСПРАВЛЕНИЕ: используем прокси-роут через свой домен
   const scriptSrc = useMemo(
-    () => "/api/turnstile-script?render=explicit",
+    () => "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit",
     []
   );
 
