@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ok, fail } from "@/lib/api/response";
-import { verifyYandexCaptcha } from "@/lib/security/yandexCaptcha";
+import { verifyTurnstileToken } from "@/lib/security/turnstile";
 
 function isValidEmail(email: string) {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -16,11 +16,9 @@ function getRemoteIp(req: Request): string | null {
 }
 
 function getAppUrl(req: Request): string | null {
-  // ✅ главный источник — env (стабильно работает локально/на проде)
   const envUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
   if (envUrl) return envUrl.replace(/\/$/, "");
 
-  // fallback — из заголовков
   const proto = req.headers.get("x-forwarded-proto") || "http";
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
   if (!host) return null;
@@ -38,14 +36,20 @@ export async function POST(req: Request) {
     const email = String(body.email ?? "").trim().toLowerCase();
     const captchaToken = String(body.captchaToken ?? "");
 
-    // 1) captcha
-    const captcha = await verifyYandexCaptcha(captchaToken, getRemoteIp(req) ?? undefined);
-    if (!captcha.ok) return fail("Проверка на человека не пройдена", 400, captcha.code);
+    const captcha = await verifyTurnstileToken({
+      token: captchaToken,
+      expectedAction: "reset_request",
+      remoteIp: getRemoteIp(req) ?? undefined,
+    });
 
-    // 2) validate email
-    if (!email || !isValidEmail(email)) return fail("Неверный формат email", 400, "VALIDATION");
+    if (!captcha.ok) {
+      return fail("Капча не пройдена", 400, captcha.code);
+    }
 
-    // 3) send email (не палим существование юзера)
+    if (!email || !isValidEmail(email)) {
+      return fail("Неверный формат email", 400, "VALIDATION");
+    }
+
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !anon) return fail("Supabase env missing", 500, "ENV_MISSING");
@@ -61,7 +65,7 @@ export async function POST(req: Request) {
       ...(redirectTo ? { redirectTo } : {}),
     });
 
-    // Даже если ошибка — не раскрываем существование email
+    // Не раскрываем существование email
     if (error) {
       return ok({
         message:

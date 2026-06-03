@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ok, fail } from "@/lib/api/response";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { verifyYandexCaptcha } from "@/lib/security/yandexCaptcha";
+import { verifyTurnstileToken } from "@/lib/security/turnstile";
 
 const BLOCKED_DOMAINS = [
   "tempmail.com",
@@ -46,11 +46,11 @@ function validateDomain(email: string) {
   return { ok: true as const };
 }
 
-function getRemoteIp(req: Request): string | undefined {
+function getRemoteIp(req: Request): string | null {
   const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]?.trim() || undefined;
+  if (xff) return xff.split(",")[0]?.trim() || null;
   const xr = req.headers.get("x-real-ip");
-  return xr || undefined;
+  return xr || null;
 }
 
 function getPublicOrigin(req: Request): string | undefined {
@@ -83,13 +83,16 @@ export async function POST(req: Request) {
     const password = String(body.password ?? "");
     const captchaToken = String(body.captchaToken ?? "");
 
-    const remoteIp = getRemoteIp(req) ?? "";
+    const remoteIp = getRemoteIp(req) ?? undefined;
 
-    // ✅ Замена Turnstile на Yandex Captcha
-    const captcha = await verifyYandexCaptcha(captchaToken, remoteIp);
+    const captcha = await verifyTurnstileToken({
+      token: captchaToken,
+      expectedAction: "register",
+      remoteIp,
+    });
 
     if (!captcha.ok) {
-      return fail("Проверка на человека не пройдена. Перезагрузите страницу и попробуйте снова.", 400, captcha.code);
+      return fail("Капча не пройдена. Перезагрузите и попробуйте снова.", 400, captcha.code);
     }
 
     if (!fullName || fullName.length < 3) return fail("Введите ФИО", 400, "VALIDATION");

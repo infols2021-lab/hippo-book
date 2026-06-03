@@ -3,7 +3,7 @@
 import "./reset.css";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import YandexCaptchaWidget from "@/components/YandexCaptchaWidget";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 type BannerType = "error" | "success" | "warning" | null;
 type ModalKind = "error" | "success" | "warning";
@@ -74,8 +74,7 @@ function validateDomain(email: string) {
 }
 
 export default function ResetPage() {
-  // ✅ Используем ключ для Яндекс Капчи
-  const siteKey = process.env.NEXT_PUBLIC_YANDEX_CAPTCHA_SITE_KEY || "";
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
   const [email, setEmail] = useState("");
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -84,11 +83,9 @@ export default function ResetPage() {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
 
-  // верхний баннер оставим только для "warning" (процесс)
   const [bannerType, setBannerType] = useState<BannerType>(null);
   const [bannerText, setBannerText] = useState("");
 
-  // ✅ модалка
   const [modalOpen, setModalOpen] = useState(false);
   const [modalKind, setModalKind] = useState<ModalKind>("success");
   const [modalTitle, setModalTitle] = useState("");
@@ -112,7 +109,6 @@ export default function ResetPage() {
 
   function closeModal() {
     setModalOpen(false);
-    // ✅ чтобы "Отправляем..." не залипало
     setBusy(false);
     clearBanner();
   }
@@ -131,11 +127,11 @@ export default function ResetPage() {
     const code = String(payload?.code || "").toUpperCase();
     const err = String(payload?.error || payload?.message || "").trim();
 
-    if (code.includes("CAPTCHA") || code.includes("TURNSTILE") || err.toLowerCase().includes("captcha") || err.toLowerCase().includes("капч") || err.toLowerCase().includes("проверк")) {
+    if (code.includes("CAPTCHA") || code.includes("TURNSTILE") || err.toLowerCase().includes("captcha") || err.toLowerCase().includes("капч")) {
       return (
-        (err || "Проверка не пройдена или не загрузилась.") +
+        (err || "Капча не пройдена или не загрузилась.") +
         "\n\nПопробуйте:\n" +
-        "• Нажать «Перезагрузить проверку»\n" +
+        "• Нажать «Перезагрузить капчу»\n" +
         "• Отключить VPN/прокси\n" +
         "• Обновить страницу"
       );
@@ -145,7 +141,7 @@ export default function ResetPage() {
     if (status === 429 || code === "RATE_LIMIT") return "Слишком много попыток. Попробуйте позже.";
 
     if (err) return err;
-    return `Не удалось отправить письмо (${status}). Попробуйте перезагрузить проверку и повторить.`;
+    return `Не удалось отправить письмо (${status}). Попробуйте перезагрузить капчу и повторить.`;
   }
 
   async function onSend() {
@@ -169,8 +165,8 @@ export default function ResetPage() {
     if (!captchaToken) {
       openModal(
         "warning",
-        "Нужна проверка",
-        "Пожалуйста, пройдите проверку.\n\nЕсли проверка не отображается — нажмите «Перезагрузить проверку».",
+        "Нужна капча",
+        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
       );
       return;
     }
@@ -185,7 +181,6 @@ export default function ResetPage() {
         body: JSON.stringify({ email: e, captchaToken }),
       });
 
-      // ✅ читаем ответ даже при 400
       const text = await res.text();
       let json: any = null;
       try {
@@ -216,12 +211,10 @@ export default function ResetPage() {
         return;
       }
 
-      // SUCCESS
       setBusy(false);
       clearBanner();
       setSent(true);
 
-      // ⚠️ безопасность: всегда одинаковое сообщение
       openModal(
         "success",
         "Готово!",
@@ -229,7 +222,6 @@ export default function ResetPage() {
           "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\n\nПроверьте «Входящие» и «Спам».",
       );
 
-      // после успеха токен можно сбросить (чтобы не переиспользовать)
       setCaptchaToken(null);
     } catch (e: any) {
       setBusy(false);
@@ -239,7 +231,7 @@ export default function ResetPage() {
       openModal(
         "error",
         "Ошибка",
-        "Не удалось отправить запрос.\n\nПопробуйте:\n• Перезагрузить проверку\n• Обновить страницу\n• Отключить VPN/прокси\n\nДетали: " +
+        "Не удалось отправить запрос.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n• Отключить VPN/прокси\n\nДетали: " +
           (e?.message || String(e)),
       );
     }
@@ -249,7 +241,6 @@ export default function ResetPage() {
 
   return (
     <div className="page-reset">
-      {/* ✅ MODAL */}
       {modalOpen ? (
         <div
           role="dialog"
@@ -282,7 +273,7 @@ export default function ResetPage() {
                     closeModal();
                   }}
                 >
-                  Перезагрузить проверку
+                  Перезагрузить капчу
                 </button>
               ) : null}
 
@@ -310,7 +301,7 @@ export default function ResetPage() {
             Проверьте также папку <strong>Спам</strong>.
           </div>
 
-          {!siteKey ? <div className="error-message">❌ Ключ проверки не задан. Обратитесь к администратору.</div> : null}
+          {!siteKey ? <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div> : null}
 
           <div className="form-group">
             <label htmlFor="email">Email:</label>
@@ -325,17 +316,17 @@ export default function ResetPage() {
 
           {siteKey ? (
             <>
-              <YandexCaptchaWidget
+              <TurnstileWidget
                 siteKey={siteKey}
+                action="reset_request"
                 reloadNonce={reloadNonce}
                 onToken={(t) => setCaptchaToken(t)}
               />
 
-              {/* ✅ Подсказка, если проверка не прогрузилась / нет токена */}
               {!captchaToken ? (
                 <div className="captcha-hint">
-                  🧩 <strong>Если вы не видите проверку</strong> — нажмите{" "}
-                  <strong>«Перезагрузить проверку»</strong>.
+                  🧩 <strong>Если вы не видите капчу</strong> — нажмите{" "}
+                  <strong>«Перезагрузить капчу»</strong>.
                   <br />
                   Если не помогло: отключите VPN/прокси и обновите страницу.
                 </div>
@@ -347,7 +338,7 @@ export default function ResetPage() {
                 disabled={false}
                 onClick={() => resetCaptchaHard()}
               >
-                Перезагрузить проверку
+                Перезагрузить капчу
               </button>
             </>
           ) : null}
