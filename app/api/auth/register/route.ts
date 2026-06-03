@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ok, fail } from "@/lib/api/response";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { verifyTurnstileToken } from "@/lib/security/turnstile";
+import { verifyYandexCaptcha } from "@/lib/security/yandexCaptcha";
 
 const BLOCKED_DOMAINS = [
   "tempmail.com",
@@ -85,14 +85,11 @@ export async function POST(req: Request) {
 
     const remoteIp = getRemoteIp(req) ?? "";
 
-    const captcha = await verifyTurnstileToken({
-      token: captchaToken,
-      expectedAction: "register",
-      remoteIp,
-    });
+    // ✅ Замена Turnstile на Yandex Captcha
+    const captcha = await verifyYandexCaptcha(captchaToken, remoteIp);
 
     if (!captcha.ok) {
-      return fail("Капча не пройдена. Перезагрузите и попробуйте снова.", 400, captcha.code);
+      return fail("Проверка на человека не пройдена. Перезагрузите страницу и попробуйте снова.", 400, captcha.code);
     }
 
     if (!fullName || fullName.length < 3) return fail("Введите ФИО", 400, "VALIDATION");

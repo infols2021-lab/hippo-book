@@ -3,7 +3,7 @@
 import "./update-password.css";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import TurnstileWidget from "@/components/TurnstileWidget";
+import YandexCaptchaWidget from "@/components/YandexCaptchaWidget";
 
 type BannerType = "error" | "success" | "warning" | null;
 type ModalKind = "error" | "success" | "warning";
@@ -40,7 +40,8 @@ function unwrapApiData(json: ApiPayload | null) {
 }
 
 export default function UpdatePasswordPage() {
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+  // ✅ Используем ключ для Яндекс Капчи
+  const siteKey = process.env.NEXT_PUBLIC_YANDEX_CAPTCHA_SITE_KEY || "";
 
   const [ready, setReady] = useState(false);
   const [hasSession, setHasSession] = useState(false);
@@ -97,12 +98,13 @@ export default function UpdatePasswordPage() {
       code.includes("CAPTCHA") ||
       code.includes("TURNSTILE") ||
       err.toLowerCase().includes("captcha") ||
-      err.toLowerCase().includes("капч")
+      err.toLowerCase().includes("капч") ||
+      err.toLowerCase().includes("проверк")
     ) {
       return (
-        (err || "Капча не пройдена или не загрузилась.") +
+        (err || "Проверка не пройдена или не загрузилась.") +
         "\n\nПопробуйте:\n" +
-        "• Нажать «Перезагрузить капчу»\n" +
+        "• Нажать «Перезагрузить проверку»\n" +
         "• Отключить VPN/прокси\n" +
         "• Обновить страницу"
       );
@@ -123,7 +125,7 @@ export default function UpdatePasswordPage() {
 
     if (err) return err;
 
-    return `Не удалось обновить пароль (${status}). Попробуйте перезагрузить капчу и повторить.`;
+    return `Не удалось обновить пароль (${status}). Попробуйте перезагрузить проверку и повторить.`;
   }
 
   useEffect(() => {
@@ -278,8 +280,8 @@ export default function UpdatePasswordPage() {
     if (!captchaToken) {
       openModal(
         "warning",
-        "Нужна капча",
-        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
+        "Нужна проверка",
+        "Пожалуйста, пройдите проверку.\n\nЕсли проверка не отображается — нажмите «Перезагрузить проверку».",
       );
       return;
     }
@@ -327,7 +329,7 @@ export default function UpdatePasswordPage() {
       openModal(
         "error",
         "Ошибка",
-        "Не удалось обновить пароль.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n\nДетали: " +
+        "Не удалось обновить пароль.\n\nПопробуйте:\n• Перезагрузить проверку\n• Обновить страницу\n\nДетали: " +
           (e?.message || String(e)),
       );
     }
@@ -369,7 +371,7 @@ export default function UpdatePasswordPage() {
                     closeModal();
                   }}
                 >
-                  Перезагрузить капчу
+                  Перезагрузить проверку
                 </button>
               ) : null}
 
@@ -404,7 +406,7 @@ export default function UpdatePasswordPage() {
             </div>
           ) : (
             <>
-              {!siteKey ? <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div> : null}
+              {!siteKey ? <div className="error-message">❌ Ключ проверки не задан. Обратитесь к администратору.</div> : null}
 
               <div className="form-group">
                 <label htmlFor="password">Новый пароль:</label>
@@ -432,23 +434,22 @@ export default function UpdatePasswordPage() {
 
               {siteKey ? (
                 <>
-                  <TurnstileWidget
+                  <YandexCaptchaWidget
                     siteKey={siteKey}
-                    action="update_password"
                     reloadNonce={reloadNonce}
                     onToken={(t) => setCaptchaToken(t)}
                   />
 
                   {!captchaToken ? (
                     <div className="captcha-hint">
-                      🧩 <strong>Если вы не видите капчу</strong> — нажмите <strong>«Перезагрузить капчу»</strong>.
+                      🧩 <strong>Если вы не видите проверку</strong> — нажмите <strong>«Перезагрузить проверку»</strong>.
                       <br />
                       Если не помогло: обновите страницу.
                     </div>
                   ) : null}
 
                   <button type="button" className="btn btn-captcha-reload" disabled={false} onClick={() => resetCaptchaHard()}>
-                    Перезагрузить капчу
+                    Перезагрузить проверку
                   </button>
                 </>
               ) : null}

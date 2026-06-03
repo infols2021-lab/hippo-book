@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ok, fail } from "@/lib/api/response";
-import { verifyTurnstileToken } from "@/lib/security/turnstile";
+import { verifyYandexCaptcha } from "@/lib/security/yandexCaptcha";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function getRemoteIp(req: Request): string | null {
@@ -22,12 +22,8 @@ export async function POST(req: Request) {
     const captchaToken = String(body.captchaToken ?? "");
 
     // captcha
-    const captcha = await verifyTurnstileToken({
-      token: captchaToken,
-      expectedAction: "update_password",
-      remoteIp: getRemoteIp(req),
-    });
-    if (!captcha.ok) return fail("Captcha failed", 400, captcha.code);
+    const captcha = await verifyYandexCaptcha(captchaToken, getRemoteIp(req) ?? undefined);
+    if (!captcha.ok) return fail("Проверка на человека не пройдена", 400, captcha.code);
 
     if (!password || password.length < 6) {
       return fail("Пароль должен быть не менее 6 символов", 400, "VALIDATION");

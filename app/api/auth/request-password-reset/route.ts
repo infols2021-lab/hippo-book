@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ok, fail } from "@/lib/api/response";
-import { verifyTurnstileToken } from "@/lib/security/turnstile";
+import { verifyYandexCaptcha } from "@/lib/security/yandexCaptcha";
 
 function isValidEmail(email: string) {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,12 +39,8 @@ export async function POST(req: Request) {
     const captchaToken = String(body.captchaToken ?? "");
 
     // 1) captcha
-    const captcha = await verifyTurnstileToken({
-      token: captchaToken,
-      expectedAction: "reset_request",
-      remoteIp: getRemoteIp(req),
-    });
-    if (!captcha.ok) return fail("Captcha failed", 400, captcha.code);
+    const captcha = await verifyYandexCaptcha(captchaToken, getRemoteIp(req) ?? undefined);
+    if (!captcha.ok) return fail("Проверка на человека не пройдена", 400, captcha.code);
 
     // 2) validate email
     if (!email || !isValidEmail(email)) return fail("Неверный формат email", 400, "VALIDATION");

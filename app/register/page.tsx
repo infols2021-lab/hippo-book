@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import TurnstileWidget from "@/components/TurnstileWidget";
+import YandexCaptchaWidget from "@/components/YandexCaptchaWidget";
 import "./register.css";
 
 type BannerType = "error" | "success" | "warning" | null;
@@ -88,7 +88,8 @@ function checkRateLimit() {
 }
 
 export default function RegisterPage() {
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+  // ✅ Используем ключ для Яндекс Капчи
+  const siteKey = process.env.NEXT_PUBLIC_YANDEX_CAPTCHA_SITE_KEY || "";
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -206,7 +207,8 @@ export default function RegisterPage() {
     if (
       code.includes("CAPTCHA") ||
       code.includes("TURNSTILE") ||
-      err.toLowerCase().includes("капч")
+      err.toLowerCase().includes("капч") ||
+      err.toLowerCase().includes("проверк")
     ) {
       return (
         (err || "Проверка на человека не пройдена или не загрузилась.") +
@@ -261,7 +263,7 @@ export default function RegisterPage() {
       openModal(
         "warning",
         "Нужна проверка на человека",
-        "Пожалуйста, пройдите проверку.\n\nЕсли проверка не отображается — нажмите «Перезагрузить капчу».",
+        "Пожалуйста, пройдите проверку.\n\nЕсли проверка не отображается — нажмите «Перезагрузить проверку».",
       );
       return;
     }
@@ -462,7 +464,7 @@ export default function RegisterPage() {
                     closeModal();
                   }}
                 >
-                  Перезагрузить капчу
+                  Перезагрузить проверку
                 </button>
               ) : null}
 
@@ -490,7 +492,7 @@ export default function RegisterPage() {
           </div>
 
           {!siteKey ? (
-            <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div>
+            <div className="error-message">❌ Ключ капчи не задан. Обратитесь к администратору.</div>
           ) : null}
 
           <div className="form-group">
@@ -568,19 +570,18 @@ export default function RegisterPage() {
 
           {siteKey ? (
             <>
-              <TurnstileWidget
+              <YandexCaptchaWidget
                 siteKey={siteKey}
-                action="register"
                 reloadNonce={reloadNonce}
                 onToken={(t) => setCaptchaToken(t)}
               />
 
               {!captchaToken ? (
                 <div className="rate-limit" style={{ marginTop: 10 }}>
-                  🧩 <strong>Если вы не видите капчу</strong> — нажмите{" "}
-                  <strong>«Перезагрузить капчу»</strong>.
+                  🧩 <strong>Если вы не видите проверку</strong> — нажмите{" "}
+                  <strong>«Перезагрузить проверку»</strong>.
                   <br />
-                  Если не помогло: отключите VPN/прокси и обновите страницу.
+                  Если не помогло: обновите страницу.
                 </div>
               ) : null}
 
@@ -590,7 +591,7 @@ export default function RegisterPage() {
                 disabled={false}
                 onClick={() => resetCaptchaHard()}
               >
-                Перезагрузить капчу
+                Перезагрузить проверку
               </button>
             </>
           ) : null}
