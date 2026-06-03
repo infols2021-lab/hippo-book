@@ -25,11 +25,7 @@ type Props = {
   onToken: (token: string | null) => void;
 };
 
-export default function YandexCaptcha({
-  siteKey,
-  reloadNonce,
-  onToken,
-}: Props) {
+export default function YandexCaptchaWidget({ siteKey, reloadNonce, onToken }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
   const scriptLoadedRef = useRef(false);
@@ -38,36 +34,34 @@ export default function YandexCaptcha({
     if (!containerRef.current || !window.ym) return;
 
     try {
+      // Очищаем контейнер от старых виджетов
       containerRef.current.innerHTML = "";
 
       window.ym.init(containerRef.current, {
         sitekey: siteKey,
         theme: "light",
         hl: "ru",
-        callback: (token: string) => {
-          onToken(token);
-        },
-        "error-callback": () => {
-          onToken(null);
-        },
+        callback: (token: string) => onToken(token),
+        "error-callback": () => onToken(null),
       });
 
       initializedRef.current = true;
     } catch (e) {
-      console.error("Captcha init error:", e);
+      console.error("Yandex Captcha init error:", e);
       onToken(null);
     }
   };
 
-  const loadScript = () => {
+  const loadScript = async () => {
+    if (scriptLoadedRef.current) return;
+
+    // Если скрипт уже есть в DOM, считаем загруженным
+    if (document.getElementById("yandex-captcha-script")) {
+      scriptLoadedRef.current = true;
+      return;
+    }
+
     return new Promise<void>((resolve, reject) => {
-      if (scriptLoadedRef.current) return resolve();
-
-      if (document.getElementById("yandex-captcha-script")) {
-        scriptLoadedRef.current = true;
-        return resolve();
-      }
-
       const script = document.createElement("script");
       script.id = "yandex-captcha-script";
       script.src = "https://captcha-api.yandex.ru/captcha.js";
@@ -79,21 +73,36 @@ export default function YandexCaptcha({
       };
 
       script.onerror = () => {
-        reject("Failed to load captcha script");
+        reject(new Error("Failed to load Yandex Captcha script"));
       };
 
       document.head.appendChild(script);
     });
   };
 
-  // initial load
+  // Основной эффект: загрузка скрипта + ожидание window.ym
   useEffect(() => {
-    let mounted = true;
+    let isMounted = true;
+    let retryCount = 0;
+    let interval: NodeJS.Timeout | null = null;
+
+    const tryInit = () => {
+      if (window.ym) {
+        if (interval) clearInterval(interval);
+        initCaptcha();
+      } else if (retryCount < 50) { // максимум 5 секунд
+        retryCount++;
+      } else {
+        if (interval) clearInterval(interval);
+        console.error("window.ym not available after 5 seconds");
+        onToken(null);
+      }
+    };
 
     loadScript()
       .then(() => {
-        if (!mounted) return;
-        initCaptcha();
+        if (!isMounted) return;
+        interval = setInterval(tryInit, 100);
       })
       .catch((err) => {
         console.error(err);
@@ -101,28 +110,31 @@ export default function YandexCaptcha({
       });
 
     return () => {
-      mounted = false;
+      isMounted = false;
+      if (interval) clearInterval(interval);
     };
   }, [siteKey]);
 
-  // reload captcha
+  // Перезагрузка капчи при изменении reloadNonce
   useEffect(() => {
     if (!initializedRef.current) return;
     if (!containerRef.current) return;
 
     initializedRef.current = false;
-    containerRef.current.innerHTML = "";
+    if (containerRef.current) containerRef.current.innerHTML = "";
 
-    const t = setTimeout(() => {
-      initCaptcha();
+    const timer = setTimeout(() => {
+      if (window.ym && containerRef.current && !initializedRef.current) {
+        initCaptcha();
+      }
     }, 200);
 
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [reloadNonce]);
 
   return (
-    <div style={{ width: "100%", minHeight: 160 }}>
-      <div ref={containerRef} />
+    <div style={{ marginTop: 16, minHeight: 100, textAlign: "center" }}>
+      <div ref={containerRef} style={{ display: "inline-block" }} />
     </div>
   );
 }
