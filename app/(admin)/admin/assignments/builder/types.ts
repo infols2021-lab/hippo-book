@@ -26,7 +26,7 @@ export type MediaAttachment = {
 export type BaseQuestion = {
   id: string;
   type: QuestionType;
-  q?: string;
+  q?: string; // Текст вопроса (для кроссвордов может быть пустым/отсутствовать)
   image?: string; // Устаревшее (оставлено для совместимости старых данных) — также используется для imagemap
   media?: MediaAttachment[]; // Новый массив медиа-файлов
 };
@@ -130,6 +130,7 @@ export type CrosswordQuestion = BaseQuestion & {
   blocks?: CWBlock[];
   cellNumbers?: Record<string, number>; // "r,c" -> number
   metadata: CrosswordMetadata;
+  // Поле q наследуется от BaseQuestion и является необязательным (опционально)
 };
 
 // ===== Image Map =====
@@ -294,7 +295,7 @@ export function newQuestion(type: QuestionType): Question {
   return {
     id,
     type: "crossword",
-    q: "",
+    q: "", // опциональное поле, может быть пустым
     media: [],
     grid: Array.from({ length: 15 }, () => Array.from({ length: 15 }, () => "")),
     words: [],

@@ -307,7 +307,7 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
 }
 
 // ============================================================================
-// ИЗОБРАЖЕНИЕ (без встроенной модалки, открывает ImageModal из родителя)
+// ИЗОБРАЖЕНИЕ (с зумом через ImageModal)
 // ============================================================================
 
 function ZoomableImage({
@@ -560,7 +560,7 @@ export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) 
             inset: 0;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justifyContent: center;
             z-index: 5;
           }
           .spinner {

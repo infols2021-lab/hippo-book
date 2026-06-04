@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { getImageUrl } from "../lib/image";
+import MediaRenderer from "./MediaRenderer";
 
 type Dir = "across" | "down";
 
@@ -136,8 +137,8 @@ export function CrosswordGridReadOnly({
                           display: "flex", 
                           alignItems: "center", 
                           justifyContent: "center",
-                          fontWeight: 900, // Делаем буквы жирными
-                          color: "#000"    // Делаем буквы черными для идеальной читаемости
+                          fontWeight: 900,
+                          color: "#000"
                         }}
                       >
                         {String(displayChar).toUpperCase()}
@@ -356,7 +357,24 @@ export default function QuestionCrossword({
 
   return (
     <div className="crossword-container">
-      {question?.image ? (
+      {/* ===== ТЕКСТ ВОПРОСА (опционально) ===== */}
+      {question?.q && typeof question.q === "string" && question.q.trim() && (
+        <div className="cw-card" style={{ marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, fontSize: "1.1rem", marginBottom: 8, whiteSpace: "pre-wrap" }}>
+            {question.q}
+          </div>
+        </div>
+      )}
+
+      {/* ===== МЕДИА (изображения, аудио, PDF) ===== */}
+      {question?.media && Array.isArray(question.media) && question.media.length > 0 && (
+        <div className="cw-card" style={{ marginBottom: 12 }}>
+          <MediaRenderer media={question.media} />
+        </div>
+      )}
+
+      {/* ===== Устаревшее поле image (обратная совместимость) ===== */}
+      {question?.image && !(question?.media?.length) ? (
         <div className="cw-card cw-image-card">
           <img
             className="cw-image"
@@ -370,7 +388,6 @@ export default function QuestionCrossword({
       ) : null}
 
       <div className="cw-card">
-        {/* Добавлен горизонтальный скролл для защиты от слишком широких сеток */}
         <div className="cw-grid-wrap" style={{ maxWidth: "100%", overflowX: "auto", paddingBottom: "8px" }}>
           <div className={`cw-grid ${sizeClass}`}>
             {Array.from({ length: rows }).map((_, r) => (
@@ -396,8 +413,8 @@ export default function QuestionCrossword({
                           value={(userGrid?.[r]?.[c] ?? "").toUpperCase()}
                           maxLength={1}
                           style={{
-                            fontWeight: 900, // Жирный шрифт во время ввода
-                            color: "#000",   // Черный цвет
+                            fontWeight: 900,
+                            color: "#000",
                           }}
                           onFocus={() => {
                             setFocused({ r, c });

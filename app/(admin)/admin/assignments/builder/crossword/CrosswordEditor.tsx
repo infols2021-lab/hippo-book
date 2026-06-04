@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CrosswordQuestion } from "../types";
 import GridEditor from "./GridEditor";
 import WordsEditor from "./WordsEditor";
+import MediaUpload from "../MediaUpload";
 
 type Props = {
   value: CrosswordQuestion;
@@ -174,9 +175,41 @@ export default function CrosswordEditor({ value, onChange, disabled }: Props) {
 
       <div style={{ height: 12 }} />
 
+      {/* Текст вопроса (опционально) */}
+      <div className="form-group">
+        <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>
+          Текст вопроса (опционально):
+        </label>
+        <textarea
+          className="question-textarea"
+          value={value.q ?? ""}
+          placeholder="Введите текст вопроса или оставьте пустым"
+          onChange={(e) => patch({ q: e.target.value })}
+          disabled={disabled}
+          rows={3}
+        />
+        <div className="format-hint">💡 Необязательное поле. Можно оставить пустым.</div>
+      </div>
+
+      {/* Медиа (изображения, аудио, PDF) */}
+      <MediaUpload
+        value={value.media ?? []}
+        onChange={(nextMedia) => patch({ media: nextMedia })}
+        disabled={disabled}
+        bucket="question-images"
+        audioBucket="hippo-book-audio"
+        label="Медиафайлы к кроссворду (изображения, аудио, PDF):"
+      />
+
+      <div style={{ height: 12 }} />
+
       <div className="card" style={{ padding: 14 }}>
         <div style={{ fontWeight: 800, marginBottom: 10 }}>📝 Управление словами</div>
-        <WordsEditor value={{ ...(value as any), grid, blocks, words, cellNumbers, metadata: { ...value.metadata, rows, cols } }} onChange={onChange} disabled={disabled} />
+        <WordsEditor
+          value={{ ...(value as any), grid, blocks, words, cellNumbers, metadata: { ...value.metadata, rows, cols } }}
+          onChange={onChange}
+          disabled={disabled}
+        />
       </div>
 
       <div style={{ height: 12 }} />
@@ -222,7 +255,11 @@ export default function CrosswordEditor({ value, onChange, disabled }: Props) {
 
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Сетка кроссворда (для администратора):</div>
 
-        <GridEditor value={{ ...(value as any), grid, blocks, words, cellNumbers, metadata: { ...value.metadata, rows, cols } }} onChange={onChange} disabled={disabled} />
+        <GridEditor
+          value={{ ...(value as any), grid, blocks, words, cellNumbers, metadata: { ...value.metadata, rows, cols } }}
+          onChange={onChange}
+          disabled={disabled}
+        />
 
         <div style={{ height: 14 }} />
 

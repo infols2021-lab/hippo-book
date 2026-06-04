@@ -62,7 +62,7 @@ function FillRow({
       <div
         style={{
           fontWeight: 900,
-          color: isCorrect ? "#10b981" : "#ef4444", // Зеленый если верно, красный если ошибка
+          color: isCorrect ? "#10b981" : "#ef4444",
           wordBreak: "break-word",
           lineHeight: "1.5",
           fontSize: "15px",
@@ -73,7 +73,7 @@ function FillRow({
       <div
         style={{
           fontWeight: 900,
-          color: "#10b981", // Правильный ответ всегда зеленый
+          color: "#10b981",
           wordBreak: "break-word",
           lineHeight: "1.5",
           fontSize: "15px",
@@ -115,7 +115,6 @@ function TestOptionsReview({
         let icon = null;
 
         if (isCorrect) {
-          // Правильный ответ всегда обводим зеленым и ставим галочку
           borderColor = "#10b981";
           bgColor = "#f0fdf4";
           icon = (
@@ -135,14 +134,13 @@ function TestOptionsReview({
                 fontSize: "14px",
                 fontWeight: "bold",
                 zIndex: 2,
-                boxShadow: "0 2px 4px rgba(16,185,129,0.3)"
+                boxShadow: "0 2px 4px rgba(16,185,129,0.3)",
               }}
             >
               ✓
             </div>
           );
         } else if (isUserSelected) {
-          // Неправильный выбор пользователя обводим красным и ставим крестик
           borderColor = "#ef4444";
           bgColor = "#fef2f2";
           icon = (
@@ -162,7 +160,7 @@ function TestOptionsReview({
                 fontSize: "14px",
                 fontWeight: "bold",
                 zIndex: 2,
-                boxShadow: "0 2px 4px rgba(239,68,68,0.3)"
+                boxShadow: "0 2px 4px rgba(239,68,68,0.3)",
               }}
             >
               ✗
@@ -179,7 +177,7 @@ function TestOptionsReview({
               padding: "16px",
               background: bgColor,
               position: "relative",
-              opacity: (!isCorrect && !isUserSelected) ? 0.6 : 1, // Немного гасим невыбранные неверные варианты
+              opacity: (!isCorrect && !isUserSelected) ? 0.6 : 1,
             }}
           >
             {icon}
@@ -465,7 +463,7 @@ export default function ReviewPanel({
           </div>
         )}
 
-        {/* ===== ТЕСТ (сетка вариантов) ===== */}
+        {/* ===== ТЕСТ ===== */}
         {r.type === "test" && r.options && (
           <div
             style={{
@@ -635,6 +633,34 @@ export default function ReviewPanel({
               padding: "16px",
             }}
           >
+            {/* Текст вопроса для кроссворда (если есть) */}
+            {r.questionText && (
+              <div
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 700,
+                  color: "#1e293b",
+                  marginBottom: "12px",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {r.questionText}
+              </div>
+            )}
+
+            {/* Медиа для кроссворда (если есть) */}
+            {itemMedia && itemMedia.length > 0 && (
+              <div
+                style={{
+                  marginBottom: "16px",
+                  borderRadius: "14px",
+                  overflow: "hidden",
+                }}
+              >
+                <MediaRenderer media={itemMedia} />
+              </div>
+            )}
+
             {r.note && (
               <div
                 style={{
@@ -1030,7 +1056,7 @@ export default function ReviewPanel({
           font-weight: 700;
           background: #ffffff;
           padding: 6px 12px;
-          border-radius: 12px;
+          borderRadius: 12px;
           border: 1px solid rgba(0, 0, 0, 0.04);
           color: #475569;
         }
