@@ -448,9 +448,8 @@ export default function ReviewPanel({
           </div>
         </div>
 
-        {/* Медиа вопроса — рендерится один раз для всех типов, кроме кроссворда
-            (у crossword медиа — это картинки-подсказки внутри сетки, не нужны отдельно) */}
-        {itemMedia && itemMedia.length > 0 && r.type !== "crossword" && (
+        {/* Главные материалы вопроса — теперь рендерятся для всех типов, включая кроссворды */}
+        {itemMedia && itemMedia.length > 0 && (
           <div
             style={{
               marginBottom: "20px",
