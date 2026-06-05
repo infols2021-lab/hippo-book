@@ -114,6 +114,34 @@ export default function QuestionComplex({
         borderLeft: "4px solid rgba(0,123,255,0.2)",
       }}
     >
+      {/* Глобальный блок текста и медиа комплексного вопроса */}
+      {(question.q || (question.media && question.media.length > 0)) && (
+        <div
+          style={{
+            marginBottom: 8,
+            padding: "0 0 16px 0",
+            borderBottom: "1px solid rgba(0,0,0,0.08)",
+          }}
+        >
+          {question.q && (
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: "#1e293b",
+                marginBottom: 12,
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {question.q}
+            </div>
+          )}
+          {question.media && question.media.length > 0 && (
+            <MediaRenderer key={JSON.stringify(question.media)} media={question.media} />
+          )}
+        </div>
+      )}
+
       {subQuestions.map((subQ, index) => (
         <div
           key={subQ.id || `subq-${index}`}
