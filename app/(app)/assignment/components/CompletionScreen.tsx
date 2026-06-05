@@ -52,7 +52,7 @@ export default function CompletionScreen({
           </div>
         </div>
 
-        {showReview ? <ReviewPanel items={reviewItems} questions={questions} /> : null}
+        {showReview ? <ReviewPanel items={reviewItems} /> : null}
 
         <div style={{ marginTop: 30 }}>
           <button className="btn" onClick={() => (location.href = "/materials")} type="button">
