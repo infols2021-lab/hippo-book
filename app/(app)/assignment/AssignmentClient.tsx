@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { createPortal } from "react-dom"; // Добавили для модалки
+import { createPortal } from "react-dom";
 
 // === КОМПОНЕНТЫ ВОПРОСОВ ===
 import QuestionCrossword from "./components/QuestionCrossword";
@@ -49,6 +49,59 @@ type Props = {
   source?: string;
   sourceId?: string;
 };
+
+// ===================== ЖЕЛЕЗОБЕТОННЫЙ ПОРТАЛ =====================
+// Эта обертка вырывает модалку из любых контейнеров и обходит баги CSS (transform/filter),
+// гарантируя 100% покрытие экрана поверх всего сайта с блокировкой скролла.
+function IroncladModalPortal({ open, children }: { open: boolean; children: React.ReactNode }) {
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const div = document.createElement("div");
+    div.id = "ironclad-modal-root";
+    div.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 2147483647 !important;
+      pointer-events: none;
+      visibility: hidden;
+      margin: 0 !important;
+      padding: 0 !important;
+      transform: none !important;
+      filter: none !important;
+      background: transparent !important;
+    `;
+    document.body.appendChild(div);
+    setEl(div);
+
+    return () => {
+      document.body.removeChild(div);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!el) return;
+    if (open) {
+      el.style.pointerEvents = "auto";
+      el.style.visibility = "visible";
+      document.body.style.overflow = "hidden"; // Блокируем скролл фона
+    } else {
+      el.style.pointerEvents = "none";
+      el.style.visibility = "hidden";
+      document.body.style.overflow = "";
+    }
+
+    return () => { document.body.style.overflow = ""; };
+  }, [open, el]);
+
+  if (!el) return null;
+  return createPortal(children, el);
+}
 
 // ===================== HELPERS =====================
 function normalizeQuestions(qs: unknown): QuestionAny[] {
@@ -98,7 +151,6 @@ function isQuestionAnswered(q: QuestionAny, answer: any): boolean {
       const correctGrid: string[][] = Array.isArray((q as any).grid) ? (q as any).grid : [];
       const words: any[] = Array.isArray((q as any).words) ? (q as any).words : [];
 
-      // Собираем активные ячейки кроссворда
       const activeCells = new Set<string>();
       for (const w of words) {
         const len = Number(w?.length ?? 0);
@@ -110,7 +162,6 @@ function isQuestionAnswered(q: QuestionAny, answer: any): boolean {
         }
       }
       
-      // Fallback: если слова не переданы, ищем непустые ячейки в эталонной сетке
       if (activeCells.size === 0) {
         correctGrid.forEach((row: string[], r: number) =>
           row.forEach((ch: string, c: number) => {
@@ -121,12 +172,9 @@ function isQuestionAnswered(q: QuestionAny, answer: any): boolean {
 
       if (activeCells.size === 0) return false;
 
-      // Проверяем, что ВСЕ активные ячейки заполнены юзером
       for (const key of activeCells) {
         const [r, c] = key.split(",").map(Number);
-        if (!String(userGrid?.[r]?.[c] ?? "").trim()) {
-          return false;
-        }
+        if (!String(userGrid?.[r]?.[c] ?? "").trim()) return false;
       }
       return true;
     }
@@ -166,15 +214,8 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [modalSrc, setModalSrc] = useState<string>("");
-  
-  // Добавлено для безопасного рендера портала модалки
-  const [isMounted, setIsMounted] = useState(false);
 
   const saveBusyRef = useRef(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   // --- PRELOAD следующего вопроса ---
   useEffect(() => {
@@ -665,7 +706,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                           width={800}
                           height={600}
                           priority={true}
-                          unoptimized={true} // Не кэшировать жестко, так как задания часто меняются
+                          unoptimized={true}
                           style={{
                             width: "100%",
                             height: "auto",
@@ -718,15 +759,14 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         )}
       </main>
 
-      {/* МОДАЛКА ЗУМА ИЗОБРАЖЕНИЙ (ЧЕРЕЗ ПОРТАЛ) */}
-      {isMounted && createPortal(
+      {/* ЖЕЛЕЗОБЕТОННЫЙ ПОРТАЛ ЗУМА ИЗОБРАЖЕНИЙ */}
+      <IroncladModalPortal open={imageModalOpen}>
         <ImageModal
           open={imageModalOpen}
           src={modalSrc}
           onClose={closeImage}
-        />,
-        document.body
-      )}
+        />
+      </IroncladModalPortal>
 
       {/* CSS STYLES */}
       <style jsx>{`
@@ -756,7 +796,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           margin-bottom: 10px;
           flex-wrap: nowrap;
           overflow-x: auto;
-          padding: 10px 4px; /* Чтобы точки не резались при зуме x1.4 */
+          padding: 10px 4px;
           margin-top: -10px;
           scrollbar-width: none;
         }
