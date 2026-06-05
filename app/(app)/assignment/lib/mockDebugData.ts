@@ -27,7 +27,7 @@ const allQuestionTypes = [
     ],
   },
 
-  // 2. FILL: Несколько пропусков + Новый массив media
+  // 2. FILL: Несколько пропусков (исправлено на структуру items)
   {
     id: "q_fill_multi",
     type: "fill",
@@ -36,20 +36,17 @@ const allQuestionTypes = [
       { type: "image", url: "https://placehold.co/600x150/334155/ffffff?text=Modern+Media+Array" },
       { type: "image", url: "https://placehold.co/600x150/0f172a/ffffff?text=Second+Media+Item" }
     ],
-    // Бронебойный набор ключей для Fill-компонента
-    text: "Столица Великобритании — ___. А Франции — ___.",
-    template: "Столица Великобритании — ___. А Франции — ___.",
-    parts: [
-      { type: "text", text: "Столица Великобритании — " },
-      { type: "input", correct: "Лондон" },
-      { type: "text", text: ". А Франции — " },
-      { type: "input", correct: "Париж" },
-    ],
+    // Теперь компонент найдет свой массив items и не будет писать "Количество ответов: 0"
     items: [
-      { type: "text", text: "Столица Великобритании — " },
-      { type: "input", correct: "Лондон" },
-      { type: "text", text: ". А Франции — " },
-      { type: "input", correct: "Париж" },
+      {
+        id: "fill_item_1",
+        parts: [
+          { type: "text", text: "Столица Великобритании — " },
+          { type: "input", correct: "Лондон", id: "input_1" },
+          { type: "text", text: ". А Франции — " },
+          { type: "input", correct: "Париж", id: "input_2" },
+        ]
+      }
     ]
   },
 
@@ -58,24 +55,34 @@ const allQuestionTypes = [
     id: "q_sentence_long",
     type: "sentence",
     q: "Соберите очень длинное предложение, чтобы проверить переносы строк:",
-    // Бронебойный набор ключей для Sentence-компонента
-    text: "The quick brown ___ jumps over the lazy ___, and then ___ away.",
-    sentence: "The quick brown ___ jumps over the lazy ___, and then ___ away.",
-    template: "The quick brown ___ jumps over the lazy ___, and then ___ away.",
     sentenceTemplate: "The quick brown ___ jumps over the lazy ___, and then ___ away.",
+    template: "The quick brown ___ jumps over the lazy ___, and then ___ away.",
     correctAnswers: ["fox", "dog", "runs"],
+    words: ["runs", "dog", "fox", "cat"] // Добавили слова для перетаскивания
   },
 
-  // 4. MATCHING: Соединялки
+  // 4. MATCHING: Соединялки (исправлена структура для отрисовки линий)
   {
     id: "q_matching_basic",
     type: "matching",
     q: "Соедините слова с их переводами:",
-    pairs: [
-      { left: { id: "l1", text: "Apple" }, right: { id: "r1", text: "Яблоко" } },
-      { left: { id: "l2", text: "Dog" }, right: { id: "r2", text: "Собака" } },
-      { left: { id: "l3", text: "Cat" }, right: { id: "r3", text: "Кошка" } },
+    // Разделили на независимые массивы left и right, чтобы логика линий заработала
+    left: [
+      { id: "l1", text: "Apple" },
+      { id: "l2", text: "Dog" },
+      { id: "l3", text: "Cat" },
     ],
+    right: [
+      { id: "r1", text: "Яблоко" },
+      { id: "r2", text: "Собака" },
+      { id: "r3", text: "Кошка" },
+    ],
+    // Pairs хранит только правильные связи
+    pairs: [
+      { leftId: "l1", rightId: "r1" },
+      { leftId: "l2", rightId: "r2" },
+      { leftId: "l3", rightId: "r3" },
+    ]
   },
 
   // 5. IMAGEMAP: Точки на картинке
@@ -112,37 +119,56 @@ const allQuestionTypes = [
     ],
   },
 
-  // 7. READING: Полотно текста
+  // 7. READING: Полотно текста (добавили все варианты ключей для текста)
   {
     id: "q_reading_wall",
     type: "reading",
-    q: "Прочитайте текст и ответьте на вопросы (текст должен скроллиться или умещаться красиво):",
-    // Бронебойный набор ключей для Reading-компонента
+    q: "Прочитайте текст и ответьте на вопросы:",
+    // Бронебойный набор: один из этих ключей компонент точно съест
+    passage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(20),
+    article: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(20),
     text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(20),
-    content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(20),
-    readingText: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(20),
-    questions: [
+    items: [
       { id: "rq1", type: "test", q: "О чем текст?", multiple: false, options: [{ id: "ro1", text: "О природе" }, { id: "ro2", text: "О лореме" }] }
     ],
-    subQuestions: [
+    questions: [
       { id: "rq1", type: "test", q: "О чем текст?", multiple: false, options: [{ id: "ro1", text: "О природе" }, { id: "ro2", text: "О лореме" }] }
     ]
   },
 
-  // 8. COMPLEX: Вложенный ад
+  // 8. COMPLEX: Вложенный ад (исправили вложенный fill)
   {
     id: "q_complex_nested",
     type: "complex",
     q: "Комплексное задание. Ознакомьтесь с материалом и выполните подзадания:",
     media: [{ type: "image", url: "https://placehold.co/600x200/ec4899/ffffff?text=Complex+Parent+Media" }],
-    // Бронебойный набор ключей для Complex-компонента
+    items: [
+      { id: "sq1", type: "test", q: "Вложенный тест", multiple: false, options: [{ id: "so1", text: "Да" }, { id: "so2", text: "Нет" }] },
+      { 
+        id: "sq2", 
+        type: "fill", 
+        q: "Вложенный fill", 
+        items: [
+          {
+            id: "sq2_item1",
+            parts: [{ type: "text", text: "2 + 2 = " }, { type: "input", correct: "4", id: "sq2_in1" }]
+          }
+        ] 
+      }
+    ],
     questions: [
       { id: "sq1", type: "test", q: "Вложенный тест", multiple: false, options: [{ id: "so1", text: "Да" }, { id: "so2", text: "Нет" }] },
-      { id: "sq2", type: "fill", q: "Вложенный fill", text: "2 + 2 = ___", template: "2 + 2 = ___", parts: [{ type: "text", text: "2 + 2 = " }, { type: "input", correct: "4" }] }
-    ],
-    subQuestions: [
-      { id: "sq1", type: "test", q: "Вложенный тест", multiple: false, options: [{ id: "so1", text: "Да" }, { id: "so2", text: "Нет" }] },
-      { id: "sq2", type: "fill", q: "Вложенный fill", text: "2 + 2 = ___", template: "2 + 2 = ___", parts: [{ type: "text", text: "2 + 2 = " }, { type: "input", correct: "4" }] }
+      { 
+        id: "sq2", 
+        type: "fill", 
+        q: "Вложенный fill", 
+        items: [
+          {
+            id: "sq2_item1",
+            parts: [{ type: "text", text: "2 + 2 = " }, { type: "input", correct: "4", id: "sq2_in1" }]
+          }
+        ] 
+      }
     ]
   }
 ];
@@ -188,7 +214,7 @@ export const mockDebugAll = {
   progress: null, // Нет прогресса, начинаем чисто
 };
 
-// 2. Сценарий: Моментальная проверка ReviewPanel (Ошибки, успехи, частичные)
+// 2. Сценарий: Моментальная проверка ReviewPanel
 export const mockDebugReview = {
   ok: true,
   assignment: {
@@ -199,27 +225,27 @@ export const mockDebugReview = {
   },
   progress: {
     is_completed: true,
-    score: 65, // Условный балл
+    score: 65, 
     completed_at: new Date().toISOString(),
     answers: {
-      0: 1, // test: Правильно (выбрал 2026, индекс 1)
-      1: [0, 1], // test_media: Частично/ошибка (выбрал o1 и o2)
-      2: ["Лондон", "Рим"], // fill: Одно правильно, одно нет
-      3: ["fox", "cat", "runs"], // sentence: Ошибка посередине
-      4: { l1: "r1", l2: "r3", l3: "r2" }, // matching: Одно правильно, два перепутаны
-      5: { p1: "a1", p2: "a3" }, // imagemap: Одно правильно, одно мимо
-      6: [ // crossword: Ошибка в одной букве (c-o-t вместо c-a-t)
+      0: 1, // test
+      1: [0, 1], // test_media
+      2: ["Лондон", "Рим"], // fill (q_fill_multi)
+      3: ["fox", "cat", "runs"], // sentence
+      4: { l1: "r1", l2: "r3", l3: "r2" }, // matching
+      5: { p1: "a1", p2: "a3" }, // imagemap
+      6: [ // crossword
         ["c", "o", "t", ""],
         ["", "p", "i", "g"],
         ["", "", "g", ""],
       ],
-      7: [1], // reading: Вложенный ответ
-      8: [0, ["5"]], // complex: Вложенные ответы
+      7: [1], // reading
+      8: [0, ["5"]], // complex
     },
   },
 };
 
-// 3. Сценарий: Одиночный вопрос (проверка скрытия точек навигации)
+// 3. Сценарий: Одиночный вопрос
 export const mockDebugSingle = {
   ok: true,
   assignment: {
@@ -227,7 +253,7 @@ export const mockDebugSingle = {
     id: "debug-single",
     title: "🎯 ЛАБОРАТОРИЯ: Одиночка",
     branch_type: "gatehouse",
-    content: { questions: [allQuestionTypes[2]] }, // Берем только FILL
+    content: { questions: [allQuestionTypes[2]] }, // Берем FILL
   },
   progress: null,
 };
