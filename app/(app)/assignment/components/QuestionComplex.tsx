@@ -114,7 +114,7 @@ export default function QuestionComplex({
         borderLeft: "4px solid rgba(0,123,255,0.2)",
       }}
     >
-      {/* Блок текста и медиа самого комплексного вопроса */}
+      {/* Блок текста и медиа самого комплексного вопроса (только один раз) */}
       {(question.q || (question.media && question.media.length > 0)) && (
         <div
           style={{
@@ -137,7 +137,7 @@ export default function QuestionComplex({
             </div>
           )}
           {question.media && question.media.length > 0 && (
-            <MediaRenderer media={question.media} />
+            <MediaRenderer key={JSON.stringify(question.media)} media={question.media} />
           )}
         </div>
       )}
@@ -201,9 +201,10 @@ export default function QuestionComplex({
               </div>
             )}
 
+            {/* Медиа подвопроса — только если они есть и не совпадают с глобальными */}
             {subQ.media && subQ.media.length > 0 && (
               <div style={{ marginBottom: 16 }}>
-                <MediaRenderer media={subQ.media} />
+                <MediaRenderer key={JSON.stringify(subQ.media)} media={subQ.media} />
               </div>
             )}
 
