@@ -116,6 +116,29 @@ export async function POST(req: Request) {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // Дебаг-задания (не существуют в БД) – возвращаем успех без сохранения
+  // ─────────────────────────────────────────────────────────────
+  const debugIds = [
+    "debug-all",
+    "debug-review",
+    "debug-perfect",
+    "debug-mode-choice",
+    "debug-gatehouse",
+  ];
+  const isDebugId = debugIds.includes(body.assignmentId) || body.assignmentId?.startsWith("debug-single-");
+  if (isDebugId) {
+    return NextResponse.json({
+      ok: true,
+      score: body.score,
+      branch_type: "olympiad",
+      counters: {
+        olympiadCompletedAssignmentsCount: 0,
+        gatehouseCompletedAssignmentsCount: 0,
+      },
+    });
+  }
+
   if (!body.isCompleted) {
     return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
   }
