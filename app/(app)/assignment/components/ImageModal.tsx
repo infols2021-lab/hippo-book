@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 type Props = {
   open: boolean;
@@ -21,18 +22,63 @@ export default function ImageModal({ open, src, onClose }: Props) {
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
 
-  // Блокируем скролл body при открытии, сбрасываем трансформацию
+  // Стейт для хранения нашего бронебойного рут-узла
+  const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
+
+  // 1. Создаем автономный узел в DOM, которому плевать на любые стили React-дерева
   useEffect(() => {
+    let node = document.getElementById("ironclad-modal-root");
+    if (!node) {
+      node = document.createElement("div");
+      node.id = "ironclad-modal-root";
+      // Блокируем любые попытки браузера "запереть" этот блок
+      node.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 2147483647 !important;
+        pointer-events: none;
+        visibility: hidden;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        transform: none !important;
+        filter: none !important;
+        backdrop-filter: none !important;
+        contain: none !important;
+      `;
+      document.body.appendChild(node);
+    }
+    setPortalNode(node);
+  }, []);
+
+  // 2. Управление открытием/закрытием и блокировкой скролла
+  useEffect(() => {
+    if (!portalNode) return;
+
     if (open) {
+      portalNode.style.pointerEvents = "auto";
+      portalNode.style.visibility = "visible";
+      
+      // Железобетонная блокировка скролла для всех устройств (включая iOS Safari)
       document.body.style.overflow = "hidden";
-      document.body.style.overscrollBehavior = "contain";
+      document.body.style.overscrollBehavior = "none";
+      document.documentElement.style.overflow = "hidden";
+      
       translate.current = { x: 0, y: 0 };
       setZoom(1);
+      
       if (imageRef.current) {
         imageRef.current.style.transform = "translate(0px, 0px) scale(1)";
         imageRef.current.style.transition = "transform 0.2s ease";
       }
-      // Автоподгон размера после загрузки изображения
+
+      // Автоподгон размера
       setTimeout(() => {
         if (imageRef.current && containerRef.current) {
           const fit = calculateFitZoom(imageRef.current, containerRef.current);
@@ -40,18 +86,25 @@ export default function ImageModal({ open, src, onClose }: Props) {
         }
       }, 50);
     } else {
+      portalNode.style.pointerEvents = "none";
+      portalNode.style.visibility = "hidden";
+      
       document.body.style.overflow = "";
       document.body.style.overscrollBehavior = "";
+      document.documentElement.style.overflow = "";
+      
       setZoom(1);
       translate.current = { x: 0, y: 0 };
     }
+
     return () => {
       document.body.style.overflow = "";
       document.body.style.overscrollBehavior = "";
+      document.documentElement.style.overflow = "";
     };
-  }, [open]);
+  }, [open, portalNode]);
 
-  // Применяем трансформацию при каждом изменении зума или переводе
+  // Трансформации зума
   useEffect(() => {
     if (!imageRef.current) return;
     imageRef.current.style.transform = `translate(${translate.current.x}px, ${translate.current.y}px) scale(${zoom})`;
@@ -68,7 +121,7 @@ export default function ImageModal({ open, src, onClose }: Props) {
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  // Подгонка размера под экран
+  // Вычисления автозума
   function calculateFitZoom(img: HTMLImageElement, container: HTMLElement | null) {
     if (!container) return 1;
     const containerW = container.clientWidth * 0.9;
@@ -81,7 +134,8 @@ export default function ImageModal({ open, src, onClose }: Props) {
     return Math.min(scaleW, scaleH);
   }
 
-  // Колёсико мыши / тачпад
+  // === ОБРАБОТЧИКИ СОБЫТИЙ ===
+
   const handleWheel = (e: React.WheelEvent) => {
     if (!imageRef.current) return;
     e.preventDefault();
@@ -90,7 +144,6 @@ export default function ImageModal({ open, src, onClose }: Props) {
     setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoom)));
   };
 
-  // Drag мышью
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom <= 1) return;
     e.preventDefault();
@@ -129,7 +182,6 @@ export default function ImageModal({ open, src, onClose }: Props) {
     }
   };
 
-  // Touch drag (один палец)
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) return;
     if (zoom <= 1) return;
@@ -169,7 +221,6 @@ export default function ImageModal({ open, src, onClose }: Props) {
     }
   };
 
-  // Пинч (двумя пальцами) – простейшая реализация через отслеживание расстояния
   const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
   const handleTouchStartPinch = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
@@ -179,6 +230,7 @@ export default function ImageModal({ open, src, onClose }: Props) {
       pinchRef.current = { dist, zoom };
     }
   };
+  
   const handleTouchMovePinch = (e: React.TouchEvent) => {
     if (e.touches.length === 2 && pinchRef.current) {
       e.preventDefault();
@@ -191,19 +243,20 @@ export default function ImageModal({ open, src, onClose }: Props) {
       setZoom(newZoom);
     }
   };
+  
   const handleTouchEndPinch = () => {
     pinchRef.current = null;
   };
 
-  // Сброс (центр + масштаб 1)
   const resetTransform = () => {
     translate.current = { x: 0, y: 0 };
     setZoom(1);
   };
 
-  if (!open) return null;
+  if (!open || !portalNode) return null;
 
-  return (
+  // Рендерим модалку через портал в наш неуязвимый DOM-узел
+  return createPortal(
     <div
       ref={containerRef}
       onWheel={handleWheel}
@@ -223,11 +276,11 @@ export default function ImageModal({ open, src, onClose }: Props) {
         handleTouchEndPinch();
       }}
       style={{
-        position: "fixed",
+        position: "absolute", // Контейнер уже fixed, так что тут absolute
         inset: 0,
-        zIndex: 9999,
         background: "rgba(0,0,0,0.94)",
         backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)", // Фикс для айфонов
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -239,7 +292,6 @@ export default function ImageModal({ open, src, onClose }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      {/* Кнопка закрытия */}
       <button
         onClick={onClose}
         className="image-modal-close-btn"
@@ -254,6 +306,7 @@ export default function ImageModal({ open, src, onClose }: Props) {
           border: "none",
           background: "rgba(255,255,255,0.15)",
           backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
           color: "#fff",
           fontSize: 28,
           fontWeight: 300,
@@ -271,7 +324,7 @@ export default function ImageModal({ open, src, onClose }: Props) {
       <img
         ref={imageRef}
         src={src}
-        alt=""
+        alt="Fullscreen view"
         onMouseDown={handleMouseDown}
         draggable={false}
         style={{
@@ -282,11 +335,11 @@ export default function ImageModal({ open, src, onClose }: Props) {
           boxShadow: "0 30px 60px rgba(0,0,0,0.5)",
           cursor: zoom > 1 ? "grab" : "default",
           userSelect: "none",
+          WebkitUserSelect: "none",
           transition: "transform 0.15s cubic-bezier(0.2, 0.9, 0.4, 1.1)",
         }}
       />
 
-      {/* Панель управления */}
       <div className="image-modal-controls" style={{
         position: "absolute",
         bottom: 30,
@@ -296,6 +349,7 @@ export default function ImageModal({ open, src, onClose }: Props) {
         gap: 16,
         background: "rgba(20,20,30,0.8)",
         backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
         padding: "12px 20px",
         borderRadius: 60,
         border: "1px solid rgba(255,255,255,0.2)",
@@ -304,7 +358,7 @@ export default function ImageModal({ open, src, onClose }: Props) {
         <button onClick={() => setZoom(Math.max(MIN_ZOOM, +(zoom - ZOOM_STEP).toFixed(2)))} style={ctrlBtnStyle}>
           −
         </button>
-        <span style={{ color: "#fff", fontWeight: 700, minWidth: 60, textAlign: "center" }}>
+        <span style={{ color: "#fff", fontWeight: 700, minWidth: 60, textAlign: "center", userSelect: "none" }}>
           {Math.round(zoom * 100)}%
         </span>
         <button onClick={() => setZoom(Math.min(MAX_ZOOM, +(zoom + ZOOM_STEP).toFixed(2)))} style={ctrlBtnStyle}>
@@ -315,7 +369,6 @@ export default function ImageModal({ open, src, onClose }: Props) {
         </button>
       </div>
 
-      {/* Инструкция для мобильных */}
       <div className="image-modal-hint" style={{
         position: "absolute",
         bottom: 100,
@@ -323,6 +376,7 @@ export default function ImageModal({ open, src, onClose }: Props) {
         transform: "translateX(-50%)",
         background: "rgba(0,0,0,0.6)",
         backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
         padding: "8px 16px",
         borderRadius: 30,
         color: "rgba(255,255,255,0.7)",
@@ -334,7 +388,8 @@ export default function ImageModal({ open, src, onClose }: Props) {
       }}>
         🖱️ Колесо — зум • Перетаскивание
       </div>
-    </div>
+    </div>,
+    portalNode
   );
 }
 
@@ -352,4 +407,6 @@ const ctrlBtnStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   transition: "transform 0.15s, background 0.2s",
+  userSelect: "none",
+  WebkitUserSelect: "none",
 };

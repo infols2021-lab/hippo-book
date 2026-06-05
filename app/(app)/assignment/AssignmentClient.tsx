@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { createPortal } from "react-dom";
 
 // === КОМПОНЕНТЫ ВОПРОСОВ ===
 import QuestionCrossword from "./components/QuestionCrossword";
@@ -49,59 +48,6 @@ type Props = {
   source?: string;
   sourceId?: string;
 };
-
-// ===================== ЖЕЛЕЗОБЕТОННЫЙ ПОРТАЛ =====================
-// Эта обертка вырывает модалку из любых контейнеров и обходит баги CSS (transform/filter),
-// гарантируя 100% покрытие экрана поверх всего сайта с блокировкой скролла.
-function IroncladModalPortal({ open, children }: { open: boolean; children: React.ReactNode }) {
-  const [el, setEl] = useState<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const div = document.createElement("div");
-    div.id = "ironclad-modal-root";
-    div.style.cssText = `
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      bottom: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      z-index: 2147483647 !important;
-      pointer-events: none;
-      visibility: hidden;
-      margin: 0 !important;
-      padding: 0 !important;
-      transform: none !important;
-      filter: none !important;
-      background: transparent !important;
-    `;
-    document.body.appendChild(div);
-    setEl(div);
-
-    return () => {
-      document.body.removeChild(div);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!el) return;
-    if (open) {
-      el.style.pointerEvents = "auto";
-      el.style.visibility = "visible";
-      document.body.style.overflow = "hidden"; // Блокируем скролл фона
-    } else {
-      el.style.pointerEvents = "none";
-      el.style.visibility = "hidden";
-      document.body.style.overflow = "";
-    }
-
-    return () => { document.body.style.overflow = ""; };
-  }, [open, el]);
-
-  if (!el) return null;
-  return createPortal(children, el);
-}
 
 // ===================== HELPERS =====================
 function normalizeQuestions(qs: unknown): QuestionAny[] {
@@ -759,14 +705,12 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         )}
       </main>
 
-      {/* ЖЕЛЕЗОБЕТОННЫЙ ПОРТАЛ ЗУМА ИЗОБРАЖЕНИЙ */}
-      <IroncladModalPortal open={imageModalOpen}>
-        <ImageModal
-          open={imageModalOpen}
-          src={modalSrc}
-          onClose={closeImage}
-        />
-      </IroncladModalPortal>
+      {/* АБСОЛЮТНО ЧИСТЫЙ ВЫЗОВ МОДАЛКИ (БЕЗ ДВОЙНЫХ ПОРТАЛОВ) */}
+      <ImageModal
+        open={imageModalOpen}
+        src={modalSrc}
+        onClose={closeImage}
+      />
 
       {/* CSS STYLES */}
       <style jsx>{`
