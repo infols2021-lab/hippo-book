@@ -1,19 +1,39 @@
 // lib/assignments/scoring.ts
 // Серверная версия скоринга – используется в API для проверки ответов и подсчёта баллов.
-// Полностью синхронизирована с клиентской логикой, поддерживает все типы вопросов:
-// test, fill, sentence, matching, complex, reading, imagemap, crossword.
+// Поддерживает все типы вопросов: test, fill, sentence, matching, complex, reading, imagemap, crossword.
+// Ответы ищутся сначала по id вопроса, затем по индексу (для обратной совместимости со старыми заданиями).
 
 import type { FinalStats, ReviewItem, TestOption, MatchingPair } from "@/app/(app)/assignment/lib/types";
 
 // ---------------------------------------------------------------------------
-// Нормализация текста (копия из клиентской normalize.ts)
+// Нормализация текста (расширенная версия, синхронизирована с клиентской normalize.ts)
 // ---------------------------------------------------------------------------
-function normalizeText(text: any) {
+function normalizeText(text: any): string {
   if (!text) return "";
   let normalized = String(text).toLowerCase().trim();
-  normalized = normalized.replace(/[''`´]/g, "'");
+  normalized = normalized.normalize("NFC");
+  normalized = normalized.replace(/ё/g, "е");
+  normalized = normalized.replace(/[''`´’‘]/g, "'");
   normalized = normalized.replace(/\s*'\s*/g, "'");
   normalized = normalized.replace(/\s+/g, " ");
+
+  const hasLatin = /[a-z]/.test(normalized);
+  const hasCyrillic = /[а-я]/.test(normalized);
+  if (hasLatin && hasCyrillic) {
+    const cyrillicToLatin: Record<string, string> = {
+      'а': 'a', 'с': 'c', 'е': 'e', 'о': 'o', 'р': 'p', 'х': 'x', 'у': 'y'
+    };
+    const latinToCyrillic: Record<string, string> = {
+      'a': 'а', 'c': 'с', 'e': 'е', 'o': 'о', 'p': 'р', 'x': 'х', 'y': 'у'
+    };
+    const latinCount = (normalized.match(/[a-z]/g) || []).length;
+    const cyrillicCount = (normalized.match(/[а-я]/g) || []).length;
+    if (latinCount >= cyrillicCount) {
+      normalized = normalized.replace(/[асеорху]/g, match => cyrillicToLatin[match] || match);
+    } else {
+      normalized = normalized.replace(/[aceopxy]/g, match => latinToCyrillic[match] || match);
+    }
+  }
   return normalized;
 }
 
@@ -139,7 +159,10 @@ export function validateAllAnswered(
     const q = qs[i];
     if (!q || typeof q !== "object") continue;
 
-    const a = (safeAnswers as any)[i];
+    // Сначала ищем ответ по id вопроса, затем по индексу
+    const answerByIndex = (safeAnswers as any)[i];
+    const answerById = safeAnswers[q.id];
+    const a = answerById !== undefined ? answerById : answerByIndex;
 
     if (q.type === "test") {
       if (q.multiple) {
@@ -869,8 +892,12 @@ export function calcAndBuildReview(
     } as ReviewItem;
   }
 
+  // Основной цикл по вопросам: ответ ищем сначала по id, затем по индексу
   qs.forEach((q, i) => {
-    review.push(processQ(q, (safeAnswers as any)[i], String(i + 1)));
+    const answerByIndex = (safeAnswers as any)[i];
+    const answerById = safeAnswers[q.id];
+    const answer = answerById !== undefined ? answerById : answerByIndex;
+    review.push(processQ(q, answer, String(i + 1)));
   });
 
   const score = clampScore(safeFraction(statsSum.pointsEarned, statsSum.pointsTotal) * 100);
