@@ -1,12 +1,11 @@
 "use client";
 
 import React from "react";
-import type { ReviewItem, QuestionAny, TestOption } from "../lib/types";
+import type { ReviewItem, TestOption } from "../lib/types";
 import MediaRenderer from "./MediaRenderer";
 import { ImageMapRenderer } from "./QuestionImageMap";
 import { CrosswordGridReadOnly } from "./QuestionCrossword";
 import { MatchingLinesRenderer } from "./QuestionMatching";
-import { getImageUrl } from "../lib/image"; // Подключили для легаси картинок
 
 // Форматирование баллов
 function fmtPoints(x: number) {
@@ -18,6 +17,22 @@ function fmtPoints(x: number) {
 function getStatusConfig(item: ReviewItem) {
   if (item.isSkipped)
     return { key: "skipped", label: "Пропущен", color: "#94a3b8", bg: "#f8fafc" };
+
+  // РЕШЕНИЕ БАГА #7: Подсказка для тестов, если человек угадал часть, но получил штраф за лишний клик
+  if (
+    item.type === "test" &&
+    item.isMultiple &&
+    item.pointsEarned === 0 &&
+    Array.isArray(item.userIndices) &&
+    item.userIndices.length > 0
+  ) {
+    // Явно указали i: number, чтобы TS не ругался
+    const hasCorrect = item.userIndices.some((i: number) => item.correctIndices?.includes(i));
+    if (hasCorrect) {
+      return { key: "penalty", label: "Штраф (лишний вариант)", color: "#f59e0b", bg: "#fffbeb" };
+    }
+  }
+
   if (item.isCorrect)
     return { key: "correct", label: "Правильно", color: "#10b981", bg: "#f0fdf4" };
   if (item.pointsEarned > 0)
@@ -91,12 +106,10 @@ function TestOptionsReview({
   options,
   userSelectedIndices,
   correctIndices,
-  isMultiple,
 }: {
   options: TestOption[];
   userSelectedIndices: number[];
   correctIndices: number[];
-  isMultiple: boolean;
 }) {
   return (
     <div
@@ -107,7 +120,7 @@ function TestOptionsReview({
         marginTop: "12px",
       }}
     >
-      {options.map((opt, idx) => {
+      {options.map((opt, idx: number) => {
         const isUserSelected = userSelectedIndices.includes(idx);
         const isCorrect = correctIndices.includes(idx);
 
@@ -228,7 +241,7 @@ function FilledSentence({
   const parts = template.split("___");
   return (
     <div style={{ lineHeight: "2.4", fontSize: "16px", color: "#1e293b" }}>
-      {parts.map((part, idx) => {
+      {parts.map((part, idx: number) => {
         const uAns = userAnswers[idx]?.trim().toLowerCase();
         const cAns = correctAnswers[idx]?.trim().toLowerCase();
         const isCorrect = uAns === cAns;
@@ -268,7 +281,7 @@ function FilledSentence({
           }}
         >
           <span style={{ fontWeight: 800, color: "#166534" }}>Правильные ответы: </span>
-          {correctAnswers.map((ans, i) => (
+          {correctAnswers.map((ans, i: number) => (
             <span key={i} style={{ marginRight: "16px", fontWeight: 900, color: "#000" }}>
               {i + 1}. <span style={{ color: "#10b981" }}>{ans}</span>
             </span>
@@ -279,26 +292,14 @@ function FilledSentence({
   );
 }
 
-export default function ReviewPanel({
-  items,
-  questions,
-}: {
-  items: ReviewItem[];
-  questions: QuestionAny[];
-}) {
+export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
   function renderItem(r: ReviewItem, idx: number, parentType?: string) {
     const status = getStatusConfig(r);
-    const scorePercent =
-      r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
+    const scorePercent = r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
       
-    // Берем данные из исходного вопроса для медиа
-    const q = questions[idx] || ({} as any);
-    const mediaToRender = r.media && r.media.length > 0 ? r.media : q.media;
-    const legacyImage = q.image;
-    // Легаси картинку показываем для кроссворда и других, но НЕ для imagemap (там она рисуется внутри компонента)
-    const showLegacyImage = !!legacyImage && r.type !== "imagemap";
+    // Все медиа и настройки приезжают к нам уже упакованными в ReviewItem (r) из scoring.ts
+    const mediaToRender = r.media;
 
-    // Для imagemap берём данные из вопроса
     let imageUrl = "";
     let points: any[] = [];
     let answers: any[] = [];
@@ -306,20 +307,17 @@ export default function ReviewPanel({
     let correctMatches: Record<string, string> = {};
 
     if (r.type === "imagemap") {
-      if (q && q.type === "imagemap") {
-        imageUrl = q.image || "";
-        points = q.points || [];
-        answers = q.answers || [];
-        userMatches = (r as any).userMatches || {};
-        correctMatches = (r as any).correctMatches || {};
-      }
+      imageUrl = r.imageUrl || "";
+      points = r.points || [];
+      answers = r.answers || [];
+      userMatches = r.userMatches || {};
+      correctMatches = r.correctMatches || {};
     }
 
-    // Для test вычисляем правильные индексы и индексы выбранных пользователем
     let userIndices: number[] = Array.isArray((r as any).userIndices) ? (r as any).userIndices : [];
     let correctIndices: number[] = Array.isArray((r as any).correctIndices) ? (r as any).correctIndices : [];
 
-    // Fallback на старую логику по тексту
+    // Fallback для совместимости со старыми записями
     if (r.type === "test" && r.options && correctIndices.length === 0) {
       const options = r.options;
       if (Array.isArray(r.correctLabel)) {
@@ -354,7 +352,6 @@ export default function ReviewPanel({
           position: "relative",
         }}
       >
-        {/* Цветная полоса слева */}
         <div
           style={{
             position: "absolute",
@@ -367,7 +364,6 @@ export default function ReviewPanel({
           }}
         />
 
-        {/* Заголовок */}
         <div
           style={{
             display: "flex",
@@ -424,7 +420,6 @@ export default function ReviewPanel({
             </h4>
           </div>
 
-          {/* Баллы */}
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             <div style={{ fontSize: "16px", fontWeight: 900, color: "#1e293b" }}>
               <span style={{ color: status.color }}>{fmtPoints(r.pointsEarned)}</span>
@@ -454,8 +449,7 @@ export default function ReviewPanel({
           </div>
         </div>
 
-        {/* Главные материалы вопроса (Отображается для всех, включая кроссворд) */}
-        {((mediaToRender?.length ?? 0) > 0 || showLegacyImage) && (
+        {mediaToRender && mediaToRender.length > 0 && (
           <div
             style={{
               marginBottom: "20px",
@@ -466,20 +460,7 @@ export default function ReviewPanel({
               padding: "16px",
             }}
           >
-            {(mediaToRender?.length ?? 0) > 0 ? (
-              <MediaRenderer media={mediaToRender} />
-            ) : showLegacyImage ? (
-              <img
-                src={getImageUrl(legacyImage)}
-                alt="task-media"
-                style={{
-                  width: "100%",
-                  height: "auto",
-                  borderRadius: "10px",
-                  objectFit: "contain",
-                }}
-              />
-            ) : null}
+            <MediaRenderer media={mediaToRender} />
           </div>
         )}
 
@@ -496,7 +477,6 @@ export default function ReviewPanel({
               options={r.options}
               userSelectedIndices={userIndices}
               correctIndices={correctIndices}
-              isMultiple={r.isMultiple || false}
             />
           </div>
         )}
@@ -530,7 +510,7 @@ export default function ReviewPanel({
               <div>Ваш ответ</div>
               <div>Верный ответ</div>
             </div>
-            {(r.parts ?? []).map((p, pI) => (
+            {(r.parts ?? []).map((p, pI: number) => (
               <FillRow
                 key={pI}
                 index={pI}
@@ -730,7 +710,7 @@ export default function ReviewPanel({
                       Правильные слова ({r.wordReview.correct.length})
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      {r.wordReview.correct.map((w, i) => (
+                      {r.wordReview.correct.map((w, i: number) => (
                         <div
                           key={i}
                           style={{
@@ -770,7 +750,7 @@ export default function ReviewPanel({
                       Неправильные слова ({r.wordReview.wrong.length})
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      {r.wordReview.wrong.map((w, i) => (
+                      {r.wordReview.wrong.map((w, i: number) => (
                         <div
                           key={i}
                           style={{
@@ -847,7 +827,7 @@ export default function ReviewPanel({
         {(r.type === "complex" || r.type === "reading") && r.subReviews && (
           <div style={{ marginTop: "16px" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              {r.subReviews.map((sr, srI) => (
+              {r.subReviews.map((sr, srI: number) => (
                 <div
                   key={srI}
                   style={{
@@ -1012,26 +992,8 @@ export default function ReviewPanel({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column" }}>
-        {items.map((r, idx) => renderItem(r, idx))}
+        {items.map((r, idx: number) => renderItem(r, idx))}
       </div>
-
-      <style jsx>{`
-        .badge-pill {
-          font-size: 12px;
-          font-weight: 700;
-          background: #ffffff;
-          padding: 6px 12px;
-          borderRadius: 12px;
-          border: 1px solid rgba(0, 0, 0, 0.04);
-          color: #475569;
-        }
-        @media (max-width: 640px) {
-          .review-card {
-            padding: 16px;
-            margin-bottom: 16px;
-          }
-        }
-      `}</style>
     </section>
   );
 }

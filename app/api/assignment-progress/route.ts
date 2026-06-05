@@ -10,9 +10,9 @@ import { recommendGatehouseLevel } from "@/lib/exams/recommendLevel";
 
 type Body = {
   assignmentId: string;
-  answers: any;
+  answers: Record<string, any>;
   isCompleted: boolean;
-  score: number;           // игнорируется – пересчитывается сервером
+  score: number;           // присланный клиентом балл игнорируется
   source?: string;
   sourceId?: string;
   branchType?: string;
@@ -38,8 +38,9 @@ function normalizeStringArray(value: unknown): string[] {
 }
 
 function getMaterialLevels(assignment: any): string[] {
+  // Баг #10: Единообразное извлечение уровней из базы, а не из клиентских данных
   const material = firstOrNull(assignment?.materials);
-  return normalizeStringArray(material?.target_levels);
+  return normalizeStringArray(assignment?.target_levels || material?.target_levels);
 }
 
 function getMaterialId(assignment: any): string | null {
@@ -49,15 +50,14 @@ function getMaterialId(assignment: any): string | null {
   return direct || fromMaterial || null;
 }
 
-function isGatehouseAssignment(assignment: any, body: Body) {
+// Баг #11: Жесткая проверка ветки только на основе данных из БД
+function isGatehouseAssignment(assignment: any) {
+  if (assignment?.branch_type === "gatehouse") return true;
+  
   const material = firstOrNull(assignment?.materials);
-  return (
-    body.branchType === "gatehouse" ||
-    body.source === "gatehouse" ||
-    body.source === "gatehouse-material" ||
-    assignment?.branch_type === "gatehouse" ||
-    material?.branch_type === "gatehouse"
-  );
+  if (material?.branch_type === "gatehouse") return true;
+
+  return false;
 }
 
 async function recalcCompletedCounters(supabase: any, userId: string) {
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
   }
 
-  // Загружаем задание вместе со связанным материалом
+  // Загружаем задание вместе со связанным материалом (Источник истины)
   const { data: assignment, error: assignmentErr } = await supabase
     .from("assignments")
     .select(
@@ -131,6 +131,7 @@ export async function POST(req: Request) {
       textbook_id,
       crossword_id,
       content,
+      target_levels,
       materials(
         id,
         branch_type,
@@ -150,8 +151,8 @@ export async function POST(req: Request) {
     );
   }
 
-  // Проверяем доступ к заданию
-  const gatehouse = isGatehouseAssignment(assignment, body);
+  // Проверяем доступ к заданию (Используем чистую функцию проверки)
+  const gatehouse = isGatehouseAssignment(assignment);
   try {
     if (gatehouse) {
       await assertGatehouseAssignmentAccess(supabase, auth.user.id, assignment);
@@ -165,7 +166,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // Серверный пересчёт баллов
+  // Серверный пересчёт баллов (Баг #1: Защита от подделки на клиенте)
   const questions = assignment.content?.questions;
   if (!Array.isArray(questions)) {
     return NextResponse.json(
@@ -176,9 +177,6 @@ export async function POST(req: Request) {
 
   const { stats } = calcAndBuildReview(questions, body.answers);
   const realScore = normalizeScore(stats.score);
-
-  console.log("[DEBUG] assignment-progress stats.score:", stats.score, "realScore:", realScore);
-  console.log("[DEBUG] assignment-progress answers received:", JSON.stringify(body.answers, null, 2));
 
   const payload = {
     user_id: auth.user.id,
@@ -195,11 +193,10 @@ export async function POST(req: Request) {
     .upsert(payload, { onConflict: "user_id,assignment_id" });
 
   if (upsertError) {
-    console.error("[DEBUG] upsert error:", upsertError);
+    // Оставляем только критичные логи ошибок
+    console.error("[ERROR] user_progress upsert failed:", upsertError.message);
     return NextResponse.json({ ok: false, error: upsertError.message }, { status: 500 });
   }
-
-  console.log("[DEBUG] upsert success for assignment", body.assignmentId);
 
   const counters = await recalcCompletedCounters(supabase, auth.user.id);
 
@@ -231,8 +228,11 @@ export async function POST(req: Request) {
       .from("exam_results")
       .upsert(examResultPayload, { onConflict: "user_id,assignment_id" });
 
-    if (examErr) console.error("exam_results upsert error:", examErr.message);
+    if (examErr) {
+      console.error("[ERROR] exam_results upsert failed:", examErr.message);
+    }
 
+    // Возвращаем строго серверный score
     return NextResponse.json(
       { ok: true, branch_type: "gatehouse", score: realScore, recommendation, counters },
       { status: 200 }
@@ -249,9 +249,10 @@ export async function POST(req: Request) {
   if (!streakErr) {
     streak = streakData ?? null;
   } else {
-    console.error("record_streak_completion RPC error:", streakErr.message);
+    console.error("[ERROR] record_streak_completion RPC failed:", streakErr.message);
   }
 
+  // Возвращаем строго серверный score
   return NextResponse.json(
     { ok: true, branch_type: "olympiad", score: realScore, streak, counters },
     { status: 200 }

@@ -135,7 +135,7 @@ export type Progress = {
   is_completed: boolean;
   score: number | null;
   completed_at: string | null;
-  answers: any;
+  answers: Record<string, any>; // ИЗМЕНЕНО: вместо any, чтобы хранить по question.id (Баг #3)
 };
 
 export type ReviewPart = {
@@ -160,9 +160,10 @@ export type ReviewItem =
       type: "test";
       userLabel: string | string[];
       correctLabel: string | string[];
-      fraction?: number; // 0..1 для дробных баллов
+      userIndices: number[];      // <--- ДОБАВИТЬ ЭТО
+      correctIndices: number[];   // <--- И ЭТО
+      fraction?: number; 
       isMultiple?: boolean;
-      // ДОБАВЛЕНО: полный массив вариантов для визуального рендера
       options: TestOption[];
     })
   | (ReviewBase & {
@@ -260,10 +261,37 @@ export type FinalStats = {
 
 export type AssignmentProgressRequestBody = {
   assignmentId: string;
-  answers: any;
+  answers: Record<string, any>; // ИЗМЕНЕНО: вместо any, чтобы хранить по question.id (Баг #3)
   isCompleted: boolean;
   score: number;
   source?: AssignmentSource | string;
   sourceId?: string;
   branchType?: AssignmentBranchType | string;
+};
+
+// ==================== НОВЫЕ ТИПЫ ДЛЯ РЕШЕНИЯ БАГОВ ====================
+
+// Для решения бага #15 (assignment в state как any) и бага #10 (уровни)
+export type MaterialData = {
+  id?: string;
+  title?: string;
+  target_levels?: string[] | string;
+  branch_type?: AssignmentBranchType | string;
+  [key: string]: any;
+};
+
+export type AssignmentContent = {
+  questions: QuestionAny[];
+  [key: string]: any;
+};
+
+export type AssignmentData = {
+  id: string;
+  title?: string;
+  branch_type?: AssignmentBranchType | string;
+  target_levels?: string[] | string;
+  materials?: MaterialData[]; // Основной массив материалов
+  material?: MaterialData[];  // Возможный алиас (встречается в легаси/апи)
+  content: AssignmentContent; // Распакованный JSON задания
+  [key: string]: any;
 };
