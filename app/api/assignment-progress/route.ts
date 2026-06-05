@@ -38,9 +38,9 @@ function normalizeStringArray(value: unknown): string[] {
 }
 
 function getMaterialLevels(assignment: any): string[] {
-  // Баг #10: Единообразное извлечение уровней из базы, а не из клиентских данных
+  // Баг #10: Извлекаем уровни из связанных материалов
   const material = firstOrNull(assignment?.materials);
-  return normalizeStringArray(assignment?.target_levels || material?.target_levels);
+  return normalizeStringArray(material?.target_levels);
 }
 
 function getMaterialId(assignment: any): string | null {
@@ -50,7 +50,6 @@ function getMaterialId(assignment: any): string | null {
   return direct || fromMaterial || null;
 }
 
-// Баг #11: Жесткая проверка ветки только на основе данных из БД
 function isGatehouseAssignment(assignment: any) {
   if (assignment?.branch_type === "gatehouse") return true;
   
@@ -121,7 +120,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
   }
 
-  // Загружаем задание вместе со связанным материалом (Источник истины)
+  // ЗАПРОС ИСПРАВЛЕН: убрали несуществующее поле target_levels из assignments
   const { data: assignment, error: assignmentErr } = await supabase
     .from("assignments")
     .select(
@@ -131,7 +130,6 @@ export async function POST(req: Request) {
       textbook_id,
       crossword_id,
       content,
-      target_levels,
       materials(
         id,
         branch_type,
@@ -151,7 +149,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Проверяем доступ к заданию (Используем чистую функцию проверки)
   const gatehouse = isGatehouseAssignment(assignment);
   try {
     if (gatehouse) {
@@ -166,7 +163,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Серверный пересчёт баллов (Баг #1: Защита от подделки на клиенте)
   const questions = assignment.content?.questions;
   if (!Array.isArray(questions)) {
     return NextResponse.json(
@@ -187,13 +183,11 @@ export async function POST(req: Request) {
     score: realScore,
   };
 
-  // Используем upsert: если запись существует, обновляем, иначе вставляем
   const { error: upsertError } = await supabase
     .from("user_progress")
     .upsert(payload, { onConflict: "user_id,assignment_id" });
 
   if (upsertError) {
-    // Оставляем только критичные логи ошибок
     console.error("[ERROR] user_progress upsert failed:", upsertError.message);
     return NextResponse.json({ ok: false, error: upsertError.message }, { status: 500 });
   }
@@ -232,14 +226,12 @@ export async function POST(req: Request) {
       console.error("[ERROR] exam_results upsert failed:", examErr.message);
     }
 
-    // Возвращаем строго серверный score
     return NextResponse.json(
       { ok: true, branch_type: "gatehouse", score: realScore, recommendation, counters },
       { status: 200 }
     );
   }
 
-  // Олимпиада — запись стрика
   let streak: any = null;
   const { data: streakData, error: streakErr } = await supabase.rpc(
     "record_streak_completion",
@@ -252,7 +244,6 @@ export async function POST(req: Request) {
     console.error("[ERROR] record_streak_completion RPC failed:", streakErr.message);
   }
 
-  // Возвращаем строго серверный score
   return NextResponse.json(
     { ok: true, branch_type: "olympiad", score: realScore, streak, counters },
     { status: 200 }
