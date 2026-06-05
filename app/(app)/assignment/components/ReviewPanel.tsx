@@ -6,6 +6,7 @@ import MediaRenderer from "./MediaRenderer";
 import { ImageMapRenderer } from "./QuestionImageMap";
 import { CrosswordGridReadOnly } from "./QuestionCrossword";
 import { MatchingLinesRenderer } from "./QuestionMatching";
+import { getImageUrl } from "../lib/image"; // Подключили для легаси картинок
 
 // Форматирование баллов
 function fmtPoints(x: number) {
@@ -289,7 +290,13 @@ export default function ReviewPanel({
     const status = getStatusConfig(r);
     const scorePercent =
       r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
-    const itemMedia = r.media;
+      
+    // Берем данные из исходного вопроса для медиа
+    const q = questions[idx] || ({} as any);
+    const mediaToRender = r.media && r.media.length > 0 ? r.media : q.media;
+    const legacyImage = q.image;
+    // Легаси картинку показываем для кроссворда и других, но НЕ для imagemap (там она рисуется внутри компонента)
+    const showLegacyImage = !!legacyImage && r.type !== "imagemap";
 
     // Для imagemap берём данные из вопроса
     let imageUrl = "";
@@ -299,7 +306,6 @@ export default function ReviewPanel({
     let correctMatches: Record<string, string> = {};
 
     if (r.type === "imagemap") {
-      const q = questions[idx];
       if (q && q.type === "imagemap") {
         imageUrl = q.image || "";
         points = q.points || [];
@@ -448,16 +454,32 @@ export default function ReviewPanel({
           </div>
         </div>
 
-        {/* Главные материалы вопроса — теперь рендерятся для всех типов, включая кроссворды */}
-        {itemMedia && itemMedia.length > 0 && (
+        {/* Главные материалы вопроса (Отображается для всех, включая кроссворд) */}
+        {((mediaToRender?.length ?? 0) > 0 || showLegacyImage) && (
           <div
             style={{
               marginBottom: "20px",
               borderRadius: "14px",
               overflow: "hidden",
+              background: "#f8fafc",
+              border: "1px solid rgba(0,0,0,0.04)",
+              padding: "16px",
             }}
           >
-            <MediaRenderer media={itemMedia} />
+            {(mediaToRender?.length ?? 0) > 0 ? (
+              <MediaRenderer media={mediaToRender} />
+            ) : showLegacyImage ? (
+              <img
+                src={getImageUrl(legacyImage)}
+                alt="task-media"
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  borderRadius: "10px",
+                  objectFit: "contain",
+                }}
+              />
+            ) : null}
           </div>
         )}
 
@@ -657,26 +679,7 @@ export default function ReviewPanel({
                 {r.note}
               </div>
             )}
-            {r.crosswordStats && (
-              <div
-                style={{
-                  display: "flex",
-                  gap: "12px",
-                  marginBottom: "20px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <span className="badge-pill">
-                  Заполнено клеток:{" "}
-                  <b>
-                    {r.crosswordStats.filled}/{r.crosswordStats.total}
-                  </b>
-                </span>
-                <span className="badge-pill">
-                  Точность заполнения: <b>{r.crosswordStats.percent}%</b>
-                </span>
-              </div>
-            )}
+            
             <div
               style={{
                 display: "flex",

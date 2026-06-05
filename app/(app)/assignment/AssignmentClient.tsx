@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image"; // Подключили Next Image
 
 // === КОМПОНЕНТЫ ВОПРОСОВ ===
 import QuestionCrossword from "./components/QuestionCrossword";
@@ -92,10 +93,41 @@ function isQuestionAnswered(q: QuestionAny, answer: any): boolean {
     case "imagemap":
       return typeof answer === "object" && Object.keys(answer).length > 0;
     case "crossword": {
-      const grid = Array.isArray(answer) ? answer : [];
-      return grid.some((row: any) =>
-        Array.isArray(row) && row.some((cell: any) => String(cell ?? "").trim() !== "")
-      );
+      const userGrid: string[][] = Array.isArray(answer) ? answer : [];
+      const correctGrid: string[][] = Array.isArray((q as any).grid) ? (q as any).grid : [];
+      const words: any[] = Array.isArray((q as any).words) ? (q as any).words : [];
+
+      // Собираем активные ячейки кроссворда
+      const activeCells = new Set<string>();
+      for (const w of words) {
+        const len = Number(w?.length ?? 0);
+        if (!w?.start || !w?.direction || len <= 0) continue;
+        for (let step = 0; step < len; step++) {
+          const r = w.direction === "across" ? w.start.row : w.start.row + step;
+          const c = w.direction === "across" ? w.start.col + step : w.start.col;
+          activeCells.add(`${r},${c}`);
+        }
+      }
+      
+      // Fallback: если слова не переданы, ищем непустые ячейки в эталонной сетке
+      if (activeCells.size === 0) {
+        correctGrid.forEach((row: string[], r: number) =>
+          row.forEach((ch: string, c: number) => {
+            if (String(ch ?? "").trim()) activeCells.add(`${r},${c}`);
+          })
+        );
+      }
+
+      if (activeCells.size === 0) return false;
+
+      // Проверяем, что ВСЕ активные ячейки заполнены юзером
+      for (const key of activeCells) {
+        const [r, c] = key.split(",").map(Number);
+        if (!String(userGrid?.[r]?.[c] ?? "").trim()) {
+          return false;
+        }
+      }
+      return true;
     }
     case "complex":
     case "reading": {
@@ -357,8 +389,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     }
 
     // --- Дополнительная проверка кроссворда ---
-    // validateAllAnswered видит что ответ существует (пустой grid тоже truthy),
-    // поэтому проверяем отдельно: все активные ячейки должны быть заполнены.
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (q?.type !== "crossword") continue;
@@ -367,7 +397,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       const correctGrid: string[][] = Array.isArray((q as any).grid) ? (q as any).grid : [];
       const words: any[] = Array.isArray((q as any).words) ? (q as any).words : [];
 
-      // Собираем активные ячейки (те же правила что в QuestionCrossword)
       const activeCells = new Set<string>();
       for (const w of words) {
         const len = Number(w?.length ?? 0);
@@ -380,7 +409,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           activeCells.add(`${r},${c}`);
         }
       }
-      // Fallback: ячейки с правильными буквами в эталонной сетке
+      
       if (activeCells.size === 0) {
         correctGrid.forEach((row, r) =>
           row.forEach((ch, c) => {
@@ -389,7 +418,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         );
       }
 
-      // Проверяем что пользователь заполнил все активные ячейки
       let hasEmpty = false;
       for (const key of activeCells) {
         const [r, c] = key.split(",").map(Number);
@@ -500,7 +528,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       </header>
 
       <main className="premium-main">
-        {/* ЭКРАН ВЫБОРА РЕЖИМА (ЕСЛИ УЖЕ ПРОЙДЕНО) */}
+        {/* ЭКРАН ВЫБОРА РЕЖИМА */}
         {showChoice && (
           <div className="premium-card animate-in" style={{ background: theme.cardBg }}>
             <h2 className="card-title">Предыдущий результат</h2>
@@ -551,42 +579,45 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           <div className="assignment-layout animate-in">
             {/* ====== ПРОГРЕСС-БАР С ТОЧКАМИ ====== */}
             <div className="progress-container">
-              <div className="progress-dots">
-                {questions.map((q, i) => {
-                  const isCurrent  = i === currentIndex;
-                  const answered   = isQuestionAnswered(q, answers[i]);
-                  const dotSize    = questions.length > 25 ? 8 : questions.length > 15 ? 10 : 13;
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => setCurrentIndex(i)}
-                      title={`Вопрос ${i + 1}${answered ? " ✓" : ""}`}
-                      style={{
-                        width:  dotSize,
-                        height: dotSize,
-                        minWidth: dotSize,
-                        borderRadius: "50%",
-                        border: isCurrent
-                          ? `2px solid ${theme.primary}`
-                          : "2px solid transparent",
-                        background: isCurrent
-                          ? theme.primary
-                          : answered
-                          ? `${theme.primary}66`
-                          : "rgba(0,0,0,0.1)",
-                        cursor: "pointer",
-                        padding: 0,
-                        transition: "all 0.2s ease",
-                        transform: isCurrent ? "scale(1.4)" : "scale(1)",
-                        boxShadow: isCurrent
-                          ? `0 0 0 3px ${theme.primary}22`
-                          : "none",
-                        flexShrink: 0,
-                      }}
-                    />
-                  );
-                })}
-              </div>
+              {questions.length > 1 && (
+                <div className="progress-dots">
+                  {questions.map((q, i) => {
+                    const isCurrent  = i === currentIndex;
+                    const answered   = isQuestionAnswered(q, answers[i]);
+                    const dotSize    = questions.length > 25 ? 8 : questions.length > 15 ? 10 : 13;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentIndex(i)}
+                        title={`Вопрос ${i + 1}${answered ? " ✓" : ""}`}
+                        style={{
+                          width:  dotSize,
+                          height: dotSize,
+                          minWidth: dotSize,
+                          borderRadius: "50%",
+                          border: isCurrent
+                            ? `2px solid ${theme.primary}`
+                            : "2px solid transparent",
+                          background: isCurrent
+                            ? theme.primary
+                            : answered
+                            ? `${theme.primary}66`
+                            : "rgba(0,0,0,0.1)",
+                          cursor: "pointer",
+                          padding: 0,
+                          transition: "all 0.2s ease",
+                          transform: isCurrent ? "scale(1.4)" : "scale(1)",
+                          boxShadow: isCurrent
+                            ? `0 0 0 3px ${theme.primary}22`
+                            : "none",
+                          flexShrink: 0,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+              
               <div className="progress-bar-bg">
                 <div className="progress-fill" style={{ 
                   width: `${((currentIndex + 1) / questions.length) * 100}%`, 
@@ -617,12 +648,24 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                       <MediaRenderer media={questions[currentIndex]!.media} />
                     )}
                     {!(questions[currentIndex]!.media?.length ?? 0) && questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword' && questions[currentIndex]!.type !== 'imagemap' && (
-                      <img 
-                        className="legacy-image" 
-                        src={getImageUrl(questions[currentIndex]!.image!)} 
-                        alt="task-media" 
-                        onClick={() => openImage(getImageUrl(questions[currentIndex]!.image!))} 
-                      />
+                      <div className="optimized-image-wrapper" onClick={() => openImage(getImageUrl(questions[currentIndex]!.image!))}>
+                        <Image
+                          src={getImageUrl(questions[currentIndex]!.image!)}
+                          alt="task-media"
+                          width={800}
+                          height={600}
+                          priority={true}
+                          unoptimized={true} // Не кэшировать жестко, так как задания часто меняются
+                          style={{
+                            width: "100%",
+                            height: "auto",
+                            borderRadius: "20px",
+                            cursor: "zoom-in",
+                            objectFit: "contain",
+                            boxShadow: "0 10px 30px rgba(0,0,0,0.05)"
+                          }}
+                        />
+                      </div>
                     )}
                   </div>
                 )}
@@ -700,7 +743,8 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           margin-bottom: 10px;
           flex-wrap: nowrap;
           overflow-x: auto;
-          padding-bottom: 4px;
+          padding: 10px 4px; /* Чтобы точки не резались при зуме x1.4 */
+          margin-top: -10px;
           scrollbar-width: none;
         }
         .progress-dots::-webkit-scrollbar { display: none; }
@@ -711,7 +755,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
         .question-title { font-size: 24px; font-weight: 800; line-height: 1.4; margin-bottom: 30px; color: #111827; }
         .media-section { margin-bottom: 35px; border-radius: 24px; overflow: hidden; }
-        .legacy-image { width: 100%; border-radius: 20px; cursor: zoom-in; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .optimized-image-wrapper { width: 100%; position: relative; }
 
         .materials-block {
           background: #f8fafc;
@@ -829,11 +873,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           .btn-premium.finish {
             width: 100%;
             flex: none;
-          }
-
-          .legacy-image {
-            border-radius: 14px;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.04);
           }
 
           .score-circle { width: 140px; height: 140px; margin-bottom: 24px; }
