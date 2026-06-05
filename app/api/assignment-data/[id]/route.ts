@@ -1,6 +1,7 @@
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { mockDebugAll, mockDebugReview, mockDebugSingle } from "@/app/(app)/assignment/lib/mockDebugData";
 
 function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -25,6 +26,12 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 
   const { supabase, user } = auth;
   const { id } = await ctx.params;
+
+  // ====== БЭКДОР ДЛЯ ДЕБАГА ======
+  if (id === "debug-all") return NextResponse.json(mockDebugAll);
+  if (id === "debug-review") return NextResponse.json(mockDebugReview);
+  if (id === "debug-single") return NextResponse.json(mockDebugSingle);
+  // ===============================
 
   try {
     const { data: assignment, error: aErr } = await supabase
