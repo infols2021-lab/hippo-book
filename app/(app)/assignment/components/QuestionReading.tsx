@@ -3,7 +3,6 @@
 import React from "react";
 import type { QuestionReading as QuestionReadingType, QuestionTest as QuestionTestType } from "../lib/types";
 import QuestionTestComponent from "./QuestionTest";
-import MediaRenderer from "./MediaRenderer";
 
 type Props = {
   question: QuestionReadingType;
@@ -38,8 +37,8 @@ export default function QuestionReading({
         gap: "32px",
       }}
     >
-      {/* ========== БЛОК ТЕКСТА ДЛЯ ЧТЕНИЯ И МЕДИА ========== */}
-      {(question.text || (question.media && question.media.length > 0)) && (
+      {/* ========== ТЕКСТ ДЛЯ ЧТЕНИЯ ========== */}
+      {question.text && (
         <div
           style={{
             background: "#f8fafc",
@@ -49,23 +48,17 @@ export default function QuestionReading({
             marginBottom: "8px",
           }}
         >
-          {question.text && (
-            <div
-              style={{
-                fontSize: "16px",
-                lineHeight: 1.6,
-                whiteSpace: "pre-wrap",
-                color: "#1e293b",
-                fontWeight: 500,
-                marginBottom: question.media?.length ? "16px" : 0,
-              }}
-            >
-              {question.text}
-            </div>
-          )}
-          {question.media && question.media.length > 0 && (
-            <MediaRenderer media={question.media} />
-          )}
+          <div
+            style={{
+              fontSize: "16px",
+              lineHeight: 1.6,
+              whiteSpace: "pre-wrap",
+              color: "#1e293b",
+              fontWeight: 500,
+            }}
+          >
+            {question.text}
+          </div>
         </div>
       )}
 

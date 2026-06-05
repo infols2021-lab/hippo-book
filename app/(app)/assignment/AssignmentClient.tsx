@@ -19,9 +19,7 @@ import ImageModal from "./components/ImageModal";
 
 // === ЛОГИКА И ТИПЫ ===
 import { getImageUrl } from "./lib/image";
-// БАГ #15: Типизация assignment
 import type { FinalStats, ReviewItem, QuestionAny, AssignmentData } from "./lib/types";
-// БАГ #4, #9: Единая логика из scoring.ts
 import { validateAllAnswered, calcAndBuildReview, isQuestionAnswered } from "./lib/scoring";
 
 import {
@@ -30,7 +28,6 @@ import {
   type GatehouseRecommendation,
 } from "@/lib/exams/recommendLevel";
 
-// Подключаем вынесенные стили (Баг #14)
 import "./assignment.css";
 
 // ===================== TYPES =====================
@@ -69,7 +66,6 @@ function normalizeStringArray(value: unknown): string[] {
   return value.map((item) => String(item ?? "").trim()).filter(Boolean);
 }
 
-// Баг #10: Единая логика уровней (совпадает с сервером)
 function getAssignmentMaterialLevels(assignment: AssignmentData | null): string[] {
   if (!assignment) return [];
   const direct = normalizeStringArray(assignment.target_levels);
@@ -87,50 +83,38 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   // --- STATE ---
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-
-  // БАГ #15: Строгая типизация вместо any
   const [assignment, setAssignment] = useState<AssignmentData | null>(null);
   const [questions, setQuestions] = useState<QuestionAny[]>([]);
-
   const [previousProgress, setPreviousProgress] = useState<ApiOk["progress"]>(null);
-
   const [showChoice, setShowChoice] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
-
-  // БАГ #3: Ответы хранятся по ID, но state поддерживает Record
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [currentIndex, setCurrentIndex] = useState(0);
-
   const [completedScreen, setCompletedScreen] = useState(false);
   const [finalStats, setFinalStats] = useState<FinalStats | null>(null);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [gatehouseRecommendation, setGatehouseRecommendation] = useState<GatehouseRecommendation | null>(null);
-
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [modalSrc, setModalSrc] = useState<string>("");
-
-  // БАГ #6: Визуальный state для сохранения
   const [isSaving, setIsSaving] = useState(false);
   const saveBusyRef = useRef(false);
 
-  // --- PRELOAD следующего вопроса (БАГ #13: Поддержка аудио и PDF) ---
+  // --- PRELOAD следующего вопроса (без обнуления src, чтобы не отменять загрузку последней картинки) ---
   useEffect(() => {
     const nextIndex = currentIndex + 1;
     if (!questions[nextIndex]) return;
-    
+
     const nextQ = questions[nextIndex];
     const urls: { type: string; url: string }[] = [];
-    
+
     if (Array.isArray(nextQ.media)) {
       for (const m of nextQ.media) {
         if (m?.url) urls.push({ type: m.type || "unknown", url: getImageUrl(m.url) });
       }
     }
-    
     if ((nextQ as any).image) {
       urls.push({ type: "image", url: getImageUrl((nextQ as any).image) });
     }
-    
     if (nextQ.type === "test" && Array.isArray((nextQ as any).options)) {
       for (const opt of (nextQ as any).options) {
         if (Array.isArray(opt?.media)) {
@@ -140,30 +124,30 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         }
       }
     }
-    
+
     const preloads = urls.map(({ type, url }) => {
-      // Изображения
+      // Изображения – просто запускаем загрузку, в cleanup ничего не делаем
       if (type.startsWith("image") || url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i)) {
         const img = new window.Image();
         img.src = url;
-        return { cleanup: () => { img.src = ""; } };
+        return { cleanup: () => {} };
       }
-      // Аудио
+      // Аудио – аналогично
       if (type.startsWith("audio") || url.match(/\.(mp3|wav|ogg)$/i)) {
         const audio = new window.Audio();
         audio.preload = "auto";
         audio.src = url;
-        return { cleanup: () => { audio.src = ""; } };
+        return { cleanup: () => {} };
       }
-      // PDF (Делаем HEAD запрос чтобы браузер закешировал файл)
+      // PDF – используем AbortController
       if (type.startsWith("pdf") || url.match(/\.pdf$/i)) {
         const controller = new AbortController();
-        fetch(url, { method: 'HEAD', signal: controller.signal }).catch(() => {});
+        fetch(url, { method: "HEAD", signal: controller.signal }).catch(() => {});
         return { cleanup: () => controller.abort() };
       }
       return { cleanup: () => {} };
     });
-    
+
     return () => {
       preloads.forEach(p => p.cleanup());
     };
@@ -184,7 +168,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         cardBg: "rgba(255, 255, 255, 0.95)",
         text: "#1e1b4b",
         buttonText: "#ffffff",
-        badge: "PROFICIENCY TEST"
+        badge: "PROFICIENCY TEST",
       };
     }
     return {
@@ -194,7 +178,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       cardBg: "#ffffff",
       text: "#0c4a6e",
       buttonText: "#ffffff",
-      badge: "OLYMPIAD"
+      badge: "OLYMPIAD",
     };
   }, [isGatehouse]);
 
@@ -256,7 +240,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     }
   }
 
-  useEffect(() => { load(); }, [assignmentId]);
+  useEffect(() => {
+    load();
+  }, [assignmentId]);
 
   function openImage(src: string) {
     setModalSrc(src);
@@ -269,18 +255,18 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   }
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === "Escape" && imageModalOpen) closeImage(); }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && imageModalOpen) closeImage();
+    }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [imageModalOpen]);
 
-  // Баг #3: Сохраняем ответы по ID вопроса, а не по индексу
   function setAnswerForQuestion(qIndex: number, value: any) {
     const qId = questions[qIndex]?.id || qIndex;
     setAnswers((prev: any) => ({ ...prev, [qId]: value }));
   }
 
-  // Вспомогательная функция для получения ответа (поддерживает и ID, и индексы для старых прохождений)
   function getAnswerForQuestion(qIndex: number) {
     const qId = questions[qIndex]?.id;
     if (qId && answers[qId] !== undefined) return answers[qId];
@@ -311,11 +297,10 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     setGatehouseRecommendation(null);
   }
 
-  // БАГ #1: Ждем ответа от сервера перед показом результатов
   async function saveProgressAndShowResults(clientStats: FinalStats, review: ReviewItem[]) {
     if (saveBusyRef.current) return;
     saveBusyRef.current = true;
-    setIsSaving(true); // БАГ #6: Блокировка UI
+    setIsSaving(true);
 
     try {
       const payload = {
@@ -327,7 +312,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         sourceId,
         branchType: isGatehouse ? "gatehouse" : "olympiad",
       };
-      
+
       const res = await fetch("/api/assignment-progress", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -336,14 +321,12 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       const json = await res.json();
 
       if (res.ok && json?.ok) {
-        // БАГ #1: Сервер прислал СВОЙ посчитанный балл! Используем его!
         const serverScore = json.score !== undefined ? json.score : clientStats.score;
         const finalStatsToDisplay = { ...clientStats, score: serverScore };
-        
+
         if (isGatehouse && json.recommendation) {
           setGatehouseRecommendation(json.recommendation);
         } else if (isGatehouse) {
-          // Фолбэк на случай если сервер не прислал рекомендацию
           const recommendation = recommendGatehouseLevel({
             score: serverScore,
             maxScore: 100,
@@ -371,7 +354,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   async function finish() {
     if (isViewMode || isSaving) return;
 
-    // --- Общая проверка заполненности (БАГ #4: Единая логика из scoring.ts) ---
     const v = validateAllAnswered(questions, answers);
     if (!v.ok) {
       alert(`❌ Заполните вопрос №${v.index + 1}`);
@@ -379,31 +361,32 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       return;
     }
 
-    // БАГ #9: Из finish удален гигантский 40-строчный дубль логики проверки кроссворда
-    // Функция validateAllAnswered уже сделала это внутри!
-
-    // Считаем черновик на клиенте
     const { stats, review } = calcAndBuildReview(questions, answers);
-    
-    // БАГ #1: Вызываем сохранение и ДОЖИДАЕМСЯ ответа перед тем как показать экран
     await saveProgressAndShowResults(stats, review);
   }
 
   function renderQuestionComponent(q: QuestionAny, index: number) {
     const val = getAnswerForQuestion(index);
-    const sharedProps = { 
-      disabled: isViewMode, 
-      onChange: (v: any) => setAnswerForQuestion(index, v) 
+    const sharedProps = {
+      disabled: isViewMode,
+      onChange: (v: any) => setAnswerForQuestion(index, v),
     };
 
     switch (q.type) {
-      case "test": return <QuestionTest question={q as any} value={val} {...sharedProps} />;
-      case "fill": return <QuestionFill question={q as any} value={val} {...sharedProps} />;
-      case "sentence": return <QuestionSentence question={q as any} value={val} {...sharedProps} />;
-      case "matching": return <QuestionMatching question={q as any} value={val} {...sharedProps} />;
-      case "complex": return <QuestionComplex question={q as any} value={val} {...sharedProps} />;
-      case "imagemap": return <QuestionImageMap question={q as any} value={val || {}} {...sharedProps} />;
-      case "reading": return <QuestionReading question={q as any} value={val || []} {...sharedProps} />;
+      case "test":
+        return <QuestionTest question={q as any} value={val} {...sharedProps} />;
+      case "fill":
+        return <QuestionFill question={q as any} value={val} {...sharedProps} />;
+      case "sentence":
+        return <QuestionSentence question={q as any} value={val} {...sharedProps} />;
+      case "matching":
+        return <QuestionMatching question={q as any} value={val} {...sharedProps} />;
+      case "complex":
+        return <QuestionComplex question={q as any} value={val} {...sharedProps} />;
+      case "imagemap":
+        return <QuestionImageMap question={q as any} value={val || {}} {...sharedProps} />;
+      case "reading":
+        return <QuestionReading question={q as any} value={val || []} {...sharedProps} />;
       case "crossword":
         return (
           <QuestionCrossword
@@ -414,34 +397,41 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
             onChange={sharedProps.onChange}
           />
         );
-      default: return <div className="error-message">Тип "{q.type}" не поддерживается</div>;
+      default:
+        return <div className="error-message">Тип "{q.type}" не поддерживается</div>;
     }
   }
 
   const answeredCount = questions.filter((q, i) => isQuestionAnswered(q, getAnswerForQuestion(i))).length;
 
-  if (loading) return (
-    <div className="loader-container" style={{ background: theme.bg }}>
-      <div className="premium-spinner" style={{ borderColor: theme.primary, borderTopColor: "transparent" }} />
-      <p style={{ color: theme.primary, fontWeight: 600, marginTop: "20px" }}>Загружаем материалы...</p>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="loader-container" style={{ background: theme.bg }}>
+        <div className="premium-spinner" style={{ borderColor: theme.primary, borderTopColor: "transparent" }} />
+        <p style={{ color: theme.primary, fontWeight: 600, marginTop: "20px" }}>Загружаем материалы...</p>
+      </div>
+    );
 
-  if (err) return (
-    <div className="loader-container" style={{ background: theme.bg }}>
-      <div className="error-card">{err}</div>
-      {/* Баг #8: retry вызывает load() без жесткой перезагрузки страницы */}
-      <button onClick={load} className="btn-premium primary" style={{ background: theme.primary, marginTop: "20px" }}>Попробовать снова</button>
-    </div>
-  );
+  if (err)
+    return (
+      <div className="loader-container" style={{ background: theme.bg }}>
+        <div className="error-card">{err}</div>
+        <button onClick={load} className="btn-premium primary" style={{ background: theme.primary, marginTop: "20px" }}>
+          Попробовать снова
+        </button>
+      </div>
+    );
 
   return (
-    <div className="assignment-page" style={{ 
-      background: theme.bg, 
-      minHeight: "100vh", 
-      color: theme.text,
-      fontFamily: "var(--font-geist-sans), 'Inter', sans-serif"
-    }}>
+    <div
+      className="assignment-page"
+      style={{
+        background: theme.bg,
+        minHeight: "100vh",
+        color: theme.text,
+        fontFamily: "var(--font-geist-sans), 'Inter', sans-serif",
+      }}
+    >
       {/* HEADER */}
       <header className="premium-header">
         <div className="header-content">
@@ -451,9 +441,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
             </button>
 
             {previousProgress?.is_completed && !showChoice && !completedScreen && (
-               <button className="mode-switch-button" onClick={switchMode}>
-                 ↶ Сменить режим
-               </button>
+              <button className="mode-switch-button" onClick={switchMode}>
+                ↶ Сменить режим
+              </button>
             )}
           </div>
 
@@ -468,10 +458,16 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         {showChoice && (
           <div className="premium-card animate-in" style={{ background: theme.cardBg }}>
             <h2 className="card-title">Предыдущий результат</h2>
-            <p className="card-subtitle">У вас уже есть сохраненный прогресс. Хотите начать с чистого листа или просто посмотреть ошибки?</p>
+            <p className="card-subtitle">
+              У вас уже есть сохраненный прогресс. Хотите начать с чистого листа или просто посмотреть ошибки?
+            </p>
             <div className="button-group">
-              <button className="btn-premium primary" style={{ background: theme.primary }} onClick={startFresh}>Начать заново</button>
-              <button className="btn-premium secondary" onClick={viewPrevious}>Посмотреть ответы</button>
+              <button className="btn-premium primary" style={{ background: theme.primary }} onClick={startFresh}>
+                Начать заново
+              </button>
+              <button className="btn-premium secondary" onClick={viewPrevious}>
+                Посмотреть ответы
+              </button>
             </div>
           </div>
         )}
@@ -480,7 +476,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         {completedScreen && finalStats && (
           <div className="premium-card animate-in" style={{ background: theme.cardBg }}>
             <div className="score-circle" style={{ borderColor: theme.primary }}>
-              <span className="score-value" style={{ color: theme.primary }}>{finalStats.score}%</span>
+              <span className="score-value" style={{ color: theme.primary }}>
+                {finalStats.score}%
+              </span>
               <span className="score-label">Ваш балл</span>
             </div>
 
@@ -493,10 +491,21 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
             )}
 
             <div className="stats-grid">
-              <div className="stat-item"><span>Всего вопросов:</span> <b>{finalStats.total}</b></div>
-              <div className="stat-item"><span>Набрано баллов:</span> <b>{finalStats.pointsEarned.toFixed(2)} / {finalStats.pointsTotal}</b></div>
-              <div className="stat-item"><span>Правильно:</span> <b style={{color: '#10b981'}}>{finalStats.correct}</b></div>
-              <div className="stat-item"><span>Ошибки:</span> <b style={{color: '#ef4444'}}>{finalStats.incorrect}</b></div>
+              <div className="stat-item">
+                <span>Всего вопросов:</span> <b>{finalStats.total}</b>
+              </div>
+              <div className="stat-item">
+                <span>Набрано баллов:</span>{" "}
+                <b>
+                  {finalStats.pointsEarned.toFixed(2)} / {finalStats.pointsTotal}
+                </b>
+              </div>
+              <div className="stat-item">
+                <span>Правильно:</span> <b style={{ color: "#10b981" }}>{finalStats.correct}</b>
+              </div>
+              <div className="stat-item">
+                <span>Ошибки:</span> <b style={{ color: "#ef4444" }}>{finalStats.incorrect}</b>
+              </div>
             </div>
 
             <div className="review-section">
@@ -504,8 +513,16 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
             </div>
 
             <div className="button-group" style={{ marginTop: "40px" }}>
-              <button className="btn-premium primary" style={{ flex: 1, background: theme.primary }} onClick={() => router.push(back.href)}>К списку материалов</button>
-              <button className="btn-premium secondary" style={{ flex: 1 }} onClick={() => window.location.reload()}>Пройти еще раз</button>
+              <button
+                className="btn-premium primary"
+                style={{ flex: 1, background: theme.primary }}
+                onClick={() => router.push(back.href)}
+              >
+                К списку материалов
+              </button>
+              <button className="btn-premium secondary" style={{ flex: 1 }} onClick={() => window.location.reload()}>
+                Пройти еще раз
+              </button>
             </div>
           </div>
         )}
@@ -518,22 +535,20 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
               <div className="progress-container">
                 <div className="progress-dots">
                   {questions.map((q, i) => {
-                    const isCurrent  = i === currentIndex;
-                    const answered   = isQuestionAnswered(q, getAnswerForQuestion(i));
-                    const dotSize    = questions.length > 25 ? 8 : questions.length > 15 ? 10 : 13;
+                    const isCurrent = i === currentIndex;
+                    const answered = isQuestionAnswered(q, getAnswerForQuestion(i));
+                    const dotSize = questions.length > 25 ? 8 : questions.length > 15 ? 10 : 13;
                     return (
                       <button
                         key={i}
                         onClick={() => setCurrentIndex(i)}
                         title={`Вопрос ${i + 1}${answered ? " ✓" : ""}`}
                         style={{
-                          width:  dotSize,
+                          width: dotSize,
                           height: dotSize,
                           minWidth: dotSize,
                           borderRadius: "50%",
-                          border: isCurrent
-                            ? `2px solid ${theme.primary}`
-                            : "2px solid transparent",
+                          border: isCurrent ? `2px solid ${theme.primary}` : "2px solid transparent",
                           background: isCurrent
                             ? theme.primary
                             : answered
@@ -543,24 +558,27 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                           padding: 0,
                           transition: "all 0.2s ease",
                           transform: isCurrent ? "scale(1.4)" : "scale(1)",
-                          boxShadow: isCurrent
-                            ? `0 0 0 3px ${theme.primary}22`
-                            : "none",
+                          boxShadow: isCurrent ? `0 0 0 3px ${theme.primary}22` : "none",
                           flexShrink: 0,
                         }}
                       />
                     );
                   })}
                 </div>
-                
+
                 <div className="progress-bar-bg">
-                  <div className="progress-fill" style={{ 
-                    width: `${((currentIndex + 1) / questions.length) * 100}%`, 
-                    background: theme.primary 
-                  }} />
+                  <div
+                    className="progress-fill"
+                    style={{
+                      width: `${((currentIndex + 1) / questions.length) * 100}%`,
+                      background: theme.primary,
+                    }}
+                  />
                 </div>
                 <div className="progress-info">
-                  <span>Вопрос {currentIndex + 1} из {questions.length}</span>
+                  <span>
+                    Вопрос {currentIndex + 1} из {questions.length}
+                  </span>
                   <span style={{ fontSize: "12px", opacity: 0.45 }}>
                     {answeredCount} / {questions.length} заполнено
                   </span>
@@ -574,43 +592,60 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                 {/* ======== ЗАГОЛОВОК ВОПРОСА ======== */}
                 {questions[currentIndex]!.q && (
                   <h2 className="question-title">
-                    {questions.length > 1 ? `${currentIndex + 1}. ` : ""}{questions[currentIndex]!.q}
+                    {questions.length > 1 ? `${currentIndex + 1}. ` : ""}
+                    {questions[currentIndex]!.q}
                   </h2>
                 )}
 
                 {/* ======== МАТЕРИАЛЫ К ВОПРОСУ ======== */}
-                {((questions[currentIndex]!.media?.length ?? 0) > 0 || (questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword' && questions[currentIndex]!.type !== 'imagemap')) && (
-                  <div className="materials-block">
-                    <div className="materials-label">МАТЕРИАЛЫ К ВОПРОСУ</div>
-                    {(questions[currentIndex]!.media?.length ?? 0) > 0 && (
-                      <MediaRenderer media={questions[currentIndex]!.media} />
-                    )}
-                    {!(questions[currentIndex]!.media?.length ?? 0) && questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword' && questions[currentIndex]!.type !== 'imagemap' && (
-                      <div className="optimized-image-wrapper" onClick={() => openImage(getImageUrl(questions[currentIndex]!.image!))}>
-                        <Image
-                          src={getImageUrl(questions[currentIndex]!.image!)}
-                          alt="task-media"
-                          width={800}
-                          height={600}
-                          priority={true}
-                          unoptimized={true}
-                          style={{
-                            width: "100%",
-                            height: "auto",
-                            borderRadius: "20px",
-                            cursor: "zoom-in",
-                            objectFit: "contain",
-                            boxShadow: "0 10px 30px rgba(0,0,0,0.05)"
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
+                {/* Для complex и reading медиа рендерит сам компонент, чтобы избежать дублирования */}
+                {questions[currentIndex]!.type !== "complex" && questions[currentIndex]!.type !== "reading" && (
+                  ((questions[currentIndex]!.media?.length ?? 0) > 0 ||
+                    (questions[currentIndex]!.image &&
+                      questions[currentIndex]!.type !== "crossword" &&
+                      questions[currentIndex]!.type !== "imagemap")) && (
+                    <div className="materials-block">
+                      <div className="materials-label">МАТЕРИАЛЫ К ВОПРОСУ</div>
+                      {(questions[currentIndex]!.media?.length ?? 0) > 0 && (
+                        <MediaRenderer media={questions[currentIndex]!.media} />
+                      )}
+                      {!(questions[currentIndex]!.media?.length ?? 0) &&
+                        questions[currentIndex]!.image &&
+                        questions[currentIndex]!.type !== "crossword" &&
+                        questions[currentIndex]!.type !== "imagemap" && (
+                          <div
+                            className="optimized-image-wrapper"
+                            onClick={() => openImage(getImageUrl(questions[currentIndex]!.image!))}
+                          >
+                            <Image
+                              src={getImageUrl(questions[currentIndex]!.image!)}
+                              alt="task-media"
+                              width={800}
+                              height={600}
+                              priority={true}
+                              unoptimized={true}
+                              style={{
+                                width: "100%",
+                                height: "auto",
+                                borderRadius: "20px",
+                                cursor: "zoom-in",
+                                objectFit: "contain",
+                                boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
+                              }}
+                            />
+                          </div>
+                        )}
+                    </div>
+                  )
                 )}
 
                 {/* ======== СОДЕРЖИМОЕ ВОПРОСА ======== */}
                 <div className="answer-block">
-                  {((questions[currentIndex]!.media?.length ?? 0) > 0 || (questions[currentIndex]!.image && questions[currentIndex]!.type !== 'crossword' && questions[currentIndex]!.type !== 'imagemap') || questions[currentIndex]!.q) ? (
+                  {((questions[currentIndex]!.media?.length ?? 0) > 0 ||
+                    (questions[currentIndex]!.image &&
+                      questions[currentIndex]!.type !== "crossword" &&
+                      questions[currentIndex]!.type !== "imagemap") ||
+                    questions[currentIndex]!.q) ? (
                     <div className="answer-label">СОДЕРЖИМОЕ ЗАДАНИЯ</div>
                   ) : null}
                   <div className="question-content">
@@ -619,23 +654,32 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                 </div>
 
                 <div className="navigation-footer">
-                  <button 
-                    className="nav-btn" 
-                    disabled={currentIndex === 0 || isSaving} 
-                    onClick={() => setCurrentIndex(i => i - 1)}
+                  <button
+                    className="nav-btn"
+                    disabled={currentIndex === 0 || isSaving}
+                    onClick={() => setCurrentIndex((i) => i - 1)}
                     style={{ opacity: currentIndex === 0 ? 0.3 : 1 }}
                   >
                     Назад
                   </button>
-                  
+
                   {currentIndex < questions.length - 1 ? (
-                    <button className="btn-premium primary" style={{ flex: 1, background: theme.primary }} disabled={isSaving} onClick={() => setCurrentIndex(i => i + 1)}>
+                    <button
+                      className="btn-premium primary"
+                      style={{ flex: 1, background: theme.primary }}
+                      disabled={isSaving}
+                      onClick={() => setCurrentIndex((i) => i + 1)}
+                    >
                       Далее
                     </button>
                   ) : (
                     !isViewMode && (
-                      // БАГ #6: Блокировка кнопки и смена текста при сохранении
-                      <button className="btn-premium finish" style={{ flex: 1, opacity: isSaving ? 0.7 : 1 }} disabled={isSaving} onClick={finish}>
+                      <button
+                        className="btn-premium finish"
+                        style={{ flex: 1, opacity: isSaving ? 0.7 : 1 }}
+                        disabled={isSaving}
+                        onClick={finish}
+                      >
                         {isSaving ? "Сохраняем..." : "Завершить и проверить"}
                       </button>
                     )
@@ -647,12 +691,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         )}
       </main>
 
-      {/* АБСОЛЮТНО ЧИСТЫЙ ВЫЗОВ МОДАЛКИ (БЕЗ ДВОЙНЫХ ПОРТАЛОВ) */}
-      <ImageModal
-        open={imageModalOpen}
-        src={modalSrc}
-        onClose={closeImage}
-      />
+      <ImageModal open={imageModalOpen} src={modalSrc} onClose={closeImage} />
     </div>
   );
 }
