@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image"; // Подключили Next Image
+import Image from "next/image";
+import { createPortal } from "react-dom"; // Добавили для модалки
 
 // === КОМПОНЕНТЫ ВОПРОСОВ ===
 import QuestionCrossword from "./components/QuestionCrossword";
@@ -165,8 +166,15 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
 
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [modalSrc, setModalSrc] = useState<string>("");
+  
+  // Добавлено для безопасного рендера портала модалки
+  const [isMounted, setIsMounted] = useState(false);
 
   const saveBusyRef = useRef(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // --- PRELOAD следующего вопроса ---
   useEffect(() => {
@@ -577,9 +585,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         {/* ПРОЦЕСС ВЫПОЛНЕНИЯ ЗАДАНИЯ */}
         {!showChoice && !completedScreen && assignment && questions.length > 0 && (
           <div className="assignment-layout animate-in">
-            {/* ====== ПРОГРЕСС-БАР С ТОЧКАМИ ====== */}
-            <div className="progress-container">
-              {questions.length > 1 && (
+            {/* ====== ПРОГРЕСС-БАР ====== */}
+            {questions.length > 1 && (
+              <div className="progress-container">
                 <div className="progress-dots">
                   {questions.map((q, i) => {
                     const isCurrent  = i === currentIndex;
@@ -616,28 +624,30 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
                     );
                   })}
                 </div>
-              )}
-              
-              <div className="progress-bar-bg">
-                <div className="progress-fill" style={{ 
-                  width: `${((currentIndex + 1) / questions.length) * 100}%`, 
-                  background: theme.primary 
-                }} />
+                
+                <div className="progress-bar-bg">
+                  <div className="progress-fill" style={{ 
+                    width: `${((currentIndex + 1) / questions.length) * 100}%`, 
+                    background: theme.primary 
+                  }} />
+                </div>
+                <div className="progress-info">
+                  <span>Вопрос {currentIndex + 1} из {questions.length}</span>
+                  <span style={{ fontSize: "12px", opacity: 0.45 }}>
+                    {answeredCount} / {questions.length} заполнено
+                  </span>
+                  {isViewMode && <span className="view-mode-tag">РЕЖИМ ПРОСМОТРА</span>}
+                </div>
               </div>
-              <div className="progress-info">
-                <span>Вопрос {currentIndex + 1} из {questions.length}</span>
-                <span style={{ fontSize: "12px", opacity: 0.45 }}>
-                  {answeredCount} / {questions.length} заполнено
-                </span>
-                {isViewMode && <span className="view-mode-tag">РЕЖИМ ПРОСМОТРА</span>}
-              </div>
-            </div>
+            )}
 
             {questions[currentIndex] && (
               <div key={currentIndex} className="premium-card active-question" style={{ background: theme.cardBg }}>
                 {/* ======== ЗАГОЛОВОК ВОПРОСА ======== */}
                 {questions[currentIndex]!.q && (
-                  <h2 className="question-title">{currentIndex + 1}. {questions[currentIndex]!.q}</h2>
+                  <h2 className="question-title">
+                    {questions.length > 1 ? `${currentIndex + 1}. ` : ""}{questions[currentIndex]!.q}
+                  </h2>
                 )}
 
                 {/* ======== МАТЕРИАЛЫ К ВОПРОСУ ======== */}
@@ -708,12 +718,15 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         )}
       </main>
 
-      {/* МОДАЛКА ЗУМА ИЗОБРАЖЕНИЙ */}
-      <ImageModal
-        open={imageModalOpen}
-        src={modalSrc}
-        onClose={closeImage}
-      />
+      {/* МОДАЛКА ЗУМА ИЗОБРАЖЕНИЙ (ЧЕРЕЗ ПОРТАЛ) */}
+      {isMounted && createPortal(
+        <ImageModal
+          open={imageModalOpen}
+          src={modalSrc}
+          onClose={closeImage}
+        />,
+        document.body
+      )}
 
       {/* CSS STYLES */}
       <style jsx>{`
