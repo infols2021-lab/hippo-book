@@ -109,7 +109,7 @@ function TestOptionsReview({
       {options.map((opt, idx) => {
         const isUserSelected = userSelectedIndices.includes(idx);
         const isCorrect = correctIndices.includes(idx);
-        
+
         let borderColor = "#e2e8f0";
         let bgColor = "#fff";
         let icon = null;
@@ -177,7 +177,7 @@ function TestOptionsReview({
               padding: "16px",
               background: bgColor,
               position: "relative",
-              opacity: (!isCorrect && !isUserSelected) ? 0.6 : 1,
+              opacity: !isCorrect && !isUserSelected ? 0.6 : 1,
             }}
           >
             {icon}
@@ -188,7 +188,8 @@ function TestOptionsReview({
             )}
             {opt.media && opt.media.length > 0 && (
               <div style={{ marginTop: "8px", display: "flex", justifyContent: "flex-start" }}>
-                {opt.media[0].url?.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) || opt.media[0].type?.startsWith("image") ? (
+                {opt.media[0].url?.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) ||
+                opt.media[0].type?.startsWith("image") ? (
                   <img
                     src={opt.media[0].url}
                     alt=""
@@ -308,11 +309,11 @@ export default function ReviewPanel({
       }
     }
 
-    // Для test вычисляем правильные индексы и индексы выбранных пользователем из новых свойств
+    // Для test вычисляем правильные индексы и индексы выбранных пользователем
     let userIndices: number[] = Array.isArray((r as any).userIndices) ? (r as any).userIndices : [];
     let correctIndices: number[] = Array.isArray((r as any).correctIndices) ? (r as any).correctIndices : [];
-    
-    // Fallback на старую логику по тексту, если новых массивов почему-то нет
+
+    // Fallback на старую логику по тексту
     if (r.type === "test" && r.options && correctIndices.length === 0) {
       const options = r.options;
       if (Array.isArray(r.correctLabel)) {
@@ -421,10 +422,7 @@ export default function ReviewPanel({
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             <div style={{ fontSize: "16px", fontWeight: 900, color: "#1e293b" }}>
               <span style={{ color: status.color }}>{fmtPoints(r.pointsEarned)}</span>
-              <span style={{ opacity: 0.3, fontWeight: 500 }}>
-                {" "}
-                / {r.pointsTotal}
-              </span>
+              <span style={{ opacity: 0.3, fontWeight: 500 }}> / {r.pointsTotal}</span>
             </div>
             <div
               style={{
@@ -450,8 +448,9 @@ export default function ReviewPanel({
           </div>
         </div>
 
-        {/* Медиа вопроса */}
-        {itemMedia && itemMedia.length > 0 && (
+        {/* Медиа вопроса — рендерится один раз для всех типов, кроме кроссворда
+            (у crossword медиа — это картинки-подсказки внутри сетки, не нужны отдельно) */}
+        {itemMedia && itemMedia.length > 0 && r.type !== "crossword" && (
           <div
             style={{
               marginBottom: "20px",
@@ -585,7 +584,14 @@ export default function ReviewPanel({
               }}
             >
               <div>
-                <div style={{ fontWeight: 800, marginBottom: "12px", color: "#1e293b", textAlign: "center" }}>
+                <div
+                  style={{
+                    fontWeight: 800,
+                    marginBottom: "12px",
+                    color: "#1e293b",
+                    textAlign: "center",
+                  }}
+                >
                   Ваши ответы
                 </div>
                 <ImageMapRenderer
@@ -603,7 +609,14 @@ export default function ReviewPanel({
                 />
               </div>
               <div>
-                <div style={{ fontWeight: 800, marginBottom: "12px", color: "#1e293b", textAlign: "center" }}>
+                <div
+                  style={{
+                    fontWeight: 800,
+                    marginBottom: "12px",
+                    color: "#1e293b",
+                    textAlign: "center",
+                  }}
+                >
                   Правильные ответы
                 </div>
                 <ImageMapRenderer
@@ -633,34 +646,6 @@ export default function ReviewPanel({
               padding: "16px",
             }}
           >
-            {/* Текст вопроса для кроссворда (если есть) */}
-            {r.questionText && (
-              <div
-                style={{
-                  fontSize: "16px",
-                  fontWeight: 700,
-                  color: "#1e293b",
-                  marginBottom: "12px",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {r.questionText}
-              </div>
-            )}
-
-            {/* Медиа для кроссворда (если есть) */}
-            {itemMedia && itemMedia.length > 0 && (
-              <div
-                style={{
-                  marginBottom: "16px",
-                  borderRadius: "14px",
-                  overflow: "hidden",
-                }}
-              >
-                <MediaRenderer media={itemMedia} />
-              </div>
-            )}
-
             {r.note && (
               <div
                 style={{
@@ -742,13 +727,7 @@ export default function ReviewPanel({
                     >
                       Правильные слова ({r.wordReview.correct.length})
                     </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "6px",
-                      }}
-                    >
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       {r.wordReview.correct.map((w, i) => (
                         <div
                           key={i}
@@ -763,31 +742,11 @@ export default function ReviewPanel({
                             fontSize: "14px",
                           }}
                         >
-                          <span
-                            style={{
-                              fontWeight: 800,
-                              color: "#10b981",
-                              minWidth: "28px",
-                            }}
-                          >
-                            ✓
-                          </span>
-                          <span
-                            style={{
-                              fontWeight: 700,
-                              color: "#1e293b",
-                              minWidth: "80px",
-                            }}
-                          >
+                          <span style={{ fontWeight: 800, color: "#10b981", minWidth: "28px" }}>✓</span>
+                          <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "80px" }}>
                             №{w.number} {w.direction === "across" ? "→" : "↓"}
                           </span>
-                          <span
-                            style={{
-                              fontWeight: 900,
-                              color: "#000",
-                              wordBreak: "break-word",
-                            }}
-                          >
+                          <span style={{ fontWeight: 900, color: "#000", wordBreak: "break-word" }}>
                             {w.word}
                           </span>
                         </div>
@@ -808,13 +767,7 @@ export default function ReviewPanel({
                     >
                       Неправильные слова ({r.wordReview.wrong.length})
                     </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "6px",
-                      }}
-                    >
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       {r.wordReview.wrong.map((w, i) => (
                         <div
                           key={i}
@@ -829,48 +782,16 @@ export default function ReviewPanel({
                             fontSize: "14px",
                           }}
                         >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "12px",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontWeight: 800,
-                                color: "#ef4444",
-                                minWidth: "28px",
-                              }}
-                            >
-                              ✗
-                            </span>
-                            <span
-                              style={{
-                                fontWeight: 700,
-                                color: "#1e293b",
-                                minWidth: "80px",
-                              }}
-                            >
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <span style={{ fontWeight: 800, color: "#ef4444", minWidth: "28px" }}>✗</span>
+                            <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "80px" }}>
                               №{w.number} {w.direction === "across" ? "→" : "↓"}
                             </span>
-                            <span
-                              style={{
-                                fontWeight: 900,
-                                color: "#000",
-                                wordBreak: "break-word",
-                              }}
-                            >
+                            <span style={{ fontWeight: 900, color: "#000", wordBreak: "break-word" }}>
                               Ваш ответ: {w.user}
                             </span>
                           </div>
-                          <div
-                            style={{
-                              marginLeft: "40px",
-                              color: "#000",
-                              fontWeight: 900,
-                            }}
-                          >
+                          <div style={{ marginLeft: "40px", color: "#000", fontWeight: 900 }}>
                             Правильно: {w.correct}
                           </div>
                         </div>
@@ -923,13 +844,7 @@ export default function ReviewPanel({
         {/* ===== COMPLEX / READING (вложенные) ===== */}
         {(r.type === "complex" || r.type === "reading") && r.subReviews && (
           <div style={{ marginTop: "16px" }}>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-              }}
-            >
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               {r.subReviews.map((sr, srI) => (
                 <div
                   key={srI}
@@ -1024,24 +939,72 @@ export default function ReviewPanel({
       </div>
 
       {/* ГЛОБАЛЬНАЯ ЛЕГЕНДА ЦВЕТОВ */}
-      <div 
-        style={{ 
-          display: "flex", 
+      <div
+        style={{
+          display: "flex",
           flexWrap: "wrap",
-          gap: "24px", 
-          marginBottom: "32px", 
-          padding: "20px", 
-          background: "#f8fafc", 
-          borderRadius: "16px", 
-          border: "2px solid #e2e8f0" 
+          gap: "24px",
+          marginBottom: "32px",
+          padding: "20px",
+          background: "#f8fafc",
+          borderRadius: "16px",
+          border: "2px solid #e2e8f0",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "15px", fontWeight: 800, color: "#1e293b" }}>
-          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "13px", background: "#10b981", color: "#fff", fontSize: "14px", boxShadow: "0 2px 4px rgba(16,185,129,0.3)" }}>✓</span>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            fontSize: "15px",
+            fontWeight: 800,
+            color: "#1e293b",
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "26px",
+              height: "26px",
+              borderRadius: "13px",
+              background: "#10b981",
+              color: "#fff",
+              fontSize: "14px",
+              boxShadow: "0 2px 4px rgba(16,185,129,0.3)",
+            }}
+          >
+            ✓
+          </span>
           Зеленым цветом выделены правильные ответы
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "15px", fontWeight: 800, color: "#1e293b" }}>
-          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "13px", background: "#ef4444", color: "#fff", fontSize: "14px", boxShadow: "0 2px 4px rgba(239,68,68,0.3)" }}>✗</span>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            fontSize: "15px",
+            fontWeight: 800,
+            color: "#1e293b",
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "26px",
+              height: "26px",
+              borderRadius: "13px",
+              background: "#ef4444",
+              color: "#fff",
+              fontSize: "14px",
+              boxShadow: "0 2px 4px rgba(239,68,68,0.3)",
+            }}
+          >
+            ✗
+          </span>
           Красным цветом выделены ваши ошибки
         </div>
       </div>
