@@ -75,6 +75,38 @@ function getAssignmentMaterialLevels(assignment: any): string[] {
   return normalizeStringArray(material2?.target_levels);
 }
 
+// Проверяет заполнен ли ответ на вопрос (для прогресс-бара)
+function isQuestionAnswered(q: QuestionAny, answer: any): boolean {
+  if (answer === undefined || answer === null) return false;
+  switch (q.type) {
+    case "test":
+      return (q as any).multiple
+        ? Array.isArray(answer) && answer.length > 0
+        : answer !== "" && answer !== null && answer !== undefined;
+    case "fill":
+    case "sentence": {
+      const arr = Array.isArray(answer) ? answer : [];
+      return arr.length > 0 && arr.some((x: any) => String(x ?? "").trim() !== "");
+    }
+    case "matching":
+    case "imagemap":
+      return typeof answer === "object" && Object.keys(answer).length > 0;
+    case "crossword": {
+      const grid = Array.isArray(answer) ? answer : [];
+      return grid.some((row: any) =>
+        Array.isArray(row) && row.some((cell: any) => String(cell ?? "").trim() !== "")
+      );
+    }
+    case "complex":
+    case "reading": {
+      const arr = Array.isArray(answer) ? answer : [];
+      return arr.some((a: any) => a !== null && a !== undefined);
+    }
+    default:
+      return !!answer;
+  }
+}
+
 // ===================== COMPONENT =====================
 export default function AssignmentClient({ assignmentId, source, sourceId }: Props) {
   const router = useRouter();
@@ -103,6 +135,48 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   const [modalSrc, setModalSrc] = useState<string>("");
 
   const saveBusyRef = useRef(false);
+
+  // --- PRELOAD следующего вопроса ---
+  useEffect(() => {
+    const nextIndex = currentIndex + 1;
+    if (!questions[nextIndex]) return;
+    
+    const nextQ = questions[nextIndex];
+    const urls: string[] = [];
+    
+    if (Array.isArray(nextQ.media)) {
+      for (const m of nextQ.media) {
+        if (
+          m?.url &&
+          (m.type === "image" || m.url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i))
+        ) {
+          urls.push(getImageUrl(m.url));
+        }
+      }
+    }
+    
+    if ((nextQ as any).image) urls.push(getImageUrl((nextQ as any).image));
+    
+    if (nextQ.type === "test" && Array.isArray((nextQ as any).options)) {
+      for (const opt of (nextQ as any).options) {
+        if (Array.isArray(opt?.media)) {
+          for (const m of opt.media) {
+            if (m?.url) urls.push(m.url);
+          }
+        }
+      }
+    }
+    
+    const imgs = urls.map((src) => {
+      const img = new window.Image();
+      img.src = src;
+      return img;
+    });
+    
+    return () => {
+      imgs.forEach((img) => { img.src = ""; });
+    };
+  }, [currentIndex, questions]);
 
   // --- THEME LOGIC ---
   const isGatehouse = useMemo(() => {
@@ -269,88 +343,88 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   }
 
   async function finish() {
-  if (isViewMode) return;
+    if (isViewMode) return;
 
-  console.log("[DEBUG] === FINISH ===");
-  console.log("[DEBUG] Answers object:", answers);
+    console.log("[DEBUG] === FINISH ===");
+    console.log("[DEBUG] Answers object:", answers);
 
-  // --- Общая проверка заполненности ---
-  const v = validateAllAnswered(questions, answers);
-  if (!v.ok) {
-    alert(`❌ Заполните вопрос №${v.index + 1}`);
-    setCurrentIndex(v.index);
-    return;
-  }
-
-  // --- Дополнительная проверка кроссворда ---
-  // validateAllAnswered видит что ответ существует (пустой grid тоже truthy),
-  // поэтому проверяем отдельно: все активные ячейки должны быть заполнены.
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-    if (q?.type !== "crossword") continue;
-
-    const userGrid: string[][] = answers[i] ?? [];
-    const correctGrid: string[][] = Array.isArray(q.grid) ? q.grid : [];
-    const words: any[] = Array.isArray(q.words) ? q.words : [];
-
-    // Собираем активные ячейки (те же правила что в QuestionCrossword)
-    const activeCells = new Set<string>();
-    for (const w of words) {
-      const len = Number(w?.length ?? 0);
-      const dir = w?.direction;
-      const start = w?.start;
-      if (!start || !dir || !Number.isFinite(len) || len <= 0) continue;
-      for (let step = 0; step < len; step++) {
-        const r = dir === "across" ? start.row : start.row + step;
-        const c = dir === "across" ? start.col + step : start.col;
-        activeCells.add(`${r},${c}`);
-      }
-    }
-    // Fallback: ячейки с правильными буквами в эталонной сетке
-    if (activeCells.size === 0) {
-      correctGrid.forEach((row, r) =>
-        row.forEach((ch, c) => {
-          if (String(ch ?? "").trim()) activeCells.add(`${r},${c}`);
-        })
-      );
-    }
-
-    // Проверяем что пользователь заполнил все активные ячейки
-    let hasEmpty = false;
-    for (const key of activeCells) {
-      const [r, c] = key.split(",").map(Number);
-      if (!String(userGrid?.[r]?.[c] ?? "").trim()) {
-        hasEmpty = true;
-        break;
-      }
-    }
-
-    if (hasEmpty) {
-      alert(`❌ Заполните все ячейки кроссворда в вопросе №${i + 1}`);
-      setCurrentIndex(i);
+    // --- Общая проверка заполненности ---
+    const v = validateAllAnswered(questions, answers);
+    if (!v.ok) {
+      alert(`❌ Заполните вопрос №${v.index + 1}`);
+      setCurrentIndex(v.index);
       return;
     }
+
+    // --- Дополнительная проверка кроссворда ---
+    // validateAllAnswered видит что ответ существует (пустой grid тоже truthy),
+    // поэтому проверяем отдельно: все активные ячейки должны быть заполнены.
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (q?.type !== "crossword") continue;
+
+      const userGrid: string[][] = answers[i] ?? [];
+      const correctGrid: string[][] = Array.isArray((q as any).grid) ? (q as any).grid : [];
+      const words: any[] = Array.isArray((q as any).words) ? (q as any).words : [];
+
+      // Собираем активные ячейки (те же правила что в QuestionCrossword)
+      const activeCells = new Set<string>();
+      for (const w of words) {
+        const len = Number(w?.length ?? 0);
+        const dir = w?.direction;
+        const start = w?.start;
+        if (!start || !dir || !Number.isFinite(len) || len <= 0) continue;
+        for (let step = 0; step < len; step++) {
+          const r = dir === "across" ? start.row : start.row + step;
+          const c = dir === "across" ? start.col + step : start.col;
+          activeCells.add(`${r},${c}`);
+        }
+      }
+      // Fallback: ячейки с правильными буквами в эталонной сетке
+      if (activeCells.size === 0) {
+        correctGrid.forEach((row, r) =>
+          row.forEach((ch, c) => {
+            if (String(ch ?? "").trim()) activeCells.add(`${r},${c}`);
+          })
+        );
+      }
+
+      // Проверяем что пользователь заполнил все активные ячейки
+      let hasEmpty = false;
+      for (const key of activeCells) {
+        const [r, c] = key.split(",").map(Number);
+        if (!String(userGrid?.[r]?.[c] ?? "").trim()) {
+          hasEmpty = true;
+          break;
+        }
+      }
+
+      if (hasEmpty) {
+        alert(`❌ Заполните все ячейки кроссворда в вопросе №${i + 1}`);
+        setCurrentIndex(i);
+        return;
+      }
+    }
+
+    const { stats, review } = calcAndBuildReview(questions, answers);
+    console.log("[DEBUG] Stats from scoring:", stats);
+    console.log("[DEBUG] Review from scoring:", review);
+
+    if (isGatehouse) {
+      const recommendation = recommendGatehouseLevel({
+        score: stats.score,
+        maxScore: 100,
+        percent: stats.score,
+        materialLevels: getAssignmentMaterialLevels(assignment),
+      });
+      setGatehouseRecommendation(recommendation);
+    }
+
+    setFinalStats(stats);
+    setReviewItems(review);
+    setCompletedScreen(true);
+    await saveProgress(stats.score);
   }
-
-  const { stats, review } = calcAndBuildReview(questions, answers);
-  console.log("[DEBUG] Stats from scoring:", stats);
-  console.log("[DEBUG] Review from scoring:", review);
-
-  if (isGatehouse) {
-    const recommendation = recommendGatehouseLevel({
-      score: stats.score,
-      maxScore: 100,
-      percent: stats.score,
-      materialLevels: getAssignmentMaterialLevels(assignment),
-    });
-    setGatehouseRecommendation(recommendation);
-  }
-
-  setFinalStats(stats);
-  setReviewItems(review);
-  setCompletedScreen(true);
-  await saveProgress(stats.score);
-}
 
   function renderQuestionComponent(q: QuestionAny, index: number) {
     const val = answers[index];
@@ -380,6 +454,8 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
       default: return <div className="error-message">Тип "{q.type}" не поддерживается</div>;
     }
   }
+
+  const answeredCount = questions.filter((q, i) => isQuestionAnswered(q, answers[i])).length;
 
   if (loading) return (
     <div className="loader-container" style={{ background: theme.bg }}>
@@ -459,7 +535,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
               <div className="stat-item"><span>Ошибки:</span> <b style={{color: '#ef4444'}}>{finalStats.incorrect}</b></div>
             </div>
 
-            {/* ✅ Передаём questions в ReviewPanel */}
             <div className="review-section">
               <ReviewPanel items={reviewItems} questions={questions} />
             </div>
@@ -474,8 +549,44 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         {/* ПРОЦЕСС ВЫПОЛНЕНИЯ ЗАДАНИЯ */}
         {!showChoice && !completedScreen && assignment && questions.length > 0 && (
           <div className="assignment-layout animate-in">
-            {/* PROGRESS BAR */}
+            {/* ====== ПРОГРЕСС-БАР С ТОЧКАМИ ====== */}
             <div className="progress-container">
+              <div className="progress-dots">
+                {questions.map((q, i) => {
+                  const isCurrent  = i === currentIndex;
+                  const answered   = isQuestionAnswered(q, answers[i]);
+                  const dotSize    = questions.length > 25 ? 8 : questions.length > 15 ? 10 : 13;
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setCurrentIndex(i)}
+                      title={`Вопрос ${i + 1}${answered ? " ✓" : ""}`}
+                      style={{
+                        width:  dotSize,
+                        height: dotSize,
+                        minWidth: dotSize,
+                        borderRadius: "50%",
+                        border: isCurrent
+                          ? `2px solid ${theme.primary}`
+                          : "2px solid transparent",
+                        background: isCurrent
+                          ? theme.primary
+                          : answered
+                          ? `${theme.primary}66`
+                          : "rgba(0,0,0,0.1)",
+                        cursor: "pointer",
+                        padding: 0,
+                        transition: "all 0.2s ease",
+                        transform: isCurrent ? "scale(1.4)" : "scale(1)",
+                        boxShadow: isCurrent
+                          ? `0 0 0 3px ${theme.primary}22`
+                          : "none",
+                        flexShrink: 0,
+                      }}
+                    />
+                  );
+                })}
+              </div>
               <div className="progress-bar-bg">
                 <div className="progress-fill" style={{ 
                   width: `${((currentIndex + 1) / questions.length) * 100}%`, 
@@ -484,6 +595,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
               </div>
               <div className="progress-info">
                 <span>Вопрос {currentIndex + 1} из {questions.length}</span>
+                <span style={{ fontSize: "12px", opacity: 0.45 }}>
+                  {answeredCount} / {questions.length} заполнено
+                </span>
                 {isViewMode && <span className="view-mode-tag">РЕЖИМ ПРОСМОТРА</span>}
               </div>
             </div>
@@ -558,7 +672,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         onClose={closeImage}
       />
 
-      {/* CSS STYLES (без изменений) */}
+      {/* CSS STYLES */}
       <style jsx>{`
         .premium-header { padding: 30px 20px; }
         .header-content { max-width: 900px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
@@ -578,10 +692,21 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         .card-title { font-size: 32px; font-weight: 800; margin-bottom: 16px; text-align: center; }
         .card-subtitle { text-align: center; opacity: 0.6; margin-bottom: 40px; line-height: 1.5; }
         
+        /* === ПРОГРЕСС === */
         .progress-container { margin-bottom: 30px; }
-        .progress-bar-bg { height: 12px; background: rgba(0,0,0,0.05); border-radius: 20px; overflow: hidden; margin-bottom: 12px; }
+        .progress-dots {
+          display: flex;
+          gap: 5px;
+          margin-bottom: 10px;
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          padding-bottom: 4px;
+          scrollbar-width: none;
+        }
+        .progress-dots::-webkit-scrollbar { display: none; }
+        .progress-bar-bg { height: 6px; background: rgba(0,0,0,0.05); border-radius: 20px; overflow: hidden; margin-bottom: 10px; }
         .progress-fill { height: 100%; border-radius: 20px; transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
-        .progress-info { display: flex; justify-content: space-between; font-size: 14px; font-weight: 800; opacity: 0.5; }
+        .progress-info { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 800; opacity: 0.5; gap: 8px; }
         .view-mode-tag { color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 2px 8px; border-radius: 6px; }
 
         .question-title { font-size: 24px; font-weight: 800; line-height: 1.4; margin-bottom: 30px; color: #111827; }
@@ -658,7 +783,8 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           .card-subtitle { font-size: 14px; margin-bottom: 24px; }
 
           .progress-container { margin-bottom: 20px; }
-          .progress-bar-bg { height: 10px; border-radius: 14px; }
+          .progress-dots { gap: 4px; }
+          .progress-bar-bg { height: 5px; }
           .progress-info { font-size: 12px; }
 
           .question-title { font-size: 20px; margin-bottom: 20px; }
