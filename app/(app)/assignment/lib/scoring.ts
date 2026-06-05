@@ -111,26 +111,31 @@ function safeFraction(earned: number, total: number): number {
 export function getCrosswordStats(q: any, a: any) {
   const grid = ensureArray(q.grid);
   const blocks = ensureArray(q.blocks);
+  const words = ensureArray(q.words); // Берем слова из вопроса
   const userGrid = ensureArray(a);
 
-  const rows = grid.length;
-  const cols = rows > 0 ? Math.max(...grid.map(r => ensureArray(r).length)) : 0;
-
-  const blockedSet = new Set<string>();
-  for (const b of blocks) {
-    if (b && typeof b === "object") blockedSet.add(`${b.row},${b.col}`);
+  // 1. Сначала узнаем, какие клетки реально участвуют в словах
+  const activeCells = new Set<string>();
+  for (const w of words) {
+    const len = Number(w?.length ?? 0);
+    const dir = w?.direction;
+    const start = w?.start;
+    if (!start || !dir || !Number.isFinite(len) || len <= 0) continue;
+    for (let step = 0; step < len; step++) {
+      const r = dir === "across" ? start.row : start.row + step;
+      const c = dir === "across" ? start.col + step : start.col;
+      activeCells.add(`${r},${c}`);
+    }
   }
 
-  let totalActiveCells = 0;
+  // 2. Считаем только те клетки, которые входят в activeCells
+  let totalActiveCells = activeCells.size;
   let filledCells = 0;
 
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (blockedSet.has(`${r},${c}`)) continue;
-      totalActiveCells++;
-      const userCell = String(ensureArray(userGrid[r])[c] ?? "").trim();
-      if (userCell !== "") filledCells++;
-    }
+  for (const key of activeCells) {
+    const [r, c] = key.split(",").map(Number);
+    const userLetter = String(userGrid?.[r]?.[c] ?? "").trim();
+    if (userLetter !== "") filledCells++;
   }
 
   const percent = totalActiveCells > 0 ? Math.round((filledCells / totalActiveCells) * 100) : 0;
