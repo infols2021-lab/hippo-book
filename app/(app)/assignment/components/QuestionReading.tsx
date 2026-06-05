@@ -3,6 +3,7 @@
 import React from "react";
 import type { QuestionReading as QuestionReadingType, QuestionTest as QuestionTestType } from "../lib/types";
 import QuestionTestComponent from "./QuestionTest";
+import MediaRenderer from "./MediaRenderer";
 
 type Props = {
   question: QuestionReadingType;
@@ -37,7 +38,38 @@ export default function QuestionReading({
         gap: "32px",
       }}
     >
-      {/* Текст и медиа берутся из самого вопроса (q и media), поэтому отдельный блок не нужен */}
+      {/* ========== БЛОК ТЕКСТА ДЛЯ ЧТЕНИЯ И МЕДИА ========== */}
+      {(question.text || (question.media && question.media.length > 0)) && (
+        <div
+          style={{
+            background: "#f8fafc",
+            borderRadius: "20px",
+            padding: "20px",
+            border: "1px solid #e2e8f0",
+            marginBottom: "8px",
+          }}
+        >
+          {question.text && (
+            <div
+              style={{
+                fontSize: "16px",
+                lineHeight: 1.6,
+                whiteSpace: "pre-wrap",
+                color: "#1e293b",
+                fontWeight: 500,
+                marginBottom: question.media?.length ? "16px" : 0,
+              }}
+            >
+              {question.text}
+            </div>
+          )}
+          {question.media && question.media.length > 0 && (
+            <MediaRenderer media={question.media} />
+          )}
+        </div>
+      )}
+
+      {/* ========== ПОДВОПРОСЫ ========== */}
       {subQuestions.length > 0 && (
         <div
           style={{
@@ -90,8 +122,8 @@ export default function QuestionReading({
                     <div
                       style={{
                         fontSize: "16px",
-                        fontWeight: 900, // Сделали текст жирным, как просили
-                        color: "#000",   // Сделали текст чисто черным
+                        fontWeight: 900,
+                        color: "#000",
                         lineHeight: 1.4,
                         flex: 1,
                       }}
@@ -101,7 +133,7 @@ export default function QuestionReading({
                   )}
                 </div>
 
-                {/* Тестовые варианты (уже обновленные с маленькими картинками) */}
+                {/* Тестовые варианты */}
                 <QuestionTestComponent
                   question={sq}
                   value={subValue}
