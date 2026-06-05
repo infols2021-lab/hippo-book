@@ -61,13 +61,10 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
   const [duration, setDuration] = useState(0);
   const [audioError, setAudioError] = useState(false);
   const [loading, setLoading] = useState(true);
-
-  // Громкость — изначально половина (тише)
   const [volume, setVolume] = useState(0.5);
 
   const finalUrl = useMemo(() => getImageUrl(url), [url]);
 
-  // Инициализация громкости после mount
   useEffect(() => {
     const v = getInitialVolume();
     setVolume(v);
@@ -75,7 +72,6 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
     isMounted.current = true;
   }, []);
 
-  // Сброс при смене трека
   useEffect(() => {
     setIsPlaying(false);
     setProgress(0);
@@ -85,14 +81,12 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
     setLoading(true);
   }, [url]);
 
-  // Применяем громкость к audio-элементу
   useEffect(() => {
     if (audioRef.current && isMounted.current) {
       audioRef.current.volume = volume;
     }
   }, [volume]);
 
-  // Синхронизация с другими плеерами через window event
   useEffect(() => {
     function onVolumeSync(e: Event) {
       const v = (e as CustomEvent).detail?.volume;
@@ -102,7 +96,6 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
     return () => window.removeEventListener(VOLUME_EVENT, onVolumeSync);
   }, []);
 
-  // Подписка на события audio-элемента
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -161,7 +154,8 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
     broadcastVolume(v);
   };
 
-  const volIcon = volume === 0 ? "🔇" : volume < 0.4 ? "🔈" : volume < 0.75 ? "🔉" : "🔊";
+  const volIcon =
+    volume === 0 ? "🔇" : volume < 0.4 ? "🔈" : volume < 0.75 ? "🔉" : "🔊";
 
   return (
     <div
@@ -213,7 +207,7 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
               border: "2px solid rgba(255,255,255,0.3)",
               borderTopColor: "#fff",
               borderRadius: "50%",
-              animation: "spin 1s linear infinite",
+              animation: "mediaSpin 1s linear infinite",
             }}
           />
         ) : audioError ? (
@@ -290,7 +284,7 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
         }}
         title={`Громкость: ${Math.round(volume * 100)}%`}
       >
-        <span style={{ fontSize: 14, lineHeight: 1, userSelect: "none" }}>
+        <span style={{ fontSize: 14, lineHeight: "1", userSelect: "none" }}>
           {volIcon}
         </span>
         <input
@@ -351,7 +345,7 @@ function ZoomableImage({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        cursor: isLoading ? "default" : "zoom-in",
+        cursor: isLoading || hasError ? "default" : "zoom-in",
         margin: "12px 0",
         borderRadius: "20px",
         overflow: "hidden",
@@ -363,9 +357,29 @@ function ZoomableImage({
       }}
       onClick={handleClick}
     >
+      {/* Лоадер — виден пока грузится */}
       {isLoading && !hasError && (
-        <div className="media-loader">
-          <div className="spinner" />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 5,
+            background: "#f8fafc",
+          }}
+        >
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              border: "3px solid rgba(0,123,255,0.15)",
+              borderTopColor: "#007bff",
+              borderRadius: "50%",
+              animation: "mediaSpin 0.8s linear infinite",
+            }}
+          />
         </div>
       )}
 
@@ -416,6 +430,7 @@ function ZoomableImage({
         />
       )}
 
+      {/* Бейдж «Увеличить» — только когда картинка загружена */}
       {!isLoading && !hasError && (
         <div
           style={{
@@ -431,6 +446,7 @@ function ZoomableImage({
             fontWeight: 800,
             pointerEvents: "none",
             textTransform: "uppercase",
+            letterSpacing: "0.05em",
           }}
         >
           🔍 Увеличить
@@ -464,7 +480,14 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
           borderBottom: "none",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            overflow: "hidden",
+          }}
+        >
           <span style={{ fontSize: 18 }}>📄</span>
           <span
             style={{
@@ -506,7 +529,12 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
           background: "#fff",
         }}
       >
-        <iframe src={`${finalUrl}#toolbar=0`} width="100%" height="100%" style={{ border: "none" }} />
+        <iframe
+          src={`${finalUrl}#toolbar=0`}
+          width="100%"
+          height="100%"
+          style={{ border: "none" }}
+        />
       </div>
     </div>
   );
@@ -534,14 +562,23 @@ export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) 
 
   return (
     <>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+      <div
+        style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}
+      >
         {media.map((m) => {
           if (!m.url) return null;
           const key = `${m.id}-${m.url}`;
           if (m.type === "audio")
             return <CustomAudioPlayer key={key} url={m.url} name={m.name} />;
           if (m.type === "image")
-            return <ZoomableImage key={key} url={m.url} name={m.name} onZoom={handleZoom} />;
+            return (
+              <ZoomableImage
+                key={key}
+                url={m.url}
+                name={m.name}
+                onZoom={handleZoom}
+              />
+            );
           if (m.type === "pdf")
             return <PdfViewer key={key} url={m.url} name={m.name} />;
           return null;
@@ -552,27 +589,20 @@ export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) 
             animation: mediaAppear 0.4s ease-out forwards;
           }
           @keyframes mediaAppear {
-            from { opacity: 0; transform: translateY(5px); }
-            to   { opacity: 1; transform: translateY(0); }
+            from {
+              opacity: 0;
+              transform: translateY(5px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
           }
-          .media-loader {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justifyContent: center;
-            z-index: 5;
+          @keyframes mediaSpin {
+            to {
+              transform: rotate(360deg);
+            }
           }
-          .spinner {
-            width: 30px;
-            height: 30px;
-            border: 3px solid rgba(0, 123, 255, 0.1);
-            border-top-color: #007bff;
-            border-radius: 50%;
-            animation: mediaSpin 0.8s linear infinite;
-          }
-          @keyframes mediaSpin { to { transform: rotate(360deg); } }
-          @keyframes spin      { to { transform: rotate(360deg); } }
         `}</style>
       </div>
 

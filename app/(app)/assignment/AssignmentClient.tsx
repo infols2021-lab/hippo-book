@@ -269,37 +269,88 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   }
 
   async function finish() {
-    if (isViewMode) return;
-    
-    console.log("[DEBUG] === FINISH ===");
-    console.log("[DEBUG] Answers object:", answers);
-    
-    const v = validateAllAnswered(questions, answers);
-    if (!v.ok) {
-      alert(`❌ Заполните вопрос №${v.index + 1}`);
-      setCurrentIndex(v.index);
+  if (isViewMode) return;
+
+  console.log("[DEBUG] === FINISH ===");
+  console.log("[DEBUG] Answers object:", answers);
+
+  // --- Общая проверка заполненности ---
+  const v = validateAllAnswered(questions, answers);
+  if (!v.ok) {
+    alert(`❌ Заполните вопрос №${v.index + 1}`);
+    setCurrentIndex(v.index);
+    return;
+  }
+
+  // --- Дополнительная проверка кроссворда ---
+  // validateAllAnswered видит что ответ существует (пустой grid тоже truthy),
+  // поэтому проверяем отдельно: все активные ячейки должны быть заполнены.
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    if (q?.type !== "crossword") continue;
+
+    const userGrid: string[][] = answers[i] ?? [];
+    const correctGrid: string[][] = Array.isArray(q.grid) ? q.grid : [];
+    const words: any[] = Array.isArray(q.words) ? q.words : [];
+
+    // Собираем активные ячейки (те же правила что в QuestionCrossword)
+    const activeCells = new Set<string>();
+    for (const w of words) {
+      const len = Number(w?.length ?? 0);
+      const dir = w?.direction;
+      const start = w?.start;
+      if (!start || !dir || !Number.isFinite(len) || len <= 0) continue;
+      for (let step = 0; step < len; step++) {
+        const r = dir === "across" ? start.row : start.row + step;
+        const c = dir === "across" ? start.col + step : start.col;
+        activeCells.add(`${r},${c}`);
+      }
+    }
+    // Fallback: ячейки с правильными буквами в эталонной сетке
+    if (activeCells.size === 0) {
+      correctGrid.forEach((row, r) =>
+        row.forEach((ch, c) => {
+          if (String(ch ?? "").trim()) activeCells.add(`${r},${c}`);
+        })
+      );
+    }
+
+    // Проверяем что пользователь заполнил все активные ячейки
+    let hasEmpty = false;
+    for (const key of activeCells) {
+      const [r, c] = key.split(",").map(Number);
+      if (!String(userGrid?.[r]?.[c] ?? "").trim()) {
+        hasEmpty = true;
+        break;
+      }
+    }
+
+    if (hasEmpty) {
+      alert(`❌ Заполните все ячейки кроссворда в вопросе №${i + 1}`);
+      setCurrentIndex(i);
       return;
     }
-
-    const { stats, review } = calcAndBuildReview(questions, answers);
-    console.log("[DEBUG] Stats from scoring:", stats);
-    console.log("[DEBUG] Review from scoring:", review);
-
-    if (isGatehouse) {
-      const recommendation = recommendGatehouseLevel({
-        score: stats.score,
-        maxScore: 100,
-        percent: stats.score,
-        materialLevels: getAssignmentMaterialLevels(assignment),
-      });
-      setGatehouseRecommendation(recommendation);
-    }
-
-    setFinalStats(stats);
-    setReviewItems(review);
-    setCompletedScreen(true);
-    await saveProgress(stats.score);
   }
+
+  const { stats, review } = calcAndBuildReview(questions, answers);
+  console.log("[DEBUG] Stats from scoring:", stats);
+  console.log("[DEBUG] Review from scoring:", review);
+
+  if (isGatehouse) {
+    const recommendation = recommendGatehouseLevel({
+      score: stats.score,
+      maxScore: 100,
+      percent: stats.score,
+      materialLevels: getAssignmentMaterialLevels(assignment),
+    });
+    setGatehouseRecommendation(recommendation);
+  }
+
+  setFinalStats(stats);
+  setReviewItems(review);
+  setCompletedScreen(true);
+  await saveProgress(stats.score);
+}
 
   function renderQuestionComponent(q: QuestionAny, index: number) {
     const val = answers[index];
