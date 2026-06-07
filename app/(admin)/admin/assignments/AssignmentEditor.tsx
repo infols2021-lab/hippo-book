@@ -9,7 +9,7 @@ import { deepClone, newQuestion, newBlock } from "./builder/types";
 import { validateQuestions, validateBlocks } from "./builder/validate";
 
 import QuestionList from "./builder/QuestionList";
-import BlockList from "./builder/blocks/BlockList"; // НОВЫЙ КОМПОНЕНТ ДЛЯ БЛОКОВ
+import BlockList from "./builder/blocks/BlockList";
 import JsonEditor from "./builder/json/JsonEditor";
 
 type MaterialOption =
@@ -84,20 +84,17 @@ function materialLabel(material: MaterialOption | null) {
 export default function AssignmentEditor({ material, editing, onCancel, onSaved }: Props) {
   const [mode, setMode] = useState<EditorMode>("visual");
   
-  // Добавляем состояние режима задания
   const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>("interactive");
 
   const [title, setTitle] = useState<string>(editing?.title ?? "");
   const [orderIndex, setOrderIndex] = useState<number>(Number(editing?.order_index ?? 0));
 
-  // Инициализация интерактивных вопросов
   const initialQuestions: Question[] = useMemo(() => {
     const qs = editing?.content?.questions;
     if (Array.isArray(qs) && qs.length) return deepClone(qs);
     return [newQuestion("test")];
   }, [editing]);
 
-  // Инициализация ознакомительных блоков
   const initialBlocks: InfoBlock[] = useMemo(() => {
     const blks = editing?.content?.blocks;
     if (Array.isArray(blks) && blks.length) return deepClone(blks);
@@ -116,7 +113,6 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
 
     const content = editing?.content;
     
-    // Определяем режим на основе сохраненного контента
     if (content?.mode === "informational") {
       setAssignmentMode("informational");
     } else {
@@ -146,7 +142,6 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
 
     let finalContent: any = {};
 
-    // Раздельная валидация в зависимости от режима
     if (assignmentMode === "informational") {
       const vr = validateBlocks(blocks);
       if (!vr.ok) {
@@ -172,7 +167,7 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
       const payload: any = {
         title: title.trim(),
         order_index: Number.isFinite(orderIndex) ? orderIndex : 0,
-        content: finalContent, // Используем сформированный контент
+        content: finalContent,
 
         branch_type: material.branch_type,
 
@@ -267,7 +262,6 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
         </div>
       </div>
 
-      {/* Выбор режима задания */}
       <div style={{ marginTop: 16, background: "#f8fafc", padding: "12px 16px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
         <label className="small-muted" style={{ display: "block", marginBottom: 8 }}>Тип задания</label>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
@@ -296,7 +290,6 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
 
       <div style={{ height: 16 }} />
 
-      {/* Условный рендеринг редактора в зависимости от режима и вкладки */}
       {mode === "visual" ? (
         assignmentMode === "interactive" ? (
           <QuestionList value={questions} onChange={setQuestions} disabled={saving} />
@@ -306,6 +299,7 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
       ) : (
         <JsonEditor 
           value={(assignmentMode === "interactive" ? questions : blocks) as any[]} 
+          arrayKey={assignmentMode === "interactive" ? "questions" : "blocks"}
           onChange={(next) => assignmentMode === "interactive" ? setQuestions(next as any) : setBlocks(next as any)} 
           disabled={saving} 
         />
