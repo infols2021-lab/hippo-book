@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import LoadingBlock from "@/components/LoadingBlock";
 import ErrorBox from "@/components/ErrorBox";
 
-import type { EditorMode, Question } from "./builder/types";
-import { deepClone, newQuestion } from "./builder/types";
-import { validateQuestions } from "./builder/validate";
+import type { EditorMode, AssignmentMode, Question, InfoBlock } from "./builder/types";
+import { deepClone, newQuestion, newBlock } from "./builder/types";
+import { validateQuestions, validateBlocks } from "./builder/validate";
 
 import QuestionList from "./builder/QuestionList";
+import BlockList from "./builder/blocks/BlockList"; // НОВЫЙ КОМПОНЕНТ ДЛЯ БЛОКОВ
 import JsonEditor from "./builder/json/JsonEditor";
 
 type MaterialOption =
@@ -82,17 +83,29 @@ function materialLabel(material: MaterialOption | null) {
 
 export default function AssignmentEditor({ material, editing, onCancel, onSaved }: Props) {
   const [mode, setMode] = useState<EditorMode>("visual");
+  
+  // Добавляем состояние режима задания
+  const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>("interactive");
 
   const [title, setTitle] = useState<string>(editing?.title ?? "");
   const [orderIndex, setOrderIndex] = useState<number>(Number(editing?.order_index ?? 0));
 
+  // Инициализация интерактивных вопросов
   const initialQuestions: Question[] = useMemo(() => {
     const qs = editing?.content?.questions;
     if (Array.isArray(qs) && qs.length) return deepClone(qs);
     return [newQuestion("test")];
   }, [editing]);
 
+  // Инициализация ознакомительных блоков
+  const initialBlocks: InfoBlock[] = useMemo(() => {
+    const blks = editing?.content?.blocks;
+    if (Array.isArray(blks) && blks.length) return deepClone(blks);
+    return [newBlock("hero")];
+  }, [editing]);
+
   const [questions, setQuestions] = useState<Question[]>(initialQuestions);
+  const [blocks, setBlocks] = useState<InfoBlock[]>(initialBlocks);
 
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -101,8 +114,20 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
     setTitle(editing?.title ?? "");
     setOrderIndex(Number(editing?.order_index ?? 0));
 
-    const qs = editing?.content?.questions;
+    const content = editing?.content;
+    
+    // Определяем режим на основе сохраненного контента
+    if (content?.mode === "informational") {
+      setAssignmentMode("informational");
+    } else {
+      setAssignmentMode("interactive");
+    }
+
+    const qs = content?.questions;
     setQuestions(Array.isArray(qs) && qs.length ? deepClone(qs) : [newQuestion("test")]);
+
+    const blks = content?.blocks;
+    setBlocks(Array.isArray(blks) && blks.length ? deepClone(blks) : [newBlock("hero")]);
 
     setMode("visual");
     setErr(null);
@@ -119,12 +144,25 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
       return;
     }
 
-    const vr = validateQuestions(questions);
+    let finalContent: any = {};
 
-    if (!vr.ok) {
-      const text = vr.issues.map((i) => (i.index >= 0 ? `#${i.index + 1}: ${i.message}` : i.message)).join("\n");
-      setErr(text || "Ошибки в вопросах");
-      return;
+    // Раздельная валидация в зависимости от режима
+    if (assignmentMode === "informational") {
+      const vr = validateBlocks(blocks);
+      if (!vr.ok) {
+        const text = vr.issues.map((i) => (i.index >= 0 ? `Блок #${i.index + 1}: ${i.message}` : i.message)).join("\n");
+        setErr(text || "Ошибки в блоках");
+        return;
+      }
+      finalContent = { mode: "informational", blocks };
+    } else {
+      const vr = validateQuestions(questions);
+      if (!vr.ok) {
+        const text = vr.issues.map((i) => (i.index >= 0 ? `Вопрос #${i.index + 1}: ${i.message}` : i.message)).join("\n");
+        setErr(text || "Ошибки в вопросах");
+        return;
+      }
+      finalContent = { mode: "interactive", questions };
     }
 
     setErr(null);
@@ -134,7 +172,7 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
       const payload: any = {
         title: title.trim(),
         order_index: Number.isFinite(orderIndex) ? orderIndex : 0,
-        content: { questions },
+        content: finalContent, // Используем сформированный контент
 
         branch_type: material.branch_type,
 
@@ -229,15 +267,51 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
         </div>
       </div>
 
-      <div style={{ height: 12 }} />
+      {/* Выбор режима задания */}
+      <div style={{ marginTop: 16, background: "#f8fafc", padding: "12px 16px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+        <label className="small-muted" style={{ display: "block", marginBottom: 8 }}>Тип задания</label>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500, color: "#1e293b" }}>
+            <input 
+              type="radio" 
+              name="assignmentMode" 
+              checked={assignmentMode === "interactive"} 
+              onChange={() => setAssignmentMode("interactive")} 
+              disabled={saving} 
+            />
+            📝 Интерактивное (Вопросы, Тесты)
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500, color: "#1e293b" }}>
+            <input 
+              type="radio" 
+              name="assignmentMode" 
+              checked={assignmentMode === "informational"} 
+              onChange={() => setAssignmentMode("informational")} 
+              disabled={saving} 
+            />
+            📖 Ознакомительное (Гайды, Блоки)
+          </label>
+        </div>
+      </div>
 
+      <div style={{ height: 16 }} />
+
+      {/* Условный рендеринг редактора в зависимости от режима и вкладки */}
       {mode === "visual" ? (
-        <QuestionList value={questions} onChange={setQuestions} disabled={saving} />
+        assignmentMode === "interactive" ? (
+          <QuestionList value={questions} onChange={setQuestions} disabled={saving} />
+        ) : (
+          <BlockList value={blocks} onChange={setBlocks} disabled={saving} />
+        )
       ) : (
-        <JsonEditor value={questions as any[]} onChange={(next) => setQuestions(next as any)} disabled={saving} />
+        <JsonEditor 
+          value={(assignmentMode === "interactive" ? questions : blocks) as any[]} 
+          onChange={(next) => assignmentMode === "interactive" ? setQuestions(next as any) : setBlocks(next as any)} 
+          disabled={saving} 
+        />
       )}
 
-      <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 14, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 24, flexWrap: "wrap" }}>
         <button className="btn" type="button" onClick={() => void save()} disabled={saving}>
           💾 Сохранить
         </button>

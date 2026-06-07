@@ -1,7 +1,146 @@
 // ===== Modes =====
 export type EditorMode = "visual" | "json";
+export type AssignmentMode = "interactive" | "informational"; // НОВЫЙ: Режим задания
 
-// ===== Question types =====
+// ===== Assignment Root Content =====
+// Это описывает, как данные будут лежать в колонке content (JSONB) в базе данных
+export type InteractiveContent = {
+  mode?: "interactive"; // Опционально для обратной совместимости со старыми заданиями
+  questions: Question[];
+};
+
+export type InformationalContent = {
+  mode: "informational";
+  blocks: InfoBlock[];
+};
+
+export type AssignmentContent = InteractiveContent | InformationalContent;
+
+
+// ==========================================
+// БЛОК 1: ОЗНАКОМИТЕЛЬНЫЙ РЕЖИМ (БЛОКИ)
+// ==========================================
+
+export type BlockType =
+  | "hero"
+  | "text_section"
+  | "alert"
+  | "video"
+  | "cards_grid"
+  | "accordion"
+  | "downloads";
+
+export type BaseBlock = {
+  id: string;
+  type: BlockType;
+};
+
+// 1. Hero (Обложка)
+export type HeroBlock = BaseBlock & {
+  type: "hero";
+  data: {
+    badge?: string;
+    title: string;
+    subtitle?: string;
+    pills?: string[];
+  };
+};
+
+// 2. Text Section (Текстовый блок)
+export type TextSectionBlock = BaseBlock & {
+  type: "text_section";
+  data: {
+    label?: string; // Маленькая надпись сверху (например, "Знакомство")
+    title?: string; // Заголовок секции
+    content: string; // Основной текст
+  };
+};
+
+// 3. Alert (Предупреждение/Сноска)
+export type AlertBlock = BaseBlock & {
+  type: "alert";
+  data: {
+    theme: "teacher" | "info" | "warning"; // Желтый, Синий, Оранжевый
+    icon?: string; // Эмодзи, например 🎓 или ℹ️
+    content: string;
+  };
+};
+
+// 4. Video (Видео)
+export type VideoBlock = BaseBlock & {
+  type: "video";
+  data: {
+    url: string; // YouTube или Vimeo embed url
+    caption?: string; // Подпись (Как играть в Speaking)
+    subCaption?: string; // Длительность
+  };
+};
+
+// 5. Cards Grid (Сетка карточек / Шаги)
+export type CardItem = {
+  id: string;
+  title: string;
+  content: string;
+  theme?: "blue" | "green" | "orange" | "purple" | "default";
+  icon?: string;
+};
+
+export type CardsGridBlock = BaseBlock & {
+  type: "cards_grid";
+  data: {
+    columns: number; // Обычно 2 или 3
+    items: CardItem[];
+  };
+};
+
+// 6. Accordion (Спойлеры / Задания / FAQ)
+export type AccordionItem = {
+  id: string;
+  title: string;
+  content: string;
+  tag?: string; // Тег справа (например, "Лексика")
+  tagTheme?: "blue" | "green" | "orange" | "purple" | "gold" | "default";
+};
+
+export type AccordionBlock = BaseBlock & {
+  type: "accordion";
+  data: {
+    items: AccordionItem[];
+  };
+};
+
+// 7. Downloads (Материалы для скачивания)
+export type DownloadFile = {
+  id: string;
+  name: string;
+  url: string;
+  fileType: string; // Например "DOCX" или "PDF"
+  description?: string;
+  theme?: "blue" | "green" | "orange" | "purple" | "red" | "gold" | "default";
+  icon?: string; // Эмодзи, например 📋
+};
+
+export type DownloadsBlock = BaseBlock & {
+  type: "downloads";
+  data: {
+    files: DownloadFile[];
+  };
+};
+
+export type InfoBlock =
+  | HeroBlock
+  | TextSectionBlock
+  | AlertBlock
+  | VideoBlock
+  | CardsGridBlock
+  | AccordionBlock
+  | DownloadsBlock;
+
+
+// ==========================================
+// БЛОК 2: ИНТЕРАКТИВНЫЙ РЕЖИМ (ВОПРОСЫ)
+// ==========================================
+
 export type QuestionType =
   | "test"
   | "fill"
@@ -12,26 +151,23 @@ export type QuestionType =
   | "imagemap"
   | "reading";
 
-// ===== Media =====
 export type MediaType = "image" | "audio" | "pdf";
 
 export type MediaAttachment = {
   id: string;
   url: string;
   type: MediaType;
-  name?: string; // Имя файла (особенно полезно для PDF)
+  name?: string;
 };
 
-// ===== Base =====
 export type BaseQuestion = {
   id: string;
   type: QuestionType;
-  q?: string; // Текст вопроса (для кроссвордов может быть пустым/отсутствовать)
-  image?: string; // Устаревшее (оставлено для совместимости старых данных) — также используется для imagemap
-  media?: MediaAttachment[]; // Новый массив медиа-файлов
+  q?: string;
+  image?: string;
+  media?: MediaAttachment[];
 };
 
-// ===== Test =====
 export type TestOption = {
   id: string;
   text: string;
@@ -40,32 +176,28 @@ export type TestOption = {
 
 export type TestQuestion = BaseQuestion & {
   type: "test";
-  multiple?: boolean; // Чекбокс для множественного выбора
-  options: TestOption[]; // Обновленная структура опций с поддержкой медиа
-  correct: number[]; // Массив индексов правильных ответов (даже если один)
-  layout?: "vertical" | "horizontal"; // раскладка вариантов: вертикально (по умолчанию) или сеткой до 3 в ряд
+  multiple?: boolean;
+  options: TestOption[];
+  correct: number[];
+  layout?: "vertical" | "horizontal";
 };
 
-// ===== Fill =====
 export type FillQuestion = BaseQuestion & {
   type: "fill";
   answers: string[][];
 };
 
-// ===== Sentence =====
 export type SentenceQuestion = BaseQuestion & {
   type: "sentence";
   sentence: string;
   answers: string[][];
 };
 
-// ===== Complex =====
 export type ComplexQuestion = BaseQuestion & {
   type: "complex";
-  subQuestions: Question[]; // Вложенные вопросы
+  subQuestions: Question[];
 };
 
-// ===== Matching =====
 export type MatchingItem = {
   text?: string;
   media?: MediaAttachment[];
@@ -79,26 +211,22 @@ export type MatchingPair = {
 
 export type MatchingQuestion = BaseQuestion & {
   type: "matching";
-  centerImage?: MediaAttachment; // То самое "центральное изображение"
+  centerImage?: MediaAttachment;
   pairs: MatchingPair[];
 };
 
-// ===== Reading =====
 export type ReadingQuestion = BaseQuestion & {
   type: "reading";
-  /** общий текст или инструкция */
   text?: string;
-  /** серия тестовых подвопросов */
   subQuestions: TestQuestion[];
 };
 
-// ===== Crossword (editor helpers) =====
 export type WordDir = "across" | "down";
 
 export type CWWord = {
   id: string;
-  number: number; // 1..N
-  text: string; // UPPER
+  number: number;
+  text: string;
   direction: WordDir;
   start: { row: number; col: number };
   length: number;
@@ -106,56 +234,48 @@ export type CWWord = {
 
 export type CWBlock = { row: number; col: number };
 
-// В metadata мы храним и “сохранённые” вещи, и состояние редактора (placing/deleteMode)
 export type CrosswordMetadata = {
   rows: number;
   cols: number;
   nextWordNumber?: number;
-
-  // editor-state (не критично для ученика, но нужно админу)
   placingWord?: {
     text: string;
     direction: WordDir;
     number: number;
   } | null;
-
   deleteMode?: boolean;
 };
 
-// ===== Crossword =====
 export type CrosswordQuestion = BaseQuestion & {
   type: "crossword";
-  grid: string[][]; // letters (admin view)
+  grid: string[][];
   words: CWWord[];
   blocks?: CWBlock[];
-  cellNumbers?: Record<string, number>; // "r,c" -> number
+  cellNumbers?: Record<string, number>;
   metadata: CrosswordMetadata;
-  // Поле q наследуется от BaseQuestion и является необязательным (опционально)
 };
 
-// ===== Image Map =====
 export type ImageMapPoint = {
   id: string;
-  x: number; // 0..100 (% от ширины)
-  y: number; // 0..100 (% от высоты)
+  x: number;
+  y: number;
   correctAnswerId: string;
-  label?: string; // вспомогательная подпись для админа/ученика
+  label?: string;
 };
 
 export type ImageMapAnswer = {
   id: string;
   text?: string;
-  media?: MediaAttachment[];   // может быть картинкой
+  media?: MediaAttachment[];
 };
 
 export type ImageMapQuestion = BaseQuestion & {
   type: "imagemap";
-  image: string;               // URL центральной картинки (обязателен)
+  image: string;
   points: ImageMapPoint[];
   answers: ImageMapAnswer[];
 };
 
-// ===== Union =====
 export type Question =
   | TestQuestion
   | FillQuestion
@@ -166,11 +286,90 @@ export type Question =
   | ImageMapQuestion
   | ReadingQuestion;
 
-// ===== Helpers =====
+
+// ==========================================
+// БЛОК 3: ФУНКЦИИ-ХЕЛПЕРЫ (FACTORY)
+// ==========================================
+
 export function deepClone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v));
 }
 
+// Хелпер для создания новых блоков ознакомительного режима
+export function newBlock(type: BlockType): InfoBlock {
+  const id = crypto.randomUUID();
+
+  switch (type) {
+    case "hero":
+      return {
+        id,
+        type: "hero",
+        data: { title: "Новый заголовок", badge: "", subtitle: "", pills: [] },
+      };
+    case "text_section":
+      return {
+        id,
+        type: "text_section",
+        data: { label: "", title: "", content: "Текст блока..." },
+      };
+    case "alert":
+      return {
+        id,
+        type: "alert",
+        data: { theme: "info", icon: "ℹ️", content: "Обратите внимание..." },
+      };
+    case "video":
+      return {
+        id,
+        type: "video",
+        data: { url: "", caption: "Название видео", subCaption: "" },
+      };
+    case "cards_grid":
+      return {
+        id,
+        type: "cards_grid",
+        data: {
+          columns: 2,
+          items: [
+            { id: crypto.randomUUID(), title: "Карточка 1", content: "Описание", theme: "default" },
+            { id: crypto.randomUUID(), title: "Карточка 2", content: "Описание", theme: "default" },
+          ],
+        },
+      };
+    case "accordion":
+      return {
+        id,
+        type: "accordion",
+        data: {
+          items: [
+            { id: crypto.randomUUID(), title: "Новый вопрос/задание", content: "Описание", tag: "" },
+          ],
+        },
+      };
+    case "downloads":
+      return {
+        id,
+        type: "downloads",
+        data: {
+          files: [
+            {
+              id: crypto.randomUUID(),
+              name: "Новый файл",
+              url: "",
+              fileType: "PDF",
+              theme: "default",
+              icon: "📄",
+            },
+          ],
+        },
+      };
+    default:
+      // Фолбэк на базовый текст, если что-то пошло не так
+      return { id, type: "text_section", data: { content: "" } } as TextSectionBlock;
+  }
+}
+
+// Хелпер для создания новых вопросов (оставлен без изменений)
 export function newQuestion(type: QuestionType): Question {
   const id = crypto.randomUUID();
 
@@ -186,7 +385,7 @@ export function newQuestion(type: QuestionType): Question {
         { id: crypto.randomUUID(), text: "", media: [] },
         { id: crypto.randomUUID(), text: "", media: [] },
       ],
-      correct: [0], // По умолчанию первый вариант верный
+      correct: [0],
     };
   }
 
@@ -247,20 +446,10 @@ export function newQuestion(type: QuestionType): Question {
       image: "",
       media: [],
       points: [
-        {
-          id: firstPointId,
-          x: 50,
-          y: 50,
-          correctAnswerId: firstAnswerId,
-          label: "Точка 1",
-        },
+        { id: firstPointId, x: 50, y: 50, correctAnswerId: firstAnswerId, label: "Точка 1" },
       ],
       answers: [
-        {
-          id: firstAnswerId,
-          text: "Ответ 1",
-          media: [],
-        },
+        { id: firstAnswerId, text: "Ответ 1", media: [] },
       ],
     };
   }
@@ -291,11 +480,10 @@ export function newQuestion(type: QuestionType): Question {
     };
   }
 
-  // crossword
   return {
     id,
     type: "crossword",
-    q: "", // опциональное поле, может быть пустым
+    q: "",
     media: [],
     grid: Array.from({ length: 15 }, () => Array.from({ length: 15 }, () => "")),
     words: [],

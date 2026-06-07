@@ -12,7 +12,7 @@ type Body = {
   assignmentId: string;
   answers: Record<string, any>;
   isCompleted: boolean;
-  score: number;           // присланный клиентом балл игнорируется
+  score: number | null;    // присланный клиентом балл игнорируется
   source?: string;
   sourceId?: string;
   branchType?: string;
@@ -186,16 +186,23 @@ export async function POST(req: Request) {
     );
   }
 
-  const questions = assignment.content?.questions;
-  if (!Array.isArray(questions)) {
-    return NextResponse.json(
-      { ok: false, error: "Некорректное содержимое задания" },
-      { status: 500 }
-    );
-  }
+  // =================================================================
+  // ЛОГИКА ОПРЕДЕЛЕНИЯ БАЛЛОВ (ИНТЕРАКТИВНЫЙ VS ОЗНАКОМИТЕЛЬНЫЙ)
+  // =================================================================
+  const isInformational = assignment.content?.mode === "informational";
+  let realScore: number | null = null;
 
-  const { stats } = calcAndBuildReview(questions, body.answers);
-  const realScore = normalizeScore(stats.score);
+  if (!isInformational) {
+    const questions = assignment.content?.questions;
+    if (!Array.isArray(questions)) {
+      return NextResponse.json(
+        { ok: false, error: "Некорректное содержимое задания" },
+        { status: 500 }
+      );
+    }
+    const { stats } = calcAndBuildReview(questions, body.answers);
+    realScore = normalizeScore(stats.score);
+  }
 
   const payload = {
     user_id: auth.user.id,
@@ -219,19 +226,24 @@ export async function POST(req: Request) {
 
   if (gatehouse) {
     const materialId = getMaterialId(assignment);
-    const recommendation = recommendGatehouseLevel({
-      score: realScore,
-      maxScore: 100,
-      percent: realScore,
-      materialLevels: getMaterialLevels(assignment),
-    });
+    
+    // Если это ознакомительное задание, рекомендация не выдается
+    let recommendation: any = null;
+    if (!isInformational && realScore !== null) {
+      recommendation = recommendGatehouseLevel({
+        score: realScore,
+        maxScore: 100,
+        percent: realScore,
+        materialLevels: getMaterialLevels(assignment),
+      });
+    }
 
     const examResultPayload = {
       user_id: auth.user.id,
       assignment_id: body.assignmentId,
       material_id: materialId,
       score: realScore,
-      recommended_level: recommendation.recommendedLevel,
+      recommended_level: recommendation?.recommendedLevel || null,
       breakdown: {
         recommendation,
         source: body.source ?? null,

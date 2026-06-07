@@ -17,10 +17,14 @@ import MediaRenderer from "./components/MediaRenderer";
 import ReviewPanel from "./components/ReviewPanel";
 import ImageModal from "./components/ImageModal";
 
+// === НОВЫЙ КОМПОНЕНТ ОЗНАКОМИТЕЛЬНОГО РЕЖИМА ===
+import BlockRenderer from "./components/BlockRenderer";
+
 // === ЛОГИКА И ТИПЫ ===
 import { getImageUrl } from "./lib/image";
 import type { FinalStats, ReviewItem, QuestionAny, AssignmentData } from "./lib/types";
 import { validateAllAnswered, calcAndBuildReview, isQuestionAnswered } from "./lib/scoring";
+import type { InfoBlock } from "@/app/(admin)/admin/assignments/builder/types";
 
 import {
   recommendGatehouseLevel,
@@ -84,7 +88,12 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [assignment, setAssignment] = useState<AssignmentData | null>(null);
+  
+  // Разделение состояния на интерактивный и ознакомительный
+  const [assignmentMode, setAssignmentMode] = useState<"interactive" | "informational">("interactive");
   const [questions, setQuestions] = useState<QuestionAny[]>([]);
+  const [blocks, setBlocks] = useState<InfoBlock[]>([]);
+
   const [previousProgress, setPreviousProgress] = useState<ApiOk["progress"]>(null);
   const [showChoice, setShowChoice] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
@@ -99,8 +108,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   const [isSaving, setIsSaving] = useState(false);
   const saveBusyRef = useRef(false);
 
-  // --- PRELOAD следующего вопроса (без обнуления src, чтобы не отменять загрузку последней картинки) ---
+  // --- PRELOAD следующего вопроса (работает только для интерактивного режима) ---
   useEffect(() => {
+    if (assignmentMode !== "interactive") return;
     const nextIndex = currentIndex + 1;
     if (!questions[nextIndex]) return;
 
@@ -126,20 +136,17 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     }
 
     const preloads = urls.map(({ type, url }) => {
-      // Изображения – просто запускаем загрузку, в cleanup ничего не делаем
       if (type.startsWith("image") || url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i)) {
         const img = new window.Image();
         img.src = url;
         return { cleanup: () => {} };
       }
-      // Аудио – аналогично
       if (type.startsWith("audio") || url.match(/\.(mp3|wav|ogg)$/i)) {
         const audio = new window.Audio();
         audio.preload = "auto";
         audio.src = url;
         return { cleanup: () => {} };
       }
-      // PDF – используем AbortController
       if (type.startsWith("pdf") || url.match(/\.pdf$/i)) {
         const controller = new AbortController();
         fetch(url, { method: "HEAD", signal: controller.signal }).catch(() => {});
@@ -151,7 +158,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     return () => {
       preloads.forEach(p => p.cleanup());
     };
-  }, [currentIndex, questions]);
+  }, [currentIndex, questions, assignmentMode]);
 
   // --- THEME LOGIC ---
   const isGatehouse = useMemo(() => {
@@ -214,9 +221,17 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         throw new Error((json as ApiErr).error || "Не удалось загрузить задание");
       }
 
-      setAssignment(json.assignment);
-      const qs = normalizeQuestions(json.assignment?.content?.questions);
-      setQuestions(qs);
+      const data = json.assignment;
+      setAssignment(data);
+
+      if (data?.content?.mode === "informational") {
+        setAssignmentMode("informational");
+        setBlocks(data.content.blocks || []);
+      } else {
+        setAssignmentMode("interactive");
+        setQuestions(normalizeQuestions(data?.content?.questions));
+      }
+
       setPreviousProgress(json.progress);
 
       if (json.progress?.is_completed) {
@@ -297,6 +312,44 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     setGatehouseRecommendation(null);
   }
 
+  // Сохранение для ознакомительных гайдов (БЕЗ БАЛЛОВ)
+  async function finishInformational() {
+    if (saveBusyRef.current) return;
+    saveBusyRef.current = true;
+    setIsSaving(true);
+
+    try {
+      const payload = {
+        assignmentId,
+        answers: {}, // Нет ответов
+        isCompleted: true,
+        score: null, // Нет баллов
+        source,
+        sourceId,
+        branchType: isGatehouse ? "gatehouse" : "olympiad",
+      };
+
+      const res = await fetch("/api/assignment-progress", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setCompletedScreen(true);
+        window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
+      } else {
+        alert("Ошибка при сохранении результатов");
+      }
+    } catch (e) {
+      alert("Сетевая ошибка при сохранении прогресса");
+    } finally {
+      saveBusyRef.current = false;
+      setIsSaving(false);
+    }
+  }
+
+  // Сохранение для интерактивных тестов (С БАЛЛАМИ)
   async function saveProgressAndShowResults(clientStats: FinalStats, review: ReviewItem[]) {
     if (saveBusyRef.current) return;
     saveBusyRef.current = true;
@@ -448,7 +501,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           </div>
 
           <div className="assignment-badge" style={{ background: theme.primary }}>
-            {theme.badge}
+            {assignmentMode === "informational" ? "GUIDE" : theme.badge}
           </div>
         </div>
       </header>
@@ -457,23 +510,27 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         {/* ЭКРАН ВЫБОРА РЕЖИМА */}
         {showChoice && (
           <div className="premium-card animate-in" style={{ background: theme.cardBg }}>
-            <h2 className="card-title">Предыдущий результат</h2>
+            <h2 className="card-title">
+              {assignmentMode === "informational" ? "Материал уже изучен" : "Предыдущий результат"}
+            </h2>
             <p className="card-subtitle">
-              У вас уже есть сохраненный прогресс. Хотите начать с чистого листа или просто посмотреть ошибки?
+              {assignmentMode === "informational" 
+                ? "Вы уже ознакомились с этим гайдом. Хотите просмотреть его снова?" 
+                : "У вас уже есть сохраненный прогресс. Хотите начать с чистого листа или просто посмотреть ошибки?"}
             </p>
             <div className="button-group">
               <button className="btn-premium primary" style={{ background: theme.primary }} onClick={startFresh}>
-                Начать заново
+                {assignmentMode === "informational" ? "Изучить заново" : "Начать заново"}
               </button>
               <button className="btn-premium secondary" onClick={viewPrevious}>
-                Посмотреть ответы
+                {assignmentMode === "informational" ? "Перейти к материалу" : "Посмотреть ответы"}
               </button>
             </div>
           </div>
         )}
 
-        {/* ЭКРАН РЕЗУЛЬТАТОВ */}
-        {completedScreen && finalStats && (
+        {/* ЭКРАН РЕЗУЛЬТАТОВ (ДЛЯ ТЕСТОВ) */}
+        {completedScreen && assignmentMode === "interactive" && finalStats && (
           <div className="premium-card animate-in" style={{ background: theme.cardBg }}>
             <div className="score-circle" style={{ borderColor: theme.primary }}>
               <span className="score-value" style={{ color: theme.primary }}>
@@ -527,165 +584,200 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           </div>
         )}
 
+        {/* ЭКРАН ЗАВЕРШЕНИЯ (ДЛЯ ГАЙДОВ) */}
+        {completedScreen && assignmentMode === "informational" && (
+          <div className="premium-card animate-in" style={{ background: theme.cardBg, textAlign: "center", padding: "60px 20px" }}>
+            <div style={{ fontSize: "72px", marginBottom: "24px" }}>🎉</div>
+            <h2 className="card-title" style={{ fontSize: "28px" }}>Материал успешно изучен!</h2>
+            <p className="card-subtitle" style={{ fontSize: "16px", marginTop: "12px" }}>
+              Вы ознакомились со всеми файлами и правилами из этого раздела. 
+            </p>
+            <div style={{ marginTop: "40px", display: "flex", justifyContent: "center" }}>
+              <button
+                className="btn-premium primary"
+                style={{ background: theme.primary, minWidth: "250px" }}
+                onClick={() => router.push(back.href)}
+              >
+                Вернуться к списку
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ПРОЦЕСС ВЫПОЛНЕНИЯ ЗАДАНИЯ */}
-        {!showChoice && !completedScreen && assignment && questions.length > 0 && (
+        {!showChoice && !completedScreen && assignment && (
           <div className="assignment-layout animate-in">
-            {/* ====== ПРОГРЕСС-БАР ====== */}
-            {questions.length > 1 && (
-              <div className="progress-container">
-                <div className="progress-dots">
-                  {questions.map((q, i) => {
-                    const isCurrent = i === currentIndex;
-                    const answered = isQuestionAnswered(q, getAnswerForQuestion(i));
-                    const dotSize = questions.length > 25 ? 8 : questions.length > 15 ? 10 : 13;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => setCurrentIndex(i)}
-                        title={`Вопрос ${i + 1}${answered ? " ✓" : ""}`}
-                        style={{
-                          width: dotSize,
-                          height: dotSize,
-                          minWidth: dotSize,
-                          borderRadius: "50%",
-                          border: isCurrent ? `2px solid ${theme.primary}` : "2px solid transparent",
-                          background: isCurrent
-                            ? theme.primary
-                            : answered
-                            ? `${theme.primary}66`
-                            : "rgba(0,0,0,0.1)",
-                          cursor: "pointer",
-                          padding: 0,
-                          transition: "all 0.2s ease",
-                          transform: isCurrent ? "scale(1.4)" : "scale(1)",
-                          boxShadow: isCurrent ? `0 0 0 3px ${theme.primary}22` : "none",
-                          flexShrink: 0,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-
-                <div className="progress-bar-bg">
-                  <div
-                    className="progress-fill"
-                    style={{
-                      width: `${((currentIndex + 1) / questions.length) * 100}%`,
-                      background: theme.primary,
-                    }}
-                  />
-                </div>
-                <div className="progress-info">
-                  <span>
-                    Вопрос {currentIndex + 1} из {questions.length}
-                  </span>
-                  <span style={{ fontSize: "12px", opacity: 0.45 }}>
-                    {answeredCount} / {questions.length} заполнено
-                  </span>
-                  {isViewMode && <span className="view-mode-tag">РЕЖИМ ПРОСМОТРА</span>}
-                </div>
-              </div>
-            )}
-
-            {questions[currentIndex] && (
-              <div key={currentIndex} className="premium-card active-question" style={{ background: theme.cardBg }}>
-                {/* ======== ЗАГОЛОВОК ВОПРОСА ======== */}
-                {questions[currentIndex]!.q && (
-                  <h2 className="question-title">
-                    {questions.length > 1 ? `${currentIndex + 1}. ` : ""}
-                    {questions[currentIndex]!.q}
-                  </h2>
-                )}
-
-                {/* ======== МАТЕРИАЛЫ К ВОПРОСУ ======== */}
-                {/* Для complex и reading медиа рендерит сам компонент, чтобы избежать дублирования */}
-                {questions[currentIndex]!.type !== "complex" && questions[currentIndex]!.type !== "reading" && (
-                  ((questions[currentIndex]!.media?.length ?? 0) > 0 ||
-                    (questions[currentIndex]!.image &&
-                      questions[currentIndex]!.type !== "crossword" &&
-                      questions[currentIndex]!.type !== "imagemap")) && (
-                    <div className="materials-block">
-                      <div className="materials-label">МАТЕРИАЛЫ К ВОПРОСУ</div>
-                      {(questions[currentIndex]!.media?.length ?? 0) > 0 && (
-                        <MediaRenderer media={questions[currentIndex]!.media} />
-                      )}
-                      {!(questions[currentIndex]!.media?.length ?? 0) &&
-                        questions[currentIndex]!.image &&
-                        questions[currentIndex]!.type !== "crossword" &&
-                        questions[currentIndex]!.type !== "imagemap" && (
-                          <div
-                            className="optimized-image-wrapper"
-                            onClick={() => openImage(getImageUrl(questions[currentIndex]!.image!))}
-                          >
-                            <Image
-                              src={getImageUrl(questions[currentIndex]!.image!)}
-                              alt="task-media"
-                              width={800}
-                              height={600}
-                              priority={true}
-                              unoptimized={true}
+            
+            {/* ЕСЛИ ЭТО ОЗНАКОМИТЕЛЬНЫЙ РЕЖИМ */}
+            {assignmentMode === "informational" ? (
+              <BlockRenderer 
+                blocks={blocks} 
+                onComplete={finishInformational} 
+                disabled={isViewMode} 
+                isSaving={isSaving} 
+              />
+            ) : (
+              /* ЕСЛИ ЭТО ИНТЕРАКТИВНЫЙ РЕЖИМ (ТЕСТЫ) */
+              questions.length > 0 && (
+                <>
+                  {/* ====== ПРОГРЕСС-БАР ====== */}
+                  {questions.length > 1 && (
+                    <div className="progress-container">
+                      <div className="progress-dots">
+                        {questions.map((q, i) => {
+                          const isCurrent = i === currentIndex;
+                          const answered = isQuestionAnswered(q, getAnswerForQuestion(i));
+                          const dotSize = questions.length > 25 ? 8 : questions.length > 15 ? 10 : 13;
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => setCurrentIndex(i)}
+                              title={`Вопрос ${i + 1}${answered ? " ✓" : ""}`}
                               style={{
-                                width: "100%",
-                                height: "auto",
-                                borderRadius: "20px",
-                                cursor: "zoom-in",
-                                objectFit: "contain",
-                                boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
+                                width: dotSize,
+                                height: dotSize,
+                                minWidth: dotSize,
+                                borderRadius: "50%",
+                                border: isCurrent ? `2px solid ${theme.primary}` : "2px solid transparent",
+                                background: isCurrent
+                                  ? theme.primary
+                                  : answered
+                                  ? `${theme.primary}66`
+                                  : "rgba(0,0,0,0.1)",
+                                cursor: "pointer",
+                                padding: 0,
+                                transition: "all 0.2s ease",
+                                transform: isCurrent ? "scale(1.4)" : "scale(1)",
+                                boxShadow: isCurrent ? `0 0 0 3px ${theme.primary}22` : "none",
+                                flexShrink: 0,
                               }}
                             />
-                          </div>
-                        )}
+                          );
+                        })}
+                      </div>
+
+                      <div className="progress-bar-bg">
+                        <div
+                          className="progress-fill"
+                          style={{
+                            width: `${((currentIndex + 1) / questions.length) * 100}%`,
+                            background: theme.primary,
+                          }}
+                        />
+                      </div>
+                      <div className="progress-info">
+                        <span>
+                          Вопрос {currentIndex + 1} из {questions.length}
+                        </span>
+                        <span style={{ fontSize: "12px", opacity: 0.45 }}>
+                          {answeredCount} / {questions.length} заполнено
+                        </span>
+                        {isViewMode && <span className="view-mode-tag">РЕЖИМ ПРОСМОТРА</span>}
+                      </div>
                     </div>
-                  )
-                )}
-
-                {/* ======== СОДЕРЖИМОЕ ВОПРОСА ======== */}
-                <div className="answer-block">
-                  {((questions[currentIndex]!.media?.length ?? 0) > 0 ||
-                    (questions[currentIndex]!.image &&
-                      questions[currentIndex]!.type !== "crossword" &&
-                      questions[currentIndex]!.type !== "imagemap") ||
-                    questions[currentIndex]!.q) ? (
-                    <div className="answer-label">СОДЕРЖИМОЕ ЗАДАНИЯ</div>
-                  ) : null}
-                  <div className="question-content">
-                    {renderQuestionComponent(questions[currentIndex]!, currentIndex)}
-                  </div>
-                </div>
-
-                <div className="navigation-footer">
-                  <button
-                    className="nav-btn"
-                    disabled={currentIndex === 0 || isSaving}
-                    onClick={() => setCurrentIndex((i) => i - 1)}
-                    style={{ opacity: currentIndex === 0 ? 0.3 : 1 }}
-                  >
-                    Назад
-                  </button>
-
-                  {currentIndex < questions.length - 1 ? (
-                    <button
-                      className="btn-premium primary"
-                      style={{ flex: 1, background: theme.primary }}
-                      disabled={isSaving}
-                      onClick={() => setCurrentIndex((i) => i + 1)}
-                    >
-                      Далее
-                    </button>
-                  ) : (
-                    !isViewMode && (
-                      <button
-                        className="btn-premium finish"
-                        style={{ flex: 1, opacity: isSaving ? 0.7 : 1 }}
-                        disabled={isSaving}
-                        onClick={finish}
-                      >
-                        {isSaving ? "Сохраняем..." : "Завершить и проверить"}
-                      </button>
-                    )
                   )}
-                </div>
-              </div>
+
+                  {questions[currentIndex] && (
+                    <div key={currentIndex} className="premium-card active-question" style={{ background: theme.cardBg }}>
+                      {/* ======== ЗАГОЛОВОК ВОПРОСА ======== */}
+                      {questions[currentIndex]!.q && (
+                        <h2 className="question-title">
+                          {questions.length > 1 ? `${currentIndex + 1}. ` : ""}
+                          {questions[currentIndex]!.q}
+                        </h2>
+                      )}
+
+                      {/* ======== МАТЕРИАЛЫ К ВОПРОСУ ======== */}
+                      {questions[currentIndex]!.type !== "complex" && questions[currentIndex]!.type !== "reading" && (
+                        ((questions[currentIndex]!.media?.length ?? 0) > 0 ||
+                          (questions[currentIndex]!.image &&
+                            questions[currentIndex]!.type !== "crossword" &&
+                            questions[currentIndex]!.type !== "imagemap")) && (
+                          <div className="materials-block">
+                            <div className="materials-label">МАТЕРИАЛЫ К ВОПРОСУ</div>
+                            {(questions[currentIndex]!.media?.length ?? 0) > 0 && (
+                              <MediaRenderer media={questions[currentIndex]!.media} />
+                            )}
+                            {!(questions[currentIndex]!.media?.length ?? 0) &&
+                              questions[currentIndex]!.image &&
+                              questions[currentIndex]!.type !== "crossword" &&
+                              questions[currentIndex]!.type !== "imagemap" && (
+                                <div
+                                  className="optimized-image-wrapper"
+                                  onClick={() => openImage(getImageUrl(questions[currentIndex]!.image!))}
+                                >
+                                  <Image
+                                    src={getImageUrl(questions[currentIndex]!.image!)}
+                                    alt="task-media"
+                                    width={800}
+                                    height={600}
+                                    priority={true}
+                                    unoptimized={true}
+                                    style={{
+                                      width: "100%",
+                                      height: "auto",
+                                      borderRadius: "20px",
+                                      cursor: "zoom-in",
+                                      objectFit: "contain",
+                                      boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
+                                    }}
+                                  />
+                                </div>
+                              )}
+                          </div>
+                        )
+                      )}
+
+                      {/* ======== СОДЕРЖИМОЕ ВОПРОСА ======== */}
+                      <div className="answer-block">
+                        {((questions[currentIndex]!.media?.length ?? 0) > 0 ||
+                          (questions[currentIndex]!.image &&
+                            questions[currentIndex]!.type !== "crossword" &&
+                            questions[currentIndex]!.type !== "imagemap") ||
+                          questions[currentIndex]!.q) ? (
+                          <div className="answer-label">СОДЕРЖИМОЕ ЗАДАНИЯ</div>
+                        ) : null}
+                        <div className="question-content">
+                          {renderQuestionComponent(questions[currentIndex]!, currentIndex)}
+                        </div>
+                      </div>
+
+                      <div className="navigation-footer">
+                        <button
+                          className="nav-btn"
+                          disabled={currentIndex === 0 || isSaving}
+                          onClick={() => setCurrentIndex((i) => i - 1)}
+                          style={{ opacity: currentIndex === 0 ? 0.3 : 1 }}
+                        >
+                          Назад
+                        </button>
+
+                        {currentIndex < questions.length - 1 ? (
+                          <button
+                            className="btn-premium primary"
+                            style={{ flex: 1, background: theme.primary }}
+                            disabled={isSaving}
+                            onClick={() => setCurrentIndex((i) => i + 1)}
+                          >
+                            Далее
+                          </button>
+                        ) : (
+                          !isViewMode && (
+                            <button
+                              className="btn-premium finish"
+                              style={{ flex: 1, opacity: isSaving ? 0.7 : 1 }}
+                              disabled={isSaving}
+                              onClick={finish}
+                            >
+                              {isSaving ? "Сохраняем..." : "Завершить и проверить"}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )
             )}
           </div>
         )}

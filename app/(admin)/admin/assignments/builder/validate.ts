@@ -1,5 +1,5 @@
 // app/(admin)/admin/assignments/builder/validate.ts
-import type { Question, TestQuestion } from "./types";
+import type { Question, TestQuestion, InfoBlock } from "./types";
 
 export type ValidationIssue = {
   index: number; // -1 для общих ошибок
@@ -11,10 +11,13 @@ export type ValidationResult = {
   issues: ValidationIssue[];
 };
 
+// ==========================================
+// ВАЛИДАЦИЯ ИНТЕРАКТИВНОГО РЕЖИМА (ВОПРОСЫ)
+// ==========================================
 export function validateQuestions(questions: Question[]): ValidationResult {
   const issues: ValidationIssue[] = [];
 
-  if (!questions.length) {
+  if (!questions || !questions.length) {
     issues.push({ index: -1, message: "Нет ни одного вопроса" });
     return { ok: false, issues };
   }
@@ -117,7 +120,6 @@ export function validateQuestions(questions: Question[]): ValidationResult {
     }
 
     if (q.type === "reading") {
-      // Общий текст или медиа должны быть
       if (!q.text?.trim() && (!q.media || q.media.length === 0)) {
         issues.push({ index, message: "Добавьте текст для чтения или прикрепите медиа" });
       }
@@ -125,13 +127,89 @@ export function validateQuestions(questions: Question[]): ValidationResult {
       if (!q.subQuestions?.length) {
         issues.push({ index, message: "Добавьте хотя бы один подвопрос" });
       } else {
-        // Каждый подвопрос — TestQuestion, проверяем как обычный тест
         (q.subQuestions as TestQuestion[]).forEach((subQ: TestQuestion, subIdx: number) => {
           if (!subQ.options || subQ.options.length < 2) {
             issues.push({ index, message: `Подвопрос ${subIdx + 1}: минимум 2 варианта ответа` });
           }
           if (!subQ.correct || subQ.correct.length === 0) {
             issues.push({ index, message: `Подвопрос ${subIdx + 1}: выберите хотя бы один правильный ответ` });
+          }
+        });
+      }
+    }
+  });
+
+  return { ok: issues.length === 0, issues };
+}
+
+
+// ==========================================
+// ВАЛИДАЦИЯ ОЗНАКОМИТЕЛЬНОГО РЕЖИМА (БЛОКИ)
+// ==========================================
+export function validateBlocks(blocks: InfoBlock[]): ValidationResult {
+  const issues: ValidationIssue[] = [];
+
+  if (!blocks || !blocks.length) {
+    issues.push({ index: -1, message: "Нет ни одного блока. Добавьте хотя бы один." });
+    return { ok: false, issues };
+  }
+
+  blocks.forEach((block, index) => {
+    if (block.type === "hero") {
+      if (!block.data.title?.trim()) {
+        issues.push({ index, message: "Блок 'Обложка': добавьте заголовок." });
+      }
+    }
+
+    if (block.type === "text_section") {
+      if (!block.data.content?.trim()) {
+        issues.push({ index, message: "Блок 'Текст': содержимое не может быть пустым." });
+      }
+    }
+
+    if (block.type === "alert") {
+      if (!block.data.content?.trim()) {
+        issues.push({ index, message: "Блок 'Предупреждение': введите текст предупреждения." });
+      }
+    }
+
+    if (block.type === "video") {
+      if (!block.data.url?.trim()) {
+        issues.push({ index, message: "Блок 'Видео': укажите ссылку на видео (URL)." });
+      }
+    }
+
+    if (block.type === "cards_grid") {
+      if (!block.data.items || block.data.items.length === 0) {
+        issues.push({ index, message: "Блок 'Сетка карточек': добавьте хотя бы одну карточку." });
+      } else {
+        block.data.items.forEach((item, i) => {
+          if (!item.title?.trim()) {
+            issues.push({ index, message: `Сетка карточек (Карточка ${i + 1}): укажите заголовок.` });
+          }
+        });
+      }
+    }
+
+    if (block.type === "accordion") {
+      if (!block.data.items || block.data.items.length === 0) {
+        issues.push({ index, message: "Блок 'Спойлеры/FAQ': добавьте хотя бы один пункт." });
+      } else {
+        block.data.items.forEach((item, i) => {
+          if (!item.title?.trim() || !item.content?.trim()) {
+            issues.push({ index, message: `Спойлеры (Пункт ${i + 1}): укажите заголовок и содержимое.` });
+          }
+        });
+      }
+    }
+
+    if (block.type === "downloads") {
+      if (!block.data.files || block.data.files.length === 0) {
+        issues.push({ index, message: "Блок 'Файлы': добавьте хотя бы один файл для скачивания." });
+      } else {
+        block.data.files.forEach((file, i) => {
+          if (!file.name?.trim() || !file.url?.trim()) {
+            issues.push({ index, message: `Файлы (Файл ${i + 1}): укажите название и прикрепите файл (URL).` });
           }
         });
       }
