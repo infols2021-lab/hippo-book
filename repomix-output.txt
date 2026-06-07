@@ -54,6 +54,9 @@ app/(admin)/admin/admin.css
 app/(admin)/admin/AdminClient.tsx
 app/(admin)/admin/assignments/AssignmentEditor.tsx
 app/(admin)/admin/assignments/AssignmentsTab.tsx
+app/(admin)/admin/assignments/builder/blocks/BlockItem.tsx
+app/(admin)/admin/assignments/builder/blocks/BlockList.tsx
+app/(admin)/admin/assignments/builder/blocks/BlockTypeSwitch.tsx
 app/(admin)/admin/assignments/builder/complex/ComplexEditor.tsx
 app/(admin)/admin/assignments/builder/crossword/CrosswordEditor.tsx
 app/(admin)/admin/assignments/builder/crossword/GridEditor.tsx
@@ -88,6 +91,8 @@ app/(app)/assignment/[id]/page.tsx
 app/(app)/assignment/assignment.css
 app/(app)/assignment/AssignmentClient.tsx
 app/(app)/assignment/components/AssignmentHeader.tsx
+app/(app)/assignment/components/BlockRenderer.tsx
+app/(app)/assignment/components/blocks/InformationalBlocks.tsx
 app/(app)/assignment/components/CompletionScreen.tsx
 app/(app)/assignment/components/ImageModal.tsx
 app/(app)/assignment/components/MediaRenderer.tsx
@@ -1477,261 +1482,6 @@ File: app/(admin)/admin/admin.css
 
 .modal-close:hover {
   background: rgba(0,0,0,0.06);
-}
-
-================
-File: app/(admin)/admin/assignments/AssignmentEditor.tsx
-================
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import LoadingBlock from "@/components/LoadingBlock";
-import ErrorBox from "@/components/ErrorBox";
-
-import type { EditorMode, Question } from "./builder/types";
-import { deepClone, newQuestion } from "./builder/types";
-import { validateQuestions } from "./builder/validate";
-
-import QuestionList from "./builder/QuestionList";
-import JsonEditor from "./builder/json/JsonEditor";
-
-type MaterialOption =
-  | {
-      branch_type: "olympiad";
-      kind: "textbook";
-      id: string;
-      title: string;
-      material_kind?: "textbook";
-    }
-  | {
-      branch_type: "olympiad";
-      kind: "crossword";
-      id: string;
-      title: string;
-      material_kind?: "crossword";
-    }
-  | {
-      branch_type: "gatehouse";
-      kind: "material";
-      id: string;
-      title: string;
-      material_kind: string;
-    };
-
-type AssignmentRow = {
-  id: string;
-  title: string;
-  order_index: number | null;
-  branch_type?: string | null;
-  material_id?: string | null;
-  textbook_id: string | null;
-  crossword_id: string | null;
-  content: any;
-};
-
-type Props = {
-  material: MaterialOption | null;
-  editing: AssignmentRow | null;
-  onCancel: () => void;
-  onSaved: () => Promise<void>;
-};
-
-async function safeJson(res: Response) {
-  const text = await res.text();
-
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { ok: false, error: text };
-  }
-}
-
-function materialIcon(material: MaterialOption | null) {
-  if (!material) return "—";
-  if (material.kind === "textbook") return "📚";
-  if (material.kind === "crossword") return "🧩";
-  return "🎓";
-}
-
-function materialLabel(material: MaterialOption | null) {
-  if (!material) return "—";
-
-  if (material.kind === "textbook") return `📚 ${material.title}`;
-  if (material.kind === "crossword") return `🧩 ${material.title}`;
-
-  return `🎓 ${material.title}`;
-}
-
-export default function AssignmentEditor({ material, editing, onCancel, onSaved }: Props) {
-  const [mode, setMode] = useState<EditorMode>("visual");
-
-  const [title, setTitle] = useState<string>(editing?.title ?? "");
-  const [orderIndex, setOrderIndex] = useState<number>(Number(editing?.order_index ?? 0));
-
-  const initialQuestions: Question[] = useMemo(() => {
-    const qs = editing?.content?.questions;
-    if (Array.isArray(qs) && qs.length) return deepClone(qs);
-    return [newQuestion("test")];
-  }, [editing]);
-
-  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
-
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    setTitle(editing?.title ?? "");
-    setOrderIndex(Number(editing?.order_index ?? 0));
-
-    const qs = editing?.content?.questions;
-    setQuestions(Array.isArray(qs) && qs.length ? deepClone(qs) : [newQuestion("test")]);
-
-    setMode("visual");
-    setErr(null);
-  }, [editing]);
-
-  async function save() {
-    if (!material) {
-      setErr("Сначала выберите материал");
-      return;
-    }
-
-    if (!title.trim()) {
-      setErr("Введите название задания");
-      return;
-    }
-
-    const vr = validateQuestions(questions);
-
-    if (!vr.ok) {
-      const text = vr.issues.map((i) => (i.index >= 0 ? `#${i.index + 1}: ${i.message}` : i.message)).join("\n");
-      setErr(text || "Ошибки в вопросах");
-      return;
-    }
-
-    setErr(null);
-    setSaving(true);
-
-    try {
-      const payload: any = {
-        title: title.trim(),
-        order_index: Number.isFinite(orderIndex) ? orderIndex : 0,
-        content: { questions },
-
-        branch_type: material.branch_type,
-
-        kind: material.kind,
-        material_kind: material.material_kind ?? material.kind,
-
-        material_id: material.kind === "material" ? material.id : null,
-
-        textbook_id: material.kind === "textbook" ? material.id : null,
-        crossword_id: material.kind === "crossword" ? material.id : null,
-      };
-
-      const url = editing?.id ? `/api/admin/assignments/${encodeURIComponent(editing.id)}` : `/api/admin/assignments`;
-      const method = editing?.id ? "PATCH" : "POST";
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await safeJson(res);
-
-      if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || `HTTP ${res.status}`);
-      }
-
-      await onSaved();
-    } catch (e: any) {
-      setErr(e?.message || String(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="card" style={{ marginTop: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-        <div>
-          <h3 style={{ margin: 0 }}>{editing ? "✏️ Редактирование задания" : "➕ Новое задание"}</h3>
-          <div className="small-muted" style={{ marginTop: 4 }}>
-            Материал: <strong>{material ? materialLabel(material) : "—"}</strong>
-          </div>
-          <div className="small-muted" style={{ marginTop: 4 }}>
-            Раздел: <strong>{material?.branch_type === "gatehouse" ? "🎓 Gatehouse Awards" : "🏆 Олимпиада"}</strong>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span className="material-badge">{materialIcon(material)}</span>
-
-          <button
-            className={`btn small ${mode === "visual" ? "" : "ghost"}`}
-            type="button"
-            onClick={() => setMode("visual")}
-            disabled={saving}
-          >
-            🎨 Редактор
-          </button>
-
-          <button
-            className={`btn small ${mode === "json" ? "" : "ghost"}`}
-            type="button"
-            onClick={() => setMode("json")}
-            disabled={saving}
-          >
-            📄 JSON
-          </button>
-        </div>
-      </div>
-
-      <div style={{ height: 12 }} />
-
-      {err ? <ErrorBox message={err} retryMode="none" /> : null}
-      {saving ? <LoadingBlock text="Сохраняем..." /> : null}
-
-      <div className="row" style={{ marginTop: 10 }}>
-        <div className="col" style={{ flex: 1 }}>
-          <label className="small-muted">Название</label>
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={saving} />
-        </div>
-
-        <div className="col" style={{ width: 140 }}>
-          <label className="small-muted">Порядок</label>
-          <input
-            className="input"
-            type="number"
-            value={orderIndex}
-            onChange={(e) => setOrderIndex(Number(e.target.value))}
-            disabled={saving}
-          />
-        </div>
-      </div>
-
-      <div style={{ height: 12 }} />
-
-      {mode === "visual" ? (
-        <QuestionList value={questions} onChange={setQuestions} disabled={saving} />
-      ) : (
-        <JsonEditor value={questions as any[]} onChange={(next) => setQuestions(next as any)} disabled={saving} />
-      )}
-
-      <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 14, flexWrap: "wrap" }}>
-        <button className="btn" type="button" onClick={() => void save()} disabled={saving}>
-          💾 Сохранить
-        </button>
-
-        <button className="btn secondary" type="button" onClick={onCancel} disabled={saving}>
-          ❌ Отмена
-        </button>
-      </div>
-    </div>
-  );
 }
 
 ================
@@ -5751,152 +5501,6 @@ export default function TestEditor({ value, onChange, disabled }: Props) {
       </div>
     </div>
   );
-}
-
-================
-File: app/(admin)/admin/assignments/builder/validate.ts
-================
-// app/(admin)/admin/assignments/builder/validate.ts
-import type { Question, TestQuestion } from "./types";
-
-export type ValidationIssue = {
-  index: number; // -1 для общих ошибок
-  message: string;
-};
-
-export type ValidationResult = {
-  ok: boolean;
-  issues: ValidationIssue[];
-};
-
-export function validateQuestions(questions: Question[]): ValidationResult {
-  const issues: ValidationIssue[] = [];
-
-  if (!questions.length) {
-    issues.push({ index: -1, message: "Нет ни одного вопроса" });
-    return { ok: false, issues };
-  }
-
-  questions.forEach((q, index) => {
-    // Текст или медиа обязательны (кроме кроссворда, imagemap и reading)
-    if (q.type !== "crossword" && q.type !== "imagemap" && q.type !== "reading" && !q.q?.trim() && (!q.media || q.media.length === 0)) {
-      issues.push({ index, message: "Добавьте текст вопроса или прикрепите медиа-файл" });
-    }
-
-    if (q.type === "test") {
-      if (!q.options?.length || q.options.length < 2) {
-        issues.push({ index, message: "Минимум 2 варианта ответа" });
-      }
-      
-      if (!q.correct || q.correct.length === 0) {
-        issues.push({ index, message: "Выберите хотя бы один правильный ответ" });
-      }
-
-      if (!q.multiple && q.correct && q.correct.length > 1) {
-        issues.push({ index, message: "Для одиночного выбора должен быть только 1 правильный ответ" });
-      }
-    }
-
-    if (q.type === "fill") {
-      if (!q.answers?.length) {
-        issues.push({ index, message: "Добавьте хотя бы один правильный ответ" });
-      }
-    }
-
-    if (q.type === "sentence") {
-      const gaps = (q.sentence?.match(/___/g) || []).length;
-      if (!q.sentence?.trim() || gaps === 0) {
-        issues.push({ index, message: "В предложении должны быть пропуски ___" });
-      }
-      if (!Array.isArray(q.answers) || q.answers.length !== gaps) {
-        issues.push({ index, message: "Ответы не совпадают с количеством пропусков" });
-      }
-    }
-
-    if (q.type === "crossword") {
-      if (!q.words?.length) issues.push({ index, message: "В кроссворде нет слов" });
-    }
-
-    if (q.type === "complex") {
-      if (!q.subQuestions?.length) {
-        issues.push({ index, message: "Комплексный вопрос должен содержать хотя бы один подвопрос" });
-      } else {
-        const subRes = validateQuestions(q.subQuestions);
-        if (!subRes.ok) {
-          issues.push({ index, message: "Ошибки в подвопросах комплексного вопроса" });
-        }
-      }
-    }
-
-    if (q.type === "matching") {
-      if (!q.pairs?.length || q.pairs.length < 2) {
-        issues.push({ index, message: "Добавьте минимум 2 пары для сопоставления" });
-      }
-    }
-
-    if (q.type === "imagemap") {
-      if (!q.image || !String(q.image).trim()) {
-        issues.push({ index, message: "Загрузите центральное изображение для карты" });
-      }
-
-      if (!q.points || q.points.length === 0) {
-        issues.push({ index, message: "Добавьте хотя бы одну точку на изображении" });
-      }
-
-      if (!q.answers || q.answers.length === 0) {
-        issues.push({ index, message: "Добавьте хотя бы один вариант ответа" });
-      }
-
-      if (q.points && q.answers) {
-        const answerIds = new Set(q.answers.map(a => a.id));
-        for (const point of q.points) {
-          if (!point.correctAnswerId) {
-            issues.push({ index, message: `Точка "${point.label || point.id}" не связана с ответом` });
-          } else if (!answerIds.has(point.correctAnswerId)) {
-            issues.push({ index, message: `Точка "${point.label || point.id}" ссылается на несуществующий ответ` });
-          }
-        }
-
-        const pointToAnswer = new Map<string, string>();
-        for (const point of q.points) {
-          if (point.correctAnswerId) {
-            const existing = pointToAnswer.get(point.correctAnswerId);
-            if (existing) {
-              issues.push({
-                index,
-                message: `Ответ "${q.answers.find(a => a.id === point.correctAnswerId)?.text || point.correctAnswerId}" используется несколькими точками. Лучше 1:1.`,
-              });
-              break;
-            }
-            pointToAnswer.set(point.correctAnswerId, point.id);
-          }
-        }
-      }
-    }
-
-    if (q.type === "reading") {
-      // Общий текст или медиа должны быть
-      if (!q.text?.trim() && (!q.media || q.media.length === 0)) {
-        issues.push({ index, message: "Добавьте текст для чтения или прикрепите медиа" });
-      }
-
-      if (!q.subQuestions?.length) {
-        issues.push({ index, message: "Добавьте хотя бы один подвопрос" });
-      } else {
-        // Каждый подвопрос — TestQuestion, проверяем как обычный тест
-        (q.subQuestions as TestQuestion[]).forEach((subQ: TestQuestion, subIdx: number) => {
-          if (!subQ.options || subQ.options.length < 2) {
-            issues.push({ index, message: `Подвопрос ${subIdx + 1}: минимум 2 варианта ответа` });
-          }
-          if (!subQ.correct || subQ.correct.length === 0) {
-            issues.push({ index, message: `Подвопрос ${subIdx + 1}: выберите хотя бы один правильный ответ` });
-          }
-        });
-      }
-    }
-  });
-
-  return { ok: issues.length === 0, issues };
 }
 
 ================
@@ -30736,6 +30340,883 @@ export default function AdminClient() {
 }
 
 ================
+File: app/(admin)/admin/assignments/AssignmentEditor.tsx
+================
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import LoadingBlock from "@/components/LoadingBlock";
+import ErrorBox from "@/components/ErrorBox";
+
+import type { EditorMode, AssignmentMode, Question, InfoBlock } from "./builder/types";
+import { deepClone, newQuestion, newBlock } from "./builder/types";
+import { validateQuestions, validateBlocks } from "./builder/validate";
+
+import QuestionList from "./builder/QuestionList";
+import BlockList from "./builder/blocks/BlockList"; // НОВЫЙ КОМПОНЕНТ ДЛЯ БЛОКОВ
+import JsonEditor from "./builder/json/JsonEditor";
+
+type MaterialOption =
+  | {
+      branch_type: "olympiad";
+      kind: "textbook";
+      id: string;
+      title: string;
+      material_kind?: "textbook";
+    }
+  | {
+      branch_type: "olympiad";
+      kind: "crossword";
+      id: string;
+      title: string;
+      material_kind?: "crossword";
+    }
+  | {
+      branch_type: "gatehouse";
+      kind: "material";
+      id: string;
+      title: string;
+      material_kind: string;
+    };
+
+type AssignmentRow = {
+  id: string;
+  title: string;
+  order_index: number | null;
+  branch_type?: string | null;
+  material_id?: string | null;
+  textbook_id: string | null;
+  crossword_id: string | null;
+  content: any;
+};
+
+type Props = {
+  material: MaterialOption | null;
+  editing: AssignmentRow | null;
+  onCancel: () => void;
+  onSaved: () => Promise<void>;
+};
+
+async function safeJson(res: Response) {
+  const text = await res.text();
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: false, error: text };
+  }
+}
+
+function materialIcon(material: MaterialOption | null) {
+  if (!material) return "—";
+  if (material.kind === "textbook") return "📚";
+  if (material.kind === "crossword") return "🧩";
+  return "🎓";
+}
+
+function materialLabel(material: MaterialOption | null) {
+  if (!material) return "—";
+
+  if (material.kind === "textbook") return `📚 ${material.title}`;
+  if (material.kind === "crossword") return `🧩 ${material.title}`;
+
+  return `🎓 ${material.title}`;
+}
+
+export default function AssignmentEditor({ material, editing, onCancel, onSaved }: Props) {
+  const [mode, setMode] = useState<EditorMode>("visual");
+  
+  // Добавляем состояние режима задания
+  const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>("interactive");
+
+  const [title, setTitle] = useState<string>(editing?.title ?? "");
+  const [orderIndex, setOrderIndex] = useState<number>(Number(editing?.order_index ?? 0));
+
+  // Инициализация интерактивных вопросов
+  const initialQuestions: Question[] = useMemo(() => {
+    const qs = editing?.content?.questions;
+    if (Array.isArray(qs) && qs.length) return deepClone(qs);
+    return [newQuestion("test")];
+  }, [editing]);
+
+  // Инициализация ознакомительных блоков
+  const initialBlocks: InfoBlock[] = useMemo(() => {
+    const blks = editing?.content?.blocks;
+    if (Array.isArray(blks) && blks.length) return deepClone(blks);
+    return [newBlock("hero")];
+  }, [editing]);
+
+  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
+  const [blocks, setBlocks] = useState<InfoBlock[]>(initialBlocks);
+
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTitle(editing?.title ?? "");
+    setOrderIndex(Number(editing?.order_index ?? 0));
+
+    const content = editing?.content;
+    
+    // Определяем режим на основе сохраненного контента
+    if (content?.mode === "informational") {
+      setAssignmentMode("informational");
+    } else {
+      setAssignmentMode("interactive");
+    }
+
+    const qs = content?.questions;
+    setQuestions(Array.isArray(qs) && qs.length ? deepClone(qs) : [newQuestion("test")]);
+
+    const blks = content?.blocks;
+    setBlocks(Array.isArray(blks) && blks.length ? deepClone(blks) : [newBlock("hero")]);
+
+    setMode("visual");
+    setErr(null);
+  }, [editing]);
+
+  async function save() {
+    if (!material) {
+      setErr("Сначала выберите материал");
+      return;
+    }
+
+    if (!title.trim()) {
+      setErr("Введите название задания");
+      return;
+    }
+
+    let finalContent: any = {};
+
+    // Раздельная валидация в зависимости от режима
+    if (assignmentMode === "informational") {
+      const vr = validateBlocks(blocks);
+      if (!vr.ok) {
+        const text = vr.issues.map((i) => (i.index >= 0 ? `Блок #${i.index + 1}: ${i.message}` : i.message)).join("\n");
+        setErr(text || "Ошибки в блоках");
+        return;
+      }
+      finalContent = { mode: "informational", blocks };
+    } else {
+      const vr = validateQuestions(questions);
+      if (!vr.ok) {
+        const text = vr.issues.map((i) => (i.index >= 0 ? `Вопрос #${i.index + 1}: ${i.message}` : i.message)).join("\n");
+        setErr(text || "Ошибки в вопросах");
+        return;
+      }
+      finalContent = { mode: "interactive", questions };
+    }
+
+    setErr(null);
+    setSaving(true);
+
+    try {
+      const payload: any = {
+        title: title.trim(),
+        order_index: Number.isFinite(orderIndex) ? orderIndex : 0,
+        content: finalContent, // Используем сформированный контент
+
+        branch_type: material.branch_type,
+
+        kind: material.kind,
+        material_kind: material.material_kind ?? material.kind,
+
+        material_id: material.kind === "material" ? material.id : null,
+
+        textbook_id: material.kind === "textbook" ? material.id : null,
+        crossword_id: material.kind === "crossword" ? material.id : null,
+      };
+
+      const url = editing?.id ? `/api/admin/assignments/${encodeURIComponent(editing.id)}` : `/api/admin/assignments`;
+      const method = editing?.id ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await safeJson(res);
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+
+      await onSaved();
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+        <div>
+          <h3 style={{ margin: 0 }}>{editing ? "✏️ Редактирование задания" : "➕ Новое задание"}</h3>
+          <div className="small-muted" style={{ marginTop: 4 }}>
+            Материал: <strong>{material ? materialLabel(material) : "—"}</strong>
+          </div>
+          <div className="small-muted" style={{ marginTop: 4 }}>
+            Раздел: <strong>{material?.branch_type === "gatehouse" ? "🎓 Gatehouse Awards" : "🏆 Олимпиада"}</strong>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span className="material-badge">{materialIcon(material)}</span>
+
+          <button
+            className={`btn small ${mode === "visual" ? "" : "ghost"}`}
+            type="button"
+            onClick={() => setMode("visual")}
+            disabled={saving}
+          >
+            🎨 Редактор
+          </button>
+
+          <button
+            className={`btn small ${mode === "json" ? "" : "ghost"}`}
+            type="button"
+            onClick={() => setMode("json")}
+            disabled={saving}
+          >
+            📄 JSON
+          </button>
+        </div>
+      </div>
+
+      <div style={{ height: 12 }} />
+
+      {err ? <ErrorBox message={err} retryMode="none" /> : null}
+      {saving ? <LoadingBlock text="Сохраняем..." /> : null}
+
+      <div className="row" style={{ marginTop: 10 }}>
+        <div className="col" style={{ flex: 1 }}>
+          <label className="small-muted">Название</label>
+          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={saving} />
+        </div>
+
+        <div className="col" style={{ width: 140 }}>
+          <label className="small-muted">Порядок</label>
+          <input
+            className="input"
+            type="number"
+            value={orderIndex}
+            onChange={(e) => setOrderIndex(Number(e.target.value))}
+            disabled={saving}
+          />
+        </div>
+      </div>
+
+      {/* Выбор режима задания */}
+      <div style={{ marginTop: 16, background: "#f8fafc", padding: "12px 16px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+        <label className="small-muted" style={{ display: "block", marginBottom: 8 }}>Тип задания</label>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500, color: "#1e293b" }}>
+            <input 
+              type="radio" 
+              name="assignmentMode" 
+              checked={assignmentMode === "interactive"} 
+              onChange={() => setAssignmentMode("interactive")} 
+              disabled={saving} 
+            />
+            📝 Интерактивное (Вопросы, Тесты)
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500, color: "#1e293b" }}>
+            <input 
+              type="radio" 
+              name="assignmentMode" 
+              checked={assignmentMode === "informational"} 
+              onChange={() => setAssignmentMode("informational")} 
+              disabled={saving} 
+            />
+            📖 Ознакомительное (Гайды, Блоки)
+          </label>
+        </div>
+      </div>
+
+      <div style={{ height: 16 }} />
+
+      {/* Условный рендеринг редактора в зависимости от режима и вкладки */}
+      {mode === "visual" ? (
+        assignmentMode === "interactive" ? (
+          <QuestionList value={questions} onChange={setQuestions} disabled={saving} />
+        ) : (
+          <BlockList value={blocks} onChange={setBlocks} disabled={saving} />
+        )
+      ) : (
+        <JsonEditor 
+          value={(assignmentMode === "interactive" ? questions : blocks) as any[]} 
+          onChange={(next) => assignmentMode === "interactive" ? setQuestions(next as any) : setBlocks(next as any)} 
+          disabled={saving} 
+        />
+      )}
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 24, flexWrap: "wrap" }}>
+        <button className="btn" type="button" onClick={() => void save()} disabled={saving}>
+          💾 Сохранить
+        </button>
+
+        <button className="btn secondary" type="button" onClick={onCancel} disabled={saving}>
+          ❌ Отмена
+        </button>
+      </div>
+    </div>
+  );
+}
+
+================
+File: app/(admin)/admin/assignments/builder/blocks/BlockItem.tsx
+================
+"use client";
+
+import React from "react";
+import type { 
+  InfoBlock, HeroBlock, TextSectionBlock, AlertBlock, 
+  VideoBlock, CardsGridBlock, AccordionBlock, DownloadsBlock 
+} from "../types";
+
+type Props = {
+  block: InfoBlock;
+  index: number;
+  isFirst: boolean;
+  isLast: boolean;
+  onChange: (updated: InfoBlock) => void;
+  onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  disabled?: boolean;
+};
+
+// ==========================================
+// ВСПОМОГАТЕЛЬНЫЕ ФОРМЫ ДЛЯ КАЖДОГО БЛОКА
+// ==========================================
+
+function HeroForm({ data, onChange, disabled }: { data: HeroBlock["data"], onChange: (d: HeroBlock["data"]) => void, disabled?: boolean }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div>
+        <label className="small-muted">Бейдж (маленький текст сверху)</label>
+        <input className="input" disabled={disabled} value={data.badge || ""} onChange={e => onChange({ ...data, badge: e.target.value })} placeholder="Например: Gatehouse Awards..." />
+      </div>
+      <div>
+        <label className="small-muted">Главный заголовок *</label>
+        <input className="input" disabled={disabled} value={data.title} onChange={e => onChange({ ...data, title: e.target.value })} placeholder="Например: Устный экзамен Speaking" />
+      </div>
+      <div>
+        <label className="small-muted">Подзаголовок</label>
+        <textarea className="input" disabled={disabled} value={data.subtitle || ""} onChange={e => onChange({ ...data, subtitle: e.target.value })} rows={2} placeholder="Краткое описание гайда..." />
+      </div>
+      <div>
+        <label className="small-muted">Теги/Пиллсы (через запятую)</label>
+        <input 
+          className="input" 
+          disabled={disabled} 
+          value={(data.pills || []).join(", ")} 
+          onChange={e => onChange({ ...data, pills: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} 
+          placeholder="Для ученика, 15 минут, 5 заданий" 
+        />
+      </div>
+    </div>
+  );
+}
+
+function TextSectionForm({ data, onChange, disabled }: { data: TextSectionBlock["data"], onChange: (d: TextSectionBlock["data"]) => void, disabled?: boolean }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="row">
+        <div className="col" style={{ flex: 1 }}>
+          <label className="small-muted">Лейбл (надзаголовок)</label>
+          <input className="input" disabled={disabled} value={data.label || ""} onChange={e => onChange({ ...data, label: e.target.value })} placeholder="Знакомство" />
+        </div>
+        <div className="col" style={{ flex: 2 }}>
+          <label className="small-muted">Заголовок секции</label>
+          <input className="input" disabled={disabled} value={data.title || ""} onChange={e => onChange({ ...data, title: e.target.value })} placeholder="Что такое Speaking?" />
+        </div>
+      </div>
+      <div>
+        <label className="small-muted">Текст секции * (поддерживает HTML-теги для выделения)</label>
+        <textarea className="input" disabled={disabled} value={data.content} onChange={e => onChange({ ...data, content: e.target.value })} rows={4} placeholder="Speaking — это устная часть..." />
+      </div>
+    </div>
+  );
+}
+
+function AlertForm({ data, onChange, disabled }: { data: AlertBlock["data"], onChange: (d: AlertBlock["data"]) => void, disabled?: boolean }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="row">
+        <div className="col" style={{ flex: 1 }}>
+          <label className="small-muted">Тема</label>
+          <select className="input" disabled={disabled} value={data.theme} onChange={e => onChange({ ...data, theme: e.target.value as any })}>
+            <option value="info">Синяя (Информация)</option>
+            <option value="teacher">Желтая (Для учителя)</option>
+            <option value="warning">Красная (Важно)</option>
+          </select>
+        </div>
+        <div className="col" style={{ flex: 1 }}>
+          <label className="small-muted">Иконка (Эмодзи)</label>
+          <input className="input" disabled={disabled} value={data.icon || ""} onChange={e => onChange({ ...data, icon: e.target.value })} placeholder="🎓" />
+        </div>
+      </div>
+      <div>
+        <label className="small-muted">Текст сноски *</label>
+        <textarea className="input" disabled={disabled} value={data.content} onChange={e => onChange({ ...data, content: e.target.value })} rows={2} />
+      </div>
+    </div>
+  );
+}
+
+function VideoForm({ data, onChange, disabled }: { data: VideoBlock["data"], onChange: (d: VideoBlock["data"]) => void, disabled?: boolean }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div>
+        <label className="small-muted">URL видео (YouTube/Vimeo Embed) *</label>
+        <input className="input" disabled={disabled} value={data.url} onChange={e => onChange({ ...data, url: e.target.value })} placeholder="https://www.youtube.com/embed/..." />
+      </div>
+      <div className="row">
+        <div className="col" style={{ flex: 1 }}>
+          <label className="small-muted">Подпись на заглушке</label>
+          <input className="input" disabled={disabled} value={data.caption || ""} onChange={e => onChange({ ...data, caption: e.target.value })} placeholder="Как играть в Speaking" />
+        </div>
+        <div className="col" style={{ flex: 1 }}>
+          <label className="small-muted">Доп. текст (длительность)</label>
+          <input className="input" disabled={disabled} value={data.subCaption || ""} onChange={e => onChange({ ...data, subCaption: e.target.value })} placeholder="~3 минуты" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CardsGridForm({ data, onChange, disabled }: { data: CardsGridBlock["data"], onChange: (d: CardsGridBlock["data"]) => void, disabled?: boolean }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div>
+        <label className="small-muted">Количество колонок</label>
+        <select className="input" disabled={disabled} value={data.columns} onChange={e => onChange({ ...data, columns: Number(e.target.value) })} style={{ width: 120 }}>
+          <option value={1}>1 колонка</option>
+          <option value={2}>2 колонки</option>
+          <option value={3}>3 колонки</option>
+          <option value={4}>4 колонки</option>
+        </select>
+      </div>
+      
+      {data.items.map((item, i) => (
+        <div key={item.id} style={{ padding: 12, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", position: "relative" }}>
+          <button 
+            type="button" 
+            onClick={() => onChange({ ...data, items: data.items.filter((_, idx) => idx !== i) })}
+            style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", cursor: "pointer", color: "#ef4444" }}
+          >
+            ✖
+          </button>
+          <div className="row" style={{ marginBottom: 8, paddingRight: 20 }}>
+            <div className="col" style={{ width: 60 }}>
+              <label className="small-muted">Иконка</label>
+              <input className="input" disabled={disabled} value={item.icon || ""} onChange={e => {
+                const next = [...data.items]; next[i].icon = e.target.value; onChange({ ...data, items: next });
+              }} placeholder="🎲" />
+            </div>
+            <div className="col" style={{ flex: 1 }}>
+              <label className="small-muted">Заголовок карточки *</label>
+              <input className="input" disabled={disabled} value={item.title} onChange={e => {
+                const next = [...data.items]; next[i].title = e.target.value; onChange({ ...data, items: next });
+              }} />
+            </div>
+            <div className="col" style={{ width: 120 }}>
+              <label className="small-muted">Цвет</label>
+              <select className="input" disabled={disabled} value={item.theme || "default"} onChange={e => {
+                const next = [...data.items]; next[i].theme = e.target.value as any; onChange({ ...data, items: next });
+              }}>
+                <option value="default">Серый</option>
+                <option value="blue">Синий</option>
+                <option value="green">Зеленый</option>
+                <option value="orange">Оранжевый</option>
+                <option value="purple">Пурпурный</option>
+              </select>
+            </div>
+          </div>
+          <textarea className="input" rows={2} disabled={disabled} value={item.content} onChange={e => {
+            const next = [...data.items]; next[i].content = e.target.value; onChange({ ...data, items: next });
+          }} placeholder="Текст карточки..." />
+        </div>
+      ))}
+      <button type="button" className="btn small secondary" disabled={disabled} onClick={() => onChange({
+        ...data, items: [...data.items, { id: crypto.randomUUID(), title: "Новая карточка", content: "", theme: "default" }]
+      })} style={{ alignSelf: "flex-start" }}>
+        ➕ Добавить карточку
+      </button>
+    </div>
+  );
+}
+
+function AccordionForm({ data, onChange, disabled }: { data: AccordionBlock["data"], onChange: (d: AccordionBlock["data"]) => void, disabled?: boolean }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {data.items.map((item, i) => (
+        <div key={item.id} style={{ padding: 12, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+            <input className="input" style={{ flex: 1 }} disabled={disabled} value={item.title} onChange={e => {
+              const next = [...data.items]; next[i].title = e.target.value; onChange({ ...data, items: next });
+            }} placeholder="Заголовок/Вопрос *" />
+            
+            <input className="input" style={{ width: 150 }} disabled={disabled} value={item.tag || ""} onChange={e => {
+              const next = [...data.items]; next[i].tag = e.target.value; onChange({ ...data, items: next });
+            }} placeholder="Тег (Лексика)" />
+
+            <button type="button" className="btn small" style={{ background: "#ef4444", color: "white" }} disabled={disabled} onClick={() => onChange({ ...data, items: data.items.filter((_, idx) => idx !== i) })}>
+              🗑
+            </button>
+          </div>
+          <textarea className="input" rows={3} disabled={disabled} value={item.content} onChange={e => {
+            const next = [...data.items]; next[i].content = e.target.value; onChange({ ...data, items: next });
+          }} placeholder="Ответ или содержимое..." />
+        </div>
+      ))}
+      <button type="button" className="btn small secondary" disabled={disabled} onClick={() => onChange({
+        ...data, items: [...data.items, { id: crypto.randomUUID(), title: "", content: "" }]
+      })} style={{ alignSelf: "flex-start" }}>
+        ➕ Добавить пункт
+      </button>
+    </div>
+  );
+}
+
+function DownloadsForm({ data, onChange, disabled }: { data: DownloadsBlock["data"], onChange: (d: DownloadsBlock["data"]) => void, disabled?: boolean }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {data.files.map((file, i) => (
+        <div key={file.id} style={{ padding: 12, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+          <div className="row" style={{ marginBottom: 8 }}>
+            <div className="col" style={{ width: 60 }}>
+              <input className="input" disabled={disabled} value={file.icon || ""} onChange={e => {
+                const next = [...data.files]; next[i].icon = e.target.value; onChange({ ...data, files: next });
+              }} placeholder="📄" title="Иконка" />
+            </div>
+            <div className="col" style={{ flex: 1 }}>
+              <input className="input" disabled={disabled} value={file.name} onChange={e => {
+                const next = [...data.files]; next[i].name = e.target.value; onChange({ ...data, files: next });
+              }} placeholder="Название файла *" />
+            </div>
+            <div className="col" style={{ width: 100 }}>
+              <input className="input" disabled={disabled} value={file.fileType} onChange={e => {
+                const next = [...data.files]; next[i].fileType = e.target.value; onChange({ ...data, files: next });
+              }} placeholder="PDF / DOCX" />
+            </div>
+            <div className="col" style={{ width: 120 }}>
+              <select className="input" disabled={disabled} value={file.theme || "default"} onChange={e => {
+                const next = [...data.files]; next[i].theme = e.target.value as any; onChange({ ...data, files: next });
+              }}>
+                <option value="default">Серый</option>
+                <option value="blue">Синий</option>
+                <option value="green">Зеленый</option>
+                <option value="orange">Оранжевый</option>
+                <option value="red">Красный</option>
+                <option value="gold">Золотой</option>
+              </select>
+            </div>
+            <button type="button" className="btn small" style={{ background: "#ef4444", color: "white", marginTop: 24 }} disabled={disabled} onClick={() => onChange({ ...data, files: data.files.filter((_, idx) => idx !== i) })}>
+              🗑
+            </button>
+          </div>
+          <div className="row">
+            <div className="col" style={{ flex: 1 }}>
+              <input className="input" disabled={disabled} value={file.url} onChange={e => {
+                const next = [...data.files]; next[i].url = e.target.value; onChange({ ...data, files: next });
+              }} placeholder="Ссылка на файл (URL) *" />
+            </div>
+            <div className="col" style={{ flex: 1 }}>
+              <input className="input" disabled={disabled} value={file.description || ""} onChange={e => {
+                const next = [...data.files]; next[i].description = e.target.value; onChange({ ...data, files: next });
+              }} placeholder="Краткое описание (опционально)" />
+            </div>
+          </div>
+        </div>
+      ))}
+      <button type="button" className="btn small secondary" disabled={disabled} onClick={() => onChange({
+        ...data, files: [...data.files, { id: crypto.randomUUID(), name: "", url: "", fileType: "PDF" }]
+      })} style={{ alignSelf: "flex-start" }}>
+        ➕ Добавить файл
+      </button>
+    </div>
+  );
+}
+
+// ==========================================
+// ГЛАВНЫЙ КОМПОНЕНТ ОБОЛОЧКИ БЛОКА
+// ==========================================
+
+export default function BlockItem({ block, index, isFirst, isLast, onChange, onRemove, onMoveUp, onMoveDown, disabled }: Props) {
+  
+  // Определяем название и иконку блока для хедера
+  let title = "Блок";
+  let icon = "📦";
+  
+  switch(block.type) {
+    case "hero": title = "Обложка (Hero)"; icon = "🖼"; break;
+    case "text_section": title = "Текстовая секция"; icon = "📝"; break;
+    case "alert": title = "Предупреждение/Сноска"; icon = "⚠️"; break;
+    case "video": title = "Видео"; icon = "🎥"; break;
+    case "cards_grid": title = "Сетка карточек"; icon = "🗂"; break;
+    case "accordion": title = "Спойлеры (FAQ)"; icon = "🔽"; break;
+    case "downloads": title = "Файлы для скачивания"; icon = "⬇️"; break;
+  }
+
+  // Главный свитчер форм
+  function renderForm() {
+    switch(block.type) {
+      case "hero": return <HeroForm data={block.data} onChange={d => onChange({ ...block, data: d } as HeroBlock)} disabled={disabled} />;
+      case "text_section": return <TextSectionForm data={block.data} onChange={d => onChange({ ...block, data: d } as TextSectionBlock)} disabled={disabled} />;
+      case "alert": return <AlertForm data={block.data} onChange={d => onChange({ ...block, data: d } as AlertBlock)} disabled={disabled} />;
+      case "video": return <VideoForm data={block.data} onChange={d => onChange({ ...block, data: d } as VideoBlock)} disabled={disabled} />;
+      case "cards_grid": return <CardsGridForm data={block.data} onChange={d => onChange({ ...block, data: d } as CardsGridBlock)} disabled={disabled} />;
+      case "accordion": return <AccordionForm data={block.data} onChange={d => onChange({ ...block, data: d } as AccordionBlock)} disabled={disabled} />;
+      case "downloads": return <DownloadsForm data={block.data} onChange={d => onChange({ ...block, data: d } as DownloadsBlock)} disabled={disabled} />;
+      default: return <div style={{ color: "red" }}>Неизвестный тип блока</div>;
+    }
+  }
+
+  return (
+    <div style={{ 
+      background: "#fff", 
+      border: "1px solid #cbd5e1", 
+      borderRadius: 12, 
+      overflow: "hidden",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+    }}>
+      {/* HEADER: Управление блоком */}
+      <div style={{ 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "center", 
+        background: "#f1f5f9", 
+        padding: "10px 16px",
+        borderBottom: "1px solid #cbd5e1"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ 
+            background: "#fff", width: 28, height: 28, borderRadius: 6, 
+            display: "flex", alignItems: "center", justifyContent: "center", 
+            fontWeight: 800, fontSize: 13, color: "#64748b", border: "1px solid #cbd5e1" 
+          }}>
+            {index + 1}
+          </div>
+          <div style={{ fontWeight: 600, color: "#334155", display: "flex", alignItems: "center", gap: 6 }}>
+            <span>{icon}</span> {title}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 6 }}>
+          <button type="button" className="btn small ghost" disabled={disabled || isFirst} onClick={onMoveUp} title="Поднять выше">
+            ⬆️
+          </button>
+          <button type="button" className="btn small ghost" disabled={disabled || isLast} onClick={onMoveDown} title="Опустить ниже">
+            ⬇️
+          </button>
+          <div style={{ width: 1, background: "#cbd5e1", margin: "0 4px" }} />
+          <button type="button" className="btn small ghost" disabled={disabled} onClick={onRemove} title="Удалить блок" style={{ color: "#ef4444" }}>
+            ✖
+          </button>
+        </div>
+      </div>
+
+      {/* BODY: Форма настроек блока */}
+      <div style={{ padding: 16 }}>
+        {renderForm()}
+      </div>
+    </div>
+  );
+}
+
+================
+File: app/(admin)/admin/assignments/builder/blocks/BlockList.tsx
+================
+"use client";
+
+import React from "react";
+import type { InfoBlock, BlockType } from "../types";
+import { newBlock, deepClone } from "../types";
+import BlockItem from "./BlockItem"; // Напишем его следующим шагом!
+
+type Props = {
+  value: InfoBlock[];
+  onChange: (val: InfoBlock[]) => void;
+  disabled?: boolean;
+};
+
+export default function BlockList({ value, onChange, disabled }: Props) {
+  
+  // Добавление нового блока в конец списка
+  function addBlock(type: BlockType) {
+    const next = deepClone(value);
+    next.push(newBlock(type));
+    onChange(next);
+  }
+
+  // Обновление данных внутри конкретного блока
+  function updateBlock(index: number, updated: InfoBlock) {
+    const next = deepClone(value);
+    next[index] = updated;
+    onChange(next);
+  }
+
+  // Удаление блока
+  function removeBlock(index: number) {
+    if (!window.confirm("Точно удалить этот блок? Восстановить будет нельзя.")) return;
+    const next = deepClone(value);
+    next.splice(index, 1);
+    onChange(next);
+  }
+
+  // Перемещение блока выше
+  function moveUp(index: number) {
+    if (index === 0) return;
+    const next = deepClone(value);
+    const temp = next[index - 1];
+    next[index - 1] = next[index];
+    next[index] = temp;
+    onChange(next);
+  }
+
+  // Перемещение блока ниже
+  function moveDown(index: number) {
+    if (index === value.length - 1) return;
+    const next = deepClone(value);
+    const temp = next[index + 1];
+    next[index + 1] = next[index];
+    next[index] = temp;
+    onChange(next);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      
+      {/* Список текущих блоков */}
+      {value.length === 0 ? (
+        <div style={{ 
+          padding: "40px 20px", 
+          textAlign: "center", 
+          background: "#f8fafc", 
+          borderRadius: 12, 
+          border: "2px dashed #cbd5e1" 
+        }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>📖</div>
+          <div style={{ color: "#334155", fontWeight: 600, fontSize: 16 }}>Нет ни одного блока</div>
+          <div style={{ color: "#64748b", fontSize: 14, marginTop: 4 }}>
+            Соберите свой первый гайд, добавляя блоки из меню ниже
+          </div>
+        </div>
+      ) : (
+        value.map((block, index) => (
+          <BlockItem
+            key={block.id}
+            block={block}
+            index={index}
+            isFirst={index === 0}
+            isLast={index === value.length - 1}
+            onChange={(updated) => updateBlock(index, updated)}
+            onRemove={() => removeBlock(index)}
+            onMoveUp={() => moveUp(index)}
+            onMoveDown={() => moveDown(index)}
+            disabled={disabled}
+          />
+        ))
+      )}
+
+      {/* Панель добавления новых блоков */}
+      <div style={{ 
+        marginTop: 10, 
+        padding: 20, 
+        background: "#f1f5f9", 
+        borderRadius: 12, 
+        border: "1px solid #e2e8f0" 
+      }}>
+        <div style={{ 
+          fontSize: 12, 
+          fontWeight: 800, 
+          color: "#475569", 
+          textTransform: "uppercase", 
+          letterSpacing: "0.08em", 
+          marginBottom: 14 
+        }}>
+          ➕ Добавить блок
+        </div>
+        
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          <button type="button" className="btn small secondary" disabled={disabled} onClick={() => addBlock("hero")}>
+            🖼 Обложка
+          </button>
+          <button type="button" className="btn small secondary" disabled={disabled} onClick={() => addBlock("text_section")}>
+            📝 Текст
+          </button>
+          <button type="button" className="btn small secondary" disabled={disabled} onClick={() => addBlock("alert")}>
+            ⚠️ Сноска
+          </button>
+          <button type="button" className="btn small secondary" disabled={disabled} onClick={() => addBlock("video")}>
+            🎥 Видео
+          </button>
+          <button type="button" className="btn small secondary" disabled={disabled} onClick={() => addBlock("cards_grid")}>
+            🗂 Сетка карточек
+          </button>
+          <button type="button" className="btn small secondary" disabled={disabled} onClick={() => addBlock("accordion")}>
+            🔽 Спойлеры (FAQ)
+          </button>
+          <button type="button" className="btn small secondary" disabled={disabled} onClick={() => addBlock("downloads")}>
+            ⬇️ Файлы
+          </button>
+        </div>
+      </div>
+      
+    </div>
+  );
+}
+
+================
+File: app/(admin)/admin/assignments/builder/blocks/BlockTypeSwitch.tsx
+================
+"use client";
+
+import React from "react";
+import type { BlockType } from "../types";
+
+type Props = {
+  onAdd: (type: BlockType) => void;
+  disabled?: boolean;
+};
+
+export default function BlockTypeSwitch({ onAdd, disabled }: Props) {
+  const blockTypes: { t: BlockType; label: string; icon: string }[] = [
+    { t: "hero", label: "Обложка", icon: "🖼" },
+    { t: "text_section", label: "Текст", icon: "📝" },
+    { t: "alert", label: "Сноска", icon: "⚠️" },
+    { t: "video", label: "Видео", icon: "🎥" },
+    { t: "cards_grid", label: "Сетка карточек", icon: "🗂" },
+    { t: "accordion", label: "Спойлеры (FAQ)", icon: "🔽" },
+    { t: "downloads", label: "Файлы", icon: "⬇️" },
+  ];
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+      {blockTypes.map((block) => (
+        <button
+          key={block.t}
+          type="button"
+          className="btn small secondary"
+          onClick={() => onAdd(block.t)}
+          disabled={disabled}
+          style={{ opacity: disabled ? 0.6 : 1 }}
+        >
+          {block.icon} {block.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+================
 File: app/(admin)/admin/assignments/builder/crossword/CrosswordEditor.tsx
 ================
 "use client";
@@ -31023,319 +31504,647 @@ export default function CrosswordEditor({ value, onChange, disabled }: Props) {
 }
 
 ================
-File: app/(admin)/admin/assignments/builder/types.ts
+File: app/(admin)/admin/assignments/builder/validate.ts
 ================
-// ===== Modes =====
-export type EditorMode = "visual" | "json";
+// app/(admin)/admin/assignments/builder/validate.ts
+import type { Question, TestQuestion, InfoBlock } from "./types";
 
-// ===== Question types =====
-export type QuestionType =
-  | "test"
-  | "fill"
-  | "sentence"
-  | "crossword"
-  | "complex"
-  | "matching"
-  | "imagemap"
-  | "reading";
-
-// ===== Media =====
-export type MediaType = "image" | "audio" | "pdf";
-
-export type MediaAttachment = {
-  id: string;
-  url: string;
-  type: MediaType;
-  name?: string; // Имя файла (особенно полезно для PDF)
+export type ValidationIssue = {
+  index: number; // -1 для общих ошибок
+  message: string;
 };
 
-// ===== Base =====
-export type BaseQuestion = {
-  id: string;
-  type: QuestionType;
-  q?: string; // Текст вопроса (для кроссвордов может быть пустым/отсутствовать)
-  image?: string; // Устаревшее (оставлено для совместимости старых данных) — также используется для imagemap
-  media?: MediaAttachment[]; // Новый массив медиа-файлов
+export type ValidationResult = {
+  ok: boolean;
+  issues: ValidationIssue[];
 };
 
-// ===== Test =====
-export type TestOption = {
-  id: string;
-  text: string;
-  media?: MediaAttachment[];
-};
+// ==========================================
+// ВАЛИДАЦИЯ ИНТЕРАКТИВНОГО РЕЖИМА (ВОПРОСЫ)
+// ==========================================
+export function validateQuestions(questions: Question[]): ValidationResult {
+  const issues: ValidationIssue[] = [];
 
-export type TestQuestion = BaseQuestion & {
-  type: "test";
-  multiple?: boolean; // Чекбокс для множественного выбора
-  options: TestOption[]; // Обновленная структура опций с поддержкой медиа
-  correct: number[]; // Массив индексов правильных ответов (даже если один)
-  layout?: "vertical" | "horizontal"; // раскладка вариантов: вертикально (по умолчанию) или сеткой до 3 в ряд
-};
+  if (!questions || !questions.length) {
+    issues.push({ index: -1, message: "Нет ни одного вопроса" });
+    return { ok: false, issues };
+  }
 
-// ===== Fill =====
-export type FillQuestion = BaseQuestion & {
-  type: "fill";
-  answers: string[][];
-};
+  questions.forEach((q, index) => {
+    // Текст или медиа обязательны (кроме кроссворда, imagemap и reading)
+    if (q.type !== "crossword" && q.type !== "imagemap" && q.type !== "reading" && !q.q?.trim() && (!q.media || q.media.length === 0)) {
+      issues.push({ index, message: "Добавьте текст вопроса или прикрепите медиа-файл" });
+    }
 
-// ===== Sentence =====
-export type SentenceQuestion = BaseQuestion & {
-  type: "sentence";
-  sentence: string;
-  answers: string[][];
-};
+    if (q.type === "test") {
+      if (!q.options?.length || q.options.length < 2) {
+        issues.push({ index, message: "Минимум 2 варианта ответа" });
+      }
+      
+      if (!q.correct || q.correct.length === 0) {
+        issues.push({ index, message: "Выберите хотя бы один правильный ответ" });
+      }
 
-// ===== Complex =====
-export type ComplexQuestion = BaseQuestion & {
-  type: "complex";
-  subQuestions: Question[]; // Вложенные вопросы
-};
+      if (!q.multiple && q.correct && q.correct.length > 1) {
+        issues.push({ index, message: "Для одиночного выбора должен быть только 1 правильный ответ" });
+      }
+    }
 
-// ===== Matching =====
-export type MatchingItem = {
-  text?: string;
-  media?: MediaAttachment[];
-};
+    if (q.type === "fill") {
+      if (!q.answers?.length) {
+        issues.push({ index, message: "Добавьте хотя бы один правильный ответ" });
+      }
+    }
 
-export type MatchingPair = {
-  id: string;
-  left: MatchingItem;
-  right: MatchingItem;
-};
+    if (q.type === "sentence") {
+      const gaps = (q.sentence?.match(/___/g) || []).length;
+      if (!q.sentence?.trim() || gaps === 0) {
+        issues.push({ index, message: "В предложении должны быть пропуски ___" });
+      }
+      if (!Array.isArray(q.answers) || q.answers.length !== gaps) {
+        issues.push({ index, message: "Ответы не совпадают с количеством пропусков" });
+      }
+    }
 
-export type MatchingQuestion = BaseQuestion & {
-  type: "matching";
-  centerImage?: MediaAttachment; // То самое "центральное изображение"
-  pairs: MatchingPair[];
-};
+    if (q.type === "crossword") {
+      if (!q.words?.length) issues.push({ index, message: "В кроссворде нет слов" });
+    }
 
-// ===== Reading =====
-export type ReadingQuestion = BaseQuestion & {
-  type: "reading";
-  /** общий текст или инструкция */
-  text?: string;
-  /** серия тестовых подвопросов */
-  subQuestions: TestQuestion[];
-};
+    if (q.type === "complex") {
+      if (!q.subQuestions?.length) {
+        issues.push({ index, message: "Комплексный вопрос должен содержать хотя бы один подвопрос" });
+      } else {
+        const subRes = validateQuestions(q.subQuestions);
+        if (!subRes.ok) {
+          issues.push({ index, message: "Ошибки в подвопросах комплексного вопроса" });
+        }
+      }
+    }
 
-// ===== Crossword (editor helpers) =====
-export type WordDir = "across" | "down";
+    if (q.type === "matching") {
+      if (!q.pairs?.length || q.pairs.length < 2) {
+        issues.push({ index, message: "Добавьте минимум 2 пары для сопоставления" });
+      }
+    }
 
-export type CWWord = {
-  id: string;
-  number: number; // 1..N
-  text: string; // UPPER
-  direction: WordDir;
-  start: { row: number; col: number };
-  length: number;
-};
+    if (q.type === "imagemap") {
+      if (!q.image || !String(q.image).trim()) {
+        issues.push({ index, message: "Загрузите центральное изображение для карты" });
+      }
 
-export type CWBlock = { row: number; col: number };
+      if (!q.points || q.points.length === 0) {
+        issues.push({ index, message: "Добавьте хотя бы одну точку на изображении" });
+      }
 
-// В metadata мы храним и “сохранённые” вещи, и состояние редактора (placing/deleteMode)
-export type CrosswordMetadata = {
-  rows: number;
-  cols: number;
-  nextWordNumber?: number;
+      if (!q.answers || q.answers.length === 0) {
+        issues.push({ index, message: "Добавьте хотя бы один вариант ответа" });
+      }
 
-  // editor-state (не критично для ученика, но нужно админу)
-  placingWord?: {
-    text: string;
-    direction: WordDir;
-    number: number;
-  } | null;
+      if (q.points && q.answers) {
+        const answerIds = new Set(q.answers.map(a => a.id));
+        for (const point of q.points) {
+          if (!point.correctAnswerId) {
+            issues.push({ index, message: `Точка "${point.label || point.id}" не связана с ответом` });
+          } else if (!answerIds.has(point.correctAnswerId)) {
+            issues.push({ index, message: `Точка "${point.label || point.id}" ссылается на несуществующий ответ` });
+          }
+        }
 
-  deleteMode?: boolean;
-};
+        const pointToAnswer = new Map<string, string>();
+        for (const point of q.points) {
+          if (point.correctAnswerId) {
+            const existing = pointToAnswer.get(point.correctAnswerId);
+            if (existing) {
+              issues.push({
+                index,
+                message: `Ответ "${q.answers.find(a => a.id === point.correctAnswerId)?.text || point.correctAnswerId}" используется несколькими точками. Лучше 1:1.`,
+              });
+              break;
+            }
+            pointToAnswer.set(point.correctAnswerId, point.id);
+          }
+        }
+      }
+    }
 
-// ===== Crossword =====
-export type CrosswordQuestion = BaseQuestion & {
-  type: "crossword";
-  grid: string[][]; // letters (admin view)
-  words: CWWord[];
-  blocks?: CWBlock[];
-  cellNumbers?: Record<string, number>; // "r,c" -> number
-  metadata: CrosswordMetadata;
-  // Поле q наследуется от BaseQuestion и является необязательным (опционально)
-};
+    if (q.type === "reading") {
+      if (!q.text?.trim() && (!q.media || q.media.length === 0)) {
+        issues.push({ index, message: "Добавьте текст для чтения или прикрепите медиа" });
+      }
 
-// ===== Image Map =====
-export type ImageMapPoint = {
-  id: string;
-  x: number; // 0..100 (% от ширины)
-  y: number; // 0..100 (% от высоты)
-  correctAnswerId: string;
-  label?: string; // вспомогательная подпись для админа/ученика
-};
+      if (!q.subQuestions?.length) {
+        issues.push({ index, message: "Добавьте хотя бы один подвопрос" });
+      } else {
+        (q.subQuestions as TestQuestion[]).forEach((subQ: TestQuestion, subIdx: number) => {
+          if (!subQ.options || subQ.options.length < 2) {
+            issues.push({ index, message: `Подвопрос ${subIdx + 1}: минимум 2 варианта ответа` });
+          }
+          if (!subQ.correct || subQ.correct.length === 0) {
+            issues.push({ index, message: `Подвопрос ${subIdx + 1}: выберите хотя бы один правильный ответ` });
+          }
+        });
+      }
+    }
+  });
 
-export type ImageMapAnswer = {
-  id: string;
-  text?: string;
-  media?: MediaAttachment[];   // может быть картинкой
-};
-
-export type ImageMapQuestion = BaseQuestion & {
-  type: "imagemap";
-  image: string;               // URL центральной картинки (обязателен)
-  points: ImageMapPoint[];
-  answers: ImageMapAnswer[];
-};
-
-// ===== Union =====
-export type Question =
-  | TestQuestion
-  | FillQuestion
-  | SentenceQuestion
-  | CrosswordQuestion
-  | ComplexQuestion
-  | MatchingQuestion
-  | ImageMapQuestion
-  | ReadingQuestion;
-
-// ===== Helpers =====
-export function deepClone<T>(v: T): T {
-  return JSON.parse(JSON.stringify(v));
+  return { ok: issues.length === 0, issues };
 }
 
-export function newQuestion(type: QuestionType): Question {
-  const id = crypto.randomUUID();
 
-  if (type === "test") {
-    return {
-      id,
-      type: "test",
-      q: "",
-      multiple: false,
-      media: [],
-      layout: "vertical",
-      options: [
-        { id: crypto.randomUUID(), text: "", media: [] },
-        { id: crypto.randomUUID(), text: "", media: [] },
-      ],
-      correct: [0], // По умолчанию первый вариант верный
-    };
+// ==========================================
+// ВАЛИДАЦИЯ ОЗНАКОМИТЕЛЬНОГО РЕЖИМА (БЛОКИ)
+// ==========================================
+export function validateBlocks(blocks: InfoBlock[]): ValidationResult {
+  const issues: ValidationIssue[] = [];
+
+  if (!blocks || !blocks.length) {
+    issues.push({ index: -1, message: "Нет ни одного блока. Добавьте хотя бы один." });
+    return { ok: false, issues };
   }
 
-  if (type === "fill") {
-    return {
-      id,
-      type: "fill",
-      q: "",
-      media: [],
-      answers: [[""]],
-    };
-  }
+  blocks.forEach((block, index) => {
+    if (block.type === "hero") {
+      if (!block.data.title?.trim()) {
+        issues.push({ index, message: "Блок 'Обложка': добавьте заголовок." });
+      }
+    }
 
-  if (type === "sentence") {
-    return {
-      id,
-      type: "sentence",
-      q: "",
-      media: [],
-      sentence: "",
-      answers: [],
-    };
-  }
+    if (block.type === "text_section") {
+      if (!block.data.content?.trim()) {
+        issues.push({ index, message: "Блок 'Текст': содержимое не может быть пустым." });
+      }
+    }
 
-  if (type === "complex") {
-    return {
-      id,
-      type: "complex",
-      q: "",
-      media: [],
-      subQuestions: [],
-    };
-  }
+    if (block.type === "alert") {
+      if (!block.data.content?.trim()) {
+        issues.push({ index, message: "Блок 'Предупреждение': введите текст предупреждения." });
+      }
+    }
 
-  if (type === "matching") {
-    return {
-      id,
-      type: "matching",
-      q: "",
-      media: [],
-      pairs: [
-        {
-          id: crypto.randomUUID(),
-          left: { text: "", media: [] },
-          right: { text: "", media: [] },
-        },
-      ],
-    };
-  }
+    if (block.type === "video") {
+      if (!block.data.url?.trim()) {
+        issues.push({ index, message: "Блок 'Видео': укажите ссылку на видео (URL)." });
+      }
+    }
 
-  if (type === "imagemap") {
-    const firstPointId = crypto.randomUUID();
-    const firstAnswerId = crypto.randomUUID();
-    return {
-      id,
-      type: "imagemap",
-      q: "",
-      image: "",
-      media: [],
-      points: [
-        {
-          id: firstPointId,
-          x: 50,
-          y: 50,
-          correctAnswerId: firstAnswerId,
-          label: "Точка 1",
-        },
-      ],
-      answers: [
-        {
-          id: firstAnswerId,
-          text: "Ответ 1",
-          media: [],
-        },
-      ],
-    };
-  }
+    if (block.type === "cards_grid") {
+      if (!block.data.items || block.data.items.length === 0) {
+        issues.push({ index, message: "Блок 'Сетка карточек': добавьте хотя бы одну карточку." });
+      } else {
+        block.data.items.forEach((item, i) => {
+          if (!item.title?.trim()) {
+            issues.push({ index, message: `Сетка карточек (Карточка ${i + 1}): укажите заголовок.` });
+          }
+        });
+      }
+    }
 
-  if (type === "reading") {
-    const subId = crypto.randomUUID();
-    return {
-      id,
-      type: "reading",
-      q: "",
-      media: [],
-      text: "",
-      subQuestions: [
-        {
-          id: subId,
-          type: "test",
-          q: "",
-          multiple: false,
-          media: [],
-          layout: "vertical",
-          options: [
-            { id: crypto.randomUUID(), text: "", media: [] },
-            { id: crypto.randomUUID(), text: "", media: [] },
-          ],
-          correct: [0],
-        },
-      ],
-    };
-  }
+    if (block.type === "accordion") {
+      if (!block.data.items || block.data.items.length === 0) {
+        issues.push({ index, message: "Блок 'Спойлеры/FAQ': добавьте хотя бы один пункт." });
+      } else {
+        block.data.items.forEach((item, i) => {
+          if (!item.title?.trim() || !item.content?.trim()) {
+            issues.push({ index, message: `Спойлеры (Пункт ${i + 1}): укажите заголовок и содержимое.` });
+          }
+        });
+      }
+    }
 
-  // crossword
-  return {
-    id,
-    type: "crossword",
-    q: "", // опциональное поле, может быть пустым
-    media: [],
-    grid: Array.from({ length: 15 }, () => Array.from({ length: 15 }, () => "")),
-    words: [],
-    blocks: [],
-    cellNumbers: {},
-    metadata: {
-      rows: 15,
-      cols: 15,
-      nextWordNumber: 1,
-      placingWord: null,
-      deleteMode: false,
-    },
+    if (block.type === "downloads") {
+      if (!block.data.files || block.data.files.length === 0) {
+        issues.push({ index, message: "Блок 'Файлы': добавьте хотя бы один файл для скачивания." });
+      } else {
+        block.data.files.forEach((file, i) => {
+          if (!file.name?.trim() || !file.url?.trim()) {
+            issues.push({ index, message: `Файлы (Файл ${i + 1}): укажите название и прикрепите файл (URL).` });
+          }
+        });
+      }
+    }
+  });
+
+  return { ok: issues.length === 0, issues };
+}
+
+================
+File: app/(app)/assignment/components/BlockRenderer.tsx
+================
+"use client";
+
+import React from "react";
+import type { InfoBlock } from "@/app/(admin)/admin/assignments/builder/types";
+
+// Импортируем все визуальные компоненты блоков из отдельного файла
+import {
+  HeroView, 
+  TextSectionView, 
+  AlertView, 
+  VideoView,
+  CardsGridView, 
+  AccordionView, 
+  DownloadsView
+} from "./blocks/InformationalBlocks";
+
+type Props = {
+  blocks: InfoBlock[];
+  onComplete: () => void;
+  disabled?: boolean;
+  isSaving?: boolean;
+};
+
+// ==========================================
+// ГЛАВНЫЙ РЕНДЕРЕР (СОБИРАЕТ ВСЁ ВМЕСТЕ)
+// ==========================================
+
+export default function BlockRenderer({ blocks, onComplete, disabled, isSaving }: Props) {
+  
+  // Пробегаемся по массиву блоков и рендерим нужный UI
+  const renderBlock = (block: InfoBlock) => {
+    switch (block.type) {
+      case "hero": return <HeroView key={block.id} data={block.data} />;
+      case "text_section": return <TextSectionView key={block.id} data={block.data} />;
+      case "alert": return <AlertView key={block.id} data={block.data} />;
+      case "video": return <VideoView key={block.id} data={block.data} />;
+      case "cards_grid": return <CardsGridView key={block.id} data={block.data} />;
+      case "accordion": return <AccordionView key={block.id} data={block.data} />;
+      case "downloads": return <DownloadsView key={block.id} data={block.data} />;
+      default: return null;
+    }
   };
+
+  return (
+    <div style={{ 
+      maxWidth: "860px", 
+      margin: "0 auto", 
+      padding: "20px", 
+      fontFamily: "var(--font-geist-sans), 'Inter', sans-serif" 
+    }}>
+      
+      {/* Рендерим все созданные админом блоки */}
+      {blocks.map(renderBlock)}
+
+      {/* Финальный блок: Подтверждение изучения */}
+      {!disabled && (
+        <div style={{
+          marginTop: "64px",
+          background: "linear-gradient(135deg, #0f2444 0%, #1a3a6b 100%)",
+          borderRadius: "16px",
+          padding: "40px 28px",
+          textAlign: "center",
+          color: "white",
+          boxShadow: "0 10px 30px rgba(15, 36, 68, 0.2)"
+        }}>
+          <h2 style={{ fontSize: "24px", fontWeight: 900, marginBottom: "12px", letterSpacing: "-0.02em" }}>
+            Всё готово?
+          </h2>
+          <p style={{ fontSize: "15px", color: "rgba(255,255,255,0.8)", marginBottom: "32px", maxWidth: "440px", margin: "0 auto 32px" }}>
+            Убедитесь, что вы ознакомились со всеми материалами. После нажатия кнопки этот гайд будет отмечен как пройденный.
+          </p>
+          <button 
+            onClick={onComplete}
+            disabled={isSaving}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: "8px",
+              background: "#4ade9a", color: "#0d3d2a", padding: "14px 32px",
+              borderRadius: "999px", fontSize: "16px", fontWeight: 900,
+              border: "none", cursor: isSaving ? "not-allowed" : "pointer",
+              opacity: isSaving ? 0.7 : 1, transition: "transform 0.1s"
+            }}
+          >
+            {isSaving ? "Сохраняем..." : "✅ Отметить как изученное"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+================
+File: app/(app)/assignment/components/blocks/InformationalBlocks.tsx
+================
+"use client";
+
+import React, { useState } from "react";
+import type { 
+  HeroBlock, TextSectionBlock, AlertBlock, 
+  VideoBlock, CardsGridBlock, AccordionBlock, DownloadsBlock 
+} from "@/app/(admin)/admin/assignments/builder/types";
+
+// ==========================================
+// ЦВЕТОВЫЕ ТЕМЫ
+// ==========================================
+export const THEMES = {
+  blue: { bg: "#dbeeff", border: "#93c5fd", text: "#0d3d6e", dot: "#2176c7" },
+  green: { bg: "#d4f5e8", border: "#6ee7b7", text: "#0d5c3f", dot: "#1a9e6e" },
+  orange: { bg: "#fde8d4", border: "#fdba74", text: "#7a3208", dot: "#e06b20" },
+  purple: { bg: "#ede8ff", border: "#c4b5fd", text: "#2e1d6e", dot: "#6b4fcf" },
+  gold: { bg: "#fef3d0", border: "#fcd34d", text: "#6b4800", dot: "#c48a0a" },
+  red: { bg: "#fde8e6", border: "#fca5a5", text: "#7a1a12", dot: "#d93a2b" },
+  default: { bg: "#f1f5f9", border: "#cbd5e1", text: "#334155", dot: "#64748b" }
+};
+
+// ==========================================
+// РЕНДЕРЕРЫ ОТДЕЛЬНЫХ БЛОКОВ
+// ==========================================
+
+export function HeroView({ data }: { data: HeroBlock["data"] }) {
+  return (
+    <div style={{
+      background: "linear-gradient(135deg, #0f2444 0%, #1a3a6b 60%, #0d5c3f 100%)",
+      padding: "56px 24px 64px",
+      textAlign: "center",
+      borderRadius: "16px",
+      marginBottom: "40px",
+      boxShadow: "0 10px 30px rgba(13, 61, 110, 0.15)",
+      position: "relative",
+      overflow: "hidden"
+    }}>
+      {data.badge && (
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: "8px",
+          background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
+          borderRadius: "999px", padding: "6px 16px", fontSize: "12px",
+          fontWeight: 700, letterSpacing: "0.08em", color: "#a8f0d0",
+          textTransform: "uppercase", marginBottom: "20px"
+        }}>
+          ✦ {data.badge}
+        </div>
+      )}
+      <h1 style={{ fontSize: "clamp(28px, 5vw, 48px)", fontWeight: 900, color: "#fff", lineHeight: 1.15, marginBottom: "16px", letterSpacing: "-0.02em" }}>
+        {data.title}
+      </h1>
+      {data.subtitle && (
+        <p style={{ fontSize: "17px", color: "rgba(255,255,255,0.8)", maxWidth: "540px", margin: "0 auto 32px", fontWeight: 400, lineHeight: 1.6 }}>
+          {data.subtitle}
+        </p>
+      )}
+      {data.pills && data.pills.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
+          {data.pills.map((pill, i) => {
+            const colors = ["#4ade9a", "#fcd34d", "#93c5fd", "#f9a8d4"];
+            const dotColor = colors[i % colors.length];
+            return (
+              <div key={i} style={{
+                background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.18)",
+                borderRadius: "999px", padding: "8px 18px", fontSize: "13px",
+                fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", gap: "7px"
+              }}>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: dotColor }} />
+                {pill}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function TextSectionView({ data }: { data: TextSectionBlock["data"] }) {
+  return (
+    <div style={{ marginTop: "48px", marginBottom: "24px" }}>
+      {data.label && (
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "11px",
+          fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase",
+          color: "#6b7280", marginBottom: "14px"
+        }}>
+          <span style={{ display: "inline-block", width: "24px", height: "2px", background: "#e5e7eb", borderRadius: "1px" }} />
+          {data.label}
+          <span style={{ display: "inline-block", width: "24px", height: "2px", background: "#e5e7eb", borderRadius: "1px" }} />
+        </div>
+      )}
+      {data.title && (
+        <h2 style={{ fontSize: "clamp(22px, 3.5vw, 30px)", fontWeight: 900, color: "#111827", letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: "16px" }}>
+          {data.title}
+        </h2>
+      )}
+      <div 
+        style={{ fontSize: "16px", color: "#374151", lineHeight: 1.75, maxWidth: "720px", whiteSpace: "pre-wrap" }}
+        dangerouslySetInnerHTML={{ __html: data.content }} 
+      />
+    </div>
+  );
+}
+
+export function AlertView({ data }: { data: AlertBlock["data"] }) {
+  const styles = {
+    teacher: { bg: "#fffbeb", border: "#fcd34d", text: "#78350f" },
+    info: { bg: "#eff6ff", border: "#93c5fd", text: "#1e3a5f" },
+    warning: { bg: "#fef2f2", border: "#fca5a5", text: "#991b1b" }
+  }[data.theme || "info"];
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: "12px",
+      background: styles.bg, border: `1.5px solid ${styles.border}`,
+      borderRadius: "12px", padding: "16px 20px", margin: "24px 0"
+    }}>
+      {data.icon && <div style={{ fontSize: "20px", flexShrink: 0, marginTop: "2px" }}>{data.icon}</div>}
+      <div style={{ fontSize: "14px", lineHeight: 1.65, color: styles.text, fontWeight: 500, whiteSpace: "pre-wrap" }}>
+        {data.content}
+      </div>
+    </div>
+  );
+}
+
+export function VideoView({ data }: { data: VideoBlock["data"] }) {
+  return (
+    <div style={{ marginTop: "24px", marginBottom: "32px" }}>
+      <div style={{
+        borderRadius: "14px", overflow: "hidden", border: "1.5px solid #e5e7eb",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.08)", background: "#0f2444",
+        position: "relative", aspectRatio: "16/9", width: "100%"
+      }}>
+        {data.url ? (
+          <iframe 
+            src={data.url} 
+            allowFullScreen 
+            style={{ width: "100%", height: "100%", border: "none", display: "block" }} 
+          />
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "white", opacity: 0.5 }}>
+            Нет ссылки на видео
+          </div>
+        )}
+      </div>
+      {(data.caption || data.subCaption) && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", padding: "0 4px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: "#111827" }}>{data.caption}</div>
+          <div style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>{data.subCaption}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CardsGridView({ data }: { data: CardsGridBlock["data"] }) {
+  const gridTemplateColumns = `repeat(auto-fit, minmax(${data.columns > 2 ? "200px" : "280px"}, 1fr))`;
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns, gap: "16px", marginTop: "24px", marginBottom: "32px" }}>
+      {data.items.map((item) => {
+        const theme = THEMES[item.theme as keyof typeof THEMES] || THEMES.default;
+        
+        return (
+          <div key={item.id} style={{
+            background: "#ffffff", border: `1.5px solid ${theme.border}`,
+            borderRadius: "14px", padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+            display: "flex", flexDirection: "column", gap: "12px"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              {item.icon && (
+                <div style={{
+                  width: "44px", height: "44px", borderRadius: "12px", background: theme.bg,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px"
+                }}>
+                  {item.icon}
+                </div>
+              )}
+              <h3 style={{ fontSize: "16px", fontWeight: 800, color: theme.text, margin: 0, lineHeight: 1.3 }}>
+                {item.title}
+              </h3>
+            </div>
+            {item.content && (
+              <p style={{ fontSize: "14px", color: "#475569", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap" }}>
+                {item.content}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function AccordionView({ data }: { data: AccordionBlock["data"] }) {
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+
+  const toggle = (id: string) => {
+    const next = new Set(openIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setOpenIds(next);
+  };
+
+  return (
+    <div style={{ marginTop: "24px", marginBottom: "32px", display: "flex", flexDirection: "column", gap: "12px" }}>
+      {data.items.map((item, i) => {
+        const isOpen = openIds.has(item.id);
+        const theme = THEMES[item.tagTheme as keyof typeof THEMES] || THEMES.default;
+
+        return (
+          <div key={item.id} style={{
+            background: "#ffffff", border: "1.5px solid #e5e7eb",
+            borderRadius: "14px", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+            transition: "all 0.2s"
+          }}>
+            <div 
+              onClick={() => toggle(item.id)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px",
+                padding: "16px 20px", cursor: "pointer", userSelect: "none",
+                background: isOpen ? "#f8fafc" : "#ffffff"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{
+                  width: "32px", height: "32px", borderRadius: "8px", background: theme.bg, color: theme.text,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: 800
+                }}>
+                  {i + 1}
+                </div>
+                <div style={{ fontSize: "15px", fontWeight: 700, color: "#111827" }}>{item.title}</div>
+                {item.tag && (
+                  <span style={{
+                    fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "999px",
+                    background: theme.bg, color: theme.text, letterSpacing: "0.04em", textTransform: "uppercase"
+                  }}>
+                    {item.tag}
+                  </span>
+                )}
+              </div>
+              <div style={{ color: "#94a3b8", transform: isOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>
+                ▼
+              </div>
+            </div>
+            
+            {isOpen && (
+              <div style={{
+                borderTop: "1.5px solid #e5e7eb", padding: "20px",
+                fontSize: "14.5px", color: "#374151", lineHeight: 1.75, whiteSpace: "pre-wrap"
+              }}>
+                {item.content}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function DownloadsView({ data }: { data: DownloadsBlock["data"] }) {
+  return (
+    <div style={{
+      display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+      gap: "16px", marginTop: "24px", marginBottom: "32px"
+    }}>
+      {data.files.map((file) => {
+        const theme = THEMES[file.theme as keyof typeof THEMES] || THEMES.default;
+        
+        return (
+          <div key={file.id} style={{
+            background: "#ffffff", border: "1.5px solid #e5e7eb", borderRadius: "14px",
+            padding: "20px 18px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+            display: "flex", flexDirection: "column", gap: "12px", transition: "transform 0.15s"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{
+                width: "46px", height: "46px", borderRadius: "12px", background: theme.bg,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px"
+              }}>
+                {file.icon || "📄"}
+              </div>
+              {file.fileType && (
+                <span style={{
+                  background: theme.bg, color: theme.text, fontSize: "10px", fontWeight: 800,
+                  letterSpacing: "0.06em", padding: "3px 8px", borderRadius: "6px", textTransform: "uppercase"
+                }}>
+                  {file.fileType}
+                </span>
+              )}
+            </div>
+            
+            <div style={{ flex: 1 }}>
+              <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#111827", margin: "0 0 4px 0", lineHeight: 1.3 }}>
+                {file.name}
+              </h3>
+              {file.description && (
+                <p style={{ fontSize: "13px", color: "#64748b", margin: 0, lineHeight: 1.5 }}>
+                  {file.description}
+                </p>
+              )}
+            </div>
+
+            <a 
+              href={file.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                padding: "10px 0", borderRadius: "8px", background: theme.text, color: "#fff",
+                fontSize: "13px", fontWeight: 800, textDecoration: "none", marginTop: "8px"
+              }}
+            >
+              ⬇ Скачать
+            </a>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 ================
@@ -37289,6 +38098,510 @@ File: package.json
     "tailwindcss": "^4",
     "typescript": "^5"
   }
+}
+
+================
+File: app/(admin)/admin/assignments/builder/types.ts
+================
+// ===== Modes =====
+export type EditorMode = "visual" | "json";
+export type AssignmentMode = "interactive" | "informational"; // НОВЫЙ: Режим задания
+
+// ===== Assignment Root Content =====
+// Это описывает, как данные будут лежать в колонке content (JSONB) в базе данных
+export type InteractiveContent = {
+  mode?: "interactive"; // Опционально для обратной совместимости со старыми заданиями
+  questions: Question[];
+};
+
+export type InformationalContent = {
+  mode: "informational";
+  blocks: InfoBlock[];
+};
+
+export type AssignmentContent = InteractiveContent | InformationalContent;
+
+
+// ==========================================
+// БЛОК 1: ОЗНАКОМИТЕЛЬНЫЙ РЕЖИМ (БЛОКИ)
+// ==========================================
+
+export type BlockType =
+  | "hero"
+  | "text_section"
+  | "alert"
+  | "video"
+  | "cards_grid"
+  | "accordion"
+  | "downloads";
+
+export type BaseBlock = {
+  id: string;
+  type: BlockType;
+};
+
+// 1. Hero (Обложка)
+export type HeroBlock = BaseBlock & {
+  type: "hero";
+  data: {
+    badge?: string;
+    title: string;
+    subtitle?: string;
+    pills?: string[];
+  };
+};
+
+// 2. Text Section (Текстовый блок)
+export type TextSectionBlock = BaseBlock & {
+  type: "text_section";
+  data: {
+    label?: string; // Маленькая надпись сверху (например, "Знакомство")
+    title?: string; // Заголовок секции
+    content: string; // Основной текст
+  };
+};
+
+// 3. Alert (Предупреждение/Сноска)
+export type AlertBlock = BaseBlock & {
+  type: "alert";
+  data: {
+    theme: "teacher" | "info" | "warning"; // Желтый, Синий, Оранжевый
+    icon?: string; // Эмодзи, например 🎓 или ℹ️
+    content: string;
+  };
+};
+
+// 4. Video (Видео)
+export type VideoBlock = BaseBlock & {
+  type: "video";
+  data: {
+    url: string; // YouTube или Vimeo embed url
+    caption?: string; // Подпись (Как играть в Speaking)
+    subCaption?: string; // Длительность
+  };
+};
+
+// 5. Cards Grid (Сетка карточек / Шаги)
+export type CardItem = {
+  id: string;
+  title: string;
+  content: string;
+  theme?: "blue" | "green" | "orange" | "purple" | "default";
+  icon?: string;
+};
+
+export type CardsGridBlock = BaseBlock & {
+  type: "cards_grid";
+  data: {
+    columns: number; // Обычно 2 или 3
+    items: CardItem[];
+  };
+};
+
+// 6. Accordion (Спойлеры / Задания / FAQ)
+export type AccordionItem = {
+  id: string;
+  title: string;
+  content: string;
+  tag?: string; // Тег справа (например, "Лексика")
+  tagTheme?: "blue" | "green" | "orange" | "purple" | "gold" | "default";
+};
+
+export type AccordionBlock = BaseBlock & {
+  type: "accordion";
+  data: {
+    items: AccordionItem[];
+  };
+};
+
+// 7. Downloads (Материалы для скачивания)
+export type DownloadFile = {
+  id: string;
+  name: string;
+  url: string;
+  fileType: string; // Например "DOCX" или "PDF"
+  description?: string;
+  theme?: "blue" | "green" | "orange" | "purple" | "red" | "gold" | "default";
+  icon?: string; // Эмодзи, например 📋
+};
+
+export type DownloadsBlock = BaseBlock & {
+  type: "downloads";
+  data: {
+    files: DownloadFile[];
+  };
+};
+
+export type InfoBlock =
+  | HeroBlock
+  | TextSectionBlock
+  | AlertBlock
+  | VideoBlock
+  | CardsGridBlock
+  | AccordionBlock
+  | DownloadsBlock;
+
+
+// ==========================================
+// БЛОК 2: ИНТЕРАКТИВНЫЙ РЕЖИМ (ВОПРОСЫ)
+// ==========================================
+
+export type QuestionType =
+  | "test"
+  | "fill"
+  | "sentence"
+  | "crossword"
+  | "complex"
+  | "matching"
+  | "imagemap"
+  | "reading";
+
+export type MediaType = "image" | "audio" | "pdf";
+
+export type MediaAttachment = {
+  id: string;
+  url: string;
+  type: MediaType;
+  name?: string;
+};
+
+export type BaseQuestion = {
+  id: string;
+  type: QuestionType;
+  q?: string;
+  image?: string;
+  media?: MediaAttachment[];
+};
+
+export type TestOption = {
+  id: string;
+  text: string;
+  media?: MediaAttachment[];
+};
+
+export type TestQuestion = BaseQuestion & {
+  type: "test";
+  multiple?: boolean;
+  options: TestOption[];
+  correct: number[];
+  layout?: "vertical" | "horizontal";
+};
+
+export type FillQuestion = BaseQuestion & {
+  type: "fill";
+  answers: string[][];
+};
+
+export type SentenceQuestion = BaseQuestion & {
+  type: "sentence";
+  sentence: string;
+  answers: string[][];
+};
+
+export type ComplexQuestion = BaseQuestion & {
+  type: "complex";
+  subQuestions: Question[];
+};
+
+export type MatchingItem = {
+  text?: string;
+  media?: MediaAttachment[];
+};
+
+export type MatchingPair = {
+  id: string;
+  left: MatchingItem;
+  right: MatchingItem;
+};
+
+export type MatchingQuestion = BaseQuestion & {
+  type: "matching";
+  centerImage?: MediaAttachment;
+  pairs: MatchingPair[];
+};
+
+export type ReadingQuestion = BaseQuestion & {
+  type: "reading";
+  text?: string;
+  subQuestions: TestQuestion[];
+};
+
+export type WordDir = "across" | "down";
+
+export type CWWord = {
+  id: string;
+  number: number;
+  text: string;
+  direction: WordDir;
+  start: { row: number; col: number };
+  length: number;
+};
+
+export type CWBlock = { row: number; col: number };
+
+export type CrosswordMetadata = {
+  rows: number;
+  cols: number;
+  nextWordNumber?: number;
+  placingWord?: {
+    text: string;
+    direction: WordDir;
+    number: number;
+  } | null;
+  deleteMode?: boolean;
+};
+
+export type CrosswordQuestion = BaseQuestion & {
+  type: "crossword";
+  grid: string[][];
+  words: CWWord[];
+  blocks?: CWBlock[];
+  cellNumbers?: Record<string, number>;
+  metadata: CrosswordMetadata;
+};
+
+export type ImageMapPoint = {
+  id: string;
+  x: number;
+  y: number;
+  correctAnswerId: string;
+  label?: string;
+};
+
+export type ImageMapAnswer = {
+  id: string;
+  text?: string;
+  media?: MediaAttachment[];
+};
+
+export type ImageMapQuestion = BaseQuestion & {
+  type: "imagemap";
+  image: string;
+  points: ImageMapPoint[];
+  answers: ImageMapAnswer[];
+};
+
+export type Question =
+  | TestQuestion
+  | FillQuestion
+  | SentenceQuestion
+  | CrosswordQuestion
+  | ComplexQuestion
+  | MatchingQuestion
+  | ImageMapQuestion
+  | ReadingQuestion;
+
+
+// ==========================================
+// БЛОК 3: ФУНКЦИИ-ХЕЛПЕРЫ (FACTORY)
+// ==========================================
+
+export function deepClone<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v));
+}
+
+// Хелпер для создания новых блоков ознакомительного режима
+export function newBlock(type: BlockType): InfoBlock {
+  const id = crypto.randomUUID();
+
+  switch (type) {
+    case "hero":
+      return {
+        id,
+        type: "hero",
+        data: { title: "Новый заголовок", badge: "", subtitle: "", pills: [] },
+      };
+    case "text_section":
+      return {
+        id,
+        type: "text_section",
+        data: { label: "", title: "", content: "Текст блока..." },
+      };
+    case "alert":
+      return {
+        id,
+        type: "alert",
+        data: { theme: "info", icon: "ℹ️", content: "Обратите внимание..." },
+      };
+    case "video":
+      return {
+        id,
+        type: "video",
+        data: { url: "", caption: "Название видео", subCaption: "" },
+      };
+    case "cards_grid":
+      return {
+        id,
+        type: "cards_grid",
+        data: {
+          columns: 2,
+          items: [
+            { id: crypto.randomUUID(), title: "Карточка 1", content: "Описание", theme: "default" },
+            { id: crypto.randomUUID(), title: "Карточка 2", content: "Описание", theme: "default" },
+          ],
+        },
+      };
+    case "accordion":
+      return {
+        id,
+        type: "accordion",
+        data: {
+          items: [
+            { id: crypto.randomUUID(), title: "Новый вопрос/задание", content: "Описание", tag: "" },
+          ],
+        },
+      };
+    case "downloads":
+      return {
+        id,
+        type: "downloads",
+        data: {
+          files: [
+            {
+              id: crypto.randomUUID(),
+              name: "Новый файл",
+              url: "",
+              fileType: "PDF",
+              theme: "default",
+              icon: "📄",
+            },
+          ],
+        },
+      };
+    default:
+      // Фолбэк на базовый текст, если что-то пошло не так
+      return { id, type: "text_section", data: { content: "" } } as TextSectionBlock;
+  }
+}
+
+// Хелпер для создания новых вопросов (оставлен без изменений)
+export function newQuestion(type: QuestionType): Question {
+  const id = crypto.randomUUID();
+
+  if (type === "test") {
+    return {
+      id,
+      type: "test",
+      q: "",
+      multiple: false,
+      media: [],
+      layout: "vertical",
+      options: [
+        { id: crypto.randomUUID(), text: "", media: [] },
+        { id: crypto.randomUUID(), text: "", media: [] },
+      ],
+      correct: [0],
+    };
+  }
+
+  if (type === "fill") {
+    return {
+      id,
+      type: "fill",
+      q: "",
+      media: [],
+      answers: [[""]],
+    };
+  }
+
+  if (type === "sentence") {
+    return {
+      id,
+      type: "sentence",
+      q: "",
+      media: [],
+      sentence: "",
+      answers: [],
+    };
+  }
+
+  if (type === "complex") {
+    return {
+      id,
+      type: "complex",
+      q: "",
+      media: [],
+      subQuestions: [],
+    };
+  }
+
+  if (type === "matching") {
+    return {
+      id,
+      type: "matching",
+      q: "",
+      media: [],
+      pairs: [
+        {
+          id: crypto.randomUUID(),
+          left: { text: "", media: [] },
+          right: { text: "", media: [] },
+        },
+      ],
+    };
+  }
+
+  if (type === "imagemap") {
+    const firstPointId = crypto.randomUUID();
+    const firstAnswerId = crypto.randomUUID();
+    return {
+      id,
+      type: "imagemap",
+      q: "",
+      image: "",
+      media: [],
+      points: [
+        { id: firstPointId, x: 50, y: 50, correctAnswerId: firstAnswerId, label: "Точка 1" },
+      ],
+      answers: [
+        { id: firstAnswerId, text: "Ответ 1", media: [] },
+      ],
+    };
+  }
+
+  if (type === "reading") {
+    const subId = crypto.randomUUID();
+    return {
+      id,
+      type: "reading",
+      q: "",
+      media: [],
+      text: "",
+      subQuestions: [
+        {
+          id: subId,
+          type: "test",
+          q: "",
+          multiple: false,
+          media: [],
+          layout: "vertical",
+          options: [
+            { id: crypto.randomUUID(), text: "", media: [] },
+            { id: crypto.randomUUID(), text: "", media: [] },
+          ],
+          correct: [0],
+        },
+      ],
+    };
+  }
+
+  return {
+    id,
+    type: "crossword",
+    q: "",
+    media: [],
+    grid: Array.from({ length: 15 }, () => Array.from({ length: 15 }, () => "")),
+    words: [],
+    blocks: [],
+    cellNumbers: {},
+    metadata: {
+      rows: 15,
+      cols: 15,
+      nextWordNumber: 1,
+      placingWord: null,
+      deleteMode: false,
+    },
+  };
 }
 
 ================
@@ -47105,6 +48418,629 @@ export async function deleteRequestRowByNumber(requestNumber: string) {
 }
 
 ================
+File: app/(app)/assignment/components/MediaRenderer.tsx
+================
+"use client";
+
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
+import type { MediaAttachment } from "../lib/types";
+import { getImageUrl } from "../lib/image";
+import ImageModal from "./ImageModal";
+
+// ============================================================================
+// Глобальная синхронизация громкости между всеми плеерами на странице
+// ============================================================================
+
+const VOLUME_KEY = "hippo_audio_volume";
+const VOLUME_EVENT = "hippo:volume-change";
+
+function getInitialVolume(): number {
+  try {
+    const v = parseFloat(localStorage.getItem(VOLUME_KEY) ?? "0.5");
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
+  } catch {
+    return 0.5;
+  }
+}
+
+function broadcastVolume(v: number): void {
+  try {
+    localStorage.setItem(VOLUME_KEY, String(v));
+    window.dispatchEvent(
+      new CustomEvent(VOLUME_EVENT, { detail: { volume: v } })
+    );
+  } catch {}
+}
+
+// ============================================================================
+// Утилита форматирования времени
+// ============================================================================
+
+function formatTime(sec: number): string {
+  if (!Number.isFinite(sec) || isNaN(sec)) return "00:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+// ============================================================================
+// КАСТОМНЫЙ АУДИОПЛЕЕР
+// ============================================================================
+
+function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const isMounted = useRef(false);
+
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [audioError, setAudioError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Громкость — изначально половина (тише)
+  const [volume, setVolume] = useState(0.5);
+
+  const finalUrl = useMemo(() => getImageUrl(url), [url]);
+
+  // Инициализация громкости после mount
+  useEffect(() => {
+    const v = getInitialVolume();
+    setVolume(v);
+    if (audioRef.current) audioRef.current.volume = v;
+    isMounted.current = true;
+  }, []);
+
+  // Сброс при смене трека
+  useEffect(() => {
+    setIsPlaying(false);
+    setProgress(0);
+    setCurrentTime(0);
+    setDuration(0);
+    setAudioError(false);
+    setLoading(true);
+  }, [url]);
+
+  // Применяем громкость к audio-элементу
+  useEffect(() => {
+    if (audioRef.current && isMounted.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
+  // Синхронизация с другими плеерами через window event
+  useEffect(() => {
+    function onVolumeSync(e: Event) {
+      const v = (e as CustomEvent).detail?.volume;
+      if (typeof v === "number" && Number.isFinite(v)) setVolume(v);
+    }
+    window.addEventListener(VOLUME_EVENT, onVolumeSync);
+    return () => window.removeEventListener(VOLUME_EVENT, onVolumeSync);
+  }, []);
+
+  // Подписка на события audio-элемента
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      setProgress(
+        audio.duration > 0 ? (audio.currentTime / audio.duration) * 100 : 0
+      );
+    };
+    const onLoaded = () => {
+      setDuration(audio.duration);
+      setLoading(false);
+    };
+    const onEnded = () => setIsPlaying(false);
+    const onError = () => {
+      setAudioError(true);
+      setLoading(false);
+    };
+    const onCanPlay = () => setLoading(false);
+
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("loadedmetadata", onLoaded);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
+    audio.addEventListener("canplay", onCanPlay);
+
+    return () => {
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("loadedmetadata", onLoaded);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
+      audio.removeEventListener("canplay", onCanPlay);
+    };
+  }, []);
+
+  const togglePlay = () => {
+    if (!audioRef.current || audioError) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().catch(() => setAudioError(true));
+      setIsPlaying(true);
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!audioRef.current || audioError || !duration) return;
+    audioRef.current.currentTime = (Number(e.target.value) / 100) * duration;
+  };
+
+  const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value) / 100;
+    setVolume(v);
+    broadcastVolume(v);
+  };
+
+  const volIcon = volume === 0 ? "🔇" : volume < 0.4 ? "🔈" : volume < 0.75 ? "🔉" : "🔊";
+
+  return (
+    <div
+      className="media-item-fade"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        padding: "12px 16px",
+        borderRadius: "20px",
+        background: "rgba(255,255,255,0.8)",
+        backdropFilter: "blur(12px)",
+        border: "1px solid rgba(0,0,0,0.05)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
+        width: "100%",
+        maxWidth: "520px",
+        margin: "10px 0",
+      }}
+    >
+      <audio ref={audioRef} src={finalUrl} preload="metadata" />
+
+      {/* ── Кнопка Play / Pause ── */}
+      <button
+        onClick={togglePlay}
+        disabled={audioError || loading}
+        style={{
+          width: 46,
+          height: 46,
+          minWidth: 46,
+          borderRadius: "50%",
+          background: isPlaying ? "rgba(0,123,255,0.1)" : "#007bff",
+          color: isPlaying ? "#007bff" : "#fff",
+          border: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: audioError || loading ? "not-allowed" : "pointer",
+          transition: "all 0.2s ease",
+          boxShadow: isPlaying ? "none" : "0 6px 15px rgba(0,123,255,0.3)",
+          opacity: audioError || loading ? 0.6 : 1,
+          flexShrink: 0,
+        }}
+      >
+        {loading ? (
+          <div
+            style={{
+              width: 18,
+              height: 18,
+              border: "2px solid rgba(255,255,255,0.3)",
+              borderTopColor: "#fff",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+            }}
+          />
+        ) : audioError ? (
+          <span style={{ fontSize: 16 }}>⚠️</span>
+        ) : isPlaying ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          </svg>
+        ) : (
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            style={{ marginLeft: 3 }}
+          >
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        )}
+      </button>
+
+      {/* ── Прогресс-бар + время ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {audioError ? (
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#c62828" }}>
+            Не удалось загрузить аудио
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                minWidth: 35,
+                color: "#475569",
+                flexShrink: 0,
+              }}
+            >
+              {formatTime(currentTime)}
+            </span>
+
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={progress || 0}
+              onChange={handleSeek}
+              style={{ flex: 1, cursor: "pointer", accentColor: "#007bff" }}
+            />
+
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                minWidth: 35,
+                textAlign: "right",
+                color: "#475569",
+                flexShrink: 0,
+              }}
+            >
+              {formatTime(duration)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Регулятор громкости ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          flexShrink: 0,
+        }}
+        title={`Громкость: ${Math.round(volume * 100)}%`}
+      >
+        <span style={{ fontSize: 14, lineHeight: 1, userSelect: "none" }}>
+          {volIcon}
+        </span>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={Math.round(volume * 100)}
+          onChange={handleVolume}
+          style={{ width: 60, cursor: "pointer", accentColor: "#007bff" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ИЗОБРАЖЕНИЕ (с зумом через ImageModal + исправленный таймаут)
+// ============================================================================
+
+function ZoomableImage({
+  url,
+  name,
+  onZoom,
+}: {
+  url: string;
+  name?: string;
+  onZoom?: (imageUrl: string) => void;
+}) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadingRef = useRef(true); // синхронный флаг для таймаута
+
+  const finalUrl = useMemo(() => {
+    const base = getImageUrl(url);
+    if (!base) return "";
+    if (retryCount === 0) return base;
+    return `${base}${base.includes("?") ? "&" : "?"}retry=${retryCount}`;
+  }, [url, retryCount]);
+
+  // Сброс состояния и установка таймаута при изменении URL
+  useEffect(() => {
+    // Очищаем предыдущий таймаут
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+    // Сбрасываем состояние загрузки
+    setIsLoading(true);
+    setHasError(false);
+    loadingRef.current = true;
+
+    // Устанавливаем таймаут на 15 секунд
+    timeoutRef.current = setTimeout(() => {
+      // Используем ref для проверки, а не state (решаем проблему стейл-клоужера)
+      if (loadingRef.current) {
+        setHasError(true);
+        setIsLoading(false);
+      }
+    }, 15000);
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [finalUrl]);
+
+  const handleLoad = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    loadingRef.current = false;
+    setIsLoading(false);
+  }, []);
+
+  const handleError = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    loadingRef.current = false;
+    setHasError(true);
+    setIsLoading(false);
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setRetryCount((c) => c + 1);
+  }, []);
+
+  const handleClick = () => {
+    if (!isLoading && !hasError && onZoom) {
+      onZoom(finalUrl);
+    }
+  };
+
+  return (
+    <div
+      className="media-item-fade"
+      style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: isLoading ? "default" : "zoom-in",
+        margin: "12px 0",
+        borderRadius: "20px",
+        overflow: "hidden",
+        background: "#f8fafc",
+        minHeight: "200px",
+        width: "100%",
+        maxWidth: "600px",
+        border: "1px solid rgba(0,0,0,0.06)",
+      }}
+      onClick={handleClick}
+    >
+      {isLoading && !hasError && (
+        <div className="media-loader">
+          <div className="spinner" />
+        </div>
+      )}
+
+      {hasError ? (
+        <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
+            Не удалось загрузить фото
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRetry();
+            }}
+            style={{
+              padding: "8px 16px",
+              background: "#007bff",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 13,
+            }}
+          >
+            Повторить загрузку
+          </button>
+        </div>
+      ) : (
+        <img
+          src={finalUrl}
+          alt={name || "Task Image"}
+          onLoad={handleLoad}
+          onError={handleError}
+          loading="lazy"
+          decoding="async"
+          style={{
+            width: "100%",
+            maxHeight: "400px",
+            objectFit: "contain",
+            display: "block",
+            transition: "opacity 0.4s ease",
+            opacity: isLoading ? 0 : 1,
+          }}
+        />
+      )}
+
+      {!isLoading && !hasError && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 12,
+            right: 12,
+            background: "rgba(0,0,0,0.5)",
+            color: "#fff",
+            padding: "5px 10px",
+            borderRadius: 10,
+            backdropFilter: "blur(4px)",
+            fontSize: 11,
+            fontWeight: 800,
+            pointerEvents: "none",
+            textTransform: "uppercase",
+          }}
+        >
+          🔍 Увеличить
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// PDF VIEWER
+// ============================================================================
+
+function PdfViewer({ url, name }: { url: string; name?: string }) {
+  const finalUrl = useMemo(() => getImageUrl(url), [url]);
+
+  return (
+    <div
+      className="media-item-fade"
+      style={{ margin: "16px 0", width: "100%", maxWidth: 800 }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "#f1f5f9",
+          padding: "12px 18px",
+          borderRadius: "16px 16px 0 0",
+          border: "1px solid #e2e8f0",
+          borderBottom: "none",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
+          <span style={{ fontSize: 18 }}>📄</span>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#475569",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {name || "PDF Document"}
+          </span>
+        </div>
+        <a
+          href={finalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 11,
+            color: "#007bff",
+            fontWeight: 800,
+            textDecoration: "none",
+            background: "#fff",
+            padding: "6px 12px",
+            borderRadius: 12,
+            boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+          }}
+        >
+          ОТКРЫТЬ ↗
+        </a>
+      </div>
+      <div
+        style={{
+          height: 500,
+          borderRadius: "0 0 16px 16px",
+          overflow: "hidden",
+          border: "1px solid #e2e8f0",
+          background: "#fff",
+        }}
+      >
+        <iframe src={`${finalUrl}#toolbar=0`} width="100%" height="100%" style={{ border: "none" }} />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ГЛАВНЫЙ РЕНДЕРЕР
+// ============================================================================
+
+export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) {
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [imageModalSrc, setImageModalSrc] = useState("");
+
+  const handleZoom = useCallback((src: string) => {
+    setImageModalSrc(src);
+    setImageModalOpen(true);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setImageModalOpen(false);
+    setImageModalSrc("");
+  }, []);
+
+  if (!media || media.length === 0) return null;
+
+  return (
+    <>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+        {media.map((m) => {
+          if (!m.url) return null;
+          const key = `${m.id}-${m.url}`;
+          if (m.type === "audio")
+            return <CustomAudioPlayer key={key} url={m.url} name={m.name} />;
+          if (m.type === "image")
+            return <ZoomableImage key={key} url={m.url} name={m.name} onZoom={handleZoom} />;
+          if (m.type === "pdf")
+            return <PdfViewer key={key} url={m.url} name={m.name} />;
+          return null;
+        })}
+
+        <style jsx global>{`
+          .media-item-fade {
+            animation: mediaAppear 0.4s ease-out forwards;
+          }
+          @keyframes mediaAppear {
+            from { opacity: 0; transform: translateY(5px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          .media-loader {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+          }
+          .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(0, 123, 255, 0.1);
+            border-top-color: #007bff;
+            border-radius: 50%;
+            animation: mediaSpin 0.8s linear infinite;
+          }
+          @keyframes mediaSpin { to { transform: rotate(360deg); } }
+          @keyframes spin      { to { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+
+      <ImageModal
+        open={imageModalOpen}
+        src={imageModalSrc}
+        onClose={handleCloseModal}
+      />
+    </>
+  );
+}
+
+================
 File: app/(app)/assignment/components/QuestionComplex.tsx
 ================
 "use client";
@@ -49751,629 +51687,6 @@ const ctrlBtnStyle: React.CSSProperties = {
 };
 
 ================
-File: app/(app)/assignment/components/MediaRenderer.tsx
-================
-"use client";
-
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
-import type { MediaAttachment } from "../lib/types";
-import { getImageUrl } from "../lib/image";
-import ImageModal from "./ImageModal";
-
-// ============================================================================
-// Глобальная синхронизация громкости между всеми плеерами на странице
-// ============================================================================
-
-const VOLUME_KEY = "hippo_audio_volume";
-const VOLUME_EVENT = "hippo:volume-change";
-
-function getInitialVolume(): number {
-  try {
-    const v = parseFloat(localStorage.getItem(VOLUME_KEY) ?? "0.5");
-    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
-  } catch {
-    return 0.5;
-  }
-}
-
-function broadcastVolume(v: number): void {
-  try {
-    localStorage.setItem(VOLUME_KEY, String(v));
-    window.dispatchEvent(
-      new CustomEvent(VOLUME_EVENT, { detail: { volume: v } })
-    );
-  } catch {}
-}
-
-// ============================================================================
-// Утилита форматирования времени
-// ============================================================================
-
-function formatTime(sec: number): string {
-  if (!Number.isFinite(sec) || isNaN(sec)) return "00:00";
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-// ============================================================================
-// КАСТОМНЫЙ АУДИОПЛЕЕР
-// ============================================================================
-
-function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const isMounted = useRef(false);
-
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [audioError, setAudioError] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  // Громкость — изначально половина (тише)
-  const [volume, setVolume] = useState(0.5);
-
-  const finalUrl = useMemo(() => getImageUrl(url), [url]);
-
-  // Инициализация громкости после mount
-  useEffect(() => {
-    const v = getInitialVolume();
-    setVolume(v);
-    if (audioRef.current) audioRef.current.volume = v;
-    isMounted.current = true;
-  }, []);
-
-  // Сброс при смене трека
-  useEffect(() => {
-    setIsPlaying(false);
-    setProgress(0);
-    setCurrentTime(0);
-    setDuration(0);
-    setAudioError(false);
-    setLoading(true);
-  }, [url]);
-
-  // Применяем громкость к audio-элементу
-  useEffect(() => {
-    if (audioRef.current && isMounted.current) {
-      audioRef.current.volume = volume;
-    }
-  }, [volume]);
-
-  // Синхронизация с другими плеерами через window event
-  useEffect(() => {
-    function onVolumeSync(e: Event) {
-      const v = (e as CustomEvent).detail?.volume;
-      if (typeof v === "number" && Number.isFinite(v)) setVolume(v);
-    }
-    window.addEventListener(VOLUME_EVENT, onVolumeSync);
-    return () => window.removeEventListener(VOLUME_EVENT, onVolumeSync);
-  }, []);
-
-  // Подписка на события audio-элемента
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const onTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-      setProgress(
-        audio.duration > 0 ? (audio.currentTime / audio.duration) * 100 : 0
-      );
-    };
-    const onLoaded = () => {
-      setDuration(audio.duration);
-      setLoading(false);
-    };
-    const onEnded = () => setIsPlaying(false);
-    const onError = () => {
-      setAudioError(true);
-      setLoading(false);
-    };
-    const onCanPlay = () => setLoading(false);
-
-    audio.addEventListener("timeupdate", onTimeUpdate);
-    audio.addEventListener("loadedmetadata", onLoaded);
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("error", onError);
-    audio.addEventListener("canplay", onCanPlay);
-
-    return () => {
-      audio.removeEventListener("timeupdate", onTimeUpdate);
-      audio.removeEventListener("loadedmetadata", onLoaded);
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("error", onError);
-      audio.removeEventListener("canplay", onCanPlay);
-    };
-  }, []);
-
-  const togglePlay = () => {
-    if (!audioRef.current || audioError) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play().catch(() => setAudioError(true));
-      setIsPlaying(true);
-    }
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!audioRef.current || audioError || !duration) return;
-    audioRef.current.currentTime = (Number(e.target.value) / 100) * duration;
-  };
-
-  const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = Number(e.target.value) / 100;
-    setVolume(v);
-    broadcastVolume(v);
-  };
-
-  const volIcon = volume === 0 ? "🔇" : volume < 0.4 ? "🔈" : volume < 0.75 ? "🔉" : "🔊";
-
-  return (
-    <div
-      className="media-item-fade"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
-        padding: "12px 16px",
-        borderRadius: "20px",
-        background: "rgba(255,255,255,0.8)",
-        backdropFilter: "blur(12px)",
-        border: "1px solid rgba(0,0,0,0.05)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
-        width: "100%",
-        maxWidth: "520px",
-        margin: "10px 0",
-      }}
-    >
-      <audio ref={audioRef} src={finalUrl} preload="metadata" />
-
-      {/* ── Кнопка Play / Pause ── */}
-      <button
-        onClick={togglePlay}
-        disabled={audioError || loading}
-        style={{
-          width: 46,
-          height: 46,
-          minWidth: 46,
-          borderRadius: "50%",
-          background: isPlaying ? "rgba(0,123,255,0.1)" : "#007bff",
-          color: isPlaying ? "#007bff" : "#fff",
-          border: "none",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: audioError || loading ? "not-allowed" : "pointer",
-          transition: "all 0.2s ease",
-          boxShadow: isPlaying ? "none" : "0 6px 15px rgba(0,123,255,0.3)",
-          opacity: audioError || loading ? 0.6 : 1,
-          flexShrink: 0,
-        }}
-      >
-        {loading ? (
-          <div
-            style={{
-              width: 18,
-              height: 18,
-              border: "2px solid rgba(255,255,255,0.3)",
-              borderTopColor: "#fff",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-            }}
-          />
-        ) : audioError ? (
-          <span style={{ fontSize: 16 }}>⚠️</span>
-        ) : isPlaying ? (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-          </svg>
-        ) : (
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            style={{ marginLeft: 3 }}
-          >
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </button>
-
-      {/* ── Прогресс-бар + время ── */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {audioError ? (
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#c62828" }}>
-            Не удалось загрузить аудио
-          </div>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                minWidth: 35,
-                color: "#475569",
-                flexShrink: 0,
-              }}
-            >
-              {formatTime(currentTime)}
-            </span>
-
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={progress || 0}
-              onChange={handleSeek}
-              style={{ flex: 1, cursor: "pointer", accentColor: "#007bff" }}
-            />
-
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                minWidth: 35,
-                textAlign: "right",
-                color: "#475569",
-                flexShrink: 0,
-              }}
-            >
-              {formatTime(duration)}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* ── Регулятор громкости ── */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          flexShrink: 0,
-        }}
-        title={`Громкость: ${Math.round(volume * 100)}%`}
-      >
-        <span style={{ fontSize: 14, lineHeight: 1, userSelect: "none" }}>
-          {volIcon}
-        </span>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={Math.round(volume * 100)}
-          onChange={handleVolume}
-          style={{ width: 60, cursor: "pointer", accentColor: "#007bff" }}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// ИЗОБРАЖЕНИЕ (с зумом через ImageModal + исправленный таймаут)
-// ============================================================================
-
-function ZoomableImage({
-  url,
-  name,
-  onZoom,
-}: {
-  url: string;
-  name?: string;
-  onZoom?: (imageUrl: string) => void;
-}) {
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const loadingRef = useRef(true); // синхронный флаг для таймаута
-
-  const finalUrl = useMemo(() => {
-    const base = getImageUrl(url);
-    if (!base) return "";
-    if (retryCount === 0) return base;
-    return `${base}${base.includes("?") ? "&" : "?"}retry=${retryCount}`;
-  }, [url, retryCount]);
-
-  // Сброс состояния и установка таймаута при изменении URL
-  useEffect(() => {
-    // Очищаем предыдущий таймаут
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-    // Сбрасываем состояние загрузки
-    setIsLoading(true);
-    setHasError(false);
-    loadingRef.current = true;
-
-    // Устанавливаем таймаут на 15 секунд
-    timeoutRef.current = setTimeout(() => {
-      // Используем ref для проверки, а не state (решаем проблему стейл-клоужера)
-      if (loadingRef.current) {
-        setHasError(true);
-        setIsLoading(false);
-      }
-    }, 15000);
-
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [finalUrl]);
-
-  const handleLoad = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    loadingRef.current = false;
-    setIsLoading(false);
-  }, []);
-
-  const handleError = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    loadingRef.current = false;
-    setHasError(true);
-    setIsLoading(false);
-  }, []);
-
-  const handleRetry = useCallback(() => {
-    setRetryCount((c) => c + 1);
-  }, []);
-
-  const handleClick = () => {
-    if (!isLoading && !hasError && onZoom) {
-      onZoom(finalUrl);
-    }
-  };
-
-  return (
-    <div
-      className="media-item-fade"
-      style={{
-        position: "relative",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: isLoading ? "default" : "zoom-in",
-        margin: "12px 0",
-        borderRadius: "20px",
-        overflow: "hidden",
-        background: "#f8fafc",
-        minHeight: "200px",
-        width: "100%",
-        maxWidth: "600px",
-        border: "1px solid rgba(0,0,0,0.06)",
-      }}
-      onClick={handleClick}
-    >
-      {isLoading && !hasError && (
-        <div className="media-loader">
-          <div className="spinner" />
-        </div>
-      )}
-
-      {hasError ? (
-        <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
-            Не удалось загрузить фото
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRetry();
-            }}
-            style={{
-              padding: "8px 16px",
-              background: "#007bff",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontWeight: 600,
-              fontSize: 13,
-            }}
-          >
-            Повторить загрузку
-          </button>
-        </div>
-      ) : (
-        <img
-          src={finalUrl}
-          alt={name || "Task Image"}
-          onLoad={handleLoad}
-          onError={handleError}
-          loading="lazy"
-          decoding="async"
-          style={{
-            width: "100%",
-            maxHeight: "400px",
-            objectFit: "contain",
-            display: "block",
-            transition: "opacity 0.4s ease",
-            opacity: isLoading ? 0 : 1,
-          }}
-        />
-      )}
-
-      {!isLoading && !hasError && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 12,
-            right: 12,
-            background: "rgba(0,0,0,0.5)",
-            color: "#fff",
-            padding: "5px 10px",
-            borderRadius: 10,
-            backdropFilter: "blur(4px)",
-            fontSize: 11,
-            fontWeight: 800,
-            pointerEvents: "none",
-            textTransform: "uppercase",
-          }}
-        >
-          🔍 Увеличить
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// PDF VIEWER
-// ============================================================================
-
-function PdfViewer({ url, name }: { url: string; name?: string }) {
-  const finalUrl = useMemo(() => getImageUrl(url), [url]);
-
-  return (
-    <div
-      className="media-item-fade"
-      style={{ margin: "16px 0", width: "100%", maxWidth: 800 }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          background: "#f1f5f9",
-          padding: "12px 18px",
-          borderRadius: "16px 16px 0 0",
-          border: "1px solid #e2e8f0",
-          borderBottom: "none",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
-          <span style={{ fontSize: 18 }}>📄</span>
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: "#475569",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {name || "PDF Document"}
-          </span>
-        </div>
-        <a
-          href={finalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            fontSize: 11,
-            color: "#007bff",
-            fontWeight: 800,
-            textDecoration: "none",
-            background: "#fff",
-            padding: "6px 12px",
-            borderRadius: 12,
-            boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
-          }}
-        >
-          ОТКРЫТЬ ↗
-        </a>
-      </div>
-      <div
-        style={{
-          height: 500,
-          borderRadius: "0 0 16px 16px",
-          overflow: "hidden",
-          border: "1px solid #e2e8f0",
-          background: "#fff",
-        }}
-      >
-        <iframe src={`${finalUrl}#toolbar=0`} width="100%" height="100%" style={{ border: "none" }} />
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// ГЛАВНЫЙ РЕНДЕРЕР
-// ============================================================================
-
-export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) {
-  const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [imageModalSrc, setImageModalSrc] = useState("");
-
-  const handleZoom = useCallback((src: string) => {
-    setImageModalSrc(src);
-    setImageModalOpen(true);
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setImageModalOpen(false);
-    setImageModalSrc("");
-  }, []);
-
-  if (!media || media.length === 0) return null;
-
-  return (
-    <>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
-        {media.map((m) => {
-          if (!m.url) return null;
-          const key = `${m.id}-${m.url}`;
-          if (m.type === "audio")
-            return <CustomAudioPlayer key={key} url={m.url} name={m.name} />;
-          if (m.type === "image")
-            return <ZoomableImage key={key} url={m.url} name={m.name} onZoom={handleZoom} />;
-          if (m.type === "pdf")
-            return <PdfViewer key={key} url={m.url} name={m.name} />;
-          return null;
-        })}
-
-        <style jsx global>{`
-          .media-item-fade {
-            animation: mediaAppear 0.4s ease-out forwards;
-          }
-          @keyframes mediaAppear {
-            from { opacity: 0; transform: translateY(5px); }
-            to   { opacity: 1; transform: translateY(0); }
-          }
-          .media-loader {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 5;
-          }
-          .spinner {
-            width: 30px;
-            height: 30px;
-            border: 3px solid rgba(0, 123, 255, 0.1);
-            border-top-color: #007bff;
-            border-radius: 50%;
-            animation: mediaSpin 0.8s linear infinite;
-          }
-          @keyframes mediaSpin { to { transform: rotate(360deg); } }
-          @keyframes spin      { to { transform: rotate(360deg); } }
-        `}</style>
-      </div>
-
-      <ImageModal
-        open={imageModalOpen}
-        src={imageModalSrc}
-        onClose={handleCloseModal}
-      />
-    </>
-  );
-}
-
-================
 File: app/(app)/assignment/components/QuestionImageMap.tsx
 ================
 // файл app/(app)/assignment/components/QuestionImageMap.tsx
@@ -51536,7 +52849,7 @@ type Body = {
   assignmentId: string;
   answers: Record<string, any>;
   isCompleted: boolean;
-  score: number;           // присланный клиентом балл игнорируется
+  score: number | null;    // присланный клиентом балл игнорируется
   source?: string;
   sourceId?: string;
   branchType?: string;
@@ -51710,16 +53023,23 @@ export async function POST(req: Request) {
     );
   }
 
-  const questions = assignment.content?.questions;
-  if (!Array.isArray(questions)) {
-    return NextResponse.json(
-      { ok: false, error: "Некорректное содержимое задания" },
-      { status: 500 }
-    );
-  }
+  // =================================================================
+  // ЛОГИКА ОПРЕДЕЛЕНИЯ БАЛЛОВ (ИНТЕРАКТИВНЫЙ VS ОЗНАКОМИТЕЛЬНЫЙ)
+  // =================================================================
+  const isInformational = assignment.content?.mode === "informational";
+  let realScore: number | null = null;
 
-  const { stats } = calcAndBuildReview(questions, body.answers);
-  const realScore = normalizeScore(stats.score);
+  if (!isInformational) {
+    const questions = assignment.content?.questions;
+    if (!Array.isArray(questions)) {
+      return NextResponse.json(
+        { ok: false, error: "Некорректное содержимое задания" },
+        { status: 500 }
+      );
+    }
+    const { stats } = calcAndBuildReview(questions, body.answers);
+    realScore = normalizeScore(stats.score);
+  }
 
   const payload = {
     user_id: auth.user.id,
@@ -51743,19 +53063,24 @@ export async function POST(req: Request) {
 
   if (gatehouse) {
     const materialId = getMaterialId(assignment);
-    const recommendation = recommendGatehouseLevel({
-      score: realScore,
-      maxScore: 100,
-      percent: realScore,
-      materialLevels: getMaterialLevels(assignment),
-    });
+    
+    // Если это ознакомительное задание, рекомендация не выдается
+    let recommendation: any = null;
+    if (!isInformational && realScore !== null) {
+      recommendation = recommendGatehouseLevel({
+        score: realScore,
+        maxScore: 100,
+        percent: realScore,
+        materialLevels: getMaterialLevels(assignment),
+      });
+    }
 
     const examResultPayload = {
       user_id: auth.user.id,
       assignment_id: body.assignmentId,
       material_id: materialId,
       score: realScore,
-      recommended_level: recommendation.recommendedLevel,
+      recommended_level: recommendation?.recommendedLevel || null,
       breakdown: {
         recommendation,
         source: body.source ?? null,
@@ -54149,10 +55474,14 @@ import MediaRenderer from "./components/MediaRenderer";
 import ReviewPanel from "./components/ReviewPanel";
 import ImageModal from "./components/ImageModal";
 
+// === НОВЫЙ КОМПОНЕНТ ОЗНАКОМИТЕЛЬНОГО РЕЖИМА ===
+import BlockRenderer from "./components/BlockRenderer";
+
 // === ЛОГИКА И ТИПЫ ===
 import { getImageUrl } from "./lib/image";
 import type { FinalStats, ReviewItem, QuestionAny, AssignmentData } from "./lib/types";
 import { validateAllAnswered, calcAndBuildReview, isQuestionAnswered } from "./lib/scoring";
+import type { InfoBlock } from "@/app/(admin)/admin/assignments/builder/types";
 
 import {
   recommendGatehouseLevel,
@@ -54216,7 +55545,12 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [assignment, setAssignment] = useState<AssignmentData | null>(null);
+  
+  // Разделение состояния на интерактивный и ознакомительный
+  const [assignmentMode, setAssignmentMode] = useState<"interactive" | "informational">("interactive");
   const [questions, setQuestions] = useState<QuestionAny[]>([]);
+  const [blocks, setBlocks] = useState<InfoBlock[]>([]);
+
   const [previousProgress, setPreviousProgress] = useState<ApiOk["progress"]>(null);
   const [showChoice, setShowChoice] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
@@ -54231,8 +55565,9 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
   const [isSaving, setIsSaving] = useState(false);
   const saveBusyRef = useRef(false);
 
-  // --- PRELOAD следующего вопроса (без обнуления src, чтобы не отменять загрузку последней картинки) ---
+  // --- PRELOAD следующего вопроса (работает только для интерактивного режима) ---
   useEffect(() => {
+    if (assignmentMode !== "interactive") return;
     const nextIndex = currentIndex + 1;
     if (!questions[nextIndex]) return;
 
@@ -54258,20 +55593,17 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     }
 
     const preloads = urls.map(({ type, url }) => {
-      // Изображения – просто запускаем загрузку, в cleanup ничего не делаем
       if (type.startsWith("image") || url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i)) {
         const img = new window.Image();
         img.src = url;
         return { cleanup: () => {} };
       }
-      // Аудио – аналогично
       if (type.startsWith("audio") || url.match(/\.(mp3|wav|ogg)$/i)) {
         const audio = new window.Audio();
         audio.preload = "auto";
         audio.src = url;
         return { cleanup: () => {} };
       }
-      // PDF – используем AbortController
       if (type.startsWith("pdf") || url.match(/\.pdf$/i)) {
         const controller = new AbortController();
         fetch(url, { method: "HEAD", signal: controller.signal }).catch(() => {});
@@ -54283,7 +55615,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     return () => {
       preloads.forEach(p => p.cleanup());
     };
-  }, [currentIndex, questions]);
+  }, [currentIndex, questions, assignmentMode]);
 
   // --- THEME LOGIC ---
   const isGatehouse = useMemo(() => {
@@ -54346,9 +55678,17 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         throw new Error((json as ApiErr).error || "Не удалось загрузить задание");
       }
 
-      setAssignment(json.assignment);
-      const qs = normalizeQuestions(json.assignment?.content?.questions);
-      setQuestions(qs);
+      const data = json.assignment;
+      setAssignment(data);
+
+      if (data?.content?.mode === "informational") {
+        setAssignmentMode("informational");
+        setBlocks(data.content.blocks || []);
+      } else {
+        setAssignmentMode("interactive");
+        setQuestions(normalizeQuestions(data?.content?.questions));
+      }
+
       setPreviousProgress(json.progress);
 
       if (json.progress?.is_completed) {
@@ -54429,6 +55769,44 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
     setGatehouseRecommendation(null);
   }
 
+  // Сохранение для ознакомительных гайдов (БЕЗ БАЛЛОВ)
+  async function finishInformational() {
+    if (saveBusyRef.current) return;
+    saveBusyRef.current = true;
+    setIsSaving(true);
+
+    try {
+      const payload = {
+        assignmentId,
+        answers: {}, // Нет ответов
+        isCompleted: true,
+        score: null, // Нет баллов
+        source,
+        sourceId,
+        branchType: isGatehouse ? "gatehouse" : "olympiad",
+      };
+
+      const res = await fetch("/api/assignment-progress", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setCompletedScreen(true);
+        window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
+      } else {
+        alert("Ошибка при сохранении результатов");
+      }
+    } catch (e) {
+      alert("Сетевая ошибка при сохранении прогресса");
+    } finally {
+      saveBusyRef.current = false;
+      setIsSaving(false);
+    }
+  }
+
+  // Сохранение для интерактивных тестов (С БАЛЛАМИ)
   async function saveProgressAndShowResults(clientStats: FinalStats, review: ReviewItem[]) {
     if (saveBusyRef.current) return;
     saveBusyRef.current = true;
@@ -54580,7 +55958,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           </div>
 
           <div className="assignment-badge" style={{ background: theme.primary }}>
-            {theme.badge}
+            {assignmentMode === "informational" ? "GUIDE" : theme.badge}
           </div>
         </div>
       </header>
@@ -54589,23 +55967,27 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         {/* ЭКРАН ВЫБОРА РЕЖИМА */}
         {showChoice && (
           <div className="premium-card animate-in" style={{ background: theme.cardBg }}>
-            <h2 className="card-title">Предыдущий результат</h2>
+            <h2 className="card-title">
+              {assignmentMode === "informational" ? "Материал уже изучен" : "Предыдущий результат"}
+            </h2>
             <p className="card-subtitle">
-              У вас уже есть сохраненный прогресс. Хотите начать с чистого листа или просто посмотреть ошибки?
+              {assignmentMode === "informational" 
+                ? "Вы уже ознакомились с этим гайдом. Хотите просмотреть его снова?" 
+                : "У вас уже есть сохраненный прогресс. Хотите начать с чистого листа или просто посмотреть ошибки?"}
             </p>
             <div className="button-group">
               <button className="btn-premium primary" style={{ background: theme.primary }} onClick={startFresh}>
-                Начать заново
+                {assignmentMode === "informational" ? "Изучить заново" : "Начать заново"}
               </button>
               <button className="btn-premium secondary" onClick={viewPrevious}>
-                Посмотреть ответы
+                {assignmentMode === "informational" ? "Перейти к материалу" : "Посмотреть ответы"}
               </button>
             </div>
           </div>
         )}
 
-        {/* ЭКРАН РЕЗУЛЬТАТОВ */}
-        {completedScreen && finalStats && (
+        {/* ЭКРАН РЕЗУЛЬТАТОВ (ДЛЯ ТЕСТОВ) */}
+        {completedScreen && assignmentMode === "interactive" && finalStats && (
           <div className="premium-card animate-in" style={{ background: theme.cardBg }}>
             <div className="score-circle" style={{ borderColor: theme.primary }}>
               <span className="score-value" style={{ color: theme.primary }}>
@@ -54659,165 +56041,200 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
           </div>
         )}
 
+        {/* ЭКРАН ЗАВЕРШЕНИЯ (ДЛЯ ГАЙДОВ) */}
+        {completedScreen && assignmentMode === "informational" && (
+          <div className="premium-card animate-in" style={{ background: theme.cardBg, textAlign: "center", padding: "60px 20px" }}>
+            <div style={{ fontSize: "72px", marginBottom: "24px" }}>🎉</div>
+            <h2 className="card-title" style={{ fontSize: "28px" }}>Материал успешно изучен!</h2>
+            <p className="card-subtitle" style={{ fontSize: "16px", marginTop: "12px" }}>
+              Вы ознакомились со всеми файлами и правилами из этого раздела. 
+            </p>
+            <div style={{ marginTop: "40px", display: "flex", justifyContent: "center" }}>
+              <button
+                className="btn-premium primary"
+                style={{ background: theme.primary, minWidth: "250px" }}
+                onClick={() => router.push(back.href)}
+              >
+                Вернуться к списку
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ПРОЦЕСС ВЫПОЛНЕНИЯ ЗАДАНИЯ */}
-        {!showChoice && !completedScreen && assignment && questions.length > 0 && (
+        {!showChoice && !completedScreen && assignment && (
           <div className="assignment-layout animate-in">
-            {/* ====== ПРОГРЕСС-БАР ====== */}
-            {questions.length > 1 && (
-              <div className="progress-container">
-                <div className="progress-dots">
-                  {questions.map((q, i) => {
-                    const isCurrent = i === currentIndex;
-                    const answered = isQuestionAnswered(q, getAnswerForQuestion(i));
-                    const dotSize = questions.length > 25 ? 8 : questions.length > 15 ? 10 : 13;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => setCurrentIndex(i)}
-                        title={`Вопрос ${i + 1}${answered ? " ✓" : ""}`}
-                        style={{
-                          width: dotSize,
-                          height: dotSize,
-                          minWidth: dotSize,
-                          borderRadius: "50%",
-                          border: isCurrent ? `2px solid ${theme.primary}` : "2px solid transparent",
-                          background: isCurrent
-                            ? theme.primary
-                            : answered
-                            ? `${theme.primary}66`
-                            : "rgba(0,0,0,0.1)",
-                          cursor: "pointer",
-                          padding: 0,
-                          transition: "all 0.2s ease",
-                          transform: isCurrent ? "scale(1.4)" : "scale(1)",
-                          boxShadow: isCurrent ? `0 0 0 3px ${theme.primary}22` : "none",
-                          flexShrink: 0,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-
-                <div className="progress-bar-bg">
-                  <div
-                    className="progress-fill"
-                    style={{
-                      width: `${((currentIndex + 1) / questions.length) * 100}%`,
-                      background: theme.primary,
-                    }}
-                  />
-                </div>
-                <div className="progress-info">
-                  <span>
-                    Вопрос {currentIndex + 1} из {questions.length}
-                  </span>
-                  <span style={{ fontSize: "12px", opacity: 0.45 }}>
-                    {answeredCount} / {questions.length} заполнено
-                  </span>
-                  {isViewMode && <span className="view-mode-tag">РЕЖИМ ПРОСМОТРА</span>}
-                </div>
-              </div>
-            )}
-
-            {questions[currentIndex] && (
-              <div key={currentIndex} className="premium-card active-question" style={{ background: theme.cardBg }}>
-                {/* ======== ЗАГОЛОВОК ВОПРОСА ======== */}
-                {questions[currentIndex]!.q && (
-                  <h2 className="question-title">
-                    {questions.length > 1 ? `${currentIndex + 1}. ` : ""}
-                    {questions[currentIndex]!.q}
-                  </h2>
-                )}
-
-                {/* ======== МАТЕРИАЛЫ К ВОПРОСУ ======== */}
-                {/* Для complex и reading медиа рендерит сам компонент, чтобы избежать дублирования */}
-                {questions[currentIndex]!.type !== "complex" && questions[currentIndex]!.type !== "reading" && (
-                  ((questions[currentIndex]!.media?.length ?? 0) > 0 ||
-                    (questions[currentIndex]!.image &&
-                      questions[currentIndex]!.type !== "crossword" &&
-                      questions[currentIndex]!.type !== "imagemap")) && (
-                    <div className="materials-block">
-                      <div className="materials-label">МАТЕРИАЛЫ К ВОПРОСУ</div>
-                      {(questions[currentIndex]!.media?.length ?? 0) > 0 && (
-                        <MediaRenderer media={questions[currentIndex]!.media} />
-                      )}
-                      {!(questions[currentIndex]!.media?.length ?? 0) &&
-                        questions[currentIndex]!.image &&
-                        questions[currentIndex]!.type !== "crossword" &&
-                        questions[currentIndex]!.type !== "imagemap" && (
-                          <div
-                            className="optimized-image-wrapper"
-                            onClick={() => openImage(getImageUrl(questions[currentIndex]!.image!))}
-                          >
-                            <Image
-                              src={getImageUrl(questions[currentIndex]!.image!)}
-                              alt="task-media"
-                              width={800}
-                              height={600}
-                              priority={true}
-                              unoptimized={true}
+            
+            {/* ЕСЛИ ЭТО ОЗНАКОМИТЕЛЬНЫЙ РЕЖИМ */}
+            {assignmentMode === "informational" ? (
+              <BlockRenderer 
+                blocks={blocks} 
+                onComplete={finishInformational} 
+                disabled={isViewMode} 
+                isSaving={isSaving} 
+              />
+            ) : (
+              /* ЕСЛИ ЭТО ИНТЕРАКТИВНЫЙ РЕЖИМ (ТЕСТЫ) */
+              questions.length > 0 && (
+                <>
+                  {/* ====== ПРОГРЕСС-БАР ====== */}
+                  {questions.length > 1 && (
+                    <div className="progress-container">
+                      <div className="progress-dots">
+                        {questions.map((q, i) => {
+                          const isCurrent = i === currentIndex;
+                          const answered = isQuestionAnswered(q, getAnswerForQuestion(i));
+                          const dotSize = questions.length > 25 ? 8 : questions.length > 15 ? 10 : 13;
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => setCurrentIndex(i)}
+                              title={`Вопрос ${i + 1}${answered ? " ✓" : ""}`}
                               style={{
-                                width: "100%",
-                                height: "auto",
-                                borderRadius: "20px",
-                                cursor: "zoom-in",
-                                objectFit: "contain",
-                                boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
+                                width: dotSize,
+                                height: dotSize,
+                                minWidth: dotSize,
+                                borderRadius: "50%",
+                                border: isCurrent ? `2px solid ${theme.primary}` : "2px solid transparent",
+                                background: isCurrent
+                                  ? theme.primary
+                                  : answered
+                                  ? `${theme.primary}66`
+                                  : "rgba(0,0,0,0.1)",
+                                cursor: "pointer",
+                                padding: 0,
+                                transition: "all 0.2s ease",
+                                transform: isCurrent ? "scale(1.4)" : "scale(1)",
+                                boxShadow: isCurrent ? `0 0 0 3px ${theme.primary}22` : "none",
+                                flexShrink: 0,
                               }}
                             />
-                          </div>
-                        )}
+                          );
+                        })}
+                      </div>
+
+                      <div className="progress-bar-bg">
+                        <div
+                          className="progress-fill"
+                          style={{
+                            width: `${((currentIndex + 1) / questions.length) * 100}%`,
+                            background: theme.primary,
+                          }}
+                        />
+                      </div>
+                      <div className="progress-info">
+                        <span>
+                          Вопрос {currentIndex + 1} из {questions.length}
+                        </span>
+                        <span style={{ fontSize: "12px", opacity: 0.45 }}>
+                          {answeredCount} / {questions.length} заполнено
+                        </span>
+                        {isViewMode && <span className="view-mode-tag">РЕЖИМ ПРОСМОТРА</span>}
+                      </div>
                     </div>
-                  )
-                )}
-
-                {/* ======== СОДЕРЖИМОЕ ВОПРОСА ======== */}
-                <div className="answer-block">
-                  {((questions[currentIndex]!.media?.length ?? 0) > 0 ||
-                    (questions[currentIndex]!.image &&
-                      questions[currentIndex]!.type !== "crossword" &&
-                      questions[currentIndex]!.type !== "imagemap") ||
-                    questions[currentIndex]!.q) ? (
-                    <div className="answer-label">СОДЕРЖИМОЕ ЗАДАНИЯ</div>
-                  ) : null}
-                  <div className="question-content">
-                    {renderQuestionComponent(questions[currentIndex]!, currentIndex)}
-                  </div>
-                </div>
-
-                <div className="navigation-footer">
-                  <button
-                    className="nav-btn"
-                    disabled={currentIndex === 0 || isSaving}
-                    onClick={() => setCurrentIndex((i) => i - 1)}
-                    style={{ opacity: currentIndex === 0 ? 0.3 : 1 }}
-                  >
-                    Назад
-                  </button>
-
-                  {currentIndex < questions.length - 1 ? (
-                    <button
-                      className="btn-premium primary"
-                      style={{ flex: 1, background: theme.primary }}
-                      disabled={isSaving}
-                      onClick={() => setCurrentIndex((i) => i + 1)}
-                    >
-                      Далее
-                    </button>
-                  ) : (
-                    !isViewMode && (
-                      <button
-                        className="btn-premium finish"
-                        style={{ flex: 1, opacity: isSaving ? 0.7 : 1 }}
-                        disabled={isSaving}
-                        onClick={finish}
-                      >
-                        {isSaving ? "Сохраняем..." : "Завершить и проверить"}
-                      </button>
-                    )
                   )}
-                </div>
-              </div>
+
+                  {questions[currentIndex] && (
+                    <div key={currentIndex} className="premium-card active-question" style={{ background: theme.cardBg }}>
+                      {/* ======== ЗАГОЛОВОК ВОПРОСА ======== */}
+                      {questions[currentIndex]!.q && (
+                        <h2 className="question-title">
+                          {questions.length > 1 ? `${currentIndex + 1}. ` : ""}
+                          {questions[currentIndex]!.q}
+                        </h2>
+                      )}
+
+                      {/* ======== МАТЕРИАЛЫ К ВОПРОСУ ======== */}
+                      {questions[currentIndex]!.type !== "complex" && questions[currentIndex]!.type !== "reading" && (
+                        ((questions[currentIndex]!.media?.length ?? 0) > 0 ||
+                          (questions[currentIndex]!.image &&
+                            questions[currentIndex]!.type !== "crossword" &&
+                            questions[currentIndex]!.type !== "imagemap")) && (
+                          <div className="materials-block">
+                            <div className="materials-label">МАТЕРИАЛЫ К ВОПРОСУ</div>
+                            {(questions[currentIndex]!.media?.length ?? 0) > 0 && (
+                              <MediaRenderer media={questions[currentIndex]!.media} />
+                            )}
+                            {!(questions[currentIndex]!.media?.length ?? 0) &&
+                              questions[currentIndex]!.image &&
+                              questions[currentIndex]!.type !== "crossword" &&
+                              questions[currentIndex]!.type !== "imagemap" && (
+                                <div
+                                  className="optimized-image-wrapper"
+                                  onClick={() => openImage(getImageUrl(questions[currentIndex]!.image!))}
+                                >
+                                  <Image
+                                    src={getImageUrl(questions[currentIndex]!.image!)}
+                                    alt="task-media"
+                                    width={800}
+                                    height={600}
+                                    priority={true}
+                                    unoptimized={true}
+                                    style={{
+                                      width: "100%",
+                                      height: "auto",
+                                      borderRadius: "20px",
+                                      cursor: "zoom-in",
+                                      objectFit: "contain",
+                                      boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
+                                    }}
+                                  />
+                                </div>
+                              )}
+                          </div>
+                        )
+                      )}
+
+                      {/* ======== СОДЕРЖИМОЕ ВОПРОСА ======== */}
+                      <div className="answer-block">
+                        {((questions[currentIndex]!.media?.length ?? 0) > 0 ||
+                          (questions[currentIndex]!.image &&
+                            questions[currentIndex]!.type !== "crossword" &&
+                            questions[currentIndex]!.type !== "imagemap") ||
+                          questions[currentIndex]!.q) ? (
+                          <div className="answer-label">СОДЕРЖИМОЕ ЗАДАНИЯ</div>
+                        ) : null}
+                        <div className="question-content">
+                          {renderQuestionComponent(questions[currentIndex]!, currentIndex)}
+                        </div>
+                      </div>
+
+                      <div className="navigation-footer">
+                        <button
+                          className="nav-btn"
+                          disabled={currentIndex === 0 || isSaving}
+                          onClick={() => setCurrentIndex((i) => i - 1)}
+                          style={{ opacity: currentIndex === 0 ? 0.3 : 1 }}
+                        >
+                          Назад
+                        </button>
+
+                        {currentIndex < questions.length - 1 ? (
+                          <button
+                            className="btn-premium primary"
+                            style={{ flex: 1, background: theme.primary }}
+                            disabled={isSaving}
+                            onClick={() => setCurrentIndex((i) => i + 1)}
+                          >
+                            Далее
+                          </button>
+                        ) : (
+                          !isViewMode && (
+                            <button
+                              className="btn-premium finish"
+                              style={{ flex: 1, opacity: isSaving ? 0.7 : 1 }}
+                              disabled={isSaving}
+                              onClick={finish}
+                            >
+                              {isSaving ? "Сохраняем..." : "Завершить и проверить"}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )
             )}
           </div>
         )}

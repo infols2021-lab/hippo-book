@@ -3,17 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 
 type Props = {
-  value: any[];                 // questions[]
+  value: any[];                 // массив вопросов или блоков
+  arrayKey: "questions" | "blocks"; // ключ, под которым массив хранится в JSON
   onChange: (next: any[]) => void;
   disabled?: boolean;
 };
 
-export default function JsonEditor({ value, onChange, disabled }: Props) {
-  const pretty = useMemo(() => JSON.stringify({ questions: value }, null, 2), [value]);
+export default function JsonEditor({ value, arrayKey, onChange, disabled }: Props) {
+  const pretty = useMemo(
+    () => JSON.stringify({ [arrayKey]: value }, null, 2),
+    [value, arrayKey]
+  );
   const [text, setText] = useState(pretty);
   const [error, setError] = useState<string | null>(null);
 
-  // 🔁 если value изменился из visual-редактора → обновляем JSON
+  // синхронизация при изменении value из визуального редактора
   useEffect(() => {
     setText(pretty);
   }, [pretty]);
@@ -22,11 +26,13 @@ export default function JsonEditor({ value, onChange, disabled }: Props) {
     try {
       const parsed = JSON.parse(text);
 
-      if (!parsed || !Array.isArray(parsed.questions)) {
-        throw new Error('JSON должен иметь формат { "questions": [...] }');
+      if (!parsed || !Array.isArray(parsed[arrayKey])) {
+        throw new Error(
+          `JSON должен иметь формат { "${arrayKey}": [...] }`
+        );
       }
 
-      onChange(parsed.questions);
+      onChange(parsed[arrayKey]);
       setError(null);
     } catch (e: any) {
       setError(e?.message || "Ошибка JSON");
