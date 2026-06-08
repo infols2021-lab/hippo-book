@@ -102,7 +102,8 @@ export default async function GatehouseMaterialByIdPage({
 
       supabase
         .from("assignments")
-        .select("id, title, order_index, content, created_at")
+        // === ИСПРАВЛЕНИЕ: Добавили assignment_type в select ===
+        .select("id, title, order_index, content, assignment_type, created_at")
         .eq("material_id", material.id)
         .eq("branch_type", "gatehouse")
         .order("order_index", { ascending: true })
@@ -157,6 +158,8 @@ export default async function GatehouseMaterialByIdPage({
           isCompleted: Boolean(progress?.is_completed),
           score: progress?.score ?? null,
           completedAt: progress?.completed_at ?? null,
+          assignment_type: assignment?.assignment_type ?? "test", // === ИСПРАВЛЕНИЕ: Передаем тип на клиент ===
+          content: assignment?.content ?? {}, // === ИСПРАВЛЕНИЕ: Передаем контент для клиентских проверок ===
         };
       })
     : [];
