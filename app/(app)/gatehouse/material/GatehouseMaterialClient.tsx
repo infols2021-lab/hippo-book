@@ -14,6 +14,8 @@ export type GatehouseAssignmentPreview = {
   isCompleted: boolean;
   score: number | null;
   completedAt: string | null;
+  assignment_type?: string | null; // Добавлено для проверки типа задания
+  content?: any; // Добавлено на случай, если сервер прокидывает контент
 };
 
 export type GatehouseMaterialPageData = {
@@ -35,16 +37,47 @@ function formatScore(score: number | null): string {
   return `${Math.max(0, Math.min(100, Math.round(score)))}%`;
 }
 
+// Универсальная проверка готовности задания
+function checkIsReady(assignment: GatehouseAssignmentPreview): boolean {
+  const isIntro = assignment.assignment_type === "intro" || assignment.content?.mode === "informational";
+  const hasQuestions = assignment.questionsCount > 0 || (Array.isArray(assignment.content?.questions) && assignment.content.questions.length > 0);
+  const hasBlocks = Array.isArray(assignment.content?.blocks) && assignment.content.blocks.length > 0;
+
+  // Если это ознакомительное задание:
+  if (isIntro) {
+    // Если сервер передал content, строго проверяем наличие блоков
+    if (assignment.content) return hasBlocks;
+    // Если content не передан в превью, считаем задание готовым (доверяем флагу intro)
+    return true;
+  }
+
+  // Для обычных тестов:
+  return hasQuestions;
+}
+
 function getAssignmentStatusLabel(assignment: GatehouseAssignmentPreview): string {
+  const isReady = checkIsReady(assignment);
+  
   if (assignment.isCompleted) return "Пройдено";
-  if (assignment.questionsCount > 0) return `${assignment.questionsCount} вопросов`;
-  return "Скоро будет доступно";
+  if (!isReady) return "Скоро будет доступно";
+  
+  const isIntro = assignment.assignment_type === "intro" || assignment.content?.mode === "informational";
+  if (isIntro) return "Ознакомительный материал";
+
+  const qCount = assignment.questionsCount > 0 ? assignment.questionsCount : (assignment.content?.questions?.length || 0);
+  return `${qCount} вопросов`;
 }
 
 function getAssignmentIcon(assignment: GatehouseAssignmentPreview): string {
+  const isReady = checkIsReady(assignment);
+  
   if (assignment.isCompleted) return "✓";
-  if (assignment.questionsCount > 0) return "📝";
-  return "⏳";
+  if (!isReady) return "⏳";
+  
+  const isIntro = assignment.assignment_type === "intro" || assignment.content?.mode === "informational";
+  if (isIntro) return "📖";
+  
+  return "📝";
 }
 
 export default function GatehouseMaterialClient({
@@ -191,8 +224,6 @@ export default function GatehouseMaterialClient({
             </span>
             <span>Материалы</span>
           </Link>
-
-          {/* Удалены h1 с material.title, p с description, div с кнопками Профиль/Заявки */}
         </div>
 
         <div className="gatehouse-stats" aria-label="Прогресс материала">
@@ -243,7 +274,8 @@ export default function GatehouseMaterialClient({
               {assignments.length > 0 ? (
                 <div className="gatehouse-recent">
                   {assignments.map((assignment, index) => {
-                    const disabled = !data.hasAccess || assignment.questionsCount <= 0;
+                    const isReady = checkIsReady(assignment);
+                    const disabled = !data.hasAccess || !isReady;
                     const href = getAssignmentHref("gatehouse", assignment.id);
 
                     const content = (
@@ -255,13 +287,13 @@ export default function GatehouseMaterialClient({
                           </h3>
                           <p className="gatehouse-recent__meta">
                             {getAssignmentStatusLabel(assignment)}
-                            {assignment.isCompleted
+                            {assignment.isCompleted && assignment.score !== null
                               ? ` · результат ${formatScore(assignment.score)}`
                               : ""}
                           </p>
                         </div>
                         <div className="gatehouse-recent__score">
-                          {assignment.isCompleted ? formatScore(assignment.score) : "→"}
+                          {assignment.isCompleted && assignment.score !== null ? formatScore(assignment.score) : "→"}
                         </div>
                       </>
                     );

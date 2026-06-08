@@ -69,7 +69,26 @@ function resolvePublicUrl(raw: unknown, bucket: string) {
   return getStoragePublicUrl(bucket, cleaned);
 }
 
+// Универсальная проверка готовности задания
+function checkIsReady(assignment: any): boolean {
+  const isIntro = assignment?.assignment_type === "intro" || assignment?.content?.mode === "informational";
+  const hasQuestions = Array.isArray(assignment?.content?.questions) && assignment.content.questions.length > 0;
+  const hasBlocks = Array.isArray(assignment?.content?.blocks) && assignment.content.blocks.length > 0;
+
+  // Если это ознакомительное задание:
+  if (isIntro) {
+    if (assignment?.content && Object.keys(assignment.content).length > 0) return hasBlocks;
+    return true; 
+  }
+
+  // Для обычных тестов:
+  return hasQuestions;
+}
+
 function guessAssignmentType(assignment: any) {
+  const isIntro = assignment?.assignment_type === "intro" || assignment?.content?.mode === "informational";
+  if (isIntro) return { icon: "📖", label: "Ознакомительный материал", cls: "intro" as const };
+
   const assignmentData = assignment?.content || {};
   const aType = assignmentData?.questions?.[0]?.type || assignment?.type || "test";
 
@@ -285,8 +304,30 @@ export default function TextbookClient({ textbookId, initialData }: Props) {
                 ) : (
                   assignments.map((a: any) => {
                     const isCompleted = completedSet.has(a.id);
+                    const isReady = checkIsReady(a);
                     const meta = guessAssignmentType(a);
                     const score = scoreById.get(a.id);
+
+                    if (!isReady) {
+                      return (
+                        <div
+                          key={a.id}
+                          className="assignment-item"
+                          style={{ opacity: 0.62, cursor: "default" }}
+                        >
+                          <div className={`assignment-icon ${meta.cls}`}>⏳</div>
+
+                          <div className="assignment-content">
+                            <div className="assignment-title">{a.title}</div>
+                            <div className="assignment-type">{meta.label}</div>
+                          </div>
+
+                          <div className="assignment-status status-pending">
+                            <span>Скоро будет доступно</span>
+                          </div>
+                        </div>
+                      );
+                    }
 
                     return (
                       <div
