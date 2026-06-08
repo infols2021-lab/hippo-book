@@ -54,6 +54,25 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 
     if (aErr || !assignment) return fail(aErr?.message || "Assignment not found", 404, "NOT_FOUND");
 
+    // --- ПРОВЕРКА НА ПУСТОЕ ЗАДАНИЕ С УЧЕТОМ ТИПА (TEST / INTRO) ---
+    const content = assignment.content || {};
+    const assignmentType = assignment.assignment_type || 'test';
+    const isIntro = assignmentType === 'intro' || content.mode === 'informational';
+    
+    const questions = Array.isArray(content.questions) ? content.questions : [];
+    const blocks = Array.isArray(content.blocks) ? content.blocks : [];
+
+    // Блокируем, только если это ТЕСТ (с проверкой) и в нем 0 вопросов
+    if (!isIntro && questions.length === 0) {
+      return fail("Задание еще не готово (нет вопросов)", 403, "NOT_READY");
+    }
+
+    // Защита от пустых ознакомительных материалов (если нет ни блоков, ни вопросов)
+    if (isIntro && blocks.length === 0 && questions.length === 0) {
+      return fail("Ознакомительный материал еще не заполнен", 403, "NOT_READY");
+    }
+    // -----------------------------------------------------------------
+
     const material = firstOrNull((assignment as any).materials);
     const gatehouse = isGatehouseAssignment(assignment);
 

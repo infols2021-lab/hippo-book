@@ -43,6 +43,7 @@ type AssignmentRow = {
   material_id?: string | null;
   textbook_id: string | null;
   crossword_id: string | null;
+  assignment_type?: string | null;
   content: any;
 };
 
@@ -113,7 +114,8 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
 
     const content = editing?.content;
     
-    if (content?.mode === "informational") {
+    // Определяем режим на основе нового поля assignment_type (или старого content.mode для обратной совместимости)
+    if (editing?.assignment_type === "intro" || content?.mode === "informational") {
       setAssignmentMode("informational");
     } else {
       setAssignmentMode("interactive");
@@ -168,6 +170,9 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
         title: title.trim(),
         order_index: Number.isFinite(orderIndex) ? orderIndex : 0,
         content: finalContent,
+        
+        // Новое поле для базы данных
+        assignment_type: assignmentMode === "informational" ? "intro" : "test",
 
         branch_type: material.branch_type,
 

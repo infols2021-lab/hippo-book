@@ -130,6 +130,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const title = String(body?.title ?? "").trim();
   const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
   const content = body?.content;
+  
+  // Добавляем обработку типа задания
+  const assignment_type = body?.assignment_type === "intro" ? "intro" : "test";
 
   if (!title) return fail("title required", 400, "VALIDATION");
   if (!content || typeof content !== "object") return fail("content required", 400, "VALIDATION");
@@ -141,6 +144,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     title,
     order_index,
     content,
+    assignment_type, // Сохраняем тип
 
     branch_type: mat.branch_type,
     material_id: mat.material_id,

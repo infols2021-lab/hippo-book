@@ -252,6 +252,35 @@ export async function loadAssignmentData(
     throw error;
   }
 
+  // --- ПРОВЕРКА НА ПУСТОЕ ЗАДАНИЕ С УЧЕТОМ ТИПА (TEST / INTRO) ---
+  const content = assignment.content || {};
+  const assignmentType = assignment.assignment_type || 'test';
+  const isIntro = assignmentType === 'intro' || content.mode === 'informational';
+  
+  const questions = Array.isArray(content.questions) ? content.questions : [];
+  const blocks = Array.isArray(content.blocks) ? content.blocks : [];
+
+  if (!isIntro && questions.length === 0) {
+    const error = new Error("Задание еще не готово (нет вопросов)") as Error & {
+      status?: number;
+      code?: string;
+    };
+    error.status = 403;
+    error.code = "NOT_READY";
+    throw error;
+  }
+
+  if (isIntro && blocks.length === 0 && questions.length === 0) {
+    const error = new Error("Ознакомительный материал еще не заполнен") as Error & {
+      status?: number;
+      code?: string;
+    };
+    error.status = 403;
+    error.code = "NOT_READY";
+    throw error;
+  }
+  // -----------------------------------------------------------------
+
   if (isGatehouseAssignment(assignment)) {
     await assertGatehouseAssignmentAccess(ctx, assignment);
   } else {

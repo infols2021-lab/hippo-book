@@ -163,6 +163,9 @@ export async function POST(req: NextRequest) {
   const title = String(body?.title ?? "").trim();
   const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
   const content = body?.content;
+  
+  // Получаем тип задания, по умолчанию test
+  const assignment_type = body?.assignment_type === "intro" ? "intro" : "test";
 
   if (!title) return fail("title required", 400, "VALIDATION");
   if (!content || typeof content !== "object") return fail("content required", 400, "VALIDATION");
@@ -174,6 +177,7 @@ export async function POST(req: NextRequest) {
     title,
     order_index,
     content,
+    assignment_type, // Добавляем поле для сохранения в БД
     created_by: user.id,
 
     branch_type: mat.branch_type,

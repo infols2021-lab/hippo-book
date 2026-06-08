@@ -37,7 +37,7 @@ import "./assignment.css";
 // ===================== TYPES =====================
 type ApiOk = {
   ok: true;
-  assignment: AssignmentData;
+  assignment: AssignmentData & { assignment_type?: string }; // Добавлено поле типа задания
   progress: null | {
     is_completed: boolean;
     score: number | null;
@@ -221,12 +221,15 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         throw new Error((json as ApiErr).error || "Не удалось загрузить задание");
       }
 
-      const data = json.assignment;
+      const data = json.assignment as any;
       setAssignment(data);
 
-      if (data?.content?.mode === "informational") {
+      // Проверяем как новое поле assignment_type, так и старое content.mode для обратной совместимости
+      const isIntro = data?.assignment_type === "intro" || data?.content?.mode === "informational";
+
+      if (isIntro) {
         setAssignmentMode("informational");
-        setBlocks(data.content.blocks || []);
+        setBlocks(data?.content?.blocks || []);
       } else {
         setAssignmentMode("interactive");
         setQuestions(normalizeQuestions(data?.content?.questions));
