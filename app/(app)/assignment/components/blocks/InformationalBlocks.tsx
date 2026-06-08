@@ -246,12 +246,13 @@ export function AccordionView({ data }: { data: AccordionBlock["data"] }) {
             </div>
             
             {isOpen && (
-              <div style={{
-                borderTop: "1.5px solid #e5e7eb", padding: "20px",
-                fontSize: "14.5px", color: "#374151", lineHeight: 1.75, whiteSpace: "pre-wrap"
-              }}>
-                {item.content}
-              </div>
+              <div
+              style={{
+                    borderTop: "1.5px solid #e5e7eb", padding: "20px",
+                  fontSize: "14.5px", color: "#374151", lineHeight: 1.75,
+                }}
+                dangerouslySetInnerHTML={{ __html: item.content }}
+              />
             )}
           </div>
         );

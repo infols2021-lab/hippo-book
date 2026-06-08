@@ -3626,80 +3626,6 @@ export default function ImageUpload({
 }
 
 ================
-File: app/(admin)/admin/assignments/builder/json/JsonEditor.tsx
-================
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-
-type Props = {
-  value: any[];                 // questions[]
-  onChange: (next: any[]) => void;
-  disabled?: boolean;
-};
-
-export default function JsonEditor({ value, onChange, disabled }: Props) {
-  const pretty = useMemo(() => JSON.stringify({ questions: value }, null, 2), [value]);
-  const [text, setText] = useState(pretty);
-  const [error, setError] = useState<string | null>(null);
-
-  // 🔁 если value изменился из visual-редактора → обновляем JSON
-  useEffect(() => {
-    setText(pretty);
-  }, [pretty]);
-
-  function applyJson() {
-    try {
-      const parsed = JSON.parse(text);
-
-      if (!parsed || !Array.isArray(parsed.questions)) {
-        throw new Error('JSON должен иметь формат { "questions": [...] }');
-      }
-
-      onChange(parsed.questions);
-      setError(null);
-    } catch (e: any) {
-      setError(e?.message || "Ошибка JSON");
-    }
-  }
-
-  return (
-    <div className="card" style={{ padding: 14 }}>
-      <h3 style={{ marginTop: 0 }}>🧩 JSON редактор</h3>
-
-      <textarea
-        className="input"
-        style={{ fontFamily: "monospace", minHeight: 320 }}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        disabled={disabled}
-      />
-
-      {error ? (
-        <div className="error" style={{ display: "block", marginTop: 10 }}>
-          ❌ {error}
-        </div>
-      ) : (
-        <div className="small-muted" style={{ marginTop: 8 }}>
-          Можно править вручную или вернуться в визуальный режим
-        </div>
-      )}
-
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button
-          className="btn"
-          type="button"
-          onClick={applyJson}
-          disabled={disabled}
-        >
-          ✅ Применить JSON
-        </button>
-      </div>
-    </div>
-  );
-}
-
-================
 File: app/(admin)/admin/assignments/builder/matching/MatchingEditor.tsx
 ================
 "use client";
@@ -12861,716 +12787,10 @@ File: app/(app)/textbook/textbook.css
 }
 
 ================
-File: app/(app)/textbook/TextbookClient.tsx
-================
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import AppHeader from "@/components/AppHeader";
-import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
-
-type UserProgress = {
-  assignment_id: string;
-  is_completed: boolean;
-  score?: number | null;
-};
-
-type TextbookApiOk = {
-  ok: true;
-  locked: boolean;
-  textbook: any;
-  assignments?: any[];
-  userProgress?: UserProgress[];
-};
-
-type TextbookApiErr = {
-  ok: false;
-  error: string;
-};
-
-type TextbookApi = TextbookApiOk | TextbookApiErr;
-
-type Props = {
-  textbookId: string;
-  initialData: TextbookApiOk | null;
-};
-
-function isHttpUrl(v: unknown): boolean {
-  return typeof v === "string" && /^https?:\/\//i.test(v);
-}
-
-function resolvePublicUrl(raw: unknown, bucket: string) {
-  if (!raw) return null;
-
-  const value = String(raw).trim();
-  if (!value) return null;
-
-  if (value.startsWith("data:")) return value;
-  if (value.startsWith("/api/storage/public/")) return value;
-
-  const storageMarker = "/storage/v1/object/public/";
-
-  if (isHttpUrl(value)) {
-    const markerIndex = value.indexOf(storageMarker);
-
-    if (markerIndex === -1) return value;
-
-    const rest = value.slice(markerIndex + storageMarker.length).split("?")[0]?.split("#")[0] ?? "";
-    const parts = rest.split("/").filter(Boolean);
-
-    const parsedBucket = parts.shift();
-    const parsedPath = parts.join("/");
-
-    if (!parsedBucket || !parsedPath) return value;
-
-    return getStoragePublicUrl(parsedBucket, parsedPath);
-  }
-
-  const cleaned = value
-    .replace(/^\/+/, "")
-    .replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
-
-  return getStoragePublicUrl(bucket, cleaned);
-}
-
-function guessAssignmentType(assignment: any) {
-  const assignmentData = assignment?.content || {};
-  const aType = assignmentData?.questions?.[0]?.type || assignment?.type || "test";
-
-  if (aType === "fill") return { icon: "✍️", label: "Ввод ответа", cls: "fill" as const };
-  if (aType === "sentence") return { icon: "📝", label: "Заполнение предложения", cls: "sentence" as const };
-
-  return { icon: "📝", label: "Тест", cls: "test" as const };
-}
-
-export default function TextbookClient({ textbookId, initialData }: Props) {
-  const router = useRouter();
-  const invalidTextbookId = !textbookId?.trim();
-
-  const [data, setData] = useState<TextbookApiOk | null>(initialData);
-  const [loading, setLoading] = useState<boolean>(!initialData && !invalidTextbookId);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (invalidTextbookId) return;
-
-    let cancelled = false;
-
-    async function load() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const res = await fetch(`/api/textbook-data/${encodeURIComponent(textbookId)}`, {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        const json = (await res.json()) as TextbookApi;
-
-        if (!res.ok || !json.ok) {
-          const msg = (json as TextbookApiErr).error || "Не удалось загрузить учебник";
-          throw new Error(msg);
-        }
-
-        if (cancelled) return;
-
-        setData(json);
-        setLoading(false);
-      } catch (e: any) {
-        if (cancelled) return;
-
-        setLoading(false);
-        setError(e?.message || "Ошибка загрузки учебника");
-      }
-    }
-
-    if (!initialData) void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [initialData, invalidTextbookId, textbookId]);
-
-  const textbook = data?.textbook ?? null;
-  const assignments = data?.assignments ?? [];
-  const userProgress = data?.userProgress ?? [];
-
-  const completedSet = useMemo(
-    () => new Set(userProgress.filter((x) => x.is_completed).map((x) => x.assignment_id)),
-    [userProgress],
-  );
-
-  const scoreById = useMemo(() => {
-    const m = new Map<string, number>();
-
-    for (const p of userProgress) {
-      if (p?.assignment_id && typeof p.score === "number") {
-        m.set(p.assignment_id, p.score);
-      }
-    }
-
-    return m;
-  }, [userProgress]);
-
-  const completedCount = userProgress.filter((x) => x.is_completed).length;
-  const totalCount = assignments.length;
-  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-
-  const coverUrl = resolvePublicUrl(textbook?.cover_image_url, "covers");
-
-  if (invalidTextbookId) {
-    return (
-      <div className="textbook-container">
-        <div className="error" style={{ display: "block" }}>
-          ❌ Некорректная ссылка на учебник
-          <div style={{ height: 10 }} />
-          <a className="btn" href="/materials">
-            ← Назад к материалам
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="textbook-container">
-      <AppHeader
-        nav={[
-          { kind: "link", href: "/materials", label: "📚 Материалы", className: "btn" },
-          { kind: "link", href: "/profile", label: "👤 Профиль", className: "btn" },
-          { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
-        ]}
-      />
-
-      <div className="back-button">
-        <button className="btn secondary" type="button" onClick={() => router.push("/materials")}>
-          ← Назад
-        </button>
-      </div>
-
-      {loading ? (
-        <div id="loading" className="loading" style={{ display: "block" }}>
-          <div className="spinner" />
-          <p>Загружаем учебник...</p>
-        </div>
-      ) : null}
-
-      {error ? (
-        <div id="errorMessage" className="error" style={{ display: "block" }}>
-          ❌ {error}
-          <div style={{ height: 10 }} />
-          <button className="btn" onClick={() => location.reload()} type="button">
-            🔄 Повторить
-          </button>
-        </div>
-      ) : null}
-
-      {!loading && !error ? (
-        <div id="textbookContent" style={{ display: "block" }}>
-          {data?.locked ? (
-            <div id="lockedMessage" className="locked-message" style={{ display: "block" }}>
-              <h3>🔒 Учебник недоступен</h3>
-              <p>Для доступа к этому учебнику обратитесь к администратору.</p>
-            </div>
-          ) : null}
-
-          {!data?.locked && textbook ? (
-            <div className="textbook-header" id="textbookHeader" style={{ display: "block" }}>
-              <div
-                className="textbook-cover"
-                id="textbookCover"
-                style={{ aspectRatio: "16 / 9", height: "auto" }}
-              >
-                {coverUrl ? (
-                  <img
-                    src={coverUrl}
-                    alt="Обложка учебника"
-                    loading="lazy"
-                    decoding="async"
-                    style={{ objectFit: "contain", objectPosition: "center" }}
-                    onError={(e) => {
-                      const img = e.currentTarget;
-                      img.style.display = "none";
-                      (img.parentElement as HTMLElement).textContent = "📚";
-                    }}
-                  />
-                ) : (
-                  "📚"
-                )}
-              </div>
-
-              <div className="textbook-info">
-                <div className="textbook-title" id="textbookTitle">
-                  {textbook.title}
-                </div>
-
-                <div className="textbook-description" id="textbookDescription">
-                  {textbook.description || "Учебные материалы и задания"}
-                </div>
-
-                <div className="progress-stats">
-                  <div className="stat-item">
-                    <div className="stat-number" id="completedCount">
-                      {completedCount}
-                    </div>
-                    <div className="stat-label">Выполнено</div>
-                  </div>
-
-                  <div className="stat-item">
-                    <div className="stat-number" id="totalCount">
-                      {totalCount}
-                    </div>
-                    <div className="stat-label">Всего заданий</div>
-                  </div>
-
-                  <div className="stat-item">
-                    <div className="stat-number" id="progressPercent">
-                      {progressPercent}%
-                    </div>
-                    <div className="stat-label">Прогресс</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {!data?.locked && textbook ? (
-            <div className="card" id="assignmentsCard" style={{ display: "block" }}>
-              <h3>Задания учебника</h3>
-              <p className="small-muted">Нажмите на задание, чтобы пройти его.</p>
-
-              <div className="assignments-list" id="assignmentsList">
-                {assignments.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: 40, color: "#666" }}>
-                    <p>📝 Задания пока не добавлены</p>
-                    <p className="small-muted">Скоро здесь появятся задания для выполнения</p>
-                  </div>
-                ) : (
-                  assignments.map((a: any) => {
-                    const isCompleted = completedSet.has(a.id);
-                    const meta = guessAssignmentType(a);
-                    const score = scoreById.get(a.id);
-
-                    return (
-                      <div
-                        key={a.id}
-                        className={`assignment-item ${isCompleted ? "completed" : ""}`}
-                        onClick={() => router.push(`/assignment/${a.id}?source=textbook&sourceId=${textbookId}`)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            router.push(`/assignment/${a.id}?source=textbook&sourceId=${textbookId}`);
-                          }
-                        }}
-                      >
-                        <div className={`assignment-icon ${meta.cls}`}>{meta.icon}</div>
-
-                        <div className="assignment-content">
-                          <div className="assignment-title">{a.title}</div>
-                          <div className="assignment-type">{meta.label}</div>
-                        </div>
-
-                        <div className={`assignment-status ${isCompleted ? "status-completed" : "status-pending"}`}>
-                          {isCompleted ? (
-                            <>
-                              {typeof score === "number" ? <span className="score-pill">{score}%</span> : null}
-                              <span>✅ Выполнено</span>
-                            </>
-                          ) : (
-                            <span>⏳ Ожидает</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-================
 File: app/(auth)/layout.tsx
 ================
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
-}
-
-================
-File: app/api/admin/assignments/[id]/route.ts
-================
-import { ok, fail } from "@/lib/api/response";
-import { requireAdmin } from "@/lib/api/admin";
-import type { NextRequest } from "next/server";
-
-type BranchType = "olympiad" | "gatehouse";
-
-type MatPick =
-  | {
-      branch_type: "olympiad";
-      kind: "textbook";
-      material_id: null;
-      textbook_id: string;
-      crossword_id: null;
-      error?: undefined;
-    }
-  | {
-      branch_type: "olympiad";
-      kind: "crossword";
-      material_id: null;
-      textbook_id: null;
-      crossword_id: string;
-      error?: undefined;
-    }
-  | {
-      branch_type: "gatehouse";
-      kind: "material";
-      material_id: string;
-      textbook_id: null;
-      crossword_id: null;
-      error?: undefined;
-    }
-  | {
-      error: string;
-      branch_type?: undefined;
-      kind?: undefined;
-      material_id?: undefined;
-      textbook_id?: undefined;
-      crossword_id?: undefined;
-    };
-
-function normalizeBranchType(value: unknown): BranchType {
-  const v = String(value ?? "").trim().toLowerCase();
-
-  if (v === "gatehouse" || v === "ga" || v === "ga_exam" || v === "exam" || v === "gatehouse_awards") {
-    return "gatehouse";
-  }
-
-  return "olympiad";
-}
-
-function pickMaterial(body: any): MatPick {
-  const branch_type = normalizeBranchType(body?.branch_type);
-  const kind = String(body?.kind || "").trim().toLowerCase();
-  const material_id = String(body?.material_id || "").trim();
-
-  const textbook_id = body?.textbook_id ? String(body.textbook_id).trim() : "";
-  const crossword_id = body?.crossword_id ? String(body.crossword_id).trim() : "";
-
-  if (branch_type === "gatehouse" || kind === "material") {
-    if (!material_id) return { error: "material_id required for gatehouse assignment" };
-
-    return {
-      branch_type: "gatehouse",
-      kind: "material",
-      material_id,
-      textbook_id: null,
-      crossword_id: null,
-    };
-  }
-
-  if (kind && material_id) {
-    if (kind !== "textbook" && kind !== "crossword") return { error: "Bad kind" };
-
-    if (kind === "textbook") {
-      return {
-        branch_type: "olympiad",
-        kind: "textbook",
-        material_id: null,
-        textbook_id: material_id,
-        crossword_id: null,
-      };
-    }
-
-    return {
-      branch_type: "olympiad",
-      kind: "crossword",
-      material_id: null,
-      textbook_id: null,
-      crossword_id: material_id,
-    };
-  }
-
-  if (textbook_id) {
-    return {
-      branch_type: "olympiad",
-      kind: "textbook",
-      material_id: null,
-      textbook_id,
-      crossword_id: null,
-    };
-  }
-
-  if (crossword_id) {
-    return {
-      branch_type: "olympiad",
-      kind: "crossword",
-      material_id: null,
-      textbook_id: null,
-      crossword_id,
-    };
-  }
-
-  return { error: "kind/material_id or textbook_id/crossword_id required" };
-}
-
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-  const { id } = await ctx.params;
-
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Bad JSON", 400, "BAD_JSON");
-  }
-
-  const title = String(body?.title ?? "").trim();
-  const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
-  const content = body?.content;
-
-  if (!title) return fail("title required", 400, "VALIDATION");
-  if (!content || typeof content !== "object") return fail("content required", 400, "VALIDATION");
-
-  const mat = pickMaterial(body);
-  if (mat.error) return fail(mat.error, 400, "VALIDATION");
-
-  const payload: any = {
-    title,
-    order_index,
-    content,
-
-    branch_type: mat.branch_type,
-    material_id: mat.material_id,
-
-    textbook_id: mat.textbook_id,
-    crossword_id: mat.crossword_id,
-  };
-
-  const { data, error } = await supabase.from("assignments").update(payload).eq("id", id).select("*").single();
-
-  if (error) return fail(error.message, 500, "DB_ERROR");
-
-  return ok({ assignment: data });
-}
-
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-  const { id } = await ctx.params;
-
-  const { error } = await supabase.from("assignments").delete().eq("id", id);
-
-  if (error) return fail(error.message, 500, "DB_ERROR");
-
-  return ok({ deleted: true });
-}
-
-================
-File: app/api/admin/assignments/route.ts
-================
-import { ok, fail } from "@/lib/api/response";
-import { requireAdmin } from "@/lib/api/admin";
-import type { NextRequest } from "next/server";
-
-type BranchType = "olympiad" | "gatehouse";
-
-type MatPick =
-  | {
-      branch_type: "olympiad";
-      kind: "textbook";
-      material_id: null;
-      textbook_id: string;
-      crossword_id: null;
-      error?: undefined;
-    }
-  | {
-      branch_type: "olympiad";
-      kind: "crossword";
-      material_id: null;
-      textbook_id: null;
-      crossword_id: string;
-      error?: undefined;
-    }
-  | {
-      branch_type: "gatehouse";
-      kind: "material";
-      material_id: string;
-      textbook_id: null;
-      crossword_id: null;
-      error?: undefined;
-    }
-  | {
-      error: string;
-      branch_type?: undefined;
-      kind?: undefined;
-      material_id?: undefined;
-      textbook_id?: undefined;
-      crossword_id?: undefined;
-    };
-
-function normalizeBranchType(value: unknown): BranchType {
-  const v = String(value ?? "").trim().toLowerCase();
-
-  if (v === "gatehouse" || v === "ga" || v === "ga_exam" || v === "exam" || v === "gatehouse_awards") {
-    return "gatehouse";
-  }
-
-  return "olympiad";
-}
-
-function pickMaterial(body: any): MatPick {
-  const branch_type = normalizeBranchType(body?.branch_type);
-  const kind = String(body?.kind || "").trim().toLowerCase();
-  const material_id = String(body?.material_id || "").trim();
-
-  const textbook_id = body?.textbook_id ? String(body.textbook_id).trim() : "";
-  const crossword_id = body?.crossword_id ? String(body.crossword_id).trim() : "";
-
-  if (branch_type === "gatehouse" || kind === "material") {
-    if (!material_id) return { error: "material_id required for gatehouse assignment" };
-
-    return {
-      branch_type: "gatehouse",
-      kind: "material",
-      material_id,
-      textbook_id: null,
-      crossword_id: null,
-    };
-  }
-
-  if (kind && material_id) {
-    if (kind !== "textbook" && kind !== "crossword") return { error: "Bad kind" };
-
-    if (kind === "textbook") {
-      return {
-        branch_type: "olympiad",
-        kind: "textbook",
-        material_id: null,
-        textbook_id: material_id,
-        crossword_id: null,
-      };
-    }
-
-    return {
-      branch_type: "olympiad",
-      kind: "crossword",
-      material_id: null,
-      textbook_id: null,
-      crossword_id: material_id,
-    };
-  }
-
-  if (textbook_id) {
-    return {
-      branch_type: "olympiad",
-      kind: "textbook",
-      material_id: null,
-      textbook_id,
-      crossword_id: null,
-    };
-  }
-
-  if (crossword_id) {
-    return {
-      branch_type: "olympiad",
-      kind: "crossword",
-      material_id: null,
-      textbook_id: null,
-      crossword_id,
-    };
-  }
-
-  return { error: "kind/material_id or textbook_id/crossword_id required" };
-}
-
-export async function GET(req: NextRequest) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-
-  const branch_type = normalizeBranchType(req.nextUrl.searchParams.get("branch_type"));
-  const kind = String(req.nextUrl.searchParams.get("kind") || "").trim().toLowerCase();
-  const id = String(req.nextUrl.searchParams.get("id") || "").trim();
-  const material_id = String(req.nextUrl.searchParams.get("material_id") || id || "").trim();
-
-  if (!kind || !id) return ok({ assignments: [] });
-
-  let q = supabase.from("assignments").select("*");
-
-  if (branch_type === "gatehouse" || kind === "material") {
-    if (!material_id) return ok({ assignments: [] });
-
-    q = q.eq("branch_type", "gatehouse").eq("material_id", material_id);
-  } else if (kind === "textbook") {
-    q = q.eq("textbook_id", id).or("branch_type.eq.olympiad,branch_type.is.null");
-  } else if (kind === "crossword") {
-    q = q.eq("crossword_id", id).or("branch_type.eq.olympiad,branch_type.is.null");
-  } else {
-    return fail("Bad kind", 400, "VALIDATION");
-  }
-
-  const { data, error } = await q.order("order_index", { ascending: false }).order("created_at", { ascending: false });
-
-  if (error) return fail(error.message, 500, "DB_ERROR");
-
-  return ok({ assignments: data ?? [] });
-}
-
-export async function POST(req: NextRequest) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase, user } = auth;
-
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Bad JSON", 400, "BAD_JSON");
-  }
-
-  const title = String(body?.title ?? "").trim();
-  const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
-  const content = body?.content;
-
-  if (!title) return fail("title required", 400, "VALIDATION");
-  if (!content || typeof content !== "object") return fail("content required", 400, "VALIDATION");
-
-  const mat = pickMaterial(body);
-  if (mat.error) return fail(mat.error, 400, "VALIDATION");
-
-  const payload: any = {
-    title,
-    order_index,
-    content,
-    created_by: user.id,
-
-    branch_type: mat.branch_type,
-    material_id: mat.material_id,
-
-    textbook_id: mat.textbook_id,
-    crossword_id: mat.crossword_id,
-  };
-
-  const { data, error } = await supabase.from("assignments").insert(payload).select("*").single();
-
-  if (error) return fail(error.message, 500, "DB_ERROR");
-
-  return ok({ assignment: data });
 }
 
 ================
@@ -23993,305 +23213,6 @@ export type BranchConfig = {
 };
 
 ================
-File: lib/data/assignments.ts
-================
-import "server-only";
-
-import type { DataAuthContext } from "@/lib/data/auth";
-
-export type AssignmentProgressData = {
-  is_completed: boolean;
-  score: number | null;
-  completed_at: string | null;
-  answers: any;
-};
-
-export type AssignmentDataResult = {
-  assignment: any;
-  progress: AssignmentProgressData | null;
-};
-
-function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
-}
-
-function normalizeScore(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-
-  const score = Number(value);
-  if (!Number.isFinite(score)) return null;
-
-  return Math.max(0, Math.min(100, Math.round(score)));
-}
-
-function normalizeProgress(row: any): AssignmentProgressData | null {
-  if (!row) return null;
-
-  return {
-    is_completed: Boolean(row?.is_completed),
-    score: normalizeScore(row?.score),
-    completed_at: typeof row?.completed_at === "string" ? row.completed_at : null,
-    answers: row?.answers ?? {},
-  };
-}
-
-function isGatehouseAssignment(assignment: any) {
-  const material = firstOrNull(assignment?.materials);
-
-  return assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
-}
-
-function getGatehouseMaterialId(assignment: any): string | null {
-  const material = firstOrNull(assignment?.materials);
-
-  if (typeof assignment?.material_id === "string" && assignment.material_id) {
-    return assignment.material_id;
-  }
-
-  if (typeof material?.id === "string" && material.id) {
-    return material.id;
-  }
-
-  return null;
-}
-
-async function assertGatehouseAssignmentAccess(ctx: DataAuthContext, assignment: any) {
-  const { supabase, user } = ctx;
-  const material = firstOrNull(assignment?.materials);
-  const materialId = getGatehouseMaterialId(assignment);
-
-  if (!materialId) {
-    const error = new Error("Gatehouse assignment has no material") as Error & {
-      status?: number;
-      code?: string;
-    };
-
-    error.status = 404;
-    error.code = "NOT_FOUND";
-    throw error;
-  }
-
-  if (material?.is_active === false) {
-    const error = new Error("Material is not active") as Error & {
-      status?: number;
-      code?: string;
-    };
-
-    error.status = 404;
-    error.code = "NOT_FOUND";
-    throw error;
-  }
-
-  const { data: accessRow, error: accessError } = await supabase
-    .from("material_access")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("material_id", materialId)
-    .maybeSingle();
-
-  if (accessError) {
-    throw new Error(accessError.message);
-  }
-
-  const hasAccess = Boolean(material?.is_available || accessRow);
-
-  if (!hasAccess) {
-    const error = new Error("No access to this Gatehouse material") as Error & {
-      status?: number;
-      code?: string;
-    };
-
-    error.status = 403;
-    error.code = "FORBIDDEN";
-    throw error;
-  }
-}
-
-async function assertOlympiadAssignmentAccess(ctx: DataAuthContext, assignment: any) {
-  const { supabase, user } = ctx;
-
-  const textbookId = typeof assignment?.textbook_id === "string" ? assignment.textbook_id : null;
-  const crosswordId = typeof assignment?.crossword_id === "string" ? assignment.crossword_id : null;
-
-  if (textbookId) {
-    const [
-      { data: textbook, error: textbookError },
-      { data: access, error: accessError },
-    ] = await Promise.all([
-      supabase
-        .from("textbooks")
-        .select("id, is_available, is_active, branch_type")
-        .eq("id", textbookId)
-        .or("branch_type.eq.olympiad,branch_type.is.null")
-        .maybeSingle(),
-
-      supabase
-        .from("textbook_access")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("textbook_id", textbookId)
-        .maybeSingle(),
-    ]);
-
-    if (textbookError) throw new Error(textbookError.message);
-    if (accessError) throw new Error(accessError.message);
-
-    if (!textbook || textbook.is_active === false) {
-      const error = new Error("Textbook not found") as Error & {
-        status?: number;
-        code?: string;
-      };
-
-      error.status = 404;
-      error.code = "NOT_FOUND";
-      throw error;
-    }
-
-    if (!textbook.is_available && !access) {
-      const error = new Error("No access to this textbook") as Error & {
-        status?: number;
-        code?: string;
-      };
-
-      error.status = 403;
-      error.code = "FORBIDDEN";
-      throw error;
-    }
-
-    return;
-  }
-
-  if (crosswordId) {
-    const [
-      { data: crossword, error: crosswordError },
-      { data: access, error: accessError },
-    ] = await Promise.all([
-      supabase
-        .from("crosswords")
-        .select("id, is_available, is_active, branch_type")
-        .eq("id", crosswordId)
-        .or("branch_type.eq.olympiad,branch_type.is.null")
-        .maybeSingle(),
-
-      supabase
-        .from("crossword_access")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("crossword_id", crosswordId)
-        .maybeSingle(),
-    ]);
-
-    if (crosswordError) throw new Error(crosswordError.message);
-    if (accessError) throw new Error(accessError.message);
-
-    if (!crossword || crossword.is_active === false) {
-      const error = new Error("Crossword not found") as Error & {
-        status?: number;
-        code?: string;
-      };
-
-      error.status = 404;
-      error.code = "NOT_FOUND";
-      throw error;
-    }
-
-    if (!crossword.is_available && !access) {
-      const error = new Error("No access to this crossword") as Error & {
-        status?: number;
-        code?: string;
-      };
-
-      error.status = 403;
-      error.code = "FORBIDDEN";
-      throw error;
-    }
-  }
-}
-
-export async function loadAssignmentData(
-  ctx: DataAuthContext,
-  assignmentId: string,
-): Promise<AssignmentDataResult | null> {
-  const id = String(assignmentId || "").trim();
-  if (!id) return null;
-
-  const { supabase, user } = ctx;
-
-  const { data: assignment, error: assignmentError } = await supabase
-    .from("assignments")
-    .select(
-      `
-      *,
-      materials(
-        id,
-        title,
-        branch_type,
-        material_kind,
-        is_active,
-        is_available,
-        target_levels,
-        class_levels
-      )
-    `,
-    )
-    .eq("id", id)
-    .single();
-
-  if (assignmentError || !assignment) {
-    const error = new Error(assignmentError?.message || "Assignment not found") as Error & {
-      status?: number;
-      code?: string;
-    };
-
-    error.status = 404;
-    error.code = "NOT_FOUND";
-    throw error;
-  }
-
-  if (isGatehouseAssignment(assignment)) {
-    await assertGatehouseAssignmentAccess(ctx, assignment);
-  } else {
-    await assertOlympiadAssignmentAccess(ctx, assignment);
-  }
-
-  const { data: progressRow, error: progressError } = await supabase
-    .from("user_progress")
-    .select("is_completed, score, completed_at, answers")
-    .eq("user_id", user.id)
-    .eq("assignment_id", id)
-    .maybeSingle();
-
-  if (progressError) {
-    throw new Error(progressError.message);
-  }
-
-  return {
-    assignment,
-    progress: normalizeProgress(progressRow),
-  };
-}
-
-export async function loadGatehouseAssignmentShellData(ctx: DataAuthContext, assignmentId: string) {
-  const result = await loadAssignmentData(ctx, assignmentId);
-
-  if (!result) {
-    return null;
-  }
-
-  const material = firstOrNull(result.assignment?.materials);
-  const materialId = getGatehouseMaterialId(result.assignment);
-
-  return {
-    assignment: result.assignment,
-    progress: result.progress,
-    material,
-    materialId,
-    isGatehouse: isGatehouseAssignment(result.assignment),
-  };
-}
-
-================
 File: lib/data/auth.ts
 ================
 import "server-only";
@@ -30340,335 +29261,6 @@ export default function AdminClient() {
 }
 
 ================
-File: app/(admin)/admin/assignments/AssignmentEditor.tsx
-================
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import LoadingBlock from "@/components/LoadingBlock";
-import ErrorBox from "@/components/ErrorBox";
-
-import type { EditorMode, AssignmentMode, Question, InfoBlock } from "./builder/types";
-import { deepClone, newQuestion, newBlock } from "./builder/types";
-import { validateQuestions, validateBlocks } from "./builder/validate";
-
-import QuestionList from "./builder/QuestionList";
-import BlockList from "./builder/blocks/BlockList"; // НОВЫЙ КОМПОНЕНТ ДЛЯ БЛОКОВ
-import JsonEditor from "./builder/json/JsonEditor";
-
-type MaterialOption =
-  | {
-      branch_type: "olympiad";
-      kind: "textbook";
-      id: string;
-      title: string;
-      material_kind?: "textbook";
-    }
-  | {
-      branch_type: "olympiad";
-      kind: "crossword";
-      id: string;
-      title: string;
-      material_kind?: "crossword";
-    }
-  | {
-      branch_type: "gatehouse";
-      kind: "material";
-      id: string;
-      title: string;
-      material_kind: string;
-    };
-
-type AssignmentRow = {
-  id: string;
-  title: string;
-  order_index: number | null;
-  branch_type?: string | null;
-  material_id?: string | null;
-  textbook_id: string | null;
-  crossword_id: string | null;
-  content: any;
-};
-
-type Props = {
-  material: MaterialOption | null;
-  editing: AssignmentRow | null;
-  onCancel: () => void;
-  onSaved: () => Promise<void>;
-};
-
-async function safeJson(res: Response) {
-  const text = await res.text();
-
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { ok: false, error: text };
-  }
-}
-
-function materialIcon(material: MaterialOption | null) {
-  if (!material) return "—";
-  if (material.kind === "textbook") return "📚";
-  if (material.kind === "crossword") return "🧩";
-  return "🎓";
-}
-
-function materialLabel(material: MaterialOption | null) {
-  if (!material) return "—";
-
-  if (material.kind === "textbook") return `📚 ${material.title}`;
-  if (material.kind === "crossword") return `🧩 ${material.title}`;
-
-  return `🎓 ${material.title}`;
-}
-
-export default function AssignmentEditor({ material, editing, onCancel, onSaved }: Props) {
-  const [mode, setMode] = useState<EditorMode>("visual");
-  
-  // Добавляем состояние режима задания
-  const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>("interactive");
-
-  const [title, setTitle] = useState<string>(editing?.title ?? "");
-  const [orderIndex, setOrderIndex] = useState<number>(Number(editing?.order_index ?? 0));
-
-  // Инициализация интерактивных вопросов
-  const initialQuestions: Question[] = useMemo(() => {
-    const qs = editing?.content?.questions;
-    if (Array.isArray(qs) && qs.length) return deepClone(qs);
-    return [newQuestion("test")];
-  }, [editing]);
-
-  // Инициализация ознакомительных блоков
-  const initialBlocks: InfoBlock[] = useMemo(() => {
-    const blks = editing?.content?.blocks;
-    if (Array.isArray(blks) && blks.length) return deepClone(blks);
-    return [newBlock("hero")];
-  }, [editing]);
-
-  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
-  const [blocks, setBlocks] = useState<InfoBlock[]>(initialBlocks);
-
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    setTitle(editing?.title ?? "");
-    setOrderIndex(Number(editing?.order_index ?? 0));
-
-    const content = editing?.content;
-    
-    // Определяем режим на основе сохраненного контента
-    if (content?.mode === "informational") {
-      setAssignmentMode("informational");
-    } else {
-      setAssignmentMode("interactive");
-    }
-
-    const qs = content?.questions;
-    setQuestions(Array.isArray(qs) && qs.length ? deepClone(qs) : [newQuestion("test")]);
-
-    const blks = content?.blocks;
-    setBlocks(Array.isArray(blks) && blks.length ? deepClone(blks) : [newBlock("hero")]);
-
-    setMode("visual");
-    setErr(null);
-  }, [editing]);
-
-  async function save() {
-    if (!material) {
-      setErr("Сначала выберите материал");
-      return;
-    }
-
-    if (!title.trim()) {
-      setErr("Введите название задания");
-      return;
-    }
-
-    let finalContent: any = {};
-
-    // Раздельная валидация в зависимости от режима
-    if (assignmentMode === "informational") {
-      const vr = validateBlocks(blocks);
-      if (!vr.ok) {
-        const text = vr.issues.map((i) => (i.index >= 0 ? `Блок #${i.index + 1}: ${i.message}` : i.message)).join("\n");
-        setErr(text || "Ошибки в блоках");
-        return;
-      }
-      finalContent = { mode: "informational", blocks };
-    } else {
-      const vr = validateQuestions(questions);
-      if (!vr.ok) {
-        const text = vr.issues.map((i) => (i.index >= 0 ? `Вопрос #${i.index + 1}: ${i.message}` : i.message)).join("\n");
-        setErr(text || "Ошибки в вопросах");
-        return;
-      }
-      finalContent = { mode: "interactive", questions };
-    }
-
-    setErr(null);
-    setSaving(true);
-
-    try {
-      const payload: any = {
-        title: title.trim(),
-        order_index: Number.isFinite(orderIndex) ? orderIndex : 0,
-        content: finalContent, // Используем сформированный контент
-
-        branch_type: material.branch_type,
-
-        kind: material.kind,
-        material_kind: material.material_kind ?? material.kind,
-
-        material_id: material.kind === "material" ? material.id : null,
-
-        textbook_id: material.kind === "textbook" ? material.id : null,
-        crossword_id: material.kind === "crossword" ? material.id : null,
-      };
-
-      const url = editing?.id ? `/api/admin/assignments/${encodeURIComponent(editing.id)}` : `/api/admin/assignments`;
-      const method = editing?.id ? "PATCH" : "POST";
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await safeJson(res);
-
-      if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || `HTTP ${res.status}`);
-      }
-
-      await onSaved();
-    } catch (e: any) {
-      setErr(e?.message || String(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="card" style={{ marginTop: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-        <div>
-          <h3 style={{ margin: 0 }}>{editing ? "✏️ Редактирование задания" : "➕ Новое задание"}</h3>
-          <div className="small-muted" style={{ marginTop: 4 }}>
-            Материал: <strong>{material ? materialLabel(material) : "—"}</strong>
-          </div>
-          <div className="small-muted" style={{ marginTop: 4 }}>
-            Раздел: <strong>{material?.branch_type === "gatehouse" ? "🎓 Gatehouse Awards" : "🏆 Олимпиада"}</strong>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span className="material-badge">{materialIcon(material)}</span>
-
-          <button
-            className={`btn small ${mode === "visual" ? "" : "ghost"}`}
-            type="button"
-            onClick={() => setMode("visual")}
-            disabled={saving}
-          >
-            🎨 Редактор
-          </button>
-
-          <button
-            className={`btn small ${mode === "json" ? "" : "ghost"}`}
-            type="button"
-            onClick={() => setMode("json")}
-            disabled={saving}
-          >
-            📄 JSON
-          </button>
-        </div>
-      </div>
-
-      <div style={{ height: 12 }} />
-
-      {err ? <ErrorBox message={err} retryMode="none" /> : null}
-      {saving ? <LoadingBlock text="Сохраняем..." /> : null}
-
-      <div className="row" style={{ marginTop: 10 }}>
-        <div className="col" style={{ flex: 1 }}>
-          <label className="small-muted">Название</label>
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={saving} />
-        </div>
-
-        <div className="col" style={{ width: 140 }}>
-          <label className="small-muted">Порядок</label>
-          <input
-            className="input"
-            type="number"
-            value={orderIndex}
-            onChange={(e) => setOrderIndex(Number(e.target.value))}
-            disabled={saving}
-          />
-        </div>
-      </div>
-
-      {/* Выбор режима задания */}
-      <div style={{ marginTop: 16, background: "#f8fafc", padding: "12px 16px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
-        <label className="small-muted" style={{ display: "block", marginBottom: 8 }}>Тип задания</label>
-        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500, color: "#1e293b" }}>
-            <input 
-              type="radio" 
-              name="assignmentMode" 
-              checked={assignmentMode === "interactive"} 
-              onChange={() => setAssignmentMode("interactive")} 
-              disabled={saving} 
-            />
-            📝 Интерактивное (Вопросы, Тесты)
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500, color: "#1e293b" }}>
-            <input 
-              type="radio" 
-              name="assignmentMode" 
-              checked={assignmentMode === "informational"} 
-              onChange={() => setAssignmentMode("informational")} 
-              disabled={saving} 
-            />
-            📖 Ознакомительное (Гайды, Блоки)
-          </label>
-        </div>
-      </div>
-
-      <div style={{ height: 16 }} />
-
-      {/* Условный рендеринг редактора в зависимости от режима и вкладки */}
-      {mode === "visual" ? (
-        assignmentMode === "interactive" ? (
-          <QuestionList value={questions} onChange={setQuestions} disabled={saving} />
-        ) : (
-          <BlockList value={blocks} onChange={setBlocks} disabled={saving} />
-        )
-      ) : (
-        <JsonEditor 
-          value={(assignmentMode === "interactive" ? questions : blocks) as any[]} 
-          onChange={(next) => assignmentMode === "interactive" ? setQuestions(next as any) : setBlocks(next as any)} 
-          disabled={saving} 
-        />
-      )}
-
-      <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 24, flexWrap: "wrap" }}>
-        <button className="btn" type="button" onClick={() => void save()} disabled={saving}>
-          💾 Сохранить
-        </button>
-
-        <button className="btn secondary" type="button" onClick={onCancel} disabled={saving}>
-          ❌ Отмена
-        </button>
-      </div>
-    </div>
-  );
-}
-
-================
 File: app/(admin)/admin/assignments/builder/blocks/BlockItem.tsx
 ================
 "use client";
@@ -31504,6 +30096,86 @@ export default function CrosswordEditor({ value, onChange, disabled }: Props) {
 }
 
 ================
+File: app/(admin)/admin/assignments/builder/json/JsonEditor.tsx
+================
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+type Props = {
+  value: any[];                 // массив вопросов или блоков
+  arrayKey: "questions" | "blocks"; // ключ, под которым массив хранится в JSON
+  onChange: (next: any[]) => void;
+  disabled?: boolean;
+};
+
+export default function JsonEditor({ value, arrayKey, onChange, disabled }: Props) {
+  const pretty = useMemo(
+    () => JSON.stringify({ [arrayKey]: value }, null, 2),
+    [value, arrayKey]
+  );
+  const [text, setText] = useState(pretty);
+  const [error, setError] = useState<string | null>(null);
+
+  // синхронизация при изменении value из визуального редактора
+  useEffect(() => {
+    setText(pretty);
+  }, [pretty]);
+
+  function applyJson() {
+    try {
+      const parsed = JSON.parse(text);
+
+      if (!parsed || !Array.isArray(parsed[arrayKey])) {
+        throw new Error(
+          `JSON должен иметь формат { "${arrayKey}": [...] }`
+        );
+      }
+
+      onChange(parsed[arrayKey]);
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message || "Ошибка JSON");
+    }
+  }
+
+  return (
+    <div className="card" style={{ padding: 14 }}>
+      <h3 style={{ marginTop: 0 }}>🧩 JSON редактор</h3>
+
+      <textarea
+        className="input"
+        style={{ fontFamily: "monospace", minHeight: 320 }}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        disabled={disabled}
+      />
+
+      {error ? (
+        <div className="error" style={{ display: "block", marginTop: 10 }}>
+          ❌ {error}
+        </div>
+      ) : (
+        <div className="small-muted" style={{ marginTop: 8 }}>
+          Можно править вручную или вернуться в визуальный режим
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button
+          className="btn"
+          type="button"
+          onClick={applyJson}
+          disabled={disabled}
+        >
+          ✅ Применить JSON
+        </button>
+      </div>
+    </div>
+  );
+}
+
+================
 File: app/(admin)/admin/assignments/builder/validate.ts
 ================
 // app/(admin)/admin/assignments/builder/validate.ts
@@ -32146,6 +30818,422 @@ export function DownloadsView({ data }: { data: DownloadsBlock["data"] }) {
     </div>
   );
 }
+
+================
+File: app/(app)/assignment/components/ImageModal.tsx
+================
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+type Props = {
+  open: boolean;
+  src: string;
+  onClose: () => void;
+};
+
+const ZOOM_STEP = 0.25;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 5;
+const WHEEL_ZOOM_FACTOR = 0.1;
+
+export default function ImageModal({ open, src, onClose }: Props) {
+  const imageRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const translate = useRef({ x: 0, y: 0 });
+  const dragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
+
+  // Стейт для хранения нашего бронебойного рут-узла
+  const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
+
+  // 1. Создаем автономный узел в DOM, которому плевать на любые стили React-дерева
+  useEffect(() => {
+    let node = document.getElementById("ironclad-modal-root");
+    if (!node) {
+      node = document.createElement("div");
+      node.id = "ironclad-modal-root";
+      // Блокируем любые попытки браузера "запереть" этот блок
+      node.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 2147483647 !important;
+        pointer-events: none;
+        visibility: hidden;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        transform: none !important;
+        filter: none !important;
+        backdrop-filter: none !important;
+        contain: none !important;
+      `;
+      document.body.appendChild(node);
+    }
+    setPortalNode(node);
+  }, []);
+
+  // 2. Управление открытием/закрытием и блокировкой скролла
+  useEffect(() => {
+    if (!portalNode) return;
+
+    if (open) {
+      portalNode.style.pointerEvents = "auto";
+      portalNode.style.visibility = "visible";
+      
+      // Железобетонная блокировка скролла для всех устройств (включая iOS Safari)
+      document.body.style.overflow = "hidden";
+      document.body.style.overscrollBehavior = "none";
+      document.documentElement.style.overflow = "hidden";
+      
+      translate.current = { x: 0, y: 0 };
+      setZoom(1);
+      
+      if (imageRef.current) {
+        imageRef.current.style.transform = "translate(0px, 0px) scale(1)";
+        imageRef.current.style.transition = "transform 0.2s ease";
+      }
+
+      // Автоподгон размера
+      setTimeout(() => {
+        if (imageRef.current && containerRef.current) {
+          const fit = calculateFitZoom(imageRef.current, containerRef.current);
+          setZoom(Math.min(MAX_ZOOM, Math.max(1, fit)));
+        }
+      }, 50);
+    } else {
+      portalNode.style.pointerEvents = "none";
+      portalNode.style.visibility = "hidden";
+      
+      document.body.style.overflow = "";
+      document.body.style.overscrollBehavior = "";
+      document.documentElement.style.overflow = "";
+      
+      setZoom(1);
+      translate.current = { x: 0, y: 0 };
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.overscrollBehavior = "";
+      document.documentElement.style.overflow = "";
+    };
+  }, [open, portalNode]);
+
+  // Трансформации зума
+  useEffect(() => {
+    if (!imageRef.current) return;
+    imageRef.current.style.transform = `translate(${translate.current.x}px, ${translate.current.y}px) scale(${zoom})`;
+    imageRef.current.style.transition = "transform 0.15s cubic-bezier(0.2, 0.9, 0.4, 1.1)";
+  }, [zoom]);
+
+  // Закрытие по Escape
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  // Вычисления автозума
+  function calculateFitZoom(img: HTMLImageElement, container: HTMLElement | null) {
+    if (!container) return 1;
+    const containerW = container.clientWidth * 0.9;
+    const containerH = container.clientHeight * 0.85;
+    const imgW = img.naturalWidth || img.width;
+    const imgH = img.naturalHeight || img.height;
+    if (!imgW || !imgH) return 1;
+    const scaleW = containerW / imgW;
+    const scaleH = containerH / imgH;
+    return Math.min(scaleW, scaleH);
+  }
+
+  // === ОБРАБОТЧИКИ СОБЫТИЙ ===
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!imageRef.current) return;
+    e.preventDefault();
+    const delta = -Math.sign(e.deltaY);
+    const newZoom = +(zoom + delta * WHEEL_ZOOM_FACTOR).toFixed(2);
+    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoom)));
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1) return;
+    e.preventDefault();
+    dragging.current = true;
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      translateX: translate.current.x,
+      translateY: translate.current.y,
+    };
+    if (imageRef.current) {
+      imageRef.current.style.cursor = "grabbing";
+      imageRef.current.style.transition = "none";
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!dragging.current || !imageRef.current) return;
+    e.preventDefault();
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    translate.current = {
+      x: dragStart.current.translateX + dx,
+      y: dragStart.current.translateY + dy,
+    };
+    imageRef.current.style.transform = `translate(${translate.current.x}px, ${translate.current.y}px) scale(${zoom})`;
+  };
+
+  const handleMouseUp = () => {
+    if (dragging.current) {
+      dragging.current = false;
+      if (imageRef.current) {
+        imageRef.current.style.cursor = zoom > 1 ? "grab" : "default";
+        imageRef.current.style.transition = "transform 0.15s ease";
+      }
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) return;
+    if (zoom <= 1) return;
+    const touch = e.touches[0];
+    dragging.current = true;
+    dragStart.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      translateX: translate.current.x,
+      translateY: translate.current.y,
+    };
+    if (imageRef.current) {
+      imageRef.current.style.cursor = "grabbing";
+      imageRef.current.style.transition = "none";
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!dragging.current || !imageRef.current) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - dragStart.current.x;
+    const dy = touch.clientY - dragStart.current.y;
+    translate.current = {
+      x: dragStart.current.translateX + dx,
+      y: dragStart.current.translateY + dy,
+    };
+    imageRef.current.style.transform = `translate(${translate.current.x}px, ${translate.current.y}px) scale(${zoom})`;
+  };
+
+  const handleTouchEnd = () => {
+    if (dragging.current) {
+      dragging.current = false;
+      if (imageRef.current) {
+        imageRef.current.style.cursor = zoom > 1 ? "grab" : "default";
+        imageRef.current.style.transition = "transform 0.15s ease";
+      }
+    }
+  };
+
+  const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
+  const handleTouchStartPinch = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      pinchRef.current = { dist, zoom };
+    }
+  };
+  
+  const handleTouchMovePinch = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      const ratio = newDist / pinchRef.current.dist;
+      let newZoom = pinchRef.current.zoom * ratio;
+      newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoom));
+      setZoom(newZoom);
+    }
+  };
+  
+  const handleTouchEndPinch = () => {
+    pinchRef.current = null;
+  };
+
+  const resetTransform = () => {
+    translate.current = { x: 0, y: 0 };
+    setZoom(1);
+  };
+
+  if (!open || !portalNode) return null;
+
+  // Рендерим модалку через портал в наш неуязвимый DOM-узел
+  return createPortal(
+    <div
+      ref={containerRef}
+      onWheel={handleWheel}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onTouchStart={(e) => {
+        handleTouchStart(e);
+        handleTouchStartPinch(e);
+      }}
+      onTouchMove={(e) => {
+        handleTouchMove(e);
+        handleTouchMovePinch(e);
+      }}
+      onTouchEnd={() => {
+        handleTouchEnd();
+        handleTouchEndPinch();
+      }}
+      style={{
+        position: "absolute", // Контейнер уже fixed, так что тут absolute
+        inset: 0,
+        background: "rgba(0,0,0,0.94)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)", // Фикс для айфонов
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        touchAction: "none",
+        willChange: "transform",
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <button
+        onClick={onClose}
+        className="image-modal-close-btn"
+        aria-label="Закрыть"
+        style={{
+          position: "absolute",
+          top: 20,
+          right: 24,
+          width: 48,
+          height: 48,
+          borderRadius: "50%",
+          border: "none",
+          background: "rgba(255,255,255,0.15)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          color: "#fff",
+          fontSize: 28,
+          fontWeight: 300,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "transform 0.2s, background 0.2s",
+          zIndex: 20,
+        }}
+      >
+        ✕
+      </button>
+
+      <img
+        ref={imageRef}
+        src={src}
+        alt="Fullscreen view"
+        onMouseDown={handleMouseDown}
+        draggable={false}
+        style={{
+          maxWidth: "90vw",
+          maxHeight: "85vh",
+          objectFit: "contain",
+          borderRadius: 16,
+          boxShadow: "0 30px 60px rgba(0,0,0,0.5)",
+          cursor: zoom > 1 ? "grab" : "default",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          transition: "transform 0.15s cubic-bezier(0.2, 0.9, 0.4, 1.1)",
+        }}
+      />
+
+      <div className="image-modal-controls" style={{
+        position: "absolute",
+        bottom: 30,
+        left: "50%",
+        transform: "translateX(-50%)",
+        display: "flex",
+        gap: 16,
+        background: "rgba(20,20,30,0.8)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        padding: "12px 20px",
+        borderRadius: 60,
+        border: "1px solid rgba(255,255,255,0.2)",
+        zIndex: 20,
+      }}>
+        <button onClick={() => setZoom(Math.max(MIN_ZOOM, +(zoom - ZOOM_STEP).toFixed(2)))} style={ctrlBtnStyle}>
+          −
+        </button>
+        <span style={{ color: "#fff", fontWeight: 700, minWidth: 60, textAlign: "center", userSelect: "none" }}>
+          {Math.round(zoom * 100)}%
+        </span>
+        <button onClick={() => setZoom(Math.min(MAX_ZOOM, +(zoom + ZOOM_STEP).toFixed(2)))} style={ctrlBtnStyle}>
+          +
+        </button>
+        <button onClick={resetTransform} style={{ ...ctrlBtnStyle, fontSize: 18 }}>
+          ⟲
+        </button>
+      </div>
+
+      <div className="image-modal-hint" style={{
+        position: "absolute",
+        bottom: 100,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        padding: "8px 16px",
+        borderRadius: 30,
+        color: "rgba(255,255,255,0.7)",
+        fontSize: 12,
+        fontWeight: 500,
+        pointerEvents: "none",
+        whiteSpace: "nowrap",
+        zIndex: 20,
+      }}>
+        🖱️ Колесо — зум • Перетаскивание
+      </div>
+    </div>,
+    portalNode
+  );
+}
+
+const ctrlBtnStyle: React.CSSProperties = {
+  width: 48,
+  height: 48,
+  borderRadius: "50%",
+  border: "1px solid rgba(255,255,255,0.3)",
+  background: "rgba(255,255,255,0.1)",
+  color: "#fff",
+  fontSize: 26,
+  fontWeight: 500,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "transform 0.15s, background 0.2s",
+  userSelect: "none",
+  WebkitUserSelect: "none",
+};
 
 ================
 File: app/(app)/assignment/components/QuestionSentence.tsx
@@ -35328,6 +34416,761 @@ body {
 }
 
 ================
+File: app/(app)/textbook/TextbookClient.tsx
+================
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import AppHeader from "@/components/AppHeader";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
+
+type UserProgress = {
+  assignment_id: string;
+  is_completed: boolean;
+  score?: number | null;
+};
+
+type TextbookApiOk = {
+  ok: true;
+  locked: boolean;
+  textbook: any;
+  assignments?: any[];
+  userProgress?: UserProgress[];
+};
+
+type TextbookApiErr = {
+  ok: false;
+  error: string;
+};
+
+type TextbookApi = TextbookApiOk | TextbookApiErr;
+
+type Props = {
+  textbookId: string;
+  initialData: TextbookApiOk | null;
+};
+
+function isHttpUrl(v: unknown): boolean {
+  return typeof v === "string" && /^https?:\/\//i.test(v);
+}
+
+function resolvePublicUrl(raw: unknown, bucket: string) {
+  if (!raw) return null;
+
+  const value = String(raw).trim();
+  if (!value) return null;
+
+  if (value.startsWith("data:")) return value;
+  if (value.startsWith("/api/storage/public/")) return value;
+
+  const storageMarker = "/storage/v1/object/public/";
+
+  if (isHttpUrl(value)) {
+    const markerIndex = value.indexOf(storageMarker);
+
+    if (markerIndex === -1) return value;
+
+    const rest = value.slice(markerIndex + storageMarker.length).split("?")[0]?.split("#")[0] ?? "";
+    const parts = rest.split("/").filter(Boolean);
+
+    const parsedBucket = parts.shift();
+    const parsedPath = parts.join("/");
+
+    if (!parsedBucket || !parsedPath) return value;
+
+    return getStoragePublicUrl(parsedBucket, parsedPath);
+  }
+
+  const cleaned = value
+    .replace(/^\/+/, "")
+    .replace(/^storage\/v1\/object\/public\/[^/]+\//, "");
+
+  return getStoragePublicUrl(bucket, cleaned);
+}
+
+// Универсальная проверка готовности задания
+function checkIsReady(assignment: any): boolean {
+  const isIntro = assignment?.assignment_type === "intro" || assignment?.content?.mode === "informational";
+  const hasQuestions = Array.isArray(assignment?.content?.questions) && assignment.content.questions.length > 0;
+  const hasBlocks = Array.isArray(assignment?.content?.blocks) && assignment.content.blocks.length > 0;
+
+  // Если это ознакомительное задание:
+  if (isIntro) {
+    if (assignment?.content && Object.keys(assignment.content).length > 0) return hasBlocks;
+    return true; 
+  }
+
+  // Для обычных тестов:
+  return hasQuestions;
+}
+
+function guessAssignmentType(assignment: any) {
+  const isIntro = assignment?.assignment_type === "intro" || assignment?.content?.mode === "informational";
+  if (isIntro) return { icon: "📖", label: "Ознакомительный материал", cls: "intro" as const };
+
+  const assignmentData = assignment?.content || {};
+  const aType = assignmentData?.questions?.[0]?.type || assignment?.type || "test";
+
+  if (aType === "fill") return { icon: "✍️", label: "Ввод ответа", cls: "fill" as const };
+  if (aType === "sentence") return { icon: "📝", label: "Заполнение предложения", cls: "sentence" as const };
+
+  return { icon: "📝", label: "Тест", cls: "test" as const };
+}
+
+export default function TextbookClient({ textbookId, initialData }: Props) {
+  const router = useRouter();
+  const invalidTextbookId = !textbookId?.trim();
+
+  const [data, setData] = useState<TextbookApiOk | null>(initialData);
+  const [loading, setLoading] = useState<boolean>(!initialData && !invalidTextbookId);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (invalidTextbookId) return;
+
+    let cancelled = false;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch(`/api/textbook-data/${encodeURIComponent(textbookId)}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        const json = (await res.json()) as TextbookApi;
+
+        if (!res.ok || !json.ok) {
+          const msg = (json as TextbookApiErr).error || "Не удалось загрузить учебник";
+          throw new Error(msg);
+        }
+
+        if (cancelled) return;
+
+        setData(json);
+        setLoading(false);
+      } catch (e: any) {
+        if (cancelled) return;
+
+        setLoading(false);
+        setError(e?.message || "Ошибка загрузки учебника");
+      }
+    }
+
+    if (!initialData) void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialData, invalidTextbookId, textbookId]);
+
+  const textbook = data?.textbook ?? null;
+  const assignments = data?.assignments ?? [];
+  const userProgress = data?.userProgress ?? [];
+
+  const completedSet = useMemo(
+    () => new Set(userProgress.filter((x) => x.is_completed).map((x) => x.assignment_id)),
+    [userProgress],
+  );
+
+  const scoreById = useMemo(() => {
+    const m = new Map<string, number>();
+
+    for (const p of userProgress) {
+      if (p?.assignment_id && typeof p.score === "number") {
+        m.set(p.assignment_id, p.score);
+      }
+    }
+
+    return m;
+  }, [userProgress]);
+
+  const completedCount = userProgress.filter((x) => x.is_completed).length;
+  const totalCount = assignments.length;
+  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  const coverUrl = resolvePublicUrl(textbook?.cover_image_url, "covers");
+
+  if (invalidTextbookId) {
+    return (
+      <div className="textbook-container">
+        <div className="error" style={{ display: "block" }}>
+          ❌ Некорректная ссылка на учебник
+          <div style={{ height: 10 }} />
+          <a className="btn" href="/materials">
+            ← Назад к материалам
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="textbook-container">
+      <AppHeader
+        nav={[
+          { kind: "link", href: "/materials", label: "📚 Материалы", className: "btn" },
+          { kind: "link", href: "/profile", label: "👤 Профиль", className: "btn" },
+          { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
+        ]}
+      />
+
+      <div className="back-button">
+        <button className="btn secondary" type="button" onClick={() => router.push("/materials")}>
+          ← Назад
+        </button>
+      </div>
+
+      {loading ? (
+        <div id="loading" className="loading" style={{ display: "block" }}>
+          <div className="spinner" />
+          <p>Загружаем учебник...</p>
+        </div>
+      ) : null}
+
+      {error ? (
+        <div id="errorMessage" className="error" style={{ display: "block" }}>
+          ❌ {error}
+          <div style={{ height: 10 }} />
+          <button className="btn" onClick={() => location.reload()} type="button">
+            🔄 Повторить
+          </button>
+        </div>
+      ) : null}
+
+      {!loading && !error ? (
+        <div id="textbookContent" style={{ display: "block" }}>
+          {data?.locked ? (
+            <div id="lockedMessage" className="locked-message" style={{ display: "block" }}>
+              <h3>🔒 Учебник недоступен</h3>
+              <p>Для доступа к этому учебнику обратитесь к администратору.</p>
+            </div>
+          ) : null}
+
+          {!data?.locked && textbook ? (
+            <div className="textbook-header" id="textbookHeader" style={{ display: "block" }}>
+              <div
+                className="textbook-cover"
+                id="textbookCover"
+                style={{ aspectRatio: "16 / 9", height: "auto" }}
+              >
+                {coverUrl ? (
+                  <img
+                    src={coverUrl}
+                    alt="Обложка учебника"
+                    loading="lazy"
+                    decoding="async"
+                    style={{ objectFit: "contain", objectPosition: "center" }}
+                    onError={(e) => {
+                      const img = e.currentTarget;
+                      img.style.display = "none";
+                      (img.parentElement as HTMLElement).textContent = "📚";
+                    }}
+                  />
+                ) : (
+                  "📚"
+                )}
+              </div>
+
+              <div className="textbook-info">
+                <div className="textbook-title" id="textbookTitle">
+                  {textbook.title}
+                </div>
+
+                <div className="textbook-description" id="textbookDescription">
+                  {textbook.description || "Учебные материалы и задания"}
+                </div>
+
+                <div className="progress-stats">
+                  <div className="stat-item">
+                    <div className="stat-number" id="completedCount">
+                      {completedCount}
+                    </div>
+                    <div className="stat-label">Выполнено</div>
+                  </div>
+
+                  <div className="stat-item">
+                    <div className="stat-number" id="totalCount">
+                      {totalCount}
+                    </div>
+                    <div className="stat-label">Всего заданий</div>
+                  </div>
+
+                  <div className="stat-item">
+                    <div className="stat-number" id="progressPercent">
+                      {progressPercent}%
+                    </div>
+                    <div className="stat-label">Прогресс</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {!data?.locked && textbook ? (
+            <div className="card" id="assignmentsCard" style={{ display: "block" }}>
+              <h3>Задания учебника</h3>
+              <p className="small-muted">Нажмите на задание, чтобы пройти его.</p>
+
+              <div className="assignments-list" id="assignmentsList">
+                {assignments.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: 40, color: "#666" }}>
+                    <p>📝 Задания пока не добавлены</p>
+                    <p className="small-muted">Скоро здесь появятся задания для выполнения</p>
+                  </div>
+                ) : (
+                  assignments.map((a: any) => {
+                    const isCompleted = completedSet.has(a.id);
+                    const isReady = checkIsReady(a);
+                    const meta = guessAssignmentType(a);
+                    const score = scoreById.get(a.id);
+
+                    if (!isReady) {
+                      return (
+                        <div
+                          key={a.id}
+                          className="assignment-item"
+                          style={{ opacity: 0.62, cursor: "default" }}
+                        >
+                          <div className={`assignment-icon ${meta.cls}`}>⏳</div>
+
+                          <div className="assignment-content">
+                            <div className="assignment-title">{a.title}</div>
+                            <div className="assignment-type">{meta.label}</div>
+                          </div>
+
+                          <div className="assignment-status status-pending">
+                            <span>Скоро будет доступно</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={a.id}
+                        className={`assignment-item ${isCompleted ? "completed" : ""}`}
+                        onClick={() => router.push(`/assignment/${a.id}?source=textbook&sourceId=${textbookId}`)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            router.push(`/assignment/${a.id}?source=textbook&sourceId=${textbookId}`);
+                          }
+                        }}
+                      >
+                        <div className={`assignment-icon ${meta.cls}`}>{meta.icon}</div>
+
+                        <div className="assignment-content">
+                          <div className="assignment-title">{a.title}</div>
+                          <div className="assignment-type">{meta.label}</div>
+                        </div>
+
+                        <div className={`assignment-status ${isCompleted ? "status-completed" : "status-pending"}`}>
+                          {isCompleted ? (
+                            <>
+                              {typeof score === "number" ? <span className="score-pill">{score}%</span> : null}
+                              <span>✅ Выполнено</span>
+                            </>
+                          ) : (
+                            <span>⏳ Ожидает</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+================
+File: app/api/admin/assignments/[id]/route.ts
+================
+import { ok, fail } from "@/lib/api/response";
+import { requireAdmin } from "@/lib/api/admin";
+import type { NextRequest } from "next/server";
+
+type BranchType = "olympiad" | "gatehouse";
+
+type MatPick =
+  | {
+      branch_type: "olympiad";
+      kind: "textbook";
+      material_id: null;
+      textbook_id: string;
+      crossword_id: null;
+      error?: undefined;
+    }
+  | {
+      branch_type: "olympiad";
+      kind: "crossword";
+      material_id: null;
+      textbook_id: null;
+      crossword_id: string;
+      error?: undefined;
+    }
+  | {
+      branch_type: "gatehouse";
+      kind: "material";
+      material_id: string;
+      textbook_id: null;
+      crossword_id: null;
+      error?: undefined;
+    }
+  | {
+      error: string;
+      branch_type?: undefined;
+      kind?: undefined;
+      material_id?: undefined;
+      textbook_id?: undefined;
+      crossword_id?: undefined;
+    };
+
+function normalizeBranchType(value: unknown): BranchType {
+  const v = String(value ?? "").trim().toLowerCase();
+
+  if (v === "gatehouse" || v === "ga" || v === "ga_exam" || v === "exam" || v === "gatehouse_awards") {
+    return "gatehouse";
+  }
+
+  return "olympiad";
+}
+
+function pickMaterial(body: any): MatPick {
+  const branch_type = normalizeBranchType(body?.branch_type);
+  const kind = String(body?.kind || "").trim().toLowerCase();
+  const material_id = String(body?.material_id || "").trim();
+
+  const textbook_id = body?.textbook_id ? String(body.textbook_id).trim() : "";
+  const crossword_id = body?.crossword_id ? String(body.crossword_id).trim() : "";
+
+  if (branch_type === "gatehouse" || kind === "material") {
+    if (!material_id) return { error: "material_id required for gatehouse assignment" };
+
+    return {
+      branch_type: "gatehouse",
+      kind: "material",
+      material_id,
+      textbook_id: null,
+      crossword_id: null,
+    };
+  }
+
+  if (kind && material_id) {
+    if (kind !== "textbook" && kind !== "crossword") return { error: "Bad kind" };
+
+    if (kind === "textbook") {
+      return {
+        branch_type: "olympiad",
+        kind: "textbook",
+        material_id: null,
+        textbook_id: material_id,
+        crossword_id: null,
+      };
+    }
+
+    return {
+      branch_type: "olympiad",
+      kind: "crossword",
+      material_id: null,
+      textbook_id: null,
+      crossword_id: material_id,
+    };
+  }
+
+  if (textbook_id) {
+    return {
+      branch_type: "olympiad",
+      kind: "textbook",
+      material_id: null,
+      textbook_id,
+      crossword_id: null,
+    };
+  }
+
+  if (crossword_id) {
+    return {
+      branch_type: "olympiad",
+      kind: "crossword",
+      material_id: null,
+      textbook_id: null,
+      crossword_id,
+    };
+  }
+
+  return { error: "kind/material_id or textbook_id/crossword_id required" };
+}
+
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { id } = await ctx.params;
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return fail("Bad JSON", 400, "BAD_JSON");
+  }
+
+  const title = String(body?.title ?? "").trim();
+  const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
+  const content = body?.content;
+  
+  // Добавляем обработку типа задания
+  const assignment_type = body?.assignment_type === "intro" ? "intro" : "test";
+
+  if (!title) return fail("title required", 400, "VALIDATION");
+  if (!content || typeof content !== "object") return fail("content required", 400, "VALIDATION");
+
+  const mat = pickMaterial(body);
+  if (mat.error) return fail(mat.error, 400, "VALIDATION");
+
+  const payload: any = {
+    title,
+    order_index,
+    content,
+    assignment_type, // Сохраняем тип
+
+    branch_type: mat.branch_type,
+    material_id: mat.material_id,
+
+    textbook_id: mat.textbook_id,
+    crossword_id: mat.crossword_id,
+  };
+
+  const { data, error } = await supabase.from("assignments").update(payload).eq("id", id).select("*").single();
+
+  if (error) return fail(error.message, 500, "DB_ERROR");
+
+  return ok({ assignment: data });
+}
+
+export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { id } = await ctx.params;
+
+  const { error } = await supabase.from("assignments").delete().eq("id", id);
+
+  if (error) return fail(error.message, 500, "DB_ERROR");
+
+  return ok({ deleted: true });
+}
+
+================
+File: app/api/admin/assignments/route.ts
+================
+import { ok, fail } from "@/lib/api/response";
+import { requireAdmin } from "@/lib/api/admin";
+import type { NextRequest } from "next/server";
+
+type BranchType = "olympiad" | "gatehouse";
+
+type MatPick =
+  | {
+      branch_type: "olympiad";
+      kind: "textbook";
+      material_id: null;
+      textbook_id: string;
+      crossword_id: null;
+      error?: undefined;
+    }
+  | {
+      branch_type: "olympiad";
+      kind: "crossword";
+      material_id: null;
+      textbook_id: null;
+      crossword_id: string;
+      error?: undefined;
+    }
+  | {
+      branch_type: "gatehouse";
+      kind: "material";
+      material_id: string;
+      textbook_id: null;
+      crossword_id: null;
+      error?: undefined;
+    }
+  | {
+      error: string;
+      branch_type?: undefined;
+      kind?: undefined;
+      material_id?: undefined;
+      textbook_id?: undefined;
+      crossword_id?: undefined;
+    };
+
+function normalizeBranchType(value: unknown): BranchType {
+  const v = String(value ?? "").trim().toLowerCase();
+
+  if (v === "gatehouse" || v === "ga" || v === "ga_exam" || v === "exam" || v === "gatehouse_awards") {
+    return "gatehouse";
+  }
+
+  return "olympiad";
+}
+
+function pickMaterial(body: any): MatPick {
+  const branch_type = normalizeBranchType(body?.branch_type);
+  const kind = String(body?.kind || "").trim().toLowerCase();
+  const material_id = String(body?.material_id || "").trim();
+
+  const textbook_id = body?.textbook_id ? String(body.textbook_id).trim() : "";
+  const crossword_id = body?.crossword_id ? String(body.crossword_id).trim() : "";
+
+  if (branch_type === "gatehouse" || kind === "material") {
+    if (!material_id) return { error: "material_id required for gatehouse assignment" };
+
+    return {
+      branch_type: "gatehouse",
+      kind: "material",
+      material_id,
+      textbook_id: null,
+      crossword_id: null,
+    };
+  }
+
+  if (kind && material_id) {
+    if (kind !== "textbook" && kind !== "crossword") return { error: "Bad kind" };
+
+    if (kind === "textbook") {
+      return {
+        branch_type: "olympiad",
+        kind: "textbook",
+        material_id: null,
+        textbook_id: material_id,
+        crossword_id: null,
+      };
+    }
+
+    return {
+      branch_type: "olympiad",
+      kind: "crossword",
+      material_id: null,
+      textbook_id: null,
+      crossword_id: material_id,
+    };
+  }
+
+  if (textbook_id) {
+    return {
+      branch_type: "olympiad",
+      kind: "textbook",
+      material_id: null,
+      textbook_id,
+      crossword_id: null,
+    };
+  }
+
+  if (crossword_id) {
+    return {
+      branch_type: "olympiad",
+      kind: "crossword",
+      material_id: null,
+      textbook_id: null,
+      crossword_id,
+    };
+  }
+
+  return { error: "kind/material_id or textbook_id/crossword_id required" };
+}
+
+export async function GET(req: NextRequest) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+
+  const branch_type = normalizeBranchType(req.nextUrl.searchParams.get("branch_type"));
+  const kind = String(req.nextUrl.searchParams.get("kind") || "").trim().toLowerCase();
+  const id = String(req.nextUrl.searchParams.get("id") || "").trim();
+  const material_id = String(req.nextUrl.searchParams.get("material_id") || id || "").trim();
+
+  if (!kind || !id) return ok({ assignments: [] });
+
+  let q = supabase.from("assignments").select("*");
+
+  if (branch_type === "gatehouse" || kind === "material") {
+    if (!material_id) return ok({ assignments: [] });
+
+    q = q.eq("branch_type", "gatehouse").eq("material_id", material_id);
+  } else if (kind === "textbook") {
+    q = q.eq("textbook_id", id).or("branch_type.eq.olympiad,branch_type.is.null");
+  } else if (kind === "crossword") {
+    q = q.eq("crossword_id", id).or("branch_type.eq.olympiad,branch_type.is.null");
+  } else {
+    return fail("Bad kind", 400, "VALIDATION");
+  }
+
+  const { data, error } = await q.order("order_index", { ascending: false }).order("created_at", { ascending: false });
+
+  if (error) return fail(error.message, 500, "DB_ERROR");
+
+  return ok({ assignments: data ?? [] });
+}
+
+export async function POST(req: NextRequest) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase, user } = auth;
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return fail("Bad JSON", 400, "BAD_JSON");
+  }
+
+  const title = String(body?.title ?? "").trim();
+  const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
+  const content = body?.content;
+  
+  // Получаем тип задания, по умолчанию test
+  const assignment_type = body?.assignment_type === "intro" ? "intro" : "test";
+
+  if (!title) return fail("title required", 400, "VALIDATION");
+  if (!content || typeof content !== "object") return fail("content required", 400, "VALIDATION");
+
+  const mat = pickMaterial(body);
+  if (mat.error) return fail(mat.error, 400, "VALIDATION");
+
+  const payload: any = {
+    title,
+    order_index,
+    content,
+    assignment_type, // Добавляем поле для сохранения в БД
+    created_by: user.id,
+
+    branch_type: mat.branch_type,
+    material_id: mat.material_id,
+
+    textbook_id: mat.textbook_id,
+    crossword_id: mat.crossword_id,
+  };
+
+  const { data, error } = await supabase.from("assignments").insert(payload).select("*").single();
+
+  if (error) return fail(error.message, 500, "DB_ERROR");
+
+  return ok({ assignment: data });
+}
+
+================
 File: app/api/admin/requests/route.ts
 ================
 /* app/api/admin/requests/route.ts */
@@ -36537,122 +36380,6 @@ export async function POST(req: Request) {
     },
     noStoreInit()
   );
-}
-
-================
-File: app/api/assignment-data/[id]/route.ts
-================
-import { ok, fail } from "@/lib/api/response";
-import { requireUser } from "@/lib/api/auth";
-import { NextResponse, type NextRequest } from "next/server";
-import { mockDebugAll, mockDebugReview, mockDebugSingle } from "@/app/(app)/assignment/lib/mockDebugData";
-
-function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
-}
-
-function isGatehouseAssignment(assignment: any) {
-  const material = firstOrNull(assignment?.materials);
-  return assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
-}
-
-function getMaterialId(assignment: any): string | null {
-  const material = firstOrNull(assignment?.materials);
-  const direct = typeof assignment?.material_id === "string" ? assignment.material_id : null;
-  const fromMaterial = typeof material?.id === "string" ? material.id : null;
-  return direct || fromMaterial || null;
-}
-
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireUser();
-  if ("response" in auth) return auth.response;
-
-  const { supabase, user } = auth;
-  const { id } = await ctx.params;
-
-  // ====== БЭКДОР ДЛЯ ДЕБАГА ======
-  if (id === "debug-all") return NextResponse.json(mockDebugAll);
-  if (id === "debug-review") return NextResponse.json(mockDebugReview);
-  if (id === "debug-single") return NextResponse.json(mockDebugSingle);
-  // ===============================
-
-  try {
-    const { data: assignment, error: aErr } = await supabase
-      .from("assignments")
-      .select(
-        `*,
-        materials(
-          id,
-          title,
-          branch_type,
-          material_kind,
-          is_active,
-          is_available,
-          target_levels,
-          class_levels
-        )
-      `)
-      .eq("id", id)
-      .single();
-
-    if (aErr || !assignment) return fail(aErr?.message || "Assignment not found", 404, "NOT_FOUND");
-
-    const material = firstOrNull((assignment as any).materials);
-    const gatehouse = isGatehouseAssignment(assignment);
-
-    if (gatehouse) {
-      const materialId = getMaterialId(assignment);
-
-      if (!materialId) {
-        return fail("Gatehouse assignment has no material", 404, "NOT_FOUND");
-      }
-
-      if (material?.is_active === false) {
-        return fail("Material is not active", 404, "NOT_FOUND");
-      }
-
-      const { data: access, error: accessErr } = await supabase
-        .from("material_access")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("material_id", materialId)
-        .maybeSingle();
-
-      if (accessErr) {
-        return fail(accessErr.message, 500, "DB_ERROR");
-      }
-
-      const hasAccess = Boolean(material?.is_available || access);
-
-      if (!hasAccess) {
-        return fail("No access to this Gatehouse material", 403, "FORBIDDEN");
-      }
-    }
-
-    const { data: progress, error: pErr } = await supabase
-      .from("user_progress")
-      .select("is_completed, score, completed_at, answers")
-      .eq("user_id", user.id)
-      .eq("assignment_id", id)
-      .maybeSingle();
-
-    if (pErr) return fail(pErr.message, 500, "DB_ERROR");
-
-    return ok({
-      assignment,
-      progress: progress
-        ? {
-            is_completed: Boolean(progress.is_completed),
-            score: progress.score ?? null,
-            completed_at: progress.completed_at ?? null,
-            answers: progress.answers ?? {},
-          }
-        : null,
-    });
-  } catch (e: any) {
-    return fail(e?.message || "Server error", 500, "SERVER_ERROR");
-  }
 }
 
 ================
@@ -37945,6 +37672,334 @@ export default function SettingsPanel({ quality, setQuality }: SettingsPanelProp
       />
     </div>
   );
+}
+
+================
+File: lib/data/assignments.ts
+================
+import "server-only";
+
+import type { DataAuthContext } from "@/lib/data/auth";
+
+export type AssignmentProgressData = {
+  is_completed: boolean;
+  score: number | null;
+  completed_at: string | null;
+  answers: any;
+};
+
+export type AssignmentDataResult = {
+  assignment: any;
+  progress: AssignmentProgressData | null;
+};
+
+function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function normalizeScore(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+
+  const score = Number(value);
+  if (!Number.isFinite(score)) return null;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function normalizeProgress(row: any): AssignmentProgressData | null {
+  if (!row) return null;
+
+  return {
+    is_completed: Boolean(row?.is_completed),
+    score: normalizeScore(row?.score),
+    completed_at: typeof row?.completed_at === "string" ? row.completed_at : null,
+    answers: row?.answers ?? {},
+  };
+}
+
+function isGatehouseAssignment(assignment: any) {
+  const material = firstOrNull(assignment?.materials);
+
+  return assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
+}
+
+function getGatehouseMaterialId(assignment: any): string | null {
+  const material = firstOrNull(assignment?.materials);
+
+  if (typeof assignment?.material_id === "string" && assignment.material_id) {
+    return assignment.material_id;
+  }
+
+  if (typeof material?.id === "string" && material.id) {
+    return material.id;
+  }
+
+  return null;
+}
+
+async function assertGatehouseAssignmentAccess(ctx: DataAuthContext, assignment: any) {
+  const { supabase, user } = ctx;
+  const material = firstOrNull(assignment?.materials);
+  const materialId = getGatehouseMaterialId(assignment);
+
+  if (!materialId) {
+    const error = new Error("Gatehouse assignment has no material") as Error & {
+      status?: number;
+      code?: string;
+    };
+
+    error.status = 404;
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+
+  if (material?.is_active === false) {
+    const error = new Error("Material is not active") as Error & {
+      status?: number;
+      code?: string;
+    };
+
+    error.status = 404;
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+
+  const { data: accessRow, error: accessError } = await supabase
+    .from("material_access")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("material_id", materialId)
+    .maybeSingle();
+
+  if (accessError) {
+    throw new Error(accessError.message);
+  }
+
+  const hasAccess = Boolean(material?.is_available || accessRow);
+
+  if (!hasAccess) {
+    const error = new Error("No access to this Gatehouse material") as Error & {
+      status?: number;
+      code?: string;
+    };
+
+    error.status = 403;
+    error.code = "FORBIDDEN";
+    throw error;
+  }
+}
+
+async function assertOlympiadAssignmentAccess(ctx: DataAuthContext, assignment: any) {
+  const { supabase, user } = ctx;
+
+  const textbookId = typeof assignment?.textbook_id === "string" ? assignment.textbook_id : null;
+  const crosswordId = typeof assignment?.crossword_id === "string" ? assignment.crossword_id : null;
+
+  if (textbookId) {
+    const [
+      { data: textbook, error: textbookError },
+      { data: access, error: accessError },
+    ] = await Promise.all([
+      supabase
+        .from("textbooks")
+        .select("id, is_available, is_active, branch_type")
+        .eq("id", textbookId)
+        .or("branch_type.eq.olympiad,branch_type.is.null")
+        .maybeSingle(),
+
+      supabase
+        .from("textbook_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("textbook_id", textbookId)
+        .maybeSingle(),
+    ]);
+
+    if (textbookError) throw new Error(textbookError.message);
+    if (accessError) throw new Error(accessError.message);
+
+    if (!textbook || textbook.is_active === false) {
+      const error = new Error("Textbook not found") as Error & {
+        status?: number;
+        code?: string;
+      };
+
+      error.status = 404;
+      error.code = "NOT_FOUND";
+      throw error;
+    }
+
+    if (!textbook.is_available && !access) {
+      const error = new Error("No access to this textbook") as Error & {
+        status?: number;
+        code?: string;
+      };
+
+      error.status = 403;
+      error.code = "FORBIDDEN";
+      throw error;
+    }
+
+    return;
+  }
+
+  if (crosswordId) {
+    const [
+      { data: crossword, error: crosswordError },
+      { data: access, error: accessError },
+    ] = await Promise.all([
+      supabase
+        .from("crosswords")
+        .select("id, is_available, is_active, branch_type")
+        .eq("id", crosswordId)
+        .or("branch_type.eq.olympiad,branch_type.is.null")
+        .maybeSingle(),
+
+      supabase
+        .from("crossword_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("crossword_id", crosswordId)
+        .maybeSingle(),
+    ]);
+
+    if (crosswordError) throw new Error(crosswordError.message);
+    if (accessError) throw new Error(accessError.message);
+
+    if (!crossword || crossword.is_active === false) {
+      const error = new Error("Crossword not found") as Error & {
+        status?: number;
+        code?: string;
+      };
+
+      error.status = 404;
+      error.code = "NOT_FOUND";
+      throw error;
+    }
+
+    if (!crossword.is_available && !access) {
+      const error = new Error("No access to this crossword") as Error & {
+        status?: number;
+        code?: string;
+      };
+
+      error.status = 403;
+      error.code = "FORBIDDEN";
+      throw error;
+    }
+  }
+}
+
+export async function loadAssignmentData(
+  ctx: DataAuthContext,
+  assignmentId: string,
+): Promise<AssignmentDataResult | null> {
+  const id = String(assignmentId || "").trim();
+  if (!id) return null;
+
+  const { supabase, user } = ctx;
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("assignments")
+    .select(
+      `
+      *,
+      materials(
+        id,
+        title,
+        branch_type,
+        material_kind,
+        is_active,
+        is_available,
+        target_levels,
+        class_levels
+      )
+    `,
+    )
+    .eq("id", id)
+    .single();
+
+  if (assignmentError || !assignment) {
+    const error = new Error(assignmentError?.message || "Assignment not found") as Error & {
+      status?: number;
+      code?: string;
+    };
+
+    error.status = 404;
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+
+  // --- ПРОВЕРКА НА ПУСТОЕ ЗАДАНИЕ С УЧЕТОМ ТИПА (TEST / INTRO) ---
+  const content = assignment.content || {};
+  const assignmentType = assignment.assignment_type || 'test';
+  const isIntro = assignmentType === 'intro' || content.mode === 'informational';
+  
+  const questions = Array.isArray(content.questions) ? content.questions : [];
+  const blocks = Array.isArray(content.blocks) ? content.blocks : [];
+
+  if (!isIntro && questions.length === 0) {
+    const error = new Error("Задание еще не готово (нет вопросов)") as Error & {
+      status?: number;
+      code?: string;
+    };
+    error.status = 403;
+    error.code = "NOT_READY";
+    throw error;
+  }
+
+  if (isIntro && blocks.length === 0 && questions.length === 0) {
+    const error = new Error("Ознакомительный материал еще не заполнен") as Error & {
+      status?: number;
+      code?: string;
+    };
+    error.status = 403;
+    error.code = "NOT_READY";
+    throw error;
+  }
+  // -----------------------------------------------------------------
+
+  if (isGatehouseAssignment(assignment)) {
+    await assertGatehouseAssignmentAccess(ctx, assignment);
+  } else {
+    await assertOlympiadAssignmentAccess(ctx, assignment);
+  }
+
+  const { data: progressRow, error: progressError } = await supabase
+    .from("user_progress")
+    .select("is_completed, score, completed_at, answers")
+    .eq("user_id", user.id)
+    .eq("assignment_id", id)
+    .maybeSingle();
+
+  if (progressError) {
+    throw new Error(progressError.message);
+  }
+
+  return {
+    assignment,
+    progress: normalizeProgress(progressRow),
+  };
+}
+
+export async function loadGatehouseAssignmentShellData(ctx: DataAuthContext, assignmentId: string) {
+  const result = await loadAssignmentData(ctx, assignmentId);
+
+  if (!result) {
+    return null;
+  }
+
+  const material = firstOrNull(result.assignment?.materials);
+  const materialId = getGatehouseMaterialId(result.assignment);
+
+  return {
+    assignment: result.assignment,
+    progress: result.progress,
+    material,
+    materialId,
+    isGatehouse: isGatehouseAssignment(result.assignment),
+  };
 }
 
 ================
@@ -39413,7 +39468,8 @@ export default async function GatehouseMaterialByIdPage({
 
       supabase
         .from("assignments")
-        .select("id, title, order_index, content, created_at")
+        // === ИСПРАВЛЕНИЕ: Добавили assignment_type в select ===
+        .select("id, title, order_index, content, assignment_type, created_at")
         .eq("material_id", material.id)
         .eq("branch_type", "gatehouse")
         .order("order_index", { ascending: true })
@@ -39468,6 +39524,8 @@ export default async function GatehouseMaterialByIdPage({
           isCompleted: Boolean(progress?.is_completed),
           score: progress?.score ?? null,
           completedAt: progress?.completed_at ?? null,
+          assignment_type: assignment?.assignment_type ?? "test", // === ИСПРАВЛЕНИЕ: Передаем тип на клиент ===
+          content: assignment?.content ?? {}, // === ИСПРАВЛЕНИЕ: Передаем контент для клиентских проверок ===
         };
       })
     : [];
@@ -42461,6 +42519,141 @@ export default function ProfileClient({
 }
 
 ================
+File: app/api/assignment-data/[id]/route.ts
+================
+import { ok, fail } from "@/lib/api/response";
+import { requireUser } from "@/lib/api/auth";
+import { NextResponse, type NextRequest } from "next/server";
+import { mockDebugAll, mockDebugReview, mockDebugSingle } from "@/app/(app)/assignment/lib/mockDebugData";
+
+function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function isGatehouseAssignment(assignment: any) {
+  const material = firstOrNull(assignment?.materials);
+  return assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
+}
+
+function getMaterialId(assignment: any): string | null {
+  const material = firstOrNull(assignment?.materials);
+  const direct = typeof assignment?.material_id === "string" ? assignment.material_id : null;
+  const fromMaterial = typeof material?.id === "string" ? material.id : null;
+  return direct || fromMaterial || null;
+}
+
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
+  const { supabase, user } = auth;
+  const { id } = await ctx.params;
+
+  // ====== БЭКДОР ДЛЯ ДЕБАГА ======
+  if (id === "debug-all") return NextResponse.json(mockDebugAll);
+  if (id === "debug-review") return NextResponse.json(mockDebugReview);
+  if (id === "debug-single") return NextResponse.json(mockDebugSingle);
+  // ===============================
+
+  try {
+    const { data: assignment, error: aErr } = await supabase
+      .from("assignments")
+      .select(
+        `*,
+        materials(
+          id,
+          title,
+          branch_type,
+          material_kind,
+          is_active,
+          is_available,
+          target_levels,
+          class_levels
+        )
+      `)
+      .eq("id", id)
+      .single();
+
+    if (aErr || !assignment) return fail(aErr?.message || "Assignment not found", 404, "NOT_FOUND");
+
+    // --- ПРОВЕРКА НА ПУСТОЕ ЗАДАНИЕ С УЧЕТОМ ТИПА (TEST / INTRO) ---
+    const content = assignment.content || {};
+    const assignmentType = assignment.assignment_type || 'test';
+    const isIntro = assignmentType === 'intro' || content.mode === 'informational';
+    
+    const questions = Array.isArray(content.questions) ? content.questions : [];
+    const blocks = Array.isArray(content.blocks) ? content.blocks : [];
+
+    // Блокируем, только если это ТЕСТ (с проверкой) и в нем 0 вопросов
+    if (!isIntro && questions.length === 0) {
+      return fail("Задание еще не готово (нет вопросов)", 403, "NOT_READY");
+    }
+
+    // Защита от пустых ознакомительных материалов (если нет ни блоков, ни вопросов)
+    if (isIntro && blocks.length === 0 && questions.length === 0) {
+      return fail("Ознакомительный материал еще не заполнен", 403, "NOT_READY");
+    }
+    // -----------------------------------------------------------------
+
+    const material = firstOrNull((assignment as any).materials);
+    const gatehouse = isGatehouseAssignment(assignment);
+
+    if (gatehouse) {
+      const materialId = getMaterialId(assignment);
+
+      if (!materialId) {
+        return fail("Gatehouse assignment has no material", 404, "NOT_FOUND");
+      }
+
+      if (material?.is_active === false) {
+        return fail("Material is not active", 404, "NOT_FOUND");
+      }
+
+      const { data: access, error: accessErr } = await supabase
+        .from("material_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("material_id", materialId)
+        .maybeSingle();
+
+      if (accessErr) {
+        return fail(accessErr.message, 500, "DB_ERROR");
+      }
+
+      const hasAccess = Boolean(material?.is_available || access);
+
+      if (!hasAccess) {
+        return fail("No access to this Gatehouse material", 403, "FORBIDDEN");
+      }
+    }
+
+    const { data: progress, error: pErr } = await supabase
+      .from("user_progress")
+      .select("is_completed, score, completed_at, answers")
+      .eq("user_id", user.id)
+      .eq("assignment_id", id)
+      .maybeSingle();
+
+    if (pErr) return fail(pErr.message, 500, "DB_ERROR");
+
+    return ok({
+      assignment,
+      progress: progress
+        ? {
+            is_completed: Boolean(progress.is_completed),
+            score: progress.score ?? null,
+            completed_at: progress.completed_at ?? null,
+            answers: progress.answers ?? {},
+          }
+        : null,
+    });
+  } catch (e: any) {
+    return fail(e?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+
+================
 File: app/api/auth/register/route.ts
 ================
 import { NextResponse } from "next/server";
@@ -44332,6 +44525,334 @@ export default function TurnstileWidget(props: {
 }
 
 ================
+File: app/(admin)/admin/assignments/AssignmentEditor.tsx
+================
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import LoadingBlock from "@/components/LoadingBlock";
+import ErrorBox from "@/components/ErrorBox";
+
+import type { EditorMode, AssignmentMode, Question, InfoBlock } from "./builder/types";
+import { deepClone, newQuestion, newBlock } from "./builder/types";
+import { validateQuestions, validateBlocks } from "./builder/validate";
+
+import QuestionList from "./builder/QuestionList";
+import BlockList from "./builder/blocks/BlockList";
+import JsonEditor from "./builder/json/JsonEditor";
+
+type MaterialOption =
+  | {
+      branch_type: "olympiad";
+      kind: "textbook";
+      id: string;
+      title: string;
+      material_kind?: "textbook";
+    }
+  | {
+      branch_type: "olympiad";
+      kind: "crossword";
+      id: string;
+      title: string;
+      material_kind?: "crossword";
+    }
+  | {
+      branch_type: "gatehouse";
+      kind: "material";
+      id: string;
+      title: string;
+      material_kind: string;
+    };
+
+type AssignmentRow = {
+  id: string;
+  title: string;
+  order_index: number | null;
+  branch_type?: string | null;
+  material_id?: string | null;
+  textbook_id: string | null;
+  crossword_id: string | null;
+  assignment_type?: string | null;
+  content: any;
+};
+
+type Props = {
+  material: MaterialOption | null;
+  editing: AssignmentRow | null;
+  onCancel: () => void;
+  onSaved: () => Promise<void>;
+};
+
+async function safeJson(res: Response) {
+  const text = await res.text();
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: false, error: text };
+  }
+}
+
+function materialIcon(material: MaterialOption | null) {
+  if (!material) return "—";
+  if (material.kind === "textbook") return "📚";
+  if (material.kind === "crossword") return "🧩";
+  return "🎓";
+}
+
+function materialLabel(material: MaterialOption | null) {
+  if (!material) return "—";
+
+  if (material.kind === "textbook") return `📚 ${material.title}`;
+  if (material.kind === "crossword") return `🧩 ${material.title}`;
+
+  return `🎓 ${material.title}`;
+}
+
+export default function AssignmentEditor({ material, editing, onCancel, onSaved }: Props) {
+  const [mode, setMode] = useState<EditorMode>("visual");
+  
+  const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>("interactive");
+
+  const [title, setTitle] = useState<string>(editing?.title ?? "");
+  const [orderIndex, setOrderIndex] = useState<number>(Number(editing?.order_index ?? 0));
+
+  const initialQuestions: Question[] = useMemo(() => {
+    const qs = editing?.content?.questions;
+    if (Array.isArray(qs) && qs.length) return deepClone(qs);
+    return [newQuestion("test")];
+  }, [editing]);
+
+  const initialBlocks: InfoBlock[] = useMemo(() => {
+    const blks = editing?.content?.blocks;
+    if (Array.isArray(blks) && blks.length) return deepClone(blks);
+    return [newBlock("hero")];
+  }, [editing]);
+
+  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
+  const [blocks, setBlocks] = useState<InfoBlock[]>(initialBlocks);
+
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTitle(editing?.title ?? "");
+    setOrderIndex(Number(editing?.order_index ?? 0));
+
+    const content = editing?.content;
+    
+    // Определяем режим на основе нового поля assignment_type (или старого content.mode для обратной совместимости)
+    if (editing?.assignment_type === "intro" || content?.mode === "informational") {
+      setAssignmentMode("informational");
+    } else {
+      setAssignmentMode("interactive");
+    }
+
+    const qs = content?.questions;
+    setQuestions(Array.isArray(qs) && qs.length ? deepClone(qs) : [newQuestion("test")]);
+
+    const blks = content?.blocks;
+    setBlocks(Array.isArray(blks) && blks.length ? deepClone(blks) : [newBlock("hero")]);
+
+    setMode("visual");
+    setErr(null);
+  }, [editing]);
+
+  async function save() {
+    if (!material) {
+      setErr("Сначала выберите материал");
+      return;
+    }
+
+    if (!title.trim()) {
+      setErr("Введите название задания");
+      return;
+    }
+
+    let finalContent: any = {};
+
+    if (assignmentMode === "informational") {
+      const vr = validateBlocks(blocks);
+      if (!vr.ok) {
+        const text = vr.issues.map((i) => (i.index >= 0 ? `Блок #${i.index + 1}: ${i.message}` : i.message)).join("\n");
+        setErr(text || "Ошибки в блоках");
+        return;
+      }
+      finalContent = { mode: "informational", blocks };
+    } else {
+      const vr = validateQuestions(questions);
+      if (!vr.ok) {
+        const text = vr.issues.map((i) => (i.index >= 0 ? `Вопрос #${i.index + 1}: ${i.message}` : i.message)).join("\n");
+        setErr(text || "Ошибки в вопросах");
+        return;
+      }
+      finalContent = { mode: "interactive", questions };
+    }
+
+    setErr(null);
+    setSaving(true);
+
+    try {
+      const payload: any = {
+        title: title.trim(),
+        order_index: Number.isFinite(orderIndex) ? orderIndex : 0,
+        content: finalContent,
+        
+        // Новое поле для базы данных
+        assignment_type: assignmentMode === "informational" ? "intro" : "test",
+
+        branch_type: material.branch_type,
+
+        kind: material.kind,
+        material_kind: material.material_kind ?? material.kind,
+
+        material_id: material.kind === "material" ? material.id : null,
+
+        textbook_id: material.kind === "textbook" ? material.id : null,
+        crossword_id: material.kind === "crossword" ? material.id : null,
+      };
+
+      const url = editing?.id ? `/api/admin/assignments/${encodeURIComponent(editing.id)}` : `/api/admin/assignments`;
+      const method = editing?.id ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await safeJson(res);
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+
+      await onSaved();
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+        <div>
+          <h3 style={{ margin: 0 }}>{editing ? "✏️ Редактирование задания" : "➕ Новое задание"}</h3>
+          <div className="small-muted" style={{ marginTop: 4 }}>
+            Материал: <strong>{material ? materialLabel(material) : "—"}</strong>
+          </div>
+          <div className="small-muted" style={{ marginTop: 4 }}>
+            Раздел: <strong>{material?.branch_type === "gatehouse" ? "🎓 Gatehouse Awards" : "🏆 Олимпиада"}</strong>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span className="material-badge">{materialIcon(material)}</span>
+
+          <button
+            className={`btn small ${mode === "visual" ? "" : "ghost"}`}
+            type="button"
+            onClick={() => setMode("visual")}
+            disabled={saving}
+          >
+            🎨 Редактор
+          </button>
+
+          <button
+            className={`btn small ${mode === "json" ? "" : "ghost"}`}
+            type="button"
+            onClick={() => setMode("json")}
+            disabled={saving}
+          >
+            📄 JSON
+          </button>
+        </div>
+      </div>
+
+      <div style={{ height: 12 }} />
+
+      {err ? <ErrorBox message={err} retryMode="none" /> : null}
+      {saving ? <LoadingBlock text="Сохраняем..." /> : null}
+
+      <div className="row" style={{ marginTop: 10 }}>
+        <div className="col" style={{ flex: 1 }}>
+          <label className="small-muted">Название</label>
+          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={saving} />
+        </div>
+
+        <div className="col" style={{ width: 140 }}>
+          <label className="small-muted">Порядок</label>
+          <input
+            className="input"
+            type="number"
+            value={orderIndex}
+            onChange={(e) => setOrderIndex(Number(e.target.value))}
+            disabled={saving}
+          />
+        </div>
+      </div>
+
+      <div style={{ marginTop: 16, background: "#f8fafc", padding: "12px 16px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+        <label className="small-muted" style={{ display: "block", marginBottom: 8 }}>Тип задания</label>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500, color: "#1e293b" }}>
+            <input 
+              type="radio" 
+              name="assignmentMode" 
+              checked={assignmentMode === "interactive"} 
+              onChange={() => setAssignmentMode("interactive")} 
+              disabled={saving} 
+            />
+            📝 Интерактивное (Вопросы, Тесты)
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500, color: "#1e293b" }}>
+            <input 
+              type="radio" 
+              name="assignmentMode" 
+              checked={assignmentMode === "informational"} 
+              onChange={() => setAssignmentMode("informational")} 
+              disabled={saving} 
+            />
+            📖 Ознакомительное (Гайды, Блоки)
+          </label>
+        </div>
+      </div>
+
+      <div style={{ height: 16 }} />
+
+      {mode === "visual" ? (
+        assignmentMode === "interactive" ? (
+          <QuestionList value={questions} onChange={setQuestions} disabled={saving} />
+        ) : (
+          <BlockList value={blocks} onChange={setBlocks} disabled={saving} />
+        )
+      ) : (
+        <JsonEditor 
+          value={(assignmentMode === "interactive" ? questions : blocks) as any[]} 
+          arrayKey={assignmentMode === "interactive" ? "questions" : "blocks"}
+          onChange={(next) => assignmentMode === "interactive" ? setQuestions(next as any) : setBlocks(next as any)} 
+          disabled={saving} 
+        />
+      )}
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 24, flexWrap: "wrap" }}>
+        <button className="btn" type="button" onClick={() => void save()} disabled={saving}>
+          💾 Сохранить
+        </button>
+
+        <button className="btn secondary" type="button" onClick={onCancel} disabled={saving}>
+          ❌ Отмена
+        </button>
+      </div>
+    </div>
+  );
+}
+
+================
 File: app/(app)/assignment/assignment.css
 ================
 /* app/(app)/assignment/assignment.css */
@@ -45940,6 +46461,629 @@ File: app/(app)/assignment/assignment.css
 }
 
 ================
+File: app/(app)/assignment/components/MediaRenderer.tsx
+================
+"use client";
+
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
+import type { MediaAttachment } from "../lib/types";
+import { getImageUrl } from "../lib/image";
+import ImageModal from "./ImageModal";
+
+// ============================================================================
+// Глобальная синхронизация громкости между всеми плеерами на странице
+// ============================================================================
+
+const VOLUME_KEY = "hippo_audio_volume";
+const VOLUME_EVENT = "hippo:volume-change";
+
+function getInitialVolume(): number {
+  try {
+    const v = parseFloat(localStorage.getItem(VOLUME_KEY) ?? "0.5");
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
+  } catch {
+    return 0.5;
+  }
+}
+
+function broadcastVolume(v: number): void {
+  try {
+    localStorage.setItem(VOLUME_KEY, String(v));
+    window.dispatchEvent(
+      new CustomEvent(VOLUME_EVENT, { detail: { volume: v } })
+    );
+  } catch {}
+}
+
+// ============================================================================
+// Утилита форматирования времени
+// ============================================================================
+
+function formatTime(sec: number): string {
+  if (!Number.isFinite(sec) || isNaN(sec)) return "00:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+// ============================================================================
+// КАСТОМНЫЙ АУДИОПЛЕЕР
+// ============================================================================
+
+function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const isMounted = useRef(false);
+
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [audioError, setAudioError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Громкость — изначально половина (тише)
+  const [volume, setVolume] = useState(0.5);
+
+  const finalUrl = useMemo(() => getImageUrl(url), [url]);
+
+  // Инициализация громкости после mount
+  useEffect(() => {
+    const v = getInitialVolume();
+    setVolume(v);
+    if (audioRef.current) audioRef.current.volume = v;
+    isMounted.current = true;
+  }, []);
+
+  // Сброс при смене трека
+  useEffect(() => {
+    setIsPlaying(false);
+    setProgress(0);
+    setCurrentTime(0);
+    setDuration(0);
+    setAudioError(false);
+    setLoading(true);
+  }, [url]);
+
+  // Применяем громкость к audio-элементу
+  useEffect(() => {
+    if (audioRef.current && isMounted.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
+  // Синхронизация с другими плеерами через window event
+  useEffect(() => {
+    function onVolumeSync(e: Event) {
+      const v = (e as CustomEvent).detail?.volume;
+      if (typeof v === "number" && Number.isFinite(v)) setVolume(v);
+    }
+    window.addEventListener(VOLUME_EVENT, onVolumeSync);
+    return () => window.removeEventListener(VOLUME_EVENT, onVolumeSync);
+  }, []);
+
+  // Подписка на события audio-элемента
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      setProgress(
+        audio.duration > 0 ? (audio.currentTime / audio.duration) * 100 : 0
+      );
+    };
+    const onLoaded = () => {
+      setDuration(audio.duration);
+      setLoading(false);
+    };
+    const onEnded = () => setIsPlaying(false);
+    const onError = () => {
+      setAudioError(true);
+      setLoading(false);
+    };
+    const onCanPlay = () => setLoading(false);
+
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("loadedmetadata", onLoaded);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
+    audio.addEventListener("canplay", onCanPlay);
+
+    return () => {
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("loadedmetadata", onLoaded);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
+      audio.removeEventListener("canplay", onCanPlay);
+    };
+  }, []);
+
+  const togglePlay = () => {
+    if (!audioRef.current || audioError) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().catch(() => setAudioError(true));
+      setIsPlaying(true);
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!audioRef.current || audioError || !duration) return;
+    audioRef.current.currentTime = (Number(e.target.value) / 100) * duration;
+  };
+
+  const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value) / 100;
+    setVolume(v);
+    broadcastVolume(v);
+  };
+
+  const volIcon = volume === 0 ? "🔇" : volume < 0.4 ? "🔈" : volume < 0.75 ? "🔉" : "🔊";
+
+  return (
+    <div
+      className="media-item-fade"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        padding: "12px 16px",
+        borderRadius: "20px",
+        background: "rgba(255,255,255,0.8)",
+        backdropFilter: "blur(12px)",
+        border: "1px solid rgba(0,0,0,0.05)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
+        width: "100%",
+        maxWidth: "520px",
+        margin: "10px 0",
+      }}
+    >
+      <audio ref={audioRef} src={finalUrl} preload="metadata" />
+
+      {/* ── Кнопка Play / Pause ── */}
+      <button
+        onClick={togglePlay}
+        disabled={audioError || loading}
+        style={{
+          width: 46,
+          height: 46,
+          minWidth: 46,
+          borderRadius: "50%",
+          background: isPlaying ? "rgba(0,123,255,0.1)" : "#007bff",
+          color: isPlaying ? "#007bff" : "#fff",
+          border: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: audioError || loading ? "not-allowed" : "pointer",
+          transition: "all 0.2s ease",
+          boxShadow: isPlaying ? "none" : "0 6px 15px rgba(0,123,255,0.3)",
+          opacity: audioError || loading ? 0.6 : 1,
+          flexShrink: 0,
+        }}
+      >
+        {loading ? (
+          <div
+            style={{
+              width: 18,
+              height: 18,
+              border: "2px solid rgba(255,255,255,0.3)",
+              borderTopColor: "#fff",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+            }}
+          />
+        ) : audioError ? (
+          <span style={{ fontSize: 16 }}>⚠️</span>
+        ) : isPlaying ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          </svg>
+        ) : (
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            style={{ marginLeft: 3 }}
+          >
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        )}
+      </button>
+
+      {/* ── Прогресс-бар + время ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {audioError ? (
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#c62828" }}>
+            Не удалось загрузить аудио
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                minWidth: 35,
+                color: "#475569",
+                flexShrink: 0,
+              }}
+            >
+              {formatTime(currentTime)}
+            </span>
+
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={progress || 0}
+              onChange={handleSeek}
+              style={{ flex: 1, cursor: "pointer", accentColor: "#007bff" }}
+            />
+
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                minWidth: 35,
+                textAlign: "right",
+                color: "#475569",
+                flexShrink: 0,
+              }}
+            >
+              {formatTime(duration)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Регулятор громкости ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          flexShrink: 0,
+        }}
+        title={`Громкость: ${Math.round(volume * 100)}%`}
+      >
+        <span style={{ fontSize: 14, lineHeight: 1, userSelect: "none" }}>
+          {volIcon}
+        </span>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={Math.round(volume * 100)}
+          onChange={handleVolume}
+          style={{ width: 60, cursor: "pointer", accentColor: "#007bff" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ИЗОБРАЖЕНИЕ (с зумом через ImageModal + исправленный таймаут)
+// ============================================================================
+
+function ZoomableImage({
+  url,
+  name,
+  onZoom,
+}: {
+  url: string;
+  name?: string;
+  onZoom?: (imageUrl: string) => void;
+}) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadingRef = useRef(true); // синхронный флаг для таймаута
+
+  const finalUrl = useMemo(() => {
+    const base = getImageUrl(url);
+    if (!base) return "";
+    if (retryCount === 0) return base;
+    return `${base}${base.includes("?") ? "&" : "?"}retry=${retryCount}`;
+  }, [url, retryCount]);
+
+  // Сброс состояния и установка таймаута при изменении URL
+  useEffect(() => {
+    // Очищаем предыдущий таймаут
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+    // Сбрасываем состояние загрузки
+    setIsLoading(true);
+    setHasError(false);
+    loadingRef.current = true;
+
+    // Устанавливаем таймаут на 15 секунд
+    timeoutRef.current = setTimeout(() => {
+      // Используем ref для проверки, а не state (решаем проблему стейл-клоужера)
+      if (loadingRef.current) {
+        setHasError(true);
+        setIsLoading(false);
+      }
+    }, 15000);
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [finalUrl]);
+
+  const handleLoad = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    loadingRef.current = false;
+    setIsLoading(false);
+  }, []);
+
+  const handleError = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    loadingRef.current = false;
+    setHasError(true);
+    setIsLoading(false);
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setRetryCount((c) => c + 1);
+  }, []);
+
+  const handleClick = () => {
+    if (!isLoading && !hasError && onZoom) {
+      onZoom(finalUrl);
+    }
+  };
+
+  return (
+    <div
+      className="media-item-fade"
+      style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: isLoading ? "default" : "zoom-in",
+        margin: "12px 0",
+        borderRadius: "20px",
+        overflow: "hidden",
+        background: "#f8fafc",
+        minHeight: "200px",
+        width: "100%",
+        maxWidth: "600px",
+        border: "1px solid rgba(0,0,0,0.06)",
+      }}
+      onClick={handleClick}
+    >
+      {isLoading && !hasError && (
+        <div className="media-loader">
+          <div className="spinner" />
+        </div>
+      )}
+
+      {hasError ? (
+        <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
+            Не удалось загрузить фото
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRetry();
+            }}
+            style={{
+              padding: "8px 16px",
+              background: "#007bff",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 13,
+            }}
+          >
+            Повторить загрузку
+          </button>
+        </div>
+      ) : (
+        <img
+          src={finalUrl}
+          alt={name || "Task Image"}
+          onLoad={handleLoad}
+          onError={handleError}
+          loading="lazy"
+          decoding="async"
+          style={{
+            width: "100%",
+            maxHeight: "400px",
+            objectFit: "contain",
+            display: "block",
+            transition: "opacity 0.4s ease",
+            opacity: isLoading ? 0 : 1,
+          }}
+        />
+      )}
+
+      {!isLoading && !hasError && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 12,
+            right: 12,
+            background: "rgba(0,0,0,0.5)",
+            color: "#fff",
+            padding: "5px 10px",
+            borderRadius: 10,
+            backdropFilter: "blur(4px)",
+            fontSize: 11,
+            fontWeight: 800,
+            pointerEvents: "none",
+            textTransform: "uppercase",
+          }}
+        >
+          🔍 Увеличить
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// PDF VIEWER
+// ============================================================================
+
+function PdfViewer({ url, name }: { url: string; name?: string }) {
+  const finalUrl = useMemo(() => getImageUrl(url), [url]);
+
+  return (
+    <div
+      className="media-item-fade"
+      style={{ margin: "16px 0", width: "100%", maxWidth: 800 }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "#f1f5f9",
+          padding: "12px 18px",
+          borderRadius: "16px 16px 0 0",
+          border: "1px solid #e2e8f0",
+          borderBottom: "none",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
+          <span style={{ fontSize: 18 }}>📄</span>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#475569",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {name || "PDF Document"}
+          </span>
+        </div>
+        <a
+          href={finalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 11,
+            color: "#007bff",
+            fontWeight: 800,
+            textDecoration: "none",
+            background: "#fff",
+            padding: "6px 12px",
+            borderRadius: 12,
+            boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+          }}
+        >
+          ОТКРЫТЬ ↗
+        </a>
+      </div>
+      <div
+        style={{
+          height: 500,
+          borderRadius: "0 0 16px 16px",
+          overflow: "hidden",
+          border: "1px solid #e2e8f0",
+          background: "#fff",
+        }}
+      >
+        <iframe src={`${finalUrl}#toolbar=0`} width="100%" height="100%" style={{ border: "none" }} />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ГЛАВНЫЙ РЕНДЕРЕР
+// ============================================================================
+
+export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) {
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [imageModalSrc, setImageModalSrc] = useState("");
+
+  const handleZoom = useCallback((src: string) => {
+    setImageModalSrc(src);
+    setImageModalOpen(true);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setImageModalOpen(false);
+    setImageModalSrc("");
+  }, []);
+
+  if (!media || media.length === 0) return null;
+
+  return (
+    <>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+        {media.map((m) => {
+          if (!m.url) return null;
+          const key = `${m.id}-${m.url}`;
+          if (m.type === "audio")
+            return <CustomAudioPlayer key={key} url={m.url} name={m.name} />;
+          if (m.type === "image")
+            return <ZoomableImage key={key} url={m.url} name={m.name} onZoom={handleZoom} />;
+          if (m.type === "pdf")
+            return <PdfViewer key={key} url={m.url} name={m.name} />;
+          return null;
+        })}
+
+        <style jsx global>{`
+          .media-item-fade {
+            animation: mediaAppear 0.4s ease-out forwards;
+          }
+          @keyframes mediaAppear {
+            from { opacity: 0; transform: translateY(5px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          .media-loader {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+          }
+          .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(0, 123, 255, 0.1);
+            border-top-color: #007bff;
+            border-radius: 50%;
+            animation: mediaSpin 0.8s linear infinite;
+          }
+          @keyframes mediaSpin { to { transform: rotate(360deg); } }
+          @keyframes spin      { to { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+
+      <ImageModal
+        open={imageModalOpen}
+        src={imageModalSrc}
+        onClose={handleCloseModal}
+      />
+    </>
+  );
+}
+
+================
 File: app/(app)/assignment/components/QuestionFill.tsx
 ================
 "use client";
@@ -46396,318 +47540,6 @@ export type AssignmentData = {
   content: AssignmentContent; // Распакованный JSON задания
   [key: string]: any;
 };
-
-================
-File: app/(app)/gatehouse/material/GatehouseMaterialClient.tsx
-================
-"use client";
-
-import Link from "next/link";
-import { useMemo } from "react";
-import GatehouseHeader from "@/components/gatehouse/GatehouseHeader";
-import type { MaterialDbRow } from "@/lib/materials/types";
-import { formatGatehouseLevels, getAssignmentHref } from "@/lib/materials/format";
-
-export type GatehouseAssignmentPreview = {
-  id: string;
-  title: string;
-  order_index: number;
-  questionsCount: number;
-  isCompleted: boolean;
-  score: number | null;
-  completedAt: string | null;
-};
-
-export type GatehouseMaterialPageData = {
-  material: MaterialDbRow;
-  assignments: GatehouseAssignmentPreview[];
-  hasAccess: boolean;
-  progress: number;
-  completedAssignments: number;
-  totalAssignments: number;
-};
-
-type GatehouseMaterialClientProps = {
-  initialData: GatehouseMaterialPageData | null;
-  initialError: string | null;
-};
-
-function formatScore(score: number | null): string {
-  if (typeof score !== "number" || !Number.isFinite(score)) return "—";
-  return `${Math.max(0, Math.min(100, Math.round(score)))}%`;
-}
-
-function getAssignmentStatusLabel(assignment: GatehouseAssignmentPreview): string {
-  if (assignment.isCompleted) return "Пройдено";
-  if (assignment.questionsCount > 0) return `${assignment.questionsCount} вопросов`;
-  return "Скоро будет доступно";
-}
-
-function getAssignmentIcon(assignment: GatehouseAssignmentPreview): string {
-  if (assignment.isCompleted) return "✓";
-  if (assignment.questionsCount > 0) return "📝";
-  return "⏳";
-}
-
-export default function GatehouseMaterialClient({
-  initialData,
-  initialError,
-}: GatehouseMaterialClientProps) {
-  const data = initialData;
-
-  const assignments = useMemo(() => {
-    return [...(data?.assignments ?? [])].sort((a, b) => {
-      const orderDiff = Number(a.order_index ?? 0) - Number(b.order_index ?? 0);
-      if (orderDiff !== 0) return orderDiff;
-      return String(a.title ?? "").localeCompare(String(b.title ?? ""), "ru");
-    });
-  }, [data?.assignments]);
-
-  if (!data) {
-    return (
-      <main className="gatehouse-page">
-        <div className="gatehouse-container">
-          <GatehouseHeader />
-
-          <div style={{ marginBottom: "24px" }}>
-            <Link
-              href="/gatehouse/materials"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 16px",
-                backgroundColor: "#4f46e5",
-                color: "white",
-                fontSize: "14px",
-                fontWeight: 500,
-                textDecoration: "none",
-                borderRadius: "40px",
-                transition: "all 0.2s ease",
-                boxShadow: "0 2px 6px rgba(79, 70, 229, 0.3)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 6px 12px rgba(79, 70, 229, 0.4)";
-                e.currentTarget.style.backgroundColor = "#6366f1";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 2px 6px rgba(79, 70, 229, 0.3)";
-                e.currentTarget.style.backgroundColor = "#4f46e5";
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = "translateY(1px)";
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-              }}
-            >
-              <span style={{ fontSize: "18px" }}>←</span>
-              <span>Материалы</span>
-            </Link>
-            <h1 style={{ margin: "12px 0 8px", color: "#f8fafc", fontWeight: 900 }}>
-              Материал не найден
-            </h1>
-            <p style={{ color: "#94a3b8", margin: 0 }}>
-              Не удалось открыть пробный тест Gatehouse Awards.
-            </p>
-          </div>
-
-          <section className="gatehouse-profile">
-            <div className="gatehouse-card">
-              <div className="gatehouse-card__inner">
-                <div className="gatehouse-message gatehouse-message--error">
-                  {initialError || "Материал не найден или больше недоступен."}
-                </div>
-                <div style={{ marginTop: 18 }}>
-                  <Link className="gatehouse-button" href="/gatehouse/materials">
-                    Вернуться к материалам
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-      </main>
-    );
-  }
-
-  const material = data.material;
-  const levels = formatGatehouseLevels(material.target_levels);
-
-  return (
-    <main className="gatehouse-page">
-      <div className="gatehouse-container">
-        <GatehouseHeader />
-
-        <div style={{ marginBottom: "24px" }}>
-          {/* Новая стильная кнопка назад */}
-          <Link
-            href="/gatehouse/materials"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 20px",
-              backgroundColor: "#4f46e5",
-              color: "white",
-              fontSize: "14px",
-              fontWeight: 500,
-              textDecoration: "none",
-              borderRadius: "40px",
-              transition: "all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1)",
-              boxShadow: "0 2px 8px rgba(79, 70, 229, 0.3)",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 8px 16px rgba(79, 70, 229, 0.4)";
-              e.currentTarget.style.backgroundColor = "#6366f1";
-              const arrow = e.currentTarget.querySelector(".back-arrow") as HTMLElement;
-              if (arrow) arrow.style.transform = "translateX(-3px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 2px 8px rgba(79, 70, 229, 0.3)";
-              e.currentTarget.style.backgroundColor = "#4f46e5";
-              const arrow = e.currentTarget.querySelector(".back-arrow") as HTMLElement;
-              if (arrow) arrow.style.transform = "translateX(0)";
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = "translateY(1px)";
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-            }}
-          >
-            <span
-              className="back-arrow"
-              style={{
-                fontSize: "18px",
-                transition: "transform 0.2s ease",
-                display: "inline-block",
-              }}
-            >
-              ←
-            </span>
-            <span>Материалы</span>
-          </Link>
-
-          {/* Удалены h1 с material.title, p с description, div с кнопками Профиль/Заявки */}
-        </div>
-
-        <div className="gatehouse-stats" aria-label="Прогресс материала">
-          <article className="gatehouse-stat">
-            <span className="gatehouse-stat__value">{levels}</span>
-            <span className="gatehouse-stat__label">уровень</span>
-          </article>
-          <article className="gatehouse-stat">
-            <span className="gatehouse-stat__value">{data.totalAssignments}</span>
-            <span className="gatehouse-stat__label">заданий</span>
-          </article>
-          <article className="gatehouse-stat">
-            <span className="gatehouse-stat__value">{data.progress}%</span>
-            <span className="gatehouse-stat__label">
-              {data.completedAssignments} из {data.totalAssignments} пройдено
-            </span>
-          </article>
-        </div>
-
-        <section className="gatehouse-profile">
-          {initialError ? (
-            <div className="gatehouse-message gatehouse-message--error">{initialError}</div>
-          ) : null}
-
-          {!data.hasAccess ? (
-            <div className="gatehouse-card">
-              <div className="gatehouse-card__inner">
-                <h2 className="gatehouse-card__title">Материал пока закрыт</h2>
-                <p className="gatehouse-card__subtitle">
-                  Чтобы открыть этот пробный тест, создайте заявку на нужный уровень Gatehouse Awards.
-                </p>
-                <div style={{ marginTop: 18 }}>
-                  <Link className="gatehouse-button" href="/gatehouse/requests">
-                    Создать заявку
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="gatehouse-card">
-            <div className="gatehouse-card__inner">
-              <h2 className="gatehouse-card__title">Задания пробного теста</h2>
-              <p className="gatehouse-card__subtitle">
-                Задания используют общий движок платформы. В экзаменах не начисляются олимпийские стрики.
-              </p>
-
-              {assignments.length > 0 ? (
-                <div className="gatehouse-recent">
-                  {assignments.map((assignment, index) => {
-                    const disabled = !data.hasAccess || assignment.questionsCount <= 0;
-                    const href = getAssignmentHref("gatehouse", assignment.id);
-
-                    const content = (
-                      <>
-                        <div>
-                          <h3 className="gatehouse-recent__title">
-                            <span aria-hidden="true">{getAssignmentIcon(assignment)} </span>
-                            {index + 1}. {assignment.title}
-                          </h3>
-                          <p className="gatehouse-recent__meta">
-                            {getAssignmentStatusLabel(assignment)}
-                            {assignment.isCompleted
-                              ? ` · результат ${formatScore(assignment.score)}`
-                              : ""}
-                          </p>
-                        </div>
-                        <div className="gatehouse-recent__score">
-                          {assignment.isCompleted ? formatScore(assignment.score) : "→"}
-                        </div>
-                      </>
-                    );
-
-                    if (disabled) {
-                      return (
-                        <article
-                          className="gatehouse-recent__item"
-                          key={assignment.id}
-                          style={{ opacity: 0.62 }}
-                        >
-                          {content}
-                        </article>
-                      );
-                    }
-
-                    return (
-                      <Link
-                        className="gatehouse-recent__item"
-                        key={assignment.id}
-                        href={href}
-                        style={{ color: "inherit", textDecoration: "none" }}
-                      >
-                        {content}
-                      </Link>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="gatehouse-empty" style={{ marginTop: 20 }}>
-                  <span className="gatehouse-empty__icon" aria-hidden="true">📝</span>
-                  <h3 className="gatehouse-empty__title">Заданий пока нет</h3>
-                  <p className="gatehouse-empty__text">
-                    Администратор уже создал материал, но задания для него ещё не добавлены.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      </div>
-    </main>
-  );
-}
 
 ================
 File: app/(app)/gatehouse/requests/GatehouseRequestsClient.tsx
@@ -48418,629 +49250,6 @@ export async function deleteRequestRowByNumber(requestNumber: string) {
 }
 
 ================
-File: app/(app)/assignment/components/MediaRenderer.tsx
-================
-"use client";
-
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
-import type { MediaAttachment } from "../lib/types";
-import { getImageUrl } from "../lib/image";
-import ImageModal from "./ImageModal";
-
-// ============================================================================
-// Глобальная синхронизация громкости между всеми плеерами на странице
-// ============================================================================
-
-const VOLUME_KEY = "hippo_audio_volume";
-const VOLUME_EVENT = "hippo:volume-change";
-
-function getInitialVolume(): number {
-  try {
-    const v = parseFloat(localStorage.getItem(VOLUME_KEY) ?? "0.5");
-    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
-  } catch {
-    return 0.5;
-  }
-}
-
-function broadcastVolume(v: number): void {
-  try {
-    localStorage.setItem(VOLUME_KEY, String(v));
-    window.dispatchEvent(
-      new CustomEvent(VOLUME_EVENT, { detail: { volume: v } })
-    );
-  } catch {}
-}
-
-// ============================================================================
-// Утилита форматирования времени
-// ============================================================================
-
-function formatTime(sec: number): string {
-  if (!Number.isFinite(sec) || isNaN(sec)) return "00:00";
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-// ============================================================================
-// КАСТОМНЫЙ АУДИОПЛЕЕР
-// ============================================================================
-
-function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const isMounted = useRef(false);
-
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [audioError, setAudioError] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  // Громкость — изначально половина (тише)
-  const [volume, setVolume] = useState(0.5);
-
-  const finalUrl = useMemo(() => getImageUrl(url), [url]);
-
-  // Инициализация громкости после mount
-  useEffect(() => {
-    const v = getInitialVolume();
-    setVolume(v);
-    if (audioRef.current) audioRef.current.volume = v;
-    isMounted.current = true;
-  }, []);
-
-  // Сброс при смене трека
-  useEffect(() => {
-    setIsPlaying(false);
-    setProgress(0);
-    setCurrentTime(0);
-    setDuration(0);
-    setAudioError(false);
-    setLoading(true);
-  }, [url]);
-
-  // Применяем громкость к audio-элементу
-  useEffect(() => {
-    if (audioRef.current && isMounted.current) {
-      audioRef.current.volume = volume;
-    }
-  }, [volume]);
-
-  // Синхронизация с другими плеерами через window event
-  useEffect(() => {
-    function onVolumeSync(e: Event) {
-      const v = (e as CustomEvent).detail?.volume;
-      if (typeof v === "number" && Number.isFinite(v)) setVolume(v);
-    }
-    window.addEventListener(VOLUME_EVENT, onVolumeSync);
-    return () => window.removeEventListener(VOLUME_EVENT, onVolumeSync);
-  }, []);
-
-  // Подписка на события audio-элемента
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const onTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-      setProgress(
-        audio.duration > 0 ? (audio.currentTime / audio.duration) * 100 : 0
-      );
-    };
-    const onLoaded = () => {
-      setDuration(audio.duration);
-      setLoading(false);
-    };
-    const onEnded = () => setIsPlaying(false);
-    const onError = () => {
-      setAudioError(true);
-      setLoading(false);
-    };
-    const onCanPlay = () => setLoading(false);
-
-    audio.addEventListener("timeupdate", onTimeUpdate);
-    audio.addEventListener("loadedmetadata", onLoaded);
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("error", onError);
-    audio.addEventListener("canplay", onCanPlay);
-
-    return () => {
-      audio.removeEventListener("timeupdate", onTimeUpdate);
-      audio.removeEventListener("loadedmetadata", onLoaded);
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("error", onError);
-      audio.removeEventListener("canplay", onCanPlay);
-    };
-  }, []);
-
-  const togglePlay = () => {
-    if (!audioRef.current || audioError) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play().catch(() => setAudioError(true));
-      setIsPlaying(true);
-    }
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!audioRef.current || audioError || !duration) return;
-    audioRef.current.currentTime = (Number(e.target.value) / 100) * duration;
-  };
-
-  const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = Number(e.target.value) / 100;
-    setVolume(v);
-    broadcastVolume(v);
-  };
-
-  const volIcon = volume === 0 ? "🔇" : volume < 0.4 ? "🔈" : volume < 0.75 ? "🔉" : "🔊";
-
-  return (
-    <div
-      className="media-item-fade"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
-        padding: "12px 16px",
-        borderRadius: "20px",
-        background: "rgba(255,255,255,0.8)",
-        backdropFilter: "blur(12px)",
-        border: "1px solid rgba(0,0,0,0.05)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
-        width: "100%",
-        maxWidth: "520px",
-        margin: "10px 0",
-      }}
-    >
-      <audio ref={audioRef} src={finalUrl} preload="metadata" />
-
-      {/* ── Кнопка Play / Pause ── */}
-      <button
-        onClick={togglePlay}
-        disabled={audioError || loading}
-        style={{
-          width: 46,
-          height: 46,
-          minWidth: 46,
-          borderRadius: "50%",
-          background: isPlaying ? "rgba(0,123,255,0.1)" : "#007bff",
-          color: isPlaying ? "#007bff" : "#fff",
-          border: "none",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: audioError || loading ? "not-allowed" : "pointer",
-          transition: "all 0.2s ease",
-          boxShadow: isPlaying ? "none" : "0 6px 15px rgba(0,123,255,0.3)",
-          opacity: audioError || loading ? 0.6 : 1,
-          flexShrink: 0,
-        }}
-      >
-        {loading ? (
-          <div
-            style={{
-              width: 18,
-              height: 18,
-              border: "2px solid rgba(255,255,255,0.3)",
-              borderTopColor: "#fff",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-            }}
-          />
-        ) : audioError ? (
-          <span style={{ fontSize: 16 }}>⚠️</span>
-        ) : isPlaying ? (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-          </svg>
-        ) : (
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            style={{ marginLeft: 3 }}
-          >
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </button>
-
-      {/* ── Прогресс-бар + время ── */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {audioError ? (
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#c62828" }}>
-            Не удалось загрузить аудио
-          </div>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                minWidth: 35,
-                color: "#475569",
-                flexShrink: 0,
-              }}
-            >
-              {formatTime(currentTime)}
-            </span>
-
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={progress || 0}
-              onChange={handleSeek}
-              style={{ flex: 1, cursor: "pointer", accentColor: "#007bff" }}
-            />
-
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                minWidth: 35,
-                textAlign: "right",
-                color: "#475569",
-                flexShrink: 0,
-              }}
-            >
-              {formatTime(duration)}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* ── Регулятор громкости ── */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          flexShrink: 0,
-        }}
-        title={`Громкость: ${Math.round(volume * 100)}%`}
-      >
-        <span style={{ fontSize: 14, lineHeight: 1, userSelect: "none" }}>
-          {volIcon}
-        </span>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={Math.round(volume * 100)}
-          onChange={handleVolume}
-          style={{ width: 60, cursor: "pointer", accentColor: "#007bff" }}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// ИЗОБРАЖЕНИЕ (с зумом через ImageModal + исправленный таймаут)
-// ============================================================================
-
-function ZoomableImage({
-  url,
-  name,
-  onZoom,
-}: {
-  url: string;
-  name?: string;
-  onZoom?: (imageUrl: string) => void;
-}) {
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const loadingRef = useRef(true); // синхронный флаг для таймаута
-
-  const finalUrl = useMemo(() => {
-    const base = getImageUrl(url);
-    if (!base) return "";
-    if (retryCount === 0) return base;
-    return `${base}${base.includes("?") ? "&" : "?"}retry=${retryCount}`;
-  }, [url, retryCount]);
-
-  // Сброс состояния и установка таймаута при изменении URL
-  useEffect(() => {
-    // Очищаем предыдущий таймаут
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-    // Сбрасываем состояние загрузки
-    setIsLoading(true);
-    setHasError(false);
-    loadingRef.current = true;
-
-    // Устанавливаем таймаут на 15 секунд
-    timeoutRef.current = setTimeout(() => {
-      // Используем ref для проверки, а не state (решаем проблему стейл-клоужера)
-      if (loadingRef.current) {
-        setHasError(true);
-        setIsLoading(false);
-      }
-    }, 15000);
-
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [finalUrl]);
-
-  const handleLoad = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    loadingRef.current = false;
-    setIsLoading(false);
-  }, []);
-
-  const handleError = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    loadingRef.current = false;
-    setHasError(true);
-    setIsLoading(false);
-  }, []);
-
-  const handleRetry = useCallback(() => {
-    setRetryCount((c) => c + 1);
-  }, []);
-
-  const handleClick = () => {
-    if (!isLoading && !hasError && onZoom) {
-      onZoom(finalUrl);
-    }
-  };
-
-  return (
-    <div
-      className="media-item-fade"
-      style={{
-        position: "relative",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: isLoading ? "default" : "zoom-in",
-        margin: "12px 0",
-        borderRadius: "20px",
-        overflow: "hidden",
-        background: "#f8fafc",
-        minHeight: "200px",
-        width: "100%",
-        maxWidth: "600px",
-        border: "1px solid rgba(0,0,0,0.06)",
-      }}
-      onClick={handleClick}
-    >
-      {isLoading && !hasError && (
-        <div className="media-loader">
-          <div className="spinner" />
-        </div>
-      )}
-
-      {hasError ? (
-        <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
-            Не удалось загрузить фото
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRetry();
-            }}
-            style={{
-              padding: "8px 16px",
-              background: "#007bff",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontWeight: 600,
-              fontSize: 13,
-            }}
-          >
-            Повторить загрузку
-          </button>
-        </div>
-      ) : (
-        <img
-          src={finalUrl}
-          alt={name || "Task Image"}
-          onLoad={handleLoad}
-          onError={handleError}
-          loading="lazy"
-          decoding="async"
-          style={{
-            width: "100%",
-            maxHeight: "400px",
-            objectFit: "contain",
-            display: "block",
-            transition: "opacity 0.4s ease",
-            opacity: isLoading ? 0 : 1,
-          }}
-        />
-      )}
-
-      {!isLoading && !hasError && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 12,
-            right: 12,
-            background: "rgba(0,0,0,0.5)",
-            color: "#fff",
-            padding: "5px 10px",
-            borderRadius: 10,
-            backdropFilter: "blur(4px)",
-            fontSize: 11,
-            fontWeight: 800,
-            pointerEvents: "none",
-            textTransform: "uppercase",
-          }}
-        >
-          🔍 Увеличить
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// PDF VIEWER
-// ============================================================================
-
-function PdfViewer({ url, name }: { url: string; name?: string }) {
-  const finalUrl = useMemo(() => getImageUrl(url), [url]);
-
-  return (
-    <div
-      className="media-item-fade"
-      style={{ margin: "16px 0", width: "100%", maxWidth: 800 }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          background: "#f1f5f9",
-          padding: "12px 18px",
-          borderRadius: "16px 16px 0 0",
-          border: "1px solid #e2e8f0",
-          borderBottom: "none",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
-          <span style={{ fontSize: 18 }}>📄</span>
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: "#475569",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {name || "PDF Document"}
-          </span>
-        </div>
-        <a
-          href={finalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            fontSize: 11,
-            color: "#007bff",
-            fontWeight: 800,
-            textDecoration: "none",
-            background: "#fff",
-            padding: "6px 12px",
-            borderRadius: 12,
-            boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
-          }}
-        >
-          ОТКРЫТЬ ↗
-        </a>
-      </div>
-      <div
-        style={{
-          height: 500,
-          borderRadius: "0 0 16px 16px",
-          overflow: "hidden",
-          border: "1px solid #e2e8f0",
-          background: "#fff",
-        }}
-      >
-        <iframe src={`${finalUrl}#toolbar=0`} width="100%" height="100%" style={{ border: "none" }} />
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// ГЛАВНЫЙ РЕНДЕРЕР
-// ============================================================================
-
-export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) {
-  const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [imageModalSrc, setImageModalSrc] = useState("");
-
-  const handleZoom = useCallback((src: string) => {
-    setImageModalSrc(src);
-    setImageModalOpen(true);
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setImageModalOpen(false);
-    setImageModalSrc("");
-  }, []);
-
-  if (!media || media.length === 0) return null;
-
-  return (
-    <>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
-        {media.map((m) => {
-          if (!m.url) return null;
-          const key = `${m.id}-${m.url}`;
-          if (m.type === "audio")
-            return <CustomAudioPlayer key={key} url={m.url} name={m.name} />;
-          if (m.type === "image")
-            return <ZoomableImage key={key} url={m.url} name={m.name} onZoom={handleZoom} />;
-          if (m.type === "pdf")
-            return <PdfViewer key={key} url={m.url} name={m.name} />;
-          return null;
-        })}
-
-        <style jsx global>{`
-          .media-item-fade {
-            animation: mediaAppear 0.4s ease-out forwards;
-          }
-          @keyframes mediaAppear {
-            from { opacity: 0; transform: translateY(5px); }
-            to   { opacity: 1; transform: translateY(0); }
-          }
-          .media-loader {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 5;
-          }
-          .spinner {
-            width: 30px;
-            height: 30px;
-            border: 3px solid rgba(0, 123, 255, 0.1);
-            border-top-color: #007bff;
-            border-radius: 50%;
-            animation: mediaSpin 0.8s linear infinite;
-          }
-          @keyframes mediaSpin { to { transform: rotate(360deg); } }
-          @keyframes spin      { to { transform: rotate(360deg); } }
-        `}</style>
-      </div>
-
-      <ImageModal
-        open={imageModalOpen}
-        src={imageModalSrc}
-        onClose={handleCloseModal}
-      />
-    </>
-  );
-}
-
-================
 File: app/(app)/assignment/components/QuestionComplex.tsx
 ================
 "use client";
@@ -50393,6 +50602,350 @@ export const mockDebugSingle = (questionIndex = 3) => ({
 });
 
 ================
+File: app/(app)/gatehouse/material/GatehouseMaterialClient.tsx
+================
+"use client";
+
+import Link from "next/link";
+import { useMemo } from "react";
+import GatehouseHeader from "@/components/gatehouse/GatehouseHeader";
+import type { MaterialDbRow } from "@/lib/materials/types";
+import { formatGatehouseLevels, getAssignmentHref } from "@/lib/materials/format";
+
+export type GatehouseAssignmentPreview = {
+  id: string;
+  title: string;
+  order_index: number;
+  questionsCount: number;
+  isCompleted: boolean;
+  score: number | null;
+  completedAt: string | null;
+  assignment_type?: string | null; // Добавлено для проверки типа задания
+  content?: any; // Добавлено на случай, если сервер прокидывает контент
+};
+
+export type GatehouseMaterialPageData = {
+  material: MaterialDbRow;
+  assignments: GatehouseAssignmentPreview[];
+  hasAccess: boolean;
+  progress: number;
+  completedAssignments: number;
+  totalAssignments: number;
+};
+
+type GatehouseMaterialClientProps = {
+  initialData: GatehouseMaterialPageData | null;
+  initialError: string | null;
+};
+
+function formatScore(score: number | null): string {
+  if (typeof score !== "number" || !Number.isFinite(score)) return "—";
+  return `${Math.max(0, Math.min(100, Math.round(score)))}%`;
+}
+
+// Универсальная проверка готовности задания
+function checkIsReady(assignment: GatehouseAssignmentPreview): boolean {
+  const isIntro = assignment.assignment_type === "intro" || assignment.content?.mode === "informational";
+  const hasQuestions = assignment.questionsCount > 0 || (Array.isArray(assignment.content?.questions) && assignment.content.questions.length > 0);
+  const hasBlocks = Array.isArray(assignment.content?.blocks) && assignment.content.blocks.length > 0;
+
+  // Если это ознакомительное задание:
+  if (isIntro) {
+    // Если сервер передал content, строго проверяем наличие блоков
+    if (assignment.content) return hasBlocks;
+    // Если content не передан в превью, считаем задание готовым (доверяем флагу intro)
+    return true;
+  }
+
+  // Для обычных тестов:
+  return hasQuestions;
+}
+
+function getAssignmentStatusLabel(assignment: GatehouseAssignmentPreview): string {
+  const isReady = checkIsReady(assignment);
+  
+  if (assignment.isCompleted) return "Пройдено";
+  if (!isReady) return "Скоро будет доступно";
+  
+  const isIntro = assignment.assignment_type === "intro" || assignment.content?.mode === "informational";
+  if (isIntro) return "Ознакомительный материал";
+
+  const qCount = assignment.questionsCount > 0 ? assignment.questionsCount : (assignment.content?.questions?.length || 0);
+  return `${qCount} вопросов`;
+}
+
+function getAssignmentIcon(assignment: GatehouseAssignmentPreview): string {
+  const isReady = checkIsReady(assignment);
+  
+  if (assignment.isCompleted) return "✓";
+  if (!isReady) return "⏳";
+  
+  const isIntro = assignment.assignment_type === "intro" || assignment.content?.mode === "informational";
+  if (isIntro) return "📖";
+  
+  return "📝";
+}
+
+export default function GatehouseMaterialClient({
+  initialData,
+  initialError,
+}: GatehouseMaterialClientProps) {
+  const data = initialData;
+
+  const assignments = useMemo(() => {
+    return [...(data?.assignments ?? [])].sort((a, b) => {
+      const orderDiff = Number(a.order_index ?? 0) - Number(b.order_index ?? 0);
+      if (orderDiff !== 0) return orderDiff;
+      return String(a.title ?? "").localeCompare(String(b.title ?? ""), "ru");
+    });
+  }, [data?.assignments]);
+
+  if (!data) {
+    return (
+      <main className="gatehouse-page">
+        <div className="gatehouse-container">
+          <GatehouseHeader />
+
+          <div style={{ marginBottom: "24px" }}>
+            <Link
+              href="/gatehouse/materials"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 16px",
+                backgroundColor: "#4f46e5",
+                color: "white",
+                fontSize: "14px",
+                fontWeight: 500,
+                textDecoration: "none",
+                borderRadius: "40px",
+                transition: "all 0.2s ease",
+                boxShadow: "0 2px 6px rgba(79, 70, 229, 0.3)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 6px 12px rgba(79, 70, 229, 0.4)";
+                e.currentTarget.style.backgroundColor = "#6366f1";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 2px 6px rgba(79, 70, 229, 0.3)";
+                e.currentTarget.style.backgroundColor = "#4f46e5";
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "translateY(1px)";
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+              }}
+            >
+              <span style={{ fontSize: "18px" }}>←</span>
+              <span>Материалы</span>
+            </Link>
+            <h1 style={{ margin: "12px 0 8px", color: "#f8fafc", fontWeight: 900 }}>
+              Материал не найден
+            </h1>
+            <p style={{ color: "#94a3b8", margin: 0 }}>
+              Не удалось открыть пробный тест Gatehouse Awards.
+            </p>
+          </div>
+
+          <section className="gatehouse-profile">
+            <div className="gatehouse-card">
+              <div className="gatehouse-card__inner">
+                <div className="gatehouse-message gatehouse-message--error">
+                  {initialError || "Материал не найден или больше недоступен."}
+                </div>
+                <div style={{ marginTop: 18 }}>
+                  <Link className="gatehouse-button" href="/gatehouse/materials">
+                    Вернуться к материалам
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  const material = data.material;
+  const levels = formatGatehouseLevels(material.target_levels);
+
+  return (
+    <main className="gatehouse-page">
+      <div className="gatehouse-container">
+        <GatehouseHeader />
+
+        <div style={{ marginBottom: "24px" }}>
+          {/* Новая стильная кнопка назад */}
+          <Link
+            href="/gatehouse/materials"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 20px",
+              backgroundColor: "#4f46e5",
+              color: "white",
+              fontSize: "14px",
+              fontWeight: 500,
+              textDecoration: "none",
+              borderRadius: "40px",
+              transition: "all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1)",
+              boxShadow: "0 2px 8px rgba(79, 70, 229, 0.3)",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 8px 16px rgba(79, 70, 229, 0.4)";
+              e.currentTarget.style.backgroundColor = "#6366f1";
+              const arrow = e.currentTarget.querySelector(".back-arrow") as HTMLElement;
+              if (arrow) arrow.style.transform = "translateX(-3px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(79, 70, 229, 0.3)";
+              e.currentTarget.style.backgroundColor = "#4f46e5";
+              const arrow = e.currentTarget.querySelector(".back-arrow") as HTMLElement;
+              if (arrow) arrow.style.transform = "translateX(0)";
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = "translateY(1px)";
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+            }}
+          >
+            <span
+              className="back-arrow"
+              style={{
+                fontSize: "18px",
+                transition: "transform 0.2s ease",
+                display: "inline-block",
+              }}
+            >
+              ←
+            </span>
+            <span>Материалы</span>
+          </Link>
+        </div>
+
+        <div className="gatehouse-stats" aria-label="Прогресс материала">
+          <article className="gatehouse-stat">
+            <span className="gatehouse-stat__value">{levels}</span>
+            <span className="gatehouse-stat__label">уровень</span>
+          </article>
+          <article className="gatehouse-stat">
+            <span className="gatehouse-stat__value">{data.totalAssignments}</span>
+            <span className="gatehouse-stat__label">заданий</span>
+          </article>
+          <article className="gatehouse-stat">
+            <span className="gatehouse-stat__value">{data.progress}%</span>
+            <span className="gatehouse-stat__label">
+              {data.completedAssignments} из {data.totalAssignments} пройдено
+            </span>
+          </article>
+        </div>
+
+        <section className="gatehouse-profile">
+          {initialError ? (
+            <div className="gatehouse-message gatehouse-message--error">{initialError}</div>
+          ) : null}
+
+          {!data.hasAccess ? (
+            <div className="gatehouse-card">
+              <div className="gatehouse-card__inner">
+                <h2 className="gatehouse-card__title">Материал пока закрыт</h2>
+                <p className="gatehouse-card__subtitle">
+                  Чтобы открыть этот пробный тест, создайте заявку на нужный уровень Gatehouse Awards.
+                </p>
+                <div style={{ marginTop: 18 }}>
+                  <Link className="gatehouse-button" href="/gatehouse/requests">
+                    Создать заявку
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="gatehouse-card">
+            <div className="gatehouse-card__inner">
+              <h2 className="gatehouse-card__title">Задания пробного теста</h2>
+              <p className="gatehouse-card__subtitle">
+                Задания используют общий движок платформы. В экзаменах не начисляются олимпийские стрики.
+              </p>
+
+              {assignments.length > 0 ? (
+                <div className="gatehouse-recent">
+                  {assignments.map((assignment, index) => {
+                    const isReady = checkIsReady(assignment);
+                    const disabled = !data.hasAccess || !isReady;
+                    const href = getAssignmentHref("gatehouse", assignment.id);
+
+                    const content = (
+                      <>
+                        <div>
+                          <h3 className="gatehouse-recent__title">
+                            <span aria-hidden="true">{getAssignmentIcon(assignment)} </span>
+                            {index + 1}. {assignment.title}
+                          </h3>
+                          <p className="gatehouse-recent__meta">
+                            {getAssignmentStatusLabel(assignment)}
+                            {assignment.isCompleted && assignment.score !== null
+                              ? ` · результат ${formatScore(assignment.score)}`
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="gatehouse-recent__score">
+                          {assignment.isCompleted && assignment.score !== null ? formatScore(assignment.score) : "→"}
+                        </div>
+                      </>
+                    );
+
+                    if (disabled) {
+                      return (
+                        <article
+                          className="gatehouse-recent__item"
+                          key={assignment.id}
+                          style={{ opacity: 0.62 }}
+                        >
+                          {content}
+                        </article>
+                      );
+                    }
+
+                    return (
+                      <Link
+                        className="gatehouse-recent__item"
+                        key={assignment.id}
+                        href={href}
+                        style={{ color: "inherit", textDecoration: "none" }}
+                      >
+                        {content}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="gatehouse-empty" style={{ marginTop: 20 }}>
+                  <span className="gatehouse-empty__icon" aria-hidden="true">📝</span>
+                  <h3 className="gatehouse-empty__title">Заданий пока нет</h3>
+                  <p className="gatehouse-empty__text">
+                    Администратор уже создал материал, но задания для него ещё не добавлены.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+================
 File: app/login/login.css
 ================
 /* app/login/login.css */
@@ -51269,422 +51822,6 @@ export default function GatehouseHeader() {
     </header>
   );
 }
-
-================
-File: app/(app)/assignment/components/ImageModal.tsx
-================
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-
-type Props = {
-  open: boolean;
-  src: string;
-  onClose: () => void;
-};
-
-const ZOOM_STEP = 0.25;
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 5;
-const WHEEL_ZOOM_FACTOR = 0.1;
-
-export default function ImageModal({ open, src, onClose }: Props) {
-  const imageRef = useRef<HTMLImageElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(1);
-  const translate = useRef({ x: 0, y: 0 });
-  const dragging = useRef(false);
-  const dragStart = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
-
-  // Стейт для хранения нашего бронебойного рут-узла
-  const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
-
-  // 1. Создаем автономный узел в DOM, которому плевать на любые стили React-дерева
-  useEffect(() => {
-    let node = document.getElementById("ironclad-modal-root");
-    if (!node) {
-      node = document.createElement("div");
-      node.id = "ironclad-modal-root";
-      // Блокируем любые попытки браузера "запереть" этот блок
-      node.style.cssText = `
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        z-index: 2147483647 !important;
-        pointer-events: none;
-        visibility: hidden;
-        margin: 0 !important;
-        padding: 0 !important;
-        border: none !important;
-        background: transparent !important;
-        transform: none !important;
-        filter: none !important;
-        backdrop-filter: none !important;
-        contain: none !important;
-      `;
-      document.body.appendChild(node);
-    }
-    setPortalNode(node);
-  }, []);
-
-  // 2. Управление открытием/закрытием и блокировкой скролла
-  useEffect(() => {
-    if (!portalNode) return;
-
-    if (open) {
-      portalNode.style.pointerEvents = "auto";
-      portalNode.style.visibility = "visible";
-      
-      // Железобетонная блокировка скролла для всех устройств (включая iOS Safari)
-      document.body.style.overflow = "hidden";
-      document.body.style.overscrollBehavior = "none";
-      document.documentElement.style.overflow = "hidden";
-      
-      translate.current = { x: 0, y: 0 };
-      setZoom(1);
-      
-      if (imageRef.current) {
-        imageRef.current.style.transform = "translate(0px, 0px) scale(1)";
-        imageRef.current.style.transition = "transform 0.2s ease";
-      }
-
-      // Автоподгон размера
-      setTimeout(() => {
-        if (imageRef.current && containerRef.current) {
-          const fit = calculateFitZoom(imageRef.current, containerRef.current);
-          setZoom(Math.min(MAX_ZOOM, Math.max(1, fit)));
-        }
-      }, 50);
-    } else {
-      portalNode.style.pointerEvents = "none";
-      portalNode.style.visibility = "hidden";
-      
-      document.body.style.overflow = "";
-      document.body.style.overscrollBehavior = "";
-      document.documentElement.style.overflow = "";
-      
-      setZoom(1);
-      translate.current = { x: 0, y: 0 };
-    }
-
-    return () => {
-      document.body.style.overflow = "";
-      document.body.style.overscrollBehavior = "";
-      document.documentElement.style.overflow = "";
-    };
-  }, [open, portalNode]);
-
-  // Трансформации зума
-  useEffect(() => {
-    if (!imageRef.current) return;
-    imageRef.current.style.transform = `translate(${translate.current.x}px, ${translate.current.y}px) scale(${zoom})`;
-    imageRef.current.style.transition = "transform 0.15s cubic-bezier(0.2, 0.9, 0.4, 1.1)";
-  }, [zoom]);
-
-  // Закрытие по Escape
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
-
-  // Вычисления автозума
-  function calculateFitZoom(img: HTMLImageElement, container: HTMLElement | null) {
-    if (!container) return 1;
-    const containerW = container.clientWidth * 0.9;
-    const containerH = container.clientHeight * 0.85;
-    const imgW = img.naturalWidth || img.width;
-    const imgH = img.naturalHeight || img.height;
-    if (!imgW || !imgH) return 1;
-    const scaleW = containerW / imgW;
-    const scaleH = containerH / imgH;
-    return Math.min(scaleW, scaleH);
-  }
-
-  // === ОБРАБОТЧИКИ СОБЫТИЙ ===
-
-  const handleWheel = (e: React.WheelEvent) => {
-    if (!imageRef.current) return;
-    e.preventDefault();
-    const delta = -Math.sign(e.deltaY);
-    const newZoom = +(zoom + delta * WHEEL_ZOOM_FACTOR).toFixed(2);
-    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoom)));
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (zoom <= 1) return;
-    e.preventDefault();
-    dragging.current = true;
-    dragStart.current = {
-      x: e.clientX,
-      y: e.clientY,
-      translateX: translate.current.x,
-      translateY: translate.current.y,
-    };
-    if (imageRef.current) {
-      imageRef.current.style.cursor = "grabbing";
-      imageRef.current.style.transition = "none";
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!dragging.current || !imageRef.current) return;
-    e.preventDefault();
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    translate.current = {
-      x: dragStart.current.translateX + dx,
-      y: dragStart.current.translateY + dy,
-    };
-    imageRef.current.style.transform = `translate(${translate.current.x}px, ${translate.current.y}px) scale(${zoom})`;
-  };
-
-  const handleMouseUp = () => {
-    if (dragging.current) {
-      dragging.current = false;
-      if (imageRef.current) {
-        imageRef.current.style.cursor = zoom > 1 ? "grab" : "default";
-        imageRef.current.style.transition = "transform 0.15s ease";
-      }
-    }
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) return;
-    if (zoom <= 1) return;
-    const touch = e.touches[0];
-    dragging.current = true;
-    dragStart.current = {
-      x: touch.clientX,
-      y: touch.clientY,
-      translateX: translate.current.x,
-      translateY: translate.current.y,
-    };
-    if (imageRef.current) {
-      imageRef.current.style.cursor = "grabbing";
-      imageRef.current.style.transition = "none";
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!dragging.current || !imageRef.current) return;
-    const touch = e.touches[0];
-    const dx = touch.clientX - dragStart.current.x;
-    const dy = touch.clientY - dragStart.current.y;
-    translate.current = {
-      x: dragStart.current.translateX + dx,
-      y: dragStart.current.translateY + dy,
-    };
-    imageRef.current.style.transform = `translate(${translate.current.x}px, ${translate.current.y}px) scale(${zoom})`;
-  };
-
-  const handleTouchEnd = () => {
-    if (dragging.current) {
-      dragging.current = false;
-      if (imageRef.current) {
-        imageRef.current.style.cursor = zoom > 1 ? "grab" : "default";
-        imageRef.current.style.transition = "transform 0.15s ease";
-      }
-    }
-  };
-
-  const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
-  const handleTouchStartPinch = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.hypot(dx, dy);
-      pinchRef.current = { dist, zoom };
-    }
-  };
-  
-  const handleTouchMovePinch = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && pinchRef.current) {
-      e.preventDefault();
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const newDist = Math.hypot(dx, dy);
-      const ratio = newDist / pinchRef.current.dist;
-      let newZoom = pinchRef.current.zoom * ratio;
-      newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoom));
-      setZoom(newZoom);
-    }
-  };
-  
-  const handleTouchEndPinch = () => {
-    pinchRef.current = null;
-  };
-
-  const resetTransform = () => {
-    translate.current = { x: 0, y: 0 };
-    setZoom(1);
-  };
-
-  if (!open || !portalNode) return null;
-
-  // Рендерим модалку через портал в наш неуязвимый DOM-узел
-  return createPortal(
-    <div
-      ref={containerRef}
-      onWheel={handleWheel}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onTouchStart={(e) => {
-        handleTouchStart(e);
-        handleTouchStartPinch(e);
-      }}
-      onTouchMove={(e) => {
-        handleTouchMove(e);
-        handleTouchMovePinch(e);
-      }}
-      onTouchEnd={() => {
-        handleTouchEnd();
-        handleTouchEndPinch();
-      }}
-      style={{
-        position: "absolute", // Контейнер уже fixed, так что тут absolute
-        inset: 0,
-        background: "rgba(0,0,0,0.94)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)", // Фикс для айфонов
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        touchAction: "none",
-        willChange: "transform",
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <button
-        onClick={onClose}
-        className="image-modal-close-btn"
-        aria-label="Закрыть"
-        style={{
-          position: "absolute",
-          top: 20,
-          right: 24,
-          width: 48,
-          height: 48,
-          borderRadius: "50%",
-          border: "none",
-          background: "rgba(255,255,255,0.15)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
-          color: "#fff",
-          fontSize: 28,
-          fontWeight: 300,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "transform 0.2s, background 0.2s",
-          zIndex: 20,
-        }}
-      >
-        ✕
-      </button>
-
-      <img
-        ref={imageRef}
-        src={src}
-        alt="Fullscreen view"
-        onMouseDown={handleMouseDown}
-        draggable={false}
-        style={{
-          maxWidth: "90vw",
-          maxHeight: "85vh",
-          objectFit: "contain",
-          borderRadius: 16,
-          boxShadow: "0 30px 60px rgba(0,0,0,0.5)",
-          cursor: zoom > 1 ? "grab" : "default",
-          userSelect: "none",
-          WebkitUserSelect: "none",
-          transition: "transform 0.15s cubic-bezier(0.2, 0.9, 0.4, 1.1)",
-        }}
-      />
-
-      <div className="image-modal-controls" style={{
-        position: "absolute",
-        bottom: 30,
-        left: "50%",
-        transform: "translateX(-50%)",
-        display: "flex",
-        gap: 16,
-        background: "rgba(20,20,30,0.8)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        padding: "12px 20px",
-        borderRadius: 60,
-        border: "1px solid rgba(255,255,255,0.2)",
-        zIndex: 20,
-      }}>
-        <button onClick={() => setZoom(Math.max(MIN_ZOOM, +(zoom - ZOOM_STEP).toFixed(2)))} style={ctrlBtnStyle}>
-          −
-        </button>
-        <span style={{ color: "#fff", fontWeight: 700, minWidth: 60, textAlign: "center", userSelect: "none" }}>
-          {Math.round(zoom * 100)}%
-        </span>
-        <button onClick={() => setZoom(Math.min(MAX_ZOOM, +(zoom + ZOOM_STEP).toFixed(2)))} style={ctrlBtnStyle}>
-          +
-        </button>
-        <button onClick={resetTransform} style={{ ...ctrlBtnStyle, fontSize: 18 }}>
-          ⟲
-        </button>
-      </div>
-
-      <div className="image-modal-hint" style={{
-        position: "absolute",
-        bottom: 100,
-        left: "50%",
-        transform: "translateX(-50%)",
-        background: "rgba(0,0,0,0.6)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        padding: "8px 16px",
-        borderRadius: 30,
-        color: "rgba(255,255,255,0.7)",
-        fontSize: 12,
-        fontWeight: 500,
-        pointerEvents: "none",
-        whiteSpace: "nowrap",
-        zIndex: 20,
-      }}>
-        🖱️ Колесо — зум • Перетаскивание
-      </div>
-    </div>,
-    portalNode
-  );
-}
-
-const ctrlBtnStyle: React.CSSProperties = {
-  width: 48,
-  height: 48,
-  borderRadius: "50%",
-  border: "1px solid rgba(255,255,255,0.3)",
-  background: "rgba(255,255,255,0.1)",
-  color: "#fff",
-  fontSize: 26,
-  fontWeight: 500,
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  transition: "transform 0.15s, background 0.2s",
-  userSelect: "none",
-  WebkitUserSelect: "none",
-};
 
 ================
 File: app/(app)/assignment/components/QuestionImageMap.tsx
@@ -55494,7 +55631,7 @@ import "./assignment.css";
 // ===================== TYPES =====================
 type ApiOk = {
   ok: true;
-  assignment: AssignmentData;
+  assignment: AssignmentData & { assignment_type?: string }; // Добавлено поле типа задания
   progress: null | {
     is_completed: boolean;
     score: number | null;
@@ -55678,12 +55815,15 @@ export default function AssignmentClient({ assignmentId, source, sourceId }: Pro
         throw new Error((json as ApiErr).error || "Не удалось загрузить задание");
       }
 
-      const data = json.assignment;
+      const data = json.assignment as any;
       setAssignment(data);
 
-      if (data?.content?.mode === "informational") {
+      // Проверяем как новое поле assignment_type, так и старое content.mode для обратной совместимости
+      const isIntro = data?.assignment_type === "intro" || data?.content?.mode === "informational";
+
+      if (isIntro) {
         setAssignmentMode("informational");
-        setBlocks(data.content.blocks || []);
+        setBlocks(data?.content?.blocks || []);
       } else {
         setAssignmentMode("interactive");
         setQuestions(normalizeQuestions(data?.content?.questions));
