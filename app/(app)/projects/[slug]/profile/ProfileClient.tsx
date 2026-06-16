@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import Modal from "@/components/Modal";
@@ -151,7 +152,6 @@ type CustomUpdateDialogState = {
   retryAction: CustomUpdateRetryAction | null;
 };
 
-// НОВЫЕ ПРОПСЫ ДЛЯ ДИНАМИЧЕСКОЙ ВЕТКИ
 type Props = {
   projectName: string;
   projectSlug: string;
@@ -602,6 +602,7 @@ export default function ProfileClient({
   streak: streakProp,
   equippedTitleLabel = null,
 }: Props) {
+  const router = useRouter();
   const cachedStreak = typeof window !== "undefined" ? readStreakCache() : null;
   const cachedProgress = typeof window !== "undefined" ? readProgressCache() : null;
 
@@ -1220,7 +1221,6 @@ export default function ProfileClient({
               </button>
             )}
 
-            <Link className="nav-pill nav-pill--info" href={`/projects/${projectSlug}`}>Главная</Link>
             <Link className="nav-pill nav-pill--materials" href={`/projects/${projectSlug}/materials`}>Материалы</Link>
             <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}>Выйти</button>
           </div>
@@ -1262,7 +1262,14 @@ export default function ProfileClient({
               <div className="profile-name">{nameLabel(profile.full_name)}</div>
 
               {features?.titles && (
-                <button type="button" onClick={() => setTitleModalOpen(true)} title="Выбрать титул" aria-label="Открыть выбор титула" style={{ all: "unset", width: "100%", display: "block", cursor: customUpdateDialog.open ? "not-allowed" : "pointer", opacity: customUpdateDialog.open ? 0.88 : 1 }}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setTitleModalOpen(true)}
+                  title="Выбрать титул"
+                  aria-label="Открыть выбор титула"
+                  style={{ width: "100%", display: "block", cursor: customUpdateDialog.open ? "not-allowed" : "pointer", opacity: customUpdateDialog.open ? 0.88 : 1 }}
+                >
                   <div className="profile-title-slot">
                     <span className="profile-title-slot-icon">Т</span>
                     <span className="profile-title-slot-text">{titleText}</span>
@@ -1270,7 +1277,7 @@ export default function ProfileClient({
                       {titleSavingNow ? "Ожидание..." : "Изменить"}
                     </span>
                   </div>
-                </button>
+                </div>
               )}
 
               <div className="profile-mini" style={{ display: "flex", flexDirection: "column", padding: "4px 0", maxWidth: "100%", marginTop: features?.titles ? 0 : 12 }}>
@@ -1325,7 +1332,7 @@ export default function ProfileClient({
                 </div>
               </div>
 
-              <button className="action-btn action-btn--dangerSoft" onClick={() => window.location.href = `/projects/${projectSlug}/requests`} type="button">
+              <button className="action-btn action-btn--dangerSoft" onClick={() => router.push(`/projects/${projectSlug}/requests`)} type="button">
                 Заявки на покупку
               </button>
 
@@ -1368,7 +1375,7 @@ export default function ProfileClient({
               ) : (
                 <div className="progress-list">
                   {materialsProgress.map((m) => (
-                    <div key={`${m.kind}-${m.id}`} className="progress-row" onClick={() => window.location.href = m.href}>
+                    <div key={`${m.kind}-${m.id}`} className="progress-row" onClick={() => router.push(m.href)}>
                       <div className="progress-left">
                         <div className={"progress-type " + (m.kind === "textbook" ? "progress-type--textbook" : "progress-type--crossword")}>
                           {m.kind === "textbook" ? "УЧЕБНИК" : "КРОССВОРД"}

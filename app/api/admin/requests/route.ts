@@ -28,7 +28,7 @@ type ReqRow = {
   textbook_types: any;
   material_kinds?: any;
   project_id?: string | null;
-  projects?: any; // ИСПРАВЛЕНО: Убираем строгую типизацию, чтобы избежать ошибки сборки
+  projects?: any;
 };
 
 type GrantTarget = {
@@ -422,32 +422,62 @@ async function findGatehouseMaterialsForRequest(supabase: any, r: ReqRow) {
   return materials.filter((m) => gatehouseMaterialMatchesRequest(m, r));
 }
 
-// Умная выдача доступов для новых динамических проектов
+// 🚀 УМНАЯ СИСТЕМА ВЫДАЧИ ДИНАМИЧЕСКИХ ДОСТУПОВ
 async function grantDynamicProjectAccessForRequest(supabase: any, adminId: string, r: ReqRow) {
   const nowISO = new Date().toISOString();
   const grantedLabels: string[] = [];
   const grantsToStore: any[] = [];
 
-  const targetLevels = toArr(r.target_levels).length ? toArr(r.target_levels) : toArr(r.class_level);
-  const requestedTabs = toArr(r.material_kinds);
+  // Пользователь присылает реальные названия с фронта (Лейблы)
+  const targetLevels = toArr(r.class_level).length ? toArr(r.class_level) : toArr(r.target_levels);
+  const requestedTabs = toArr(r.material_kinds).length ? toArr(r.material_kinds) : toArr(r.textbook_types);
 
   if (!targetLevels.length) return { grantedLabels, grantsToStore };
 
+  // 1. Получаем все табы этого проекта, чтобы сматчить их ID с названиями из заявки
+  const { data: tabsRes } = await runDbQuery<any[]>(
+    () => supabase.from("project_tabs").select("id, title").eq("project_id", r.project_id),
+    "fetchTabsForGrant"
+  );
+  
+  const requestedTabIds: string[] = [];
+  for (const reqTab of requestedTabs) {
+    const matched = (tabsRes ?? []).find((t: any) => 
+      t.id === reqTab || String(t.title).toLowerCase() === String(reqTab).toLowerCase()
+    );
+    if (matched) requestedTabIds.push(matched.id);
+  }
+
+  // 2. Достаем активные материалы по найденным табам
   let q = supabase
     .from("materials")
-    .select("id, title, material_kind")
+    .select("id, title, material_kind, target_levels, class_levels")
     .eq("project_id", r.project_id)
-    .eq("is_active", true)
-    .overlaps("target_levels", targetLevels);
+    .eq("is_active", true);
 
-  if (requestedTabs.length > 0) {
-    q = q.in("project_tab_id", requestedTabs);
+  if (requestedTabIds.length > 0) {
+    q = q.in("project_tab_id", requestedTabIds);
   }
 
   const { data: materials, error } = await runDbQuery<any[]>(() => q, "grantDynamicProjectAccess");
   if (error) throw new Error(error.message);
 
-  for (const mat of materials ?? []) {
+  // 3. Мягкая фильтрация (Fuzzy match) уровней. 
+  // Ищем совпадение текста (например: "Hippo 1" == "hippo-1")
+  const userLevels = targetLevels.map(x => String(x).toLowerCase());
+  
+  const matchedMaterials = (materials ?? []).filter(mat => {
+    const matLevels = [...toArr(mat.target_levels), ...toArr(mat.class_levels)].map(x => String(x).toLowerCase());
+    
+    // Если материал доступен всем уровням (массив пуст) -> выдаем
+    if (matLevels.length === 0) return true; 
+    
+    // Ищем хоть одно пересечение уровней
+    return matLevels.some(ml => userLevels.some(ul => ml === ul || ml.includes(ul) || ul.includes(ml)));
+  });
+
+  // 4. Записываем доступы в БД
+  for (const mat of matchedMaterials) {
     const up = await supabase.from("material_access").upsert({
       user_id: r.user_id,
       material_id: mat.id,
@@ -460,7 +490,7 @@ async function grantDynamicProjectAccessForRequest(supabase: any, adminId: strin
       grantsToStore.push({
         request_id: r.id,
         user_id: r.user_id,
-        kind: "mock_test", // Fallback для обхода constraints схемы БД
+        kind: "mock_test", // Fallback, чтобы легаси-роуты корректно могли отозвать доступ при удалении заявки
         item_id: mat.id,
         title: mat.title,
         granted_by: adminId,
@@ -823,12 +853,10 @@ export async function GET(req: NextRequest) {
       return q;
     };
 
-    // ИСПРАВЛЕНО: <any[]> убирает конфликты типов при сборке
     const { data, error } = await runDbQuery<any[]>(makeQuery, "adminRequestsList");
 
     if (error) return fail(error.message, 500, "DB_ERROR", noStoreInit());
 
-    // ИСПРАВЛЕНО: Нормализуем массив projects в один объект (решает баг отображения имени проекта на клиенте)
     const rawRows = data ?? [];
     const rows: ReqRow[] = rawRows.map((r: any) => ({
       ...r,
