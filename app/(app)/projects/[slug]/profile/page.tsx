@@ -1,6 +1,10 @@
 /* app/(app)/projects/[slug]/profile/page.tsx */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import ProfileClient from "./ProfileClient";
+
+// Отключаем кэш, чтобы настройки фичей и профиль всегда были свежими
+export const revalidate = 0;
 
 export default async function ProjectProfilePage({
   params,
@@ -9,117 +13,63 @@ export default async function ProjectProfilePage({
 }) {
   const supabase = await createSupabaseServerClient();
   const { slug } = await params;
-  
-  // В реальном приложении здесь еще тянем данные юзера `auth.getUser()`
-  // и его `user_progress`
 
+  // 1. Проверяем авторизацию
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    redirect("/login");
+  }
+
+  // 2. Получаем ядро ветки (проекта)
   const { data: project } = await supabase
     .from("projects")
-    .select("id, name, features")
+    .select("id, name, slug, features, is_active, theme")
     .eq("slug", slug)
     .single();
 
-  if (!project) notFound();
+  // Защита от несуществующих или скрытых веток
+  if (!project || project.is_active === false) {
+    notFound();
+  }
 
-  // Достаем флаги геймификации, которые мы настраивали в админке, поддерживаем оба формата
-  const features = project.features || {};
-  const showStreaks = features.streaks || features.hasStreaks;
-  const showTitles = features.titles || features.hasTitles;
-  const showLeaderboard = features.leaderboard || features.hasLeaderboard;
+  // 3. Получаем данные профиля пользователя (имя, телефон, регион, роль)
+  // Предполагаем, что публичные данные лежат в таблице users (или profiles)
+  const { data: userProfile } = await supabase
+    .from("users")
+    .select("full_name, contact_phone, region, is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
 
+  const initialProfile = {
+    full_name: userProfile?.full_name || "",
+    contact_phone: userProfile?.contact_phone || "",
+    region: userProfile?.region || "",
+    is_admin: Boolean(userProfile?.is_admin),
+  };
+
+  // 4. Формируем флаги геймификации (с поддержкой обратной совместимости легаси-ключей)
+  const rawFeatures = project.features || {};
+  const features = {
+    streaks: Boolean(rawFeatures.streaks || rawFeatures.hasStreaks),
+    titles: Boolean(rawFeatures.titles || rawFeatures.hasTitles),
+    leaderboard: Boolean(rawFeatures.leaderboard || rawFeatures.hasLeaderboard),
+  };
+
+  // Достаем картинку фона из темы (если она была задана в админке)
+  const backgroundUrl = project.theme?.backgroundUrl || project.theme?.bgImage || null;
+
+  // 5. Передаем всё в умный клиентский компонент, который сделает всю магию!
+  // Загрузку статистики (stats, materialsProgress) и стриков ProfileClient 
+  // выполнит сам через свои API-роуты (/api/profile-progress и др.)
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Профиль: {project.name}</h2>
-        <p className="text-gray-500 text-lg">Ваш личный прогресс и достижения в этой ветке.</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* 1. БАЗОВАЯ СТАТИСТИКА (Рендерится всегда) */}
-        <div className="bg-white rounded-3xl p-6 border shadow-sm md:col-span-2 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-5" style={{ color: "var(--project-primary)" }}>
-             <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-5 relative z-10">Общая статистика</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 relative z-10 text-center">
-            <div className="bg-gray-50 p-4 rounded-2xl">
-              <div className="text-3xl font-black text-gray-900">12</div>
-              <div className="text-[10px] text-gray-500 uppercase font-bold mt-2 tracking-wider">Решено заданий</div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-2xl">
-              <div className="text-3xl font-black text-green-600">89%</div>
-              <div className="text-[10px] text-gray-500 uppercase font-bold mt-2 tracking-wider">Средний балл</div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-2xl">
-              <div className="text-3xl font-black" style={{ color: "var(--project-primary)" }}>3</div>
-              <div className="text-[10px] text-gray-500 uppercase font-bold mt-2 tracking-wider">Доступа открыто</div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-2xl">
-              <div className="text-3xl font-black text-purple-600">1.2k</div>
-              <div className="text-[10px] text-gray-500 uppercase font-bold mt-2 tracking-wider">Очков опыта</div>
-            </div>
-          </div>
-        </div>
-
-        {/* 2. ОГНЕННЫЙ СТРИК */}
-        {showStreaks && (
-          <div className="bg-white rounded-3xl p-6 border shadow-sm flex items-start gap-5 hover:-translate-y-1 transition-transform">
-            <div className="text-4xl bg-orange-50 w-16 h-16 flex items-center justify-center rounded-2xl border border-orange-100">🔥</div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">Огненный стрик</h3>
-              <p className="text-gray-500 text-sm mt-1">Решайте задания каждый день, чтобы копить огонь!</p>
-              <div className="mt-4 bg-orange-500 text-white px-3 py-1 text-sm rounded-lg font-bold inline-flex items-center gap-1.5 shadow-sm shadow-orange-200">
-                <span>3 дня в огне</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 3. ТИТУЛЫ */}
-        {showTitles && (
-          <div className="bg-white rounded-3xl p-6 border shadow-sm flex items-start gap-5 hover:-translate-y-1 transition-transform">
-            <div className="text-4xl bg-yellow-50 w-16 h-16 flex items-center justify-center rounded-2xl border border-yellow-100">👑</div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">Ваш титул</h3>
-              <p className="text-gray-500 text-sm mt-1">Ранг мастерства в {project.name}.</p>
-              <div className="mt-4 bg-yellow-100 text-yellow-800 px-3 py-1 text-sm rounded-lg font-bold inline-flex items-center gap-1.5">
-                Продвинутый Знаток
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 4. ТАБЛИЦА ЛИДЕРОВ */}
-        {showLeaderboard && (
-          <div className="bg-white rounded-3xl p-6 border shadow-sm flex flex-col md:col-span-2">
-            <div className="flex items-center gap-4 mb-5">
-              <div className="text-3xl bg-blue-50 w-12 h-12 flex items-center justify-center rounded-xl">🏆</div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Таблица лидеров</h3>
-                <p className="text-gray-500 text-sm">Топ учеников этой ветки</p>
-              </div>
-            </div>
-            
-            <div className="space-y-2 bg-gray-50 p-4 rounded-2xl">
-              {/* Фейковые данные для наглядности */}
-              <div className="flex justify-between items-center bg-white px-4 py-3 rounded-xl shadow-sm border border-gray-100">
-                <span className="font-bold text-gray-800 flex items-center gap-2"><span className="text-yellow-500">1.</span> Александр В.</span>
-                <span className="text-gray-900 font-black">1500 XP</span>
-              </div>
-              <div 
-                className="flex justify-between items-center px-4 py-3 rounded-xl border-2"
-                style={{ borderColor: "var(--project-primary)", backgroundColor: "color-mix(in srgb, var(--project-primary) 10%, white)" }}
-              >
-                <span className="font-bold flex items-center gap-2" style={{ color: "var(--project-primary)" }}>
-                  <span className="opacity-60">4.</span> Вы (Текущее место)
-                </span>
-                <span className="font-black" style={{ color: "var(--project-primary)" }}>1200 XP</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    <ProfileClient
+      projectName={project.name}
+      projectSlug={project.slug}
+      features={features}
+      userId={user.id}
+      userEmail={user.email || ""}
+      initialProfile={initialProfile}
+      backgroundUrl={backgroundUrl}
+    />
   );
 }
