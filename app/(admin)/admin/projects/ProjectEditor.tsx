@@ -176,20 +176,13 @@ export default function ProjectEditor({ project, onClose, onSaved }: { project: 
     });
   };
 
-  const ColorPicker = ({ label, colorKey, value }: { label: string, colorKey: string, value: string }) => (
-    <div className="flex items-center justify-between p-3 bg-gray-50 border rounded-xl">
-      <span className="text-sm font-bold text-gray-700">{label}</span>
-      <div className="flex items-center gap-3">
-        <span className="text-xs font-mono text-gray-500 uppercase">{value}</span>
-        <input 
-          type="color" 
-          className="w-8 h-8 rounded cursor-pointer border-0 p-0 bg-transparent" 
-          value={value} 
-          onChange={e => handleThemeChange(colorKey, e.target.value)} 
-        />
-      </div>
-    </div>
-  );
+  const colorSettings = [
+    { label: "Основной (Кнопки, Акценты)", key: "primary", value: formData.theme.colors.primary },
+    { label: "Второстепенный (Ховеры, Градиенты)", key: "secondary", value: formData.theme.colors.secondary },
+    { label: "Фон страницы", key: "pageBg", value: formData.theme.colors.pageBg },
+    { label: "Фон карточек", key: "cardBg", value: formData.theme.colors.cardBg },
+    { label: "Цвет текста", key: "textColor", value: formData.theme.colors.textColor },
+  ];
 
   return (
     <div className="bg-white p-6 rounded-3xl border shadow-sm max-w-5xl mx-auto space-y-8">
@@ -223,11 +216,20 @@ export default function ProjectEditor({ project, onClose, onSaved }: { project: 
               <p className="text-sm text-gray-500 mb-4">Настройте цвета, которые будут применяться ко всей ветке.</p>
             </div>
             <div className="space-y-2">
-              <ColorPicker label="Основной (Кнопки, Акценты)" colorKey="primary" value={formData.theme.colors.primary} />
-              <ColorPicker label="Второстепенный (Ховеры, Градиенты)" colorKey="secondary" value={formData.theme.colors.secondary} />
-              <ColorPicker label="Фон страницы" colorKey="pageBg" value={formData.theme.colors.pageBg} />
-              <ColorPicker label="Фон карточек" colorKey="cardBg" value={formData.theme.colors.cardBg} />
-              <ColorPicker label="Цвет текста" colorKey="textColor" value={formData.theme.colors.textColor} />
+              {colorSettings.map((c) => (
+                <div key={c.key} className="flex items-center justify-between p-3 bg-gray-50 border rounded-xl">
+                  <span className="text-sm font-bold text-gray-700">{c.label}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono text-gray-500 uppercase">{c.value}</span>
+                    <input 
+                      type="color" 
+                      className="w-8 h-8 rounded cursor-pointer border-0 p-0 bg-transparent" 
+                      value={c.value} 
+                      onChange={e => handleThemeChange(c.key, e.target.value)} 
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

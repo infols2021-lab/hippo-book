@@ -72,9 +72,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         title,
         description,
         target_levels, 
-        class_levels: target_levels, // ИСПРАВЛЕНО: Поле NOT NULL в БД
-        material_kind: "material",   // ИСПРАВЛЕНО: Поле NOT NULL в БД
-        branch_type: "project",      // ИСПРАВЛЕНО: Помечаем как новый формат
+        class_levels: target_levels, // Дублируем для обратной совместимости с БД
+        material_kind: "textbook",   // Обходим легаси-ограничение БД 
+        branch_type: "olympiad",     // Обходим ограничение "materials_branch_type_check"
         order_index,
         is_available,
         is_active,

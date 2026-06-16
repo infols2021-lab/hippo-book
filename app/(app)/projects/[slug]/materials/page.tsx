@@ -2,15 +2,16 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
+import AppHeader from "@/components/AppHeader"; // Твоя родная шапка
 
-export const revalidate = 0; // Отключаем кэш для моментального обновления прогресса
+export const revalidate = 0; // Отключаем кэш для актуальных данных
 
 type PageProps = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string; level?: string }>;
+  searchParams: Promise<{ tab?: string }>;
 };
 
-// Хелпер для получения правильных ссылок на картинки
+// Хелпер для получения правильных ссылок на обложки
 function toStorageProxyUrl(raw: unknown) {
   if (typeof raw !== "string") return "";
   const value = raw.trim();
@@ -39,66 +40,59 @@ function toStorageProxyUrl(raw: unknown) {
 export default async function ProjectMaterialsPage({ params, searchParams }: PageProps) {
   const supabase = await createSupabaseServerClient();
   const { slug } = await params;
-  const { tab: activeTabSlug, level: activeLevelCode } = await searchParams;
+  
+  // Убрали дурацкий level! Оставили только табы.
+  const { tab: activeTabSlug } = await searchParams;
 
-  // 1. Проверяем авторизацию пользователя
+  // 1. Проверяем авторизацию
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // 2. Получаем ядро проекта (ИСПРАВЛЕНО: проверяем is_active вместо is_available)
+  // 2. Получаем ядро ветки
   const { data: project } = await supabase
     .from("projects")
-    .select("id, name, slug, is_active, theme")
+    .select("id, name, is_active")
     .eq("slug", slug)
     .single();
 
-  if (!project || project.is_active === false) notFound();
+  if (!project || !project.is_active) notFound();
 
-  // 3. Получаем табы и уровни для фильтров
-  const [tabsRes, levelsRes] = await Promise.all([
-    supabase.from("project_tabs").select("*").eq("project_id", project.id).eq("is_active", true).order("order_index"),
-    supabase.from("project_levels").select("*").eq("project_id", project.id).eq("is_active", true).order("order_index")
-  ]);
+  // 3. Получаем список табов для этой ветки
+  const { data: tabsRes } = await supabase
+    .from("project_tabs")
+    .select("*")
+    .eq("project_id", project.id)
+    .eq("is_active", true)
+    .order("order_index");
+    
+  const tabs = tabsRes || [];
 
-  const tabs = tabsRes.data || [];
-  const levels = levelsRes.data || [];
-
-  // Если таб не выбран, но табы есть — делаем мягкий редирект на первый доступный
+  // Если таб не выбран в URL, кидаем на первый доступный
   if (!activeTabSlug && tabs.length > 0) {
-    redirect(`/projects/${slug}/materials?tab=${tabs[0].slug}${activeLevelCode ? `&level=${activeLevelCode}` : ''}`);
+    redirect(`/projects/${slug}/materials?tab=${tabs[0].slug}`);
   }
 
   const activeTab = tabs.find(t => t.slug === activeTabSlug);
 
-  // 4. Формируем запрос на материалы
+  // 4. Формируем запрос на материалы только для этого таба
   let materialsQuery = supabase
     .from("materials")
     .select("*")
     .eq("is_active", true)
     .order("order_index", { ascending: false });
 
-  // Фильтр по табам (через ID)
   if (activeTab) {
     materialsQuery = materialsQuery.eq("project_tab_id", activeTab.id);
   } else {
-    const tabIds = tabs.map(t => t.id);
-    if (tabIds.length > 0) {
-      materialsQuery = materialsQuery.in("project_tab_id", tabIds);
-    } else {
-      materialsQuery = materialsQuery.eq("project_tab_id", "00000000-0000-0000-0000-000000000000"); // Заглушка, если табов нет
-    }
-  }
-
-  // Фильтр по уровням
-  if (activeLevelCode) {
-    materialsQuery = materialsQuery.contains("target_levels", [activeLevelCode]);
+    // Если табов нет, выдаем пустоту (защита)
+    materialsQuery = materialsQuery.eq("project_tab_id", "00000000-0000-0000-0000-000000000000");
   }
 
   const { data: materialsData } = await materialsQuery;
   const materials = materialsData || [];
   const materialIds = materials.map(m => m.id);
 
-  // 5. Запрашиваем доступы и прогресс пользователя одним махом
+  // 5. Собираем доступы и прогресс (Всё происходит на сервере, клиент не ждет!)
   let grantedMaterialIds = new Set<string>();
   let completedSet = new Set<string>();
   let assignments: any[] = [];
@@ -108,7 +102,6 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
 
     const [accessRes, assignmentsRes] = await Promise.all([
       supabase.from("material_access").select("material_id").eq("user_id", user.id).in("material_id", materialIds),
-      // or() нужен для совместимости новых материалов и старых легаси учебников/кроссвордов
       supabase.from("assignments").select("id, material_id, textbook_id, crossword_id").or(`material_id.in.(${idsString}),textbook_id.in.(${idsString}),crossword_id.in.(${idsString})`)
     ]);
 
@@ -128,7 +121,7 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
     }
   }
 
-  // 6. Разбиваем материалы на доступные и закрытые
+  // 6. Разбиваем на доступные и заблокированные
   const availableMats = [];
   const lockedMats = [];
 
@@ -140,7 +133,7 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
     }
   }
 
-  // Хелпер расчета прогресса конкретного материала
+  // Хелпер расчета прогресса (0-100%)
   function getProgress(matId: string) {
     const related = assignments.filter(a => a.material_id === matId || a.textbook_id === matId || a.crossword_id === matId);
     const total = related.length;
@@ -152,197 +145,125 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
     return { total, completed, progress };
   }
 
+  // ВОЗВРАЩАЕМ ТВОЙ РОДНОЙ CSS И ДИЗАЙН
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
-      
-      {/* 1. ШАПКА ФИЛЬТРОВ И НАВИГАЦИИ */}
-      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 space-y-8 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-gray-50 to-transparent rounded-bl-full -z-10" />
+    <div className="materials-page">
+      <div className="materials-container">
         
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 relative z-10 border-b border-gray-100 pb-6">
-          <div>
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Учебные материалы</h2>
-            <p className="text-gray-500 font-medium">Проект: <span style={{ color: "var(--project-primary)" }}>{project.name}</span></p>
-          </div>
-          <Link 
-            href={`/projects/${project.slug}/profile`}
-            className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl transition-colors shadow-sm whitespace-nowrap"
-          >
-            👤 Вернуться в профиль
-          </Link>
-        </div>
+        {/* ТВОЯ РОДНАЯ ШАПКА */}
+        <AppHeader
+          nav={[
+            { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn" },
+            { kind: "logout", label: "Выйти", className: "btn secondary" },
+          ]}
+        />
 
-        {/* Фильтр по табам */}
+        {/* ТВОИ РОДНЫЕ ТАБЫ (Теперь генерируются из БД) */}
         {tabs.length > 0 && (
-          <div className="relative z-10">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Раздел материалов</h3>
-            <div className="flex flex-wrap gap-2">
-              {tabs.map(tab => {
-                const isActive = tab.slug === activeTabSlug;
-                return (
-                  <Link
-                    key={tab.id}
-                    href={`/projects/${slug}/materials?tab=${tab.slug}${activeLevelCode ? `&level=${activeLevelCode}` : ''}`}
-                    className={`px-5 py-2.5 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 ${
-                      isActive ? 'text-white shadow-lg transform -translate-y-0.5' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 shadow-sm'
-                    }`}
-                    style={isActive ? { backgroundColor: "var(--project-primary)", borderColor: "var(--project-primary)" } : {}}
-                  >
-                    <span className={`text-lg transition-transform ${isActive ? "scale-110" : "grayscale"}`}>{tab.icon || "📁"}</span>
-                    {tab.title}
-                  </Link>
-                );
-              })}
-            </div>
+          <div className="materials-tabs" role="tablist" aria-label="Материалы">
+            {tabs.map((tab) => {
+              const isActive = tab.slug === activeTabSlug;
+              return (
+                <Link
+                  key={tab.id}
+                  href={`/projects/${slug}/materials?tab=${tab.slug}`}
+                  className={`material-tab ${isActive ? "active" : ""}`}
+                  role="tab"
+                  aria-selected={isActive}
+                  style={isActive ? { 
+                    backgroundColor: "var(--project-primary)", 
+                    borderColor: "var(--project-primary)", 
+                    color: "#fff" 
+                  } : {}}
+                >
+                  {tab.icon || ""} {tab.title}
+                </Link>
+              );
+            })}
           </div>
         )}
 
-        {/* Фильтр по уровням */}
-        {levels.length > 0 && (
-          <div className="relative z-10">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Уровень сложности / Класс</h3>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/projects/${slug}/materials?tab=${activeTabSlug || ''}`}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                  !activeLevelCode ? 'bg-gray-800 text-white shadow-md' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm'
-                }`}
-              >
-                Все уровни
-              </Link>
-              {levels.map(lvl => {
-                const isActive = lvl.code === activeLevelCode;
-                return (
-                  <Link
-                    key={lvl.id}
-                    href={`/projects/${slug}/materials?tab=${activeTabSlug || ''}&level=${lvl.code}`}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                      isActive ? 'text-white shadow-md' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm'
-                    }`}
-                    style={isActive ? { backgroundColor: "var(--project-primary)", borderColor: "var(--project-primary)" } : {}}
-                  >
-                    {lvl.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+        <div className="materials-section active">
+          <div className="materials-panel">
+            <h3 className="materials-title">
+              {activeTab ? activeTab.title : "Материалы"}
+            </h3>
+            <p className="materials-subtitle">Выберите материал для изучения и выполнения заданий</p>
 
-      {/* ЗАГОЛОВОК АКТИВНОГО ТАБА */}
-      {activeTab && (
-        <div className="flex items-center gap-3 px-2">
-          <div className="text-3xl">{activeTab.icon || "📁"}</div>
-          <h2 className="text-2xl font-extrabold text-gray-900">{activeTab.title}</h2>
-          <span className="bg-gray-200 text-gray-600 text-xs font-bold px-2.5 py-1 rounded-full ml-2">
-            {materials.length} шт.
-          </span>
-        </div>
-      )}
+            {materials.length > 0 ? (
+              <div className="materials-grid">
+                
+                {/* ДОСТУПНЫЕ МАТЕРИАЛЫ */}
+                {availableMats.map((m) => {
+                  const { total, completed, progress } = getProgress(m.id);
+                  const coverUrl = toStorageProxyUrl(m.cover_image_url);
 
-      {/* 2. СЕТКА МАТЕРИАЛОВ */}
-      {materials.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          
-          {/* ДОСТУПНЫЕ МАТЕРИАЛЫ */}
-          {availableMats.map((m) => {
-            const { total, completed, progress } = getProgress(m.id);
-            const coverUrl = toStorageProxyUrl(m.cover_image_url);
+                  return (
+                    <Link
+                      key={m.id}
+                      href={`/projects/${slug}/materials/${m.id}`}
+                      className="material-card"
+                    >
+                      <div className="material-cover">
+                        {coverUrl ? (
+                          <img src={coverUrl} alt={m.title} loading="lazy" decoding="async" />
+                        ) : (
+                          <div style={{ fontSize: "3rem", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>📄</div>
+                        )}
+                      </div>
 
-            return (
-              <Link
-                key={m.id}
-                href={`/projects/${slug}/materials/${m.id}`}
-                className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1.5 group flex flex-col relative overflow-hidden"
-              >
-                {/* Эффект свечения при наведении */}
-                <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-0 group-hover:opacity-10 transition-opacity blur-2xl pointer-events-none" style={{ backgroundColor: "var(--project-primary)" }} />
+                      <div className="material-title">{m.title}</div>
+                      <div className="material-description">{m.description || "Материалы и задания для выполнения"}</div>
 
-                <div className="flex gap-4 mb-6 relative z-10">
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-50 shrink-0 border border-black/5 flex items-center justify-center text-3xl shadow-inner">
-                    {coverUrl ? (
-                      <img src={coverUrl} alt={m.title} className="w-full h-full object-cover" loading="lazy" />
-                    ) : (
-                      "📄"
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-extrabold text-gray-900 text-lg truncate group-hover:text-blue-600 transition-colors">
-                      {m.title}
-                    </h4>
-                    <p className="text-sm text-gray-500 line-clamp-2 mt-1 leading-snug">
-                      {m.description || "Материалы и задания для выполнения"}
-                    </p>
-                  </div>
-                </div>
+                      <div className="progress-bar">
+                        <div 
+                          className="progress-fill" 
+                          style={{ width: `${progress}%`, backgroundColor: "var(--project-primary)" }} 
+                        />
+                      </div>
 
-                <div className="mt-auto relative z-10">
-                  <div className="flex justify-between items-center text-xs font-bold mb-2.5">
-                    <span className="text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
-                      {completed} / {total} выполнено
-                    </span>
-                    <span style={{ color: "var(--project-primary)" }} className="text-sm">{progress}%</span>
-                  </div>
-                  <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden shadow-inner">
-                    <div 
-                      className="h-full rounded-full transition-all duration-1000 ease-out" 
-                      style={{ width: `${progress}%`, backgroundColor: "var(--project-primary)" }} 
-                    />
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+                      <div className="material-stats">
+                        <span>{completed}/{total} заданий</span>
+                        <span className="pct" style={{ color: "var(--project-primary)" }}>{progress}%</span>
+                      </div>
+                    </Link>
+                  );
+                })}
 
-          {/* ЗАБЛОКИРОВАННЫЕ МАТЕРИАЛЫ */}
-          {lockedMats.map((m) => {
-            const coverUrl = toStorageProxyUrl(m.cover_image_url);
+                {/* ЗАБЛОКИРОВАННЫЕ МАТЕРИАЛЫ */}
+                {lockedMats.map((m) => {
+                  const coverUrl = toStorageProxyUrl(m.cover_image_url);
 
-            return (
-              <div
-                key={m.id}
-                className="bg-white/60 rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col relative overflow-hidden grayscale-[40%] opacity-80"
-              >
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur text-gray-800 px-3 py-1.5 rounded-lg shadow-sm border text-xs font-extrabold flex items-center gap-1.5 z-10">
-                  <span>🔒</span> Закрыто
-                </div>
+                  return (
+                    <div key={m.id} className="material-card locked">
+                      <div className="material-cover">
+                        {coverUrl ? (
+                          <img src={coverUrl} alt={m.title} loading="lazy" decoding="async" />
+                        ) : (
+                          <div style={{ fontSize: "3rem", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>📄</div>
+                        )}
+                      </div>
 
-                <div className="flex gap-4 mb-6">
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-100 shrink-0 border border-black/5 flex items-center justify-center text-3xl">
-                    {coverUrl ? <img src={coverUrl} alt={m.title} className="w-full h-full object-cover" /> : "📄"}
-                  </div>
-                  <div className="flex-1 min-w-0 pr-16">
-                    <h4 className="font-extrabold text-gray-600 text-lg truncate">{m.title}</h4>
-                    <p className="text-sm text-gray-400 line-clamp-2 mt-1 leading-snug">
-                      {m.description || "Материал временно недоступен"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-auto bg-gray-50 rounded-xl p-3 text-center border border-dashed border-gray-200">
-                  <span className="text-xs font-bold text-gray-500">
-                    Ожидайте доступ или отправьте заявку
-                  </span>
-                </div>
+                      <div className="material-title">{m.title}</div>
+                      <div className="material-description">{m.description || "Материал временно недоступен"}</div>
+                      <div className="locked-overlay">🔒 Недоступен</div>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            ) : (
+              // ЕСЛИ МАТЕРИАЛОВ В ТАБЕ НЕТ
+              <div className="materials-empty">
+                <p>📭 В этом разделе пока пусто</p>
+                <p className="materials-subtitle" style={{ margin: 0 }}>
+                  Ожидайте, когда администратор загрузит сюда материалы.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
-      ) : (
-        <div className="bg-white rounded-3xl p-16 text-center border-2 border-dashed border-gray-200 shadow-sm">
-          <div className="text-4xl mb-4 opacity-50">🍃</div>
-          <h3 className="text-xl font-bold text-gray-900">Материалы не найдены</h3>
-          <p className="text-gray-500 mt-2">
-            Для выбранных фильтров пока нет заданий. Попробуйте выбрать другой уровень или раздел.
-          </p>
-          {(activeTabSlug || activeLevelCode) && (
-            <Link href={`/projects/${slug}/materials`} className="mt-6 inline-block bg-gray-100 text-gray-700 font-bold px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors">
-              Сбросить фильтры
-            </Link>
-          )}
-        </div>
-      )}
+
+      </div>
     </div>
   );
 }
