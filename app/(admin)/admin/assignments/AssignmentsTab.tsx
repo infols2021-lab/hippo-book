@@ -1,34 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import LoadingBlock from "@/components/LoadingBlock";
 import ErrorBox from "@/components/ErrorBox";
 import AssignmentEditor from "./AssignmentEditor";
-
-type BranchType = "olympiad" | "gatehouse";
-
-type MaterialOption =
-  | {
-      branch_type: "olympiad";
-      kind: "textbook";
-      id: string;
-      title: string;
-      material_kind?: "textbook";
-    }
-  | {
-      branch_type: "olympiad";
-      kind: "crossword";
-      id: string;
-      title: string;
-      material_kind?: "crossword";
-    }
-  | {
-      branch_type: "gatehouse";
-      kind: "material";
-      id: string;
-      title: string;
-      material_kind: string;
-    };
 
 type AssignmentRow = {
   id: string;
@@ -40,6 +15,17 @@ type AssignmentRow = {
   crossword_id: string | null;
   content: any;
   created_at?: string | null;
+};
+
+// Универсальный тип материала, поддерживающий и новые проекты, и легаси
+type MaterialOption = {
+  id: string;
+  title: string;
+  kind: "textbook" | "crossword" | "material";
+  branch_type?: string;
+  material_kind?: string;
+  project_id?: string;
+  project_tab_id?: string;
 };
 
 type Props = {
@@ -64,203 +50,167 @@ function questionsCount(a: AssignmentRow) {
   return Array.isArray(qs) ? qs.length : 0;
 }
 
-function materialEmoji(material: MaterialOption | null) {
-  if (!material) return "";
-  if (material.kind === "textbook") return "📚";
-  if (material.kind === "crossword") return "🧩";
-  return "🎓";
-}
-
-function materialKindLabel(material: MaterialOption) {
-  if (material.kind === "textbook") return "Учебник";
-  if (material.kind === "crossword") return "Кроссворд";
-
-  const map: Record<string, string> = {
-    mock_test: "Пробный тест",
-    mock_tests: "Пробные тесты",
-  };
-
-  return map[String(material.material_kind || "").toLowerCase()] || material.material_kind || "Материал";
-}
-
 export default function AssignmentsTab({ onChanged }: Props) {
-  const [branch, setBranch] = useState<BranchType>("olympiad");
+  // 1. Стейты для селектов
+  const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  
+  const [tabs, setTabs] = useState<any[]>([]);
+  const [selectedTabId, setSelectedTabId] = useState<string>("");
 
   const [materials, setMaterials] = useState<MaterialOption[]>([]);
-  const [selected, setSelected] = useState<MaterialOption | null>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState<MaterialOption | null>(null);
 
+  // 2. Стейты для данных
   const [rows, setRows] = useState<AssignmentRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<AssignmentRow | null>(null);
 
-  const selectedKey = useMemo(() => {
-    if (!selected) return "";
-    return `${selected.branch_type}_${selected.kind}_${selected.id}`;
-  }, [selected]);
+  const isLegacy = selectedProjectId.startsWith("legacy_");
 
-  const visibleMaterials = useMemo(() => {
-    return materials.filter((m) => m.branch_type === branch);
-  }, [materials, branch]);
+  // ЗАГРУЗКА СПИСКА ПРОЕКТОВ (ВЕТОК)
+  useEffect(() => {
+    fetch("/api/admin/projects")
+      .then(r => r.json())
+      .then(d => setProjects(d.projects || d.data || []));
+  }, []);
 
-  async function loadMaterials() {
-    const [tRes, cRes, mRes] = await Promise.all([
-      fetch("/api/admin/textbooks", { cache: "no-store" }),
-      fetch("/api/admin/crosswords", { cache: "no-store" }),
-      fetch("/api/admin/materials?branch_type=gatehouse", { cache: "no-store" }),
-    ]);
+  // ЗАГРУЗКА ТАБОВ ПРИ ВЫБОРЕ РЕАЛЬНОГО ПРОЕКТА
+  useEffect(() => {
+    setSelectedTabId("");
+    setSelectedMaterial(null);
+    setMaterials([]);
+    setRows([]);
 
-    const tJson = await tRes.json();
-    const cJson = await cRes.json();
-    const mJson = await mRes.json();
-
-    if (!tRes.ok || !tJson?.ok) throw new Error(tJson?.error || "Не удалось загрузить учебники");
-    if (!cRes.ok || !cJson?.ok) throw new Error(cJson?.error || "Не удалось загрузить кроссворды");
-    if (!mRes.ok || !mJson?.ok) throw new Error(mJson?.error || "Не удалось загрузить материалы Gatehouse");
-
-    const tb: MaterialOption[] = (tJson.textbooks ?? [])
-      .filter((x: any) => !x.branch_type || x.branch_type === "olympiad")
-      .map((x: any) => ({
-        branch_type: "olympiad",
-        kind: "textbook",
-        material_kind: "textbook",
-        id: String(x.id),
-        title: String(x.title ?? "Без названия"),
-      }));
-
-    const cw: MaterialOption[] = (cJson.crosswords ?? [])
-      .filter((x: any) => !x.branch_type || x.branch_type === "olympiad")
-      .map((x: any) => ({
-        branch_type: "olympiad",
-        kind: "crossword",
-        material_kind: "crossword",
-        id: String(x.id),
-        title: String(x.title ?? "Без названия"),
-      }));
-
-    const ga: MaterialOption[] = (mJson.materials ?? [])
-      .filter((x: any) => x.branch_type === "gatehouse")
-      .map((x: any) => ({
-        branch_type: "gatehouse",
-        kind: "material",
-        material_kind: String(x.material_kind ?? "mock_test"),
-        id: String(x.id),
-        title: String(x.title ?? "Без названия"),
-      }));
-
-    const all = [...tb, ...cw, ...ga];
-    setMaterials(all);
-
-    if (selected) {
-      const found =
-        all.find((m) => m.branch_type === selected.branch_type && m.kind === selected.kind && m.id === selected.id) ||
-        null;
-
-      setSelected(found);
+    if (selectedProjectId && !isLegacy) {
+      fetch(`/api/admin/projects/${selectedProjectId}/tabs`)
+        .then(r => r.json())
+        .then(d => setTabs(d.tabs || []));
     } else {
-      setSelected(null);
+      setTabs([]);
     }
-  }
+  }, [selectedProjectId, isLegacy]);
 
-  async function loadAssignments(material: MaterialOption | null) {
+  // ЗАГРУЗКА МАТЕРИАЛОВ ПРИ ВЫБОРЕ ТАБА (ИЛИ ЛЕГАСИ ПРОЕКТА)
+  useEffect(() => {
+    async function loadMats() {
+      if (!selectedProjectId) {
+        setMaterials([]);
+        return;
+      }
+
+      setLoading(true);
+      setErr(null);
+
+      try {
+        if (selectedProjectId === "legacy_olympiad") {
+          const [tRes, cRes] = await Promise.all([
+            fetch("/api/admin/textbooks", { cache: "no-store" }),
+            fetch("/api/admin/crosswords", { cache: "no-store" })
+          ]);
+          const tJson = await tRes.json();
+          const cJson = await cRes.json();
+
+          const tb = (tJson.textbooks || []).map((x: any) => ({ ...x, branch_type: "olympiad", kind: "textbook", id: String(x.id) }));
+          const cw = (cJson.crosswords || []).map((x: any) => ({ ...x, branch_type: "olympiad", kind: "crossword", id: String(x.id) }));
+          setMaterials([...tb, ...cw]);
+        } 
+        else if (selectedProjectId === "legacy_gatehouse") {
+          const mRes = await fetch("/api/admin/materials?branch_type=gatehouse", { cache: "no-store" });
+          const mJson = await mRes.json();
+          const ga = (mJson.materials || []).map((x: any) => ({ ...x, branch_type: "gatehouse", kind: "material", id: String(x.id) }));
+          setMaterials(ga);
+        } 
+        else if (selectedTabId) {
+          // Загрузка материалов для нового проекта и таба
+          const res = await fetch(`/api/admin/projects/${selectedProjectId}/materials?tab_id=${selectedTabId}`, { cache: "no-store" });
+          const json = await res.json();
+          const projMats = (json.materials || []).map((x: any) => ({
+            ...x,
+            branch_type: "project", // Флаг новой системы
+            kind: "material",
+            project_id: selectedProjectId,
+            project_tab_id: selectedTabId,
+            id: String(x.id)
+          }));
+          setMaterials(projMats);
+        } 
+        else {
+          setMaterials([]);
+        }
+      } catch (e: any) {
+        setErr("Ошибка загрузки материалов: " + e.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadMats();
+    setSelectedMaterial(null);
+  }, [selectedProjectId, selectedTabId]);
+
+  // ЗАГРУЗКА ЗАДАНИЙ ПРИ ВЫБОРЕ МАТЕРИАЛА
+  const loadAssignments = async (material: MaterialOption | null) => {
     if (!material) {
       setRows([]);
       return;
     }
+    setLoading(true);
+    setErr(null);
 
-    const qs = new URLSearchParams();
-
-    if (material.branch_type === "gatehouse") {
-      qs.set("branch_type", "gatehouse");
-      qs.set("kind", "material");
-      qs.set("id", material.id);
-      qs.set("material_id", material.id);
-    } else {
-      qs.set("branch_type", "olympiad");
-      qs.set("kind", material.kind);
-      qs.set("id", material.id);
-    }
-
-    const res = await fetch(`/api/admin/assignments?${qs.toString()}`, { cache: "no-store" });
-    const json = await res.json();
-
-    if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить задания");
-
-    setRows((json.assignments ?? []) as AssignmentRow[]);
-  }
-
-  async function loadAll() {
     try {
-      setLoading(true);
-      setErr(null);
-
-      await loadMaterials();
-      await loadAssignments(selected);
-
-      setLoading(false);
-    } catch (e: any) {
-      setLoading(false);
-      setErr(e?.message || String(e));
-    }
-  }
-
-  useEffect(() => {
-    void loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    setSelected(null);
-    setRows([]);
-    setEditorOpen(false);
-    setEditing(null);
-  }, [branch]);
-
-  useEffect(() => {
-    if (!selected) {
-      setRows([]);
-      return;
-    }
-
-    (async () => {
-      try {
-        setErr(null);
-        setLoading(true);
-
-        await loadAssignments(selected);
-
-        setLoading(false);
-      } catch (e: any) {
-        setLoading(false);
-        setErr(e?.message || String(e));
+      const qs = new URLSearchParams();
+      
+      // Логика построения фильтра для легаси и новых проектов
+      if (material.branch_type === "gatehouse") {
+        qs.set("branch_type", "gatehouse");
+        qs.set("kind", "material");
+        qs.set("id", material.id);
+        qs.set("material_id", material.id);
+      } else if (material.branch_type === "olympiad") {
+        qs.set("branch_type", "olympiad");
+        qs.set("kind", material.kind);
+        qs.set("id", material.id);
+      } else {
+        // Логика для новых динамических проектов
+        qs.set("project_id", material.project_id || "");
+        qs.set("project_tab_id", material.project_tab_id || "");
+        qs.set("material_id", material.id);
       }
-    })();
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedKey]);
+      const res = await fetch(`/api/admin/assignments?${qs.toString()}`, { cache: "no-store" });
+      const json = await res.json();
 
+      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить задания");
+      setRows((json.assignments ?? []) as AssignmentRow[]);
+    } catch (e: any) {
+      setErr(e.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAssignments(selectedMaterial);
+  }, [selectedMaterial]);
+
+  // ДЕЙСТВИЯ (Удаление, Создание, Сохранение)
   async function removeAssignment(a: AssignmentRow) {
     const ok = window.confirm(`Удалить задание "${a.title}"?`);
     if (!ok) return;
 
     const res = await fetch(`/api/admin/assignments/${encodeURIComponent(a.id)}`, { method: "DELETE" });
-
-    let json: any = null;
-
-    try {
-      json = await res.json();
-    } catch {
-      json = null;
-    }
+    const json = await res.json().catch(() => null);
 
     if (!res.ok || !json?.ok) {
       alert(`❌ Ошибка удаления: ${json?.error || `HTTP ${res.status}`}`);
       return;
     }
 
-    await loadAssignments(selected);
+    await loadAssignments(selectedMaterial);
     await onChanged?.();
   }
 
@@ -277,111 +227,97 @@ export default function AssignmentsTab({ onChanged }: Props) {
   async function onSaved() {
     setEditorOpen(false);
     setEditing(null);
-
-    await loadAssignments(selected);
+    await loadAssignments(selectedMaterial);
     await onChanged?.();
   }
 
   return (
-    <div className="card">
-      <div className="admin-section-head">
+    <div className="card space-y-6">
+      <div className="admin-section-head mb-4">
         <div>
-          <h2>📝 Управление заданиями</h2>
-          <p>Один движок заданий используется и для олимпиады, и для Gatehouse Awards.</p>
+          <h2 className="text-2xl font-bold">📝 Управление заданиями</h2>
+          <p className="text-gray-500 text-sm">Один движок заданий используется для всех веток и проектов.</p>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-        <button
-          className={branch === "olympiad" ? "btn" : "btn ghost"}
-          type="button"
-          onClick={() => setBranch("olympiad")}
-        >
-          🏆 Олимпиада
-        </button>
-
-        <button
-          className={branch === "gatehouse" ? "btn" : "btn ghost"}
-          type="button"
-          onClick={() => setBranch("gatehouse")}
-        >
-          🎓 Экзамены Gatehouse
-        </button>
-      </div>
-
-      {loading ? <LoadingBlock text="Загружаем задания..." /> : null}
-      {err ? <ErrorBox message={err} /> : null}
-
-      <div className="admin-controls" style={{ marginTop: 10 }}>
-        <select
-          className="input"
-          value={selected ? `${selected.branch_type}_${selected.kind}_${selected.id}` : ""}
-          onChange={(e) => {
-            const v = e.target.value;
-
-            if (!v) {
-              setSelected(null);
-              return;
-            }
-
-            const found = materials.find((m) => `${m.branch_type}_${m.kind}_${m.id}` === v) || null;
-            setSelected(found);
-          }}
-        >
-          <option value="">
-            {branch === "gatehouse" ? "-- Выберите материал Gatehouse --" : "-- Выберите учебник или кроссворд --"}
-          </option>
-
-          {branch === "olympiad" ? (
-            <>
-              <optgroup label="📚 Учебники">
-                {visibleMaterials
-                  .filter((m) => m.kind === "textbook")
-                  .map((m) => (
-                    <option key={`tb-${m.id}`} value={`${m.branch_type}_${m.kind}_${m.id}`}>
-                      {m.title}
-                    </option>
-                  ))}
-              </optgroup>
-
-              <optgroup label="🧩 Кроссворды">
-                {visibleMaterials
-                  .filter((m) => m.kind === "crossword")
-                  .map((m) => (
-                    <option key={`cw-${m.id}`} value={`${m.branch_type}_${m.kind}_${m.id}`}>
-                      {m.title}
-                    </option>
-                  ))}
-              </optgroup>
-            </>
-          ) : (
-            <optgroup label="🎓 Пробные тесты">
-              {visibleMaterials
-                .filter((m) => m.kind === "material")
-                .map((m) => (
-                  <option key={`ga-${m.id}`} value={`${m.branch_type}_${m.kind}_${m.id}`}>
-                    {m.title}
-                  </option>
-                ))}
+      {/* ПАНЕЛЬ ФИЛЬТРОВ И СЕЛЕКТОВ */}
+      <div className="flex gap-4 p-5 bg-gray-50 rounded-2xl border flex-wrap items-end">
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">1. Проект (Ветка)</label>
+          <select 
+            value={selectedProjectId} 
+            onChange={e => setSelectedProjectId(e.target.value)} 
+            className="w-full border-2 rounded-xl px-4 py-2.5 outline-none bg-white font-bold"
+          >
+            <option value="">-- Выберите ветку --</option>
+            <optgroup label="Новые динамические проекты">
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </optgroup>
-          )}
-        </select>
+            <optgroup label="Легаси (старая структура)">
+              <option value="legacy_olympiad">🏆 Олимпиада (Учебники и Кроссворды)</option>
+              <option value="legacy_gatehouse">🎓 Экзамены Gatehouse Awards</option>
+            </optgroup>
+          </select>
+        </div>
 
-        <button className="btn" onClick={openCreate} disabled={!selected} type="button">
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">2. Раздел (Таб)</label>
+          <select 
+            value={selectedTabId} 
+            onChange={e => setSelectedTabId(e.target.value)} 
+            disabled={isLegacy || !selectedProjectId} 
+            className="w-full border-2 rounded-xl px-4 py-2.5 outline-none bg-white font-bold disabled:opacity-50 disabled:bg-gray-100"
+          >
+            <option value="">{isLegacy ? "Не требуется для легаси" : "-- Выберите раздел --"}</option>
+            {tabs.map(t => <option key={t.id} value={t.id}>{t.icon} {t.title}</option>)}
+          </select>
+        </div>
+
+        <div className="flex-1 min-w-[250px]">
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">3. Материал</label>
+          <select 
+            value={selectedMaterial?.id || ""} 
+            onChange={e => {
+              const v = e.target.value;
+              setSelectedMaterial(v ? materials.find(m => m.id === v) || null : null);
+            }} 
+            disabled={materials.length === 0} 
+            className="w-full border-2 rounded-xl px-4 py-2.5 outline-none bg-white font-bold disabled:opacity-50 disabled:bg-gray-100"
+          >
+            <option value="">-- Выберите материал --</option>
+            {selectedProjectId === "legacy_olympiad" ? (
+              <>
+                <optgroup label="📚 Учебники">
+                  {materials.filter(m => m.kind === "textbook").map(m => <option key={`tb-${m.id}`} value={m.id}>{m.title}</option>)}
+                </optgroup>
+                <optgroup label="🧩 Кроссворды">
+                  {materials.filter(m => m.kind === "crossword").map(m => <option key={`cw-${m.id}`} value={m.id}>{m.title}</option>)}
+                </optgroup>
+              </>
+            ) : (
+              materials.map(m => <option key={`mat-${m.id}`} value={m.id}>{m.title}</option>)
+            )}
+          </select>
+        </div>
+
+        <button 
+          className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap" 
+          onClick={openCreate} 
+          disabled={!selectedMaterial} 
+          type="button"
+        >
           ➕ Создать задание
         </button>
       </div>
 
-      {selected ? (
-        <div className="small-muted" style={{ marginTop: 10, fontWeight: 800 }}>
-          Выбрано: {materialEmoji(selected)} {materialKindLabel(selected)} · {selected.title}
-        </div>
-      ) : null}
+      {loading && <LoadingBlock text="Загрузка данных..." />}
+      {err && <ErrorBox message={err} />}
 
-      {editorOpen ? (
-        <div style={{ marginTop: 14 }}>
+      {/* РЕДАКТОР ЗАДАНИЙ */}
+      {editorOpen && selectedMaterial && (
+        <div className="mt-6 border-t pt-6">
           <AssignmentEditor
-            material={selected}
+            material={selectedMaterial}
             editing={editing}
             onCancel={() => {
               setEditorOpen(false);
@@ -390,44 +326,42 @@ export default function AssignmentsTab({ onChanged }: Props) {
             onSaved={onSaved}
           />
         </div>
-      ) : null}
+      )}
 
-      {!loading && !err ? (
-        <div style={{ overflowX: "auto", marginTop: 16 }}>
-          <table className="table">
-            <thead>
+      {/* ТАБЛИЦА ЗАДАНИЙ */}
+      {!loading && !err && !editorOpen && (
+        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden mt-6">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 border-b">
               <tr>
-                <th style={{ width: 60 }}>№</th>
-                <th>Название</th>
-                <th style={{ width: 160 }}>Порядок</th>
-                <th style={{ width: 160 }}>Тип</th>
-                <th style={{ width: 120 }}>Вопросов</th>
-                <th style={{ width: 240 }}>Действия</th>
+                <th className="p-4 font-bold w-16">№</th>
+                <th className="p-4 font-bold">Название задания</th>
+                <th className="p-4 font-bold w-32">Порядок</th>
+                <th className="p-4 font-bold w-40">Тип</th>
+                <th className="p-4 font-bold w-32">Вопросов</th>
+                <th className="p-4 font-bold w-64 text-right">Действия</th>
               </tr>
             </thead>
-
-            <tbody>
+            <tbody className="divide-y">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: 14 }}>
-                    {selected ? "Заданий пока нет" : "Выберите материал"}
+                  <td colSpan={6} className="p-8 text-center text-gray-500 font-bold">
+                    {selectedMaterial ? "Для этого материала еще не создано заданий" : "Сначала выберите материал"}
                   </td>
                 </tr>
               ) : (
                 rows.map((a, idx) => (
-                  <tr key={a.id}>
-                    <td>
-                      <strong>{idx + 1}</strong>
-                    </td>
-                    <td>{a.title}</td>
-                    <td>{a.order_index ?? 0}</td>
-                    <td>{guessTypeLabel(a)}</td>
-                    <td>{questionsCount(a)}</td>
-                    <td>
-                      <button className="btn small" onClick={() => openEdit(a)} type="button">
-                        ✏️ Редактировать
-                      </button>{" "}
-                      <button className="btn small secondary" onClick={() => void removeAssignment(a)} type="button">
+                  <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="p-4 font-bold text-gray-500">{idx + 1}</td>
+                    <td className="p-4 font-bold">{a.title}</td>
+                    <td className="p-4">{a.order_index ?? 0}</td>
+                    <td className="p-4 text-gray-600">{guessTypeLabel(a)}</td>
+                    <td className="p-4">{questionsCount(a)} шт.</td>
+                    <td className="p-4 text-right space-x-2">
+                      <button className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1.5 rounded-lg font-bold transition-colors" onClick={() => openEdit(a)} type="button">
+                        ✏️ Изменить
+                      </button>
+                      <button className="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold transition-colors" onClick={() => void removeAssignment(a)} type="button">
                         🗑️ Удалить
                       </button>
                     </td>
@@ -437,7 +371,7 @@ export default function AssignmentsTab({ onChanged }: Props) {
             </tbody>
           </table>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

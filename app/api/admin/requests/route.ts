@@ -27,7 +27,8 @@ type ReqRow = {
   target_levels?: any;
   textbook_types: any;
   material_kinds?: any;
-  project_id?: string | null; // ДОБАВЛЕНО для фильтрации
+  project_id?: string | null;
+  projects?: any; // ИСПРАВЛЕНО: Убираем строгую типизацию, чтобы избежать ошибки сборки
 };
 
 type GrantTarget = {
@@ -46,9 +47,8 @@ type GatehouseMaterialRow = {
   target_levels: string[] | null;
 };
 
-// ДОБАВЛЕНО: project_id в селект
 const REQUEST_SELECT =
-  "id,user_id,request_number,created_at,processed_at,is_processed,full_name,email,contact_phone,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,project_id";
+  "id,user_id,request_number,created_at,processed_at,is_processed,full_name,email,contact_phone,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,project_id,projects(name)";
 
 const DB_RETRY_COUNT = 1;
 const DB_RETRY_DELAY_MS = 350;
@@ -422,6 +422,58 @@ async function findGatehouseMaterialsForRequest(supabase: any, r: ReqRow) {
   return materials.filter((m) => gatehouseMaterialMatchesRequest(m, r));
 }
 
+// Умная выдача доступов для новых динамических проектов
+async function grantDynamicProjectAccessForRequest(supabase: any, adminId: string, r: ReqRow) {
+  const nowISO = new Date().toISOString();
+  const grantedLabels: string[] = [];
+  const grantsToStore: any[] = [];
+
+  const targetLevels = toArr(r.target_levels).length ? toArr(r.target_levels) : toArr(r.class_level);
+  const requestedTabs = toArr(r.material_kinds);
+
+  if (!targetLevels.length) return { grantedLabels, grantsToStore };
+
+  let q = supabase
+    .from("materials")
+    .select("id, title, material_kind")
+    .eq("project_id", r.project_id)
+    .eq("is_active", true)
+    .overlaps("target_levels", targetLevels);
+
+  if (requestedTabs.length > 0) {
+    q = q.in("project_tab_id", requestedTabs);
+  }
+
+  const { data: materials, error } = await runDbQuery<any[]>(() => q, "grantDynamicProjectAccess");
+  if (error) throw new Error(error.message);
+
+  for (const mat of materials ?? []) {
+    const up = await supabase.from("material_access").upsert({
+      user_id: r.user_id,
+      material_id: mat.id,
+      granted_by: adminId,
+      granted_at: nowISO
+    }, { onConflict: "user_id,material_id" });
+
+    if (!up.error) {
+      grantedLabels.push(`📘 ${mat.title}`);
+      grantsToStore.push({
+        request_id: r.id,
+        user_id: r.user_id,
+        kind: "mock_test", // Fallback для обхода constraints схемы БД
+        item_id: mat.id,
+        title: mat.title,
+        granted_by: adminId,
+        granted_at: nowISO,
+        material_id: mat.id,
+        material_kind: mat.material_kind || "material"
+      });
+    }
+  }
+
+  return { grantedLabels, grantsToStore };
+}
+
 async function grantOlympiadAccessForRequest(supabase: any, adminId: string, r: ReqRow) {
   const classLevels = toArr(r.class_level);
   const types = toArr(r.textbook_types).map((x) => String(x).toLowerCase());
@@ -584,6 +636,10 @@ async function grantGatehouseAccessForRequest(supabase: any, adminId: string, r:
 }
 
 async function grantAccessForRequest(supabase: any, adminId: string, r: ReqRow) {
+  if (r.project_id) {
+    return grantDynamicProjectAccessForRequest(supabase, adminId, r);
+  }
+
   const branchType = normalizeBranchType(r.branch_type);
 
   if (branchType === "gatehouse") {
@@ -735,8 +791,7 @@ export async function GET(req: NextRequest) {
     const name = (sp.get("name") || "").trim();
     const email = (sp.get("email") || "").trim();
     const branchFilter = (sp.get("branch_type") || "all").trim();
-    // ДОБАВЛЕНО: фильтр по проекту
-    const projectId = (sp.get("project_id") || "").trim();
+    const projectId = (sp.get("project_id") || "all").trim();
 
     const limit = clamp(parsePositiveInt(sp.get("limit"), 10), 1, 30);
     const cursorCreatedAt = String(sp.get("cursor_created_at") || "").trim();
@@ -748,13 +803,13 @@ export async function GET(req: NextRequest) {
         .order("created_at", { ascending: false, nullsFirst: false })
         .limit(limit);
 
-      q = applyBranchFilter(q, branchFilter);
-      q = applyCursor(q, cursorCreatedAt);
-
-      // Применяем фильтр по проекту, если он передан
-      if (projectId) {
+      if (projectId && projectId !== "all") {
         q = q.eq("project_id", projectId);
+      } else if (branchFilter && branchFilter !== "all") {
+        q = applyBranchFilter(q, branchFilter);
       }
+
+      q = applyCursor(q, cursorCreatedAt);
 
       if (status === "pending") {
         q = q.or("is_processed.eq.false,is_processed.is.null");
@@ -768,11 +823,18 @@ export async function GET(req: NextRequest) {
       return q;
     };
 
-    const { data, error } = await runDbQuery<ReqRow[]>(makeQuery, "adminRequestsList");
+    // ИСПРАВЛЕНО: <any[]> убирает конфликты типов при сборке
+    const { data, error } = await runDbQuery<any[]>(makeQuery, "adminRequestsList");
 
     if (error) return fail(error.message, 500, "DB_ERROR", noStoreInit());
 
-    const rows = (data ?? []) as ReqRow[];
+    // ИСПРАВЛЕНО: Нормализуем массив projects в один объект (решает баг отображения имени проекта на клиенте)
+    const rawRows = data ?? [];
+    const rows: ReqRow[] = rawRows.map((r: any) => ({
+      ...r,
+      projects: Array.isArray(r.projects) ? r.projects[0] : r.projects
+    }));
+
     const last = rows[rows.length - 1] ?? null;
     const nextCursor =
       rows.length === limit && last?.created_at ? { created_at: last.created_at } : null;

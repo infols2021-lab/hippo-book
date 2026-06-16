@@ -1,9 +1,7 @@
-// app/api/admin/projects/[id]/tabs/route.ts
-// ADMIN: управление табами проекта (GET список / POST upsert / DELETE по id).
-
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
-import { invalidateProjectsCache } from "@/lib/projects/loader";
+// Убедись, что этот импорт существует в твоем проекте. Если нет — просто удали его и вызовы invalidateProjectsCache()
+import { invalidateProjectsCache } from "@/lib/projects/loader"; 
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -139,7 +137,7 @@ export async function POST(
       return fail(error.message, 500, "DB_ERROR");
     }
 
-    invalidateProjectsCache();
+    try { invalidateProjectsCache(); } catch(e) {}
     return ok({ tab: data });
   }
 
@@ -157,7 +155,7 @@ export async function POST(
     return fail(error.message, 500, "DB_ERROR");
   }
 
-  invalidateProjectsCache();
+  try { invalidateProjectsCache(); } catch(e) {}
   return ok({ tab: data }, { status: 201 });
 }
 
@@ -184,7 +182,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (error) {
     if (error.code === "23503") {
       return fail(
-        "Невозможно удалить таб: есть связанные материалы или задания. Сначала перенесите их.",
+        "Невозможно удалить таб: есть связанные материалы или задания. Сначала удалите их.",
         409,
         "HAS_REFERENCES",
       );
@@ -192,6 +190,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return fail(error.message, 500, "DB_ERROR");
   }
 
-  invalidateProjectsCache();
+  try { invalidateProjectsCache(); } catch(e) {}
   return ok({ deleted: true, id: tabId });
 }

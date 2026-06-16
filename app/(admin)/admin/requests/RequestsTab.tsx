@@ -6,8 +6,6 @@ import LoadingBlock from "@/components/LoadingBlock";
 import ErrorBox from "@/components/ErrorBox";
 import ProcessingModal from "./ProcessingModal";
 
-type BranchFilter = "all" | "olympiad" | "gatehouse";
-
 type RequestRow = {
   id: string;
   user_id: string;
@@ -25,33 +23,21 @@ type RequestRow = {
   textbook_types: any;
   material_kinds?: any;
   project_id?: string | null;
+  projects?: { name: string } | null;
 };
 
 type Stats = { total: number; pending: number; processed: number };
-
-type PageCursor = {
-  created_at: string;
-} | null;
+type PageCursor = { created_at: string } | null;
 
 type ApiOkList = {
   ok: true;
   requests: RequestRow[];
   materialsByRequest?: Record<string, string[]>;
   materialsError?: string | null;
-  page?: {
-    limit: number;
-    returned: number;
-    hasMore: boolean;
-    nextCursor?: PageCursor;
-  };
+  page?: { limit: number; returned: number; hasMore: boolean; nextCursor?: PageCursor };
 };
 
-type ApiOkGrants = {
-  ok: true;
-  materialsByRequest: Record<string, string[]>;
-  materialsError?: string | null;
-};
-
+type ApiOkGrants = { ok: true; materialsByRequest: Record<string, string[]>; materialsError?: string | null };
 type ApiOkStats = { ok: true; stats: Stats };
 type ApiErr = { ok: false; error: string; code?: string };
 
@@ -59,14 +45,9 @@ const PAGE_SIZE = 10;
 
 async function safeJson(res: Response) {
   const t = await res.text();
-
   if (!t) return null;
-
-  try {
-    return JSON.parse(t);
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(t); } 
+  catch { return null; }
 }
 
 function arrOf(v: any): string[] {
@@ -77,79 +58,43 @@ function arrOf(v: any): string[] {
 
 function fmtDate(v: string | null) {
   if (!v) return "—";
-
   try {
     return new Date(v).toLocaleString("ru-RU", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit",
     });
   } catch {
     return v;
   }
 }
 
-function branchOf(row: RequestRow) {
-  const raw = String(row.branch_type || "olympiad").toLowerCase();
-
-  if (raw === "gatehouse" || raw === "ga_exam" || raw === "ga" || raw === "exam" || raw === "gatehouse_awards") {
-    return "gatehouse";
+// ДИНАМИЧЕСКИЙ РЕНДЕР ИМЕНИ ПРОЕКТА
+function renderProjectName(row: RequestRow) {
+  if (row.projects?.name) {
+    return <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">{row.projects.name}</span>;
   }
-
-  return "olympiad";
-}
-
-function renderBranch(row: RequestRow) {
-  const branch = branchOf(row);
-
-  return (
-    <span className={`admin-request-branch admin-request-branch--${branch}`}>
-      {branch === "gatehouse" ? "🎓 Экзамены" : "🏆 Олимпиада"}
-    </span>
-  );
+  
+  const branch = String(row.branch_type || "olympiad").toLowerCase();
+  if (branch === "gatehouse" || branch === "ga_exam" || branch === "ga" || branch === "exam" || branch === "gatehouse_awards") {
+    return <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">🎓 Экзамены (Легаси)</span>;
+  }
+  
+  return <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">🏆 Олимпиада (Легаси)</span>;
 }
 
 function renderClassLevels(row: RequestRow) {
-  const branch = branchOf(row);
-
-  if (branch === "gatehouse") {
-    const targetLevels = arrOf(row.target_levels);
-    const arr = targetLevels.length ? targetLevels : arrOf(row.target_level);
-
-    if (!arr.length) return <span className="small-muted">—</span>;
-
-    return (
-      <div className="admin-request-chips">
-        {arr.map((level, i) => (
-          <span key={`${level}-${i}`} className="admin-request-chip admin-request-chip--gatehouse">
-            {level}
-          </span>
-        ))}
-      </div>
-    );
-  }
-
-  const map: Record<string, string> = {
-    "1-2": "1-2",
-    "3-4": "3-4",
-    "5-6": "5-6",
-    "7": "7",
-    "8-9": "8-9",
-    "10-11": "10-11",
-    "12": "12",
-  };
-
-  const arr = arrOf(row.class_level);
-
-  if (!arr.length) return <span className="small-muted">—</span>;
+  const tLevels = arrOf(row.target_levels);
+  const tLevel = arrOf(row.target_level);
+  const cLevel = arrOf(row.class_level);
+  
+  const arr = tLevels.length ? tLevels : tLevel.length ? tLevel : cLevel;
+  if (!arr.length) return <span className="text-gray-400 font-medium">—</span>;
 
   return (
-    <div className="admin-request-chips">
+    <div className="flex flex-wrap gap-1">
       {arr.map((c, i) => (
-        <span key={`${c}-${i}`} className="admin-request-chip admin-request-chip--olympiad">
-          {map[String(c)] ?? String(c)}
+        <span key={i} className="bg-gray-100 border text-gray-700 px-2 py-0.5 rounded text-[11px] uppercase font-bold whitespace-nowrap">
+          {c}
         </span>
       ))}
     </div>
@@ -157,54 +102,48 @@ function renderClassLevels(row: RequestRow) {
 }
 
 function renderTypes(row: RequestRow) {
-  const branch = branchOf(row);
-  const materialKinds = arrOf(row.material_kinds);
-  const source = branch === "gatehouse" && materialKinds.length ? materialKinds : row.textbook_types;
-  const arr = arrOf(source);
+  const mk = arrOf(row.material_kinds);
+  const tt = arrOf(row.textbook_types);
+  const arr = mk.length ? mk : tt;
 
-  if (!arr.length) return <span className="small-muted">—</span>;
-
-  const olympiadMap: Record<string, string> = {
-    учебник: "📚 Учебник",
-    кроссворд: "🧩 Кроссворд",
-    textbook: "📚 Учебник",
-    crossword: "🧩 Кроссворд",
-  };
-
-  const gatehouseMap: Record<string, string> = {
-    mock_test: "📝 Пробные тесты",
-    mock_tests: "📝 Пробные тесты",
-    "mock-test": "📝 Пробные тесты",
-    "mock test": "📝 Пробные тесты",
-    "мок-тест": "📝 Пробные тесты",
-    "мок тест": "📝 Пробные тесты",
-    "пробный тест": "📝 Пробные тесты",
-    "пробные тесты": "📝 Пробные тесты",
-  };
-
-  const map = branch === "gatehouse" ? gatehouseMap : olympiadMap;
+  if (!arr.length) return <span className="text-gray-400 font-medium">—</span>;
 
   return (
-    <div className="admin-request-type-list">
-      {arr.map((t, i) => (
-        <span key={`${t}-${i}`} className="admin-request-type">
-          {map[String(t).toLowerCase()] ?? String(t)}
-        </span>
-      ))}
+    <div className="flex flex-wrap gap-1">
+      {arr.map((t, i) => {
+        const str = String(t).toLowerCase();
+        let label = String(t);
+        let color = "bg-gray-50 text-gray-700 border-gray-200";
+
+        if (str.includes("mock") || str.includes("пробн") || str.includes("мок")) {
+          label = "📝 Пробный тест"; color = "bg-purple-50 text-purple-700 border-purple-200";
+        }
+        else if (str.includes("учебник") || str.includes("textbook")) {
+          label = "📚 Учебник"; color = "bg-blue-50 text-blue-700 border-blue-200";
+        }
+        else if (str.includes("кроссворд") || str.includes("crossword")) {
+          label = "🧩 Кроссворд"; color = "bg-green-50 text-green-700 border-green-200";
+        }
+
+        return (
+          <span key={i} className={`px-2 py-0.5 border rounded text-[11px] font-bold whitespace-nowrap ${color}`}>
+            {label}
+          </span>
+        );
+      })}
     </div>
   );
 }
 
 function renderGrantedMaterials(items: string[] | undefined) {
   const arr = Array.isArray(items) ? items : [];
-
-  if (!arr.length) return <span className="small-muted">—</span>;
+  if (!arr.length) return <span className="text-gray-400 font-medium">—</span>;
 
   return (
-    <div className="admin-request-grants">
+    <div className="flex flex-col gap-1">
       {arr.map((m, i) => (
-        <div key={`${m}-${i}`} className="admin-request-grant">
-          {m}
+        <div key={i} className="text-xs font-medium text-gray-700 truncate max-w-[200px]" title={m}>
+          ✓ {m}
         </div>
       ))}
     </div>
@@ -217,7 +156,6 @@ function isAbortError(e: any) {
 
 export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (pending: number) => void }) {
   const [tab, setTab] = useState<"all" | "pending" | "processed">("all");
-  const [branchFilter, setBranchFilter] = useState<BranchFilter>("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
 
@@ -252,38 +190,16 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
   const [processingOpen, setProcessingOpen] = useState(false);
   const [processingMode, setProcessingMode] = useState<"process" | "unprocess">("process");
 
-  const tabs = useMemo(
-    () => [
-      { key: "all" as const, label: "📋 Все заявки" },
-      { key: "pending" as const, label: "⏳ Ожидающие" },
-      { key: "processed" as const, label: "✅ Обработанные" },
-    ],
-    [],
-  );
-
-  const branchTabs = useMemo(
-    () => [
-      { key: "all" as const, label: "Все разделы" },
-      { key: "olympiad" as const, label: "🏆 Олимпиада" },
-      { key: "gatehouse" as const, label: "🎓 Экзамены" },
-    ],
-    [],
-  );
-
+  // ЗАГРУЗКА СПИСКА ПРОЕКТОВ
   useEffect(() => {
     fetch("/api/admin/projects")
       .then(r => r.json())
-      .then(d => {
-        setProjects(d.projects || d.data || d || []);
-      })
+      .then(d => setProjects(d.projects || d.data || d || []))
       .catch(() => {});
   }, []);
 
   async function loadStats() {
     const seq = ++statsSeqRef.current;
-    const branchAtStart = branchFilter;
-    const projectAtStart = projectFilter;
-
     statsAbortRef.current?.abort();
 
     const controller = new AbortController();
@@ -294,8 +210,9 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
     try {
       const qs = new URLSearchParams();
-      if (branchAtStart !== "all") qs.set("branch_type", branchAtStart);
-      if (projectAtStart !== "all") qs.set("project_id", projectAtStart);
+      if (projectFilter === "legacy_olympiad") qs.set("branch_type", "olympiad");
+      else if (projectFilter === "legacy_gatehouse") qs.set("branch_type", "gatehouse");
+      else if (projectFilter !== "all") qs.set("project_id", projectFilter);
 
       const res = await fetch(`/api/admin/requests/stats?${qs.toString()}`, {
         cache: "no-store",
@@ -331,7 +248,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
     if (!ids.length) return;
 
     grantsAbortRef.current?.abort();
-
     const controller = new AbortController();
     grantsAbortRef.current = controller;
 
@@ -354,12 +270,11 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       }));
 
       if ((json as ApiOkGrants).materialsError) {
-        setMaterialsWarning(`Заявки загружены, но выданные материалы временно не подтянулись: ${(json as ApiOkGrants).materialsError}`);
+        setMaterialsWarning(`Выданные материалы временно недоступны: ${(json as ApiOkGrants).materialsError}`);
       }
     } catch (e: any) {
       if (isAbortError(e)) return;
-
-      setMaterialsWarning(`Заявки загружены, но выданные материалы временно не подтянулись: ${e?.message || String(e)}`);
+      setMaterialsWarning(`Ошибка загрузки выданных материалов: ${e?.message || String(e)}`);
     } finally {
       if (grantsAbortRef.current === controller) grantsAbortRef.current = null;
     }
@@ -367,14 +282,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
   async function loadList(reset = true) {
     const seq = ++listSeqRef.current;
-
-    const tabAtStart = tab;
-    const branchAtStart = branchFilter;
-    const projectAtStart = projectFilter;
-    const nameAtStart = name.trim();
-    const emailAtStart = email.trim();
-    const cursorAtStart = reset ? null : nextCursor;
-
     listAbortRef.current?.abort();
 
     const controller = new AbortController();
@@ -396,14 +303,17 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
     try {
       const qs = new URLSearchParams();
-      qs.set("status", tabAtStart);
+      qs.set("status", tab);
       qs.set("limit", String(PAGE_SIZE));
 
-      if (cursorAtStart?.created_at) qs.set("cursor_created_at", cursorAtStart.created_at);
-      if (branchAtStart !== "all") qs.set("branch_type", branchAtStart);
-      if (projectAtStart !== "all") qs.set("project_id", projectAtStart);
-      if (nameAtStart) qs.set("name", nameAtStart);
-      if (emailAtStart) qs.set("email", emailAtStart);
+      if (!reset && nextCursor?.created_at) qs.set("cursor_created_at", nextCursor.created_at);
+      
+      if (projectFilter === "legacy_olympiad") qs.set("branch_type", "olympiad");
+      else if (projectFilter === "legacy_gatehouse") qs.set("branch_type", "gatehouse");
+      else if (projectFilter !== "all") qs.set("project_id", projectFilter);
+      
+      if (name.trim()) qs.set("name", name.trim());
+      if (email.trim()) qs.set("email", email.trim());
 
       const res = await fetch(`/api/admin/requests?${qs.toString()}`, {
         cache: "no-store",
@@ -418,13 +328,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       if (!json.ok) throw new Error((json as ApiErr).error || "Не удалось загрузить заявки");
 
       const rawRows = (json as ApiOkList).requests ?? [];
-
-      const safeRows =
-        tabAtStart === "processed"
-          ? rawRows.filter((r) => Boolean(r.is_processed))
-          : tabAtStart === "pending"
-            ? rawRows.filter((r) => !Boolean(r.is_processed))
-            : rawRows;
+      const safeRows = tab === "processed" ? rawRows.filter(r => Boolean(r.is_processed)) : tab === "pending" ? rawRows.filter(r => !Boolean(r.is_processed)) : rawRows;
 
       if (reset) {
         setRows(safeRows);
@@ -439,7 +343,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       setHasMore(Boolean((json as ApiOkList).page?.hasMore));
       setNextCursor((json as ApiOkList).page?.nextCursor ?? null);
 
-      if (tabAtStart === "processed") {
+      if (tab === "processed") {
         await loadMaterialsForRows(safeRows, reset);
       }
     } catch (e: any) {
@@ -454,14 +358,13 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
         setHasMore(false);
         setNextCursor(null);
       } else {
-        setMaterialsWarning(`Не удалось загрузить следующую пачку заявок: ${e?.message || String(e)}`);
+        setMaterialsWarning(`Ошибка загрузки: ${e?.message || String(e)}`);
       }
     } finally {
       if (seq === listSeqRef.current) {
         setLoading(false);
         setLoadingMore(false);
       }
-
       if (listAbortRef.current === controller) listAbortRef.current = null;
     }
   }
@@ -473,15 +376,13 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       const okk = window.confirm(
         is_processed
           ? `Обработать выбранные заявки: ${ids.length}? (выдаст доступы)`
-          : `Вернуть выбранные заявки в ожидание: ${ids.length}? (заберёт доступы ТОЛЬКО по этим заявкам)`,
+          : `Вернуть выбранные заявки в ожидание: ${ids.length}? (заберёт доступы ТОЛЬКО по этим заявкам)`
       );
-
       if (!okk) return;
     }
 
     setProcessingMode(is_processed ? "process" : "unprocess");
     setProcessingOpen(true);
-
     setLoading(true);
     setErr(null);
     setMaterialsWarning(null);
@@ -507,64 +408,44 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
     }
   }
 
-  async function oneUpdate(id: string, is_processed: boolean) {
-    await patchRequests([id], is_processed, false);
-  }
-
-  async function bulkProcess() {
-    const ids = Array.from(selectionRef.current);
-    await patchRequests(ids, true, true);
-  }
-
-  async function bulkUnprocess() {
-    const ids = Array.from(selectionRef.current);
-    await patchRequests(ids, false, true);
-  }
+  async function oneUpdate(id: string, is_processed: boolean) { await patchRequests([id], is_processed, false); }
+  async function bulkProcess() { await patchRequests(Array.from(selectionRef.current), true, true); }
+  async function bulkUnprocess() { await patchRequests(Array.from(selectionRef.current), false, true); }
 
   useEffect(() => {
     void loadStats();
-
-    return () => {
-      statsAbortRef.current?.abort();
-    };
+    return () => statsAbortRef.current?.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branchFilter, projectFilter]);
+  }, [projectFilter]);
 
   useEffect(() => {
     void loadList(true);
-
     return () => {
       listAbortRef.current?.abort();
       grantsAbortRef.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, branchFilter, projectFilter]);
+  }, [tab, projectFilter]);
 
   useEffect(() => {
     if (!searchMountedRef.current) {
       searchMountedRef.current = true;
       return;
     }
-
     const t = window.setTimeout(() => void loadList(true), 350);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, email]);
 
   function toggleAll(checked: boolean) {
-    if (!checked) {
-      setSelected(new Set());
-      return;
-    }
-
+    if (!checked) return setSelected(new Set());
     setSelected(new Set(rows.map((r) => r.id)));
   }
 
   function toggleOne(id: string, checked: boolean) {
     setSelected((prev) => {
       const n = new Set(prev);
-      if (checked) n.add(id);
-      else n.delete(id);
+      if (checked) n.add(id); else n.delete(id);
       return n;
     });
   }
@@ -572,284 +453,193 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
   const actionBusy = loading || loadingMore;
   const allChecked = rows.length > 0 && selected.size === rows.length;
 
-  const showBulkProcess = tab === "all" || tab === "pending";
-  const showBulkUnprocess = tab === "all" || tab === "processed";
-
-  const emptyColSpan = tab === "processed" ? 12 : tab === "all" ? 11 : 10;
-
   return (
-    <div className="card admin-requests-card">
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+    <div className="card space-y-6">
+      <div className="admin-section-head mb-4 flex justify-between items-center">
         <div>
-          <h3 style={{ marginTop: 0 }}>📋 Управление заявками</h3>
-          <div className="small-muted">Заявки на доступ к материалам олимпиады и экзаменов Gatehouse Awards.</div>
+          <h2 className="text-2xl font-bold">📋 Управление заявками</h2>
+          <p className="text-gray-500 text-sm">Центр выдачи доступов ученикам по всем веткам и проектам.</p>
         </div>
-
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <button className="btn small" type="button" onClick={() => void Promise.all([loadStats(), loadList(true)])}>
-            🔄 Обновить
-          </button>
-        </div>
-      </div>
-
-      <div style={{ height: 12 }} />
-
-      {statsLoading ? <LoadingBlock text="Загружаем статистику заявок..." /> : null}
-      {statsErr ? <ErrorBox message={statsErr} /> : null}
-
-      {!statsLoading && !statsErr ? (
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <div className="admin-stat" style={{ flex: "1 1 160px" }}>
-            <div className="num">{stats.total}</div>
-            <div className="lbl">Всего заявок</div>
-          </div>
-
-          <div className="admin-stat" style={{ flex: "1 1 160px", borderLeftColor: "var(--accent)" }}>
-            <div className="num" style={{ color: "var(--accent)" }}>
-              {stats.pending}
-            </div>
-            <div className="lbl">Ожидают</div>
-          </div>
-
-          <div className="admin-stat" style={{ flex: "1 1 160px" }}>
-            <div className="num">{stats.processed}</div>
-            <div className="lbl">Обработано</div>
-          </div>
-        </div>
-      ) : null}
-
-      <div style={{ height: 14 }} />
-
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {branchTabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            className={branchFilter === t.key ? "btn" : "btn ghost"}
-            onClick={() => setBranchFilter(t.key)}
-            style={{ fontWeight: 900 }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ height: 10 }} />
-
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            className={tab === t.key ? "btn" : "btn ghost"}
-            onClick={() => setTab(t.key)}
-            style={{ fontWeight: 900 }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ height: 14 }} />
-
-      {selected.size ? (
-        <div
-          className="card"
-          style={{
-            background: "rgba(78,205,196,0.10)",
-            border: "1px solid rgba(78,205,196,0.22)",
-            marginBottom: 14,
-          }}
-        >
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ fontWeight: 900 }}>
-              Выбрано: <span style={{ color: "var(--accent2)" }}>{selected.size}</span>
-            </div>
-
-            {showBulkProcess ? (
-              <button className="btn small" type="button" onClick={() => void bulkProcess()} disabled={actionBusy}>
-                ✅ Обработать выделенные
-              </button>
-            ) : null}
-
-            {showBulkUnprocess ? (
-              <button className="btn small" type="button" onClick={() => void bulkUnprocess()} disabled={actionBusy}>
-                ↩️ Вернуть в необработанные
-              </button>
-            ) : null}
-
-            <button className="btn small secondary" type="button" onClick={() => setSelected(new Set())} disabled={actionBusy}>
-              ❌ Отменить выделение
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
-        <div className="form-group" style={{ marginBottom: 0, flex: "1 1 200px" }}>
-          <label style={{ fontSize: 13, fontWeight: "bold", color: "#666" }}>Проект (Ветка)</label>
-          <select 
-            className="input" 
-            value={projectFilter} 
-            onChange={(e) => setProjectFilter(e.target.value)}
-            style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "2px solid #e5e7eb" }}
-          >
-            <option value="all">Все проекты</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 0, flex: "1 1 200px" }}>
-          <label style={{ fontSize: 13, fontWeight: "bold", color: "#666" }}>Поиск по имени</label>
-          <input className="input" style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "2px solid #e5e7eb" }} value={name} onChange={(e) => setName(e.target.value)} placeholder="ФИО..." />
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 0, flex: "1 1 200px" }}>
-          <label style={{ fontSize: 13, fontWeight: "bold", color: "#666" }}>Поиск по email</label>
-          <input className="input" style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "2px solid #e5e7eb" }} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email..." />
-        </div>
-
-        <button
-          className="btn small secondary"
-          type="button"
-          onClick={() => {
-            setName("");
-            setEmail("");
-            setProjectFilter("all");
-          }}
-          style={{ height: "46px" }}
-        >
-          🗑️ Очистить
+        <button className="bg-gray-100 text-gray-800 px-4 py-2 rounded-xl font-bold hover:bg-gray-200 transition-colors" type="button" onClick={() => void Promise.all([loadStats(), loadList(true)])}>
+          🔄 Обновить
         </button>
       </div>
 
-      <div style={{ height: 14 }} />
+      {!statsLoading && !statsErr && (
+        <div className="flex gap-4 flex-wrap">
+          <div className="bg-white border rounded-xl p-4 flex-1 shadow-sm">
+            <div className="text-2xl font-black">{stats.total}</div>
+            <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">Всего заявок</div>
+          </div>
+          <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 flex-1 shadow-sm">
+            <div className="text-2xl font-black text-orange-600">{stats.pending}</div>
+            <div className="text-xs text-orange-500 font-bold uppercase tracking-wider">Ожидают</div>
+          </div>
+          <div className="bg-green-50 border border-green-100 rounded-xl p-4 flex-1 shadow-sm">
+            <div className="text-2xl font-black text-green-600">{stats.processed}</div>
+            <div className="text-xs text-green-500 font-bold uppercase tracking-wider">Обработано</div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-4 p-5 bg-gray-50 rounded-2xl border flex-wrap items-end mb-6">
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Проект (Ветка)</label>
+          <select 
+            value={projectFilter} 
+            onChange={(e) => setProjectFilter(e.target.value)}
+            className="w-full border-2 rounded-xl px-4 py-2 font-bold bg-white outline-none"
+          >
+            <option value="all">Все проекты</option>
+            <optgroup label="Новые динамические проекты">
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </optgroup>
+            <optgroup label="Легаси (старая структура)">
+              <option value="legacy_olympiad">🏆 Олимпиада (Легаси)</option>
+              <option value="legacy_gatehouse">🎓 Экзамены Gatehouse (Легаси)</option>
+            </optgroup>
+          </select>
+        </div>
+        <div className="flex-1 min-w-[180px]">
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Статус</label>
+          <select 
+            value={tab} 
+            onChange={e => setTab(e.target.value as any)} 
+            className="w-full border-2 rounded-xl px-4 py-2 font-bold bg-white outline-none"
+          >
+            <option value="all">📋 Все заявки</option>
+            <option value="pending">⏳ Ожидающие</option>
+            <option value="processed">✅ Обработанные</option>
+          </select>
+        </div>
+        <div className="flex-1 min-w-[180px]">
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Поиск по ФИО</label>
+          <input className="w-full border-2 rounded-xl px-4 py-2 bg-white outline-none" value={name} onChange={(e) => setName(e.target.value)} placeholder="ФИО..." />
+        </div>
+        <div className="flex-1 min-w-[180px]">
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Поиск по Email</label>
+          <input className="w-full border-2 rounded-xl px-4 py-2 bg-white outline-none" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email..." />
+        </div>
+        <button
+          className="bg-gray-200 text-gray-800 px-6 py-2 rounded-xl font-bold hover:bg-gray-300 transition-colors whitespace-nowrap"
+          type="button"
+          onClick={() => { setName(""); setEmail(""); setProjectFilter("all"); setTab("all"); }}
+        >
+          🗑️ Сбросить
+        </button>
+      </div>
+
+      {selected.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex gap-6 items-center flex-wrap shadow-sm">
+          <div className="font-bold text-blue-900">
+            Выбрано: <span className="text-blue-600">{selected.size}</span>
+          </div>
+          {tab !== "processed" && (
+            <button className="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-bold text-sm shadow-sm" type="button" onClick={() => void bulkProcess()} disabled={actionBusy}>
+              ✅ Обработать выбранные
+            </button>
+          )}
+          {tab !== "pending" && (
+            <button className="bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded-lg font-bold text-sm shadow-sm" type="button" onClick={() => void bulkUnprocess()} disabled={actionBusy}>
+              ↩️ Вернуть в необработанные
+            </button>
+          )}
+          <button className="text-gray-500 hover:text-gray-800 font-bold text-sm ml-auto" type="button" onClick={() => setSelected(new Set())} disabled={actionBusy}>
+            Отменить выделение
+          </button>
+        </div>
+      )}
 
       {loading ? <LoadingBlock text="Загружаем заявки..." /> : null}
       {err ? <ErrorBox message={err} /> : null}
       {materialsWarning ? <ErrorBox message={materialsWarning} /> : null}
 
-      {!loading && !err ? (
-        <>
-          <div className="admin-requests-table-wrap">
-            <table className="table admin-requests-table">
-              <thead>
+      {!loading && !err && (
+        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="p-4 w-12 text-center">
+                  <input type="checkbox" checked={allChecked} onChange={(e) => toggleAll(e.target.checked)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                </th>
+                <th className="p-4 font-bold text-gray-500">№</th>
+                <th className="p-4 font-bold">Номер</th>
+                <th className="p-4 font-bold">Проект (Раздел)</th>
+                <th className="p-4 font-bold">Создана</th>
+                {tab === "processed" && <th className="p-4 font-bold">Обработана</th>}
+                <th className="p-4 font-bold">Уровни</th>
+                <th className="p-4 font-bold">Типы</th>
+                <th className="p-4 font-bold">Пользователь</th>
+                {tab === "processed" ? <th className="p-4 font-bold">Выдано</th> : tab === "all" ? <th className="p-4 font-bold text-center">Статус</th> : null}
+                <th className="p-4 font-bold text-right">Действия</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.length === 0 ? (
                 <tr>
-                  <th className="admin-requests-check">
-                    <input type="checkbox" checked={allChecked} onChange={(e) => toggleAll(e.target.checked)} />
-                  </th>
-                  <th className="admin-requests-num">№</th>
-                  <th className="admin-requests-number">Номер</th>
-                  <th className="admin-requests-branch">Раздел</th>
-                  <th className="admin-requests-date">Создана</th>
-                  {tab === "processed" ? <th className="admin-requests-date">Обработана</th> : null}
-                  <th className="admin-requests-levels">{branchFilter === "gatehouse" ? "Уровни" : "Классы / уровни"}</th>
-                  <th className="admin-requests-types">Типы</th>
-                  <th className="admin-requests-email">Email</th>
-                  <th className="admin-requests-name">ФИО</th>
-                  {tab === "processed" ? (
-                    <th className="admin-requests-grants">Выданные материалы</th>
-                  ) : tab === "all" ? (
-                    <th className="admin-requests-status">Статус</th>
-                  ) : null}
-                  <th className="admin-requests-actions">Действия</th>
+                  <td colSpan={12} className="p-8 text-center text-gray-500 font-bold">Заявок не найдено</td>
                 </tr>
-              </thead>
-
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={emptyColSpan} style={{ padding: 16, textAlign: "center" }}>
-                      <div className="small-muted" style={{ fontWeight: 800 }}>
-                        Заявок не найдено
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((r, idx) => {
-                    const checked = selected.has(r.id);
-                    const status = Boolean(r.is_processed);
-
-                    return (
-                      <tr key={r.id}>
-                        <td className="admin-requests-check">
-                          <input type="checkbox" checked={checked} onChange={(e) => toggleOne(r.id, e.target.checked)} />
-                        </td>
-
-                        <td className="admin-requests-num">
-                          <strong>{idx + 1}</strong>
-                        </td>
-
-                        <td className="admin-requests-number">
-                          <strong>{r.request_number ?? "—"}</strong>
-                        </td>
-
-                        <td className="admin-requests-branch">{renderBranch(r)}</td>
-
-                        <td className="admin-requests-date">{fmtDate(r.created_at)}</td>
-
-                        {tab === "processed" ? <td className="admin-requests-date">{fmtDate(r.processed_at)}</td> : null}
-
-                        <td className="admin-requests-levels">{renderClassLevels(r)}</td>
-
-                        <td className="admin-requests-types">{renderTypes(r)}</td>
-
-                        <td className="admin-requests-email">{r.email ?? "—"}</td>
-
-                        <td className="admin-requests-name">{r.full_name ?? "—"}</td>
-
-                        {tab === "processed" ? (
-                          <td className="admin-requests-grants">{renderGrantedMaterials(materialsByRequest?.[r.id])}</td>
-                        ) : tab === "all" ? (
-                          <td className="admin-requests-status">
-                            <span
-                              className={
-                                status
-                                  ? "admin-request-status admin-request-status--processed"
-                                  : "admin-request-status admin-request-status--pending"
-                              }
-                            >
-                              {status ? "✅ Обработана" : "⏳ Ожидает"}
-                            </span>
-                          </td>
-                        ) : null}
-
-                        <td className="admin-requests-actions">
-                          {!status ? (
-                            <button className="btn small" type="button" onClick={() => void oneUpdate(r.id, true)} disabled={actionBusy}>
-                              ✅ Обработать
-                            </button>
-                          ) : (
-                            <button className="btn small" type="button" onClick={() => void oneUpdate(r.id, false)} disabled={actionBusy}>
-                              ↩️ Вернуть
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {rows.length > 0 ? (
-            <div style={{ display: "flex", justifyContent: "center", marginTop: 14 }}>
-              {hasMore ? (
-                <button className="btn small secondary" type="button" onClick={() => void loadList(false)} disabled={loadingMore}>
-                  {loadingMore ? "Загружаем..." : `Показать ещё ${PAGE_SIZE}`}
-                </button>
               ) : (
-                <div className="small-muted" style={{ fontWeight: 800 }}>
-                  Загружено: {rows.length}
-                </div>
+                rows.map((r, idx) => {
+                  const checked = selected.has(r.id);
+                  const status = Boolean(r.is_processed);
+                  return (
+                    <tr key={r.id} className={`hover:bg-gray-50 transition-colors ${checked ? "bg-blue-50/50" : ""}`}>
+                      <td className="p-4 text-center">
+                        <input type="checkbox" checked={checked} onChange={(e) => toggleOne(r.id, e.target.checked)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                      </td>
+                      <td className="p-4 font-bold text-gray-400">{idx + 1}</td>
+                      <td className="p-4 font-bold font-mono text-xs">{r.request_number || "—"}</td>
+                      <td className="p-4">{renderProjectName(r)}</td>
+                      <td className="p-4 text-xs font-mono text-gray-500 whitespace-nowrap">{fmtDate(r.created_at)}</td>
+                      {tab === "processed" && <td className="p-4 text-xs font-mono text-gray-500 whitespace-nowrap">{fmtDate(r.processed_at)}</td>}
+                      <td className="p-4">{renderClassLevels(r)}</td>
+                      <td className="p-4">{renderTypes(r)}</td>
+                      <td className="p-4">
+                        <div className="font-bold whitespace-nowrap">{r.full_name || "—"}</div>
+                        <div className="text-xs text-gray-500 truncate max-w-[150px]" title={r.email || ""}>{r.email || "—"}</div>
+                      </td>
+                      {tab === "processed" ? (
+                        <td className="p-4">{renderGrantedMaterials(materialsByRequest?.[r.id])}</td>
+                      ) : tab === "all" ? (
+                        <td className="p-4 text-center">
+                          {status 
+                            ? <span className="text-green-600 font-bold text-xs bg-green-50 px-2 py-1 rounded-md whitespace-nowrap">✅ Готово</span>
+                            : <span className="text-orange-500 font-bold text-xs bg-orange-50 px-2 py-1 rounded-md whitespace-nowrap">⏳ Ожидает</span>
+                          }
+                        </td>
+                      ) : null}
+                      <td className="p-4 text-right">
+                        {!status ? (
+                          <button className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm hover:bg-blue-700 transition-colors whitespace-nowrap" type="button" onClick={() => void oneUpdate(r.id, true)} disabled={actionBusy}>
+                            ✅ Выдать доступ
+                          </button>
+                        ) : (
+                          <button className="bg-white border text-gray-700 px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap" type="button" onClick={() => void oneUpdate(r.id, false)} disabled={actionBusy}>
+                            ↩️ Вернуть
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
-            </div>
-          ) : null}
-        </>
-      ) : null}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <div className="flex justify-center mt-6">
+          {hasMore ? (
+            <button className="bg-gray-100 text-gray-700 font-bold px-6 py-2.5 rounded-xl hover:bg-gray-200 transition-colors" type="button" onClick={() => void loadList(false)} disabled={loadingMore}>
+              {loadingMore ? "Загружаем..." : `Показать ещё ${PAGE_SIZE}`}
+            </button>
+          ) : (
+            <div className="text-gray-400 font-bold text-sm">Загружено: {rows.length}</div>
+          )}
+        </div>
+      )}
 
       <ProcessingModal open={processingOpen} mode={processingMode} />
     </div>
