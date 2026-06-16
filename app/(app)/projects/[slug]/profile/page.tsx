@@ -1,3 +1,4 @@
+/* app/(app)/projects/[slug]/profile/page.tsx */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 
@@ -20,8 +21,11 @@ export default async function ProjectProfilePage({
 
   if (!project) notFound();
 
-  // Достаем флаги геймификации, которые мы настраивали в админке
+  // Достаем флаги геймификации, которые мы настраивали в админке, поддерживаем оба формата
   const features = project.features || {};
+  const showStreaks = features.streaks || features.hasStreaks;
+  const showTitles = features.titles || features.hasTitles;
+  const showLeaderboard = features.leaderboard || features.hasLeaderboard;
 
   return (
     <div className="space-y-8">
@@ -58,8 +62,8 @@ export default async function ProjectProfilePage({
           </div>
         </div>
 
-        {/* 2. ОГНЕННЫЙ СТРИК (Рендерится, если hasStreaks === true) */}
-        {features.hasStreaks && (
+        {/* 2. ОГНЕННЫЙ СТРИК */}
+        {showStreaks && (
           <div className="bg-white rounded-3xl p-6 border shadow-sm flex items-start gap-5 hover:-translate-y-1 transition-transform">
             <div className="text-4xl bg-orange-50 w-16 h-16 flex items-center justify-center rounded-2xl border border-orange-100">🔥</div>
             <div>
@@ -72,8 +76,8 @@ export default async function ProjectProfilePage({
           </div>
         )}
 
-        {/* 3. ТИТУЛЫ (Рендерится, если hasTitles === true) */}
-        {features.hasTitles && (
+        {/* 3. ТИТУЛЫ */}
+        {showTitles && (
           <div className="bg-white rounded-3xl p-6 border shadow-sm flex items-start gap-5 hover:-translate-y-1 transition-transform">
             <div className="text-4xl bg-yellow-50 w-16 h-16 flex items-center justify-center rounded-2xl border border-yellow-100">👑</div>
             <div>
@@ -86,8 +90,8 @@ export default async function ProjectProfilePage({
           </div>
         )}
 
-        {/* 4. ТАБЛИЦА ЛИДЕРОВ (Рендерится, если hasLeaderboard === true) */}
-        {features.hasLeaderboard && (
+        {/* 4. ТАБЛИЦА ЛИДЕРОВ */}
+        {showLeaderboard && (
           <div className="bg-white rounded-3xl p-6 border shadow-sm flex flex-col md:col-span-2">
             <div className="flex items-center gap-4 mb-5">
               <div className="text-3xl bg-blue-50 w-12 h-12 flex items-center justify-center rounded-xl">🏆</div>

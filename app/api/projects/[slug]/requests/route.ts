@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
     if (!project) return fail("Проект не найден", 404, "NOT_FOUND");
 
     const { data, error } = await supabase
-      .from("requests")
+      .from("purchase_requests") // ИСПРАВЛЕНО: requests -> purchase_requests
       .select("*")
       .eq("user_id", user.id)
       .eq("project_id", project.id)
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
 
     if (!level_code) return fail("Необходимо выбрать уровень", 400, "VALIDATION");
 
-    // Универсальный payload (адаптируй под свою структуру, если поля называются чуть иначе)
+    // Универсальный payload
     const payload = {
       user_id: user.id,
       project_id: project.id,
@@ -72,13 +72,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
       target_levels: [level_code], 
       class_level: level_code, // Фоллбэк для обратной совместимости, пока легаси не удалено
       material_kinds: requested_tabs, // Сохраняем запрошенные табы (для автовыдачи)
+      // В БД колонка textbook_types обязательна (NOT NULL + CHECK не пусто). Заполняем фоллбэком, чтобы БД не ругалась:
+      textbook_types: requested_tabs.length > 0 ? requested_tabs : ["textbook"],
       email: profile?.email || user.email,
       full_name: profile?.full_name || "Не указано",
       is_processed: false,
     };
 
     const { data, error } = await supabase
-      .from("requests")
+      .from("purchase_requests") // ИСПРАВЛЕНО: requests -> purchase_requests
       .insert(payload)
       .select("*")
       .single();

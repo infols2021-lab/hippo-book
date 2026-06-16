@@ -27,6 +27,7 @@ type ReqRow = {
   target_levels?: any;
   textbook_types: any;
   material_kinds?: any;
+  project_id?: string | null; // ДОБАВЛЕНО для фильтрации
 };
 
 type GrantTarget = {
@@ -45,8 +46,9 @@ type GatehouseMaterialRow = {
   target_levels: string[] | null;
 };
 
+// ДОБАВЛЕНО: project_id в селект
 const REQUEST_SELECT =
-  "id,user_id,request_number,created_at,processed_at,is_processed,full_name,email,contact_phone,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds";
+  "id,user_id,request_number,created_at,processed_at,is_processed,full_name,email,contact_phone,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,project_id";
 
 const DB_RETRY_COUNT = 1;
 const DB_RETRY_DELAY_MS = 350;
@@ -325,12 +327,6 @@ function formatStatus(isProcessed: boolean, processedAt?: string | null) {
   if (!isProcessed) return "⏳ Ожидает";
   if (processedAt) return `✅ Обработана · ${formatDateTimeRU(processedAt)}`;
   return "✅ Обработана";
-}
-
-function formatProcessedInfo(row: any) {
-  if (!row?.is_processed) return "";
-  if (row?.processed_at) return `Обработана: ${formatDateTimeRU(String(row.processed_at))}`;
-  return "Обработана";
 }
 
 function getSheetTargetSource(row: any, branchType: BranchType) {
@@ -739,6 +735,8 @@ export async function GET(req: NextRequest) {
     const name = (sp.get("name") || "").trim();
     const email = (sp.get("email") || "").trim();
     const branchFilter = (sp.get("branch_type") || "all").trim();
+    // ДОБАВЛЕНО: фильтр по проекту
+    const projectId = (sp.get("project_id") || "").trim();
 
     const limit = clamp(parsePositiveInt(sp.get("limit"), 10), 1, 30);
     const cursorCreatedAt = String(sp.get("cursor_created_at") || "").trim();
@@ -752,6 +750,11 @@ export async function GET(req: NextRequest) {
 
       q = applyBranchFilter(q, branchFilter);
       q = applyCursor(q, cursorCreatedAt);
+
+      // Применяем фильтр по проекту, если он передан
+      if (projectId) {
+        q = q.eq("project_id", projectId);
+      }
 
       if (status === "pending") {
         q = q.or("is_processed.eq.false,is_processed.is.null");

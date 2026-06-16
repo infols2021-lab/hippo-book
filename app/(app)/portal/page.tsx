@@ -1,3 +1,4 @@
+/* app/(app)/portal/page.tsx */
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import PortalClient from "./PortalClient";
@@ -11,7 +12,7 @@ export default async function PortalPage() {
   const user = auth.user;
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
 
-  const isAdmin = profile?.role === "admin" || profile?.role === "superadmin" || profile?.role === "teacher" || profile?.is_admin;
+  const isAdmin = Boolean(profile?.is_admin);
   
   // Умный парсинг ФИО: берем полное имя, либо склеиваем имя и фамилию из метаданных
   let userName = profile?.full_name || user.user_metadata?.full_name || "";

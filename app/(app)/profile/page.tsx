@@ -1,3 +1,4 @@
+/* app/(app)/profile/page.tsx */
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getDataAuthContext } from "@/lib/data/auth";

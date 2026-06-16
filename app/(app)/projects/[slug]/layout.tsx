@@ -23,15 +23,15 @@ export default async function ProjectLayout({
     notFound(); // Если проекта нет или он скрыт админом -> 404
   }
 
-  // 2. Читаем тему (с фоллбэками на стандартный синий, если админ не задал)
+  // 2. Читаем тему (с обратной совместимостью для старого и нового форматов)
   const theme = project.theme || {};
-  const primaryColor = theme.primaryColor || "#3b82f6";
-  const secondaryColor = theme.secondaryColor || "#1d4ed8";
-  const bgColor = theme.backgroundColor || "#f8fafc";
+  const primaryColor = theme?.colors?.primary || theme.primaryColor || theme.theme_color || "#3b82f6";
+  const secondaryColor = theme?.colors?.secondary || theme.secondaryColor || "#1d4ed8";
+  const bgColor = theme?.colors?.pageBg || theme.backgroundColor || "#f8fafc";
 
   return (
     <div
-      // 🚀 МАГИЯ ТУТ: Инжектим цвета из БД прямо в CSS-переменные этого DOM-дерева!
+      // 🚀 Инжектим цвета из БД прямо в CSS-переменные этого DOM-дерева!
       style={{
         "--project-primary": primaryColor,
         "--project-secondary": secondaryColor,

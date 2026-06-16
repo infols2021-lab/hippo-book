@@ -1,3 +1,4 @@
+/* app/(admin)/admin/requests/RequestsTab.tsx */
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -23,6 +24,7 @@ type RequestRow = {
   target_levels?: any;
   textbook_types: any;
   material_kinds?: any;
+  project_id?: string | null;
 };
 
 type Stats = { total: number; pending: number; processed: number };
@@ -216,6 +218,8 @@ function isAbortError(e: any) {
 export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (pending: number) => void }) {
   const [tab, setTab] = useState<"all" | "pending" | "processed">("all");
   const [branchFilter, setBranchFilter] = useState<BranchFilter>("all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
 
   const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, processed: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
@@ -266,9 +270,19 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
     [],
   );
 
+  useEffect(() => {
+    fetch("/api/admin/projects")
+      .then(r => r.json())
+      .then(d => {
+        setProjects(d.projects || d.data || d || []);
+      })
+      .catch(() => {});
+  }, []);
+
   async function loadStats() {
     const seq = ++statsSeqRef.current;
     const branchAtStart = branchFilter;
+    const projectAtStart = projectFilter;
 
     statsAbortRef.current?.abort();
 
@@ -281,6 +295,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
     try {
       const qs = new URLSearchParams();
       if (branchAtStart !== "all") qs.set("branch_type", branchAtStart);
+      if (projectAtStart !== "all") qs.set("project_id", projectAtStart);
 
       const res = await fetch(`/api/admin/requests/stats?${qs.toString()}`, {
         cache: "no-store",
@@ -355,6 +370,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
     const tabAtStart = tab;
     const branchAtStart = branchFilter;
+    const projectAtStart = projectFilter;
     const nameAtStart = name.trim();
     const emailAtStart = email.trim();
     const cursorAtStart = reset ? null : nextCursor;
@@ -385,6 +401,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
       if (cursorAtStart?.created_at) qs.set("cursor_created_at", cursorAtStart.created_at);
       if (branchAtStart !== "all") qs.set("branch_type", branchAtStart);
+      if (projectAtStart !== "all") qs.set("project_id", projectAtStart);
       if (nameAtStart) qs.set("name", nameAtStart);
       if (emailAtStart) qs.set("email", emailAtStart);
 
@@ -511,7 +528,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       statsAbortRef.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branchFilter]);
+  }, [branchFilter, projectFilter]);
 
   useEffect(() => {
     void loadList(true);
@@ -521,7 +538,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       grantsAbortRef.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, branchFilter]);
+  }, [tab, branchFilter, projectFilter]);
 
   useEffect(() => {
     if (!searchMountedRef.current) {
@@ -669,14 +686,29 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       ) : null}
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
-        <div className="form-group" style={{ marginBottom: 0, flex: "1 1 260px" }}>
-          <label>Поиск по имени</label>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="ФИО..." />
+        <div className="form-group" style={{ marginBottom: 0, flex: "1 1 200px" }}>
+          <label style={{ fontSize: 13, fontWeight: "bold", color: "#666" }}>Проект (Ветка)</label>
+          <select 
+            className="input" 
+            value={projectFilter} 
+            onChange={(e) => setProjectFilter(e.target.value)}
+            style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "2px solid #e5e7eb" }}
+          >
+            <option value="all">Все проекты</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
         </div>
 
-        <div className="form-group" style={{ marginBottom: 0, flex: "1 1 260px" }}>
-          <label>Поиск по email</label>
-          <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email..." />
+        <div className="form-group" style={{ marginBottom: 0, flex: "1 1 200px" }}>
+          <label style={{ fontSize: 13, fontWeight: "bold", color: "#666" }}>Поиск по имени</label>
+          <input className="input" style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "2px solid #e5e7eb" }} value={name} onChange={(e) => setName(e.target.value)} placeholder="ФИО..." />
+        </div>
+
+        <div className="form-group" style={{ marginBottom: 0, flex: "1 1 200px" }}>
+          <label style={{ fontSize: 13, fontWeight: "bold", color: "#666" }}>Поиск по email</label>
+          <input className="input" style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "2px solid #e5e7eb" }} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email..." />
         </div>
 
         <button
@@ -685,7 +717,9 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
           onClick={() => {
             setName("");
             setEmail("");
+            setProjectFilter("all");
           }}
+          style={{ height: "46px" }}
         >
           🗑️ Очистить
         </button>

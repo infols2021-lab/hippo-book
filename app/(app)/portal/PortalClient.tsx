@@ -4,7 +4,6 @@ import Link from "next/link";
 import PortalCard from "@/components/portal/PortalCard";
 import LogoutButton from "@/components/LogoutButton";
 
-// Тип проекта, который прилетит с сервера (из page.tsx)
 export type ProjectConfig = {
   id: string;
   name: string;
@@ -13,7 +12,6 @@ export type ProjectConfig = {
   theme: {
     primaryColor?: string;
     secondaryColor?: string;
-    backgroundColor?: string;
   };
 };
 
@@ -21,83 +19,67 @@ type PortalClientProps = {
   userName: string;
   userEmail: string;
   isAdmin: boolean;
-  projects: ProjectConfig[]; // НОВЫЙ ПРОП: массив динамических проектов из БД
+  projects: ProjectConfig[];
 };
 
-function getDisplayName(userName: string, userEmail: string): string {
-  const name = userName.trim();
-  if (name) return name;
-
-  const email = userEmail.trim();
-  if (email) return email;
-
-  return "ученик";
-}
-
 export default function PortalClient({ userName, userEmail, isAdmin, projects }: PortalClientProps) {
-  const displayName = getDisplayName(userName, userEmail);
+  const displayName = userName || userEmail || "Ученик";
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white relative overflow-hidden font-sans">
+    <main className="relative min-h-screen bg-[#0b0f19] text-white overflow-hidden font-sans flex flex-col">
       
-      {/* ДИНАМИЧЕСКИЙ ФОН: Рисует светящиеся сферы (Orbs) на основе цветов твоих проектов */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {projects.map((p, i) => (
-          <div
-            key={p.id}
-            className="absolute rounded-full blur-[100px] opacity-20 mix-blend-screen animate-in fade-in duration-1000"
-            style={{
-              backgroundColor: p.theme?.primaryColor || '#3b82f6',
-              width: '45vw',
-              height: '45vw',
-              // Раскидываем сферы по разным углам в зависимости от индекса
-              top: i % 2 === 0 ? '-10%' : 'auto',
-              bottom: i % 2 !== 0 ? '-10%' : 'auto',
-              left: i % 3 === 0 ? '-10%' : 'auto',
-              right: i % 3 !== 0 ? '-10%' : 'auto',
-            }}
-          />
-        ))}
-        {/* Паттерн-сетка поверх фона */}
-        <div 
-          className="absolute inset-0 opacity-[0.03]" 
-          style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} 
-        />
+      {/* 1. ДИНАМИЧЕСКИЙ ФОН: Делит экран на N равных частей по количеству проектов */}
+      <div className="absolute inset-0 z-0 flex">
+        {projects.length > 0 ? projects.map((p) => {
+          const color = p.theme?.primaryColor || "#3b82f6";
+          return (
+            <div key={`bg-${p.id}`} className="relative flex-1 h-full border-r border-white/[0.02] last:border-r-0 overflow-hidden">
+              {/* Верхний градиент заливки */}
+              <div className="absolute inset-0 opacity-20" style={{ background: `linear-gradient(180deg, ${color}40 0%, transparent 100%)` }} />
+              {/* Центральная неоновая сфера для подсветки карточки */}
+              <div className="absolute top-[40%] left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full blur-[120px] mix-blend-screen opacity-30" style={{ backgroundColor: color }} />
+            </div>
+          );
+        }) : (
+          <div className="flex-1 h-full bg-[#0b0f19]" /> // Фоллбэк если нет проектов
+        )}
       </div>
 
-      <section className="relative z-10 max-w-7xl mx-auto px-6 py-12 lg:py-20 flex flex-col min-h-screen">
+      {/* Паттерн-сетка поверх фона */}
+      <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
+
+      {/* КОНТЕНТ */}
+      <section className="relative z-10 w-full max-w-[1400px] mx-auto px-6 py-12 flex flex-col flex-grow">
         
-        {/* ШАПКА ПОРТАЛА */}
-        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16 animate-in slide-in-from-top-6 duration-700">
-          <div>
-            <p className="text-sm font-bold tracking-widest text-gray-400 uppercase mb-3">
-              Выберите направление
-            </p>
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-4">
-              Добро пожаловать, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">{displayName}</span>
+        {/* ШАПКА */}
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 animate-in slide-in-from-top-8 duration-700">
+          <div className="max-w-3xl">
+            <p className="text-xs font-bold tracking-[0.2em] text-white/50 uppercase mb-4">Выберите направление</p>
+            <h1 className="text-5xl md:text-6xl font-black tracking-tight text-white mb-6 leading-[1.1]">
+              Добро пожаловать, <br/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70">{displayName}</span>
             </h1>
-            <p className="text-lg text-gray-400 max-w-2xl">
-              Ваш единый аккаунт для всех образовательных программ. Выберите ветку для продолжения работы.
+            <p className="text-lg text-white/60 font-medium">
+              Один аккаунт, {projects.length} пространства: выберите нужную ветку для продолжения работы.
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {isAdmin && (
-              <Link
-                href="/admin"
-                className="px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl font-bold transition-all backdrop-blur-md shadow-lg"
-              >
-                ⚙️ Панель управления
+              <Link href="/admin" className="px-6 py-2.5 bg-transparent border border-white/20 hover:bg-white/10 text-white rounded-full font-bold transition-all text-sm backdrop-blur-md">
+                Админка
               </Link>
             )}
-            <div className="bg-white/10 border border-white/10 rounded-xl backdrop-blur-md overflow-hidden transition-all hover:bg-white/20 shadow-lg">
-              <LogoutButton className="px-5 py-2.5 font-bold w-full h-full block" />
-            </div>
+            <LogoutButton className="px-6 py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-full font-bold transition-all text-sm backdrop-blur-md" />
           </div>
         </header>
 
-        {/* СЕТКА ПРОЕКТОВ (ВЕТОК) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow items-stretch relative z-20">
+        {/* УМНАЯ СЕТКА КАРТОЧЕК */}
+        <div className={`grid gap-6 flex-grow items-stretch ${
+          projects.length === 1 ? 'grid-cols-1 max-w-2xl mx-auto' : 
+          projects.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 
+          'grid-cols-1 md:grid-cols-3'
+        }`}>
           {projects.length > 0 ? (
             projects.map((project, index) => (
               <PortalCard 
@@ -107,18 +89,18 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
               />
             ))
           ) : (
-            <div className="col-span-full flex flex-col items-center justify-center p-16 border-2 border-dashed border-gray-700 rounded-3xl bg-gray-800/40 backdrop-blur-md animate-in zoom-in-95">
+            <div className="col-span-full flex flex-col items-center justify-center p-16 rounded-3xl bg-white/5 border-2 border-dashed border-white/10 backdrop-blur-md">
               <div className="text-6xl mb-4">📭</div>
               <h3 className="text-2xl font-bold mb-2">Платформа настраивается</h3>
-              <p className="text-gray-400 text-center">Администратор пока не добавил активные ветки обучения.</p>
+              <p className="text-white/50">Администратор пока не добавил активные ветки обучения.</p>
             </div>
           )}
         </div>
 
         {/* ФУТЕР */}
-        <footer className="mt-16 pt-8 border-t border-gray-800 flex flex-col sm:flex-row justify-center items-center gap-3 text-sm text-gray-500 font-medium animate-in fade-in duration-1000">
+        <footer className="mt-12 flex justify-center items-center py-6 bg-black/20 rounded-full border border-white/5 backdrop-blur-sm mx-auto px-8 w-fit gap-3 text-xs text-white/40 font-medium animate-in fade-in duration-1000">
           <span>Профильные данные общие для всех разделов</span>
-          <span className="hidden sm:block w-1.5 h-1.5 rounded-full bg-gray-700" />
+          <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
           <span>Прогресс и материалы разделяются отдельно</span>
         </footer>
 

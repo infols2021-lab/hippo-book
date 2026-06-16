@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       .from("materials")
       .select(`
         *,
-        project_tabs ( id, name, slug )
+        project_tabs ( id, title, slug ) 
       `)
       .eq("project_id", projectId)
       .order("order_index", { ascending: false })
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 
     // Если админ выбрал конкретный таб в селекте
     if (tabId) {
-      query = query.eq("tab_id", tabId);
+      query = query.eq("project_tab_id", tabId);
     }
 
     const { data, error } = await query;
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
   const title = String(body?.title ?? "").trim();
   const description = body?.description ? String(body.description).trim() : null;
-  const tab_id = String(body?.tab_id ?? "").trim();
+  const project_tab_id = String(body?.project_tab_id ?? "").trim();
   const target_levels = Array.isArray(body?.target_levels) ? body.target_levels.map(String).filter(Boolean) : [];
   const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
   const is_available = Boolean(body?.is_available);
@@ -61,14 +61,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const cover_image_url = body?.cover_image_url ? String(body.cover_image_url).trim() : null;
 
   if (!title) return fail("Название материала обязательно", 400, "VALIDATION");
-  if (!tab_id) return fail("Необходимо выбрать вкладку (Таб)", 400, "VALIDATION");
+  if (!project_tab_id) return fail("Необходимо выбрать вкладку (Таб)", 400, "VALIDATION");
 
   try {
     const { data, error } = await supabase
       .from("materials")
       .insert({
         project_id: projectId,
-        tab_id,
+        project_tab_id, // ИСПРАВЛЕНО
         title,
         description,
         target_levels, // Массив уровней, к которым относится материал

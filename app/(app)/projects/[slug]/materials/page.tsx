@@ -37,10 +37,10 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
     redirect(`/projects/${slug}/materials?tab=${tabs[0].slug}${activeLevelCode ? `&level=${activeLevelCode}` : ''}`);
   }
 
-  // 3. Собираем материалы
+  // 3. Собираем материалы (ИСПРАВЛЕНО: title вместо name у табов)
   let query = supabase
     .from("materials")
-    .select(`*, project_tabs!inner(slug, icon, name)`)
+    .select(`*, project_tabs!inner(slug, icon, title)`) 
     .eq("project_id", project.id)
     .eq("is_active", true)
     .order("order_index", { ascending: false });
@@ -77,7 +77,8 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
                     }`}
                     style={isActive ? { backgroundColor: "var(--project-primary)" } : {}}
                   >
-                    <span>{tab.icon}</span> {tab.name}
+                    {/* ИСПРАВЛЕНО: tab.title вместо tab.name */}
+                    <span>{tab.icon || ""}</span> {tab.title}
                   </Link>
                 );
               })}
@@ -99,17 +100,19 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
                 Все уровни
               </Link>
               {levels.map(lvl => {
-                const isActive = lvl.level_code === activeLevelCode;
+                // ИСПРАВЛЕНО: lvl.code вместо lvl.level_code
+                const isActive = lvl.code === activeLevelCode;
                 return (
                   <Link
                     key={lvl.id}
-                    href={`/projects/${slug}/materials?tab=${activeTabSlug || ''}&level=${lvl.level_code}`}
+                    href={`/projects/${slug}/materials?tab=${activeTabSlug || ''}&level=${lvl.code}`}
                     className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                       isActive ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                     style={isActive ? { backgroundColor: "var(--project-secondary)" } : {}}
                   >
-                    {lvl.name}
+                    {/* ИСПРАВЛЕНО: lvl.label вместо lvl.name */}
+                    {lvl.label}
                   </Link>
                 );
               })}
@@ -121,8 +124,9 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
       {/* ЗАГОЛОВОК АКТИВНОГО ТАБА */}
       {activeTab && (
         <div className="flex items-center gap-3">
-          <div className="text-3xl">{activeTab.icon}</div>
-          <h2 className="text-2xl font-extrabold text-gray-900">{activeTab.name}</h2>
+          <div className="text-3xl">{activeTab.icon || ""}</div>
+          {/* ИСПРАВЛЕНО: activeTab.title вместо activeTab.name */}
+          <h2 className="text-2xl font-extrabold text-gray-900">{activeTab.title}</h2>
           <span className="bg-gray-200 text-gray-600 text-xs font-bold px-2.5 py-1 rounded-full ml-2">
             {materials?.length || 0} шт.
           </span>
@@ -137,6 +141,11 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
               <div className="bg-white rounded-2xl p-5 border shadow-sm hover:shadow-md transition-all group flex flex-col h-full relative overflow-hidden cursor-pointer">
                 <div className="absolute top-0 left-0 w-full h-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: "var(--project-primary)" }} />
                 
+                {/* Обложка материала, если она есть */}
+                {mat.cover_image_url && (
+                  <img src={mat.cover_image_url} alt={mat.title} className="w-full h-32 object-cover rounded-xl mb-4 border border-gray-100" />
+                )}
+
                 <h4 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
                   {mat.title}
                 </h4>
@@ -149,7 +158,8 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
                   <div className="flex flex-wrap gap-1">
                     {mat.target_levels?.map((l: string) => (
                       <span key={l} className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded uppercase">
-                        {levels.find(level => level.level_code === l)?.name || l}
+                        {/* ИСПРАВЛЕНО: level.code и level.label */}
+                        {levels.find(level => level.code === l)?.label || l}
                       </span>
                     ))}
                   </div>
