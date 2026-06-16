@@ -1,237 +1,112 @@
 "use client";
 
-import { useState } from "react";
-import type { Project } from "./ProjectsTab";
+import { useState, useEffect } from "react";
 
-type ProjectEditorProps = {
-  project: Project | null;
-  onClose: () => void;
-  onSaved: () => void;
-};
-
-export default function ProjectEditor({ project, onClose, onSaved }: ProjectEditorProps) {
-  // Инициализируем стейт. Если создаем новый, подставляем дефолтные значения.
+export default function ProjectEditor({ project, onClose, onSaved }: { project: any, onClose: () => void, onSaved: () => void }) {
   const [formData, setFormData] = useState({
     name: project?.name || "",
     slug: project?.slug || "",
     description: project?.description || "",
-    is_available: project?.is_available ?? true,
-    theme: project?.theme || { 
-      primaryColor: "#0ea5e9", // Дефолтный синий
-      secondaryColor: "#38bdf8",
-      backgroundColor: "#f8fafc"
-    },
+    is_active: project?.is_active ?? true,
+    theme: project?.theme || { primaryColor: "#3b82f6", secondaryColor: "#1d4ed8" },
+    features: project?.features || { hasStreaks: false, hasTitles: false, hasLeaderboard: false }
   });
 
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [levels, setLevels] = useState<any[]>([]);
+  const [newLevel, setNewLevel] = useState({ code: "", name: "" });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (project?.id) {
+      fetch(`/api/admin/projects/${project.id}/levels`).then(r => r.json()).then(d => setLevels(d.levels || []));
+    }
+  }, [project]);
+
+  const saveProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
-    setError(null);
-    
-    // Динамический выбор метода и URL
-    const isEdit = !!project;
-    const method = isEdit ? "PUT" : "POST";
-    const url = isEdit ? `/api/admin/projects/${project.id}` : "/api/admin/projects";
+    const url = project?.id ? `/api/admin/projects/${project.id}` : "/api/admin/projects";
+    await fetch(url, {
+      method: project?.id ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData)
+    });
+    onSaved();
+  };
 
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Ошибка при сохранении проекта");
-      }
-
-      onSaved(); // Успешно сохранили -> уведомляем родителя
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsSaving(false);
+  const addLevel = async () => {
+    if (!newLevel.code || !newLevel.name || !project?.id) return;
+    const res = await fetch(`/api/admin/projects/${project.id}/levels`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level_code: newLevel.code, name: newLevel.name, order_index: levels.length * 10, is_active: true })
+    });
+    const d = await res.json();
+    if (d.ok) {
+      setLevels([...levels, d.level]); // или сделай повторный fetch
+      setNewLevel({ code: "", name: "" });
     }
   };
 
+  const toggleFeature = (key: string) => {
+    setFormData(prev => ({ ...prev, features: { ...prev.features, [key]: !prev.features[key] } }));
+  };
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 animate-in slide-in-from-bottom-4 duration-300">
-      {/* Шапка модалки/формы */}
-      <div className="flex justify-between items-center p-6 border-b">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">
-            {project ? "Настройка проекта" : "Создание нового проекта"}
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {project ? `Редактирование ветки /${project.slug}` : "Заполните базовые данные для новой ветки"}
-          </p>
-        </div>
-        <button 
-          onClick={onClose} 
-          className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+    <div className="bg-white p-6 rounded-3xl border shadow-sm max-w-4xl mx-auto space-y-8">
+      <div className="flex justify-between items-center border-b pb-4">
+        <h2 className="text-2xl font-bold">{project ? `Настройка ветки: ${project.name}` : "Новая ветка"}</h2>
+        <button onClick={onClose} className="text-gray-500 font-bold hover:bg-gray-100 px-4 py-2 rounded-lg">Закрыть</button>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-8">
-        {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-lg text-sm border border-red-100 flex items-center gap-2">
-            <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {error}
-          </div>
-        )}
-
-        {/* ОСНОВНАЯ ИНФОРМАЦИЯ */}
-        <div className="space-y-5">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Базовые настройки</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Название <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Например: Hippo Olympiad"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Slug (URL) <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-gray-400 select-none">
-                  /projects/
-                </span>
-                <input
-                  type="text"
-                  required
-                  pattern="[a-z0-9-]+"
-                  placeholder="olympiad"
-                  title="Только маленькие латинские буквы, цифры и дефис"
-                  value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
-                  className="w-full border border-gray-300 rounded-xl pl-24 pr-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow font-mono text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
+      <form onSubmit={saveProject} className="space-y-6">
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Краткое описание</label>
-            <textarea
-              rows={3}
-              placeholder="Опишите для чего нужна эта ветка..."
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow resize-none"
-            />
-          </div>
-        </div>
-
-        <hr className="border-gray-100" />
-
-        {/* ВИЗУАЛЬНАЯ ТЕМА */}
-        <div className="space-y-5">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Оформление (Theme JSON)</h3>
-          <div className="bg-gray-50 border border-gray-200 p-5 rounded-xl flex flex-wrap gap-8 items-center">
-            
-            <div className="flex items-center gap-3">
-              <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-gray-200 shadow-sm cursor-pointer hover:scale-105 transition-transform">
-                <input
-                  type="color"
-                  value={formData.theme.primaryColor}
-                  onChange={(e) => setFormData({ ...formData, theme: { ...formData.theme, primaryColor: e.target.value } })}
-                  className="absolute inset-0 w-[200%] h-[200%] -top-2 -left-2 cursor-pointer"
-                />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-gray-800">Основной цвет</div>
-                <div className="text-xs text-gray-500 font-mono uppercase">{formData.theme.primaryColor}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-gray-200 shadow-sm cursor-pointer hover:scale-105 transition-transform">
-                <input
-                  type="color"
-                  value={formData.theme.secondaryColor}
-                  onChange={(e) => setFormData({ ...formData, theme: { ...formData.theme, secondaryColor: e.target.value } })}
-                  className="absolute inset-0 w-[200%] h-[200%] -top-2 -left-2 cursor-pointer"
-                />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-gray-800">Вторичный цвет</div>
-                <div className="text-xs text-gray-500 font-mono uppercase">{formData.theme.secondaryColor}</div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <hr className="border-gray-100" />
-
-        {/* СТАТУС */}
-        <label className={`flex items-start gap-4 p-5 border rounded-xl cursor-pointer transition-colors ${
-          formData.is_available ? 'bg-green-50/50 border-green-200' : 'bg-gray-50 border-gray-200'
-        }`}>
-          <div className="flex items-center h-6 mt-0.5">
-            <input
-              type="checkbox"
-              checked={formData.is_available}
-              onChange={(e) => setFormData({ ...formData, is_available: e.target.checked })}
-              className="w-5 h-5 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer"
-            />
+            <label className="block text-sm font-bold mb-1">Название ветки</label>
+            <input required className="w-full border-2 rounded-xl px-4 py-2" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
           </div>
           <div>
-            <div className={`font-semibold ${formData.is_available ? 'text-green-900' : 'text-gray-900'}`}>
-              Опубликовать ветку (Активна)
-            </div>
-            <div className={`text-sm mt-1 ${formData.is_available ? 'text-green-700' : 'text-gray-500'}`}>
-              Если галочка снята, пользователи не смогут получить доступ к этому проекту, его табам и материалам.
-            </div>
+            <label className="block text-sm font-bold mb-1">URL (Slug)</label>
+            <input required className="w-full border-2 rounded-xl px-4 py-2" value={formData.slug} onChange={e => setFormData({...formData, slug: e.target.value})} />
           </div>
-        </label>
-
-        {/* КНОПКИ ДЕЙСТВИЙ */}
-        <div className="pt-2 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSaving}
-            className="px-6 py-2.5 text-gray-700 font-medium hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50"
-          >
-            Отмена
-          </button>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
-          >
-            {isSaving && (
-              <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-            )}
-            {isSaving ? "Сохранение..." : "Сохранить проект"}
-          </button>
+          <div className="col-span-2">
+            <label className="block text-sm font-bold mb-1">Описание на портале</label>
+            <textarea className="w-full border-2 rounded-xl px-4 py-2" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+          </div>
+          <div>
+            <label className="block text-sm font-bold mb-1">Цвет темы</label>
+            <input type="color" className="w-full h-12 rounded-xl cursor-pointer" value={formData.theme.primaryColor} onChange={e => setFormData({...formData, theme: {...formData.theme, primaryColor: e.target.value}})} />
+          </div>
         </div>
 
+        {/* ФИЧИ */}
+        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+          <h3 className="font-bold text-blue-900 mb-3">Модули платформы (Геймификация)</h3>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded-lg border"><input type="checkbox" checked={formData.features.hasStreaks} onChange={() => toggleFeature('hasStreaks')} /> 🔥 Огненные стрики</label>
+            <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded-lg border"><input type="checkbox" checked={formData.features.hasTitles} onChange={() => toggleFeature('hasTitles')} /> 👑 Титулы</label>
+            <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded-lg border"><input type="checkbox" checked={formData.features.hasLeaderboard} onChange={() => toggleFeature('hasLeaderboard')} /> 🏆 Лидерборд</label>
+          </div>
+        </div>
+
+        <button type="submit" className="w-full bg-gray-900 text-white font-bold py-3 rounded-xl">💾 Сохранить ядро проекта</button>
       </form>
+
+      {/* УПРАВЛЕНИЕ УРОВНЯМИ */}
+      {project?.id && (
+        <div className="border-t pt-6">
+          <h3 className="text-xl font-bold mb-4">Уровни (Классы) для этого проекта</h3>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            {levels.map(l => (
+              <div key={l.id} className="bg-gray-50 border p-3 rounded-lg flex justify-between">
+                <span className="font-bold">{l.name} <span className="text-xs text-gray-500 font-mono ml-2">({l.level_code})</span></span>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-3 bg-gray-50 p-3 rounded-xl border">
+            <input className="border-2 rounded-lg px-3 py-2 flex-1" placeholder="Код (hippo-1)" value={newLevel.code} onChange={e => setNewLevel({...newLevel, code: e.target.value})} />
+            <input className="border-2 rounded-lg px-3 py-2 flex-1" placeholder="Название (Hippo 1)" value={newLevel.name} onChange={e => setNewLevel({...newLevel, name: e.target.value})} />
+            <button onClick={addLevel} type="button" className="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg">Добавить</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

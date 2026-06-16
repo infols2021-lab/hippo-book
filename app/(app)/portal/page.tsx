@@ -6,36 +6,26 @@ export default async function PortalPage() {
   const supabase = await createSupabaseServerClient();
   const { data: auth, error: authError } = await supabase.auth.getUser();
 
-  if (authError || !auth?.user) {
-    redirect("/login");
-  }
+  if (authError || !auth?.user) redirect("/login");
 
   const user = auth.user;
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
 
-  // 1. Получаем профиль юзера (чтобы знать имя и админ ли он)
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, role")
-    .eq("id", user.id)
-    .single();
-
-  const isAdmin = profile?.role === "admin" || profile?.role === "superadmin" || profile?.role === "teacher";
-  const userName = profile?.full_name || user.user_metadata?.full_name || "";
+  const isAdmin = profile?.role === "admin" || profile?.role === "superadmin" || profile?.role === "teacher" || profile?.is_admin;
+  
+  // Умный парсинг ФИО: берем полное имя, либо склеиваем имя и фамилию из метаданных
+  let userName = profile?.full_name || user.user_metadata?.full_name || "";
+  if (!userName && (user.user_metadata?.first_name || user.user_metadata?.last_name)) {
+    userName = `${user.user_metadata?.first_name || ""} ${user.user_metadata?.last_name || ""}`.trim();
+  }
   const userEmail = user.email || "";
 
-  // 2. ВЫГРУЖАЕМ ПРОЕКТЫ ИЗ БАЗЫ! (То, чего не хватало)
+  // Берем только АКТИВНЫЕ ветки
   const { data: projects } = await supabase
     .from("projects")
-    .select("id, name, slug, description, theme, is_available")
-    .eq("is_available", true) // Берем только активные ветки
-    .order("created_at", { ascending: true });
+    .select("id, name, slug, description, theme, is_active")
+    .eq("is_active", true) 
+    .order("order_index", { ascending: true });
 
-  return (
-    <PortalClient
-      userName={userName}
-      userEmail={userEmail}
-      isAdmin={isAdmin}
-      projects={projects || []} // Передаем проекты в клиентский компонент!
-    />
-  );
+  return <PortalClient userName={userName || "Ученик"} userEmail={userEmail} isAdmin={isAdmin} projects={projects || []} />;
 }
