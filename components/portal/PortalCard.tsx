@@ -1,88 +1,95 @@
+"use client";
+
 import Link from "next/link";
-import type { CSSProperties } from "react";
-import type { BranchType, PortalCardConfig } from "@/lib/branches/types";
-import { getBranchConfig } from "@/lib/branches/config";
+import type { ProjectConfig } from "@/app/(app)/portal/PortalClient"; // Импортируем тип, который создали в клиенте
 
 type PortalCardProps = {
-  branch: BranchType;
-  card?: PortalCardConfig;
-  side: "left" | "right";
+  project: ProjectConfig;
+  index?: number;
   className?: string;
 };
 
-function getSideLabel(side: PortalCardProps["side"]): string {
-  return side === "left" ? "Левая часть портала" : "Правая часть портала";
-}
+export default function PortalCard({ project, index = 0, className = "" }: PortalCardProps) {
+  // Достаем цвета ветки с безопасными фоллбэками
+  const primaryColor = project.theme?.primaryColor || "#3b82f6";
+  const secondaryColor = project.theme?.secondaryColor || "#1d4ed8";
 
-export default function PortalCard({ branch, card, side, className = "" }: PortalCardProps) {
-  const branchConfig = getBranchConfig(branch);
-  const portalCard = card ?? branchConfig.portalCard;
-  const colors = branchConfig.theme.colors;
-
-  const style = {
-    "--portal-card-bg": colors.cardBg,
-    "--portal-card-bg-soft": colors.cardBgSoft,
-    "--portal-card-primary": colors.primary,
-    "--portal-card-primary-soft": colors.primarySoft,
-    "--portal-card-secondary": colors.secondary,
-    "--portal-card-accent": colors.accent,
-    "--portal-card-accent-soft": colors.accentSoft,
-    "--portal-card-text": colors.text,
-    "--portal-card-muted": colors.muted,
-    "--portal-card-border": colors.border,
-    "--portal-card-glow": colors.glow,
-  } as CSSProperties;
+  // Автоматически подбираем иконку (эмодзи) на основе индекса, если у нас нет загруженных обложек
+  const icons = ["🚀", "🎓", "🧩", "💡", "🔬", "📚", "🏆", "🌟"];
+  const icon = icons[index % icons.length];
 
   return (
     <Link
-      href={portalCard.href}
-      className={[
-        "portal-card",
-        `portal-card--${branch}`,
-        `portal-card--${side}`,
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      style={style}
-      aria-label={`${portalCard.title}. ${getSideLabel(side)}`}
+      href={`/projects/${project.slug}`}
+      className={`group relative flex flex-col bg-gray-800/40 hover:bg-gray-800/60 border border-gray-700/50 rounded-3xl overflow-hidden backdrop-blur-md transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl ${className}`}
+      aria-label={`Перейти в раздел ${project.name}`}
     >
-      <div className="portal-card__glow portal-card__glow--one" />
-      <div className="portal-card__glow portal-card__glow--two" />
+      {/* 1. Декоративная рамка-свечение при наведении */}
+      <div
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+        style={{
+          background: `linear-gradient(to bottom right, ${primaryColor}30, transparent, transparent)`,
+        }}
+      />
 
-      <div className="portal-card__media" aria-hidden="true">
-        {portalCard.image ? (
-          <img
-            className="portal-card__image"
-            src={portalCard.image.src}
-            alt={portalCard.image.alt}
-            loading="lazy"
-          />
-        ) : (
-          <div className="portal-card__fallback">
-            <div className="portal-card__fallback-orb portal-card__fallback-orb--one" />
-            <div className="portal-card__fallback-orb portal-card__fallback-orb--two" />
-            <div className="portal-card__fallback-icon">{portalCard.fallbackIcon}</div>
-          </div>
-        )}
+      {/* 2. Визуальная шапка (Градиент + Иконка) */}
+      <div
+        className="h-40 relative flex items-center justify-center overflow-hidden border-b border-gray-700/50"
+        style={{
+          background: `linear-gradient(135deg, ${primaryColor}22, ${secondaryColor}22)`,
+        }}
+      >
+        {/* Опережающее свечение внутри шапки */}
+        <div
+          className="absolute inset-0 opacity-40 group-hover:opacity-80 transition-opacity duration-700 mix-blend-screen"
+          style={{
+            background: `radial-gradient(circle at center, ${primaryColor}60 0%, transparent 70%)`,
+          }}
+        />
+        {/* Иконка с эффектом зума */}
+        <span className="text-6xl drop-shadow-xl transform group-hover:scale-110 group-hover:-rotate-3 transition-all duration-500 relative z-10">
+          {icon}
+        </span>
       </div>
 
-      <div className="portal-card__content">
-        <div className="portal-card__badge">{portalCard.badge}</div>
-
-        <div>
-          <p className="portal-card__subtitle">{portalCard.subtitle}</p>
-          <h2 className="portal-card__title">{portalCard.title}</h2>
-        </div>
-
-        <p className="portal-card__description">{portalCard.description}</p>
-
-        <div className="portal-card__action">
-          <span>Перейти</span>
-          <span className="portal-card__arrow" aria-hidden="true">
-            →
+      {/* 3. Контентная часть */}
+      <div className="p-6 flex flex-col flex-grow relative z-10">
+        
+        {/* Бейджик */}
+        <div className="flex items-center justify-between mb-4">
+          <span
+            className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-gray-900/80 border backdrop-blur-sm"
+            style={{
+              color: primaryColor,
+              borderColor: `${primaryColor}40`,
+            }}
+          >
+            Ветка: /{project.slug}
           </span>
         </div>
+
+        {/* Название */}
+        <h2 
+          className="text-2xl font-extrabold text-white mb-3 group-hover:text-transparent group-hover:bg-clip-text transition-all duration-300"
+          style={{ backgroundImage: `linear-gradient(to right, #ffffff, ${primaryColor})` }}
+        >
+          {project.name}
+        </h2>
+
+        {/* Описание */}
+        <p className="text-gray-400 text-sm leading-relaxed mb-8 flex-grow">
+          {project.description || "Уникальный образовательный раздел с материалами, тестами и системой достижений."}
+        </p>
+
+        {/* Кнопка действия */}
+        <div 
+          className="flex items-center gap-2 mt-auto font-bold text-sm transition-transform group-hover:translate-x-2"
+          style={{ color: primaryColor }}
+        >
+          <span>Открыть пространство</span>
+          <span className="text-lg leading-none opacity-80 group-hover:opacity-100 transition-opacity">→</span>
+        </div>
+
       </div>
     </Link>
   );

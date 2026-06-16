@@ -9,35 +9,20 @@ type Props = {
 
 export default function ProcessingModal({ open, mode }: Props) {
   return (
-    <Modal open={open} onClose={() => {}} maxWidth={420} title="">
-      <div style={{ textAlign: "center", padding: "10px 0" }}>
-        <div
-          style={{
-            width: 46,
-            height: 46,
-            borderRadius: "50%",
-            border: "4px solid #e5e7eb",
-            borderTopColor: "var(--accent2)",
-            margin: "0 auto 16px",
-            animation: "processing_spin 1s linear infinite",
-          }}
-        />
-
-        <h3 style={{ margin: "0 0 6px" }}>
-          {mode === "process" ? "⏳ Заявки обрабатываются" : "↩️ Заявки возвращаются"}
+    <Modal open={open} onClose={() => {}} maxWidth={400} title="">
+      <div className="text-center py-6 px-4">
+        {/* Анимированный спиннер с использованием Tailwind (заменяет старый @keyframes) */}
+        <div className="mx-auto w-12 h-12 rounded-full border-4 border-gray-100 border-t-blue-600 animate-spin mb-5 shadow-sm" />
+        
+        <h3 className="text-xl font-bold text-gray-900 mb-2">
+          {mode === "process" ? "⏳ Заявки обрабатываются..." : "↩️ Заявки возвращаются..."}
         </h3>
-
-        <div className="small-muted">
-          Пожалуйста, подождите.<br />
-          Не закрывайте страницу.
-        </div>
+        
+        <p className="text-gray-500 text-sm leading-relaxed">
+          Умный алгоритм сопоставляет уровни пользователей с базой материалов веток. <br/>
+          <span className="font-medium text-gray-700">Пожалуйста, подождите и не закрывайте страницу.</span>
+        </p>
       </div>
-
-      <style>{`
-        @keyframes processing_spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </Modal>
   );
 }

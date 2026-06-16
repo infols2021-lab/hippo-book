@@ -9,7 +9,10 @@ import Dropzone from "@/components/Admin/ImageOptimizer/Dropzone";
 import SettingsPanel from "@/components/Admin/ImageOptimizer/SettingsPanel";
 import { processImages } from "@/lib/imageOptimizer";
 
-import MaterialsManagementTab from "./materials/MaterialsManagementTab";
+// НОВЫЕ КОМПОНЕНТЫ УПРАВЛЕНИЯ ЯДРОМ
+import ProjectsTab from "./projects/ProjectsTab";
+import MaterialsManager from "./projects/MaterialsManager";
+
 import AssignmentsTab from "./assignments/AssignmentsTab";
 import UsersTab from "./users/UsersTab";
 import RequestsTab from "./requests/RequestsTab";
@@ -27,7 +30,8 @@ type ReqStats = {
   processed: number;
 };
 
-type AdminTab = "materials" | "assignments" | "users" | "requests";
+// ОБНОВЛЕННЫЕ ТАБЫ
+type AdminTab = "projects" | "materials" | "assignments" | "users" | "requests";
 
 type ApiOkStats = {
   ok: true;
@@ -82,7 +86,8 @@ export default function AdminClient() {
   const router = useRouter();
 
   const [loggingOut, setLoggingOut] = useState(false);
-  const [tab, setTab] = useState<AdminTab>("materials");
+  // Начинаем с управления проектами (ветками)
+  const [tab, setTab] = useState<AdminTab>("projects");
 
   const [stats, setStats] = useState<Stats>({
     textbooks: 0,
@@ -101,9 +106,11 @@ export default function AdminClient() {
   const [optimizerQuality, setOptimizerQuality] = useState(80);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // НОВОЕ НАВИГАЦИОННОЕ МЕНЮ
   const tabs = useMemo(
     () => [
-      { key: "materials" as const, label: "📦 Управление материалами" },
+      { key: "projects" as const, label: "📁 Ветки (Проекты)" },
+      { key: "materials" as const, label: "📦 Материалы" },
       { key: "assignments" as const, label: "📝 Задания" },
       { key: "users" as const, label: "👥 Пользователи" },
       { key: "requests" as const, label: "📋 Заявки" },
@@ -196,7 +203,7 @@ export default function AdminClient() {
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
             <h2 style={{ margin: 0 }}>⚙️ Панель администратора</h2>
-            <div className="small-muted">Статистика + управление платформой.</div>
+            <div className="small-muted">Управление дата-ориентированной платформой.</div>
           </div>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -212,7 +219,6 @@ export default function AdminClient() {
               🔄 Обновить статистику
             </button>
 
-            {/* Новая кнопка сжатия файлов */}
             <button
               className="btn small"
               type="button"
@@ -236,7 +242,7 @@ export default function AdminClient() {
           <div className="admin-stats-grid">
             <div className="admin-stat">
               <div className="num">{totalLegacyMaterials}</div>
-              <div className="lbl">Олимп. материалов</div>
+              <div className="lbl">Легаси материалов</div>
             </div>
 
             <div className="admin-stat">
@@ -319,7 +325,9 @@ export default function AdminClient() {
         })}
       </div>
 
-      {tab === "materials" ? <MaterialsManagementTab onChanged={loadStats} /> : null}
+      {/* НОВЫЙ РОУТИНГ ТАБОВ АДМИНКИ */}
+      {tab === "projects" ? <ProjectsTab /> : null}
+      {tab === "materials" ? <MaterialsManager /> : null}
       {tab === "assignments" ? <AssignmentsTab /> : null}
       {tab === "users" ? <UsersTab /> : null}
       {tab === "requests" ? <RequestsTab onPendingChanged={(p) => setPendingRequests(p)} /> : null}

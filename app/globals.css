@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  
+  /* Дефолтные переменные для новых веток (переопределяются через ProjectShell из БД) */
+  --project-primary: #3b82f6;
+  --project-secondary: #1d4ed8;
+  --project-bg: #f8fafc;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -11,6 +16,29 @@
     --foreground: #ededed;
   }
 }
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* ==========================================
+   УТИЛИТЫ ДЛЯ НОВОГО ДИЗАЙНА 
+   ========================================== */
+
+/* Скрытие стандартного скроллбара для горизонтальных меню (AppHeader, ProjectShell) */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
+}
+
+
+/* ==========================================
+   АДМИНКА (Инструмент сжатия)
+   ========================================== */
 
 /* Кастомный скроллбар для компонентов инструмента сжатия */
 .custom-scrollbar::-webkit-scrollbar {

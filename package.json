@@ -2,12 +2,13 @@
   "name": "test_hippo_book",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
+"scripts": {
+  "dev": "next dev",
+  "build": "next build",
+  "start": "next start",
+  "lint": "eslint",
+  "typecheck": "tsc --noEmit"
+},
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
     "@supabase/ssr": "^0.8.0",

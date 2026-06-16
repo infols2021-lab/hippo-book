@@ -12,39 +12,32 @@ import QuestionList from "./builder/QuestionList";
 import BlockList from "./builder/blocks/BlockList";
 import JsonEditor from "./builder/json/JsonEditor";
 
-type MaterialOption =
-  | {
-      branch_type: "olympiad";
-      kind: "textbook";
-      id: string;
-      title: string;
-      material_kind?: "textbook";
-    }
-  | {
-      branch_type: "olympiad";
-      kind: "crossword";
-      id: string;
-      title: string;
-      material_kind?: "crossword";
-    }
-  | {
-      branch_type: "gatehouse";
-      kind: "material";
-      id: string;
-      title: string;
-      material_kind: string;
-    };
+// УНИВЕРСАЛЬНЫЙ ТИП МАТЕРИАЛА (Поддерживает и новые проекты, и легаси)
+export type MaterialOption = {
+  id: string;
+  title: string;
+  
+  // Новая архитектура (Projects & Tabs)
+  project_tabs?: { name: string; icon: string | null };
+  projects?: { name: string; slug: string };
+  
+  // Легаси поля (на время переезда)
+  branch_type?: string;
+  kind?: string;
+  material_kind?: string;
+};
 
 type AssignmentRow = {
   id: string;
   title: string;
   order_index: number | null;
-  branch_type?: string | null;
   material_id?: string | null;
-  textbook_id: string | null;
-  crossword_id: string | null;
   assignment_type?: string | null;
   content: any;
+  // Легаси
+  branch_type?: string | null;
+  textbook_id?: string | null;
+  crossword_id?: string | null;
 };
 
 type Props = {
@@ -56,9 +49,7 @@ type Props = {
 
 async function safeJson(res: Response) {
   const text = await res.text();
-
   if (!text) return null;
-
   try {
     return JSON.parse(text);
   } catch {
@@ -66,25 +57,33 @@ async function safeJson(res: Response) {
   }
 }
 
+// ДИНАМИЧЕСКИЕ ИКОНКИ И НАЗВАНИЯ ИЗ ТАБОВ
 function materialIcon(material: MaterialOption | null) {
   if (!material) return "—";
+  if (material.project_tabs?.icon) return material.project_tabs.icon;
+  // Фоллбэк для легаси
   if (material.kind === "textbook") return "📚";
   if (material.kind === "crossword") return "🧩";
-  return "🎓";
+  return "📄";
 }
 
 function materialLabel(material: MaterialOption | null) {
   if (!material) return "—";
+  const icon = materialIcon(material);
+  const tabName = material.project_tabs?.name ? `[${material.project_tabs.name}] ` : "";
+  return `${icon} ${tabName}${material.title}`;
+}
 
-  if (material.kind === "textbook") return `📚 ${material.title}`;
-  if (material.kind === "crossword") return `🧩 ${material.title}`;
-
-  return `🎓 ${material.title}`;
+function getProjectName(material: MaterialOption | null) {
+  if (!material) return "—";
+  if (material.projects?.name) return material.projects.name;
+  // Фоллбэк для легаси
+  if (material.branch_type === "gatehouse") return "Gatehouse Awards";
+  return "Олимпиада";
 }
 
 export default function AssignmentEditor({ material, editing, onCancel, onSaved }: Props) {
   const [mode, setMode] = useState<EditorMode>("visual");
-  
   const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>("interactive");
 
   const [title, setTitle] = useState<string>(editing?.title ?? "");
@@ -114,7 +113,6 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
 
     const content = editing?.content;
     
-    // Определяем режим на основе нового поля assignment_type (или старого content.mode для обратной совместимости)
     if (editing?.assignment_type === "intro" || content?.mode === "informational") {
       setAssignmentMode("informational");
     } else {
@@ -132,15 +130,8 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
   }, [editing]);
 
   async function save() {
-    if (!material) {
-      setErr("Сначала выберите материал");
-      return;
-    }
-
-    if (!title.trim()) {
-      setErr("Введите название задания");
-      return;
-    }
+    if (!material) return setErr("Сначала выберите материал");
+    if (!title.trim()) return setErr("Введите название задания");
 
     let finalContent: any = {};
 
@@ -148,16 +139,14 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
       const vr = validateBlocks(blocks);
       if (!vr.ok) {
         const text = vr.issues.map((i) => (i.index >= 0 ? `Блок #${i.index + 1}: ${i.message}` : i.message)).join("\n");
-        setErr(text || "Ошибки в блоках");
-        return;
+        return setErr(text || "Ошибки в блоках");
       }
       finalContent = { mode: "informational", blocks };
     } else {
       const vr = validateQuestions(questions);
       if (!vr.ok) {
         const text = vr.issues.map((i) => (i.index >= 0 ? `Вопрос #${i.index + 1}: ${i.message}` : i.message)).join("\n");
-        setErr(text || "Ошибки в вопросах");
-        return;
+        return setErr(text || "Ошибки в вопросах");
       }
       finalContent = { mode: "interactive", questions };
     }
@@ -170,19 +159,15 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
         title: title.trim(),
         order_index: Number.isFinite(orderIndex) ? orderIndex : 0,
         content: finalContent,
-        
-        // Новое поле для базы данных
         assignment_type: assignmentMode === "informational" ? "intro" : "test",
-
-        branch_type: material.branch_type,
-
+        
+        // НОВАЯ АРХИТЕКТУРА: Привязываем только к единому material_id
+        material_id: material.id,
+        
+        // ЛЕГАСИ ПОЛЯ (Оставляем для обратной совместимости старых ручек API)
+        branch_type: material.projects?.slug || material.branch_type || "olympiad",
         kind: material.kind,
         material_kind: material.material_kind ?? material.kind,
-
-        material_id: material.kind === "material" ? material.id : null,
-
-        textbook_id: material.kind === "textbook" ? material.id : null,
-        crossword_id: material.kind === "crossword" ? material.id : null,
       };
 
       const url = editing?.id ? `/api/admin/assignments/${encodeURIComponent(editing.id)}` : `/api/admin/assignments`;
@@ -217,12 +202,12 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
             Материал: <strong>{material ? materialLabel(material) : "—"}</strong>
           </div>
           <div className="small-muted" style={{ marginTop: 4 }}>
-            Раздел: <strong>{material?.branch_type === "gatehouse" ? "🎓 Gatehouse Awards" : "🏆 Олимпиада"}</strong>
+            Ветка (Проект): <strong>{getProjectName(material)}</strong>
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span className="material-badge">{materialIcon(material)}</span>
+          <span className="material-badge text-xl">{materialIcon(material)}</span>
 
           <button
             className={`btn small ${mode === "visual" ? "" : "ghost"}`}
@@ -256,7 +241,7 @@ export default function AssignmentEditor({ material, editing, onCancel, onSaved 
         </div>
 
         <div className="col" style={{ width: 140 }}>
-          <label className="small-muted">Порядок</label>
+          <label className="small-muted">Порядок сортировки</label>
           <input
             className="input"
             type="number"
