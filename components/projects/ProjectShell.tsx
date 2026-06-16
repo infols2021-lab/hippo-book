@@ -29,15 +29,14 @@ export default function ProjectShell({ project, children }: ProjectShellProps) {
 
   return (
     <ProjectProvider project={project}>
-      <div
-        // МАГИЯ: Инжектим цвета из БД прямо в CSS-переменные DOM-дерева!
+<div
         style={{
           "--project-primary": primaryColor,
           "--project-secondary": secondaryColor,
           "--project-bg": bgColor,
+          backgroundColor: "var(--project-bg)",
         } as React.CSSProperties}
         className="min-h-screen transition-colors duration-500"
-        style={{ backgroundColor: "var(--project-bg)" }}
       >
         {/* ЛОКАЛЬНАЯ ШАПКА ВЕТКИ */}
         <nav className="bg-white border-b sticky top-0 z-30 shadow-sm">
