@@ -7,24 +7,27 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   if ("response" in auth) return auth.response;
   const { supabase } = auth;
 
-  const { id: projectId } = await ctx.params;
   const { searchParams } = req.nextUrl;
   const tabId = searchParams.get("tab_id");
 
   try {
+    // В таблице materials нет project_id, фильтруем через project_tabs
     let query = supabase
       .from("materials")
       .select(`
         *,
-        project_tabs ( id, title, slug ) 
+        project_tabs!inner ( id, title, slug, project_id ) 
       `)
-      .eq("project_id", projectId)
       .order("order_index", { ascending: false })
       .order("created_at", { ascending: false });
 
     // Если админ выбрал конкретный таб в селекте
     if (tabId) {
       query = query.eq("project_tab_id", tabId);
+    } else {
+      // Иначе показываем все материалы этого проекта (через связь с project_tabs)
+      const { id: projectId } = await ctx.params;
+      query = query.eq("project_tabs.project_id", projectId);
     }
 
     const { data, error } = await query;
@@ -41,8 +44,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
   const { supabase } = auth;
-
-  const { id: projectId } = await ctx.params;
 
   let body: any;
   try {
@@ -67,11 +68,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const { data, error } = await supabase
       .from("materials")
       .insert({
-        project_id: projectId,
-        project_tab_id, // ИСПРАВЛЕНО
+        project_tab_id, 
         title,
         description,
-        target_levels, // Массив уровней, к которым относится материал
+        target_levels, 
+        class_levels: target_levels, // ИСПРАВЛЕНО: Поле NOT NULL в БД
+        material_kind: "material",   // ИСПРАВЛЕНО: Поле NOT NULL в БД
+        branch_type: "project",      // ИСПРАВЛЕНО: Помечаем как новый формат
         order_index,
         is_available,
         is_active,

@@ -1,6 +1,9 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import Link from "next/link";
 
+// Отключаем кэширование страницы, чтобы изменения в админке появлялись сразу
+export const revalidate = 0;
+
 export default async function ProjectLandingPage({
   params,
 }: {
@@ -17,7 +20,6 @@ export default async function ProjectLandingPage({
     .single();
 
   // Если проекта нет или он скрыт - показываем 404 прямо здесь
-  // Файл not-found.tsx больше не нужен!
   if (!project || project.is_active === false) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4 animate-in fade-in zoom-in-95 duration-500">
@@ -75,7 +77,7 @@ export default async function ProjectLandingPage({
                 <div className="text-5xl mb-5 group-hover:scale-110 transition-transform origin-left drop-shadow-sm">
                   {tab.icon || "📄"}
                 </div>
-                {/* Используем правильное поле title */}
+                {/* ИСПРАВЛЕНО: tab.title вместо tab.name */}
                 <h4 className="text-xl font-bold text-gray-900 mb-2">{tab.title}</h4>
                 <div 
                   className="font-semibold text-sm flex items-center gap-1.5"

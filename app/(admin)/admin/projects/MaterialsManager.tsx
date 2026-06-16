@@ -72,7 +72,12 @@ export default function MaterialsManager() {
         // Обязательно передаем project_tab_id
         body: JSON.stringify({ ...editingMaterial, project_tab_id: selectedTabId }),
       });
-      if (!res.ok) throw new Error("Ошибка сохранения");
+      
+      // ИСПРАВЛЕНО: Читаем текст ошибки с бэкенда
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Ошибка сохранения материала в БД");
+      }
       
       setEditingMaterial(null);
       // Обновляем список
@@ -80,7 +85,7 @@ export default function MaterialsManager() {
       const mData = await mRes.json();
       setMaterials(mData.materials || []);
     } catch (err: any) {
-      alert(err.message);
+      alert("❌ Ошибка: " + err.message);
     }
   };
 
@@ -95,12 +100,13 @@ export default function MaterialsManager() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("bucket", "materials"); // бакет для материалов
-      formData.append("folder", "covers");
+      // ИСПРАВЛЕНО: Бакет 'covers' существует в Supabase (в отличие от materials)
+      formData.append("bucket", "covers"); 
+      formData.append("folder", "materials");
 
       const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
       const json = await res.json();
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Сбой загрузки");
+      if (!res.ok || !json?.ok) throw new Error(json?.error || "Сбой загрузки на сервер");
 
       const directUrl = json.publicUrl || json.url || json.imageUrl;
       setEditingMaterial({ ...editingMaterial, cover_image_url: directUrl });
@@ -127,7 +133,6 @@ export default function MaterialsManager() {
           <label className="block text-xs font-bold text-gray-500 uppercase mb-2">2. Вкладка (Таб)</label>
           <select value={selectedTabId} onChange={e => setSelectedTabId(e.target.value)} disabled={!selectedProjectId} className="w-full border-2 rounded-xl px-4 py-2.5 outline-none bg-gray-50 font-bold disabled:opacity-50">
             <option value="">-- Сначала таб --</option>
-            {/* ИСПРАВЛЕНО: используем t.title вместо t.name */}
             {tabs.map(t => <option key={t.id} value={t.id}>{t.icon || ""} {t.title}</option>)}
           </select>
         </div>
@@ -163,7 +168,7 @@ export default function MaterialsManager() {
                     if (file) void onPickCover(file);
                   }} />
                   <button type="button" onClick={() => fileRef.current?.click()} disabled={uploadingCover} className="bg-gray-100 hover:bg-gray-200 border-2 text-gray-700 px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-colors">
-                    {uploadingCover ? "⌛" : "📁 Файл"}
+                    {uploadingCover ? "⌛ Загрузка..." : "📁 Загрузить файл"}
                   </button>
                 </div>
                 {editingMaterial.cover_image_url && (
@@ -183,9 +188,8 @@ export default function MaterialsManager() {
           <div>
             <label className="block text-sm font-bold mb-2">Уровни доступа (Классы)</label>
             <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-xl border">
-              {levels.length === 0 ? <span className="text-red-500 text-sm">Добавьте уровни в настройках проекта</span> : levels.map(lvl => (
-                // ИСПРАВЛЕНО: используем lvl.code и lvl.label
-                <label key={lvl.id} className={`px-3 py-1.5 rounded-lg border cursor-pointer text-sm font-medium ${editingMaterial.target_levels?.includes(lvl.code) ? 'bg-blue-100 border-blue-500 text-blue-800' : 'bg-white'}`}>
+              {levels.length === 0 ? <span className="text-red-500 text-sm font-bold">⚠️ Добавьте уровни в настройках проекта</span> : levels.map(lvl => (
+                <label key={lvl.id} className={`px-3 py-1.5 rounded-lg border cursor-pointer text-sm font-medium transition-colors ${editingMaterial.target_levels?.includes(lvl.code) ? 'bg-blue-100 border-blue-500 text-blue-800' : 'bg-white hover:bg-gray-100'}`}>
                   <input type="checkbox" className="hidden" checked={editingMaterial.target_levels?.includes(lvl.code)} onChange={() => toggleLevel(lvl.code)} />
                   {lvl.label}
                 </label>
@@ -195,50 +199,75 @@ export default function MaterialsManager() {
 
           <div className="flex gap-6 p-4 bg-gray-50 rounded-xl border">
             <label className="flex items-center gap-2 cursor-pointer font-bold">
-              <input type="checkbox" className="w-5 h-5" checked={editingMaterial.is_active} onChange={e => setEditingMaterial({...editingMaterial, is_active: e.target.checked})} />
+              <input type="checkbox" className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" checked={editingMaterial.is_active} onChange={e => setEditingMaterial({...editingMaterial, is_active: e.target.checked})} />
               Отображать на сайте (is_active)
             </label>
             <label className="flex items-center gap-2 cursor-pointer font-bold">
-              <input type="checkbox" className="w-5 h-5" checked={editingMaterial.is_available} onChange={e => setEditingMaterial({...editingMaterial, is_available: e.target.checked})} />
+              <input type="checkbox" className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" checked={editingMaterial.is_available} onChange={e => setEditingMaterial({...editingMaterial, is_available: e.target.checked})} />
               Доступен всем без заявок (is_available)
             </label>
           </div>
 
           <div className="flex gap-4">
-            <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold">Сохранить</button>
-            <button type="button" onClick={() => setEditingMaterial(null)} className="bg-gray-200 text-gray-800 px-6 py-2 rounded-xl font-bold">Отмена</button>
+            <button type="submit" className="bg-blue-600 hover:bg-blue-700 transition-colors text-white px-6 py-2.5 rounded-xl font-bold">Сохранить</button>
+            <button type="button" onClick={() => setEditingMaterial(null)} className="bg-gray-200 hover:bg-gray-300 transition-colors text-gray-800 px-6 py-2.5 rounded-xl font-bold">Отмена</button>
           </div>
         </form>
       )}
 
-      {/* СПИСОК */}
-      {materials.length > 0 && !editingMaterial && (
-        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+      {/* ИСПРАВЛЕНО: Список материалов теперь показывается всегда, когда выбран таб (даже если он пустой) */}
+      {!editingMaterial && selectedProjectId && selectedTabId && (
+        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden mt-6">
           <table className="w-full text-left">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="p-4 font-bold">Название</th>
-                <th className="p-4 font-bold">Уровни</th>
-                <th className="p-4 font-bold text-center">Статус</th>
+                <th className="p-4 font-bold text-gray-600">Название</th>
+                <th className="p-4 font-bold text-gray-600">Уровни</th>
+                <th className="p-4 font-bold text-gray-600 text-center">Статус</th>
                 <th className="p-4"></th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {materials.map(mat => (
-                <tr key={mat.id} className="hover:bg-gray-50">
-                  <td className="p-4 font-bold flex items-center gap-3">
-                    {mat.cover_image_url && <img src={mat.cover_image_url} alt="" className="w-10 h-10 object-cover rounded shadow-sm" />}
-                    {mat.title}
-                  </td>
-                  <td className="p-4 text-xs font-mono text-gray-500">{(mat.target_levels || []).join(", ")}</td>
-                  <td className="p-4 text-center text-sm font-bold">
-                    {mat.is_available ? <span className="text-green-600">Всем</span> : <span className="text-yellow-600">По заявке</span>}
-                  </td>
-                  <td className="p-4 text-right">
-                    <button onClick={() => setEditingMaterial(mat)} className="text-blue-600 font-bold">Изменить</button>
+              {materials.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-10 text-center text-gray-500 font-bold bg-gray-50/50">
+                    В этом разделе пока нет материалов. Создайте первый!
                   </td>
                 </tr>
-              ))}
+              ) : (
+                materials.map(mat => (
+                  <tr key={mat.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="p-4 font-bold flex items-center gap-4">
+                      {mat.cover_image_url ? (
+                        <img src={mat.cover_image_url} alt="" className="w-12 h-12 object-cover rounded-lg shadow-sm border" />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl shadow-sm border">📄</div>
+                      )}
+                      <div>
+                        {mat.title}
+                        {mat.description && <div className="text-xs font-normal text-gray-500 mt-0.5 truncate max-w-xs">{mat.description}</div>}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex flex-wrap gap-1">
+                        {(mat.target_levels || []).map((code: string) => (
+                          <span key={code} className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded uppercase">
+                            {code}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="p-4 text-center text-sm font-bold">
+                      {mat.is_available ? <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg">Всем</span> : <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-lg">По заявке</span>}
+                    </td>
+                    <td className="p-4 text-right">
+                      <button onClick={() => setEditingMaterial(mat)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg font-bold transition-colors">
+                        Изменить
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

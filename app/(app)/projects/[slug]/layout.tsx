@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import Link from "next/link";
 
+// Отключаем кэширование, чтобы новые ветки загружались мгновенно
+export const revalidate = 0; 
+
 export default async function ProjectLayout({
   children,
   params,
@@ -12,14 +15,15 @@ export default async function ProjectLayout({
   const supabase = await createSupabaseServerClient();
   const { slug } = await params;
 
-  // 1. Получаем конфиг ветки
+  // 1. Получаем конфиг ветки (ИСПРАВЛЕНО: is_available заменено на is_active)
   const { data: project } = await supabase
     .from("projects")
-    .select("id, name, slug, is_available, theme")
+    .select("id, name, slug, is_active, theme")
     .eq("slug", slug)
     .single();
 
-  if (!project || !project.is_available) {
+  // ИСПРАВЛЕНО: проверяем is_active
+  if (!project || project.is_active === false) {
     notFound(); // Если проекта нет или он скрыт админом -> 404
   }
 
