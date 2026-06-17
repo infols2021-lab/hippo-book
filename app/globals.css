@@ -1,13 +1,19 @@
 @import "tailwindcss";
 
 :root {
+  /* Дефолтные цвета для всего сайта (fallback) */
   --background: #f8fafc;
   --foreground: #0f172a;
   
-  /* Дефолтные переменные для новых веток (переопределяются через ProjectShell из БД) */
+  /* Дефолтные переменные для веток (переопределяются через layout.tsx) */
   --project-primary: #3b82f6;
   --project-secondary: #1d4ed8;
   --project-bg: #f8fafc;
+  --project-text: #0f172a;
+  --project-muted: #64748b;
+  --project-card-bg: #ffffff;
+  --project-border: rgba(15, 23, 42, 0.12);
+  --project-glow: rgba(59, 130, 246, 0.25);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,9 +23,14 @@
   }
 }
 
+/* ==========================================
+   ГЛОБАЛЬНЫЙ ФОН И ТЕКСТ (переопределяются веткой)
+   ========================================== */
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: var(--project-bg, var(--background));
+  color: var(--project-text, var(--foreground));
+  min-height: 100vh;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* ==========================================
@@ -34,7 +45,6 @@ body {
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari and Opera */
 }
-
 
 /* ==========================================
    АДМИНКА (Инструмент сжатия)

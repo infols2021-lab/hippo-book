@@ -68,31 +68,42 @@ export default async function ProjectLayout({
     theme?.glowColor ||
     "rgba(59, 130, 246, 0.25)";
 
+  // Формируем глобальные CSS-переменные для всего документа
+  const cssVars = `
+    :root {
+      --project-primary: ${primaryColor};
+      --project-secondary: ${secondaryColor};
+      --project-bg: ${bgColor};
+      --project-text: ${textColor};
+      --project-muted: ${mutedColor};
+      --project-card-bg: ${cardBgColor};
+      --project-border: ${borderColor};
+      --project-glow: ${glowColor};
+      --accent2: ${primaryColor};
+      --accent2-soft: ${primaryColor}22;
+    }
+    body {
+      background-color: ${bgColor};
+      color: ${textColor};
+    }
+  `;
+
   return (
-    <div
-      style={
-        {
-          // Основные переменные
-          "--project-primary": primaryColor,
-          "--project-secondary": secondaryColor,
-          "--project-bg": bgColor,
-          "--project-text": textColor,
-          "--project-muted": mutedColor,
-          "--project-card-bg": cardBgColor,
-          "--project-border": borderColor,
-          "--project-glow": glowColor,
+    <>
+      {/* Глобальные стили для всей страницы */}
+      <style dangerouslySetInnerHTML={{ __html: cssVars }} />
 
-          // Алиасы для обратной совместимости со старыми стилями
-          "--accent2": primaryColor,
-          "--accent2-soft": `${primaryColor}22`,
-
-          // Цвет фона страницы
-          backgroundColor: bgColor,
-        } as React.CSSProperties
-      }
-      className="min-h-screen w-full transition-colors duration-500"
-    >
-      {children}
-    </div>
+      <div
+        style={
+          {
+            // Дополнительные переменные для локального использования (если нужно)
+            backgroundColor: bgColor,
+          } as React.CSSProperties
+        }
+        className="min-h-screen w-full transition-colors duration-500"
+      >
+        {children}
+      </div>
+    </>
   );
 }
