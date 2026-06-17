@@ -1,11 +1,11 @@
-/* app/(app)/profile/profile.css */
+/* app/(app)/projects/[slug]/profile/profile.css */
 
 /* ===== Hard reset for this page (fix top stripe) ===== */
 html,
 body {
   margin: 0 !important;
   padding: 0 !important;
-  background: #c9efff;
+  background: var(--project-bg, #c9efff);
 }
 
 body {
@@ -38,8 +38,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  color: #07172e;
-  background-color: #c9efff;
+  color: var(--project-text, #07172e);
+  background-color: var(--project-bg, #c9efff);
   background-image:
     var(--profile-overlay, none),
     radial-gradient(1200px 720px at 14% 10%, rgba(0, 180, 255, 0.42), transparent 60%),
@@ -99,8 +99,8 @@ body {
   padding: 14px 16px;
   border-radius: 22px;
 
-  background: rgba(255, 255, 255, 0.90);
-  border: 1px solid rgba(255, 255, 255, 0.96);
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.90));
+  border: 1px solid var(--project-border, rgba(255, 255, 255, 0.96));
   box-shadow: 0 18px 55px rgba(6, 30, 58, 0.14);
 
   backdrop-filter: blur(8px);
@@ -125,21 +125,21 @@ body {
   letter-spacing: 0.5px;
   color: white;
 
-  background: linear-gradient(135deg, rgba(20, 140, 255, 0.99), rgba(0, 235, 200, 0.99));
-  box-shadow: 0 14px 34px rgba(0, 235, 200, 0.24);
+  background: var(--project-primary, linear-gradient(135deg, rgba(20, 140, 255, 0.99), rgba(0, 235, 200, 0.99)));
+  box-shadow: 0 14px 34px var(--project-glow, rgba(0, 235, 200, 0.24));
 }
 
 .brand-title {
   font-size: 20px;
   font-weight: 1000;
   line-height: 1.1;
-  color: #07172e;
+  color: var(--project-text, #07172e);
 }
 
 .brand-subtitle {
   font-size: 12px;
   font-weight: 900;
-  color: rgba(7, 23, 46, 0.62);
+  color: var(--project-muted, rgba(7, 23, 46, 0.62));
   margin-top: 2px;
 }
 
@@ -346,8 +346,8 @@ body {
 
 .panel {
   border-radius: 26px;
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(255, 255, 255, 0.97);
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.86));
+  border: 1px solid var(--project-border, rgba(255, 255, 255, 0.97));
   box-shadow: 0 22px 70px rgba(6, 30, 58, 0.14);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -357,8 +357,8 @@ body {
 /* ===== Left profile panel ===== */
 .profile-card {
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.98);
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.92));
+  border: 1px solid var(--project-border, rgba(255, 255, 255, 0.98));
   box-shadow: inset 0 0 0 1px rgba(25, 145, 255, 0.10);
   padding: 24px 16px;
   text-align: center;
@@ -438,7 +438,7 @@ body {
 .profile-name {
   font-size: 26px;
   font-weight: 1000;
-  color: #07172e;
+  color: var(--project-text, #07172e);
   margin-top: 8px;
 }
 
@@ -454,8 +454,8 @@ body {
 
   padding: 8px 16px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(25, 145, 255, 0.22);
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.96));
+  border: 1px solid var(--project-border, rgba(25, 145, 255, 0.22));
   box-shadow: 0 10px 24px rgba(6, 30, 58, 0.06);
 }
 
@@ -468,7 +468,7 @@ body {
   background: rgba(25, 145, 255, 0.16);
   font-size: 13px;
   font-weight: 900;
-  color: var(--accent-blue);
+  color: var(--project-primary, #0d63ff);
   flex: 0 0 auto;
 }
 
@@ -476,7 +476,7 @@ body {
   min-width: 0;
   font-size: 13px;
   font-weight: 900;
-  color: rgba(7, 23, 46, 0.82);
+  color: var(--project-muted, rgba(7, 23, 46, 0.82));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -487,7 +487,7 @@ body {
   margin-bottom: 20px;
   font-size: 14px;
   font-weight: 900;
-  color: rgba(7, 23, 46, 0.60);
+  color: var(--project-muted, rgba(7, 23, 46, 0.60));
 }
 
 /* ===== Visual Renderers ===== */
@@ -517,7 +517,7 @@ body {
   height: 100%;
   line-height: 1;
   font-weight: 1000;
-  color: var(--text-main);
+  color: var(--project-text, #07224a);
 }
 
 .streak-visual--avatar {
@@ -682,15 +682,15 @@ body {
   grid-template-columns: 1fr 1px 1fr;
   align-items: stretch;
 
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.98);
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.94));
+  border: 1px solid var(--project-border, rgba(255, 255, 255, 0.98));
   border-radius: 16px;
   box-shadow: 0 14px 30px rgba(6, 30, 58, 0.08);
   overflow: hidden;
 }
 
 .profile-mini-divider {
-  background: rgba(7, 23, 46, 0.10);
+  background: var(--project-muted, rgba(7, 23, 46, 0.10));
 }
 
 .mini-col {
@@ -708,14 +708,14 @@ body {
   font-size: 11px;
   font-weight: 1000;
   letter-spacing: 0.8px;
-  color: rgba(7, 23, 46, 0.56);
+  color: var(--project-muted, rgba(7, 23, 46, 0.56));
   text-transform: uppercase;
 }
 
 .mini-val {
   font-size: 15px;
   font-weight: 1000;
-  color: #07172e;
+  color: var(--project-text, #07172e);
 }
 
 /* ===== Support Tech Card (NEW) ===== */
@@ -726,15 +726,15 @@ body {
   padding: 16px;
 
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.98);
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.94));
+  border: 1px solid var(--project-border, rgba(255, 255, 255, 0.98));
   box-shadow: 0 14px 30px rgba(6, 30, 58, 0.06);
 }
 
 .support-title {
   font-weight: 1000;
   font-size: 13px;
-  color: var(--text-soft);
+  color: var(--project-muted, #0b3563);
   margin-bottom: 12px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -814,8 +814,8 @@ body {
   padding: 8px 12px;
 
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.98);
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.94));
+  border: 1px solid var(--project-border, rgba(255, 255, 255, 0.98));
   box-shadow: 0 14px 30px rgba(6, 30, 58, 0.06);
 }
 
@@ -829,7 +829,7 @@ body {
 .streak-summary-row + .streak-summary-row {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid rgba(7, 23, 46, 0.10);
+  border-top: 1px solid var(--project-border, rgba(7, 23, 46, 0.10));
 }
 
 .streak-summary-row--button {
@@ -860,13 +860,13 @@ body {
 .streak-summary-key {
   font-size: 13px;
   font-weight: 1000;
-  color: rgba(7, 23, 46, 0.70);
+  color: var(--project-muted, rgba(7, 23, 46, 0.70));
 }
 
 .streak-summary-value {
   font-size: 14px;
   font-weight: 1000;
-  color: rgba(7, 23, 46, 0.94);
+  color: var(--project-text, rgba(7, 23, 46, 0.94));
   white-space: nowrap;
 }
 
@@ -912,9 +912,9 @@ body {
 }
 
 .action-btn--soft {
-  color: rgba(7, 23, 46, 0.95);
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(25, 145, 255, 0.22);
+  color: var(--project-text, rgba(7, 23, 46, 0.95));
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.92));
+  border: 1px solid var(--project-border, rgba(25, 145, 255, 0.22));
   box-shadow: 0 16px 30px rgba(6, 30, 58, 0.06);
 }
 
@@ -927,8 +927,8 @@ body {
 /* ===== Right panel sections ===== */
 .section {
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.90);
-  border: 1px solid rgba(255, 255, 255, 0.98);
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.90));
+  border: 1px solid var(--project-border, rgba(255, 255, 255, 0.98));
   box-shadow: inset 0 0 0 1px rgba(25, 145, 255, 0.08);
   padding: 24px;
 }
@@ -944,14 +944,14 @@ body {
 
   font-size: 18px;
   font-weight: 1000;
-  color: rgba(7, 23, 46, 0.92);
+  color: var(--project-text, rgba(7, 23, 46, 0.92));
   margin: 2px 0 20px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .section-title b {
-  color: rgba(0, 210, 185, 1);
+  color: var(--project-primary, rgba(0, 210, 185, 1));
 }
 
 /* mini stats row */
@@ -963,8 +963,8 @@ body {
 
 .mini-stat {
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.98);
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.92));
+  border: 1px solid var(--project-border, rgba(255, 255, 255, 0.98));
   box-shadow: 0 14px 30px rgba(6, 30, 58, 0.06);
   padding: 20px 16px;
   text-align: center;
@@ -973,7 +973,7 @@ body {
 .mini-stat-number {
   font-size: 38px;
   font-weight: 1000;
-  color: rgba(0, 210, 185, 1);
+  color: var(--project-primary, rgba(0, 210, 185, 1));
   line-height: 1;
   margin-bottom: 8px;
 }
@@ -981,7 +981,7 @@ body {
 .mini-stat-label {
   font-size: 13px;
   font-weight: 900;
-  color: rgba(7, 23, 46, 0.64);
+  color: var(--project-muted, rgba(7, 23, 46, 0.64));
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -995,8 +995,8 @@ body {
 
 .progress-row {
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.98);
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.92));
+  border: 1px solid var(--project-border, rgba(255, 255, 255, 0.98));
   box-shadow: 0 14px 28px rgba(6, 30, 58, 0.06);
   padding: 16px 18px;
 
@@ -1046,7 +1046,7 @@ body {
 
 .progress-title {
   font-weight: 1000;
-  color: rgba(7, 23, 46, 0.94);
+  color: var(--project-text, rgba(7, 23, 46, 0.94));
   font-size: 16px;
   line-height: 1.3;
   margin-bottom: 4px;
@@ -1055,7 +1055,7 @@ body {
 .progress-sub {
   font-size: 13px;
   font-weight: 900;
-  color: rgba(7, 23, 46, 0.66);
+  color: var(--project-muted, rgba(7, 23, 46, 0.66));
 }
 
 .progress-right {
@@ -1068,7 +1068,7 @@ body {
   width: 180px;
   height: 10px;
   border-radius: 999px;
-  background: rgba(7, 23, 46, 0.12);
+  background: var(--project-muted, rgba(7, 23, 46, 0.12));
   overflow: hidden;
 }
 
@@ -1076,7 +1076,7 @@ body {
   height: 100%;
   border-radius: 999px;
   width: 0%;
-  background: linear-gradient(90deg, rgba(25, 145, 255, 0.99), rgba(0, 235, 200, 0.99));
+  background: var(--project-primary, linear-gradient(90deg, rgba(25, 145, 255, 0.99), rgba(0, 235, 200, 0.99)));
   transition: width 0.35s ease;
 }
 
@@ -1084,7 +1084,7 @@ body {
   min-width: 44px;
   text-align: right;
   font-weight: 1000;
-  color: rgba(0, 210, 185, 1);
+  color: var(--project-primary, rgba(0, 210, 185, 1));
   font-size: 16px;
 }
 
@@ -1103,7 +1103,7 @@ body {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  color: rgba(7, 23, 46, 0.78);
+  color: var(--project-muted, rgba(7, 23, 46, 0.78));
   font-weight: 900;
   font-size: 14px;
   line-height: 1.4;
@@ -1113,7 +1113,7 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--accent-blue);
+  background: var(--project-primary, #0d63ff);
   flex: 0 0 auto;
   margin-top: 6px;
 }
@@ -1134,7 +1134,7 @@ body {
 
 .spinner {
   border: 3px solid rgba(255, 255, 255, 0.28);
-  border-top: 3px solid rgba(0, 235, 200, 1);
+  border-top: 3px solid var(--project-primary, rgba(0, 235, 200, 1));
   border-radius: 50%;
   width: 18px;
   height: 18px;
@@ -1160,7 +1160,7 @@ body {
   margin-bottom: 8px;
   font-weight: 1000;
   font-size: 13px;
-  color: rgba(7, 23, 46, 0.86);
+  color: var(--project-text, rgba(7, 23, 46, 0.86));
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -1173,10 +1173,10 @@ body {
   padding: 14px 16px;
   border-radius: 14px;
   border: 1px solid rgba(25, 145, 255, 0.28);
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--project-card-bg, rgba(255, 255, 255, 0.96));
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.62);
   font-weight: 900;
-  color: rgba(7, 23, 46, 0.95);
+  color: var(--project-text, rgba(7, 23, 46, 0.95));
   outline: none;
   font-size: 15px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1185,16 +1185,16 @@ body {
 #profileBody .form-group input:focus,
 #profileBody .form-group select:focus,
 #profileBody .form-group textarea:focus {
-  border-color: rgba(0, 235, 200, 0.74);
-  box-shadow: 0 0 0 4px rgba(0, 235, 200, 0.16);
+  border-color: var(--project-primary, rgba(0, 235, 200, 0.74));
+  box-shadow: 0 0 0 4px var(--project-glow, rgba(0, 235, 200, 0.16));
 }
 
 #profileBody .form-group input[disabled],
 #profileBody .form-group select[disabled],
 #profileBody .form-group textarea[disabled] {
   background: rgba(7, 23, 46, 0.06) !important;
-  border-color: rgba(7, 23, 46, 0.14) !important;
-  color: rgba(7, 23, 46, 0.55) !important;
+  border-color: var(--project-border, rgba(7, 23, 46, 0.14)) !important;
+  color: var(--project-muted, rgba(7, 23, 46, 0.55)) !important;
   cursor: not-allowed;
 }
 
@@ -1205,7 +1205,7 @@ body {
   margin-top: 24px;
   flex-wrap: wrap;
   padding-top: 16px;
-  border-top: 1px solid rgba(7, 23, 46, 0.12);
+  border-top: 1px solid var(--project-border, rgba(7, 23, 46, 0.12));
 }
 
 /* ===== Responsive ===== */
@@ -1293,9 +1293,9 @@ body {
 }
 
 /* =======================================================================
-   HIGH-CONTRAST TEXT OVERRIDE
+   HIGH-CONTRAST TEXT OVERRIDE (fallback, переопределено через var)
    ======================================================================= */
-#profileBody{
+#profileBody {
   --text-strong: #04162f;
   --text-main:   #07224a;
   --text-soft:   #0b3563;
@@ -1311,7 +1311,7 @@ body {
 .streak-summary-card,
 .mini-stat,
 .progress-row {
-  color: var(--text-main);
+  color: var(--project-text, var(--text-main));
 }
 
 .brand-title,
@@ -1321,7 +1321,7 @@ body {
 .mini-val,
 .streak-summary-value,
 .info-li b {
-  color: var(--text-strong) !important;
+  color: var(--project-text, var(--text-strong)) !important;
 }
 
 .brand-subtitle,
@@ -1335,18 +1335,18 @@ body {
 .progress-type,
 .progress-type--textbook,
 .progress-type--crossword {
-  color: var(--text-soft) !important;
+  color: var(--project-muted, var(--text-soft)) !important;
   opacity: 1 !important;
 }
 
 .section-title b,
 .mini-stat-number,
 .progress-percent {
-  color: var(--accent-teal) !important;
+  color: var(--project-primary, var(--accent-teal)) !important;
 }
 
 .progress-bar {
-  background: rgba(4, 22, 47, 0.14) !important;
+  background: var(--project-muted, rgba(4, 22, 47, 0.14)) !important;
 }
 
 .progress-title { letter-spacing: 0.005em; }
@@ -1362,11 +1362,11 @@ body {
 .streak-lb-title,
 .streak-lb-place,
 .streak-lb-val {
-  color: var(--text-strong) !important;
+  color: var(--project-text, var(--text-strong)) !important;
 }
 .streak-lb-sub,
 .streak-lb-hint,
 .streak-lb-head {
-  color: var(--text-soft) !important;
+  color: var(--project-muted, var(--text-soft)) !important;
   opacity: 1 !important;
 }

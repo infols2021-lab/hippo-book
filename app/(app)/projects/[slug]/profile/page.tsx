@@ -23,7 +23,7 @@ export default async function ProjectProfilePage({
   // 2. Получаем ядро ветки (проекта)
   const { data: project } = await supabase
     .from("projects")
-    .select("id, name, slug, features, is_active, theme")
+    .select("id, name, slug, features, is_active, theme, theme_color")
     .eq("slug", slug)
     .single();
 
@@ -33,9 +33,9 @@ export default async function ProjectProfilePage({
   }
 
   // 3. Получаем данные профиля пользователя (имя, телефон, регион, роль)
-  // Предполагаем, что публичные данные лежат в таблице users (или profiles)
+  // Используем таблицу profiles (не users)
   const { data: userProfile } = await supabase
-    .from("users")
+    .from("profiles")
     .select("full_name, contact_phone, region, is_admin")
     .eq("id", user.id)
     .maybeSingle();
@@ -58,9 +58,7 @@ export default async function ProjectProfilePage({
   // Достаем картинку фона из темы (если она была задана в админке)
   const backgroundUrl = project.theme?.backgroundUrl || project.theme?.bgImage || null;
 
-  // 5. Передаем всё в умный клиентский компонент, который сделает всю магию!
-  // Загрузку статистики (stats, materialsProgress) и стриков ProfileClient 
-  // выполнит сам через свои API-роуты (/api/profile-progress и др.)
+  // 5. Передаём всё в умный клиентский компонент
   return (
     <ProfileClient
       projectName={project.name}

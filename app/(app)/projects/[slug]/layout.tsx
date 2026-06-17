@@ -2,51 +2,96 @@ import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 // Отключаем кэширование, чтобы статусы веток проверялись мгновенно
-export const revalidate = 0; 
+export const revalidate = 0;
 
 export default async function ProjectLayout({
   children,
   params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ slug: string }>; // Next.js 15 async params
+  params: Promise<{ slug: string }>;
 }) {
   const supabase = await createSupabaseServerClient();
   const { slug } = await params;
 
-  // 1. Получаем конфиг ветки
+  // 1. Получаем конфиг ветки вместе с цветом темы
   const { data: project } = await supabase
     .from("projects")
-    .select("id, is_active, theme")
+    .select("id, is_active, theme, theme_color")
     .eq("slug", slug)
     .single();
 
-  // Проверяем, существует ли проект и активен ли он
   if (!project || project.is_active === false) {
     notFound();
   }
 
-  // 2. Читаем тему (с обратной совместимостью для старого и нового форматов)
+  // 2. Извлекаем цвета с приоритетом: theme.colors.primary -> theme.primaryColor -> theme_color -> дефолт
   const theme = project.theme || {};
-  const primaryColor = theme?.colors?.primary || theme.primaryColor || theme.theme_color || "#3b82f6";
-  const secondaryColor = theme?.colors?.secondary || theme.secondaryColor || "#1d4ed8";
-  const bgColor = theme?.colors?.pageBg || theme.backgroundColor || "#f8fafc";
+  const primaryColor =
+    theme?.colors?.primary ||
+    theme?.primaryColor ||
+    project.theme_color ||
+    "#3b82f6";
+
+  const secondaryColor =
+    theme?.colors?.secondary ||
+    theme?.secondaryColor ||
+    "#1d4ed8";
+
+  const bgColor =
+    theme?.colors?.pageBg ||
+    theme?.backgroundColor ||
+    "#f8fafc";
+
+  const textColor =
+    theme?.colors?.textColor ||
+    theme?.textColor ||
+    "#0f172a";
+
+  const mutedColor =
+    theme?.colors?.muted ||
+    theme?.mutedColor ||
+    "#64748b";
+
+  const cardBgColor =
+    theme?.colors?.cardBg ||
+    theme?.cardBg ||
+    "#ffffff";
+
+  const borderColor =
+    theme?.colors?.border ||
+    theme?.borderColor ||
+    "rgba(15, 23, 42, 0.12)";
+
+  const glowColor =
+    theme?.colors?.glow ||
+    theme?.glowColor ||
+    "rgba(59, 130, 246, 0.25)";
 
   return (
     <div
-      // 🚀 Инжектим цвета из БД прямо в CSS-переменные этого DOM-дерева!
-      // Теперь ProfileClient и MaterialsClient могут использовать var(--project-primary)
-      style={{
-        "--project-primary": primaryColor,
-        "--project-secondary": secondaryColor,
-        "--project-bg": bgColor,
-        backgroundColor: "var(--project-bg)",
-      } as React.CSSProperties}
+      style={
+        {
+          // Основные переменные
+          "--project-primary": primaryColor,
+          "--project-secondary": secondaryColor,
+          "--project-bg": bgColor,
+          "--project-text": textColor,
+          "--project-muted": mutedColor,
+          "--project-card-bg": cardBgColor,
+          "--project-border": borderColor,
+          "--project-glow": glowColor,
+
+          // Алиасы для обратной совместимости со старыми стилями
+          "--accent2": primaryColor,
+          "--accent2-soft": `${primaryColor}22`,
+
+          // Цвет фона страницы
+          backgroundColor: bgColor,
+        } as React.CSSProperties
+      }
       className="min-h-screen w-full transition-colors duration-500"
     >
-      {/* Здесь больше нет белой шапки-навигации. 
-        Дочерние страницы (Профиль и Материалы) сами рендерят свой идеальный UI.
-      */}
       {children}
     </div>
   );

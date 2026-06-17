@@ -1,22 +1,29 @@
-/* app/(app)/materials/materials.css */
+/* app/(app)/projects/[slug]/materials/materials.css */
+
+/* Определяем мягкие версии цветов на основе переменных темы */
+:root {
+  --project-primary-soft: color-mix(in srgb, var(--project-primary, #4ecdc4) 18%, transparent);
+  --project-secondary-soft: color-mix(in srgb, var(--project-secondary, #6ebeff) 22%, transparent);
+  --project-primary-glow: color-mix(in srgb, var(--project-primary, #4ecdc4) 14%, transparent);
+}
 
 /* фон страницы как в профиле/логине */
 .materials-page {
   min-height: 100vh;
   padding: 22px 0;
 
-  background-color: #eaf7ff;
+  background-color: var(--project-bg, #eaf7ff);
   background-image:
-    radial-gradient(1200px 700px at 15% 10%, rgba(78, 205, 196, 0.18), transparent 60%),
-    radial-gradient(1100px 700px at 85% 20%, rgba(110, 190, 255, 0.22), transparent 62%),
-    linear-gradient(180deg, #f5fbff 0%, #d7eefc 58%, #f0fbff 100%);
+    radial-gradient(1200px 700px at 15% 10%, var(--project-primary-soft, rgba(78, 205, 196, 0.18)), transparent 60%),
+    radial-gradient(1100px 700px at 85% 20%, var(--project-secondary-soft, rgba(110, 190, 255, 0.22)), transparent 62%),
+    linear-gradient(180deg, var(--project-bg, #f5fbff) 0%, color-mix(in srgb, var(--project-bg, #d7eefc) 80%, var(--project-primary, #d7eefc)) 58%, var(--project-bg, #f0fbff) 100%);
   background-attachment: fixed;
 
-  color: #1f2937;
+  color: var(--project-text, #1f2937);
 }
 
-.materials-page::after{
-  content:"";
+.materials-page::after {
+  content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -36,21 +43,21 @@
   margin: 0 0 6px 0;
   font-size: 18px;
   font-weight: 1000;
-  color: rgba(44, 62, 80, 0.86);
+  color: var(--project-text, rgba(44, 62, 80, 0.86));
 }
 
 .materials-subtitle {
   margin: 0 0 14px 0;
   font-size: 13px;
   font-weight: 850;
-  color: rgba(44, 62, 80, 0.60);
+  color: var(--project-muted, rgba(44, 62, 80, 0.60));
 }
 
 /* “Стеклянная” плашка под табами */
 .materials-panel {
-  background: rgba(255,255,255,0.62);
-  border: 1px solid rgba(255,255,255,0.75);
-  box-shadow: 0 20px 60px rgba(15, 65, 95, 0.14);
+  background: var(--project-card-bg, rgba(255,255,255,0.62));
+  border: 1px solid var(--project-border, rgba(255,255,255,0.75));
+  box-shadow: 0 20px 60px var(--project-glow, rgba(15, 65, 95, 0.14));
   backdrop-filter: blur(14px);
   border-radius: 22px;
   padding: 14px;
@@ -64,12 +71,12 @@
   flex-wrap: wrap;
   padding: 8px;
 
-  background: rgba(255,255,255,0.60);
-  border: 1px solid rgba(255,255,255,0.75);
+  background: var(--project-card-bg, rgba(255,255,255,0.60));
+  border: 1px solid var(--project-border, rgba(255,255,255,0.75));
   backdrop-filter: blur(14px);
   border-radius: 999px;
 
-  box-shadow: 0 16px 40px rgba(15, 65, 95, 0.12);
+  box-shadow: 0 16px 40px var(--project-glow, rgba(15, 65, 95, 0.12));
   margin: 14px 0 16px;
 }
 
@@ -81,12 +88,12 @@
 
   font-size: 14px;
   font-weight: 1000;
-  color: rgba(44, 62, 80, 0.70);
-  background: rgba(255,255,255,0.55);
-  border: 1px solid rgba(110,190,255,0.18);
+  color: var(--project-muted, rgba(44, 62, 80, 0.70));
+  background: var(--project-card-bg, rgba(255,255,255,0.55));
+  border: 1px solid var(--project-secondary-soft, rgba(110,190,255,0.18));
 
   transition: transform .12s ease, filter .12s ease, background .12s ease;
-  box-shadow: 0 14px 26px rgba(15,65,95,0.10);
+  box-shadow: 0 14px 26px var(--project-glow, rgba(15,65,95,0.10));
 }
 
 .material-tab:hover {
@@ -100,10 +107,10 @@
 }
 
 .material-tab.active {
-  color: white;
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.95), rgba(110, 190, 255, 0.92));
+  color: #fff;
+  background: linear-gradient(135deg, var(--project-primary, #4ecdc4), var(--project-secondary, #6ebeff));
   border-color: transparent;
-  box-shadow: 0 18px 36px rgba(78,205,196,0.18);
+  box-shadow: 0 18px 36px var(--project-glow, rgba(78,205,196,0.18));
 }
 
 .materials-section {
@@ -130,22 +137,22 @@
   border-radius: 18px;
   padding: 16px;
 
-  background: rgba(255,255,255,0.70);
-  border: 1px solid rgba(255,255,255,0.80);
+  background: var(--project-card-bg, rgba(255,255,255,0.70));
+  border: 1px solid var(--project-border, rgba(255,255,255,0.80));
   backdrop-filter: blur(14px);
 
-  box-shadow: 0 16px 46px rgba(15, 65, 95, 0.14);
+  box-shadow: 0 16px 46px var(--project-glow, rgba(15, 65, 95, 0.14));
   transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, filter .12s ease;
 }
 
 .material-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 24px 68px rgba(15, 65, 95, 0.18);
-  border-color: rgba(78, 205, 196, 0.45);
+  box-shadow: 0 24px 68px var(--project-glow, rgba(15, 65, 95, 0.18));
+  border-color: var(--project-primary-soft, rgba(78, 205, 196, 0.45));
   filter: brightness(1.01);
 }
 
-/* ✅ FIX: обложка теперь держит 16:9, а не фикс. высоту — 16:9 картинки не режутся на широких карточках */
+/* ✅ FIX: обложка теперь держит 16:9 */
 .material-cover {
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -156,20 +163,20 @@
   align-items: center;
   justify-content: center;
 
-  color: white;
+  color: #fff;
   font-size: 46px;
   font-weight: 1000;
 
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(110, 190, 255, 0.92), rgba(78, 205, 196, 0.92));
+  background: linear-gradient(135deg, var(--project-secondary, rgba(110, 190, 255, 0.92)), var(--project-primary, rgba(78, 205, 196, 0.92)));
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
 }
 
 .material-cover img {
   width: 100%;
   height: 100%;
-  object-fit: contain;     /* ✅ FIX: показываем 16:9 целиком, без “жесткой” обрезки */
-  object-position: center; /* на всякий */
+  object-fit: contain;
+  object-position: center;
   border-radius: 14px;
   display: block;
 }
@@ -178,11 +185,11 @@
   font-size: 16px;
   font-weight: 1000;
   margin-bottom: 6px;
-  color: rgba(44, 62, 80, 0.86);
+  color: var(--project-text, rgba(44, 62, 80, 0.86));
 }
 
 .material-description {
-  color: rgba(44, 62, 80, 0.62);
+  color: var(--project-muted, rgba(44, 62, 80, 0.62));
   font-size: 13px;
   font-weight: 800;
   margin-bottom: 10px;
@@ -193,7 +200,7 @@
 .progress-bar {
   width: 100%;
   height: 8px;
-  background: rgba(44, 62, 80, 0.10);
+  background: var(--project-muted, rgba(44, 62, 80, 0.10));
   border-radius: 999px;
   overflow: hidden;
   margin: 10px 0 8px;
@@ -202,7 +209,7 @@
 .progress-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.95), rgba(110, 190, 255, 0.92));
+  background: linear-gradient(135deg, var(--project-primary, rgba(78, 205, 196, 0.95)), var(--project-secondary, rgba(110, 190, 255, 0.92)));
   border-radius: 999px;
   transition: width 0.3s ease;
 }
@@ -214,7 +221,7 @@
 
   font-size: 12px;
   font-weight: 900;
-  color: rgba(44, 62, 80, 0.55);
+  color: var(--project-muted, rgba(44, 62, 80, 0.55));
 }
 
 .material-stats .pct {
@@ -224,9 +231,9 @@
   padding: 4px 10px;
   border-radius: 999px;
 
-  background: rgba(78, 205, 196, 0.14);
-  border: 1px solid rgba(78, 205, 196, 0.22);
-  color: rgba(44, 62, 80, 0.78);
+  background: var(--project-primary-soft, rgba(78, 205, 196, 0.14));
+  border: 1px solid var(--project-primary-soft, rgba(78, 205, 196, 0.22));
+  color: var(--project-text, rgba(44, 62, 80, 0.78));
 }
 
 /* Locked */
@@ -238,8 +245,8 @@
 
 .material-card.locked:hover {
   transform: none;
-  box-shadow: 0 16px 46px rgba(15, 65, 95, 0.14);
-  border-color: rgba(255,255,255,0.80);
+  box-shadow: 0 16px 46px var(--project-glow, rgba(15, 65, 95, 0.14));
+  border-color: var(--project-border, rgba(255,255,255,0.80));
 }
 
 .locked-overlay {
@@ -252,7 +259,7 @@
   align-items: center;
   justify-content: center;
 
-  color: white;
+  color: #fff;
   font-weight: 1000;
   font-size: 14px;
   letter-spacing: 0.2px;
@@ -265,12 +272,12 @@
   padding: 34px 16px;
   border-radius: 18px;
 
-  background: rgba(255,255,255,0.60);
-  border: 1px solid rgba(255,255,255,0.75);
+  background: var(--project-card-bg, rgba(255,255,255,0.60));
+  border: 1px solid var(--project-border, rgba(255,255,255,0.75));
   backdrop-filter: blur(14px);
-  box-shadow: 0 16px 40px rgba(15,65,95,0.10);
+  box-shadow: 0 16px 40px var(--project-glow, rgba(15,65,95,0.10));
 
-  color: rgba(44, 62, 80, 0.70);
+  color: var(--project-muted, rgba(44, 62, 80, 0.70));
   font-weight: 900;
 }
 
