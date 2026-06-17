@@ -1,8 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
-import AppHeader from "@/components/AppHeader";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
+import MaterialClient from "./MaterialClient";
 
 export const revalidate = 0;
 
@@ -10,29 +9,25 @@ type PageProps = {
   params: Promise<{ slug: string; materialId: string }>;
 };
 
-// Функция для получения ссылки на изображение из хранилища Supabase
+// Функция для получения прямой ссылки на картинку
 function toStorageProxyUrl(raw: unknown) {
   if (typeof raw !== "string") return "";
   const value = raw.trim();
   if (!value) return "";
-
   if (value.startsWith("/api/storage/public/")) return value;
   if (value.startsWith("data:")) return value;
 
   const marker = "/storage/v1/object/public/";
   const idx = value.indexOf(marker);
-
   if (idx === -1) return value;
 
   const restWithQuery = value.slice(idx + marker.length);
   const cleanRest = restWithQuery.split("?")[0]?.split("#")[0] ?? "";
   const parts = cleanRest.split("/").filter(Boolean);
-
   const bucket = parts.shift();
   const path = parts.join("/");
 
   if (!bucket || !path) return value;
-
   return getStoragePublicUrl(bucket, path);
 }
 
@@ -43,7 +38,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
 
   if (!user) redirect("/login");
 
-  // 1. Загружаем информацию о текущем проекте
+  // 1. Получаем проект
   const { data: project } = await supabase
     .from("projects")
     .select("id, name, is_active, theme_color, theme")
@@ -52,10 +47,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
 
   if (!project || !project.is_active) notFound();
 
-  const theme = project.theme || {};
-  const primaryColor = theme?.colors?.primary || theme.primaryColor || project.theme_color || "#3b82f6";
-
-  // 2. Загружаем сам материал
+  // 2. Получаем сам материал
   const { data: material } = await supabase
     .from("materials")
     .select("*")
@@ -65,7 +57,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
 
   if (!material) notFound();
 
-  // 3. Проверяем наличие прав доступа у пользователя
+  // 3. Проверка доступа
   let hasAccess = material.is_available;
   if (!hasAccess) {
     const { data: access } = await supabase
@@ -77,33 +69,18 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
     if (access) hasAccess = true;
   }
 
-  if (!hasAccess) {
-    return (
-      <div style={{ padding: 50, textAlign: "center", backgroundColor: "var(--project-bg)", minHeight: "100vh" }}>
-        <h2 style={{ color: "var(--project-text)" }}>У вас нет доступа к этому материалу 🔒</h2>
-        <Link href={`/projects/${slug}/materials`} style={{ color: "var(--project-primary)", textDecoration: "underline" }}>
-          Вернуться назад
-        </Link>
-      </div>
-    );
-  }
-
-  // 4. Загружаем задания (Убрано отсутствующее в таблице поле description, чтобы избежать падения SQL-запроса)
-  const { data: assignmentsData, error: assignmentsError } = await supabase
+  // 4. Получаем список заданий (убрано description, добавлено assignment_type)
+  const { data: assignmentsData } = await supabase
     .from("assignments")
-    .select("id, title, order_index")
+    .select("id, title, order_index, assignment_type")
     .or(`material_id.eq.${materialId},textbook_id.eq.${materialId},crossword_id.eq.${materialId}`)
     .order("order_index", { ascending: true });
-
-  if (assignmentsError) {
-    console.error("🔴 ОШИБКА SUPABASE ПРИ ПОИСКЕ ЗАДАНИЙ:", assignmentsError.message);
-  }
 
   const assignments = assignmentsData || [];
   const assignmentIds = assignments.map(a => a.id);
 
-  // 5. Вычисляем прогресс выполнения заданий
-  let completedSet = new Set<string>();
+  // 5. Прогресс
+  let completedIds: string[] = [];
   if (assignmentIds.length > 0) {
     const { data: progressRes } = await supabase
       .from("user_progress")
@@ -112,146 +89,27 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
       .eq("is_completed", true)
       .in("assignment_id", assignmentIds);
 
-    completedSet = new Set((progressRes || []).map(p => p.assignment_id));
+    completedIds = (progressRes || []).map(p => p.assignment_id);
   }
 
   const total = assignments.length;
-  const completed = completedSet.size;
+  const completed = completedIds.length;
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const coverUrl = toStorageProxyUrl(material.cover_image_url);
 
-  // Описываем стили наведения в виде строки для безопасного серверного рендеринга
-  const hoverStyles = `
-    .assignment-card-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 20px;
-      background-color: var(--project-card-bg);
-      border-radius: 12px;
-      text-decoration: none;
-      color: inherit;
-      border: 1px solid var(--project-border);
-      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
-    }
-    .assignment-card-item:hover {
-      border-color: var(--project-primary) !important;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px var(--project-glow);
-    }
-  `;
-
+  // Передаем всё в клиентский компонент!
   return (
-    <div style={{ backgroundColor: "var(--project-bg)", color: "var(--project-text)", minHeight: "100vh" }}>
-      {/* Внедряем CSS-правила наведения на сервере */}
-      <style dangerouslySetInnerHTML={{ __html: hoverStyles }} />
-
-      <AppHeader
-        themeColor={primaryColor}
-        nav={[
-          { kind: "link", href: `/projects/${slug}/materials`, label: "К материалам", className: "btn ghost" },
-          { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn secondary" },
-        ]}
-      />
-
-      <div style={{ maxWidth: 800, margin: "0 auto", padding: "20px" }}>
-        {/* Кнопка возврата */}
-        <Link 
-          href={`/projects/${slug}/materials`} 
-          style={{ display: "inline-block", marginBottom: 20, color: "var(--project-primary)", textDecoration: "none", fontWeight: 600 }}
-        >
-          ← Назад к материалам
-        </Link>
-
-        {/* Главная информационная карточка материала */}
-        <div style={{ 
-          display: "flex", gap: 24, padding: 24, 
-          backgroundColor: "var(--project-card-bg)", 
-          border: "1px solid var(--project-border)",
-          borderRadius: 16, 
-          boxShadow: "0 4px 12px var(--project-glow)", 
-          marginBottom: 32,
-          flexWrap: "wrap" 
-        }}>
-          <div style={{ 
-            flexShrink: 0, width: 140, height: 140, borderRadius: 12, overflow: "hidden", 
-            backgroundColor: "var(--project-bg)", 
-            border: "1px solid var(--project-border)",
-            display: "flex", alignItems: "center", justifyContent: "center" 
-          }}>
-            {coverUrl ? (
-              <img src={coverUrl} alt={material.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              <span style={{ fontSize: "3rem", opacity: 0.5 }}>📄</span>
-            )}
-          </div>
-          <div style={{ flex: 1, minWidth: 250 }}>
-            <h1 style={{ margin: "0 0 8px 0", fontSize: 24, color: "var(--project-text)" }}>{material.title}</h1>
-            <p style={{ color: "var(--project-muted)", margin: "0 0 16px 0", lineHeight: 1.5 }}>
-              {material.description || "Изучайте материалы и выполняйте задания."}
-            </p>
-            
-            {/* Шкала общего прогресса */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ flex: 1, height: 8, backgroundColor: "var(--project-border)", borderRadius: 4, overflow: "hidden" }}>
-                <div style={{ width: `${progressPct}%`, height: "100%", backgroundColor: "var(--project-primary)", transition: "width 0.3s" }} />
-              </div>
-              <span style={{ fontWeight: 600, color: "var(--project-primary)" }}>{progressPct}%</span>
-            </div>
-            <div style={{ fontSize: 13, color: "var(--project-muted)", marginTop: 8 }}>
-              Выполнено {completed} из {total} заданий
-            </div>
-          </div>
-        </div>
-
-        {/* Секция со списком уроков */}
-        <h2 style={{ fontSize: 20, marginBottom: 16, color: "var(--project-text)" }}>Список заданий</h2>
-        
-        {assignments.length > 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {assignments.map((a, index) => {
-              const isDone = completedSet.has(a.id);
-              return (
-                <Link
-                  key={a.id}
-                  href={`/projects/${slug}/assignment?id=${a.id}`}
-                  className="assignment-card-item"
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 16, color: "var(--project-text)" }}>
-                      {index + 1}. {a.title || "Задание без названия"}
-                    </div>
-                  </div>
-                  
-                  {/* Переключатель статуса выполнения */}
-                  <div style={{
-                    padding: "6px 12px",
-                    borderRadius: 20,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    backgroundColor: isDone ? "var(--project-glow)" : "transparent",
-                    color: "var(--project-primary)",
-                    border: isDone ? "1px solid transparent" : "1px solid var(--project-primary)",
-                    whiteSpace: "nowrap",
-                    marginLeft: 16
-                  }}>
-                    {isDone ? "✅ Выполнено" : "▶ Начать"}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        ) : (
-          <div style={{ 
-            padding: 30, textAlign: "center", 
-            backgroundColor: "var(--project-card-bg)", 
-            borderRadius: 12, color: "var(--project-muted)", 
-            border: "1px solid var(--project-border)" 
-          }}>
-            В этом материале пока нет добавленных заданий.
-          </div>
-        )}
-      </div>
-    </div>
+    <MaterialClient 
+      slug={slug}
+      project={project}
+      material={material}
+      assignments={assignments}
+      completedIds={completedIds}
+      progressPct={progressPct}
+      completedCount={completed}
+      totalCount={total}
+      coverUrl={coverUrl}
+      hasAccess={hasAccess}
+    />
   );
 }
