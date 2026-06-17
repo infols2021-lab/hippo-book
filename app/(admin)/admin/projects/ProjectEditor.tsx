@@ -19,6 +19,466 @@ type FeatureKey =
   | "hasTitles"
   | "hasLeaderboard";
 
+// ============================================================
+// 🖼️ Живое превью – точная копия реального профиля
+// ============================================================
+function LivePreview({ colors }: { colors: Record<string, string> }) {
+  const primary = colors.primary || "#3b82f6";
+  const secondary = colors.secondary || "#1d4ed8";
+  const bg = colors.pageBg || "#f8fafc";
+  const cardBg = colors.cardBg || "#ffffff";
+  const text = colors.textColor || "#0f172a";
+  const muted = "#64748b"; // fallback
+
+  return (
+    <div
+      style={{
+        backgroundColor: bg,
+        color: text,
+        fontFamily: "Inter, ui-sans-serif, sans-serif",
+        padding: "20px",
+        borderRadius: "20px",
+        minHeight: "400px",
+        border: "1px solid rgba(0,0,0,0.04)",
+      }}
+    >
+      {/* Шапка как в профиле */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "12px 16px",
+          borderRadius: "16px",
+          backgroundColor: cardBg,
+          border: "1px solid rgba(15,23,42,0.08)",
+          marginBottom: "18px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div
+            style={{
+              width: "40px",
+              height: "40px",
+              borderRadius: "10px",
+              background: `linear-gradient(135deg, ${primary}, ${secondary})`,
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 900,
+              fontSize: "16px",
+            }}
+          >
+            EK
+          </div>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: "16px" }}>Экзамены Gatehouse</div>
+            <div style={{ fontSize: "12px", color: muted }}>Профиль ученика</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <div
+            style={{
+              padding: "8px 14px",
+              borderRadius: "12px",
+              background: primary,
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: "13px",
+            }}
+          >
+            Топ серий
+          </div>
+          <div
+            style={{
+              padding: "8px 14px",
+              borderRadius: "12px",
+              background: secondary,
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: "13px",
+            }}
+          >
+            Материалы
+          </div>
+          <div
+            style={{
+              padding: "8px 14px",
+              borderRadius: "12px",
+              background: "#ff6b6b",
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: "13px",
+            }}
+          >
+            Выйти
+          </div>
+        </div>
+      </div>
+
+      {/* Основная сетка – левая панель + правая */}
+      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: "18px" }}>
+        {/* Левая панель (профиль) */}
+        <div
+          style={{
+            borderRadius: "20px",
+            backgroundColor: cardBg,
+            border: "1px solid rgba(15,23,42,0.08)",
+            padding: "20px 16px",
+            textAlign: "center",
+          }}
+        >
+          {/* Аватар */}
+          <div
+            style={{
+              width: "120px",
+              height: "120px",
+              borderRadius: "50%",
+              margin: "0 auto 16px",
+              background: `radial-gradient(circle at 30% 30%, ${primary}44, ${secondary}33)`,
+              border: "4px solid #fff",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "48px",
+            }}
+          >
+            🦛
+          </div>
+          <div style={{ fontWeight: 800, fontSize: "20px", marginBottom: "4px" }}>
+            Солнцев Алексей
+          </div>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "4px 12px",
+              borderRadius: "999px",
+              background: `${primary}22`,
+              border: `1px solid ${primary}44`,
+              fontSize: "13px",
+              fontWeight: 700,
+              color: primary,
+              marginBottom: "12px",
+            }}
+          >
+            🏷️ Легенда Хипполи
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1px 1fr 1px 1fr",
+              alignItems: "stretch",
+              background: cardBg,
+              border: "1px solid rgba(15,23,42,0.06)",
+              borderRadius: "12px",
+              overflow: "hidden",
+              marginBottom: "16px",
+            }}
+          >
+            <div style={{ padding: "8px 4px" }}>
+              <div style={{ fontSize: "11px", color: muted, fontWeight: 700 }}>EMAIL</div>
+              <div style={{ fontWeight: 700, fontSize: "13px" }}>aleksey@mail.ru</div>
+            </div>
+            <div style={{ width: "1px", background: "rgba(15,23,42,0.08)" }} />
+            <div style={{ padding: "8px 4px" }}>
+              <div style={{ fontSize: "11px", color: muted, fontWeight: 700 }}>ТЕЛЕФОН</div>
+              <div style={{ fontWeight: 700, fontSize: "13px" }}>+7 999 123-45-67</div>
+            </div>
+            <div style={{ width: "1px", background: "rgba(15,23,42,0.08)" }} />
+            <div style={{ padding: "8px 4px" }}>
+              <div style={{ fontSize: "11px", color: muted, fontWeight: 700 }}>РЕГИОН</div>
+              <div style={{ fontWeight: 700, fontSize: "13px" }}>Белгородская</div>
+            </div>
+          </div>
+
+          {/* Streak summary */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "8px",
+              marginBottom: "16px",
+            }}
+          >
+            <div
+              style={{
+                background: "rgba(0,0,0,0.02)",
+                borderRadius: "12px",
+                padding: "8px",
+              }}
+            >
+              <div style={{ fontSize: "11px", color: muted, fontWeight: 700 }}>Текущая серия</div>
+              <div style={{ fontWeight: 900, fontSize: "18px", color: primary }}>47 дн.</div>
+            </div>
+            <div
+              style={{
+                background: "rgba(0,0,0,0.02)",
+                borderRadius: "12px",
+                padding: "8px",
+              }}
+            >
+              <div style={{ fontSize: "11px", color: muted, fontWeight: 700 }}>Рекорд</div>
+              <div style={{ fontWeight: 900, fontSize: "18px", color: secondary }}>47 дн.</div>
+            </div>
+          </div>
+
+          <button
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "14px",
+              border: "1px solid rgba(15,23,42,0.08)",
+              background: cardBg,
+              fontWeight: 700,
+              marginBottom: "12px",
+              cursor: "pointer",
+            }}
+          >
+            Редактировать профиль
+          </button>
+
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              justifyContent: "center",
+              marginBottom: "12px",
+            }}
+          >
+            <a
+              href="#"
+              style={{
+                flex: 1,
+                padding: "8px",
+                borderRadius: "12px",
+                background: "#2AABEE",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: "13px",
+                textDecoration: "none",
+                textAlign: "center",
+              }}
+            >
+              Telegram
+            </a>
+            <a
+              href="#"
+              style={{
+                flex: 1,
+                padding: "8px",
+                borderRadius: "12px",
+                background: "#0077FF",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: "13px",
+                textDecoration: "none",
+                textAlign: "center",
+              }}
+            >
+              ВКонтакте
+            </a>
+          </div>
+
+          <button
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "14px",
+              border: "none",
+              background: "#ff6b6b",
+              color: "#fff",
+              fontWeight: 700,
+              marginBottom: "8px",
+              cursor: "pointer",
+            }}
+          >
+            Заявки на покупку
+          </button>
+
+          <button
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "14px",
+              border: "1px solid rgba(15,23,42,0.08)",
+              background: cardBg,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Панель управления
+          </button>
+        </div>
+
+        {/* Правая панель – статистика и прогресс */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "18px",
+          }}
+        >
+          {/* Статистика */}
+          <div
+            style={{
+              borderRadius: "20px",
+              backgroundColor: cardBg,
+              border: "1px solid rgba(15,23,42,0.08)",
+              padding: "20px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                marginBottom: "16px",
+              }}
+            >
+              <span style={{ fontSize: "20px" }}>📊</span>
+              <span style={{ fontWeight: 800, fontSize: "18px" }}>
+                Статистика по доступным <b style={{ color: primary }}>материалам</b>
+              </span>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "12px",
+              }}
+            >
+              <div
+                style={{
+                  background: "rgba(0,0,0,0.02)",
+                  borderRadius: "14px",
+                  padding: "16px",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: "32px", fontWeight: 900, color: primary }}>14</div>
+                <div style={{ fontSize: "12px", color: muted, fontWeight: 700 }}>
+                  ДОСТУПНЫХ МАТЕРИАЛА
+                </div>
+              </div>
+              <div
+                style={{
+                  background: "rgba(0,0,0,0.02)",
+                  borderRadius: "14px",
+                  padding: "16px",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: "32px", fontWeight: 900, color: secondary }}>2</div>
+                <div style={{ fontSize: "12px", color: muted, fontWeight: 700 }}>
+                  ПРОЙДЕНО МАТЕРИАЛОВ
+                </div>
+              </div>
+              <div
+                style={{
+                  background: "rgba(0,0,0,0.02)",
+                  borderRadius: "14px",
+                  padding: "16px",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: "32px", fontWeight: 900, color: "#f59e0b" }}>9%</div>
+                <div style={{ fontSize: "12px", color: muted, fontWeight: 700 }}>
+                  ОБЩИЙ ПРОГРЕСС
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Прогресс по материалам */}
+          <div
+            style={{
+              borderRadius: "20px",
+              backgroundColor: cardBg,
+              border: "1px solid rgba(15,23,42,0.08)",
+              padding: "20px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                marginBottom: "16px",
+              }}
+            >
+              <span style={{ fontSize: "20px" }}>📈</span>
+              <span style={{ fontWeight: 800, fontSize: "18px" }}>
+                Прогресс по доступным <b style={{ color: primary }}>материалам</b>
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {[
+                { title: "Little Hippo", completed: 3, total: 25 },
+                { title: "hippo 2", completed: 0, total: 28 },
+                { title: "hippo 3", completed: 2, total: 21 },
+                { title: "hippo 4", completed: 1, total: 29 },
+                { title: "baby hippo", completed: 5, total: 7 },
+                { title: "hippo 1", completed: 3, total: 21 },
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 16px",
+                    borderRadius: "14px",
+                    background: "rgba(0,0,0,0.02)",
+                    border: "1px solid rgba(15,23,42,0.04)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "14px" }}>{item.title}</div>
+                    <div style={{ fontSize: "12px", color: muted }}>
+                      {item.completed} из {item.total} заданий выполнено
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div
+                      style={{
+                        width: "120px",
+                        height: "8px",
+                        background: "rgba(0,0,0,0.06)",
+                        borderRadius: "999px",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${Math.round((item.completed / item.total) * 100)}%`,
+                          height: "100%",
+                          background: `linear-gradient(90deg, ${primary}, ${secondary})`,
+                          borderRadius: "999px",
+                        }}
+                      />
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: "14px", color: primary }}>
+                      {Math.round((item.completed / item.total) * 100)}%
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Основной редактор
+// ============================================================
 export default function ProjectEditor({
   project,
   onClose,
@@ -53,7 +513,6 @@ export default function ProjectEditor({
         cardBg: initialCardBg,
         textColor: initialTextColor,
       },
-      // Дублируем для легаси профилей
       primaryColor: initialPrimaryColor,
       secondaryColor: initialSecondaryColor,
       backgroundColor: initialPageBg,
@@ -66,7 +525,6 @@ export default function ProjectEditor({
       avatars: project?.features?.avatars || project?.features?.hasAvatars || false,
       profileProgress: project?.features?.profileProgress || false,
       requestMode: project?.features?.requestMode || false,
-      // Дублируем старые ключи для обратной совместимости
       hasStreaks: project?.features?.streaks || project?.features?.hasStreaks || false,
       hasTitles: project?.features?.titles || project?.features?.hasTitles || false,
       hasLeaderboard: project?.features?.leaderboard || project?.features?.hasLeaderboard || false,
@@ -143,7 +601,6 @@ export default function ProjectEditor({
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || `Ошибка HTTP ${res.status}`);
       }
-      // Обновляем список уровней
       const refreshRes = await fetch(`/api/admin/projects/${project.id}/levels`, {
         cache: "no-store",
       });
@@ -249,7 +706,7 @@ export default function ProjectEditor({
   ];
 
   return (
-    <div className="bg-white p-6 rounded-3xl border shadow-sm max-w-5xl mx-auto space-y-8">
+    <div className="bg-white p-6 rounded-3xl border shadow-sm max-w-7xl mx-auto space-y-8">
       <div className="flex justify-between items-center border-b pb-4">
         <h2 className="text-2xl font-bold">
           {project ? `Настройка ветки: ${project.name}` : "Новая ветка"}
@@ -297,7 +754,7 @@ export default function ProjectEditor({
           </div>
         </div>
 
-        {/* ДИЗАЙН СИСТЕМА И ПРЕВЬЮ */}
+        {/* ДИЗАЙН СИСТЕМА И ЖИВОЕ ПРЕВЬЮ */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 border-t pt-6">
           <div className="space-y-4">
             <div>
@@ -334,95 +791,8 @@ export default function ProjectEditor({
             <p className="text-sm text-gray-500 mb-4">
               Так будет выглядеть интерфейс для ученика.
             </p>
-
-            <div
-              className="rounded-2xl border overflow-hidden shadow-inner transition-colors duration-300"
-              style={{
-                backgroundColor: formData.theme.colors.pageBg,
-                color: formData.theme.colors.textColor,
-                minHeight: "300px",
-              }}
-            >
-              {/* Фейковый Header */}
-              <div
-                className="flex items-center justify-between p-4 border-b border-black/5"
-                style={{ backgroundColor: formData.theme.colors.cardBg }}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm"
-                    style={{ backgroundColor: formData.theme.colors.primary }}
-                  >
-                    EK
-                  </div>
-                  <div className="font-bold text-sm">
-                    {formData.name || "Название ветки"}
-                  </div>
-                </div>
-                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs">
-                  👤
-                </div>
-              </div>
-
-              {/* Фейковый контент */}
-              <div className="p-5 space-y-5">
-                <div className="flex gap-2">
-                  <div
-                    className="px-4 py-1.5 rounded-full text-sm font-bold text-white shadow-sm"
-                    style={{ backgroundColor: formData.theme.colors.primary }}
-                  >
-                    📚 Раздел 1
-                  </div>
-                  <div
-                    className="px-4 py-1.5 rounded-full text-sm font-bold opacity-70"
-                    style={{
-                      backgroundColor: formData.theme.colors.cardBg,
-                      color: formData.theme.colors.textColor,
-                    }}
-                  >
-                    🧩 Раздел 2
-                  </div>
-                </div>
-
-                <div
-                  className="p-4 rounded-xl shadow-sm border border-black/5"
-                  style={{ backgroundColor: formData.theme.colors.cardBg }}
-                >
-                  <div className="flex gap-4">
-                    <div
-                      className="w-12 h-12 rounded-lg flex items-center justify-center text-2xl"
-                      style={{ backgroundColor: formData.theme.colors.pageBg }}
-                    >
-                      📘
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-bold text-sm">Пример учебника</div>
-                      <div className="text-xs opacity-60 mb-2 mt-0.5">
-                        Описание материала...
-                      </div>
-                      <div
-                        className="w-full h-1.5 rounded-full overflow-hidden"
-                        style={{ backgroundColor: formData.theme.colors.pageBg }}
-                      >
-                        <div
-                          className="h-full w-2/3"
-                          style={{ backgroundColor: formData.theme.colors.primary }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  className="w-full py-2.5 rounded-xl text-center text-sm font-bold text-white shadow-md"
-                  style={{
-                    background: `linear-gradient(135deg, ${formData.theme.colors.primary}, ${formData.theme.colors.secondary})`,
-                  }}
-                >
-                  🚀 Начать обучение
-                </div>
-              </div>
-            </div>
+            {/* Заменяем примитивное превью на детальное */}
+            <LivePreview colors={formData.theme.colors} />
           </div>
         </div>
 
