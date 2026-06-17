@@ -32,13 +32,9 @@ export default function WordsEditor({ value, onChange, disabled }: Props) {
   const [text, setText] = useState("");
   const [dir, setDir] = useState<WordDir>("across");
 
-  // ✅ авто-номер = max(words.number)+1
   const autoNum = useMemo(() => getNextAutoNumber(words), [words]);
   const [numText, setNumText] = useState(String(autoNum));
 
-  // Чтобы не “перетирать” ручной ввод постоянно — обновляем только если:
-  // - поле пустое, или
-  // - последнее значение было автозначением
   const lastAutoRef = useRef<number>(autoNum);
 
   useEffect(() => {
@@ -50,7 +46,6 @@ export default function WordsEditor({ value, onChange, disabled }: Props) {
       setNumText(String(autoNum));
       lastAutoRef.current = autoNum;
     } else {
-      // пользователь вручную ставил — но автозначение всё равно запомним
       lastAutoRef.current = autoNum;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,7 +85,7 @@ export default function WordsEditor({ value, onChange, disabled }: Props) {
 
   function toggleDeleteMode() {
     if (disabled) return;
-    const cur = Boolean(value?.metadata?.deleteMode);
+    const cur = Boolean((value?.metadata as any)?.deleteMode);
     patch({
       metadata: {
         ...(value.metadata || ({} as any)),
@@ -154,7 +149,7 @@ export default function WordsEditor({ value, onChange, disabled }: Props) {
         </button>
 
         <button
-          className={`btn ${value?.metadata?.deleteMode ? "" : "btn-danger"}`}
+          className={`btn ${(value?.metadata as any)?.deleteMode ? "" : "btn-danger"}`}
           type="button"
           onClick={toggleDeleteMode}
           disabled={disabled}
@@ -168,11 +163,11 @@ export default function WordsEditor({ value, onChange, disabled }: Props) {
 
       <div className="small-muted">
         Размещённые слова: <b>{words.length}</b>{" "}
-        {value?.metadata?.placingWord ? (
+        {(value?.metadata as any)?.placingWord ? (
           <>
             · Режим: <b>размещение</b>
           </>
-        ) : value?.metadata?.deleteMode ? (
+        ) : (value?.metadata as any)?.deleteMode ? (
           <>
             · Режим: <b>удаление</b>
           </>

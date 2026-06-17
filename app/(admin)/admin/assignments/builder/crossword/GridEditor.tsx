@@ -159,8 +159,9 @@ export default function GridEditor({ value, onChange, disabled }: Props) {
     return hasAny ? incoming : rebuildGridFromWords(rows, cols, blocks, words);
   }, [rows, cols, value.grid, blocks, words]);
 
-  const placing = value?.metadata?.placingWord ?? null;
-  const deleteMode = Boolean(value?.metadata?.deleteMode);
+  // ✅ Исправление: безопасное чтение placingWord и deleteMode через приведение к any
+  const placing = (value?.metadata as any)?.placingWord ?? null;
+  const deleteMode = Boolean((value?.metadata as any)?.deleteMode);
 
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(null);
   const [pick, setPick] = useState<{ row: number; col: number; items: CWWord[] } | null>(null);
