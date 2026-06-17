@@ -10,7 +10,7 @@ type PageProps = {
   params: Promise<{ slug: string; materialId: string }>;
 };
 
-// Функция для получения прямой ссылки на картинку
+// Функция для получения ссылки на изображение из хранилища Supabase
 function toStorageProxyUrl(raw: unknown) {
   if (typeof raw !== "string") return "";
   const value = raw.trim();
@@ -43,7 +43,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
 
   if (!user) redirect("/login");
 
-  // 1. Получаем проект и тему
+  // 1. Загружаем информацию о текущем проекте
   const { data: project } = await supabase
     .from("projects")
     .select("id, name, is_active, theme_color, theme")
@@ -55,7 +55,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
   const theme = project.theme || {};
   const primaryColor = theme?.colors?.primary || theme.primaryColor || project.theme_color || "#3b82f6";
 
-  // 2. Получаем сам материал
+  // 2. Загружаем сам материал
   const { data: material } = await supabase
     .from("materials")
     .select("*")
@@ -65,7 +65,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
 
   if (!material) notFound();
 
-  // 3. Проверка доступа
+  // 3. Проверяем наличие прав доступа у пользователя
   let hasAccess = material.is_available;
   if (!hasAccess) {
     const { data: access } = await supabase
@@ -88,8 +88,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
     );
   }
 
-  // 4. Получаем список заданий.
-  // ИСПРАВЛЕНО: Запрос изменён в строгом соответствии со структурой таблицы assignments (убрано несуществующее поле description)
+  // 4. Загружаем задания (Убрано отсутствующее в таблице поле description, чтобы избежать падения SQL-запроса)
   const { data: assignmentsData, error: assignmentsError } = await supabase
     .from("assignments")
     .select("id, title, order_index")
@@ -103,7 +102,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
   const assignments = assignmentsData || [];
   const assignmentIds = assignments.map(a => a.id);
 
-  // 5. Получаем прогресс пользователя по этим заданиям
+  // 5. Вычисляем прогресс выполнения заданий
   let completedSet = new Set<string>();
   if (assignmentIds.length > 0) {
     const { data: progressRes } = await supabase
@@ -116,14 +115,37 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
     completedSet = new Set((progressRes || []).map(p => p.assignment_id));
   }
 
-  // Математика прогресса
   const total = assignments.length;
   const completed = completedSet.size;
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const coverUrl = toStorageProxyUrl(material.cover_image_url);
 
+  // Описываем стили наведения в виде строки для безопасного серверного рендеринга
+  const hoverStyles = `
+    .assignment-card-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background-color: var(--project-card-bg);
+      border-radius: 12px;
+      text-decoration: none;
+      color: inherit;
+      border: 1px solid var(--project-border);
+      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    }
+    .assignment-card-item:hover {
+      border-color: var(--project-primary) !important;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px var(--project-glow);
+    }
+  `;
+
   return (
     <div style={{ backgroundColor: "var(--project-bg)", color: "var(--project-text)", minHeight: "100vh" }}>
+      {/* Внедряем CSS-правила наведения на сервере */}
+      <style dangerouslySetInnerHTML={{ __html: hoverStyles }} />
+
       <AppHeader
         themeColor={primaryColor}
         nav={[
@@ -133,7 +155,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
       />
 
       <div style={{ maxWidth: 800, margin: "0 auto", padding: "20px" }}>
-        {/* Кнопка назад */}
+        {/* Кнопка возврата */}
         <Link 
           href={`/projects/${slug}/materials`} 
           style={{ display: "inline-block", marginBottom: 20, color: "var(--project-primary)", textDecoration: "none", fontWeight: 600 }}
@@ -141,7 +163,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
           ← Назад к материалам
         </Link>
 
-        {/* Карточка материала (Шапка) */}
+        {/* Главная информационная карточка материала */}
         <div style={{ 
           display: "flex", gap: 24, padding: 24, 
           backgroundColor: "var(--project-card-bg)", 
@@ -169,7 +191,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
               {material.description || "Изучайте материалы и выполняйте задания."}
             </p>
             
-            {/* Полоска прогресса */}
+            {/* Шкала общего прогресса */}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ flex: 1, height: 8, backgroundColor: "var(--project-border)", borderRadius: 4, overflow: "hidden" }}>
                 <div style={{ width: `${progressPct}%`, height: "100%", backgroundColor: "var(--project-primary)", transition: "width 0.3s" }} />
@@ -182,7 +204,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Список заданий */}
+        {/* Секция со списком уроков */}
         <h2 style={{ fontSize: 20, marginBottom: 16, color: "var(--project-text)" }}>Список заданий</h2>
         
         {assignments.length > 0 ? (
@@ -193,20 +215,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
                 <Link
                   key={a.id}
                   href={`/projects/${slug}/assignment?id=${a.id}`}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "16px 20px",
-                    backgroundColor: "var(--project-card-bg)",
-                    borderRadius: 12,
-                    textDecoration: "none",
-                    color: "inherit",
-                    border: "1px solid var(--project-border)",
-                    transition: "border-color 0.2s, transform 0.2s"
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--project-primary)")}
-                  onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--project-border)")}
+                  className="assignment-card-item"
                 >
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 16, color: "var(--project-text)" }}>
@@ -214,7 +223,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
                     </div>
                   </div>
                   
-                  {/* Статус-бейдж */}
+                  {/* Переключатель статуса выполнения */}
                   <div style={{
                     padding: "6px 12px",
                     borderRadius: 20,
