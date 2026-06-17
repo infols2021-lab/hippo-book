@@ -88,11 +88,11 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
     );
   }
 
-  // 4. Получаем список заданий. ДОБАВЛЕН ОТЛОВ ОШИБОК!
+  // 4. Получаем список заданий.
+  // ИСПРАВЛЕНО: Запрос изменён в строгом соответствии со структурой таблицы assignments (убрано несуществующее поле description)
   const { data: assignmentsData, error: assignmentsError } = await supabase
     .from("assignments")
-    .select("id, title, description, order_index")
-    // Если запрос падает из-за отсутствия старых колонок, он выведет ошибку в терминал
+    .select("id, title, order_index")
     .or(`material_id.eq.${materialId},textbook_id.eq.${materialId},crossword_id.eq.${materialId}`)
     .order("order_index", { ascending: true });
 
@@ -127,7 +127,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
       <AppHeader
         themeColor={primaryColor}
         nav={[
-          { kind: "link", href: `/projects/${slug}/materials`, label: "К материалам", className: "btn" },
+          { kind: "link", href: `/projects/${slug}/materials`, label: "К материалам", className: "btn ghost" },
           { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn secondary" },
         ]}
       />
@@ -141,7 +141,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
           ← Назад к материалам
         </Link>
 
-        {/* Карточка материала (Шапка) - ТЕПЕРЬ ДИНАМИЧЕСКАЯ */}
+        {/* Карточка материала (Шапка) */}
         <div style={{ 
           display: "flex", gap: 24, padding: 24, 
           backgroundColor: "var(--project-card-bg)", 
@@ -209,10 +209,9 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
                   onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--project-border)")}
                 >
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4, color: "var(--project-text)" }}>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "var(--project-text)" }}>
                       {index + 1}. {a.title || "Задание без названия"}
                     </div>
-                    {a.description && <div style={{ fontSize: 13, color: "var(--project-muted)" }}>{a.description}</div>}
                   </div>
                   
                   {/* Статус-бейдж */}
