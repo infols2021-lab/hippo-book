@@ -7,10 +7,10 @@ export type NavItem =
   | { kind: "logout"; label?: React.ReactNode; className?: string };
 
 type Props = {
-  markText?: string; 
-  title?: React.ReactNode; 
-  subtitle?: React.ReactNode; 
-  themeColor?: string; // Позволяет прокинуть цвет ветки (например, "var(--project-primary)")
+  markText?: string;
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  themeColor?: string; // Оставляем проп для легаси, но опираемся на CSS-переменные
   nav?: NavItem[];
 };
 
@@ -18,47 +18,68 @@ export default function AppHeader({
   markText = "EK",
   title = "Образовательная платформа",
   subtitle = "Единая система тестирования",
-  themeColor = "#3b82f6", // Дефолтный синий
   nav = [
-    { kind: "link", href: "/portal", label: "🏠 Портал", className: "bg-gray-100 text-gray-700 hover:bg-gray-200" },
-    { kind: "logout", label: "🚪 Выйти", className: "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50" },
+    // Теперь по дефолту используются твои красивые классы из base.css
+    { kind: "link", href: "/portal", label: "🏠 Портал", className: "btn ghost" },
+    { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
   ],
 }: Props) {
   return (
-    <header className="bg-white border-b sticky top-0 z-40 shadow-sm transition-colors duration-500">
+    <header
+      className="sticky top-0 z-40 transition-colors duration-500"
+      style={{
+        // Эффект матового стекла, который адаптируется под цвет фона проекта
+        backgroundColor: "color-mix(in srgb, var(--project-bg, #ffffff) 85%, transparent)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        borderBottom: "1px solid var(--project-border, rgba(0,0,0,0.08))",
+        marginBottom: "24px",
+      }}
+    >
       <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
         
         {/* ЛОГОТИП И НАЗВАНИЕ */}
         <div className="flex items-center gap-4">
-          <div 
-            className="w-12 h-12 flex items-center justify-center rounded-2xl font-black text-white text-xl shadow-md border border-white/20 flex-shrink-0"
-            style={{ 
-              backgroundColor: themeColor,
-              boxShadow: `0 4px 14px 0 ${themeColor}40` // Динамическая тень в цвет темы
+          <div
+            className="w-12 h-12 flex items-center justify-center rounded-2xl font-black text-xl flex-shrink-0 transition-colors duration-500"
+            style={{
+              backgroundColor: "var(--project-primary, #3b82f6)",
+              color: "#ffffff",
+              border: "1px solid color-mix(in srgb, var(--project-primary) 50%, white)",
+              boxShadow: "0 4px 14px 0 var(--project-glow, rgba(59, 130, 246, 0.4))",
             }}
           >
             {markText}
           </div>
 
           <div className="min-w-0">
-            <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 leading-tight truncate">
+            <h3
+              className="text-lg sm:text-xl font-extrabold leading-tight truncate transition-colors duration-500"
+              style={{ color: "var(--project-text, #111827)" }}
+            >
               {title}
             </h3>
-            <div className="text-xs sm:text-sm text-gray-500 font-medium truncate mt-0.5">
+            <div
+              className="text-xs sm:text-sm font-medium truncate mt-0.5 transition-colors duration-500"
+              style={{ color: "var(--project-muted, #6b7280)" }}
+            >
               {subtitle}
             </div>
           </div>
         </div>
 
         {/* НАВИГАЦИЯ */}
-        <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div
+          className="flex items-center gap-2 sm:gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           {nav.map((item, idx) => {
             if (item.kind === "link") {
               return (
-                <Link 
-                  key={`${item.href}-${idx}`} 
+                <Link
+                  key={`${item.href}-${idx}`}
                   href={item.href}
-                  className={`px-4 py-2 rounded-xl font-bold transition-all whitespace-nowrap text-sm flex-shrink-0 ${item.className || ""}`}
+                  className={`whitespace-nowrap flex-shrink-0 ${item.className || "btn ghost"}`}
                 >
                   {item.label}
                 </Link>
@@ -66,16 +87,15 @@ export default function AppHeader({
             }
 
             return (
-              <LogoutButton 
-                key={`logout-${idx}`} 
-                className={`px-4 py-2 rounded-xl font-bold transition-all whitespace-nowrap text-sm flex-shrink-0 ${item.className || ""}`}
+              <LogoutButton
+                key={`logout-${idx}`}
+                className={`whitespace-nowrap flex-shrink-0 ${item.className || "btn secondary"}`}
               >
                 {item.label || "🚪 Выйти"}
               </LogoutButton>
             );
           })}
         </div>
-
       </div>
     </header>
   );

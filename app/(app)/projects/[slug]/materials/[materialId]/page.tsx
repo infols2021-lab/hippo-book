@@ -10,7 +10,7 @@ type PageProps = {
   params: Promise<{ slug: string; materialId: string }>;
 };
 
-// Функция для получения прямой ссылки на картинку (как в предыдущем файле)
+// Функция для получения прямой ссылки на картинку
 function toStorageProxyUrl(raw: unknown) {
   if (typeof raw !== "string") return "";
   const value = raw.trim();
@@ -81,20 +81,24 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
     return (
       <div style={{ padding: 50, textAlign: "center", backgroundColor: "var(--project-bg)", minHeight: "100vh" }}>
         <h2 style={{ color: "var(--project-text)" }}>У вас нет доступа к этому материалу 🔒</h2>
-        <Link href={`/projects/${slug}/materials`} style={{ color: primaryColor, textDecoration: "underline" }}>
+        <Link href={`/projects/${slug}/materials`} style={{ color: "var(--project-primary)", textDecoration: "underline" }}>
           Вернуться назад
         </Link>
       </div>
     );
   }
 
-  // 4. Получаем список заданий (assignments), привязанных к этому материалу
-  const { data: assignmentsData } = await supabase
+  // 4. Получаем список заданий. ДОБАВЛЕН ОТЛОВ ОШИБОК!
+  const { data: assignmentsData, error: assignmentsError } = await supabase
     .from("assignments")
     .select("id, title, description, order_index")
-    // Поддержка как новых связей (material_id), так и старых (textbook_id/crossword_id)
+    // Если запрос падает из-за отсутствия старых колонок, он выведет ошибку в терминал
     .or(`material_id.eq.${materialId},textbook_id.eq.${materialId},crossword_id.eq.${materialId}`)
     .order("order_index", { ascending: true });
+
+  if (assignmentsError) {
+    console.error("🔴 ОШИБКА SUPABASE ПРИ ПОИСКЕ ЗАДАНИЙ:", assignmentsError.message);
+  }
 
   const assignments = assignmentsData || [];
   const assignmentIds = assignments.map(a => a.id);
@@ -132,41 +136,47 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
         {/* Кнопка назад */}
         <Link 
           href={`/projects/${slug}/materials`} 
-          style={{ display: "inline-block", marginBottom: 20, color: primaryColor, textDecoration: "none", fontWeight: 600 }}
+          style={{ display: "inline-block", marginBottom: 20, color: "var(--project-primary)", textDecoration: "none", fontWeight: 600 }}
         >
           ← Назад к материалам
         </Link>
 
-        {/* Карточка материала (Шапка) */}
+        {/* Карточка материала (Шапка) - ТЕПЕРЬ ДИНАМИЧЕСКАЯ */}
         <div style={{ 
-          display: "flex", gap: 24, background: "#fff", padding: 24, 
-          borderRadius: 16, boxShadow: "0 4px 12px rgba(0,0,0,0.05)", marginBottom: 32,
+          display: "flex", gap: 24, padding: 24, 
+          backgroundColor: "var(--project-card-bg)", 
+          border: "1px solid var(--project-border)",
+          borderRadius: 16, 
+          boxShadow: "0 4px 12px var(--project-glow)", 
+          marginBottom: 32,
           flexWrap: "wrap" 
         }}>
           <div style={{ 
             flexShrink: 0, width: 140, height: 140, borderRadius: 12, overflow: "hidden", 
-            background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" 
+            backgroundColor: "var(--project-bg)", 
+            border: "1px solid var(--project-border)",
+            display: "flex", alignItems: "center", justifyContent: "center" 
           }}>
             {coverUrl ? (
               <img src={coverUrl} alt={material.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <span style={{ fontSize: "3rem" }}>📄</span>
+              <span style={{ fontSize: "3rem", opacity: 0.5 }}>📄</span>
             )}
           </div>
           <div style={{ flex: 1, minWidth: 250 }}>
-            <h1 style={{ margin: "0 0 8px 0", fontSize: 24, color: "#0f172a" }}>{material.title}</h1>
-            <p style={{ color: "#64748b", margin: "0 0 16px 0", lineHeight: 1.5 }}>
+            <h1 style={{ margin: "0 0 8px 0", fontSize: 24, color: "var(--project-text)" }}>{material.title}</h1>
+            <p style={{ color: "var(--project-muted)", margin: "0 0 16px 0", lineHeight: 1.5 }}>
               {material.description || "Изучайте материалы и выполняйте задания."}
             </p>
             
             {/* Полоска прогресса */}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ flex: 1, height: 8, background: "#e2e8f0", borderRadius: 4, overflow: "hidden" }}>
-                <div style={{ width: `${progressPct}%`, height: "100%", backgroundColor: primaryColor, transition: "width 0.3s" }} />
+              <div style={{ flex: 1, height: 8, backgroundColor: "var(--project-border)", borderRadius: 4, overflow: "hidden" }}>
+                <div style={{ width: `${progressPct}%`, height: "100%", backgroundColor: "var(--project-primary)", transition: "width 0.3s" }} />
               </div>
-              <span style={{ fontWeight: 600, color: primaryColor }}>{progressPct}%</span>
+              <span style={{ fontWeight: 600, color: "var(--project-primary)" }}>{progressPct}%</span>
             </div>
-            <div style={{ fontSize: 13, color: "#64748b", marginTop: 8 }}>
+            <div style={{ fontSize: 13, color: "var(--project-muted)", marginTop: 8 }}>
               Выполнено {completed} из {total} заданий
             </div>
           </div>
@@ -182,27 +192,27 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
               return (
                 <Link
                   key={a.id}
-                  // Ссылка ведет на твой AssignmentClient, который ожидает ID задания в параметрах
                   href={`/projects/${slug}/assignment?id=${a.id}`}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "16px 20px",
-                    background: "#fff",
+                    backgroundColor: "var(--project-card-bg)",
                     borderRadius: 12,
                     textDecoration: "none",
                     color: "inherit",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-                    border: "1px solid #e2e8f0",
+                    border: "1px solid var(--project-border)",
                     transition: "border-color 0.2s, transform 0.2s"
                   }}
+                  onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--project-primary)")}
+                  onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--project-border)")}
                 >
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4, color: "#0f172a" }}>
+                    <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4, color: "var(--project-text)" }}>
                       {index + 1}. {a.title || "Задание без названия"}
                     </div>
-                    {a.description && <div style={{ fontSize: 13, color: "#64748b" }}>{a.description}</div>}
+                    {a.description && <div style={{ fontSize: 13, color: "var(--project-muted)" }}>{a.description}</div>}
                   </div>
                   
                   {/* Статус-бейдж */}
@@ -211,8 +221,9 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
                     borderRadius: 20,
                     fontSize: 13,
                     fontWeight: 600,
-                    background: isDone ? "rgba(16, 185, 129, 0.1)" : "rgba(59, 130, 246, 0.1)",
-                    color: isDone ? "#10b981" : primaryColor,
+                    backgroundColor: isDone ? "var(--project-glow)" : "transparent",
+                    color: "var(--project-primary)",
+                    border: isDone ? "1px solid transparent" : "1px solid var(--project-primary)",
                     whiteSpace: "nowrap",
                     marginLeft: 16
                   }}>
@@ -223,7 +234,12 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
             })}
           </div>
         ) : (
-          <div style={{ padding: 30, textAlign: "center", background: "#fff", borderRadius: 12, color: "#64748b", border: "1px solid #e2e8f0" }}>
+          <div style={{ 
+            padding: 30, textAlign: "center", 
+            backgroundColor: "var(--project-card-bg)", 
+            borderRadius: 12, color: "var(--project-muted)", 
+            border: "1px solid var(--project-border)" 
+          }}>
             В этом материале пока нет добавленных заданий.
           </div>
         )}

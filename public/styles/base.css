@@ -2,16 +2,16 @@
 
 :root {
   /* Базовая палитра (единая на всех страницах) – используется как fallback */
-  --bg1: #eaf6ff;
+  --bg1: var(--project-bg, #eaf6ff);
   --bg2: #d8f2ff;
 
   --accent: #ff6b6b;   /* красный (опасное/выйти) */
-  --accent2: #4ecdc4;  /* бирюза (главные действия) */
-  --accent3: #74b9ff;  /* голубой (инфо) */
+  --accent2: var(--project-primary, #4ecdc4);  /* Динамический цвет проекта или бирюза */
+  --accent3: var(--project-secondary, #74b9ff); /* Вторичный динамический цвет или голубой */
 
-  --card: rgba(255, 255, 255, 0.78);
-  --card-border: rgba(255, 255, 255, 0.65);
-  --muted: #6b7280;
+  --card: var(--project-card-bg, rgba(255, 255, 255, 0.78));
+  --card-border: var(--project-border, rgba(255, 255, 255, 0.65));
+  --muted: var(--project-muted, #6b7280);
 }
 
 /* ===== Hard reset ===== */
@@ -29,7 +29,7 @@ body {
   height: 100%;
   margin: 0 !important;
   padding: 0 !important;
-  background: var(--project-bg, #eaf6ff);
+  background: var(--bg1);
 }
 
 body {
@@ -79,14 +79,14 @@ textarea {
   width: 56px;
   height: 56px;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--accent3), rgba(116, 185, 255, 0.55));
+  background: linear-gradient(135deg, var(--accent3), var(--project-glow, rgba(116, 185, 255, 0.55)));
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
   color: #fff;
   font-size: 20px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.10);
+  box-shadow: 0 10px 24px var(--project-glow, rgba(15, 23, 42, 0.10));
 }
 
 .header .nav {
@@ -95,13 +95,13 @@ textarea {
   align-items: center;
 }
 
-/* ===== Cards ===== */
+/* ===== Cards (Glassmorphism) ===== */
 .card {
   background: var(--card);
   border-radius: 16px;
   padding: 18px;
   border: 1px solid var(--card-border);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.10);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05); /* Уменьшил тень, чтобы не было "грязи" на фоне */
 }
 
 @supports ((-webkit-backdrop-filter: blur(10px)) or (backdrop-filter: blur(10px))) {
@@ -109,19 +109,21 @@ textarea {
     .card {
       -webkit-backdrop-filter: blur(10px);
       backdrop-filter: blur(10px);
+      /* Фикс для темной темы: если цвет фона темный, карточка будет смотреться гармоничнее */
+      background: color-mix(in srgb, var(--card) 80%, transparent); 
     }
   }
 }
 
 @media (max-width: 1023px) {
   .card {
-    background: rgba(255, 255, 255, 0.92);
+    background: var(--project-card-bg, rgba(255, 255, 255, 0.92));
   }
 }
 
 /* ===== Buttons ===== */
 .btn {
-  background: linear-gradient(135deg, var(--accent2), #6dd3c0);
+  background: linear-gradient(135deg, var(--accent2), color-mix(in srgb, var(--accent2) 80%, white));
   color: #fff;
   border: 0;
   padding: 10px 16px;
@@ -129,7 +131,7 @@ textarea {
   font-weight: 800;
   cursor: pointer;
   transition: transform .12s ease, box-shadow .12s, filter .12s ease;
-  box-shadow: 0 10px 18px rgba(78, 205, 196, 0.18);
+  box-shadow: 0 10px 18px var(--project-glow, rgba(78, 205, 196, 0.18));
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -138,6 +140,7 @@ textarea {
 }
 .btn:hover {
   transform: translateY(-3px);
+  filter: brightness(1.05);
 }
 .btn:active {
   transform: translateY(-1px);
@@ -149,14 +152,14 @@ textarea {
 }
 
 .btn.info {
-  background: linear-gradient(135deg, var(--accent3), rgba(116, 185, 255, 0.55));
-  box-shadow: 0 10px 18px rgba(116, 185, 255, 0.16);
+  background: linear-gradient(135deg, var(--accent3), color-mix(in srgb, var(--accent3) 80%, white));
+  box-shadow: 0 10px 18px var(--project-glow, rgba(116, 185, 255, 0.16));
 }
 
 .btn.ghost {
-  background: rgba(255, 255, 255, 0.55);
+  background: color-mix(in srgb, var(--project-card-bg, #fff) 55%, transparent);
   color: var(--accent2);
-  border: 2px solid rgba(78, 205, 196, 0.25);
+  border: 2px solid color-mix(in srgb, var(--accent2) 25%, transparent);
   box-shadow: none;
 }
 
@@ -192,13 +195,13 @@ textarea {
   width: 220px;
   height: 220px;
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--project-card-bg, #fff) 85%, transparent), color-mix(in srgb, var(--project-card-bg, #fff) 55%, transparent));
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.10);
-  border: 6px solid rgba(255, 255, 255, 0.75);
+  border: 6px solid color-mix(in srgb, var(--project-card-bg, #fff) 75%, transparent);
 }
 
 .profile-avatar svg {
@@ -262,23 +265,13 @@ textarea {
 .table th,
 .table td {
   padding: 10px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  border-bottom: 1px solid var(--card-border);
   text-align: left;
-  background: rgba(255, 255, 255, 0.55);
+  background: color-mix(in srgb, var(--project-card-bg, #fff) 55%, transparent);
 }
 
 /* ===== Modal ===== */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 20000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  background: rgba(12, 25, 35, 0.55);
-}
-
+.modal-overlay,
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -290,26 +283,21 @@ textarea {
   background: rgba(12, 25, 35, 0.55);
 }
 
-.modal-panel {
+.modal-panel,
+.modal-body {
   width: 100%;
   border-radius: 22px;
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: var(--project-card-bg, #ffffff) !important;
+  border: 1px solid var(--card-border);
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35), 0 2px 0 rgba(15, 23, 42, 0.04);
   overflow: hidden;
   outline: none;
 }
 
-.modal-content,
-.modal-body {
-  background: #ffffff !important;
-}
-
-.modal-body {
-  width: 100%;
-  border-radius: 22px;
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35), 0 2px 0 rgba(15, 23, 42, 0.04);
+.modal-content {
+  background: var(--project-card-bg, #ffffff) !important;
+  padding: 0;
+  max-height: min(78vh, 720px);
   overflow: hidden;
 }
 
@@ -319,15 +307,15 @@ textarea {
   justify-content: space-between;
   gap: 12px;
   padding: 14px;
-  background: #f3f6fb;
-  border-bottom: 1px solid rgba(44, 62, 80, 0.10);
+  background: color-mix(in srgb, var(--project-card-bg, #f3f6fb) 95%, black);
+  border-bottom: 1px solid var(--card-border);
 }
 
 .modal-title {
   margin: 0;
   font-size: 16px;
   font-weight: 900;
-  color: rgba(44, 62, 80, 0.85);
+  color: var(--project-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -337,10 +325,10 @@ textarea {
   width: 40px;
   height: 40px;
   border-radius: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.10);
+  border: 1px solid var(--card-border);
   cursor: pointer;
-  background: #ffffff;
-  color: rgba(44, 62, 80, 0.80);
+  background: var(--project-card-bg, #ffffff);
+  color: var(--project-text);
   font-size: 18px;
   font-weight: 900;
   box-shadow: 0 12px 28px rgba(15, 65, 95, 0.12);
@@ -355,22 +343,11 @@ textarea {
   filter: brightness(0.98);
 }
 
-.modal-body {
-  padding: 16px;
-  max-height: min(78vh, 720px);
-  overflow: auto;
-}
-
-.modal-content {
-  padding: 0;
-  max-height: min(78vh, 720px);
-  overflow: hidden;
-}
-
+.modal-body,
 .modal-content > *:not(.modal-header) {
+  padding: 16px;
   max-height: min(78vh, 720px);
   overflow: auto;
-  padding: 16px;
 }
 
 .modal-body::-webkit-scrollbar,
@@ -379,9 +356,9 @@ textarea {
 }
 .modal-body::-webkit-scrollbar-thumb,
 .modal-content > *:not(.modal-header)::-webkit-scrollbar-thumb {
-  background: rgba(44, 62, 80, 0.18);
+  background: color-mix(in srgb, var(--project-text, #2c3e50) 18%, transparent);
   border-radius: 999px;
-  border: 3px solid #fff;
+  border: 3px solid var(--project-card-bg, #fff);
 }
 .modal-body::-webkit-scrollbar-track,
 .modal-content > *:not(.modal-header)::-webkit-scrollbar-track {
@@ -393,9 +370,7 @@ textarea {
   .modal-backdrop {
     padding: 12px;
   }
-  .modal-body {
-    max-height: 82vh;
-  }
+  .modal-body,
   .modal-content > *:not(.modal-header) {
     max-height: 82vh;
   }
@@ -417,13 +392,15 @@ textarea,
 select {
   padding: 8px 10px;
   border-radius: 8px;
-  border: 2px solid rgba(0, 0, 0, 0.06);
+  border: 2px solid var(--card-border);
+  background: var(--project-card-bg, #fff);
+  color: var(--project-text);
   font-size: 15px;
   width: 100%;
 }
 .small-muted {
   font-size: 13px;
-  color: #666;
+  color: var(--muted);
 }
 
 /* ===== Mobile ===== */
@@ -513,14 +490,14 @@ body.with-fixed-timer {
   font-weight: 900;
   font-size: 12px;
   line-height: 1;
-  background: rgba(78, 205, 196, 0.18);
+  background: color-mix(in srgb, var(--accent2) 18%, transparent);
   color: var(--accent2);
-  border: 1px solid rgba(78, 205, 196, 0.30);
-  box-shadow: 0 6px 12px rgba(78, 205, 196, 0.12);
+  border: 1px solid color-mix(in srgb, var(--accent2) 30%, transparent);
+  box-shadow: 0 6px 12px color-mix(in srgb, var(--accent2) 12%, transparent);
 }
 .score-pill.red {
-  background: rgba(255, 107, 107, 0.18);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent);
-  border: 1px solid rgba(255, 107, 107, 0.28);
-  box-shadow: 0 6px 12px rgba(255, 107, 107, 0.12);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: 0 6px 12px color-mix(in srgb, var(--accent) 12%, transparent);
 }

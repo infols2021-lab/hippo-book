@@ -68,42 +68,29 @@ export default async function ProjectLayout({
     theme?.glowColor ||
     "rgba(59, 130, 246, 0.25)";
 
-  // Формируем глобальные CSS-переменные для всего документа
-  const cssVars = `
-    :root {
-      --project-primary: ${primaryColor};
-      --project-secondary: ${secondaryColor};
-      --project-bg: ${bgColor};
-      --project-text: ${textColor};
-      --project-muted: ${mutedColor};
-      --project-card-bg: ${cardBgColor};
-      --project-border: ${borderColor};
-      --project-glow: ${glowColor};
-      --accent2: ${primaryColor};
-      --accent2-soft: ${primaryColor}22;
-    }
-    body {
-      background-color: ${bgColor};
-      color: ${textColor};
-    }
-  `;
+  // 3. Формируем CSS-переменные в виде объекта (React-way)
+  // Это гарантирует, что тема применится только к этому проекту и не "утечет" на другие страницы
+  const themeStyles = {
+    "--project-primary": primaryColor,
+    "--project-secondary": secondaryColor,
+    "--project-bg": bgColor,
+    "--project-text": textColor,
+    "--project-muted": mutedColor,
+    "--project-card-bg": cardBgColor,
+    "--project-border": borderColor,
+    "--project-glow": glowColor,
+    "--accent2": primaryColor, // Оставлено для легаси-компонентов
+    "--accent2-soft": `${primaryColor}22`,
+    backgroundColor: "var(--project-bg)",
+    color: "var(--project-text)",
+  } as React.CSSProperties;
 
   return (
-    <>
-      {/* Глобальные стили для всей страницы */}
-      <style dangerouslySetInnerHTML={{ __html: cssVars }} />
-
-      <div
-        style={
-          {
-            // Дополнительные переменные для локального использования (если нужно)
-            backgroundColor: bgColor,
-          } as React.CSSProperties
-        }
-        className="min-h-screen w-full transition-colors duration-500"
-      >
-        {children}
-      </div>
-    </>
+    <div 
+      style={themeStyles} 
+      className="min-h-screen w-full transition-colors duration-500 project-layout-wrapper"
+    >
+      {children}
+    </div>
   );
 }
