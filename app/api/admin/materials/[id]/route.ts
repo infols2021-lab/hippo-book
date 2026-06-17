@@ -41,9 +41,17 @@ function normalizePatchPayload(body: any) {
     payload.meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
   }
   
-  // ❗️ ИСПРАВЛЕНО: Теперь бекенд не игнорирует привязку к табу при редактировании!
-  if ("project_tab_id" in body) {
-    payload.project_tab_id = normalizeNullableString(body.project_tab_id);
+  // ❗️ ГЛАВНЫЙ ФИКС ЗДЕСЬ:
+  // Перехватываем нулевой UUID и превращаем его в null, чтобы БД не падала
+  if ("project_tab_id" in body || "tab_id" in body) {
+    let tid = normalizeNullableString(body.project_tab_id ?? body.tab_id);
+    
+    // Если фронт прислал "заглушку" пустого таба - превращаем в null
+    if (tid === "00000000-0000-0000-0000-000000000000" || tid === "none" || tid === "") {
+      tid = null;
+    }
+    
+    payload.project_tab_id = tid;
   }
 
   return payload;
@@ -83,7 +91,6 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       return fail(error.message, 404, "NOT_FOUND");
     }
 
-    // ❗️ ИСПРАВЛЕНО: Теперь мы правильно считаем и новые, и легаси задания в админке
     const { count, error: countErr } = await supabase
       .from("assignments")
       .select("id", { count: "exact", head: true })
@@ -141,9 +148,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       .single();
 
     if (error) {
-      // ❗️ ИСПРАВЛЕНО: Явный вывод ошибки в терминал, если БД ругается на данные
-      console.error("🔴 [ADMIN PATCH MATERIAL] Ошибка Базы Данных при сохранении:", error.message, error.details);
-      return fail(error.message, 500, "DB_ERROR");
+      console.error("🔴 [ADMIN PATCH MATERIAL] Ошибка БД при сохранении:", error.message, error.details);
+      
+      let errorMsg = error.message;
+      if (errorMsg.includes("foreign key")) errorMsg = "Ошибка привязки таба (несуществующий ID)";
+      
+      return fail(errorMsg, 500, "DB_ERROR");
     }
 
     return ok({ material: data });
