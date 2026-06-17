@@ -1,9 +1,13 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  let hasUser = false;
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   let connectionError = false;
+  let hasUser = false;
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -12,12 +16,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     if (error) {
       const msg = String(error.message || "").toLowerCase();
 
-      if (
+      const isSessionIssue =
         msg.includes("auth session missing") ||
         msg.includes("session missing") ||
         msg.includes("jwt") ||
-        msg.includes("invalid token")
-      ) {
+        msg.includes("invalid token");
+
+      if (isSessionIssue) {
         hasUser = false;
       } else {
         connectionError = true;
@@ -29,29 +34,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     connectionError = true;
   }
 
-  // Красивый Tailwind-экран ошибки соединения
   if (connectionError) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white max-w-md w-full rounded-3xl p-8 text-center shadow-xl border border-gray-100 animate-in zoom-in-95 duration-300">
+        <div className="bg-white max-w-md w-full rounded-3xl p-8 text-center shadow-xl border border-gray-100">
           <div className="text-5xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Проблема с соединением</h2>
+          <h2 className="text-2xl font-extrabold text-gray-900 mb-2">
+            Проблема с соединением
+          </h2>
           <p className="text-gray-500 mb-8">
-            Не удалось связаться с сервером для проверки вашей сессии. Пожалуйста, проверьте подключение к интернету.
+            Не удалось проверить сессию. Проверь интернет или сервер.
           </p>
-          
+
           <div className="flex flex-col gap-3">
-            <a 
-              href="" 
-              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg"
+            <a
+              href="/portal"
+              className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl"
             >
-              🔄 Повторить попытку
+              🔄 Повторить
             </a>
-            <a 
-              href="/login" 
-              className="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-all"
+            <a
+              href="/login"
+              className="w-full py-3.5 bg-gray-100 text-gray-700 font-bold rounded-xl"
             >
-              ← Вернуться на страницу входа
+              ← Войти
             </a>
           </div>
         </div>

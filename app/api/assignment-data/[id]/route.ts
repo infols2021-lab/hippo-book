@@ -1,19 +1,21 @@
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
 import { NextResponse, type NextRequest } from "next/server";
-import { mockDebugAll, mockDebugReview, mockDebugSingle } from "@/app/(app)/assignment/lib/mockDebugData";
+import { mockDebugAll, mockDebugReview, mockDebugSingle } from "@/lib/assignments/mockDebugData";
+import type { AssignmentData } from "@/lib/assignments/types"; // 🔥 Идеальный глобальный тип
 
 function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
 }
 
-function isGatehouseAssignment(assignment: any) {
+// Теперь TypeScript знает структуру задания, никаких any
+function isGatehouseAssignment(assignment: AssignmentData | null) {
   const material = firstOrNull(assignment?.materials);
   return assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
 }
 
-function getMaterialId(assignment: any): string | null {
+function getMaterialId(assignment: AssignmentData | null): string | null {
   const material = firstOrNull(assignment?.materials);
   const direct = typeof assignment?.material_id === "string" ? assignment.material_id : null;
   const fromMaterial = typeof material?.id === "string" ? material.id : null;
@@ -34,7 +36,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   // ===============================
 
   try {
-    const { data: assignment, error: aErr } = await supabase
+    const { data: rawAssignment, error: aErr } = await supabase
       .from("assignments")
       .select(
         `*,
@@ -52,7 +54,10 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       .eq("id", id)
       .single();
 
-    if (aErr || !assignment) return fail(aErr?.message || "Assignment not found", 404, "NOT_FOUND");
+    if (aErr || !rawAssignment) return fail(aErr?.message || "Assignment not found", 404, "NOT_FOUND");
+
+    // Жестко типизируем данные из БД
+    const assignment = rawAssignment as AssignmentData;
 
     // --- ПРОВЕРКА НА ПУСТОЕ ЗАДАНИЕ С УЧЕТОМ ТИПА (TEST / INTRO) ---
     const content = assignment.content || {};
@@ -73,7 +78,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     }
     // -----------------------------------------------------------------
 
-    const material = firstOrNull((assignment as any).materials);
+    const material = firstOrNull(assignment.materials);
     const gatehouse = isGatehouseAssignment(assignment);
 
     if (gatehouse) {
@@ -83,7 +88,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
         return fail("Gatehouse assignment has no material", 404, "NOT_FOUND");
       }
 
-      if (material?.is_active === false) {
+      if (material && material.is_active === false) {
         return fail("Material is not active", 404, "NOT_FOUND");
       }
 

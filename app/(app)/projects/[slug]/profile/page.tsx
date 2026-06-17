@@ -3,9 +3,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import ProfileClient from "./ProfileClient";
 
-// 🔥 Подключаем твой оригинальный CSS-файл по правильному пути!
-import "../../../profile/profile.css";
-
 // Отключаем кэш, чтобы настройки фичей и профиль всегда были свежими
 export const revalidate = 0;
 

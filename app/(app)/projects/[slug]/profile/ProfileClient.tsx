@@ -921,7 +921,12 @@ export default function ProfileClient({
       try {
         setProgressLoading(true);
         setProgressError(null);
-        const res = await fetch("/api/profile-progress", { method: "GET", cache: "no-store", signal: controller.signal });
+        // ⬇️ ИСПРАВЛЕНИЕ: Добавляем параметр slug для фильтрации по проекту
+        const res = await fetch(`/api/profile-progress?slug=${projectSlug}`, {
+          method: "GET",
+          cache: "no-store",
+          signal: controller.signal,
+        });
         const json = await res.json().catch(() => null);
         if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить прогресс");
         if (cancelled) return;
@@ -937,7 +942,7 @@ export default function ProfileClient({
     }
     runWhenIdle(() => void loadProgress(), 1200);
     return () => { cancelled = true; progressAbortRef.current?.abort(); };
-  }, [statsProp, progressProp]);
+  }, [statsProp, progressProp, projectSlug]); // добавил projectSlug в зависимости
 
   useEffect(() => {
     let cancelled = false;

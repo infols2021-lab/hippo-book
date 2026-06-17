@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { calcAndBuildReview } from "@/lib/assignments/scoring";
+import type { AssignmentData } from "@/lib/assignments/types"; // 🔥 Подключаем наш глобальный тип
 
 // TODO: В будущем (когда отвяжемся от легаси) заменим на универсальный assertProjectAssignmentAccess
 import {
@@ -42,20 +43,22 @@ function normalizeStringArray(value: unknown): string[] {
   return value.map((item) => String(item ?? "").trim()).filter(Boolean);
 }
 
-function getMaterialLevels(assignment: any): string[] {
+// 🔧 Заменили any на AssignmentData
+function getMaterialLevels(assignment: AssignmentData | null): string[] {
   const material = firstOrNull(assignment?.materials);
   return normalizeStringArray(material?.target_levels);
 }
 
-function getMaterialId(assignment: any): string | null {
+// 🔧 Заменили any на AssignmentData
+function getMaterialId(assignment: AssignmentData | null): string | null {
   const material = firstOrNull(assignment?.materials);
-  const direct = typeof assignment?.material_id === "string" ? assignment.material_id : null;
+  const direct = typeof assignment?.material_id === "string" ? assignment?.material_id : null;
   const fromMaterial = typeof material?.id === "string" ? material.id : null;
   return direct || fromMaterial || null;
 }
 
 // УНИВЕРСАЛЬНЫЙ ЧТЕНИЯ ФИЧ (Фоллбэк для старых материалов без project_id)
-function getProjectConfig(assignment: any) {
+function getProjectConfig(assignment: AssignmentData | null) {
   const material = firstOrNull(assignment?.materials);
   const project = material?.projects;
   
@@ -145,7 +148,7 @@ export async function POST(req: Request) {
   // ─────────────────────────────────────────────────────────────
   // ПОЛУЧЕНИЕ ЗАДАНИЯ + ДАННЫЕ ПРОЕКТА (NEW ARCHITECTURE)
   // ─────────────────────────────────────────────────────────────
-  const { data: assignment, error: assignmentErr } = await supabase
+  const { data: rawAssignment, error: assignmentErr } = await supabase
     .from("assignments")
     .select(`
       id, branch_type, material_id, textbook_id, crossword_id, content,
@@ -157,10 +160,12 @@ export async function POST(req: Request) {
     .eq("id", body.assignmentId)
     .single();
 
-  if (assignmentErr || !assignment) {
+  if (assignmentErr || !rawAssignment) {
     return NextResponse.json({ ok: false, error: assignmentErr?.message || "Assignment not found" }, { status: 404 });
   }
 
+  // Строго типизируем задание
+  const assignment = rawAssignment as AssignmentData;
   const projectConfig = getProjectConfig(assignment);
 
   // ─────────────────────────────────────────────────────────────

@@ -33,12 +33,21 @@ export function validateQuestions(questions: Question[]): ValidationResult {
         issues.push({ index, message: "Минимум 2 варианта ответа" });
       }
       
-      if (!q.correct || q.correct.length === 0) {
+      // correct может быть числом (одиночный) или массивом (множественный)
+      const correct = q.correct;
+      if (correct === undefined || correct === null) {
         issues.push({ index, message: "Выберите хотя бы один правильный ответ" });
-      }
-
-      if (!q.multiple && q.correct && q.correct.length > 1) {
-        issues.push({ index, message: "Для одиночного выбора должен быть только 1 правильный ответ" });
+      } else if (Array.isArray(correct)) {
+        if (correct.length === 0) {
+          issues.push({ index, message: "Выберите хотя бы один правильный ответ" });
+        }
+        if (!q.multiple && correct.length > 1) {
+          issues.push({ index, message: "Для одиночного выбора должен быть только 1 правильный ответ" });
+        }
+      } else if (typeof correct === "number") {
+        // одиночный выбор, корректно
+      } else {
+        issues.push({ index, message: "Некорректный формат правильных ответов" });
       }
     }
 
@@ -93,7 +102,7 @@ export function validateQuestions(questions: Question[]): ValidationResult {
       }
 
       if (q.points && q.answers) {
-        const answerIds = new Set(q.answers.map(a => a.id));
+        const answerIds = new Set(q.answers.map((a: { id: string }) => a.id));
         for (const point of q.points) {
           if (!point.correctAnswerId) {
             issues.push({ index, message: `Точка "${point.label || point.id}" не связана с ответом` });
@@ -107,9 +116,10 @@ export function validateQuestions(questions: Question[]): ValidationResult {
           if (point.correctAnswerId) {
             const existing = pointToAnswer.get(point.correctAnswerId);
             if (existing) {
+              const answerText = q.answers.find((a: { id: string; text?: string }) => a.id === point.correctAnswerId)?.text || point.correctAnswerId;
               issues.push({
                 index,
-                message: `Ответ "${q.answers.find(a => a.id === point.correctAnswerId)?.text || point.correctAnswerId}" используется несколькими точками. Лучше 1:1.`,
+                message: `Ответ "${answerText}" используется несколькими точками. Лучше 1:1.`,
               });
               break;
             }
@@ -131,7 +141,8 @@ export function validateQuestions(questions: Question[]): ValidationResult {
           if (!subQ.options || subQ.options.length < 2) {
             issues.push({ index, message: `Подвопрос ${subIdx + 1}: минимум 2 варианта ответа` });
           }
-          if (!subQ.correct || subQ.correct.length === 0) {
+          const correct = subQ.correct;
+          if (correct === undefined || correct === null || (Array.isArray(correct) && correct.length === 0)) {
             issues.push({ index, message: `Подвопрос ${subIdx + 1}: выберите хотя бы один правильный ответ` });
           }
         });

@@ -2,10 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
-import AppHeader from "@/components/AppHeader"; 
-
-// 🔥 Идеальный локальный импорт стилей (Co-location)
-import "./materials.css";
+import AppHeader from "@/components/AppHeader"; // Твоя родная шапка
 
 export const revalidate = 0; // Отключаем кэш для актуальных данных
 

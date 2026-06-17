@@ -1,40 +1,61 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import AssignmentClient from "../AssignmentClient";
 
-// Тот самый, твой родной движок тестирования!
-import AssignmentClient from "@/app/(app)/assignment/AssignmentClient";
+type MaybePromise<T> = T | Promise<T>;
+type SearchParams = Record<string, string | string[] | undefined>;
 
-type PageProps = {
-  params: Promise<{ slug: string; id: string }>;
-  searchParams: Promise<{ source?: string; sourceId?: string }>;
-};
+function first(v: string | string[] | undefined): string | undefined {
+  if (Array.isArray(v)) return v[0];
+  return v;
+}
 
-export default async function AssignmentPage({ params, searchParams }: PageProps) {
-  const supabase = await createSupabaseServerClient();
-  const { slug, id: assignmentId } = await params;
+function normStr(v: string | undefined) {
+  const s = (v ?? "").trim();
+  return s.length ? s : undefined;
+}
+
+function normSource(v: string | undefined) {
+  const s = (v ?? "").trim().toLowerCase();
+  if (!s) return undefined;
+
+  const allowed = new Set([
+    "textbook",
+    "crossword",
+    "materials",
+    "login",
+    "profile",
+    "gatehouse-material",
+    "gatehouse",
+  ]);
+
+  return allowed.has(s) ? s : undefined;
+}
+
+export default async function AssignmentByIdPage({
+  params,
+  searchParams,
+}: {
+  // 🔥 ИСПРАВЛЕНИЕ 1: Добавили slug в типы
+  params: MaybePromise<{ slug: string; id: string }>;
+  searchParams?: MaybePromise<SearchParams>;
+}) {
+  const p = await params;
+  const sp = (await searchParams) ?? {};
+
+  const assignmentId = String(p?.id ?? "").trim();
   
-  // Достаем параметры url 
-  const sp = await searchParams;
-  const source = sp?.source;
-  const sourceId = sp?.sourceId;
+  // 🔥 ИСПРАВЛЕНИЕ 2: Достаем slug из URL
+  const slug = String(p?.slug ?? "").trim();
 
-  // Проверяем, существует ли проект и не скрыт ли он
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, is_available")
-    .eq("slug", slug)
-    .single();
+  const source = normSource(first(sp["source"]));
+  const sourceId = normStr(first(sp["sourceId"]));
 
-  if (!project || !project.is_available) notFound();
-
-  // Мы больше не делаем запрос к таблице 'assignments' здесь,
-  // потому что AssignmentClient сам сделает fetch внутри себя при монтировании!
-
+  // 🔥 ИСПРАВЛЕНИЕ 3: Передаем projectSlug
   return (
     <AssignmentClient 
       assignmentId={assignmentId} 
       source={source} 
       sourceId={sourceId} 
+      projectSlug={slug} 
     />
   );
 }
