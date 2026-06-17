@@ -126,12 +126,12 @@ export type QuestionType =
   | "imagemap"
   | "reading";
 
+// БАЗОВЫЙ ИНТЕРФЕЙС (ТУТ БОЛЬШЕ НЕТ type?: string)
 export type QuestionBase = {
   id: string;
   q?: string;
   image?: string; // Устаревшее
   media?: MediaAttachment[]; // Новое
-  type?: string;
 };
 
 export type TestOption = {
@@ -238,7 +238,7 @@ export type QuestionReading = QuestionBase & {
   subQuestions?: QuestionTest[];
 };
 
-// Главный тип вопроса (используется на фронтенде)
+// ГЛАВНЫЙ ТИП ВОПРОСА (Только строгие типы, никаких Record<string, any>)
 export type QuestionAny =
   | QuestionTest
   | QuestionFill
@@ -247,10 +247,9 @@ export type QuestionAny =
   | QuestionComplex
   | QuestionMatching
   | QuestionImageMap
-  | QuestionReading
-  | (QuestionBase & Record<string, any>);
+  | QuestionReading;
 
-// АЛИАСЫ ДЛЯ АДМИНКИ (чтобы не переписывать импорты в админ-панели)
+// АЛИАСЫ ДЛЯ АДМИНКИ
 export type Question = QuestionAny;
 export type TestQuestion = QuestionTest;
 export type FillQuestion = QuestionFill;

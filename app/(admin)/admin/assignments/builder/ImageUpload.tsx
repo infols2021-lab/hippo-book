@@ -12,26 +12,12 @@ type Props = {
   maxMB?: number;
 };
 
-type UploadApiResponse = {
-  ok?: boolean;
-  error?: string;
-  url?: string | null;
-  publicUrl?: string | null;
-  imageUrl?: string | null;
-  path?: string | null;
-  bucket?: string | null;
-  data?: {
-    url?: string | null;
-    publicUrl?: string | null;
-    imageUrl?: string | null;
-    path?: string | null;
-    bucket?: string | null;
-  } | null;
-};
+// ==========================================
+// УТИЛИТЫ ДЛЯ ЗАГРУЗКИ
+// ==========================================
 
 function safeExt(name: string) {
-  const ext = (name.split(".").pop() || "").toLowerCase();
-  return ext || "bin";
+  return (name.split(".").pop() || "").toLowerCase() || "bin";
 }
 
 function isAllowedImageExt(ext: string) {
@@ -43,46 +29,12 @@ function cacheBustUrl(url: string) {
   return `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
 }
 
-async function readJsonSafe<T>(res: Response): Promise<T | null> {
-  const text = await res.text();
-
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return null;
-  }
-}
-
-function extractUploadUrl(json: UploadApiResponse | null, fallbackBucket: string): string {
-  if (!json) return "";
-
-  const directUrl = json.publicUrl || json.url || json.imageUrl || json.data?.publicUrl || json.data?.url || json.data?.imageUrl;
-
-  if (directUrl) return String(directUrl);
-
-  const bucket = json.bucket || json.data?.bucket || fallbackBucket;
-  const path = json.path || json.data?.path;
-
-  if (bucket && path) {
-    return getStoragePublicUrl(String(bucket), String(path));
-  }
-
-  return "";
-}
-
-async function uploadImageThroughApi(params: {
-  file: File;
-  bucket: string;
-  folder: string;
-}) {
+async function uploadImageThroughApi(file: File, bucket: string, folder: string): Promise<string> {
   const formData = new FormData();
-
-  formData.append("file", params.file);
-  formData.append("bucket", params.bucket);
-  formData.append("folder", params.folder);
-  formData.append("pathPrefix", params.folder);
+  formData.append("file", file);
+  formData.append("bucket", bucket);
+  formData.append("folder", folder);
+  formData.append("pathPrefix", folder);
 
   const res = await fetch("/api/admin/upload", {
     method: "POST",
@@ -90,20 +42,38 @@ async function uploadImageThroughApi(params: {
     cache: "no-store",
   });
 
-  const json = await readJsonSafe<UploadApiResponse>(res);
+  let json: Record<string, any>;
+  try {
+    json = await res.json();
+  } catch {
+    throw new Error("Ошибка сервера: не удалось прочитать ответ");
+  }
 
   if (!res.ok || !json?.ok) {
     throw new Error(json?.error || `HTTP ${res.status}`);
   }
 
-  const uploadedUrl = extractUploadUrl(json, params.bucket);
+  // Пытаемся извлечь прямой URL
+  const directUrl =
+    json.publicUrl || json.url || json.imageUrl ||
+    json.data?.publicUrl || json.data?.url || json.data?.imageUrl;
 
-  if (!uploadedUrl) {
-    throw new Error("Сервер загрузил файл, но не вернул publicUrl");
+  if (directUrl) return cacheBustUrl(String(directUrl));
+
+  // Если прямого URL нет, генерируем его через бакет и путь
+  const resBucket = json.bucket || json.data?.bucket || bucket;
+  const resPath = json.path || json.data?.path;
+
+  if (resBucket && resPath) {
+    return cacheBustUrl(getStoragePublicUrl(String(resBucket), String(resPath)));
   }
 
-  return cacheBustUrl(uploadedUrl);
+  throw new Error("Сервер загрузил файл, но не вернул публичную ссылку (publicUrl)");
 }
+
+// ==========================================
+// КОМПОНЕНТ
+// ==========================================
 
 export default function ImageUpload({
   label = "Изображение для вопроса (опционально):",
@@ -114,15 +84,25 @@ export default function ImageUpload({
   maxMB = 5,
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const localUrlRef = useRef<string | null>(null); // Для очистки URL.createObjectURL
 
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<number>(0);
   const [previewUrl, setPreviewUrl] = useState<string>(value || "");
+  const [error, setError] = useState<string | null>(null); // Локальный стейт ошибок вместо alert()
 
   useEffect(() => {
     setPreviewUrl(value || "");
+    setError(null);
   }, [value]);
+
+  // Очистка локальных URL при размонтировании компонента (борьба с утечками памяти)
+  useEffect(() => {
+    return () => {
+      if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
+    };
+  }, []);
 
   function openPicker() {
     if (disabled || busy) return;
@@ -133,70 +113,71 @@ export default function ImageUpload({
     setProgress(0);
   }
 
-  async function uploadFile(file: File) {
+  async function handleFile(file: File) {
+    setError(null);
     const ext = safeExt(file.name);
 
     if (!isAllowedImageExt(ext)) {
-      throw new Error("Поддерживаются только JPG, PNG, GIF, WebP, AVIF");
+      setError("Поддерживаются только JPG, PNG, GIF, WebP, AVIF");
+      return;
     }
 
     if (file.size > maxMB * 1024 * 1024) {
-      throw new Error(`Размер файла больше ${maxMB}MB`);
+      setError(`Размер файла больше ${maxMB}MB`);
+      return;
     }
 
+    // Создаем локальное превью и запоминаем его для последующей очистки
+    if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
     const objectUrl = URL.createObjectURL(file);
+    localUrlRef.current = objectUrl;
+    
     setPreviewUrl(objectUrl);
-
     setBusy(true);
     setProgress(15);
 
-    setProgress(45);
-
-    const finalUrl = await uploadImageThroughApi({
-      file,
-      bucket,
-      folder: "assignments",
-    });
-
-    setProgress(85);
-
-    onChange(finalUrl);
-    setPreviewUrl(finalUrl);
-
-    setProgress(100);
-    window.setTimeout(resetProgress, 450);
-  }
-
-  async function handleFile(file: File) {
     try {
-      await uploadFile(file);
-    } catch (e: any) {
-      if (!value) setPreviewUrl("");
+      setProgress(45);
+      const finalUrl = await uploadImageThroughApi(file, bucket, "assignments");
+      setProgress(85);
 
+      onChange(finalUrl);
+      setPreviewUrl(finalUrl);
+      
+      // Очищаем локальный URL, так как сервер вернул настоящий
+      URL.revokeObjectURL(objectUrl);
+      localUrlRef.current = null;
+
+      setProgress(100);
+      window.setTimeout(resetProgress, 450);
+    } catch (err: unknown) {
+      if (!value) setPreviewUrl("");
       resetProgress();
-      alert("❌ Ошибка загрузки: " + (e?.message || String(e)));
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
       setDragOver(false);
-
-      if (inputRef.current) {
-        inputRef.current.value = "";
-      }
+      if (inputRef.current) inputRef.current.value = "";
     }
   }
 
   return (
     <div className="form-group">
-      <label>{label}</label>
+      <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>{label}</label>
+
+      {/* Вывод ошибки загрузки */}
+      {error && (
+        <div style={{ padding: "8px 12px", background: "#fee", color: "red", borderRadius: 8, marginBottom: 12, fontSize: 14 }}>
+          ❌ Ошибка загрузки: {error}
+        </div>
+      )}
 
       <div
-        className={"upload-area" + (dragOver ? " dragover" : "")}
+        className={`upload-area ${dragOver ? "dragover" : ""}`}
         onClick={openPicker}
         onDragOver={(e) => {
           e.preventDefault();
-
           if (disabled || busy) return;
-
           setDragOver(true);
         }}
         onDragLeave={(e) => {
@@ -205,9 +186,7 @@ export default function ImageUpload({
         }}
         onDrop={(e) => {
           e.preventDefault();
-
           if (disabled || busy) return;
-
           setDragOver(false);
 
           const file = e.dataTransfer.files?.[0];
@@ -221,7 +200,6 @@ export default function ImageUpload({
         }}
       >
         <p style={{ margin: 0 }}>📁 Нажмите для загрузки изображения или перетащите файл сюда</p>
-
         <p className="small-muted" style={{ marginTop: 6 }}>
           Поддерживаемые форматы: JPG, PNG, GIF, WebP, AVIF, максимум {maxMB}MB
         </p>
@@ -230,7 +208,7 @@ export default function ImageUpload({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/png, image/jpeg, image/gif, image/webp, image/avif"
         disabled={disabled || busy}
         style={{ display: "none" }}
         onChange={(e) => {
@@ -243,13 +221,13 @@ export default function ImageUpload({
         <div className="upload-progress-bar" style={{ width: `${progress}%` }} />
       </div>
 
-      {previewUrl ? (
+      {previewUrl && (
         <div style={{ marginTop: 10 }}>
           <img
             className="question-image-preview"
             src={previewUrl}
             alt="Предпросмотр изображения"
-            style={{ display: "block" }}
+            style={{ display: "block", maxWidth: 200, borderRadius: 8 }}
             onError={() => {
               if (!value) setPreviewUrl("");
             }}
@@ -263,13 +241,14 @@ export default function ImageUpload({
               setPreviewUrl("");
               onChange("");
               resetProgress();
+              setError(null);
             }}
             style={{ marginTop: 8 }}
           >
             🗑️ Удалить изображение
           </button>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

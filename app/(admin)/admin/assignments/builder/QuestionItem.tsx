@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import ImageUpload from "./ImageUpload";
 import MediaUpload from "./MediaUpload";
 import QuestionTypeSwitch from "./QuestionTypeSwitch";
-import { deepClone, type Question, type QuestionType } from "./types";
+import type { Question, QuestionType } from "./types";
 
 import TestEditor from "./test/TestEditor";
 import FillEditor from "./fill/FillEditor";
@@ -30,15 +30,17 @@ type Props = {
 };
 
 function typeLabel(t: QuestionType) {
-  if (t === "test") return "📝 Тест";
-  if (t === "fill") return "✍️ Вписать ответ";
-  if (t === "sentence") return "📝 Заполнить предложение";
-  if (t === "crossword") return "🧩 Кроссворд";
-  if (t === "complex") return "📚 Комплексный вопрос";
-  if (t === "matching") return "🔗 Сопоставление";
-  if (t === "imagemap") return "🗺 Карта";
-  if (t === "reading") return "📖 Чтение + тест";
-  return t;
+  switch (t) {
+    case "test": return "📝 Тест";
+    case "fill": return "✍️ Вписать ответ";
+    case "sentence": return "📝 Заполнить предложение";
+    case "crossword": return "🧩 Кроссворд";
+    case "complex": return "📚 Комплексный вопрос";
+    case "matching": return "🔗 Сопоставление";
+    case "imagemap": return "🗺 Карта";
+    case "reading": return "📖 Чтение + тест";
+    default: return t;
+  }
 }
 
 function clamp(n: number, a: number, b: number) {
@@ -66,45 +68,29 @@ export default function QuestionItem({
   onMoveDown,
   onTypeChange,
 }: Props) {
-  const q = value as any;
+  
+  // Локальный стейт для текста, чтобы не вызывать глобальный ре-рендер на каждый символ
+  const [localText, setLocalText] = useState(value.q ?? "");
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  function patch(patchObj: Record<string, any>) {
-    const next = deepClone(value) as any;
-    Object.assign(next, patchObj);
-    onChange(next);
-  }
+  useEffect(() => {
+    setLocalText(value.q ?? "");
+  }, [value.q]);
 
   const canUp = !disabled && index > 0;
   const canDown = !disabled && index < total - 1;
 
-  const typeClass =
-    q.type === "test"
-      ? "qtype-test"
-      : q.type === "fill"
-      ? "qtype-fill"
-      : q.type === "sentence"
-      ? "qtype-sentence"
-      : q.type === "complex"
-      ? "qtype-complex"
-      : q.type === "matching"
-      ? "qtype-matching"
-      : q.type === "imagemap"
-      ? "qtype-imagemap"
-      : q.type === "reading"
-      ? "qtype-reading"
-      : "qtype-crossword";
-
-  // ====== Zoomable image state (for crossword) ======
-  const imgUrl: string = typeof q.image === "string" ? q.image : "";
-
+  // ====== ОПТИМИЗИРОВАННЫЙ ЗУМ (ЧЕРЕЗ DOM REFS, БЕЗ РЕ-РЕНДЕРОВ) ======
+  const imgUrl: string = typeof value.image === "string" ? value.image : "";
+  
   const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [scale, setScale] = useState<number>(1);
-  const [tx, setTx] = useState<number>(0);
-  const [ty, setTy] = useState<number>(0);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const zoomTextRef = useRef<HTMLElement | null>(null);
 
-  const [dragging, setDragging] = useState(false);
+  const tRef = useRef({ scale: 1, tx: 0, ty: 0 });
+  const dragging = useRef(false);
   const dragStart = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
-
+  
   const pinchStart = useRef<{
     d: number;
     scale: number;
@@ -116,21 +102,34 @@ export default function QuestionItem({
   const minScale = 1;
   const maxScale = 6;
 
-  // сброс при смене картинки/типа
-  useEffect(() => {
-    setScale(1);
-    setTx(0);
-    setTy(0);
-    setDragging(false);
-    dragStart.current = null;
-    pinchStart.current = null;
-  }, [imgUrl, q.type]);
+  function applyTransform() {
+    if (imgRef.current) {
+      const { tx, ty, scale } = tRef.current;
+      imgRef.current.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+      
+      // Меняем курсор в зависимости от состояния
+      if (wrapRef.current) {
+         wrapRef.current.style.cursor = scale > 1 ? (dragging.current ? "grabbing" : "grab") : "default";
+      }
+    }
+    if (zoomTextRef.current) {
+      zoomTextRef.current.innerText = `${Math.round(tRef.current.scale * 100)}%`;
+    }
+  }
 
   function resetZoom() {
-    setScale(1);
-    setTx(0);
-    setTy(0);
+    tRef.current = { scale: 1, tx: 0, ty: 0 };
+    applyTransform();
   }
+
+  // Сброс при смене картинки
+  useEffect(() => {
+    resetZoom();
+    dragging.current = false;
+    dragStart.current = null;
+    pinchStart.current = null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imgUrl, value.type]);
 
   function clientToLocal(eClientX: number, eClientY: number) {
     const el = wrapRef.current;
@@ -139,130 +138,103 @@ export default function QuestionItem({
     return { x: eClientX - r.left, y: eClientY - r.top };
   }
 
-  // Zoom around point:
-  // keep point under cursor stable by adjusting translation
   function applyZoom(nextScale: number, originLocal: { x: number; y: number }) {
     nextScale = clamp(nextScale, minScale, maxScale);
-
-    const s0 = scale;
+    const { scale: s0, tx, ty } = tRef.current;
     const s1 = nextScale;
 
     if (s0 === s1) return;
 
-    // Transform model: translate(tx,ty) then scale(scale)
-    // We adjust tx/ty so that originLocal stays fixed in screen coordinates.
-    // New translation:
-    // origin = (originLocal - t) / s  -> keep same => t1 = originLocal - (originLocal - t0) * (s1/s0)
     const t1x = originLocal.x - (originLocal.x - tx) * (s1 / s0);
     const t1y = originLocal.y - (originLocal.y - ty) * (s1 / s0);
 
-    setScale(s1);
-    setTx(t1x);
-    setTy(t1y);
+    tRef.current = { scale: s1, tx: t1x, ty: t1y };
+    applyTransform();
   }
 
   function onWheel(e: React.WheelEvent) {
-    if (disabled) return;
-    if (!imgUrl) return;
-
-    // чтобы колесо не скроллило страницу во время зума
+    if (disabled || !imgUrl) return;
     e.preventDefault();
 
-    const delta = -e.deltaY; // вверх => zoom in
+    const delta = -e.deltaY;
     const factor = delta > 0 ? 1.12 : 0.89;
-
     const origin = clientToLocal(e.clientX, e.clientY);
-    applyZoom(scale * factor, origin);
+    
+    applyZoom(tRef.current.scale * factor, origin);
   }
 
   function onMouseDown(e: React.MouseEvent) {
-    if (disabled) return;
-    if (!imgUrl) return;
-
-    // drag only if zoomed
-    if (scale <= 1) return;
-
-    setDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY, tx, ty };
+    if (disabled || !imgUrl || tRef.current.scale <= 1) return;
+    
+    dragging.current = true;
+    dragStart.current = { x: e.clientX, y: e.clientY, tx: tRef.current.tx, ty: tRef.current.ty };
+    applyTransform(); // Для смены курсора на grabbing
   }
 
   function onMouseMove(e: React.MouseEvent) {
-    if (!dragging || !dragStart.current) return;
+    if (!dragging.current || !dragStart.current) return;
     const dx = e.clientX - dragStart.current.x;
     const dy = e.clientY - dragStart.current.y;
-    setTx(dragStart.current.tx + dx);
-    setTy(dragStart.current.ty + dy);
+    
+    tRef.current.tx = dragStart.current.tx + dx;
+    tRef.current.ty = dragStart.current.ty + dy;
+    applyTransform();
   }
 
   function endDrag() {
-    setDragging(false);
+    dragging.current = false;
     dragStart.current = null;
+    applyTransform();
   }
 
+  // Touch события также оптимизированы на useRef
   function onTouchStart(e: React.TouchEvent) {
-    if (disabled) return;
-    if (!imgUrl) return;
+    if (disabled || !imgUrl) return;
 
     if (e.touches.length === 2) {
-      // pinch start
       e.preventDefault();
       const a = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       const b = { x: e.touches[1].clientX, y: e.touches[1].clientY };
-      const d0 = dist(a, b);
-      const mid = midpoint(a, b);
-      const midLocal = clientToLocal(mid.x, mid.y);
+      const midLocal = clientToLocal(midpoint(a, b).x, midpoint(a, b).y);
 
-      pinchStart.current = { d: d0, scale, mid: midLocal, tx, ty };
+      pinchStart.current = { d: dist(a, b), scale: tRef.current.scale, mid: midLocal, tx: tRef.current.tx, ty: tRef.current.ty };
       return;
     }
 
-    if (e.touches.length === 1 && scale > 1) {
-      // drag with one finger when zoomed
+    if (e.touches.length === 1 && tRef.current.scale > 1) {
       e.preventDefault();
-      const t = e.touches[0];
-      setDragging(true);
-      dragStart.current = { x: t.clientX, y: t.clientY, tx, ty };
+      dragging.current = true;
+      dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, tx: tRef.current.tx, ty: tRef.current.ty };
     }
   }
 
   function onTouchMove(e: React.TouchEvent) {
-    if (disabled) return;
-    if (!imgUrl) return;
+    if (disabled || !imgUrl) return;
 
     if (e.touches.length === 2 && pinchStart.current) {
       e.preventDefault();
       const a = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       const b = { x: e.touches[1].clientX, y: e.touches[1].clientY };
-      const d1 = dist(a, b);
-
-      const ratio = d1 / pinchStart.current.d;
+      
+      const ratio = dist(a, b) / pinchStart.current.d;
       const nextScale = pinchStart.current.scale * ratio;
-
-      // zoom around stored midpoint
-      // use stored tx/ty baseline instead of current to reduce jitter
-      const s0 = pinchStart.current.scale;
       const s1 = clamp(nextScale, minScale, maxScale);
+      const s0 = pinchStart.current.scale;
 
-      const origin = pinchStart.current.mid;
-      const baseTx = pinchStart.current.tx;
-      const baseTy = pinchStart.current.ty;
+      const { mid: origin, tx: baseTx, ty: baseTy } = pinchStart.current;
 
-      const t1x = origin.x - (origin.x - baseTx) * (s1 / s0);
-      const t1y = origin.y - (origin.y - baseTy) * (s1 / s0);
-
-      setScale(s1);
-      setTx(t1x);
-      setTy(t1y);
+      tRef.current.scale = s1;
+      tRef.current.tx = origin.x - (origin.x - baseTx) * (s1 / s0);
+      tRef.current.ty = origin.y - (origin.y - baseTy) * (s1 / s0);
+      applyTransform();
       return;
     }
 
-    if (e.touches.length === 1 && dragging && dragStart.current) {
+    if (e.touches.length === 1 && dragging.current && dragStart.current) {
       e.preventDefault();
-      const t = e.touches[0];
-      const dx = t.clientX - dragStart.current.x;
-      const dy = t.clientY - dragStart.current.y;
-      setTx(dragStart.current.tx + dx);
-      setTy(dragStart.current.ty + dy);
+      tRef.current.tx = dragStart.current.tx + (e.touches[0].clientX - dragStart.current.x);
+      tRef.current.ty = dragStart.current.ty + (e.touches[0].clientY - dragStart.current.y);
+      applyTransform();
     }
   }
 
@@ -271,115 +243,118 @@ export default function QuestionItem({
     if (e.touches.length === 0) endDrag();
   }
 
-  const imgTransform = useMemo(() => {
-    // translate first then scale around top-left (so formula matches applyZoom)
-    return `translate(${tx}px, ${ty}px) scale(${scale})`;
-  }, [tx, ty, scale]);
+  // ====== РЕНДЕР ======
+
+  // Type Guards: Строгая типизация редакторов без ts-ignore
+  const renderSpecificEditor = () => {
+    switch (value.type) {
+      case "test": return <TestEditor value={value} disabled={disabled} onChange={onChange} />;
+      case "fill": return <FillEditor value={value} disabled={disabled} onChange={onChange} />;
+      case "sentence": return <SentenceEditor value={value} disabled={disabled} onChange={onChange} />;
+      case "crossword": return <CrosswordEditor value={value} disabled={disabled} onChange={onChange} />;
+      case "complex": return <ComplexEditor value={value} disabled={disabled} onChange={onChange} />;
+      case "matching": return <MatchingEditor value={value} disabled={disabled} onChange={onChange} />;
+      case "imagemap": return <ImageMapEditor value={value} disabled={disabled} onChange={onChange} />;
+      case "reading": return <ReadingEditor value={value} disabled={disabled} onChange={onChange} />;
+      default: return null;
+    }
+  };
 
   return (
-    <div className={`subtask-item ${typeClass}`} style={{ position: "relative" }}>
-      {/* номер вопроса */}
+    <div className={`subtask-item qtype-${value.type}`} style={{ position: "relative" }}>
       <div className="question-number">{index + 1}</div>
 
-      {/* header */}
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
+      {/* Header */}
+      <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ fontWeight: 800 }}>{typeLabel(q.type)}</div>
-
-          <QuestionTypeSwitch value={q.type as QuestionType} onChange={(t) => onTypeChange(t)} disabled={disabled} />
+          <div style={{ fontWeight: 800 }}>{typeLabel(value.type)}</div>
+          <QuestionTypeSwitch value={value.type} onChange={(t) => onTypeChange(t)} disabled={disabled} />
         </div>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button className="btn btn-small" type="button" onClick={onMoveUp} disabled={!canUp}>
-            ↑
-          </button>
-          <button className="btn btn-small" type="button" onClick={onMoveDown} disabled={!canDown}>
-            ↓
-          </button>
-          <button
-            className="btn btn-small btn-danger"
-            type="button"
-            onClick={() => {
-              if (disabled) return;
-              if (confirm("Удалить вопрос?")) onRemove();
-            }}
-            disabled={disabled}
-          >
-            🗑️ Удалить
-          </button>
+          <button className="btn btn-small" type="button" onClick={onMoveUp} disabled={!canUp}>↑</button>
+          <button className="btn btn-small" type="button" onClick={onMoveDown} disabled={!canDown}>↓</button>
+          
+          {isDeleting ? (
+            <div style={{ display: "flex", gap: 4, alignItems: "center", background: "var(--danger-light, #fee)", padding: "2px 8px", borderRadius: 6 }}>
+              <span style={{ fontSize: 13, color: "red", fontWeight: "bold" }}>Точно?</span>
+              <button className="btn btn-small btn-danger" type="button" onClick={onRemove}>Да</button>
+              <button className="btn btn-small" type="button" onClick={() => setIsDeleting(false)}>Нет</button>
+            </div>
+          ) : (
+            <button className="btn btn-small btn-danger" type="button" onClick={() => setIsDeleting(true)} disabled={disabled}>
+              🗑️ Удалить
+            </button>
+          )}
         </div>
       </div>
 
       <div style={{ height: 12 }} />
 
-      {/* ===== ТЕКСТ ВОПРОСА — показываем для всех, кроме кроссворда ===== */}
-      {q.type !== "crossword" ? (
+      {/* Текст вопроса (кроме кроссворда) */}
+      {value.type !== "crossword" && (
         <div className="form-group">
           <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Текст вопроса:</label>
           <textarea
             className="question-textarea"
-            value={q.q ?? ""}
+            value={localText}
             placeholder="Введите текст вопроса. Enter — новая строка"
-            onChange={(e) => patch({ q: e.target.value })}
+            onChange={(e) => setLocalText(e.target.value)}
+            onBlur={() => {
+               // Отправляем наверх только при потере фокуса (мощнейшая оптимизация)
+               if (localText !== value.q) {
+                 onChange({ ...value, q: localText } as Question);
+               }
+            }}
             disabled={disabled}
           />
           <div className="format-hint">💡 Используйте Enter для переноса строк</div>
         </div>
-      ) : null}
+      )}
 
-      {/* ===== ОБЩИЙ ЗАГРУЗЧИК МЕДИА — показываем для всех, кроме кроссворда ===== */}
-      {q.type !== "crossword" ? (
+      {/* Общий загрузчик медиа (кроме кроссворда) */}
+      {value.type !== "crossword" && (
         <>
-          {/* Устаревшее изображение: показываем только если это не imagemap (у карт своя центральная картинка) */}
-          {q.type !== "imagemap" && q.image && typeof q.image === "string" && !q.media?.length && (
+          {value.type !== "imagemap" && value.image && typeof value.image === "string" && (!value.media || value.media.length === 0) && (
             <div className="form-group" style={{ marginBottom: "16px" }}>
               <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Устаревшее изображение:</label>
-              <img src={q.image} alt="old media" style={{ maxWidth: 200, borderRadius: 8 }} />
-              <button className="btn btn-small btn-danger" style={{ marginTop: 8 }} onClick={() => patch({ image: "" })}>Удалить</button>
+              <img src={value.image} alt="old media" style={{ maxWidth: 200, borderRadius: 8 }} />
+              <button 
+                className="btn btn-small btn-danger" 
+                style={{ marginTop: 8 }} 
+                onClick={() => onChange({ ...value, image: "" } as Question)}
+              >
+                Удалить
+              </button>
             </div>
           )}
 
           <MediaUpload
-            value={q.media || []}
-            onChange={(nextMedia) => patch({ media: nextMedia })}
+            value={value.media || []}
+            onChange={(nextMedia) => onChange({ ...value, media: nextMedia } as Question)}
             disabled={disabled}
             bucket="question-images"
             audioBucket="hippo-book-audio"
             label="Прикрепленные медиафайлы (Изображения, Аудио, PDF):"
           />
         </>
-      ) : null}
+      )}
 
-      {/* ===== ИЗОБРАЖЕНИЕ КРОССВОРДА (УВЕЛИЧЕНИЕ/ПИНЧ) ===== */}
-      {q.type === "crossword" ? (
+      {/* Изображение кроссворда с оптимизированным зумом */}
+      {value.type === "crossword" && (
         <div className="form-group">
           <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Изображение кроссворда (опционально):</label>
-
           <ImageUpload
             value={imgUrl}
-            onChange={(nextUrl) => patch({ image: nextUrl || "" })}
+            onChange={(nextUrl) => onChange({ ...value, image: nextUrl || "" } as Question)}
             disabled={disabled}
             bucket="question-images"
             label="Загрузить изображение (можно перетаскиванием):"
           />
 
-          {imgUrl ? (
+          {imgUrl && (
             <div style={{ marginTop: 10 }}>
-              <div
-                className="card"
-                style={{
-                  padding: 10,
-                  borderRadius: 16,
-                }}
-              >
+              <div className="card" style={{ padding: 10, borderRadius: 16 }}>
                 <div className="small-muted" style={{ marginBottom: 8 }}>
                   Zoom: колесико/тачпад • телефон: pinch • двойной клик/тап — сброс • drag при увеличении
                 </div>
@@ -396,105 +371,47 @@ export default function QuestionItem({
                   onTouchMove={onTouchMove}
                   onTouchEnd={onTouchEnd}
                   style={{
-                    width: "100%",
-                    height: 320,
-                    overflow: "hidden",
-                    borderRadius: 14,
-                    border: "1px solid rgba(0,0,0,0.12)",
-                    background: "rgba(0,0,0,0.03)",
-                    position: "relative",
-                    touchAction: "none", // важно для pinch/drag
-                    cursor: disabled ? "not-allowed" : scale > 1 ? (dragging ? "grabbing" : "grab") : "default",
+                    width: "100%", height: 320, overflow: "hidden", borderRadius: 14,
+                    border: "1px solid rgba(0,0,0,0.12)", background: "rgba(0,0,0,0.03)",
+                    position: "relative", touchAction: "none", cursor: disabled ? "not-allowed" : "default"
                   }}
                 >
                   <img
+                    ref={imgRef}
                     src={imgUrl}
                     alt="Кроссворд"
                     draggable={false}
                     style={{
-                      transform: imgTransform,
-                      transformOrigin: "0 0",
-                      willChange: "transform",
-                      userSelect: "none",
-                      pointerEvents: "none",
-                      maxWidth: "none",
-                      maxHeight: "none",
-                      width: "auto",
-                      height: "auto",
-                      display: "block",
+                      transformOrigin: "0 0", willChange: "transform", userSelect: "none",
+                      pointerEvents: "none", maxWidth: "none", maxHeight: "none",
+                      width: "auto", height: "auto", display: "block",
                     }}
                   />
-
-                  {/* мини-панель */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      right: 10,
-                      top: 10,
-                      display: "flex",
-                      gap: 6,
-                      alignItems: "center",
-                      padding: "6px 8px",
-                      borderRadius: 12,
-                      background: "rgba(255,255,255,0.85)",
-                      border: "1px solid rgba(0,0,0,0.12)",
-                      backdropFilter: "blur(8px)",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="btn small ghost"
-                      disabled={disabled}
-                      onClick={() => applyZoom(scale * 1.15, { x: 160, y: 160 })}
-                    >
-                      ＋
-                    </button>
-                    <button
-                      type="button"
-                      className="btn small ghost"
-                      disabled={disabled}
-                      onClick={() => applyZoom(scale * 0.87, { x: 160, y: 160 })}
-                    >
-                      －
-                    </button>
-                    <button type="button" className="btn small secondary" disabled={disabled} onClick={resetZoom}>
-                      Reset
-                    </button>
+                  
+                  {/* Мини-панель управления */}
+                  <div style={{
+                    position: "absolute", right: 10, top: 10, display: "flex", gap: 6,
+                    alignItems: "center", padding: "6px 8px", borderRadius: 12,
+                    background: "rgba(255,255,255,0.85)", border: "1px solid rgba(0,0,0,0.12)", backdropFilter: "blur(8px)"
+                  }}>
+                    <button type="button" className="btn small ghost" disabled={disabled} onClick={() => applyZoom(tRef.current.scale * 1.15, { x: 160, y: 160 })}>＋</button>
+                    <button type="button" className="btn small ghost" disabled={disabled} onClick={() => applyZoom(tRef.current.scale * 0.87, { x: 160, y: 160 })}>－</button>
+                    <button type="button" className="btn small secondary" disabled={disabled} onClick={resetZoom}>Reset</button>
                   </div>
                 </div>
 
                 <div className="small-muted" style={{ marginTop: 8 }}>
-                  Масштаб: <b>{Math.round(scale * 100)}%</b>
+                  Масштаб: <b ref={zoomTextRef}>100%</b>
                 </div>
               </div>
             </div>
-          ) : null}
+          )}
         </div>
-      ) : null}
+      )}
 
-      {/* ===== TYPE-SPECIFIC ===== */}
+      {/* Рендер конкретного редактора (Type-Safe) */}
       <div className="question-type-content">
-        {q.type === "test" ? (
-          <TestEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
-        ) : q.type === "fill" ? (
-          <FillEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
-        ) : q.type === "sentence" ? (
-          <SentenceEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
-        ) : q.type === "crossword" ? (
-          <CrosswordEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
-        ) : q.type === "complex" ? (
-          // @ts-ignore
-          <ComplexEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
-        ) : q.type === "matching" ? (
-          // @ts-ignore
-          <MatchingEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
-        ) : q.type === "imagemap" ? (
-          // @ts-ignore
-          <ImageMapEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
-        ) : q.type === "reading" ? (
-          // @ts-ignore
-          <ReadingEditor value={q} disabled={disabled} onChange={(next) => onChange(next)} />
-        ) : null}
+        {renderSpecificEditor()}
       </div>
     </div>
   );

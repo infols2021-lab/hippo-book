@@ -1,7 +1,6 @@
 // app/(admin)/admin/assignments/builder/types.ts
 
 // 1. Делаем "мост": экспортируем ВСЕ типы из нашего нового глобального ядра.
-// Благодаря этому ни один из компонентов админки не сломается!
 export * from "@/lib/assignments/types";
 
 // 2. Импортируем нужные типы для локальных фабрик (функций создания)
@@ -10,7 +9,15 @@ import type {
   InfoBlock,
   TextSectionBlock,
   QuestionType,
-  Question
+  Question,
+  QuestionTest,
+  QuestionFill,
+  QuestionSentence,
+  QuestionComplex,
+  QuestionMatching,
+  QuestionImageMap,
+  QuestionReading,
+  QuestionCrossword
 } from "@/lib/assignments/types";
 
 // Специфичный тип только для админки (режим редактора)
@@ -30,29 +37,13 @@ export function newBlock(type: BlockType): InfoBlock {
 
   switch (type) {
     case "hero":
-      return {
-        id,
-        type: "hero",
-        data: { title: "Новый заголовок", badge: "", subtitle: "", pills: [] },
-      };
+      return { id, type: "hero", data: { title: "Новый заголовок", badge: "", subtitle: "", pills: [] } };
     case "text_section":
-      return {
-        id,
-        type: "text_section",
-        data: { label: "", title: "", content: "Текст блока..." },
-      };
+      return { id, type: "text_section", data: { label: "", title: "", content: "Текст блока..." } };
     case "alert":
-      return {
-        id,
-        type: "alert",
-        data: { theme: "info", icon: "ℹ️", content: "Обратите внимание..." },
-      };
+      return { id, type: "alert", data: { theme: "info", icon: "ℹ️", content: "Обратите внимание..." } };
     case "video":
-      return {
-        id,
-        type: "video",
-        data: { url: "", caption: "Название видео", subCaption: "" },
-      };
+      return { id, type: "video", data: { url: "", caption: "Название видео", subCaption: "" } };
     case "cards_grid":
       return {
         id,
@@ -69,36 +60,22 @@ export function newBlock(type: BlockType): InfoBlock {
       return {
         id,
         type: "accordion",
-        data: {
-          items: [
-            { id: crypto.randomUUID(), title: "Новый вопрос/задание", content: "Описание", tag: "" },
-          ],
-        },
+        data: { items: [{ id: crypto.randomUUID(), title: "Новый вопрос/задание", content: "Описание", tag: "" }] },
       };
     case "downloads":
       return {
         id,
         type: "downloads",
         data: {
-          files: [
-            {
-              id: crypto.randomUUID(),
-              name: "Новый файл",
-              url: "",
-              fileType: "PDF",
-              theme: "default",
-              icon: "📄",
-            },
-          ],
+          files: [{ id: crypto.randomUUID(), name: "Новый файл", url: "", fileType: "PDF", theme: "default", icon: "📄" }],
         },
       };
     default:
-      // Фолбэк на базовый текст, если что-то пошло не так
       return { id, type: "text_section", data: { content: "" } } as TextSectionBlock;
   }
 }
 
-// Хелпер для создания новых вопросов
+// Хелпер для создания новых вопросов со строгой типизацией
 export function newQuestion(type: QuestionType): Question {
   const id = crypto.randomUUID();
 
@@ -115,38 +92,19 @@ export function newQuestion(type: QuestionType): Question {
         { id: crypto.randomUUID(), text: "", media: [] },
       ],
       correct: [0],
-    };
+    } satisfies QuestionTest; // Используем satisfies для строгой проверки соответствия интерфейсу
   }
 
   if (type === "fill") {
-    return {
-      id,
-      type: "fill",
-      q: "",
-      media: [],
-      answers: [[""]],
-    };
+    return { id, type: "fill", q: "", media: [], answers: [[""]] } satisfies QuestionFill;
   }
 
   if (type === "sentence") {
-    return {
-      id,
-      type: "sentence",
-      q: "",
-      media: [],
-      sentence: "",
-      answers: [],
-    };
+    return { id, type: "sentence", q: "", media: [], sentence: "", answers: [] } satisfies QuestionSentence;
   }
 
   if (type === "complex") {
-    return {
-      id,
-      type: "complex",
-      q: "",
-      media: [],
-      subQuestions: [],
-    };
+    return { id, type: "complex", q: "", media: [], subQuestions: [] } satisfies QuestionComplex;
   }
 
   if (type === "matching") {
@@ -155,14 +113,8 @@ export function newQuestion(type: QuestionType): Question {
       type: "matching",
       q: "",
       media: [],
-      pairs: [
-        {
-          id: crypto.randomUUID(),
-          left: { text: "", media: [] },
-          right: { text: "", media: [] },
-        },
-      ],
-    };
+      pairs: [{ id: crypto.randomUUID(), left: { text: "", media: [] }, right: { text: "", media: [] } }],
+    } satisfies QuestionMatching;
   }
 
   if (type === "imagemap") {
@@ -174,13 +126,9 @@ export function newQuestion(type: QuestionType): Question {
       q: "",
       image: "",
       media: [],
-      points: [
-        { id: firstPointId, x: 50, y: 50, correctAnswerId: firstAnswerId, label: "Точка 1" },
-      ],
-      answers: [
-        { id: firstAnswerId, text: "Ответ 1", media: [] },
-      ],
-    };
+      points: [{ id: firstPointId, x: 50, y: 50, correctAnswerId: firstAnswerId, label: "Точка 1" }],
+      answers: [{ id: firstAnswerId, text: "Ответ 1", media: [] }],
+    } satisfies QuestionImageMap;
   }
 
   if (type === "reading") {
@@ -206,9 +154,10 @@ export function newQuestion(type: QuestionType): Question {
           correct: [0],
         },
       ],
-    };
+    } satisfies QuestionReading;
   }
 
+  // Fallback -> Crossword
   return {
     id,
     type: "crossword",
@@ -218,12 +167,6 @@ export function newQuestion(type: QuestionType): Question {
     words: [],
     blocks: [],
     cellNumbers: {},
-    metadata: {
-      rows: 15,
-      cols: 15,
-      nextWordNumber: 1,
-      placingWord: null,
-      deleteMode: false,
-    },
-  };
+    metadata: { rows: 15, cols: 15, nextWordNumber: 1, placingWord: null, deleteMode: false },
+  } satisfies QuestionCrossword;
 }

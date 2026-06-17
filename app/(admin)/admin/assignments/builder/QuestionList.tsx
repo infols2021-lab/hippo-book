@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import QuestionItem from "./QuestionItem";
 import QuestionTypeSwitch from "./QuestionTypeSwitch";
-import { deepClone, newQuestion, type Question, type QuestionType } from "./types";
+import { newQuestion, type Question, type QuestionType } from "./types";
 
 type Props = {
   value: Question[];
@@ -13,31 +13,35 @@ type Props = {
 
 export default function QuestionList({ value, onChange, disabled }: Props) {
   const questions = Array.isArray(value) ? value : [];
-
   const [newType, setNewType] = useState<QuestionType>("test");
 
   const canAdd = !disabled;
 
-  const list = useMemo(() => questions.map((q) => q), [questions]);
-
+  // Оптимизированное, иммутабельное обновление элемента
   function patchAt(index: number, nextQ: Question) {
-    const next = deepClone(list);
+    const next = [...questions];
     next[index] = nextQ;
     onChange(next);
   }
 
   function removeAt(index: number) {
     if (disabled) return;
-    const next = deepClone(list);
+    const next = [...questions];
     next.splice(index, 1);
-    if (next.length === 0) next.push(newQuestion("test"));
+    
+    // Если удалили последний вопрос, создаем пустой тестовый (чтобы список не был пустым)
+    if (next.length === 0) {
+      next.push(newQuestion("test"));
+    }
+    
     onChange(next);
   }
 
   function move(from: number, to: number) {
     if (disabled) return;
-    if (to < 0 || to >= list.length) return;
-    const next = deepClone(list);
+    if (to < 0 || to >= questions.length) return;
+    
+    const next = [...questions];
     const [item] = next.splice(from, 1);
     next.splice(to, 0, item);
     onChange(next);
@@ -45,38 +49,39 @@ export default function QuestionList({ value, onChange, disabled }: Props) {
 
   function add() {
     if (!canAdd) return;
-    onChange([...deepClone(list), newQuestion(newType)]);
+    onChange([...questions, newQuestion(newType)]);
   }
 
   return (
     <div>
-      {/* список вопросов */}
+      {/* Список вопросов */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {list.map((q, idx) => (
+        {questions.map((q, idx) => (
           <QuestionItem
-            key={(q as any).id || `${idx}-${q.type}`}
+            key={q.id || `${idx}-${q.type}`}
             index={idx}
-            total={list.length}
+            total={questions.length}
             value={q}
             disabled={disabled}
             onChange={(next) => patchAt(idx, next)}
             onRemove={() => removeAt(idx)}
             onMoveUp={() => move(idx, idx - 1)}
             onMoveDown={() => move(idx, idx + 1)}
-            onTypeChange={(t) => {
-              // меняем тип "чисто" — пересоздаем вопрос, но сохраняем q/image если есть
-              const keepQ = (q as any).q ?? "";
-              const keepImg = (q as any).image ?? "";
-              const base = newQuestion(t);
-              (base as any).q = keepQ;
-              if (keepImg) (base as any).image = keepImg;
+            onTypeChange={(newType) => {
+              // Меняем тип "чисто" — пересоздаем вопрос, но сохраняем общие данные (текст, старую картинку, медиа)
+              const base = newQuestion(newType);
+              
+              if (q.q) base.q = q.q;
+              if (q.image) base.image = q.image;
+              if (q.media && q.media.length > 0) base.media = q.media;
+              
               patchAt(idx, base);
             }}
           />
         ))}
       </div>
 
-      {/* панель добавления СНИЗУ — как в твоём admin.html */}
+      {/* Панель добавления СНИЗУ */}
       <div style={{ marginTop: 16 }}>
         <div className="card" style={{ padding: 14 }}>
           <div className="small-muted" style={{ marginBottom: 10 }}>
