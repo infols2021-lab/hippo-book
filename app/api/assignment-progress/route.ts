@@ -2,23 +2,20 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { calcAndBuildReview } from "@/lib/assignments/scoring";
-import type { AssignmentData } from "@/lib/assignments/types"; // 🔥 Подключаем наш глобальный тип
+import type { AssignmentData } from "@/lib/assignments/types"; 
 
-// TODO: В будущем (когда отвяжемся от легаси) заменим на универсальный assertProjectAssignmentAccess
 import {
   assertOlympiadAssignmentAccess,
   assertGatehouseAssignmentAccess,
 } from "@/lib/assignments/access";
 
-// НА ЗАМЕТКУ: Когда закончишь ЭТАП 1, измени этот импорт на: 
-// import { recommendLevel } from "@/lib/projects/recommendLevel";
 import { recommendGatehouseLevel as recommendLevel } from "@/lib/exams/recommendLevel";
 
 type Body = {
   assignmentId: string;
   answers: Record<string, any>;
   isCompleted: boolean;
-  score: number | null;    // присланный клиентом балл игнорируется
+  score: number | null;
   source?: string;
   sourceId?: string;
   branchType?: string;
@@ -43,43 +40,54 @@ function normalizeStringArray(value: unknown): string[] {
   return value.map((item) => String(item ?? "").trim()).filter(Boolean);
 }
 
-// 🔧 Заменили any на AssignmentData
+// 🔧 Извлекаем материал из нового или старого формата JOIN
+function getMaterial(assignment: any) {
+  if (!assignment) return null;
+  if (assignment.material && !Array.isArray(assignment.material)) return assignment.material;
+  if (assignment.materials && !Array.isArray(assignment.materials)) return assignment.materials;
+  if (Array.isArray(assignment.materials)) return assignment.materials[0] || null;
+  if (Array.isArray(assignment.material)) return assignment.material[0] || null;
+  return null;
+}
+
 function getMaterialLevels(assignment: AssignmentData | null): string[] {
-  const material = firstOrNull(assignment?.materials);
+  const material = getMaterial(assignment);
   return normalizeStringArray(material?.target_levels);
 }
 
-// 🔧 Заменили any на AssignmentData
 function getMaterialId(assignment: AssignmentData | null): string | null {
-  const material = firstOrNull(assignment?.materials);
-  const direct = typeof assignment?.material_id === "string" ? assignment?.material_id : null;
-  const fromMaterial = typeof material?.id === "string" ? material.id : null;
-  return direct || fromMaterial || null;
+  const material = getMaterial(assignment);
+  return assignment?.material_id || material?.id || null;
 }
 
-// УНИВЕРСАЛЬНЫЙ ЧТЕНИЯ ФИЧ (Фоллбэк для старых материалов без project_id)
+// УНИВЕРСАЛЬНЫЙ ЧТЕНИЯ ФИЧ (Использует новую связь project_tabs -> projects)
 function getProjectConfig(assignment: AssignmentData | null) {
-  const material = firstOrNull(assignment?.materials);
-  const project = material?.projects;
+  const material = getMaterial(assignment);
+  
+  // Читаем проект через таб (Новая архитектура)
+  const project = material?.project_tabs?.projects; 
   
   const isLegacyGatehouse = assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
   
   return {
     slug: project?.slug ?? (isLegacyGatehouse ? "gatehouse" : "olympiad"),
-    hasStreaks: project?.features?.hasStreaks ?? !isLegacyGatehouse, // Олимпиада по умолчанию со стриками
-    hasRecommendations: project?.features?.hasRecommendations ?? isLegacyGatehouse, // Экзамены по умолчанию с рекомендациями
+    hasStreaks: project?.features?.hasStreaks ?? !isLegacyGatehouse,
+    hasRecommendations: project?.features?.hasRecommendations ?? isLegacyGatehouse, 
   };
 }
 
-// ПЕРЕПИСАНО: Надежный агрегатор счетчиков (поддерживает и старый branch_type и новый project.slug)
+// ПЕРЕПИСАНО: Надежный агрегатор без ошибочных JOIN-ов напрямую
 async function recalcCompletedCounters(supabase: any, userId: string) {
+  // Вытаскиваем прогресс и базовые поля заданий
   const { data } = await supabase
     .from("user_progress")
     .select(`
       id,
       assignments (
         branch_type,
-        materials ( projects ( slug ) )
+        material_id,
+        textbook_id,
+        crossword_id
       )
     `)
     .eq("user_id", userId)
@@ -92,17 +100,15 @@ async function recalcCompletedCounters(supabase: any, userId: string) {
     const assignment = row.assignments;
     if (!assignment) continue;
 
-    const legacyBranch = assignment.branch_type;
-    const material = firstOrNull(assignment.materials);
-    const projectSlug = material?.projects?.slug;
-
-    if (projectSlug === "gatehouse" || (!projectSlug && legacyBranch === "gatehouse")) {
+    // В легаси архитектуре gatehouse определялся по branch_type
+    if (assignment.branch_type === "gatehouse") {
       gatehouseCount++;
     } else {
-      olympiadCount++; // Все остальные проекты и олимпиада летят сюда
+      olympiadCount++;
     }
   }
 
+  // Обновляем статистику в профиле пользователя
   await supabase
     .from("profiles")
     .update({
@@ -133,7 +139,7 @@ export async function POST(req: Request) {
   if (!body?.assignmentId) return NextResponse.json({ ok: false, error: "assignmentId required" }, { status: 400 });
 
   // ─────────────────────────────────────────────────────────────
-  // Дебаг-задания (не существуют в БД)
+  // Дебаг-задания
   // ─────────────────────────────────────────────────────────────
   const debugIds = ["debug-all", "debug-review", "debug-perfect", "debug-mode-choice", "debug-gatehouse"];
   if (debugIds.includes(body.assignmentId) || body.assignmentId?.startsWith("debug-single-")) {
@@ -146,30 +152,30 @@ export async function POST(req: Request) {
   if (!body.isCompleted) return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
 
   // ─────────────────────────────────────────────────────────────
-  // ПОЛУЧЕНИЕ ЗАДАНИЯ + ДАННЫЕ ПРОЕКТА (NEW ARCHITECTURE)
+  // ПОЛУЧЕНИЕ ЗАДАНИЯ + ДАННЫЕ ПРОЕКТА (ИСПРАВЛЕНО: Правильный JOIN через project_tabs)
   // ─────────────────────────────────────────────────────────────
   const { data: rawAssignment, error: assignmentErr } = await supabase
     .from("assignments")
     .select(`
-      id, branch_type, material_id, textbook_id, crossword_id, content,
-      materials(
-        id, branch_type, project_id, material_kind, target_levels, is_active, is_available,
-        projects ( id, slug, features )
+      id, branch_type, material_id, textbook_id, crossword_id, content, assignment_type,
+      material:materials(
+        id, branch_type, project_tab_id, material_kind, target_levels, is_active, is_available,
+        project_tabs ( projects ( id, slug, features ) )
       )
     `)
     .eq("id", body.assignmentId)
     .single();
 
   if (assignmentErr || !rawAssignment) {
+    console.error("🔴 [API ASSIGNMENT-PROGRESS] Ошибка получения задания:", assignmentErr?.message);
     return NextResponse.json({ ok: false, error: assignmentErr?.message || "Assignment not found" }, { status: 404 });
   }
 
-  // Строго типизируем задание
   const assignment = rawAssignment as AssignmentData;
   const projectConfig = getProjectConfig(assignment);
 
   // ─────────────────────────────────────────────────────────────
-  // ДОСТУПЫ (Временный фоллбэк до полного переезда на единый assert)
+  // ДОСТУПЫ
   // ─────────────────────────────────────────────────────────────
   try {
     if (projectConfig.slug === "gatehouse") {
@@ -184,7 +190,9 @@ export async function POST(req: Request) {
   // ─────────────────────────────────────────────────────────────
   // ОЦЕНКА (Интерактивный vs Ознакомительный)
   // ─────────────────────────────────────────────────────────────
-  const isInformational = assignment.content?.mode === "informational";
+  const assignmentType = assignment.assignment_type || 'test';
+  const isInformational = assignmentType === 'intro' || assignment.content?.mode === "informational";
+  
   let realScore: number | null = null;
 
   if (!isInformational) {
@@ -208,19 +216,18 @@ export async function POST(req: Request) {
     .upsert(payload, { onConflict: "user_id,assignment_id" });
 
   if (upsertError) {
-    console.error("[ERROR] user_progress upsert failed:", upsertError.message);
+    console.error("🔴 [ERROR] user_progress upsert failed:", upsertError.message);
     return NextResponse.json({ ok: false, error: upsertError.message }, { status: 500 });
   }
 
   const counters = await recalcCompletedCounters(supabase, auth.user.id);
 
   // ─────────────────────────────────────────────────────────────
-  // ДИНАМИЧЕСКИЕ МОДУЛИ (ПО ФЛАГАМ ПРОЕКТА)
+  // ДИНАМИЧЕСКИЕ МОДУЛИ
   // ─────────────────────────────────────────────────────────────
   let recommendation: any = null;
   let streak: any = null;
 
-  // 1. Модуль Рекомендаций (ранее только для Gatehouse)
   if (projectConfig.hasRecommendations) {
     const materialId = getMaterialId(assignment);
     
@@ -240,26 +247,22 @@ export async function POST(req: Request) {
         answers: body.answers ?? {}, completed_at: payload.completed_at,
       }, { onConflict: "user_id,assignment_id" });
 
-    if (examErr) console.error("[ERROR] exam_results upsert failed:", examErr.message);
+    if (examErr) console.error("🔴 [ERROR] exam_results upsert failed:", examErr.message);
   }
 
-  // 2. Модуль Стриков (ранее только для Олимпиады)
   if (projectConfig.hasStreaks) {
     const { data: streakData, error: streakErr } = await supabase.rpc(
       "record_streak_completion",
       { _assignment_id: body.assignmentId }
     );
     if (!streakErr) streak = streakData ?? null;
-    else console.error("[ERROR] record_streak_completion RPC failed:", streakErr.message);
+    else console.error("🔴 [ERROR] record_streak_completion RPC failed:", streakErr.message);
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // ЕДИНЫЙ ОТВЕТ СЕРВЕРА
-  // ─────────────────────────────────────────────────────────────
   return NextResponse.json(
     { 
       ok: true, 
-      branch_type: projectConfig.slug, // Клиент получит актуальный слаг (olympiad, exam и т.д.)
+      branch_type: projectConfig.slug, 
       score: realScore, 
       recommendation, 
       streak, 
