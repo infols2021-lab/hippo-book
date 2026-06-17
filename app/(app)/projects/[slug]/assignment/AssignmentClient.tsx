@@ -444,7 +444,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
           />
         );
       default:
-        return <div className="error-message">Тип "{q.type}" не поддерживается</div>;
+  return <div className="error-message">Тип "{(q as any).type}" не поддерживается</div>;
     }
   }
 
