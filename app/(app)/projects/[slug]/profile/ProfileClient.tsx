@@ -11,6 +11,9 @@ import StreakLeaderboardModal, { type StreakLeaderboardRow } from "@/components/
 import TitlePickerModal, { type TitlePickerChoice, type TitleCatalogItem } from "@/components/profile/TitlePickerModal";
 import { getTierCodeByStreak } from "@/lib/streaks/roadmap";
 
+// 🔥 Идеальный локальный импорт стилей (Co-location)
+import "./profile.css";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────

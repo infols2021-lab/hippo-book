@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import { useRouter } from "next/navigation";
 
-// 🔥 Подтягиваем твой оригинальный CSS-файл заявок по правильному пути!
-import "../../../../requests/requests.css";
+// 🔥 Идеальный локальный импорт стилей (Co-location)
+import "./requests.css";
 
 // Типы из БД
 type ProjectLevel = { id: string; code: string; label: string; };

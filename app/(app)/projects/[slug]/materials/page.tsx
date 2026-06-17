@@ -4,8 +4,8 @@ import Link from "next/link";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import AppHeader from "@/components/AppHeader"; 
 
-// 🔥 Подключаем твой оригинальный CSS-файл материалов по правильному пути!
-import "../../../materials/materials.css";
+// 🔥 Идеальный локальный импорт стилей (Co-location)
+import "./materials.css";
 
 export const revalidate = 0; // Отключаем кэш для актуальных данных
 
