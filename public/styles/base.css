@@ -12,12 +12,6 @@
   --card: rgba(255, 255, 255, 0.78);
   --card-border: rgba(255, 255, 255, 0.65);
   --muted: #6b7280;
-
-  /* Единый фон приложения – теперь использует переменные темы */
-  --app-bg-gradient:
-    radial-gradient(1200px 800px at 15% 10%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 55%),
-    radial-gradient(900px 600px at 85% 15%, rgba(116, 185, 255, 0.25) 0%, rgba(116, 185, 255, 0) 60%),
-    linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 45%, #e9fbff 100%);
 }
 
 /* ===== Hard reset ===== */
@@ -58,8 +52,6 @@ textarea {
   font-family: inherit;
   font-style: inherit;
 }
-
-/* ===== Удалён body::before, чтобы не перекрывать фон темы ===== */
 
 /* ===== Контейнеры ===== */
 .container {
@@ -187,7 +179,7 @@ textarea {
   }
 }
 
-/* ===== Profile ===== */
+/* ===== Profile (общие элементы) ===== */
 .profile-card {
   display: flex;
   flex-direction: column;

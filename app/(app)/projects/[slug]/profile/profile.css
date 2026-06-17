@@ -28,15 +28,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* Только цвет фона – берётся из темы */
   background-color: var(--project-bg, #c9efff);
   color: var(--project-text, #07172e);
-
-  /* Удалены все background-image и псевдоэлементы, чтобы не перекрывать тему */
-}
-
-#profileBody::after {
-  display: none;
 }
 
 /* ===== Typography helpers ===== */
@@ -100,6 +93,7 @@ body {
   border-radius: 14px;
   display: grid;
   place-items: center;
+
   font-weight: 900;
   letter-spacing: 0.5px;
   color: #fff;
@@ -159,13 +153,13 @@ body {
 }
 
 .nav-pill--info {
-  background: linear-gradient(135deg, #3b82f6, #60a5fa);
+  background: linear-gradient(135deg, var(--accent3, #3b82f6), var(--accent3, #60a5fa));
 }
 .nav-pill--materials {
-  background: linear-gradient(135deg, #4ecdc4, #6dd3c0);
+  background: linear-gradient(135deg, var(--accent2, #4ecdc4), var(--accent2, #6dd3c0));
 }
 .nav-pill--logout {
-  background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+  background: linear-gradient(135deg, var(--accent, #ff6b6b), var(--accent, #ff8e8e));
 }
 
 /* ===== Streak chip ===== */
