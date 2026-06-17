@@ -4,6 +4,9 @@ import Link from "next/link";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import AppHeader from "@/components/AppHeader";
 
+// ❗️ ВАЖНО: Подключаем стили, иначе карточки развалятся, а текст будет невидимым
+import "./materials.css"; 
+
 export const revalidate = 0;
 
 type PageProps = {
@@ -89,7 +92,7 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
 
   let grantedMaterialIds = new Set<string>();
   let completedSet = new Set<string>();
-  let assignments: any[] = [];
+  let assignments: Record<string, any>[] = []; // Исправлен any
 
   if (materialIds.length > 0) {
     const idsString = materialIds.join(',');
@@ -183,6 +186,8 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
 
             {materials.length > 0 ? (
               <div className="materials-grid">
+                
+                {/* ДОСТУПНЫЕ МАТЕРИАЛЫ */}
                 {availableMats.map((m) => {
                   const { total, completed, progress } = getProgress(m.id);
                   const coverUrl = toStorageProxyUrl(m.cover_image_url);
@@ -195,7 +200,7 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
                     >
                       <div className="material-cover">
                         {coverUrl ? (
-                          <img src={coverUrl} alt={m.title} loading="lazy" decoding="async" />
+                          <img src={coverUrl} alt={m.title || "Обложка"} loading="lazy" decoding="async" />
                         ) : (
                           <div
                             style={{
@@ -212,7 +217,7 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
                         )}
                       </div>
 
-                      <div className="material-title">{m.title}</div>
+                      <div className="material-title">{m.title || "Без названия"}</div>
                       <div className="material-description">{m.description || "Материалы и задания для выполнения"}</div>
 
                       <div className="progress-bar">
@@ -234,6 +239,7 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
                   );
                 })}
 
+                {/* ЗАКРЫТЫЕ МАТЕРИАЛЫ */}
                 {lockedMats.map((m) => {
                   const coverUrl = toStorageProxyUrl(m.cover_image_url);
 
@@ -241,7 +247,7 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
                     <div key={m.id} className="material-card locked">
                       <div className="material-cover">
                         {coverUrl ? (
-                          <img src={coverUrl} alt={m.title} loading="lazy" decoding="async" />
+                          <img src={coverUrl} alt={m.title || "Обложка"} loading="lazy" decoding="async" />
                         ) : (
                           <div
                             style={{
@@ -258,7 +264,7 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
                         )}
                       </div>
 
-                      <div className="material-title">{m.title}</div>
+                      <div className="material-title">{m.title || "Без названия"}</div>
                       <div className="material-description">{m.description || "Материал временно недоступен"}</div>
                       <div className="locked-overlay">🔒 Недоступен</div>
                     </div>
