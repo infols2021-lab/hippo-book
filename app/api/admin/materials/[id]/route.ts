@@ -30,6 +30,7 @@ function normalizePatchPayload(body: any) {
   if ("is_available" in body) payload.is_available = normalizeBool(body.is_available);
   if ("is_active" in body) payload.is_active = normalizeBool(body.is_active);
   if ("order_index" in body) payload.order_index = normalizeOrderIndex(body.order_index);
+  
   if ("class_levels" in body || "class_level" in body) {
     payload.class_levels = uniqueStrings(toStringArray(body.class_levels ?? body.class_level));
   }
@@ -38,6 +39,11 @@ function normalizePatchPayload(body: any) {
   }
   if ("meta" in body) {
     payload.meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
+  }
+  
+  // ❗️ ИСПРАВЛЕНО: Теперь бекенд не игнорирует привязку к табу при редактировании!
+  if ("project_tab_id" in body) {
+    payload.project_tab_id = normalizeNullableString(body.project_tab_id);
   }
 
   return payload;
@@ -72,12 +78,20 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       .eq("id", id)
       .single();
 
-    if (error) return fail(error.message, 404, "NOT_FOUND");
+    if (error) {
+      console.error("🔴 [ADMIN GET MATERIAL] Ошибка поиска:", error.message);
+      return fail(error.message, 404, "NOT_FOUND");
+    }
 
-    const { count } = await supabase
+    // ❗️ ИСПРАВЛЕНО: Теперь мы правильно считаем и новые, и легаси задания в админке
+    const { count, error: countErr } = await supabase
       .from("assignments")
       .select("id", { count: "exact", head: true })
-      .eq("material_id", id);
+      .or(`material_id.eq.${id},textbook_id.eq.${id},crossword_id.eq.${id}`);
+
+    if (countErr) {
+      console.error("🔴 [ADMIN GET MATERIAL] Ошибка подсчета заданий:", countErr.message);
+    }
 
     return ok({
       material: {
@@ -86,6 +100,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       },
     });
   } catch (error: any) {
+    console.error("🔴 [ADMIN GET MATERIAL] Серверная ошибка:", error);
     return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
 }
@@ -125,10 +140,15 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       .select("*")
       .single();
 
-    if (error) return fail(error.message, 500, "DB_ERROR");
+    if (error) {
+      // ❗️ ИСПРАВЛЕНО: Явный вывод ошибки в терминал, если БД ругается на данные
+      console.error("🔴 [ADMIN PATCH MATERIAL] Ошибка Базы Данных при сохранении:", error.message, error.details);
+      return fail(error.message, 500, "DB_ERROR");
+    }
 
     return ok({ material: data });
   } catch (error: any) {
+    console.error("🔴 [ADMIN PATCH MATERIAL] Серверная ошибка:", error);
     return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
 }
@@ -145,7 +165,10 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   try {
     const { error } = await supabase.from("materials").delete().eq("id", id);
 
-    if (error) return fail(error.message, 500, "DB_ERROR");
+    if (error) {
+      console.error("🔴 [ADMIN DELETE MATERIAL] Ошибка удаления:", error.message);
+      return fail(error.message, 500, "DB_ERROR");
+    }
 
     return ok({ deleted: true });
   } catch (error: any) {

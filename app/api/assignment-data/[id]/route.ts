@@ -2,24 +2,32 @@ import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { mockDebugAll, mockDebugReview, mockDebugSingle } from "@/lib/assignments/mockDebugData";
-import type { AssignmentData } from "@/lib/assignments/types"; // 🔥 Идеальный глобальный тип
+import type { AssignmentData } from "@/lib/assignments/types";
 
-function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
+// Умная функция-хэлпер для извлечения материала из разных вариантов JOIN-ответов Supabase
+// (Гарантирует совместимость и с новой архитектурой, и с легаси-кодом)
+function getMaterial(assignment: any) {
+  if (!assignment) return null;
+  
+  // Если пришел как объект (новый синтаксис)
+  if (assignment.material && !Array.isArray(assignment.material)) return assignment.material;
+  if (assignment.materials && !Array.isArray(assignment.materials)) return assignment.materials;
+  
+  // Если пришел как массив (старый синтаксис)
+  if (Array.isArray(assignment.materials)) return assignment.materials[0] || null;
+  if (Array.isArray(assignment.material)) return assignment.material[0] || null;
+  
+  return null;
 }
 
-// Теперь TypeScript знает структуру задания, никаких any
-function isGatehouseAssignment(assignment: AssignmentData | null) {
-  const material = firstOrNull(assignment?.materials);
-  return assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
+function isGatehouseAssignment(assignment: any) {
+  const mat = getMaterial(assignment);
+  return assignment?.branch_type === "gatehouse" || mat?.branch_type === "gatehouse";
 }
 
-function getMaterialId(assignment: AssignmentData | null): string | null {
-  const material = firstOrNull(assignment?.materials);
-  const direct = typeof assignment?.material_id === "string" ? assignment.material_id : null;
-  const fromMaterial = typeof material?.id === "string" ? material.id : null;
-  return direct || fromMaterial || null;
+function getMaterialId(assignment: any): string | null {
+  const mat = getMaterial(assignment);
+  return assignment?.material_id || mat?.id || null;
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -36,11 +44,14 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   // ===============================
 
   try {
+    // ❗️ ИСПРАВЛЕННЫЙ JOIN-ЗАПРОС
+    // Мы используем алиас "material:materials", чтобы явно указать связь 
+    // и избежать краша "Could not find a relationship between materials and projects"
     const { data: rawAssignment, error: aErr } = await supabase
       .from("assignments")
-      .select(
-        `*,
-        materials(
+      .select(`
+        *,
+        material:materials (
           id,
           title,
           branch_type,
@@ -54,10 +65,12 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       .eq("id", id)
       .single();
 
-    if (aErr || !rawAssignment) return fail(aErr?.message || "Assignment not found", 404, "NOT_FOUND");
+    if (aErr || !rawAssignment) {
+      console.error("🔴 [API ASSIGNMENT-DATA] Ошибка поиска задания:", aErr?.message);
+      return fail(aErr?.message || "Assignment not found", 404, "NOT_FOUND");
+    }
 
-    // Жестко типизируем данные из БД
-    const assignment = rawAssignment as AssignmentData;
+    const assignment = rawAssignment as any;
 
     // --- ПРОВЕРКА НА ПУСТОЕ ЗАДАНИЕ С УЧЕТОМ ТИПА (TEST / INTRO) ---
     const content = assignment.content || {};
@@ -78,8 +91,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     }
     // -----------------------------------------------------------------
 
-    const material = firstOrNull(assignment.materials);
     const gatehouse = isGatehouseAssignment(assignment);
+    const mat = getMaterial(assignment);
 
     if (gatehouse) {
       const materialId = getMaterialId(assignment);
@@ -88,7 +101,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
         return fail("Gatehouse assignment has no material", 404, "NOT_FOUND");
       }
 
-      if (material && material.is_active === false) {
+      if (mat && mat.is_active === false) {
         return fail("Material is not active", 404, "NOT_FOUND");
       }
 
@@ -100,10 +113,11 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
         .maybeSingle();
 
       if (accessErr) {
+        console.error("🔴 [API ASSIGNMENT-DATA] Ошибка доступа:", accessErr.message);
         return fail(accessErr.message, 500, "DB_ERROR");
       }
 
-      const hasAccess = Boolean(material?.is_available || access);
+      const hasAccess = Boolean(mat?.is_available || access);
 
       if (!hasAccess) {
         return fail("No access to this Gatehouse material", 403, "FORBIDDEN");
@@ -117,8 +131,12 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       .eq("assignment_id", id)
       .maybeSingle();
 
-    if (pErr) return fail(pErr.message, 500, "DB_ERROR");
+    if (pErr) {
+      console.error("🔴 [API ASSIGNMENT-DATA] Ошибка прогресса:", pErr.message);
+      return fail(pErr.message, 500, "DB_ERROR");
+    }
 
+    // Возвращаем данные, совместимые с AssignmentClient
     return ok({
       assignment,
       progress: progress
@@ -131,6 +149,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
         : null,
     });
   } catch (e: any) {
+    console.error("🔴 [API ASSIGNMENT-DATA] Внутренняя ошибка:", e);
     return fail(e?.message || "Server error", 500, "SERVER_ERROR");
   }
 }

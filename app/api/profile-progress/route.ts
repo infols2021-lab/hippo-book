@@ -38,9 +38,7 @@ export async function GET(req: NextRequest) {
       projectId = project?.id ?? null;
     }
 
-    // 2. Получаем материалы, привязанные к проекту
-    //    Используем связь через project_tabs, т.к. материалы привязаны к табам,
-    //    а табы — к проекту.
+    // 2. Получаем материалы, привязанные к проекту (через табы)
     let materialsQuery = supabase
       .from("materials")
       .select("id, title, material_kind, is_available, project_tab_id")
@@ -60,7 +58,6 @@ export async function GET(req: NextRequest) {
 
       const tabIds = tabs?.map((t: { id: string }) => t.id) || [];
       if (tabIds.length === 0) {
-        // Если у проекта нет табов, материалов быть не может
         return ok({
           stats: {
             totalMaterials: 0,
@@ -79,6 +76,21 @@ export async function GET(req: NextRequest) {
     const { data: materials, error: matErr } = await materialsQuery;
     if (matErr) throw matErr;
 
+    // ❗️ 2.5 ИСПРАВЛЕНИЕ: Получаем реальные доступы пользователя к материалам
+    const { data: accessData, error: accessErr } = await supabase
+      .from("material_access")
+      .select("material_id")
+      .eq("user_id", user.id);
+
+    if (accessErr) throw accessErr;
+
+    const grantedMaterialIds = new Set(accessData?.map((a) => a.material_id) || []);
+
+    // ❗️ Оставляем ТОЛЬКО те материалы, которые публичны (is_available) или выданы пользователю
+    const accessibleMaterials = (materials || []).filter(
+      (m) => m.is_available || grantedMaterialIds.has(m.id)
+    );
+
     // 3. Получаем прогресс пользователя по всем заданиям
     const { data: userProgress, error: progErr } = await supabase
       .from("user_progress")
@@ -92,13 +104,15 @@ export async function GET(req: NextRequest) {
         .map((p) => p.assignment_id)
     );
 
-    // 4. Для каждого материала получаем список заданий и считаем прогресс
+    // 4. Для каждого ДОСТУПНОГО материала получаем список заданий и считаем прогресс
     const materialsProgress = await Promise.all(
-      (materials || []).map(async (m) => {
+      accessibleMaterials.map(async (m) => {
+        
+        // ❗️ ИСПРАВЛЕНИЕ: Считаем задания с учетом старой и новой архитектуры (textbook_id / crossword_id / material_id)
         const { data: assignments } = await supabase
           .from("assignments")
           .select("id")
-          .eq("material_id", m.id);
+          .or(`material_id.eq.${m.id},textbook_id.eq.${m.id},crossword_id.eq.${m.id}`);
 
         const total = assignments?.length ?? 0;
         const completed = (assignments || [])
@@ -127,8 +141,8 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    // 5. Общая статистика
-    const totalMaterials = materials?.length ?? 0;
+    // 5. Общая статистика (строим только по доступным материалам)
+    const totalMaterials = accessibleMaterials.length;
     const completedMaterials = materialsProgress.filter(
       (m) => m.total > 0 && m.completed === m.total
     ).length;
@@ -159,6 +173,7 @@ export async function GET(req: NextRequest) {
 
     return ok({ stats, materialsProgress });
   } catch (error: any) {
+    console.error("🔴 [API PROFILE PROGRESS] Ошибка:", error);
     return fail(error?.message || "Server error", 500, "DB_ERROR");
   }
 }
