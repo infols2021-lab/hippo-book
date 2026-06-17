@@ -36,8 +36,9 @@ function keyRC(r: number, c: number) {
 }
 
 function calcStats(q: CrosswordQuestion) {
-  const rows = q.metadata.rows;
-  const cols = q.metadata.cols;
+  // ✅ Исправление: защита от undefined metadata
+  const rows = q.metadata?.rows ?? 15;
+  const cols = q.metadata?.cols ?? 15;
   const grid = ensureGrid(rows, cols, q.grid);
   const blocks = Array.isArray(q.blocks) ? q.blocks : [];
 
