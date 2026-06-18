@@ -68,18 +68,29 @@ function fmtDate(v: string | null) {
   }
 }
 
-// ДИНАМИЧЕСКИЙ РЕНДЕР ИМЕНИ ПРОЕКТА
+// 🚀 ДИНАМИЧЕСКИЙ РЕНДЕР ИМЕНИ ПРОЕКТА (ИСПРАВЛЕН ПОД НОВЫЕ ВЕТКИ)
 function renderProjectName(row: RequestRow) {
   if (row.projects?.name) {
     return <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">{row.projects.name}</span>;
   }
   
   const branch = String(row.branch_type || "olympiad").toLowerCase();
+  
   if (branch === "gatehouse" || branch === "ga_exam" || branch === "ga" || branch === "exam" || branch === "gatehouse_awards") {
-    return <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">🎓 Экзамены (Легаси)</span>;
+    return <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">🎓 Экзамены (Gatehouse)</span>;
   }
   
-  return <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">🏆 Олимпиада (Легаси)</span>;
+  if (branch === "olympiad") {
+    return <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">🏆 Олимпиада (Легаси)</span>;
+  }
+
+  // Для новых веток, которые еще не переведены в таблицу projects
+  const capitalizedBranch = branch.charAt(0).toUpperCase() + branch.slice(1);
+  return (
+    <span className="bg-teal-100 text-teal-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">
+      📁 {capitalizedBranch}
+    </span>
+  );
 }
 
 function renderClassLevels(row: RequestRow) {
@@ -87,6 +98,7 @@ function renderClassLevels(row: RequestRow) {
   const tLevel = arrOf(row.target_level);
   const cLevel = arrOf(row.class_level);
   
+  // Приоритет: target_levels -> target_level -> class_level
   const arr = tLevels.length ? tLevels : tLevel.length ? tLevel : cLevel;
   if (!arr.length) return <span className="text-gray-400 font-medium">—</span>;
 
@@ -101,10 +113,14 @@ function renderClassLevels(row: RequestRow) {
   );
 }
 
+// 🚀 УЛУЧШЕННОЕ ОТОБРАЖЕНИЕ ТИПОВ МАТЕРИАЛОВ (ПОДДЕРЖКА НОВЫХ)
 function renderTypes(row: RequestRow) {
   const mk = arrOf(row.material_kinds);
   const tt = arrOf(row.textbook_types);
-  const arr = mk.length ? mk : tt;
+  
+  // Объединяем, если пришли оба, или берем что есть
+  const arrSet = new Set([...mk, ...tt]);
+  const arr = Array.from(arrSet);
 
   if (!arr.length) return <span className="text-gray-400 font-medium">—</span>;
 
@@ -123,6 +139,9 @@ function renderTypes(row: RequestRow) {
         }
         else if (str.includes("кроссворд") || str.includes("crossword")) {
           label = "🧩 Кроссворд"; color = "bg-green-50 text-green-700 border-green-200";
+        } else {
+          // Универсальное отображение для любых других (новых) типов материалов
+          label = `📁 ${str.charAt(0).toUpperCase() + str.slice(1)}`;
         }
 
         return (
@@ -210,6 +229,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
     try {
       const qs = new URLSearchParams();
+      // Улучшена фильтрация для API статистики
       if (projectFilter === "legacy_olympiad") qs.set("branch_type", "olympiad");
       else if (projectFilter === "legacy_gatehouse") qs.set("branch_type", "gatehouse");
       else if (projectFilter !== "all") qs.set("project_id", projectFilter);
@@ -308,6 +328,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
       if (!reset && nextCursor?.created_at) qs.set("cursor_created_at", nextCursor.created_at);
       
+      // ИСПОЛЬЗОВАНИЕ ФИЛЬТРА ПРОЕКТОВ (ВЕТОК)
       if (projectFilter === "legacy_olympiad") qs.set("branch_type", "olympiad");
       else if (projectFilter === "legacy_gatehouse") qs.set("branch_type", "gatehouse");
       else if (projectFilter !== "all") qs.set("project_id", projectFilter);
@@ -491,12 +512,14 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
             className="w-full border-2 rounded-xl px-4 py-2 font-bold bg-white outline-none"
           >
             <option value="all">Все проекты</option>
-            <optgroup label="Новые динамические проекты">
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </optgroup>
+            {projects.length > 0 && (
+              <optgroup label="Новые динамические проекты">
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </optgroup>
+            )}
             <optgroup label="Легаси (старая структура)">
               <option value="legacy_olympiad">🏆 Олимпиада (Легаси)</option>
-              <option value="legacy_gatehouse">🎓 Экзамены Gatehouse (Легаси)</option>
+              <option value="legacy_gatehouse">🎓 Экзамены Gatehouse</option>
             </optgroup>
           </select>
         </div>
@@ -535,12 +558,12 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
             Выбрано: <span className="text-blue-600">{selected.size}</span>
           </div>
           {tab !== "processed" && (
-            <button className="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-bold text-sm shadow-sm" type="button" onClick={() => void bulkProcess()} disabled={actionBusy}>
+            <button className="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-bold text-sm shadow-sm hover:bg-blue-700 transition-colors" type="button" onClick={() => void bulkProcess()} disabled={actionBusy}>
               ✅ Обработать выбранные
             </button>
           )}
           {tab !== "pending" && (
-            <button className="bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded-lg font-bold text-sm shadow-sm" type="button" onClick={() => void bulkUnprocess()} disabled={actionBusy}>
+            <button className="bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded-lg font-bold text-sm shadow-sm hover:bg-gray-50 transition-colors" type="button" onClick={() => void bulkUnprocess()} disabled={actionBusy}>
               ↩️ Вернуть в необработанные
             </button>
           )}
@@ -555,16 +578,16 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       {materialsWarning ? <ErrorBox message={materialsWarning} /> : null}
 
       {!loading && !err && (
-        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm">
+        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden overflow-x-auto">
+          <table className="w-full text-left text-sm min-w-[1000px]">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="p-4 w-12 text-center">
                   <input type="checkbox" checked={allChecked} onChange={(e) => toggleAll(e.target.checked)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
                 </th>
-                <th className="p-4 font-bold text-gray-500">№</th>
-                <th className="p-4 font-bold">Номер</th>
-                <th className="p-4 font-bold">Проект (Раздел)</th>
+                <th className="p-4 font-bold text-gray-500 w-12">№</th>
+                <th className="p-4 font-bold min-w-[120px]">Номер</th>
+                <th className="p-4 font-bold min-w-[150px]">Проект (Раздел)</th>
                 <th className="p-4 font-bold">Создана</th>
                 {tab === "processed" && <th className="p-4 font-bold">Обработана</th>}
                 <th className="p-4 font-bold">Уровни</th>
@@ -612,7 +635,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
                       <td className="p-4 text-right">
                         {!status ? (
                           <button className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm hover:bg-blue-700 transition-colors whitespace-nowrap" type="button" onClick={() => void oneUpdate(r.id, true)} disabled={actionBusy}>
-                            ✅ Выдать доступ
+                            ✅ Обработать
                           </button>
                         ) : (
                           <button className="bg-white border text-gray-700 px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap" type="button" onClick={() => void oneUpdate(r.id, false)} disabled={actionBusy}>

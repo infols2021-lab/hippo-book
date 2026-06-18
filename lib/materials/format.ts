@@ -1,3 +1,4 @@
+// lib/materials/format.ts
 import { getBranchConfig, normalizeBranchType } from "@/lib/branches/config";
 import type { BranchType } from "@/lib/branches/types";
 import type { MaterialDbRow, MaterialKind, MaterialTargetMode } from "@/lib/materials/types";
@@ -31,18 +32,21 @@ export const MATERIAL_KIND_LABELS: Record<string, string> = {
   textbook: "Учебник",
   crossword: "Кроссворд",
   mock_test: "Пробный тест",
+  material: "Материал",
 };
 
 export const MATERIAL_KIND_PLURAL_LABELS: Record<string, string> = {
   textbook: "Учебники",
   crossword: "Кроссворды",
   mock_test: "Пробные тесты",
+  material: "Материалы",
 };
 
 export const MATERIAL_KIND_ICONS: Record<string, string> = {
   textbook: "📚",
   crossword: "🧩",
   mock_test: "📝",
+  material: "📁",
 };
 
 export const LEGACY_MATERIAL_KIND_ALIASES: Record<string, MaterialKind> = {
@@ -78,28 +82,35 @@ export function uniqueStrings(values: string[]): string[] {
 
 export function normalizeMaterialKind(value: unknown): MaterialKind {
   const raw = String(value ?? "").trim();
-  if (!raw) return "textbook";
+  if (!raw) return "material"; // Универсальный фолбэк для новых веток
 
   const key = raw.toLowerCase();
-  return LEGACY_MATERIAL_KIND_ALIASES[key] ?? key;
+  return (LEGACY_MATERIAL_KIND_ALIASES[key] ?? key) as MaterialKind;
 }
 
 export function normalizeMaterialKinds(value: unknown): MaterialKind[] {
-  return uniqueStrings(toStringArray(value).map((item) => normalizeMaterialKind(item)));
+  return uniqueStrings(toStringArray(value).map((item) => normalizeMaterialKind(item))) as MaterialKind[];
 }
 
 export function getMaterialKindIcon(kind: unknown): string {
-  return MATERIAL_KIND_ICONS[String(kind ?? "")] ?? "📦";
+  const normalized = normalizeMaterialKind(kind);
+  return MATERIAL_KIND_ICONS[normalized] ?? "📁";
 }
 
 export function formatMaterialKind(kind: unknown): string {
   const normalized = normalizeMaterialKind(kind);
-  return MATERIAL_KIND_LABELS[normalized] ?? String(kind ?? "Материал");
+  
+  if (MATERIAL_KIND_LABELS[normalized]) {
+    return MATERIAL_KIND_LABELS[normalized];
+  }
+  
+  // Если это кастомный тип материала (например из новой ветки), делаем с заглавной буквы
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 export function formatMaterialKindPlural(kind: unknown): string {
   const normalized = normalizeMaterialKind(kind);
-  return MATERIAL_KIND_PLURAL_LABELS[normalized] ?? formatMaterialKind(kind);
+  return MATERIAL_KIND_PLURAL_LABELS[normalized] ?? `${formatMaterialKind(kind)}s`;
 }
 
 export function formatMaterialKindWithIcon(kind: unknown): string {
@@ -159,8 +170,15 @@ export function getMaterialTargetMode(branchType: unknown): MaterialTargetMode {
 }
 
 export function formatMaterialTarget(material: Pick<MaterialDbRow, "branch_type" | "class_levels" | "target_levels">): string {
-  if (material.branch_type === "gatehouse") {
+  const branch = normalizeBranchType(material.branch_type);
+  
+  if (branch === "gatehouse") {
     return formatGatehouseLevels(material.target_levels);
+  }
+
+  // Для новых веток с динамической конфигурацией проверяем, есть ли уровни
+  if (branch !== "olympiad" && Array.isArray(material.target_levels) && material.target_levels.length > 0) {
+    return material.target_levels.join(", ");
   }
 
   return formatClassLevels(material.class_levels);

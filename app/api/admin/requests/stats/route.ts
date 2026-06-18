@@ -6,15 +6,28 @@ import type { NextRequest } from "next/server";
 export const runtime = "nodejs";
 
 function applyBranchFilter(q: any, branchFilter: string) {
+  if (!branchFilter || branchFilter === "all") return q;
   if (branchFilter === "gatehouse") return q.eq("branch_type", "gatehouse");
   if (branchFilter === "olympiad") return q.or("branch_type.eq.olympiad,branch_type.is.null");
-  return q;
+  
+  // Для новых веток (в том числе динамических названий проектов)
+  return q.eq("branch_type", branchFilter);
 }
 
-async function countRequests(supabase: any, branchFilter: string, status: "all" | "pending" | "processed") {
+async function countRequests(
+  supabase: any, 
+  branchFilter: string, 
+  projectId: string, 
+  status: "all" | "pending" | "processed"
+) {
   let q = supabase.from("purchase_requests").select("id", { count: "exact", head: true });
 
-  q = applyBranchFilter(q, branchFilter);
+  // Если передан ID проекта, фильтруем строго по нему, иначе по названию ветки
+  if (projectId && projectId !== "all") {
+    q = q.eq("project_id", projectId);
+  } else {
+    q = applyBranchFilter(q, branchFilter);
+  }
 
   if (status === "pending") {
     q = q.or("is_processed.eq.false,is_processed.is.null");
@@ -39,11 +52,13 @@ export async function GET(req: NextRequest) {
 
   try {
     const branchFilter = (req.nextUrl.searchParams.get("branch_type") || "all").trim();
+    const projectId = (req.nextUrl.searchParams.get("project_id") || "all").trim();
 
+    // Запрашиваем статистику параллельно
     const [total, pending, processed] = await Promise.all([
-      countRequests(supabase, branchFilter, "all"),
-      countRequests(supabase, branchFilter, "pending"),
-      countRequests(supabase, branchFilter, "processed"),
+      countRequests(supabase, branchFilter, projectId, "all"),
+      countRequests(supabase, branchFilter, projectId, "pending"),
+      countRequests(supabase, branchFilter, projectId, "processed"),
     ]);
 
     return ok({

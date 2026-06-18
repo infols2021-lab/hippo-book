@@ -1,3 +1,4 @@
+// lib/data/assignments.ts
 import "server-only";
 
 import type { DataAuthContext } from "@/lib/data/auth";
@@ -114,9 +115,51 @@ async function assertGatehouseAssignmentAccess(ctx: DataAuthContext, assignment:
 async function assertOlympiadAssignmentAccess(ctx: DataAuthContext, assignment: any) {
   const { supabase, user } = ctx;
 
+  const materialId = typeof assignment?.material_id === "string" ? assignment.material_id : null;
   const textbookId = typeof assignment?.textbook_id === "string" ? assignment.textbook_id : null;
   const crosswordId = typeof assignment?.crossword_id === "string" ? assignment.crossword_id : null;
 
+  // 1. ПРОВЕРКА ПО НОВОЙ СИСТЕМЕ (materials) — Для новых веток (в т.ч. новых форматов олимпиад)
+  if (materialId) {
+    const [
+      { data: material, error: materialError },
+      { data: access, error: accessError },
+    ] = await Promise.all([
+      supabase
+        .from("materials")
+        .select("id, is_available, is_active")
+        .eq("id", materialId)
+        .maybeSingle(),
+
+      supabase
+        .from("material_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("material_id", materialId)
+        .maybeSingle(),
+    ]);
+
+    if (materialError) throw new Error(materialError.message);
+    if (accessError) throw new Error(accessError.message);
+
+    if (!material || material.is_active === false) {
+      const error = new Error("Material not found") as Error & { status?: number; code?: string; };
+      error.status = 404;
+      error.code = "NOT_FOUND";
+      throw error;
+    }
+
+    if (!material.is_available && !access) {
+      const error = new Error("No access to this material") as Error & { status?: number; code?: string; };
+      error.status = 403;
+      error.code = "FORBIDDEN";
+      throw error;
+    }
+
+    return;
+  }
+
+  // 2. ПРОВЕРКА ПО ЛЕГАСИ СИСТЕМЕ УЧЕБНИКОВ (textbooks)
   if (textbookId) {
     const [
       { data: textbook, error: textbookError },
@@ -126,7 +169,6 @@ async function assertOlympiadAssignmentAccess(ctx: DataAuthContext, assignment: 
         .from("textbooks")
         .select("id, is_available, is_active, branch_type")
         .eq("id", textbookId)
-        .or("branch_type.eq.olympiad,branch_type.is.null")
         .maybeSingle(),
 
       supabase
@@ -141,22 +183,14 @@ async function assertOlympiadAssignmentAccess(ctx: DataAuthContext, assignment: 
     if (accessError) throw new Error(accessError.message);
 
     if (!textbook || textbook.is_active === false) {
-      const error = new Error("Textbook not found") as Error & {
-        status?: number;
-        code?: string;
-      };
-
+      const error = new Error("Textbook not found") as Error & { status?: number; code?: string; };
       error.status = 404;
       error.code = "NOT_FOUND";
       throw error;
     }
 
     if (!textbook.is_available && !access) {
-      const error = new Error("No access to this textbook") as Error & {
-        status?: number;
-        code?: string;
-      };
-
+      const error = new Error("No access to this textbook") as Error & { status?: number; code?: string; };
       error.status = 403;
       error.code = "FORBIDDEN";
       throw error;
@@ -165,6 +199,7 @@ async function assertOlympiadAssignmentAccess(ctx: DataAuthContext, assignment: 
     return;
   }
 
+  // 3. ПРОВЕРКА ПО ЛЕГАСИ СИСТЕМЕ КРОССВОРДОВ (crosswords)
   if (crosswordId) {
     const [
       { data: crossword, error: crosswordError },
@@ -174,7 +209,6 @@ async function assertOlympiadAssignmentAccess(ctx: DataAuthContext, assignment: 
         .from("crosswords")
         .select("id, is_available, is_active, branch_type")
         .eq("id", crosswordId)
-        .or("branch_type.eq.olympiad,branch_type.is.null")
         .maybeSingle(),
 
       supabase
@@ -189,27 +223,27 @@ async function assertOlympiadAssignmentAccess(ctx: DataAuthContext, assignment: 
     if (accessError) throw new Error(accessError.message);
 
     if (!crossword || crossword.is_active === false) {
-      const error = new Error("Crossword not found") as Error & {
-        status?: number;
-        code?: string;
-      };
-
+      const error = new Error("Crossword not found") as Error & { status?: number; code?: string; };
       error.status = 404;
       error.code = "NOT_FOUND";
       throw error;
     }
 
     if (!crossword.is_available && !access) {
-      const error = new Error("No access to this crossword") as Error & {
-        status?: number;
-        code?: string;
-      };
-
+      const error = new Error("No access to this crossword") as Error & { status?: number; code?: string; };
       error.status = 403;
       error.code = "FORBIDDEN";
       throw error;
     }
+    
+    return;
   }
+  
+  // Если ни одного ID нет — пробрасываем правильную ошибку
+  const error = new Error("Assignment has no material_id, textbook_id, or crossword_id") as Error & { status?: number; code?: string; };
+  error.status = 400;
+  error.code = "BAD_REQUEST";
+  throw error;
 }
 
 export async function loadAssignmentData(

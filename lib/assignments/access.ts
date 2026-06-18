@@ -2,9 +2,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Проверяет, что пользователь имеет доступ к олимпиадному заданию.
- * Если задание привязано к учебнику – проверяет textbook_access,
- * если к кроссворду – crossword_access.
+ * Проверяет, что пользователь имеет доступ к заданию (включая легаси олимпиады и новые ветки).
+ * - Если задание привязано к унифицированному material_id -> проверяет material_access
+ * - Если к textbook_id (легаси) -> проверяет textbook_access
+ * - Если к crossword_id (легаси) -> проверяет crossword_access
  * Если доступ открыт для всех (is_available = true) – пропускает.
  */
 export async function assertOlympiadAssignmentAccess(
@@ -12,25 +13,54 @@ export async function assertOlympiadAssignmentAccess(
   userId: string,
   assignment: any
 ): Promise<void> {
+  // Извлекаем все возможные идентификаторы привязки
   const textbookId = typeof assignment?.textbook_id === "string" ? assignment.textbook_id : null;
   const crosswordId = typeof assignment?.crossword_id === "string" ? assignment.crossword_id : null;
+  const materialId = typeof assignment?.material_id === "string" ? assignment.material_id : null;
 
+  // 1. ПРОВЕРКА ПО НОВОЙ СИСТЕМЕ (materials) - Для новых веток
+  if (materialId) {
+    const { data: material, error: materialError } = await supabase
+      .from("materials")
+      .select("id, is_active, is_available")
+      .eq("id", materialId)
+      .maybeSingle();
+
+    if (materialError) throw new Error(materialError.message);
+    if (!material || material.is_active === false) {
+      throw Object.assign(new Error("Material not found or inactive"), { status: 404 });
+    }
+
+    if (material.is_available) return; // открыто для всех
+
+    const { data: access, error: accessError } = await supabase
+      .from("material_access")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("material_id", materialId)
+      .maybeSingle();
+
+    if (accessError) throw new Error(accessError.message);
+    if (!access) {
+      throw Object.assign(new Error("No access to this material"), { status: 403 });
+    }
+    return;
+  }
+
+  // 2. ПРОВЕРКА ПО ЛЕГАСИ СИСТЕМЕ УЧЕБНИКОВ (textbooks)
   if (textbookId) {
     const { data: textbook, error: textbookError } = await supabase
       .from("textbooks")
       .select("id, is_available, is_active, branch_type")
       .eq("id", textbookId)
-      .or("branch_type.eq.olympiad,branch_type.is.null")
-      .maybeSingle();
+      .maybeSingle(); // Убрал or() проверку веток, так как легаси может конфликтовать с новыми ветками
 
     if (textbookError) throw new Error(textbookError.message);
     if (!textbook || textbook.is_active === false) {
-      const err = new Error("Textbook not found or inactive") as any;
-      err.status = 404;
-      throw err;
+      throw Object.assign(new Error("Textbook not found or inactive"), { status: 404 });
     }
 
-    if (textbook.is_available) return; // открыт для всех
+    if (textbook.is_available) return; // открыто для всех
 
     const { data: access, error: accessError } = await supabase
       .from("textbook_access")
@@ -41,26 +71,22 @@ export async function assertOlympiadAssignmentAccess(
 
     if (accessError) throw new Error(accessError.message);
     if (!access) {
-      const err = new Error("No access to this textbook") as any;
-      err.status = 403;
-      throw err;
+      throw Object.assign(new Error("No access to this textbook"), { status: 403 });
     }
     return;
   }
 
+  // 3. ПРОВЕРКА ПО ЛЕГАСИ СИСТЕМЕ КРОССВОРДОВ (crosswords)
   if (crosswordId) {
     const { data: crossword, error: crosswordError } = await supabase
       .from("crosswords")
       .select("id, is_available, is_active, branch_type")
       .eq("id", crosswordId)
-      .or("branch_type.eq.olympiad,branch_type.is.null")
       .maybeSingle();
 
     if (crosswordError) throw new Error(crosswordError.message);
     if (!crossword || crossword.is_active === false) {
-      const err = new Error("Crossword not found or inactive") as any;
-      err.status = 404;
-      throw err;
+      throw Object.assign(new Error("Crossword not found or inactive"), { status: 404 });
     }
 
     if (crossword.is_available) return;
@@ -74,18 +100,17 @@ export async function assertOlympiadAssignmentAccess(
 
     if (accessError) throw new Error(accessError.message);
     if (!access) {
-      const err = new Error("No access to this crossword") as any;
-      err.status = 403;
-      throw err;
+      throw Object.assign(new Error("No access to this crossword"), { status: 403 });
     }
     return;
   }
 
-  throw Object.assign(new Error("Olympiad assignment has no textbook_id or crossword_id"), { status: 400 });
+  // Если ни одного ID нет, выдаем понятную ошибку
+  throw Object.assign(new Error("Assignment has no material_id, textbook_id, or crossword_id"), { status: 400 });
 }
 
 /**
- * Проверяет, что пользователь имеет доступ к заданию Gatehouse Awards.
+ * Проверяет, что пользователь имеет доступ к заданию Gatehouse Awards / Unified Materials.
  */
 export async function assertGatehouseAssignmentAccess(
   supabase: SupabaseClient,
@@ -103,7 +128,7 @@ export async function assertGatehouseAssignmentAccess(
 
   const { data: material, error: materialError } = await supabase
     .from("materials")
-    .select("id, is_active, is_available, branch_type")
+    .select("id, is_active, is_available")
     .eq("id", materialId)
     .maybeSingle();
 
@@ -123,6 +148,6 @@ export async function assertGatehouseAssignmentAccess(
 
   if (accessError) throw new Error(accessError.message);
   if (!access) {
-    throw Object.assign(new Error("No access to this Gatehouse material"), { status: 403 });
+    throw Object.assign(new Error("No access to this material"), { status: 403 });
   }
 }

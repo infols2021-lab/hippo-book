@@ -8,8 +8,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type BranchType = "olympiad" | "gatehouse";
-type GrantKind = "textbook" | "crossword" | "mock_test";
+type BranchType = string;
+type GrantKind = "textbook" | "crossword" | "mock_test" | "material";
 
 type ReqRow = {
   id: string;
@@ -114,6 +114,8 @@ async function runDbQuery<T>(
 
 function normalizeBranchType(value: unknown): BranchType {
   const v = String(value ?? "").trim().toLowerCase();
+  
+  if (!v) return "olympiad";
 
   if (
     v === "gatehouse" ||
@@ -126,7 +128,7 @@ function normalizeBranchType(value: unknown): BranchType {
     return "gatehouse";
   }
 
-  return "olympiad";
+  return v;
 }
 
 function norm(v: any) {
@@ -178,7 +180,9 @@ function clamp(n: number, min: number, max: number) {
 
 function formatBranchLabel(branchType: BranchType) {
   if (branchType === "gatehouse") return "🎓 Gatehouse Awards";
-  return "🏆 Олимпиада";
+  if (branchType === "olympiad") return "🏆 Олимпиада";
+  // Для новых веток возвращаем как есть с заглавной буквы
+  return `📁 ${branchType.charAt(0).toUpperCase() + branchType.slice(1)}`; 
 }
 
 function formatClassLevel(classLevel: string) {
@@ -274,6 +278,11 @@ function formatTarget(branchType: BranchType, classLevel: any, targetLevel: any)
     return levels.length ? levels.map(formatGatehouseLevel).join(", ") : "—";
   }
 
+  const levels = toArr(targetLevel);
+  if (levels.length > 0 && !classLevel) {
+    return levels.join(", ");
+  }
+
   const classes = toArr(classLevel);
   if (!classes.length) return "—";
 
@@ -330,7 +339,7 @@ function formatStatus(isProcessed: boolean, processedAt?: string | null) {
 }
 
 function getSheetTargetSource(row: any, branchType: BranchType) {
-  if (branchType !== "gatehouse") return row.class_level;
+  if (branchType !== "gatehouse" && row.class_level) return row.class_level;
 
   const targetLevels = toArr(row.target_levels);
   if (targetLevels.length) return targetLevels;
@@ -339,7 +348,7 @@ function getSheetTargetSource(row: any, branchType: BranchType) {
 }
 
 function getSheetMaterialTypesSource(row: any, branchType: BranchType) {
-  if (branchType !== "gatehouse") return row.textbook_types;
+  if (branchType !== "gatehouse" && row.textbook_types?.length) return row.textbook_types;
 
   const materialKinds = toArr(row.material_kinds);
   if (materialKinds.length) return materialKinds;
@@ -422,17 +431,16 @@ async function findGatehouseMaterialsForRequest(supabase: any, r: ReqRow) {
   return materials.filter((m) => gatehouseMaterialMatchesRequest(m, r));
 }
 
-// 🚀 УМНАЯ СИСТЕМА ВЫДАЧИ ДИНАМИЧЕСКИХ ДОСТУПОВ (ИСПРАВЛЕНА ПОД НОВУЮ БД)
+// 🚀 УМНАЯ СИСТЕМА ВЫДАЧИ ДИНАМИЧЕСКИХ ДОСТУПОВ (ИСПРАВЛЕНА ПОД НОВУЮ БД И ПРОЕКТЫ)
 async function grantDynamicProjectAccessForRequest(supabase: any, adminId: string, r: ReqRow) {
   const nowISO = new Date().toISOString();
   const grantedLabels: string[] = [];
   const grantsToStore: any[] = [];
 
-  // Пользователь присылает реальные названия с фронта (Лейблы) или ID
   const targetLevels = toArr(r.class_level).length ? toArr(r.class_level) : toArr(r.target_levels);
   const requestedTabs = toArr(r.material_kinds).length ? toArr(r.material_kinds) : toArr(r.textbook_types);
 
-  // 1. Получаем все активные табы этого проекта (т.к. материалы теперь лежат в них)
+  // 1. Получаем все активные табы этого проекта
   const { data: tabsRes } = await runDbQuery<any[]>(
     () => supabase.from("project_tabs").select("id, title").eq("project_id", r.project_id).eq("is_active", true),
     "fetchTabsForGrant"
@@ -448,14 +456,12 @@ async function grantDynamicProjectAccessForRequest(supabase: any, adminId: strin
       if (matched) tabIdsToQuery.push(matched.id);
     }
   } else {
-    // Если табы не указаны, ищем по всем активным табам проекта
     tabIdsToQuery = (tabsRes ?? []).map((t: any) => t.id);
   }
 
-  // Если табов в проекте нет, то и материалов нет
   if (tabIdsToQuery.length === 0) return { grantedLabels, grantsToStore };
 
-  // ❗️ 2. Достаем активные материалы по найденным табам (БЕЗ project_id)
+  // ❗️ 2. Достаем активные материалы по найденным табам
   const { data: materials, error } = await runDbQuery<any[]>(() => supabase
     .from("materials")
     .select("id, title, material_kind, target_levels, class_levels, project_tab_id")
@@ -465,23 +471,20 @@ async function grantDynamicProjectAccessForRequest(supabase: any, adminId: strin
 
   if (error) throw new Error(error.message);
 
-  // 3. Мягкая фильтрация (Fuzzy match) уровней. 
+  // 3. Мягкая фильтрация (Fuzzy match) уровней
   const userLevels = targetLevels.map(x => String(x).toLowerCase());
   
   const matchedMaterials = (materials ?? []).filter(mat => {
-    // Если юзер не указал уровни в заявке, выдаем всё из найденных табов
     if (userLevels.length === 0) return true;
 
     const matLevels = [...toArr(mat.target_levels), ...toArr(mat.class_levels)].map(x => String(x).toLowerCase());
     
-    // Если материал доступен всем уровням (массив пуст) -> выдаем
     if (matLevels.length === 0) return true; 
     
-    // Ищем хоть одно пересечение уровней
     return matLevels.some(ml => userLevels.some(ul => ml === ul || ml.includes(ul) || ul.includes(ml)));
   });
 
-  // 4. Записываем доступы в БД
+  // 4. Записываем доступы в БД (в material_access)
   for (const mat of matchedMaterials) {
     const up = await supabase.from("material_access").upsert({
       user_id: r.user_id,
@@ -495,7 +498,7 @@ async function grantDynamicProjectAccessForRequest(supabase: any, adminId: strin
       grantsToStore.push({
         request_id: r.id,
         user_id: r.user_id,
-        kind: "mock_test", // Fallback, чтобы легаси-роуты корректно могли отозвать доступ при удалении заявки
+        kind: "material", // Используем корректный общий вид для отзыва доступов
         item_id: mat.id,
         title: mat.title,
         granted_by: adminId,
@@ -509,6 +512,68 @@ async function grantDynamicProjectAccessForRequest(supabase: any, adminId: strin
   return { grantedLabels, grantsToStore };
 }
 
+// 🌐 УНИВЕРСАЛЬНАЯ ВЫДАЧА ДОСТУПОВ (ДЛЯ НОВЫХ ВЕТОК БЕЗ ПРОЕКТА)
+async function grantGenericBranchAccessForRequest(supabase: any, adminId: string, r: ReqRow) {
+  const nowISO = new Date().toISOString();
+  const grantedLabels: string[] = [];
+  const grantsToStore: any[] = [];
+
+  const targetLevels = toArr(r.class_level).length ? toArr(r.class_level) : toArr(r.target_levels);
+  const kinds = getRequestMaterialKinds(r);
+
+  const { data: materials, error } = await runDbQuery<any[]>(() => {
+    let q = supabase
+      .from("materials")
+      .select("id, title, material_kind, target_levels, class_levels")
+      .eq("branch_type", r.branch_type)
+      .eq("is_active", true);
+      
+    if (kinds.length) {
+       q = q.in("material_kind", kinds);
+    }
+    return q;
+  }, "grantGenericBranchAccess");
+
+  if (error) throw new Error(error.message);
+
+  const userLevels = targetLevels.map(x => String(x).toLowerCase());
+  
+  const matchedMaterials = (materials ?? []).filter(mat => {
+    if (userLevels.length === 0) return true;
+    const matLevels = [...toArr(mat.target_levels), ...toArr(mat.class_levels)].map(x => String(x).toLowerCase());
+    if (matLevels.length === 0) return true; 
+    return matLevels.some(ml => userLevels.some(ul => ml === ul || ml.includes(ul) || ul.includes(ml)));
+  });
+
+  for (const mat of matchedMaterials) {
+    const up = await supabase.from("material_access").upsert({
+      user_id: r.user_id,
+      material_id: mat.id,
+      granted_by: adminId,
+      granted_at: nowISO
+    }, { onConflict: "user_id,material_id" });
+
+    if (!up.error) {
+      grantedLabels.push(`📁 ${mat.title}`);
+      grantsToStore.push({
+        request_id: r.id,
+        user_id: r.user_id,
+        kind: "material", 
+        item_id: mat.id,
+        title: mat.title,
+        granted_by: adminId,
+        granted_at: nowISO,
+        material_id: mat.id,
+        branch_type: r.branch_type,
+        material_kind: mat.material_kind || "material"
+      });
+    }
+  }
+
+  return { grantedLabels: uniq(grantedLabels), grantsToStore };
+}
+
+
 async function grantOlympiadAccessForRequest(supabase: any, adminId: string, r: ReqRow) {
   const classLevels = toArr(r.class_level);
   const types = toArr(r.textbook_types).map((x) => String(x).toLowerCase());
@@ -516,18 +581,7 @@ async function grantOlympiadAccessForRequest(supabase: any, adminId: string, r: 
   const nowISO = new Date().toISOString();
 
   const grantedLabels: string[] = [];
-  const grantsToStore: Array<{
-    request_id: string;
-    user_id: string;
-    kind: GrantKind;
-    item_id: string;
-    title: string;
-    granted_by: string;
-    granted_at: string;
-    branch_type?: BranchType;
-    material_id?: string | null;
-    material_kind?: string | null;
-  }> = [];
+  const grantsToStore: Array<any> = [];
 
   if (!classLevels.length) return { grantedLabels: [], grantsToStore };
 
@@ -624,18 +678,7 @@ async function grantGatehouseAccessForRequest(supabase: any, adminId: string, r:
   const nowISO = new Date().toISOString();
 
   const grantedLabels: string[] = [];
-  const grantsToStore: Array<{
-    request_id: string;
-    user_id: string;
-    kind: GrantKind;
-    item_id: string;
-    title: string;
-    granted_by: string;
-    granted_at: string;
-    branch_type?: BranchType;
-    material_id?: string | null;
-    material_kind?: string | null;
-  }> = [];
+  const grantsToStore: Array<any> = [];
 
   const materials = await findGatehouseMaterialsForRequest(supabase, r);
 
@@ -671,17 +714,25 @@ async function grantGatehouseAccessForRequest(supabase: any, adminId: string, r:
 }
 
 async function grantAccessForRequest(supabase: any, adminId: string, r: ReqRow) {
+  // 1. Приоритет динамическим проектам
   if (r.project_id) {
     return grantDynamicProjectAccessForRequest(supabase, adminId, r);
   }
 
   const branchType = normalizeBranchType(r.branch_type);
 
+  // 2. Старые Gatehouse тесты
   if (branchType === "gatehouse") {
     return grantGatehouseAccessForRequest(supabase, adminId, r);
   }
 
-  return grantOlympiadAccessForRequest(supabase, adminId, r);
+  // 3. Старые Олимпиады (legacy)
+  if (branchType === "olympiad") {
+     return grantOlympiadAccessForRequest(supabase, adminId, r);
+  }
+
+  // 4. НОВЫЕ ВЕТКИ (fall-through). 
+  return grantGenericBranchAccessForRequest(supabase, adminId, r);
 }
 
 async function existsOtherProcessedGrant(
@@ -710,15 +761,16 @@ async function existsOtherProcessedGrant(
   return (data ?? []).length > 0;
 }
 
-async function existsOtherProcessedGatehouseRequestForMaterial(
+async function existsOtherProcessedGenericRequestForMaterial(
   supabase: any,
   requestId: string,
   userId: string,
+  branchType: string,
   materialKind: string | null | undefined,
   targetLevels: string[] | null | undefined,
 ) {
   const levels = Array.isArray(targetLevels) ? targetLevels.map(String) : [];
-  const kind = normalizeGatehouseMaterialKind(materialKind);
+  const kind = norm(materialKind);
 
   if (!levels.length || !kind) return false;
 
@@ -726,22 +778,22 @@ async function existsOtherProcessedGatehouseRequestForMaterial(
     () =>
       supabase
         .from("purchase_requests")
-        .select("id,target_level,target_levels,textbook_types,material_kinds,is_processed,branch_type")
+        .select("id,target_level,target_levels,textbook_types,material_kinds,class_level,is_processed,branch_type")
         .eq("user_id", userId)
         .eq("is_processed", true)
-        .eq("branch_type", "gatehouse")
+        .eq("branch_type", branchType)
         .neq("id", requestId),
-    "existsOtherProcessedGatehouseRequestForMaterial",
+    "existsOtherProcessedGenericRequestForMaterial",
   );
 
   if (error) return false;
 
   for (const row of data ?? []) {
     const req = row as ReqRow;
-    const rowLevels = getRequestTargetLevels(req);
+    const rowLevels = branchType === 'gatehouse' ? getRequestTargetLevels(req) : [...toArr(req.class_level), ...toArr(req.target_levels)];
     const rowKinds = getRequestMaterialKinds(req);
 
-    const levelMatches = overlapsGatehouseLevels(rowLevels, levels);
+    const levelMatches = branchType === 'gatehouse' ? overlapsGatehouseLevels(rowLevels, levels) : overlaps(rowLevels, levels);
     const kindMatches = rowKinds.length ? rowKinds.includes(kind) : true;
 
     if (levelMatches && kindMatches) return true;
@@ -749,6 +801,7 @@ async function existsOtherProcessedGatehouseRequestForMaterial(
 
   return false;
 }
+
 
 async function getTargetsForUnprocess(supabase: any, r: ReqRow): Promise<GrantTarget[]> {
   const { data, error } = await runDbQuery<any[]>(
@@ -772,18 +825,18 @@ async function getTargetsForUnprocess(supabase: any, r: ReqRow): Promise<GrantTa
       granted_by: String(x.granted_by || ""),
       material_kind: typeof x.material_kind === "string" ? x.material_kind : null,
     }))
-    .filter((x) => x.kind === "textbook" || x.kind === "crossword" || x.kind === "mock_test");
+    .filter((x) => x.kind === "textbook" || x.kind === "crossword" || x.kind === "mock_test" || x.kind === "material");
 }
 
 async function enrichMockTestTargetIfNeeded(supabase: any, target: GrantTarget): Promise<GrantTarget> {
-  if (target.kind !== "mock_test") return target;
+  if (target.kind !== "mock_test" && target.kind !== "material") return target;
   if (target.material_kind && Array.isArray(target.target_levels)) return target;
 
   const { data } = await runDbQuery<any>(
     () =>
       supabase
         .from("materials")
-        .select("id,title,material_kind,target_levels")
+        .select("id,title,material_kind,target_levels,class_levels")
         .eq("id", target.item_id)
         .maybeSingle(),
     "enrichMockTestTargetIfNeeded",
@@ -795,14 +848,15 @@ async function enrichMockTestTargetIfNeeded(supabase: any, target: GrantTarget):
     ...target,
     title: target.title || String(data.title || "Материал"),
     material_kind: String(data.material_kind || "mock_test"),
-    target_levels: Array.isArray(data.target_levels) ? data.target_levels.map(String) : [],
+    target_levels: [...(Array.isArray(data.target_levels) ? data.target_levels : []), ...(Array.isArray(data.class_levels) ? data.class_levels : [])].map(String),
   };
 }
 
 function applyBranchFilter(q: any, branchFilter: string) {
   if (branchFilter === "gatehouse") return q.eq("branch_type", "gatehouse");
   if (branchFilter === "olympiad") return q.or("branch_type.eq.olympiad,branch_type.is.null");
-  return q;
+  // Для новых веток
+  return q.eq("branch_type", branchFilter);
 }
 
 function applyCursor(q: any, cursorCreatedAt: string) {
@@ -939,6 +993,7 @@ export async function PATCH(req: NextRequest) {
         const grantsHistory: any = { ok: true };
 
         if (is_processed) {
+          // ВЫЗОВ НАШЕЙ НОВОЙ ФУНКЦИИ ВЫДАЧИ
           const { grantedLabels, grantsToStore } = await grantAccessForRequest(supabase, user.id, r);
 
           const delHistory = await supabase.from("purchase_request_grants").delete().eq("request_id", r.id);
@@ -951,12 +1006,13 @@ export async function PATCH(req: NextRequest) {
 
           granted = grantedLabels;
         } else {
+          // ОТМЕНА ЗАЯВКИ
           const targets = await getTargetsForUnprocess(supabase, r);
 
           for (const rawTarget of targets) {
             const t = await enrichMockTestTargetIfNeeded(supabase, rawTarget);
 
-            if (t.kind === "mock_test") {
+            if (t.kind === "mock_test" || t.kind === "material") {
               const keepByGrant = await existsOtherProcessedGrant(
                 supabase,
                 r.id,
@@ -965,10 +1021,11 @@ export async function PATCH(req: NextRequest) {
                 t.item_id,
               );
 
-              const keepByRequest = await existsOtherProcessedGatehouseRequestForMaterial(
+              const keepByRequest = await existsOtherProcessedGenericRequestForMaterial(
                 supabase,
                 r.id,
                 r.user_id,
+                r.branch_type || "olympiad",
                 t.material_kind,
                 t.target_levels,
               );

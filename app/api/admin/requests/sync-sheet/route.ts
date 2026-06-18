@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type BranchType = "olympiad" | "gatehouse";
+type BranchType = string;
 
 function noStoreInit(): ResponseInit {
   return {
@@ -26,6 +26,8 @@ function noStoreInit(): ResponseInit {
 function normalizeBranchType(value: unknown): BranchType {
   const v = String(value ?? "").trim().toLowerCase();
 
+  if (!v) return "olympiad";
+
   if (
     v === "gatehouse" ||
     v === "ga" ||
@@ -37,7 +39,7 @@ function normalizeBranchType(value: unknown): BranchType {
     return "gatehouse";
   }
 
-  return "olympiad";
+  return v;
 }
 
 function norm(v: any) {
@@ -129,6 +131,12 @@ function formatTarget(branchType: BranchType, classLevel: any, targetLevels: any
     return levels.length ? levels.map(formatGatehouseLevel).join(", ") : "—";
   }
 
+  // Для новых веток
+  const levels = toArr(targetLevels);
+  if (levels.length > 0 && !classLevel) {
+    return levels.join(", ");
+  }
+
   const classes = toArr(classLevel);
   if (!classes.length) return "—";
 
@@ -184,7 +192,7 @@ function formatStatus(isProcessed: boolean, processedAt?: string | null) {
 }
 
 function getSheetTargetSource(row: any, branchType: BranchType) {
-  if (branchType !== "gatehouse") return row.class_level;
+  if (branchType !== "gatehouse" && row.class_level) return row.class_level;
 
   const targetLevels = toArr(row.target_levels);
   if (targetLevels.length) return targetLevels;
@@ -193,7 +201,7 @@ function getSheetTargetSource(row: any, branchType: BranchType) {
 }
 
 function getSheetMaterialTypesSource(row: any, branchType: BranchType) {
-  if (branchType !== "gatehouse") return row.textbook_types;
+  if (branchType !== "gatehouse" && row.textbook_types?.length) return row.textbook_types;
 
   const materialKinds = toArr(row.material_kinds);
   if (materialKinds.length) return materialKinds;

@@ -8,7 +8,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type BranchType = "olympiad" | "gatehouse";
+// Убираем жесткую привязку, так как у вас появились новые ветки
+type BranchType = string;
 
 const SHEETS_TIMEOUT_MS = 12_000;
 
@@ -34,6 +35,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 function normalizeBranchType(value: unknown): BranchType {
   const v = String(value ?? "").trim().toLowerCase();
+  
+  if (!v) return "olympiad"; // Фолбэк для совсем старых версий фронта
 
   if (
     v === "gatehouse" ||
@@ -46,7 +49,8 @@ function normalizeBranchType(value: unknown): BranchType {
     return "gatehouse";
   }
 
-  return "olympiad";
+  // ВАЖНО: Возвращаем оригинальное имя ветки, а не принудительно "olympiad"
+  return v;
 }
 
 function normalizeString(value: unknown) {
@@ -168,6 +172,11 @@ function formatTarget(branchType: BranchType, classLevel: string | null, targetL
     return targetLevels.length ? targetLevels.map(formatGatehouseLevel).join(", ") : "—";
   }
 
+  // Если это другая ветка (в т.ч. новая), у нее может быть и класс, и таргет-уровни.
+  if (targetLevels.length > 0 && !classLevel) {
+    return targetLevels.join(", ");
+  }
+
   return classLevel ? formatClassLevel(classLevel) : "—";
 }
 
@@ -196,6 +205,7 @@ function formatMaterialTypes(branchType: BranchType, types: unknown) {
     crossword: "🧩 Кроссворд",
   };
 
+  // Для новых веток просто возвращаем их название, если их нет в словаре, или словарное значение
   return arr.map((type) => typeMap[String(type).toLowerCase()] || String(type)).join(", ");
 }
 
@@ -219,16 +229,6 @@ function formatStatus(isProcessed: boolean, processedAt?: string | null) {
   return "✅ Обработана";
 }
 
-/**
- * Google Sheets A:G:
- * A Номер заявки
- * B Дата и время создания
- * C Класс / уровень
- * D Типы материалов
- * E Email
- * F ФИО ученика
- * G Статус заявки
- */
 function buildSheetValues(row: any) {
   const branchType = normalizeBranchType(row?.branch_type);
   const targetLevels = toStringArray(row?.target_levels ?? row?.target_level);
@@ -238,7 +238,9 @@ function buildSheetValues(row: any) {
       ? toStringArray(row?.material_kinds).length
         ? row.material_kinds
         : row.textbook_types
-      : row?.textbook_types;
+      : row?.textbook_types?.length 
+        ? row.textbook_types 
+        : row?.material_kinds; // Поддержка material_kinds для новых веток
 
   return [
     String(row?.request_number || ""),
@@ -265,7 +267,11 @@ function createFallbackRequestNumber(branchType: BranchType) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  const prefix = branchType === "gatehouse" ? "GA" : "PR";
+  
+  // Динамический префикс для новых веток
+  let prefix = "PR";
+  if (branchType === "gatehouse") prefix = "GA";
+  else if (branchType !== "olympiad") prefix = branchType.substring(0, 2).toUpperCase();
 
   return `${prefix}-${yyyy}${mm}${dd}-${random}`;
 }
@@ -298,10 +304,9 @@ function normalizeRequestBody(body: any) {
         ? body.target_level
         : [];
 
-  const target_levels =
-    branch_type === "gatehouse"
-      ? uniqueStrings(toStringArray(rawTargetLevels).map(normalizeGatehouseLevel))
-      : [];
+  const target_levels = uniqueStrings(
+    toStringArray(rawTargetLevels).map(l => branch_type === 'gatehouse' ? normalizeGatehouseLevel(l) : normalizeString(l))
+  );
 
   const rawTextbookTypes =
     body?.textbook_types !== undefined
@@ -312,22 +317,22 @@ function normalizeRequestBody(body: any) {
           ? ["mock_test"]
           : [];
 
-  const textbook_types =
-    branch_type === "gatehouse"
-      ? uniqueStrings(toStringArray(rawTextbookTypes).map(normalizeGatehouseMaterialKind))
-      : uniqueStrings(toStringArray(rawTextbookTypes).map(normalizeOlympiadMaterialKind));
+  const textbook_types = uniqueStrings(
+    toStringArray(rawTextbookTypes).map(t =>
+      branch_type === 'gatehouse' ? normalizeGatehouseMaterialKind(t) : normalizeOlympiadMaterialKind(t)
+    )
+  );
 
   const rawMaterialKinds =
     body?.material_kinds !== undefined
       ? body.material_kinds
-      : branch_type === "gatehouse"
-        ? textbook_types
-        : textbook_types;
+      : textbook_types;
 
-  const material_kinds =
-    branch_type === "gatehouse"
-      ? uniqueStrings(toStringArray(rawMaterialKinds).map(normalizeGatehouseMaterialKind))
-      : uniqueStrings(toStringArray(rawMaterialKinds).map(normalizeOlympiadMaterialKind));
+  const material_kinds = uniqueStrings(
+    toStringArray(rawMaterialKinds).map(k =>
+      branch_type === 'gatehouse' ? normalizeGatehouseMaterialKind(k) : normalizeOlympiadMaterialKind(k)
+    )
+  );
 
   return {
     branch_type,
@@ -351,16 +356,17 @@ export async function POST(req: NextRequest) {
 
   const normalized = normalizeRequestBody(body);
 
-  if (!normalized.textbook_types.length) {
+  if (!normalized.textbook_types.length && !normalized.material_kinds.length) {
     return fail("Выберите тип материала", 400, "VALIDATION", noStoreInit());
   }
 
-  if (normalized.branch_type === "olympiad" && !normalized.class_level) {
-    return fail("Выберите класс", 400, "VALIDATION", noStoreInit());
-  }
-
+  // Обновленная логика валидации: Gatehouse строго требует уровень, другие ветки требуют класс ИЛИ уровень
   if (normalized.branch_type === "gatehouse" && normalized.target_levels.length === 0) {
     return fail("Выберите уровень экзамена", 400, "VALIDATION", noStoreInit());
+  }
+  
+  if (normalized.branch_type !== "gatehouse" && !normalized.class_level && normalized.target_levels.length === 0) {
+    return fail("Выберите класс или уровень", 400, "VALIDATION", noStoreInit());
   }
 
   const email = normalizeString(profile?.email || user?.email || body?.email);
@@ -378,9 +384,9 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       request_number,
       branch_type: normalized.branch_type,
-      class_level: normalized.branch_type === "olympiad" ? normalized.class_level : null,
-      target_level: normalized.branch_type === "gatehouse" ? normalized.target_levels : null,
-      target_levels: normalized.branch_type === "gatehouse" ? normalized.target_levels : null,
+      class_level: normalized.class_level || null,
+      target_level: normalized.target_levels.length > 0 ? normalized.target_levels : null,
+      target_levels: normalized.target_levels.length > 0 ? normalized.target_levels : null,
       textbook_types: normalized.textbook_types,
       material_kinds: normalized.material_kinds,
       email,
