@@ -123,7 +123,6 @@ export function normalizeGatehouseMaterial(row: any): MaterialDbRow {
     created_at: typeof row?.created_at === "string" ? row.created_at : new Date().toISOString(),
     updated_at: typeof row?.updated_at === "string" ? row.updated_at : new Date().toISOString(),
     meta: row?.meta && typeof row.meta === "object" ? row.meta : {},
-    // ✅ Добавлены новые обязательные поля из MaterialDbRow
     project_tab_id: null, // для gatehouse материалов пока нет привязки к табу
     price: typeof row?.price === "number" ? row.price : 1000,
   };
