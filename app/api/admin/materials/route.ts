@@ -19,7 +19,6 @@ function normalizeNullableString(value: unknown): string | null {
   return str || null;
 }
 
-// Защита от мусора вместо ID
 function isValidUUID(str: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
 }
@@ -37,20 +36,18 @@ function normalizePayload(body: any, userId: string) {
   const target_levels = uniqueStrings(toStringArray(body?.target_levels ?? body?.target_level));
   const meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
 
-  // ❗️ ФИКС ТАБА: Ловим и очищаем project_tab_id
   let project_tab_id = normalizeNullableString(body?.project_tab_id ?? body?.tab_id);
   
   if (project_tab_id === "00000000-0000-0000-0000-000000000000" || project_tab_id === "none" || project_tab_id === "null" || project_tab_id === "") {
     project_tab_id = null;
   }
 
-  // Если прилетел текст вместо UUID — сбрасываем в null
   if (project_tab_id && !isValidUUID(project_tab_id)) {
     project_tab_id = null;
   }
 
   return {
-    project_tab_id, // Теперь материал привяжется к табу!
+    project_tab_id,
     branch_type,
     material_kind,
     title,
@@ -117,14 +114,11 @@ export async function GET(req: NextRequest) {
       return ok({ materials });
     }
 
-    const ids = materials.map((material: any) => material.id).filter(Boolean);
-    const idsString = ids.join(',');
-
-    // ❗️ ФИКС СЧЕТЧИКА: Ищем задания и по новой, и по легаси привязке
+    // ❗️ УБИТА ПРИЧИНА ЗАВИСАНИЯ: Больше никаких гигантских .or() строк
+    // Просто забираем связи и считаем в памяти. 
     const { data: assignments, error: countError } = await supabase
       .from("assignments")
-      .select("id, material_id, textbook_id, crossword_id")
-      .or(`material_id.in.(${idsString}),textbook_id.in.(${idsString}),crossword_id.in.(${idsString})`);
+      .select("id, material_id, textbook_id, crossword_id");
 
     if (countError) {
       console.error("🔴 [ADMIN GET MATERIALS] Ошибка подсчета заданий:", countError.message);
