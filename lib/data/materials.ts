@@ -124,6 +124,8 @@ function normalizeProjectMaterial(row: any): MaterialDbRow {
     created_at: typeof row?.created_at === "string" ? row.created_at : new Date().toISOString(),
     updated_at: typeof row?.updated_at === "string" ? row.updated_at : new Date().toISOString(),
     meta: row?.meta && typeof row.meta === "object" ? row.meta : {},
+    project_tab_id: row?.project_tab_id ?? null,
+    price: typeof row?.price === "number" ? row.price : 1000,
   };
 }
  
@@ -402,4 +404,3 @@ export async function loadProjectMaterialPageData(
 export function formatMaterialDate(value: unknown): string {
   return formatDate(value);
 }
- 
