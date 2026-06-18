@@ -30,6 +30,7 @@ export type ProjectRow = {
   ui_texts: ProjectUiTextsJson | null;
   created_at: string | null;
   updated_at: string | null;
+  sheet_name: string | null; // 🚀 НОВОЕ ПОЛЕ: Название листа в Google Таблице (например "Заявки Hippo")
 };
 
 export type ProjectTabRow = {
@@ -187,6 +188,7 @@ export type ProjectConfig = {
   orderIndex: number;
   fallbackIcon: string;
   themeColor: string;
+  sheetName: string | null; // 🚀 НОВОЕ ПОЛЕ: для конфигурации Google Таблиц
 
   // Подконфиги
   theme: ProjectThemeConfig;

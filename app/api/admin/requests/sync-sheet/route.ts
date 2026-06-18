@@ -245,6 +245,31 @@ function equalRow(a: (string | number)[], b: string[]) {
   return true;
 }
 
+/**
+ * Группирует заявки по имени листа (sheet_name) и возвращает мапу:
+ *   sheetName -> { requests: [], dbSet: Set<string> }
+ */
+function groupRequestsBySheet(rows: any[]): Map<string, { requests: any[]; dbSet: Set<string> }> {
+  const groups = new Map<string, { requests: any[]; dbSet: Set<string> }>();
+
+  for (const r of rows) {
+    // Если project_id есть, берём sheet_name из проекта, иначе null (дефолтный лист)
+    const sheetName = r.sheet_name || null; // null => дефолтный лист
+    const key = sheetName ?? "default";
+
+    if (!groups.has(key)) {
+      groups.set(key, { requests: [], dbSet: new Set<string>() });
+    }
+
+    const group = groups.get(key)!;
+    group.requests.push(r);
+    const rn = norm(r.request_number);
+    if (rn) group.dbSet.add(rn);
+  }
+
+  return groups;
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
@@ -255,24 +280,43 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(Math.max(Number(sp.get("limit") || 500), 1), 2000);
 
   try {
-    const sheetMap = await getSheetRequestRowMap();
-
+    // 1. Загружаем все заявки с информацией о проекте (sheet_name)
     const { data, error } = await supabase
       .from("purchase_requests")
       .select(
-        "id,request_number,created_at,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,email,full_name,contact_phone,is_processed,processed_at,sheet_synced_at,sheet_row,sheet_sync_error",
+        `
+        id,
+        request_number,
+        created_at,
+        branch_type,
+        class_level,
+        target_level,
+        target_levels,
+        textbook_types,
+        material_kinds,
+        email,
+        full_name,
+        contact_phone,
+        is_processed,
+        processed_at,
+        sheet_synced_at,
+        sheet_row,
+        sheet_sync_error,
+        project_id,
+        projects ( sheet_name )
+      `
       )
       .order("created_at", { ascending: true });
 
     if (error) return fail(error.message, 500, "DB_ERROR", noStoreInit());
 
-    const rows = (data ?? []) as any[];
-    const dbSet = new Set<string>();
+    const rows = (data ?? []).map((r: any) => ({
+      ...r,
+      sheet_name: r.projects?.sheet_name || null, // извлекаем sheet_name из joined projects
+    }));
 
-    for (const r of rows) {
-      const rn = norm(r.request_number);
-      if (rn) dbSet.add(rn);
-    }
+    // 2. Группируем по sheet_name
+    const groups = groupRequestsBySheet(rows);
 
     let inserted = 0;
     let updated = 0;
@@ -282,58 +326,51 @@ export async function GET(req: NextRequest) {
     let failed = 0;
     let ops = 0;
 
-    for (const r of rows) {
-      if (ops >= limit) break;
+    // 3. Для каждой группы загружаем sheetMap и обрабатываем заявки
+    for (const [sheetKey, group] of groups.entries()) {
+      const sheetName = sheetKey === "default" ? null : sheetKey; // null => дефолтный лист
+      const sheetMap = await getSheetRequestRowMap(sheetName);
+      const { requests, dbSet } = group;
 
-      const rn = norm(r.request_number);
+      for (const r of requests) {
+        if (ops >= limit) break;
 
-      if (!rn) {
-        skipped += 1;
-        continue;
-      }
+        const rn = norm(r.request_number);
 
-      const sheetValues = buildSheetValues(r);
-      const existing = sheetMap.get(rn);
+        if (!rn) {
+          skipped += 1;
+          continue;
+        }
 
-      try {
-        if (!existing) {
-          const res = await appendAccountingRow(sheetValues);
-          const rowNumber = res.rowNumber ?? null;
+        const sheetValues = buildSheetValues(r);
+        const existing = sheetMap.get(rn);
 
-          await supabase
-            .from("purchase_requests")
-            .update({
-              sheet_synced_at: new Date().toISOString(),
-              sheet_row: rowNumber,
-              sheet_sync_error: null,
-            })
-            .eq("id", r.id);
+        try {
+          if (!existing) {
+            const res = await appendAccountingRow(sheetValues, sheetName);
+            const rowNumber = res.rowNumber ?? null;
 
-          inserted += 1;
-          ops += 1;
+            await supabase
+              .from("purchase_requests")
+              .update({
+                sheet_synced_at: new Date().toISOString(),
+                sheet_row: rowNumber,
+                sheet_sync_error: null,
+              })
+              .eq("id", r.id);
 
-          if (rowNumber) {
-            sheetMap.set(rn, {
-              rowNumber,
-              values: sheetValues.map((x) => norm(x)),
-            });
-          }
-        } else if (!equalRow(sheetValues, existing.values)) {
-          await updateAccountingRow(existing.rowNumber, sheetValues);
+            inserted += 1;
+            ops += 1;
 
-          await supabase
-            .from("purchase_requests")
-            .update({
-              sheet_synced_at: new Date().toISOString(),
-              sheet_row: existing.rowNumber,
-              sheet_sync_error: null,
-            })
-            .eq("id", r.id);
+            if (rowNumber) {
+              sheetMap.set(rn, {
+                rowNumber,
+                values: sheetValues.map((x) => norm(x)),
+              });
+            }
+          } else if (!equalRow(sheetValues, existing.values)) {
+            await updateAccountingRow(existing.rowNumber, sheetValues, sheetName);
 
-          updated += 1;
-          ops += 1;
-        } else {
-          if (!r.sheet_synced_at || r.sheet_row !== existing.rowNumber || r.sheet_sync_error) {
             await supabase
               .from("purchase_requests")
               .update({
@@ -342,39 +379,55 @@ export async function GET(req: NextRequest) {
                 sheet_sync_error: null,
               })
               .eq("id", r.id);
+
+            updated += 1;
+            ops += 1;
+          } else {
+            // Строка совпадает, но если в БД не проставлены метаданные – обновляем
+            if (!r.sheet_synced_at || r.sheet_row !== existing.rowNumber || r.sheet_sync_error) {
+              await supabase
+                .from("purchase_requests")
+                .update({
+                  sheet_synced_at: new Date().toISOString(),
+                  sheet_row: existing.rowNumber,
+                  sheet_sync_error: null,
+                })
+                .eq("id", r.id);
+            }
+
+            unchanged += 1;
           }
+        } catch (e: any) {
+          failed += 1;
 
-          unchanged += 1;
+          await supabase
+            .from("purchase_requests")
+            .update({
+              sheet_synced_at: null,
+              sheet_sync_error: String(e?.message || e || "Sheets sync error").slice(0, 500),
+            })
+            .eq("id", r.id);
         }
-      } catch (e: any) {
-        failed += 1;
-
-        await supabase
-          .from("purchase_requests")
-          .update({
-            sheet_synced_at: null,
-            sheet_sync_error: String(e?.message || e || "Sheets sync error").slice(0, 500),
-          })
-          .eq("id", r.id);
-      }
-    }
-
-    if (ops < limit) {
-      const toDelete: number[] = [];
-
-      for (const [rn, info] of sheetMap.entries()) {
-        if (!dbSet.has(rn)) toDelete.push(info.rowNumber);
       }
 
-      toDelete.sort((a, b) => b - a);
+      // 4. Удаляем лишние строки из этого листа (которых нет в БД)
+      if (ops < limit) {
+        const toDelete: number[] = [];
 
-      const canDelete = Math.max(0, limit - ops);
-      const slice = toDelete.slice(0, canDelete);
+        for (const [rn, info] of sheetMap.entries()) {
+          if (!dbSet.has(rn)) toDelete.push(info.rowNumber);
+        }
 
-      if (slice.length) {
-        const res = await deleteAccountingRows(slice);
-        deleted += res.deleted;
-        ops += res.deleted;
+        toDelete.sort((a, b) => b - a);
+
+        const canDelete = Math.max(0, limit - ops);
+        const slice = toDelete.slice(0, canDelete);
+
+        if (slice.length) {
+          const res = await deleteAccountingRows(slice, sheetName);
+          deleted += res.deleted;
+          ops += res.deleted;
+        }
       }
     }
 

@@ -1,3 +1,4 @@
+// app/api/admin/materials/[id]/route.ts
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -11,6 +12,11 @@ function normalizeBool(value: unknown): boolean {
 function normalizeOrderIndex(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function normalizePrice(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : 1000;
 }
 
 function normalizeNullableString(value: unknown): string | null {
@@ -43,6 +49,7 @@ function normalizePatchPayload(body: any) {
   if ("is_available" in body) payload.is_available = normalizeBool(body.is_available);
   if ("is_active" in body) payload.is_active = normalizeBool(body.is_active);
   if ("order_index" in body) payload.order_index = normalizeOrderIndex(body.order_index);
+  if ("price" in body) payload.price = normalizePrice(body.price); // 🚀 НОВОЕ ПОЛЕ: Обновление цены
   
   const classLevels = body.class_levels ?? body.class_level ?? body.classLevels;
   if (classLevels !== undefined) {

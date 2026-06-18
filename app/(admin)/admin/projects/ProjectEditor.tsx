@@ -1,3 +1,4 @@
+// app/(admin)/admin/projects/ProjectEditor.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -502,6 +503,7 @@ export default function ProjectEditor({
     name: project?.name || "",
     slug: project?.slug || "",
     description: project?.description || "",
+    sheet_name: project?.sheet_name || "", // 🚀 НОВОЕ ПОЛЕ: Название листа в Google Таблице
     is_active: project?.is_active ?? true,
     theme: {
       ...project?.theme,
@@ -721,7 +723,7 @@ export default function ProjectEditor({
 
       <form onSubmit={saveProject} className="space-y-8">
         {/* БАЗОВЫЕ НАСТРОЙКИ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-bold mb-1">Название ветки</label>
             <input
@@ -742,7 +744,17 @@ export default function ProjectEditor({
               placeholder="kids-english"
             />
           </div>
-          <div className="col-span-1 md:col-span-2">
+          <div>
+            <label className="block text-sm font-bold mb-1">Лист Google Таблицы <span className="text-gray-400 font-normal text-xs">(Опционально)</span></label>
+            <input
+              className="w-full border-2 rounded-xl px-4 py-2"
+              value={formData.sheet_name}
+              onChange={(e) => setFormData({ ...formData, sheet_name: e.target.value })}
+              placeholder="Напр: Заявки Hippo"
+            />
+            <p className="text-xs text-gray-400 mt-1">Оставьте пустым для записи в "Учёт"</p>
+          </div>
+          <div className="col-span-1 md:col-span-3">
             <label className="block text-sm font-bold mb-1">Описание на портале</label>
             <textarea
               className="w-full border-2 rounded-xl px-4 py-2"

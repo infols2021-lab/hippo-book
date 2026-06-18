@@ -61,9 +61,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // 🚀 ДОБАВЛЕНО: Извлекаем project_id, чтобы узнать лист Google Таблицы
     const { data: existing, error: existingError } = await supabase
       .from("purchase_requests")
-      .select("id,user_id,request_number,is_processed")
+      .select("id,user_id,request_number,is_processed,project_id")
       .eq("id", id)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -108,9 +109,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 🚀 ДОБАВЛЕНО: Получаем имя листа для проекта
+    let sheetName = null;
+    if (existing.project_id) {
+      const { data: project } = await supabase
+        .from("projects")
+        .select("sheet_name")
+        .eq("id", existing.project_id)
+        .maybeSingle();
+      
+      if (project?.sheet_name) {
+        sheetName = project.sheet_name;
+      }
+    }
+
     try {
+      // 🚀 ПЕРЕДАЕМ sheetName В ФУНКЦИЮ УДАЛЕНИЯ
       const sheet = await withTimeout(
-        deleteRequestRowByNumber(requestNumber),
+        deleteRequestRowByNumber(requestNumber, sheetName),
         SHEETS_TIMEOUT_MS,
         "Sheets delete",
       );

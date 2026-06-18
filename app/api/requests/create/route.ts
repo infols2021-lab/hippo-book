@@ -8,7 +8,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// Убираем жесткую привязку, так как у вас появились новые ветки
 type BranchType = string;
 
 const SHEETS_TIMEOUT_MS = 12_000;
@@ -36,7 +35,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 function normalizeBranchType(value: unknown): BranchType {
   const v = String(value ?? "").trim().toLowerCase();
   
-  if (!v) return "olympiad"; // Фолбэк для совсем старых версий фронта
+  if (!v) return "olympiad";
 
   if (
     v === "gatehouse" ||
@@ -49,7 +48,6 @@ function normalizeBranchType(value: unknown): BranchType {
     return "gatehouse";
   }
 
-  // ВАЖНО: Возвращаем оригинальное имя ветки, а не принудительно "olympiad"
   return v;
 }
 
@@ -172,7 +170,6 @@ function formatTarget(branchType: BranchType, classLevel: string | null, targetL
     return targetLevels.length ? targetLevels.map(formatGatehouseLevel).join(", ") : "—";
   }
 
-  // Если это другая ветка (в т.ч. новая), у нее может быть и класс, и таргет-уровни.
   if (targetLevels.length > 0 && !classLevel) {
     return targetLevels.join(", ");
   }
@@ -205,7 +202,6 @@ function formatMaterialTypes(branchType: BranchType, types: unknown) {
     crossword: "🧩 Кроссворд",
   };
 
-  // Для новых веток просто возвращаем их название, если их нет в словаре, или словарное значение
   return arr.map((type) => typeMap[String(type).toLowerCase()] || String(type)).join(", ");
 }
 
@@ -240,7 +236,7 @@ function buildSheetValues(row: any) {
         : row.textbook_types
       : row?.textbook_types?.length 
         ? row.textbook_types 
-        : row?.material_kinds; // Поддержка material_kinds для новых веток
+        : row?.material_kinds;
 
   return [
     String(row?.request_number || ""),
@@ -268,7 +264,6 @@ function createFallbackRequestNumber(branchType: BranchType) {
   const dd = String(d.getDate()).padStart(2, "0");
   const random = Math.random().toString(36).slice(2, 6).toUpperCase();
   
-  // Динамический префикс для новых веток
   let prefix = "PR";
   if (branchType === "gatehouse") prefix = "GA";
   else if (branchType !== "olympiad") prefix = branchType.substring(0, 2).toUpperCase();
@@ -360,7 +355,6 @@ export async function POST(req: NextRequest) {
     return fail("Выберите тип материала", 400, "VALIDATION", noStoreInit());
   }
 
-  // Обновленная логика валидации: Gatehouse строго требует уровень, другие ветки требуют класс ИЛИ уровень
   if (normalized.branch_type === "gatehouse" && normalized.target_levels.length === 0) {
     return fail("Выберите уровень экзамена", 400, "VALIDATION", noStoreInit());
   }
@@ -380,10 +374,28 @@ export async function POST(req: NextRequest) {
   try {
     const request_number = await resolveRequestNumber(supabase, body?.request_number, normalized.branch_type);
 
+    // 🚀 ДОБАВЛЕНО: Достаем настройки проекта (sheet_name и ID) для новой заявки
+    let projectId = null;
+    let sheetName = null;
+
+    if (normalized.branch_type !== "gatehouse" && normalized.branch_type !== "olympiad") {
+      const { data: projectInfo } = await supabase
+        .from("projects")
+        .select("id, sheet_name")
+        .eq("slug", normalized.branch_type)
+        .maybeSingle();
+
+      if (projectInfo) {
+        projectId = projectInfo.id;
+        sheetName = projectInfo.sheet_name;
+      }
+    }
+
     const payload: Record<string, any> = {
       user_id: user.id,
       request_number,
       branch_type: normalized.branch_type,
+      project_id: projectId, // Записываем ID проекта, если нашли
       class_level: normalized.class_level || null,
       target_level: normalized.target_levels.length > 0 ? normalized.target_levels : null,
       target_levels: normalized.target_levels.length > 0 ? normalized.target_levels : null,
@@ -417,7 +429,8 @@ export async function POST(req: NextRequest) {
     let sheetError: string | null = null;
 
     try {
-      const res = await withTimeout(appendAccountingRow(sheetValues), SHEETS_TIMEOUT_MS, "Sheets append");
+      // 🚀 ПЕРЕДАЕМ ИМЯ ЛИСТА В УТИЛИТУ (Второе поле функции)
+      const res = await withTimeout(appendAccountingRow(sheetValues, sheetName), SHEETS_TIMEOUT_MS, "Sheets append");
       sheetRow = res.rowNumber ?? null;
 
       await supabase

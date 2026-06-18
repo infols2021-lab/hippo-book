@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type BranchType = "olympiad" | "gatehouse";
+type BranchType = string;
 
 const SHEETS_TIMEOUT_MS = 12_000;
 
@@ -35,6 +35,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 function normalizeBranchType(value: unknown): BranchType {
   const v = String(value ?? "").trim().toLowerCase();
 
+  if (!v) return "olympiad";
+
   if (
     v === "gatehouse" ||
     v === "gatehouse_awards" ||
@@ -46,7 +48,7 @@ function normalizeBranchType(value: unknown): BranchType {
     return "gatehouse";
   }
 
-  return "olympiad";
+  return v;
 }
 
 function normalizeString(value: unknown) {
@@ -168,6 +170,10 @@ function formatTarget(branchType: BranchType, classLevel: string | null, targetL
     return targetLevels.length ? targetLevels.map(formatGatehouseLevel).join(", ") : "—";
   }
 
+  if (targetLevels.length > 0 && !classLevel) {
+    return targetLevels.join(", ");
+  }
+
   return classLevel ? formatClassLevel(classLevel) : "—";
 }
 
@@ -219,16 +225,6 @@ function formatStatus(isProcessed: boolean, processedAt?: string | null) {
   return "✅ Обработана";
 }
 
-/**
- * Google Sheets A:G:
- * A Номер заявки
- * B Дата и время создания
- * C Класс / уровень
- * D Типы материалов
- * E Email
- * F ФИО ученика
- * G Статус заявки
- */
 function buildSheetValues(row: any) {
   const branchType = normalizeBranchType(row?.branch_type);
   const targetLevels = toStringArray(row?.target_levels ?? row?.target_level);
@@ -238,7 +234,9 @@ function buildSheetValues(row: any) {
       ? toStringArray(row?.material_kinds).length
         ? row.material_kinds
         : row.textbook_types
-      : row?.textbook_types;
+      : row?.textbook_types?.length 
+        ? row.textbook_types 
+        : row?.material_kinds;
 
   return [
     String(row?.request_number || ""),
@@ -273,10 +271,9 @@ function normalizeRequestBody(body: any, existing: any) {
           ? existing.target_levels
           : existing?.target_level;
 
-  const target_levels =
-    branch_type === "gatehouse"
-      ? uniqueStrings(toStringArray(rawTargetLevels).map(normalizeGatehouseLevel))
-      : [];
+  const target_levels = uniqueStrings(
+    toStringArray(rawTargetLevels).map(l => branch_type === 'gatehouse' ? normalizeGatehouseLevel(l) : normalizeString(l))
+  );
 
   const rawTextbookTypes =
     body?.textbook_types !== undefined
@@ -289,10 +286,11 @@ function normalizeRequestBody(body: any, existing: any) {
             ? ["mock_test"]
             : [];
 
-  const textbook_types =
-    branch_type === "gatehouse"
-      ? uniqueStrings(toStringArray(rawTextbookTypes).map(normalizeGatehouseMaterialKind))
-      : uniqueStrings(toStringArray(rawTextbookTypes).map(normalizeOlympiadMaterialKind));
+  const textbook_types = uniqueStrings(
+    toStringArray(rawTextbookTypes).map(t =>
+      branch_type === 'gatehouse' ? normalizeGatehouseMaterialKind(t) : normalizeOlympiadMaterialKind(t)
+    )
+  );
 
   const rawMaterialKinds =
     body?.material_kinds !== undefined
@@ -301,10 +299,11 @@ function normalizeRequestBody(body: any, existing: any) {
         ? existing.material_kinds
         : textbook_types;
 
-  const material_kinds =
-    branch_type === "gatehouse"
-      ? uniqueStrings(toStringArray(rawMaterialKinds).map(normalizeGatehouseMaterialKind))
-      : uniqueStrings(toStringArray(rawMaterialKinds).map(normalizeOlympiadMaterialKind));
+  const material_kinds = uniqueStrings(
+    toStringArray(rawMaterialKinds).map(k =>
+      branch_type === 'gatehouse' ? normalizeGatehouseMaterialKind(k) : normalizeOlympiadMaterialKind(k)
+    )
+  );
 
   return {
     branch_type,
@@ -336,7 +335,7 @@ export async function POST(req: NextRequest) {
     const { data: existing, error: existingError } = await supabase
       .from("purchase_requests")
       .select(
-        "id,user_id,request_number,created_at,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,email,full_name,contact_phone,is_processed,processed_at",
+        "id,user_id,project_id,request_number,created_at,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,email,full_name,contact_phone,is_processed,processed_at",
       )
       .eq("id", id)
       .eq("user_id", user.id)
@@ -351,16 +350,16 @@ export async function POST(req: NextRequest) {
 
     const normalized = normalizeRequestBody(body, existing);
 
-    if (!normalized.textbook_types.length) {
+    if (!normalized.textbook_types.length && !normalized.material_kinds.length) {
       return fail("Выберите тип материала", 400, "VALIDATION", noStoreInit());
-    }
-
-    if (normalized.branch_type === "olympiad" && !normalized.class_level) {
-      return fail("Выберите класс", 400, "VALIDATION", noStoreInit());
     }
 
     if (normalized.branch_type === "gatehouse" && normalized.target_levels.length === 0) {
       return fail("Выберите уровень экзамена", 400, "VALIDATION", noStoreInit());
+    }
+    
+    if (normalized.branch_type !== "gatehouse" && !normalized.class_level && normalized.target_levels.length === 0) {
+      return fail("Выберите класс или уровень", 400, "VALIDATION", noStoreInit());
     }
 
     const email = normalizeString(profile?.email || user?.email || body?.email || existing.email);
@@ -373,9 +372,9 @@ export async function POST(req: NextRequest) {
 
     const payload: Record<string, any> = {
       branch_type: normalized.branch_type,
-      class_level: normalized.branch_type === "olympiad" ? normalized.class_level : null,
-      target_level: normalized.branch_type === "gatehouse" ? normalized.target_levels : null,
-      target_levels: normalized.branch_type === "gatehouse" ? normalized.target_levels : null,
+      class_level: normalized.class_level || null,
+      target_level: normalized.target_levels.length > 0 ? normalized.target_levels : null,
+      target_levels: normalized.target_levels.length > 0 ? normalized.target_levels : null,
       textbook_types: normalized.textbook_types,
       material_kinds: normalized.material_kinds,
       email,
@@ -399,12 +398,27 @@ export async function POST(req: NextRequest) {
     const row = updatedRow as any;
     const sheetValues = buildSheetValues(row);
 
+    // 🚀 ДОБАВЛЕНО: Достаем настройки листа, если заявка привязана к проекту
+    let sheetName = null;
+    if (existing.project_id) {
+      const { data: projectInfo } = await supabase
+        .from("projects")
+        .select("sheet_name")
+        .eq("id", existing.project_id)
+        .maybeSingle();
+
+      if (projectInfo?.sheet_name) {
+        sheetName = projectInfo.sheet_name;
+      }
+    }
+
     let sheetOk = true;
     let sheetRow: number | null = null;
     let sheetError: string | null = null;
 
     try {
-      const res = await withTimeout(upsertRequestRowByNumber(sheetValues), SHEETS_TIMEOUT_MS, "Sheets update");
+      // 🚀 ПЕРЕДАЕМ ИМЯ ЛИСТА
+      const res = await withTimeout(upsertRequestRowByNumber(sheetValues, sheetName), SHEETS_TIMEOUT_MS, "Sheets update");
 
       sheetRow = res.rowNumber ?? null;
 

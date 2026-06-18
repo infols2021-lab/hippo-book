@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type BranchFilter = "all" | "olympiad" | "gatehouse";
+type BranchFilter = string;
 type StatusFilter = "all" | "pending" | "processed";
 
 const REQUEST_SELECT = `
@@ -18,6 +18,7 @@ const REQUEST_SELECT = `
   created_at,
   updated_at,
   branch_type,
+  project_id,
   class_level,
   target_level,
   target_levels,
@@ -30,7 +31,8 @@ const REQUEST_SELECT = `
   processed_at,
   sheet_synced_at,
   sheet_row,
-  sheet_sync_error
+  sheet_sync_error,
+  projects(name, sheet_name)
 `;
 
 function noStoreInit(): ResponseInit {
@@ -48,6 +50,8 @@ function normalizeString(value: unknown) {
 function normalizeBranchFilter(value: unknown): BranchFilter {
   const raw = normalizeString(value).toLowerCase();
 
+  if (!raw || raw === "all") return "all";
+
   if (
     raw === "gatehouse" ||
     raw === "gatehouse_awards" ||
@@ -63,7 +67,8 @@ function normalizeBranchFilter(value: unknown): BranchFilter {
     return "olympiad";
   }
 
-  return "all";
+  // 🚀 ДОБАВЛЕНО: Поддержка новых динамических веток (Slug)
+  return raw;
 }
 
 function normalizeStatusFilter(value: unknown): StatusFilter {
@@ -136,6 +141,9 @@ function normalizeRequestRow(row: any) {
     updated_at: typeof row?.updated_at === "string" ? row.updated_at : null,
 
     branch_type: branchType,
+    project_id: typeof row?.project_id === "string" ? row.project_id : null,
+    project_name: row?.projects && typeof row.projects === 'object' && 'name' in row.projects ? String(row.projects.name) : null,
+    
     class_level: typeof row?.class_level === "string" ? row.class_level : null,
 
     target_level: toStringArray(row?.target_level),
@@ -166,6 +174,7 @@ export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
 
   const branch = normalizeBranchFilter(searchParams.get("branch_type") ?? searchParams.get("branch"));
+  const projectId = searchParams.get("project_id"); // Поддержка поиска по ID
   const status = normalizeStatusFilter(searchParams.get("status"));
   const limit = parseLimit(searchParams.get("limit"), 50);
 
@@ -177,10 +186,15 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(limit);
 
-    if (branch === "gatehouse") {
-      query = query.eq("branch_type", "gatehouse");
-    } else if (branch === "olympiad") {
-      query = query.or("branch_type.eq.olympiad,branch_type.is.null");
+    // 🚀 ДОБАВЛЕНО: Улучшенная логика фильтрации
+    if (projectId) {
+      query = query.eq("project_id", projectId);
+    } else if (branch !== "all") {
+      if (branch === "olympiad") {
+        query = query.or("branch_type.eq.olympiad,branch_type.is.null");
+      } else {
+        query = query.eq("branch_type", branch);
+      }
     }
 
     if (status === "pending") {
@@ -211,6 +225,7 @@ export async function GET(req: NextRequest) {
           : null,
         filters: {
           branch_type: branch,
+          project_id: projectId,
           status,
           limit,
         },

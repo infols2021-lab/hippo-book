@@ -44,10 +44,12 @@ function range(tab: string, address: string) {
   return `${quoteSheetName(tab)}!${address}`;
 }
 
-export function getSpreadsheetConfig() {
+// 🚀 ИЗМЕНЕНИЕ: Теперь можно передать кастомное имя листа
+export function getSpreadsheetConfig(customTabName?: string | null) {
   return {
     spreadsheetId: mustEnv("GOOGLE_SHEETS_SPREADSHEET_ID"),
-    tab: process.env.GOOGLE_SHEETS_TAB || "Учёт",
+    // Приоритет: 1. Кастомное имя из БД проекта -> 2. ENV -> 3. "Учёт" (дефолт)
+    tab: customTabName || process.env.GOOGLE_SHEETS_TAB || "Учёт",
   };
 }
 
@@ -84,7 +86,7 @@ function normalizeAccountingValues(values: AccountingRowValue[]) {
 }
 
 function isLikelyRequestNumber(value: string) {
-  return /^(PR|GA)-/i.test(norm(value));
+  return /^(PR|GA|[A-Z]{2,4})-/i.test(norm(value)); // Расширено для динамических префиксов
 }
 
 async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
@@ -111,10 +113,11 @@ async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
 
 /**
  * Append строки заявки в конец A:G.
+ * @param customTabName Имя листа из настроек проекта (опционально)
  */
-export async function appendAccountingRow(values: AccountingRowValue[]) {
+export async function appendAccountingRow(values: AccountingRowValue[], customTabName?: string | null) {
   const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
+  const { spreadsheetId, tab } = getSpreadsheetConfig(customTabName);
 
   const res = await sheets.spreadsheets.values.append(
     {
@@ -143,9 +146,9 @@ export async function appendAccountingRow(values: AccountingRowValue[]) {
 /**
  * Читает колонку A и возвращает Set request_number.
  */
-export async function getExistingRequestNumbersSet() {
+export async function getExistingRequestNumbersSet(customTabName?: string | null) {
   const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
+  const { spreadsheetId, tab } = getSpreadsheetConfig(customTabName);
 
   const res = await sheets.spreadsheets.values.get(
     {
@@ -176,9 +179,9 @@ export async function getExistingRequestNumbersSet() {
  * Мапа request_number -> { rowNumber, values[0..6] }.
  * Читает A:G и учитывает только строки, где колонка A похожа на номер заявки.
  */
-export async function getSheetRequestRowMap() {
+export async function getSheetRequestRowMap(customTabName?: string | null) {
   const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
+  const { spreadsheetId, tab } = getSpreadsheetConfig(customTabName);
 
   const res = await sheets.spreadsheets.values.get(
     {
@@ -214,13 +217,13 @@ export async function getSheetRequestRowMap() {
 /**
  * Обновить конкретную строку A:G по номеру строки.
  */
-export async function updateAccountingRow(rowNumber: number, values: AccountingRowValue[]) {
+export async function updateAccountingRow(rowNumber: number, values: AccountingRowValue[], customTabName?: string | null) {
   if (!Number.isFinite(rowNumber) || rowNumber <= 0) {
     throw new Error(`Invalid row number: ${rowNumber}`);
   }
 
   const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
+  const { spreadsheetId, tab } = getSpreadsheetConfig(customTabName);
 
   await sheets.spreadsheets.values.update(
     {
@@ -243,7 +246,7 @@ export async function updateAccountingRow(rowNumber: number, values: AccountingR
  * Удалить строки по номерам 1-based.
  * Важно: удаляем снизу вверх, иначе номера строк съедут.
  */
-export async function deleteAccountingRows(rowNumbers: number[]) {
+export async function deleteAccountingRows(rowNumbers: number[], customTabName?: string | null) {
   const nums = Array.from(new Set(rowNumbers))
     .filter((rowNumber) => Number.isFinite(rowNumber) && rowNumber > 0)
     .sort((a, b) => b - a);
@@ -253,7 +256,7 @@ export async function deleteAccountingRows(rowNumbers: number[]) {
   }
 
   const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
+  const { spreadsheetId, tab } = getSpreadsheetConfig(customTabName);
   const sheetId = await getSheetIdByTitle(spreadsheetId, tab);
 
   const requests = nums.map((rowNumber) => ({
@@ -285,11 +288,11 @@ export async function deleteAccountingRows(rowNumbers: number[]) {
 /**
  * Найти строку в Google Sheets по request_number.
  */
-export async function findRowNumberByRequestNumber(requestNumber: string) {
+export async function findRowNumberByRequestNumber(requestNumber: string, customTabName?: string | null) {
   const normalized = norm(requestNumber);
   if (!normalized) return null;
 
-  const map = await getSheetRequestRowMap();
+  const map = await getSheetRequestRowMap(customTabName);
   const found = map.get(normalized);
 
   return found?.rowNumber ?? null;
@@ -298,18 +301,18 @@ export async function findRowNumberByRequestNumber(requestNumber: string) {
 /**
  * UPSERT строки A:G по request_number из колонки A.
  */
-export async function upsertRequestRowByNumber(valuesAtoG: AccountingRowValue[]) {
+export async function upsertRequestRowByNumber(valuesAtoG: AccountingRowValue[], customTabName?: string | null) {
   const requestNumber = norm(valuesAtoG?.[0]);
 
   if (!requestNumber) {
     throw new Error("Missing request_number in values[0]");
   }
 
-  const map = await getSheetRequestRowMap();
+  const map = await getSheetRequestRowMap(customTabName);
   const found = map.get(requestNumber);
 
   if (found) {
-    await updateAccountingRow(found.rowNumber, valuesAtoG);
+    await updateAccountingRow(found.rowNumber, valuesAtoG, customTabName);
 
     return {
       action: "updated" as const,
@@ -317,7 +320,7 @@ export async function upsertRequestRowByNumber(valuesAtoG: AccountingRowValue[])
     };
   }
 
-  const appended = await appendAccountingRow(valuesAtoG);
+  const appended = await appendAccountingRow(valuesAtoG, customTabName);
 
   return {
     action: "inserted" as const,
@@ -328,8 +331,8 @@ export async function upsertRequestRowByNumber(valuesAtoG: AccountingRowValue[])
 /**
  * DELETE строки из Google Sheets по request_number.
  */
-export async function deleteRequestRowByNumber(requestNumber: string) {
-  const rowNumber = await findRowNumberByRequestNumber(requestNumber);
+export async function deleteRequestRowByNumber(requestNumber: string, customTabName?: string | null) {
+  const rowNumber = await findRowNumberByRequestNumber(requestNumber, customTabName);
 
   if (!rowNumber) {
     return {
@@ -339,7 +342,7 @@ export async function deleteRequestRowByNumber(requestNumber: string) {
     };
   }
 
-  const deleted = await deleteAccountingRows([rowNumber]);
+  const deleted = await deleteAccountingRows([rowNumber], customTabName);
 
   return {
     ok: true,

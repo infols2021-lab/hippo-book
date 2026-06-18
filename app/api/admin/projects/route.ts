@@ -20,6 +20,7 @@ type CreateProjectInput = {
   theme?: Record<string, unknown> | null;
   features?: Record<string, unknown> | null;
   ui_texts?: Record<string, unknown> | null;
+  sheet_name?: string | null; // 🚀 НОВОЕ ПОЛЕ: Лист Google Sheets
 };
 
 function isNonEmptyString(v: unknown): v is string {
@@ -67,6 +68,7 @@ export async function POST(req: Request) {
 
   const slug = (body.slug ?? "").trim().toLowerCase();
   const name = (body.name ?? "").trim();
+  const sheet_name = (body.sheet_name ?? "").trim() || null; // Нормализация имени листа
 
   if (!isNonEmptyString(slug)) {
     return fail("Поле slug обязательно", 400, "MISSING_SLUG");
@@ -93,6 +95,7 @@ export async function POST(req: Request) {
     theme: body.theme ?? {},
     features: body.features ?? {},
     ui_texts: body.ui_texts ?? {},
+    sheet_name, // 🚀 Записываем в БД
   };
 
   const { data, error } = await supabase

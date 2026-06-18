@@ -1,3 +1,4 @@
+// app/api/admin/materials/route.ts
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -11,6 +12,12 @@ function normalizeBool(value: unknown): boolean {
 function normalizeOrderIndex(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function normalizePrice(value: unknown): number {
+  const n = Number(value);
+  // Дефолтная цена 1000, если не передана или передана некорректно
+  return Number.isFinite(n) && n >= 0 ? n : 1000;
 }
 
 function normalizeNullableString(value: unknown): string | null {
@@ -32,6 +39,7 @@ function normalizePayload(body: any, userId: string) {
   const is_available = normalizeBool(body?.is_available);
   const is_active = body?.is_active === undefined ? true : normalizeBool(body?.is_active);
   const order_index = normalizeOrderIndex(body?.order_index);
+  const price = normalizePrice(body?.price); // 🚀 НОВОЕ ПОЛЕ: Парсинг цены
   const class_levels = uniqueStrings(toStringArray(body?.class_levels ?? body?.class_level));
   const target_levels = uniqueStrings(toStringArray(body?.target_levels ?? body?.target_level));
   const meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
@@ -56,6 +64,7 @@ function normalizePayload(body: any, userId: string) {
     is_available,
     is_active,
     order_index,
+    price, // 🚀 НОВОЕ ПОЛЕ: Запись в Payload для БД
     class_levels,
     target_levels,
     created_by: userId,

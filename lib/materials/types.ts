@@ -1,8 +1,10 @@
+// lib/materials/types.ts
 import type { BranchType } from "@/lib/branches/types";
 
 export type OlympiadMaterialKind = "textbook" | "crossword";
 export type GatehouseMaterialKind = "mock_test";
 
+// Поддерживаем как старые строго типизированные виды, так и новые кастомные строки (string & {})
 export type MaterialKind = OlympiadMaterialKind | GatehouseMaterialKind | (string & {});
 
 export type MaterialTargetMode = "class_level" | "target_levels";
@@ -27,6 +29,8 @@ export type MaterialDbRow = {
   created_at: string;
   updated_at: string;
   meta: Record<string, unknown>;
+  project_tab_id: string | null; // Синхронизировано со схемой БД
+  price: number; // 🚀 НОВОЕ ПОЛЕ: Цена материала (по дефолту будет 1000)
 };
 
 export type MaterialAccessDbRow = {
@@ -93,6 +97,8 @@ export type MaterialCreateInput = {
   order_index?: number;
   class_levels?: string[];
   target_levels?: string[];
+  project_tab_id?: string | null;
+  price?: number; // 🚀 НОВОЕ ПОЛЕ: Опционально при создании (бд поставит 1000)
 };
 
 export type MaterialUpdateInput = Partial<MaterialCreateInput> & {

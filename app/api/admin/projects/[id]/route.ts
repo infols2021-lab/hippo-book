@@ -18,6 +18,7 @@ type UpdateProjectInput = {
   theme?: Record<string, unknown> | null;
   features?: Record<string, unknown> | null;
   ui_texts?: Record<string, unknown> | null;
+  sheet_name?: string | null; // 🚀 НОВОЕ ПОЛЕ: Название листа Google Sheets
 };
 
 type TabInput = {
@@ -105,7 +106,7 @@ export async function PUT(
 ) {
   const guard = await requireAdmin();
   if ("response" in guard) return guard.response;
-  const { supabase, user } = guard;
+  const { supabase } = guard;
 
   const { id } = await params;
 
@@ -130,6 +131,8 @@ export async function PUT(
   if (body.theme !== undefined) patch.theme = body.theme;
   if (body.features !== undefined) patch.features = body.features;
   if (body.ui_texts !== undefined) patch.ui_texts = body.ui_texts;
+  // 🚀 ОБНОВЛЕНИЕ: Сохранение sheet_name в БД проекта
+  if (body.sheet_name !== undefined) patch.sheet_name = body.sheet_name ? body.sheet_name.trim() : null;
 
   if (Object.keys(patch).length > 0) {
     const { error: updateError } = await supabase

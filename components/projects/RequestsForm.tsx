@@ -14,6 +14,7 @@ export interface RequestFormTab {
   slug: string;
   name: string;
   icon: string | null;
+  price?: number; // цена за раздел (сумма цен материалов в этом табе)
 }
 
 interface RequestsFormProps {
@@ -35,6 +36,12 @@ export default function RequestsForm({ levels, tabs, onSuccess }: RequestsFormPr
       prev.includes(tabId) ? prev.filter(t => t !== tabId) : [...prev, tabId]
     );
   };
+
+  // Вычисляем итоговую сумму
+  const totalPrice = selectedTabs.reduce((sum, tabId) => {
+    const tab = tabs.find(t => t.id === tabId);
+    return sum + (tab?.price || 0);
+  }, 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +68,7 @@ export default function RequestsForm({ levels, tabs, onSuccess }: RequestsFormPr
       setSelectedLevel("");
       setSelectedTabs([]);
       
-      if (onSuccess) onSuccess(); // Уведомляем родителя, что нужно обновить список заявок
+      if (onSuccess) onSuccess();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -107,7 +114,7 @@ export default function RequestsForm({ levels, tabs, onSuccess }: RequestsFormPr
         </select>
       </div>
 
-      {/* ШАГ 2: ВЫБОР ТАБОВ */}
+      {/* ШАГ 2: ВЫБОР ТАБОВ С ОТОБРАЖЕНИЕМ ЦЕН */}
       <div>
         <label className="block text-sm font-extrabold text-gray-800 uppercase tracking-wide mb-3">
           2. Какие материалы открыть?
@@ -115,6 +122,9 @@ export default function RequestsForm({ levels, tabs, onSuccess }: RequestsFormPr
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {tabs.map(t => {
             const isChecked = selectedTabs.includes(t.id);
+            const price = t.price ?? 0;
+            const priceDisplay = price > 0 ? `${price} ₽` : "бесплатно";
+
             return (
               <label 
                 key={t.id} 
@@ -133,12 +143,25 @@ export default function RequestsForm({ levels, tabs, onSuccess }: RequestsFormPr
                   <div className={`font-bold ${isChecked ? 'text-gray-900' : 'text-gray-600'}`}>
                     {t.icon} {t.name}
                   </div>
+                  {price > 0 && (
+                    <div className="text-xs text-gray-500 font-medium mt-0.5">
+                      {priceDisplay}
+                    </div>
+                  )}
                 </div>
               </label>
             );
           })}
         </div>
       </div>
+
+      {/* ИТОГОВАЯ СУММА */}
+      {totalPrice > 0 && (
+        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 flex justify-between items-center">
+          <span className="font-bold text-gray-700">Итого к оплате:</span>
+          <span className="text-xl font-extrabold text-gray-900">{totalPrice} ₽</span>
+        </div>
+      )}
 
       {/* КНОПКА ОТПРАВКИ */}
       <button
