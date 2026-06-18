@@ -29,8 +29,8 @@ export type MaterialDbRow = {
   created_at: string;
   updated_at: string;
   meta: Record<string, unknown>;
-  project_tab_id: string | null; // Синхронизировано со схемой БД
-  price: number; // 🚀 НОВОЕ ПОЛЕ: Цена материала (по дефолту будет 1000)
+  project_tab_id: string | null;
+  price: number;
 };
 
 export type MaterialAccessDbRow = {
@@ -98,7 +98,7 @@ export type MaterialCreateInput = {
   class_levels?: string[];
   target_levels?: string[];
   project_tab_id?: string | null;
-  price?: number; // 🚀 НОВОЕ ПОЛЕ: Опционально при создании (бд поставит 1000)
+  price?: number;
 };
 
 export type MaterialUpdateInput = Partial<MaterialCreateInput> & {
@@ -107,8 +107,9 @@ export type MaterialUpdateInput = Partial<MaterialCreateInput> & {
 
 export type PurchaseRequestMaterialKind = MaterialKind;
 
+// ✅ Исправлено: branch_type теперь string, чтобы поддерживать динамические ветки
 export type PurchaseRequestTarget = {
-  branch_type: BranchType;
+  branch_type: string;
   material_kinds: PurchaseRequestMaterialKind[];
   class_level: string | null;
   target_levels: string[];

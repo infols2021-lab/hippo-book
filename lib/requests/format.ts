@@ -1,3 +1,4 @@
+// lib/requests/format.ts
 import { getBranchConfig, getBranchLabel, normalizeBranchType } from "@/lib/branches/config";
 import type { BranchType } from "@/lib/branches/types";
 import {
@@ -60,7 +61,8 @@ export function getRequestStatusClassName(request: PurchaseRequestLike): string 
   return request.is_processed ? "status-processed" : "status-pending";
 }
 
-export function getRequestBranchType(request: PurchaseRequestLike): BranchType {
+// ✅ Исправлено: возвращаем string (может быть "olympiad", "gatehouse" или динамический slug)
+export function getRequestBranchType(request: PurchaseRequestLike): string {
   return normalizeBranchType(request.branch_type);
 }
 
@@ -76,7 +78,9 @@ export function getRequestMaterialKinds(request: PurchaseRequestLike): MaterialK
   if (legacyKinds.length) return legacyKinds;
 
   const branch = getRequestBranchType(request);
-  return getBranchConfig(branch).requests.defaultMaterialKinds;
+  const config = getBranchConfig(branch);
+  // ✅ Исправлено: проверка на null с fallback
+  return config?.requests.defaultMaterialKinds ?? [];
 }
 
 export function formatRequestMaterialKinds(request: PurchaseRequestLike): string {
