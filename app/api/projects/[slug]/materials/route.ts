@@ -1,73 +1,87 @@
 // app/api/projects/[slug]/materials/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/api/auth";
+import { getProjectBySlug } from "@/lib/projects/loader";
+import { loadProjectMaterialsData } from "@/lib/data/materials";
+import type { MaterialWithProgress } from "@/lib/materials/types";
+
+function toPublicMaterialDTO(material: MaterialWithProgress) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { created_by, updated_at, meta, is_active, ...rest } = material;
+  return {
+    ...rest,
+    id: material.id,
+    title: material.title,
+    description: material.description,
+    cover_image_url: material.cover_image_url,
+    branch_type: material.branch_type,
+    material_kind: material.material_kind,
+    target_levels: material.target_levels,
+    class_levels: material.class_levels,
+    order_index: material.order_index,
+    price: material.price,
+    is_available: material.is_available,
+    hasAccess: material.hasAccess,
+    progress: material.progress,
+    totalAssignments: material.totalAssignments,
+    completedAssignments: material.completedAssignments,
+    project_tab_id: material.project_tab_id,
+  };
+}
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
-  const supabase = await createSupabaseServerClient();
+  // 1. Авторизация (получаем полный контекст)
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
+  const { supabase, user, profile } = auth;
   const { slug } = await ctx.params;
   const { searchParams } = req.nextUrl;
-  
-  const tabSlug = searchParams.get("tab"); // e.g. 'textbooks' или 'mock-tests'
-  const levelCode = searchParams.get("level"); // e.g. 'hippo-1'
 
-  try {
-    // 1. Проверяем существование и доступность проекта по slug
-    const { data: project, error: projError } = await supabase
-      .from("projects")
-      .select("id, is_active") // ❗️ ИСПРАВЛЕНО: в БД поле is_active, а не is_available
-      .eq("slug", slug)
-      .single();
+  const tabSlug = searchParams.get("tab");
+  const levelCode = searchParams.get("level");
 
-    if (projError || !project) return fail("Проект не найден", 404, "NOT_FOUND");
-    if (!project.is_active) return fail("Ветка временно недоступна", 403, "FORBIDDEN");
-
-    // 2. Если передан slug таба — находим его ID
-    let tabId: string | null = null;
-    if (tabSlug) {
-      const { data: tab } = await supabase
-        .from("project_tabs")
-        .select("id")
-        .eq("project_id", project.id)
-        .eq("slug", tabSlug)
-        .single();
-        
-      // Если фронт запросил несуществующий таб, отдаем пустой массив
-      if (!tab) return ok({ materials: [] });
-      tabId = tab.id;
-    }
-
-    // 3. Собираем запрос к материалам
-    // ❗️ ИСПРАВЛЕНО: в project_tabs поле title, а не name.
-    let query = supabase
-      .from("materials")
-      .select(`
-        *,
-        project_tabs ( id, title, slug, icon )
-      `)
-      // ❗️ ИСПРАВЛЕНО: В materials связь с проектом идет через branch_type === slug
-      .eq("branch_type", slug)
-      .eq("is_active", true)
-      .order("order_index", { ascending: true }) // Порядок как в админке
-      .order("created_at", { ascending: false });
-
-    // Фильтр по табу
-    if (tabId) {
-      // ❗️ ИСПРАВЛЕНО: колонка в БД называется project_tab_id, а не tab_id
-      query = query.eq("project_tab_id", tabId);
-    }
-
-    // Фильтр по уровню: Supabase поддерживает оператор contains для массивов
-    if (levelCode) {
-      query = query.contains("target_levels", [levelCode]);
-    }
-
-    const { data: materials, error: matError } = await query;
-
-    if (matError) return fail(matError.message, 500, "DB_ERROR");
-
-    return ok({ materials: materials ?? [] });
-  } catch (e: any) {
-    return fail(e?.message || "Внутренняя ошибка сервера", 500, "SERVER_ERROR");
+  // 2. Получение конфига проекта
+  const project = await getProjectBySlug(slug);
+  if (!project) {
+    return fail("Проект не найден или неактивен", 404, "NOT_FOUND");
   }
+
+  // 3. Если таб не указан или не существует — возвращаем пустой список
+  if (!tabSlug) {
+    return ok({ materials: [] });
+  }
+
+  const tabExists = project.tabs.some((t) => t.slug === tabSlug && t.isActive);
+  if (!tabExists) {
+    return ok({ materials: [] });
+  }
+
+  // 4. Загрузка материалов через унифицированный слой
+  const result = await loadProjectMaterialsData(
+    { supabase, user, profile },
+    slug,
+    tabSlug,
+  );
+
+  if (result.error) {
+    console.error("Ошибка загрузки материалов:", result.error);
+    return fail(result.error, 500, "DB_ERROR");
+  }
+
+  let materials = result.materials;
+
+  // 5. Дополнительная фильтрация по уровню
+  if (levelCode) {
+    materials = materials.filter((m) =>
+      (m.target_levels ?? []).includes(levelCode) ||
+      (m.class_levels ?? []).includes(levelCode),
+    );
+  }
+
+  // 6. Преобразование в публичный DTO
+  const dto = materials.map(toPublicMaterialDTO);
+
+  return ok({ materials: dto });
 }

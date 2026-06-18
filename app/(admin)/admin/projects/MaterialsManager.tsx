@@ -64,20 +64,49 @@ export default function MaterialsManager() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const isEdit = !!editingMaterial.id;
-    const url = isEdit ? `/api/admin/projects/${selectedProjectId}/materials/${editingMaterial.id}` : `/api/admin/projects/${selectedProjectId}/materials`;
+    const url = isEdit 
+      ? `/api/admin/projects/${selectedProjectId}/materials/${editingMaterial.id}` 
+      : `/api/admin/projects/${selectedProjectId}/materials`;
     
+    // ✅ Формируем payload с правильными полями
+    const payload = {
+      // Обязательные поля
+      title: editingMaterial.title?.trim() || "",
+      project_tab_id: selectedTabId,
+      
+      // Опциональные с нормализацией
+      description: editingMaterial.description?.trim() || null,
+      cover_image_url: editingMaterial.cover_image_url?.trim() || null,
+      
+      // ⚡️ Важно: передаём branch_type и material_kind (берём из editingMaterial, если есть, иначе дефолты)
+      branch_type: editingMaterial.branch_type || "olympiad",
+      material_kind: editingMaterial.material_kind || "mock_test",
+      
+      // Уровни
+      target_levels: Array.isArray(editingMaterial.target_levels) ? editingMaterial.target_levels : [],
+      class_levels: Array.isArray(editingMaterial.class_levels) 
+        ? editingMaterial.class_levels 
+        : (Array.isArray(editingMaterial.target_levels) ? editingMaterial.target_levels : []),
+      
+      // Числовые поля
+      order_index: Number.isFinite(Number(editingMaterial.order_index)) ? Number(editingMaterial.order_index) : 0,
+      price: Number.isFinite(Number(editingMaterial.price)) ? Number(editingMaterial.price) : 1000,
+      
+      // Булевы
+      is_available: Boolean(editingMaterial.is_available),
+      is_active: editingMaterial.is_active !== undefined ? Boolean(editingMaterial.is_active) : true,
+    };
+
     try {
       const res = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        // Обязательно передаем project_tab_id
-        body: JSON.stringify({ ...editingMaterial, project_tab_id: selectedTabId }),
+        body: JSON.stringify(payload),
       });
       
-      // ИСПРАВЛЕНО: Читаем текст ошибки с бэкенда
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Ошибка сохранения материала в БД");
+        throw new Error(errorData.error || `Ошибка HTTP ${res.status}`);
       }
       
       setEditingMaterial(null);
@@ -101,7 +130,6 @@ export default function MaterialsManager() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      // ИСПРАВЛЕНО: Бакет 'covers' существует в Supabase (в отличие от materials)
       formData.append("bucket", "covers"); 
       formData.append("folder", "materials");
 
@@ -140,7 +168,18 @@ export default function MaterialsManager() {
 
         <button
           disabled={!selectedTabId}
-          onClick={() => setEditingMaterial({ title: "", description: "", cover_image_url: "", target_levels: [], price: 1000, is_active: true, is_available: false, order_index: 0 })}
+          onClick={() => setEditingMaterial({ 
+            title: "", 
+            description: "", 
+            cover_image_url: "", 
+            target_levels: [], 
+            price: 1000, 
+            is_active: true, 
+            is_available: false, 
+            order_index: 0,
+            branch_type: "olympiad",    // 👈 явно задаём дефолт
+            material_kind: "mock_test", // 👈 явно задаём дефолт
+          })}
           className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed"
         >
           + Создать материал
@@ -157,7 +196,7 @@ export default function MaterialsManager() {
               <input required type="text" className="w-full border-2 rounded-xl px-4 py-2" value={editingMaterial.title} onChange={e => setEditingMaterial({...editingMaterial, title: e.target.value})} />
             </div>
 
-            {/* 🚀 НОВОЕ ПОЛЕ: Цена */}
+            {/* Поле Цена */}
             <div>
               <label className="block text-sm font-bold mb-1">Стоимость (₽)</label>
               <input 
@@ -176,7 +215,6 @@ export default function MaterialsManager() {
                 <div className="flex gap-2">
                   <input type="text" className="flex-1 border-2 rounded-xl px-4 py-2" placeholder="URL картинки..." value={editingMaterial.cover_image_url || ""} onChange={e => setEditingMaterial({...editingMaterial, cover_image_url: e.target.value})} />
                   
-                  {/* ИНТЕГРИРОВАННАЯ ЗАГРУЗКА */}
                   <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) void onPickCover(file);
@@ -229,7 +267,6 @@ export default function MaterialsManager() {
         </form>
       )}
 
-      {/* ИСПРАВЛЕНО: Список материалов теперь показывается всегда, когда выбран таб (даже если он пустой) */}
       {!editingMaterial && selectedProjectId && selectedTabId && (
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden mt-6">
           <table className="w-full text-left">

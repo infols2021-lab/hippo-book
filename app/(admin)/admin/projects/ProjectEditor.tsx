@@ -29,7 +29,7 @@ function LivePreview({ colors }: { colors: Record<string, string> }) {
   const bg = colors.pageBg || "#f8fafc";
   const cardBg = colors.cardBg || "#ffffff";
   const text = colors.textColor || "#0f172a";
-  const muted = "#64748b"; // fallback
+  const muted = "#64748b";
 
   return (
     <div
@@ -503,7 +503,7 @@ export default function ProjectEditor({
     name: project?.name || "",
     slug: project?.slug || "",
     description: project?.description || "",
-    sheet_name: project?.sheet_name || "", // 🚀 НОВОЕ ПОЛЕ: Название листа в Google Таблице
+    sheet_name: project?.sheet_name || "",
     is_active: project?.is_active ?? true,
     theme: {
       ...project?.theme,
@@ -526,7 +526,7 @@ export default function ProjectEditor({
       leaderboard: project?.features?.leaderboard || project?.features?.hasLeaderboard || false,
       avatars: project?.features?.avatars || project?.features?.hasAvatars || false,
       profileProgress: project?.features?.profileProgress || false,
-      requestMode: project?.features?.requestMode || false,
+      requestMode: project?.features?.requestMode || "target_levels",
       hasStreaks: project?.features?.streaks || project?.features?.hasStreaks || false,
       hasTitles: project?.features?.titles || project?.features?.hasTitles || false,
       hasLeaderboard: project?.features?.leaderboard || project?.features?.hasLeaderboard || false,
@@ -676,6 +676,17 @@ export default function ProjectEditor({
     });
   };
 
+  // Обработчик изменения requestMode
+  const handleRequestModeChange = (mode: "class_level" | "target_levels") => {
+    setFormData((prev) => ({
+      ...prev,
+      features: {
+        ...prev.features,
+        requestMode: mode,
+      },
+    }));
+  };
+
   const handleThemeChange = (
     colorKey: "primary" | "secondary" | "pageBg" | "cardBg" | "textColor",
     colorValue: string
@@ -764,6 +775,18 @@ export default function ProjectEditor({
               placeholder="Лучшие материалы для изучения..."
             />
           </div>
+          {/* ✅ Фаза 2: переключатель is_active */}
+          <div className="col-span-1 md:col-span-3">
+            <label className="flex items-center gap-3 cursor-pointer p-4 bg-gray-50 rounded-xl border">
+              <input
+                type="checkbox"
+                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                checked={formData.is_active}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+              />
+              <span className="font-bold text-gray-800">Проект активен (виден на портале)</span>
+            </label>
+          </div>
         </div>
 
         {/* ДИЗАЙН СИСТЕМА И ЖИВОЕ ПРЕВЬЮ */}
@@ -803,7 +826,6 @@ export default function ProjectEditor({
             <p className="text-sm text-gray-500 mb-4">
               Так будет выглядеть интерфейс для ученика.
             </p>
-            {/* Заменяем примитивное превью на детальное */}
             <LivePreview colors={formData.theme.colors} />
           </div>
         </div>
@@ -844,6 +866,37 @@ export default function ProjectEditor({
               />
               <span className="font-bold text-gray-800">🏆 Лидерборд</span>
             </label>
+          </div>
+
+          {/* ✅ Фаза 2: переключатель requestMode */}
+          <div className="mt-6 pt-4 border-t border-blue-200/50">
+            <div className="text-sm font-bold text-gray-800 mb-3">Режим выбора уровня в заявках:</div>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 cursor-pointer bg-white p-3 rounded-xl border shadow-sm hover:shadow transition-all">
+                <input
+                  type="radio"
+                  name="requestMode"
+                  value="class_level"
+                  checked={formData.features.requestMode === "class_level"}
+                  onChange={() => handleRequestModeChange("class_level")}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="font-bold text-gray-800">📚 Класс (одиночный)</span>
+                <span className="text-xs text-gray-500">(как в Олимпиаде)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer bg-white p-3 rounded-xl border shadow-sm hover:shadow transition-all">
+                <input
+                  type="radio"
+                  name="requestMode"
+                  value="target_levels"
+                  checked={formData.features.requestMode === "target_levels"}
+                  onChange={() => handleRequestModeChange("target_levels")}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="font-bold text-gray-800">🎯 Уровни (массив)</span>
+                <span className="text-xs text-gray-500">(как в Gatehouse)</span>
+              </label>
+            </div>
           </div>
         </div>
 

@@ -1,3 +1,4 @@
+// middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware";
@@ -12,9 +13,10 @@ const PROTECTED_PREFIXES = [
   "/gatehouse",
   "/requests",
   "/admin",
+  "/projects", // ✅ Фаза 0 — защита динамических страниц веток
 ];
 
-export async function proxy(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const supabase = createSupabaseMiddlewareClient(req, res);
   const { data: { user } } = await supabase.auth.getUser();

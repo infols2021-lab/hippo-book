@@ -1,14 +1,33 @@
-/* app/api/requests/create/route.ts */
+// app/api/requests/create/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
 import { appendAccountingRow } from "@/lib/integrations/googleSheets";
+import {
+  normalizeBranchType,
+  normalizeString,
+  toStringArray,
+  uniqueStrings,
+  normalizeGatehouseLevel,
+  normalizeMaterialKind,
+} from "@/lib/materials/normalize";
+import {
+  // formatClassLevel,       // ❌ не используется
+  // formatGatehouseLevel,   // ❌ не используется
+  formatTargetForSheet,
+  formatMaterialTypesForSheet,
+  formatRequestStatus,
+  formatDateTimeRU,
+  buildSheetValues,
+  generateRequestNumber,
+  validateRequest,
+  normalizeRequestPayload,
+  normalizeGatehouseMaterialKind,
+} from "@/lib/requests/normalize";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-type BranchType = string;
 
 const SHEETS_TIMEOUT_MS = 12_000;
 
@@ -22,231 +41,12 @@ function noStoreInit(): ResponseInit {
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
   });
-
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);
   });
-}
-
-function normalizeBranchType(value: unknown): BranchType {
-  const v = String(value ?? "").trim().toLowerCase();
-  
-  if (!v) return "olympiad";
-
-  if (
-    v === "gatehouse" ||
-    v === "gatehouse_awards" ||
-    v === "ga" ||
-    v === "ga_exam" ||
-    v === "exam" ||
-    v === "exams"
-  ) {
-    return "gatehouse";
-  }
-
-  return v;
-}
-
-function normalizeString(value: unknown) {
-  return String(value ?? "").trim();
-}
-
-function toStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeString(item)).filter(Boolean);
-  }
-
-  if (typeof value === "string") {
-    const text = value.trim();
-
-    if (!text) return [];
-
-    if (text.startsWith("[") && text.endsWith("]")) {
-      try {
-        return toStringArray(JSON.parse(text));
-      } catch {
-        return [];
-      }
-    }
-
-    return text
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
-  const single = normalizeString(value);
-  return single ? [single] : [];
-}
-
-function uniqueStrings(values: string[]) {
-  return Array.from(new Set(values.map((value) => normalizeString(value)).filter(Boolean)));
-}
-
-function normalizeGatehouseLevel(value: unknown) {
-  const raw = normalizeString(value);
-  const v = raw.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-
-  if (v === "stage 1" || v === "stage1") return "stage_1";
-  if (v === "stage 2" || v === "stage2") return "stage_2";
-  if (v === "stage 3" || v === "stage3") return "stage_3";
-
-  if (v === "a1") return "a1";
-  if (v === "a2") return "a2";
-  if (v === "b1") return "b1";
-  if (v === "b2") return "b2";
-  if (v === "c1") return "c1";
-  if (v === "c2") return "c2";
-
-  return v || raw;
-}
-
-function formatGatehouseLevel(value: unknown) {
-  const v = normalizeGatehouseLevel(value);
-
-  const map: Record<string, string> = {
-    stage_1: "Stage 1",
-    stage_2: "Stage 2",
-    stage_3: "Stage 3",
-    a1: "A1",
-    a2: "A2",
-    b1: "B1",
-    b2: "B2",
-    c1: "C1",
-    c2: "C2",
-  };
-
-  return map[v] || normalizeString(value) || v;
-}
-
-function normalizeGatehouseMaterialKind(value: unknown) {
-  const v = normalizeString(value).toLowerCase();
-
-  if (
-    v === "mock_test" ||
-    v === "mock_tests" ||
-    v === "mock-test" ||
-    v === "mock test" ||
-    v === "мок-тест" ||
-    v === "мок тест" ||
-    v === "пробный тест" ||
-    v === "пробные тесты"
-  ) {
-    return "mock_test";
-  }
-
-  return v;
-}
-
-function normalizeOlympiadMaterialKind(value: unknown) {
-  const v = normalizeString(value).toLowerCase();
-
-  if (v === "учебник" || v === "textbook") return "textbook";
-  if (v === "кроссворд" || v === "crossword") return "crossword";
-
-  return v;
-}
-
-function formatClassLevel(classLevel: string) {
-  const classMap: Record<string, string> = {
-    "1-2": "1-2 класс",
-    "3-4": "3-4 класс",
-    "5-6": "5-6 класс",
-    "7": "7 класс",
-    "8-9": "8-9 класс",
-    "10-11": "10-11 класс (Техникум, колледж - 1й курс)",
-    "12": "12 класс (Техникум, college)",
-  };
-
-  return classMap[classLevel] || classLevel;
-}
-
-function formatTarget(branchType: BranchType, classLevel: string | null, targetLevels: string[]) {
-  if (branchType === "gatehouse") {
-    return targetLevels.length ? targetLevels.map(formatGatehouseLevel).join(", ") : "—";
-  }
-
-  if (targetLevels.length > 0 && !classLevel) {
-    return targetLevels.join(", ");
-  }
-
-  return classLevel ? formatClassLevel(classLevel) : "—";
-}
-
-function formatMaterialTypes(branchType: BranchType, types: unknown) {
-  const arr = toStringArray(types);
-
-  if (branchType === "gatehouse") {
-    const typeMap: Record<string, string> = {
-      mock_test: "📝 Пробные тесты",
-      mock_tests: "📝 Пробные тесты",
-      "mock-test": "📝 Пробные тесты",
-      "mock test": "📝 Пробные тесты",
-      "мок-тест": "📝 Пробные тесты",
-      "мок тест": "📝 Пробные тесты",
-      "пробный тест": "📝 Пробные тесты",
-      "пробные тесты": "📝 Пробные тесты",
-    };
-
-    return arr.map((type) => typeMap[String(type).toLowerCase()] || String(type)).join(", ");
-  }
-
-  const typeMap: Record<string, string> = {
-    учебник: "📚 Учебник",
-    кроссворд: "🧩 Кроссворд",
-    textbook: "📚 Учебник",
-    crossword: "🧩 Кроссворд",
-  };
-
-  return arr.map((type) => typeMap[String(type).toLowerCase()] || String(type)).join(", ");
-}
-
-function formatDateTimeRU(dateString: string) {
-  const d = new Date(dateString);
-  if (Number.isNaN(d.getTime())) return "—";
-
-  return d.toLocaleString("ru-RU", {
-    timeZone: "Europe/Moscow",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatStatus(isProcessed: boolean, processedAt?: string | null) {
-  if (!isProcessed) return "⏳ Ожидает";
-  if (processedAt) return `✅ Обработана · ${formatDateTimeRU(processedAt)}`;
-  return "✅ Обработана";
-}
-
-function buildSheetValues(row: any) {
-  const branchType = normalizeBranchType(row?.branch_type);
-  const targetLevels = toStringArray(row?.target_levels ?? row?.target_level);
-
-  const materialTypes =
-    branchType === "gatehouse"
-      ? toStringArray(row?.material_kinds).length
-        ? row.material_kinds
-        : row.textbook_types
-      : row?.textbook_types?.length 
-        ? row.textbook_types 
-        : row?.material_kinds;
-
-  return [
-    String(row?.request_number || ""),
-    formatDateTimeRU(String(row?.created_at || "")),
-    formatTarget(branchType, row?.class_level ? String(row.class_level) : null, targetLevels),
-    formatMaterialTypes(branchType, materialTypes),
-    String(row?.email || ""),
-    String(row?.full_name || ""),
-    formatStatus(Boolean(row?.is_processed), row?.processed_at ?? null),
-  ];
 }
 
 async function safeJson(req: NextRequest) {
@@ -257,13 +57,13 @@ async function safeJson(req: NextRequest) {
   }
 }
 
-function createFallbackRequestNumber(branchType: BranchType) {
+function createFallbackRequestNumber(branchType: string): string {
   const d = new Date();
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  
+
   let prefix = "PR";
   if (branchType === "gatehouse") prefix = "GA";
   else if (branchType !== "olympiad") prefix = branchType.substring(0, 2).toUpperCase();
@@ -271,7 +71,7 @@ function createFallbackRequestNumber(branchType: BranchType) {
   return `${prefix}-${yyyy}${mm}${dd}-${random}`;
 }
 
-async function resolveRequestNumber(supabase: any, rawValue: unknown, branchType: BranchType) {
+async function resolveRequestNumber(supabase: any, rawValue: unknown, branchType: string): Promise<string> {
   const provided = normalizeString(rawValue);
   if (provided) return provided;
 
@@ -280,7 +80,6 @@ async function resolveRequestNumber(supabase: any, rawValue: unknown, branchType
   }
 
   const { data, error } = await supabase.rpc("generate_request_number");
-
   if (!error && data) {
     return String(data);
   }
@@ -300,7 +99,9 @@ function normalizeRequestBody(body: any) {
         : [];
 
   const target_levels = uniqueStrings(
-    toStringArray(rawTargetLevels).map(l => branch_type === 'gatehouse' ? normalizeGatehouseLevel(l) : normalizeString(l))
+    toStringArray(rawTargetLevels).map((l) =>
+      branch_type === "gatehouse" ? normalizeGatehouseLevel(l) : normalizeString(l)
+    )
   );
 
   const rawTextbookTypes =
@@ -313,19 +114,17 @@ function normalizeRequestBody(body: any) {
           : [];
 
   const textbook_types = uniqueStrings(
-    toStringArray(rawTextbookTypes).map(t =>
-      branch_type === 'gatehouse' ? normalizeGatehouseMaterialKind(t) : normalizeOlympiadMaterialKind(t)
+    toStringArray(rawTextbookTypes).map((t) =>
+      branch_type === "gatehouse" ? normalizeGatehouseMaterialKind(t) : normalizeMaterialKind(t)
     )
   );
 
   const rawMaterialKinds =
-    body?.material_kinds !== undefined
-      ? body.material_kinds
-      : textbook_types;
+    body?.material_kinds !== undefined ? body.material_kinds : textbook_types;
 
   const material_kinds = uniqueStrings(
-    toStringArray(rawMaterialKinds).map(k =>
-      branch_type === 'gatehouse' ? normalizeGatehouseMaterialKind(k) : normalizeOlympiadMaterialKind(k)
+    toStringArray(rawMaterialKinds).map((k) =>
+      branch_type === "gatehouse" ? normalizeGatehouseMaterialKind(k) : normalizeMaterialKind(k)
     )
   );
 
@@ -351,30 +150,29 @@ export async function POST(req: NextRequest) {
 
   const normalized = normalizeRequestBody(body);
 
-  if (!normalized.textbook_types.length && !normalized.material_kinds.length) {
-    return fail("Выберите тип материала", 400, "VALIDATION", noStoreInit());
-  }
+  const validation = validateRequest({
+    branch_type: normalized.branch_type,
+    class_level: normalized.class_level,
+    target_levels: normalized.target_levels,
+    textbook_types: normalized.textbook_types,
+    material_kinds: normalized.material_kinds,
+    email: normalizeString(profile?.email || user?.email || body?.email),
+    full_name: normalizeString(profile?.full_name || body?.full_name),
+    contact_phone: normalizeString(profile?.contact_phone || body?.contact_phone),
+    is_processed: false,
+  });
 
-  if (normalized.branch_type === "gatehouse" && normalized.target_levels.length === 0) {
-    return fail("Выберите уровень экзамена", 400, "VALIDATION", noStoreInit());
-  }
-  
-  if (normalized.branch_type !== "gatehouse" && !normalized.class_level && normalized.target_levels.length === 0) {
-    return fail("Выберите класс или уровень", 400, "VALIDATION", noStoreInit());
+  if (!validation.valid) {
+    return fail(validation.error || "Неверные данные заявки", 400, "VALIDATION", noStoreInit());
   }
 
   const email = normalizeString(profile?.email || user?.email || body?.email);
   const full_name = normalizeString(profile?.full_name || body?.full_name);
   const contact_phone = normalizeString(profile?.contact_phone || body?.contact_phone);
 
-  if (!email || !full_name) {
-    return fail("Missing profile data (email/full_name)", 400, "PROFILE_MISSING", noStoreInit());
-  }
-
   try {
     const request_number = await resolveRequestNumber(supabase, body?.request_number, normalized.branch_type);
 
-    // 🚀 ДОБАВЛЕНО: Достаем настройки проекта (sheet_name и ID) для новой заявки
     let projectId = null;
     let sheetName = null;
 
@@ -395,7 +193,7 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       request_number,
       branch_type: normalized.branch_type,
-      project_id: projectId, // Записываем ID проекта, если нашли
+      project_id: projectId,
       class_level: normalized.class_level || null,
       target_level: normalized.target_levels.length > 0 ? normalized.target_levels : null,
       target_levels: normalized.target_levels.length > 0 ? normalized.target_levels : null,
@@ -422,15 +220,29 @@ export async function POST(req: NextRequest) {
     }
 
     const row = insertedRow as any;
-    const sheetValues = buildSheetValues(row);
+    const sheetValues = buildSheetValues(
+      row.request_number || "",
+      row.created_at || "",
+      normalizeBranchType(row.branch_type),
+      row.class_level,
+      toStringArray(row.target_levels).length ? toStringArray(row.target_levels) : toStringArray(row.target_level),
+      toStringArray(row.material_kinds).length ? toStringArray(row.material_kinds) : toStringArray(row.textbook_types),
+      row.email || "",
+      row.full_name || "",
+      Boolean(row.is_processed),
+      row.processed_at ?? null,
+    );
 
     let sheetOk = true;
     let sheetRow: number | null = null;
     let sheetError: string | null = null;
 
     try {
-      // 🚀 ПЕРЕДАЕМ ИМЯ ЛИСТА В УТИЛИТУ (Второе поле функции)
-      const res = await withTimeout(appendAccountingRow(sheetValues, sheetName), SHEETS_TIMEOUT_MS, "Sheets append");
+      const res = await withTimeout(
+        appendAccountingRow(sheetValues, sheetName),
+        SHEETS_TIMEOUT_MS,
+        "Sheets append"
+      );
       sheetRow = res.rowNumber ?? null;
 
       await supabase
@@ -450,7 +262,6 @@ export async function POST(req: NextRequest) {
         .from("purchase_requests")
         .update({
           sheet_synced_at: null,
-          sheet_row: null,
           sheet_sync_error: sheetError,
         })
         .eq("id", row.id)
@@ -466,7 +277,7 @@ export async function POST(req: NextRequest) {
           error: sheetError,
         },
       },
-      noStoreInit(),
+      noStoreInit()
     );
   } catch (e: any) {
     return fail(e?.message || "Server error", 500, "SERVER_ERROR", noStoreInit());

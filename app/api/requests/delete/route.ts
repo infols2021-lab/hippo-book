@@ -1,8 +1,9 @@
-/* app/api/requests/delete/route.ts */
+// app/api/requests/delete/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
 import { deleteRequestRowByNumber } from "@/lib/integrations/googleSheets";
+import { normalizeString } from "@/lib/materials/normalize"; // заменили локальную
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,18 +21,12 @@ function noStoreInit(): ResponseInit {
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
   });
-
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);
   });
-}
-
-function normalizeString(value: unknown) {
-  return String(value ?? "").trim();
 }
 
 async function safeJson(req: NextRequest) {
@@ -61,7 +56,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 🚀 ДОБАВЛЕНО: Извлекаем project_id, чтобы узнать лист Google Таблицы
     const { data: existing, error: existingError } = await supabase
       .from("purchase_requests")
       .select("id,user_id,request_number,is_processed,project_id")
@@ -105,11 +99,10 @@ export async function POST(req: NextRequest) {
             error: "Request number is empty, sheet row was not deleted",
           },
         },
-        noStoreInit(),
+        noStoreInit()
       );
     }
 
-    // 🚀 ДОБАВЛЕНО: Получаем имя листа для проекта
     let sheetName = null;
     if (existing.project_id) {
       const { data: project } = await supabase
@@ -117,18 +110,17 @@ export async function POST(req: NextRequest) {
         .select("sheet_name")
         .eq("id", existing.project_id)
         .maybeSingle();
-      
+
       if (project?.sheet_name) {
         sheetName = project.sheet_name;
       }
     }
 
     try {
-      // 🚀 ПЕРЕДАЕМ sheetName В ФУНКЦИЮ УДАЛЕНИЯ
       const sheet = await withTimeout(
         deleteRequestRowByNumber(requestNumber, sheetName),
         SHEETS_TIMEOUT_MS,
-        "Sheets delete",
+        "Sheets delete"
       );
 
       return ok(
@@ -141,7 +133,7 @@ export async function POST(req: NextRequest) {
             row: sheet.rowNumber,
           },
         },
-        noStoreInit(),
+        noStoreInit()
       );
     } catch (e: any) {
       return ok(
@@ -155,7 +147,7 @@ export async function POST(req: NextRequest) {
             error: String(e?.message || e || "Sheets delete error").slice(0, 500),
           },
         },
-        noStoreInit(),
+        noStoreInit()
       );
     }
   } catch (e: any) {

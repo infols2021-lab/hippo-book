@@ -1,4 +1,4 @@
-/* app/api/admin/requests/sync-sheet/route.ts */
+// app/api/admin/requests/sync-sheet/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -8,12 +8,19 @@ import {
   getSheetRequestRowMap,
   updateAccountingRow,
 } from "@/lib/integrations/googleSheets";
+import {
+  normalizeBranchType,
+  toArr,
+  formatDateTimeRU,
+  formatTargetForSheet,
+  formatMaterialTypesForSheet,
+  formatRequestStatus,
+  buildSheetValues,
+} from "@/lib/requests/normalize";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-type BranchType = string;
 
 function noStoreInit(): ResponseInit {
   return {
@@ -23,225 +30,17 @@ function noStoreInit(): ResponseInit {
   };
 }
 
-function normalizeBranchType(value: unknown): BranchType {
-  const v = String(value ?? "").trim().toLowerCase();
-
-  if (!v) return "olympiad";
-
-  if (
-    v === "gatehouse" ||
-    v === "ga" ||
-    v === "ga_exam" ||
-    v === "exam" ||
-    v === "exams" ||
-    v === "gatehouse_awards"
-  ) {
-    return "gatehouse";
-  }
-
-  return v;
-}
-
 function norm(v: any) {
   return String(v ?? "").trim();
 }
 
-function toArr(v: any): string[] {
-  if (!v) return [];
-
-  if (Array.isArray(v)) {
-    return v.map(String).map((x) => x.trim()).filter(Boolean);
-  }
-
-  if (typeof v === "string") {
-    const text = v.trim();
-
-    if (!text) return [];
-
-    if (text.startsWith("[") && text.endsWith("]")) {
-      try {
-        return toArr(JSON.parse(text));
-      } catch {
-        return [];
-      }
-    }
-
-    return text
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean);
-  }
-
-  return [String(v).trim()].filter(Boolean);
-}
-
-function formatClassLevel(classLevel: string) {
-  const classMap: Record<string, string> = {
-    "1-2": "1-2 класс",
-    "3-4": "3-4 класс",
-    "5-6": "5-6 класс",
-    "7": "7 класс",
-    "8-9": "8-9 класс",
-    "10-11": "10-11 класс (Техникум, колледж - 1й курс)",
-    "12": "12 класс (Техникум, колледж)",
-  };
-
-  return classMap[classLevel] || classLevel;
-}
-
-function normalizeGatehouseLevel(value: unknown) {
-  const raw = norm(value);
-  const v = raw.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-
-  if (v === "stage 1" || v === "stage1") return "stage_1";
-  if (v === "stage 2" || v === "stage2") return "stage_2";
-  if (v === "stage 3" || v === "stage3") return "stage_3";
-
-  if (v === "a1") return "a1";
-  if (v === "a2") return "a2";
-  if (v === "b1") return "b1";
-  if (v === "b2") return "b2";
-  if (v === "c1") return "c1";
-  if (v === "c2") return "c2";
-
-  return v || raw;
-}
-
-function formatGatehouseLevel(value: unknown) {
-  const v = normalizeGatehouseLevel(value);
-
-  const map: Record<string, string> = {
-    stage_1: "Stage 1",
-    stage_2: "Stage 2",
-    stage_3: "Stage 3",
-    a1: "A1",
-    a2: "A2",
-    b1: "B1",
-    b2: "B2",
-    c1: "C1",
-    c2: "C2",
-  };
-
-  return map[v] || norm(value) || v;
-}
-
-function formatTarget(branchType: BranchType, classLevel: any, targetLevels: any) {
-  if (branchType === "gatehouse") {
-    const levels = toArr(targetLevels);
-    return levels.length ? levels.map(formatGatehouseLevel).join(", ") : "—";
-  }
-
-  // Для новых веток
-  const levels = toArr(targetLevels);
-  if (levels.length > 0 && !classLevel) {
-    return levels.join(", ");
-  }
-
-  const classes = toArr(classLevel);
-  if (!classes.length) return "—";
-
-  return classes.map(formatClassLevel).join(", ");
-}
-
-function formatMaterialTypes(branchType: BranchType, types: any) {
-  const arr = toArr(types);
-
-  if (branchType === "gatehouse") {
-    const typeMap: Record<string, string> = {
-      mock_test: "📝 Пробные тесты",
-      mock_tests: "📝 Пробные тесты",
-      "mock-test": "📝 Пробные тесты",
-      "mock test": "📝 Пробные тесты",
-      "мок-тест": "📝 Пробные тесты",
-      "мок тест": "📝 Пробные тесты",
-      "пробный тест": "📝 Пробные тесты",
-      "пробные тесты": "📝 Пробные тесты",
-    };
-
-    return arr.map((t) => typeMap[String(t).toLowerCase()] || String(t)).join(", ");
-  }
-
-  const typeMap: Record<string, string> = {
-    учебник: "📚 Учебник",
-    кроссворд: "🧩 Кроссворд",
-    textbook: "📚 Учебник",
-    crossword: "🧩 Кроссворд",
-  };
-
-  return arr.map((t) => typeMap[String(t).toLowerCase()] || String(t)).join(", ");
-}
-
-function formatDateTimeRU(dateString: string) {
-  const d = new Date(dateString);
-  if (Number.isNaN(d.getTime())) return "—";
-
-  return d.toLocaleString("ru-RU", {
-    timeZone: "Europe/Moscow",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatStatus(isProcessed: boolean, processedAt?: string | null) {
-  if (!isProcessed) return "⏳ Ожидает";
-  if (processedAt) return `✅ Обработана · ${formatDateTimeRU(processedAt)}`;
-  return "✅ Обработана";
-}
-
-function getSheetTargetSource(row: any, branchType: BranchType) {
-  if (branchType !== "gatehouse" && row.class_level) return row.class_level;
-
-  const targetLevels = toArr(row.target_levels);
-  if (targetLevels.length) return targetLevels;
-
-  return row.target_level;
-}
-
-function getSheetMaterialTypesSource(row: any, branchType: BranchType) {
-  if (branchType !== "gatehouse" && row.textbook_types?.length) return row.textbook_types;
-
-  const materialKinds = toArr(row.material_kinds);
-  if (materialKinds.length) return materialKinds;
-
-  return row.textbook_types;
-}
-
-/**
- * Google Sheets A:G:
- * A Номер заявки
- * B Дата и время создания
- * C Класс / уровень
- * D Типы материалов
- * E Email
- * F ФИО ученика
- * G Статус заявки
- */
-function buildSheetValues(row: any) {
-  const branchType = normalizeBranchType(row.branch_type);
-
-  return [
-    String(row.request_number || ""),
-    formatDateTimeRU(String(row.created_at || "")),
-    formatTarget(branchType, row.class_level, getSheetTargetSource(row, branchType)),
-    formatMaterialTypes(branchType, getSheetMaterialTypesSource(row, branchType)),
-    String(row.email || ""),
-    String(row.full_name || ""),
-    formatStatus(Boolean(row.is_processed), row.processed_at ?? null),
-  ];
-}
-
 function equalRow(a: (string | number)[], b: string[]) {
   const max = Math.max(a.length, b.length, 7);
-
   for (let i = 0; i < max; i += 1) {
     const av = norm(a[i]);
     const bv = norm(b[i]);
     if (av !== bv) return false;
   }
-
   return true;
 }
 
@@ -253,7 +52,6 @@ function groupRequestsBySheet(rows: any[]): Map<string, { requests: any[]; dbSet
   const groups = new Map<string, { requests: any[]; dbSet: Set<string> }>();
 
   for (const r of rows) {
-    // Если project_id есть, берём sheet_name из проекта, иначе null (дефолтный лист)
     const sheetName = r.sheet_name || null; // null => дефолтный лист
     const key = sheetName ?? "default";
 
@@ -270,14 +68,23 @@ function groupRequestsBySheet(rows: any[]): Map<string, { requests: any[]; dbSet
   return groups;
 }
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
 
   const { supabase } = auth;
 
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    // Если тело не JSON, пробуем читать query-параметры (для обратной совместимости)
+    body = {};
+  }
+
   const sp = req.nextUrl.searchParams;
-  const limit = Math.min(Math.max(Number(sp.get("limit") || 500), 1), 2000);
+  const limit = Math.min(Math.max(Number(sp.get("limit") || body?.limit || 500), 1), 2000);
+  const dryRun = sp.get("dryRun") === "true" || body?.dryRun === true;
 
   try {
     // 1. Загружаем все заявки с информацией о проекте (sheet_name)
@@ -326,11 +133,33 @@ export async function GET(req: NextRequest) {
     let failed = 0;
     let ops = 0;
 
+    // Для dry-run собираем отчёт
+    const dryRunReport: any = {
+      groups: [],
+      total: { inserted: 0, updated: 0, deleted: 0, unchanged: 0, skipped: 0, failed: 0 },
+    };
+
     // 3. Для каждой группы загружаем sheetMap и обрабатываем заявки
     for (const [sheetKey, group] of groups.entries()) {
       const sheetName = sheetKey === "default" ? null : sheetKey; // null => дефолтный лист
-      const sheetMap = await getSheetRequestRowMap(sheetName);
+
+      // Если dryRun, мы всё равно получаем текущий state листа, но не применяем изменения
+      const sheetMap = dryRun
+        ? await getSheetRequestRowMap(sheetName).catch(() => new Map())
+        : await getSheetRequestRowMap(sheetName);
+
       const { requests, dbSet } = group;
+
+      const groupReport = {
+        sheetName: sheetName || "default",
+        operations: [] as string[],
+        inserted: 0,
+        updated: 0,
+        deleted: 0,
+        unchanged: 0,
+        skipped: 0,
+        failed: 0,
+      };
 
       for (const r of requests) {
         if (ops >= limit) break;
@@ -339,52 +168,52 @@ export async function GET(req: NextRequest) {
 
         if (!rn) {
           skipped += 1;
+          groupReport.skipped += 1;
           continue;
         }
 
-        const sheetValues = buildSheetValues(r);
+        const sheetValues = buildSheetValues(
+          r.request_number || "",
+          r.created_at || "",
+          normalizeBranchType(r.branch_type),
+          r.class_level,
+          toArr(r.target_levels).length ? toArr(r.target_levels) : toArr(r.target_level),
+          toArr(r.material_kinds).length ? toArr(r.material_kinds) : toArr(r.textbook_types),
+          r.email || "",
+          r.full_name || "",
+          Boolean(r.is_processed),
+          r.processed_at ?? null,
+        );
+
         const existing = sheetMap.get(rn);
 
         try {
           if (!existing) {
-            const res = await appendAccountingRow(sheetValues, sheetName);
-            const rowNumber = res.rowNumber ?? null;
-
-            await supabase
-              .from("purchase_requests")
-              .update({
-                sheet_synced_at: new Date().toISOString(),
-                sheet_row: rowNumber,
-                sheet_sync_error: null,
-              })
-              .eq("id", r.id);
-
+            if (!dryRun) {
+              const res = await appendAccountingRow(sheetValues, sheetName);
+              const rowNumber = res.rowNumber ?? null;
+              await supabase
+                .from("purchase_requests")
+                .update({
+                  sheet_synced_at: new Date().toISOString(),
+                  sheet_row: rowNumber,
+                  sheet_sync_error: null,
+                })
+                .eq("id", r.id);
+              if (rowNumber) {
+                sheetMap.set(rn, {
+                  rowNumber,
+                  values: sheetValues.map((x) => norm(x)),
+                });
+              }
+            }
             inserted += 1;
             ops += 1;
-
-            if (rowNumber) {
-              sheetMap.set(rn, {
-                rowNumber,
-                values: sheetValues.map((x) => norm(x)),
-              });
-            }
+            groupReport.inserted += 1;
+            groupReport.operations.push(`INSERT ${rn} -> ${sheetName || "default"}`);
           } else if (!equalRow(sheetValues, existing.values)) {
-            await updateAccountingRow(existing.rowNumber, sheetValues, sheetName);
-
-            await supabase
-              .from("purchase_requests")
-              .update({
-                sheet_synced_at: new Date().toISOString(),
-                sheet_row: existing.rowNumber,
-                sheet_sync_error: null,
-              })
-              .eq("id", r.id);
-
-            updated += 1;
-            ops += 1;
-          } else {
-            // Строка совпадает, но если в БД не проставлены метаданные – обновляем
-            if (!r.sheet_synced_at || r.sheet_row !== existing.rowNumber || r.sheet_sync_error) {
+            if (!dryRun) {
+              await updateAccountingRow(existing.rowNumber, sheetValues, sheetName);
               await supabase
                 .from("purchase_requests")
                 .update({
@@ -394,41 +223,81 @@ export async function GET(req: NextRequest) {
                 })
                 .eq("id", r.id);
             }
-
+            updated += 1;
+            ops += 1;
+            groupReport.updated += 1;
+            groupReport.operations.push(`UPDATE ${rn} (row ${existing.rowNumber}) -> ${sheetName || "default"}`);
+          } else {
+            // Строка совпадает, но если в БД не проставлены метаданные – обновляем
+            if (!dryRun && (!r.sheet_synced_at || r.sheet_row !== existing.rowNumber || r.sheet_sync_error)) {
+              await supabase
+                .from("purchase_requests")
+                .update({
+                  sheet_synced_at: new Date().toISOString(),
+                  sheet_row: existing.rowNumber,
+                  sheet_sync_error: null,
+                })
+                .eq("id", r.id);
+            }
             unchanged += 1;
+            groupReport.unchanged += 1;
           }
         } catch (e: any) {
           failed += 1;
-
-          await supabase
-            .from("purchase_requests")
-            .update({
-              sheet_synced_at: null,
-              sheet_sync_error: String(e?.message || e || "Sheets sync error").slice(0, 500),
-            })
-            .eq("id", r.id);
+          groupReport.failed += 1;
+          if (!dryRun) {
+            await supabase
+              .from("purchase_requests")
+              .update({
+                sheet_synced_at: null,
+                sheet_sync_error: String(e?.message || e || "Sheets sync error").slice(0, 500),
+              })
+              .eq("id", r.id);
+          }
+          groupReport.operations.push(`FAIL ${rn}: ${e?.message || "unknown error"}`);
         }
       }
 
       // 4. Удаляем лишние строки из этого листа (которых нет в БД)
       if (ops < limit) {
         const toDelete: number[] = [];
-
         for (const [rn, info] of sheetMap.entries()) {
           if (!dbSet.has(rn)) toDelete.push(info.rowNumber);
         }
-
         toDelete.sort((a, b) => b - a);
 
         const canDelete = Math.max(0, limit - ops);
         const slice = toDelete.slice(0, canDelete);
 
         if (slice.length) {
-          const res = await deleteAccountingRows(slice, sheetName);
-          deleted += res.deleted;
-          ops += res.deleted;
+          if (!dryRun) {
+            const res = await deleteAccountingRows(slice, sheetName);
+            deleted += res.deleted;
+            ops += res.deleted;
+          } else {
+            deleted += slice.length;
+            ops += slice.length;
+          }
+          groupReport.deleted += slice.length;
+          groupReport.operations.push(`DELETE ${slice.length} rows from ${sheetName || "default"}`);
         }
       }
+
+      dryRunReport.groups.push(groupReport);
+    }
+
+    // Общая статистика для dryRun
+    dryRunReport.total = { inserted, updated, deleted, unchanged, skipped, failed };
+
+    if (dryRun) {
+      return ok(
+        {
+          dryRun: true,
+          report: dryRunReport,
+          summary: { inserted, updated, deleted, unchanged, skipped, failed, limit, ops },
+        },
+        noStoreInit(),
+      );
     }
 
     return ok(

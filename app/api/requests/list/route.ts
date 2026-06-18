@@ -1,7 +1,8 @@
-/* app/api/requests/list/route.ts */
+// app/api/requests/list/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
+import { normalizeString, toStringArray } from "@/lib/materials/normalize";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,10 +44,6 @@ function noStoreInit(): ResponseInit {
   };
 }
 
-function normalizeString(value: unknown) {
-  return String(value ?? "").trim();
-}
-
 function normalizeBranchFilter(value: unknown): BranchFilter {
   const raw = normalizeString(value).toLowerCase();
 
@@ -67,7 +64,7 @@ function normalizeBranchFilter(value: unknown): BranchFilter {
     return "olympiad";
   }
 
-  // 🚀 ДОБАВЛЕНО: Поддержка новых динамических веток (Slug)
+  // Динамические ветки (slug)
   return raw;
 }
 
@@ -101,34 +98,6 @@ function parseLimit(value: unknown, fallback = 50) {
   return Math.max(1, Math.min(n, 100));
 }
 
-function toStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeString(item)).filter(Boolean);
-  }
-
-  if (typeof value === "string") {
-    const text = value.trim();
-
-    if (!text) return [];
-
-    if (text.startsWith("[") && text.endsWith("]")) {
-      try {
-        return toStringArray(JSON.parse(text));
-      } catch {
-        return [];
-      }
-    }
-
-    return text
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
-  const single = normalizeString(value);
-  return single ? [single] : [];
-}
-
 function normalizeRequestRow(row: any) {
   const branchType = normalizeString(row?.branch_type) || "olympiad";
 
@@ -142,8 +111,11 @@ function normalizeRequestRow(row: any) {
 
     branch_type: branchType,
     project_id: typeof row?.project_id === "string" ? row.project_id : null,
-    project_name: row?.projects && typeof row.projects === 'object' && 'name' in row.projects ? String(row.projects.name) : null,
-    
+    project_name:
+      row?.projects && typeof row.projects === "object" && "name" in row.projects
+        ? String(row.projects.name)
+        : null,
+
     class_level: typeof row?.class_level === "string" ? row.class_level : null,
 
     target_level: toStringArray(row?.target_level),
@@ -173,8 +145,10 @@ export async function GET(req: NextRequest) {
 
   const searchParams = req.nextUrl.searchParams;
 
-  const branch = normalizeBranchFilter(searchParams.get("branch_type") ?? searchParams.get("branch"));
-  const projectId = searchParams.get("project_id"); // Поддержка поиска по ID
+  const branch = normalizeBranchFilter(
+    searchParams.get("branch_type") ?? searchParams.get("branch")
+  );
+  const projectId = searchParams.get("project_id");
   const status = normalizeStatusFilter(searchParams.get("status"));
   const limit = parseLimit(searchParams.get("limit"), 50);
 
@@ -186,7 +160,6 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(limit);
 
-    // 🚀 ДОБАВЛЕНО: Улучшенная логика фильтрации
     if (projectId) {
       query = query.eq("project_id", projectId);
     } else if (branch !== "all") {
@@ -230,7 +203,7 @@ export async function GET(req: NextRequest) {
           limit,
         },
       },
-      noStoreInit(),
+      noStoreInit()
     );
   } catch (e: any) {
     return fail(e?.message || "Server error", 500, "SERVER_ERROR", noStoreInit());

@@ -1,7 +1,7 @@
 // lib/projects/loader.ts
 // Загрузчик конфигов проектов из БД с in-memory кэшем.
 // Серверная сторона. Для клиента — тот же API через /api/projects.
- 
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   ProjectConfig,
@@ -19,43 +19,43 @@ import type {
   ProjectThemeJson,
   ProjectUiTextsJson,
 } from "./types";
- 
+
 // ---------------------------------------------------------------------------
 // КЭШ
 // ---------------------------------------------------------------------------
- 
+
 type CacheEntry = {
   config: ProjectConfig | null;
   fetchedAt: number;
 };
- 
+
 type CacheShape = {
   /** Slug → проект. */
   bySlug: Map<ProjectSlug, CacheEntry>;
   /** Полный список (только активные). */
   list: { items: ProjectConfig[]; fetchedAt: number } | null;
 };
- 
+
 const TTL_MS = 60_000; // 1 минута
- 
+
 const cache: CacheShape = {
   bySlug: new Map(),
   list: null,
 };
- 
+
 export function invalidateProjectsCache() {
   cache.bySlug.clear();
   cache.list = null;
 }
- 
+
 function isFresh(fetchedAt: number) {
   return Date.now() - fetchedAt < TTL_MS;
 }
- 
+
 // ---------------------------------------------------------------------------
 // ДЕФОЛТЫ
 // ---------------------------------------------------------------------------
- 
+
 const DEFAULT_COLORS: ProjectThemeColors = {
   pageBg: "#ffffff",
   cardBg: "#ffffff",
@@ -70,7 +70,7 @@ const DEFAULT_COLORS: ProjectThemeColors = {
   border: "rgba(15,23,42,0.12)",
   glow: "rgba(16,185,129,0.25)",
 };
- 
+
 const DEFAULT_THEME: ProjectThemeConfig = {
   tone: "default",
   rootClassName: "project-default",
@@ -78,7 +78,7 @@ const DEFAULT_THEME: ProjectThemeConfig = {
   fontFamily: "inherit",
   colors: { ...DEFAULT_COLORS },
 };
- 
+
 const DEFAULT_FEATURES: ProjectFeaturesJson = {
   streaks: false,
   titles: false,
@@ -87,13 +87,13 @@ const DEFAULT_FEATURES: ProjectFeaturesJson = {
   profileProgress: true,
   requestMode: "target_levels",
 };
- 
+
 const DEFAULT_UI_TEXTS: ProjectUiTextsJson = {};
- 
+
 // ---------------------------------------------------------------------------
 // МАРШРУТЫ
 // ---------------------------------------------------------------------------
- 
+
 /**
  * Известные slug → legacy-роуты (старые хардкод-папки app/(app)/...).
  * Для новых веток — универсальный /projects/[slug]/*.
@@ -116,11 +116,11 @@ const LEGACY_ROUTES: Partial<Record<ProjectSlug, ProjectRouteConfig>> = {
     material: (id) => `/gatehouse/material/${id}`,
   },
 };
- 
+
 function buildRoutes(slug: ProjectSlug): ProjectRouteConfig {
   const legacy = LEGACY_ROUTES[slug];
   if (legacy) return legacy;
- 
+
   const base = `/projects/${slug}`;
   return {
     portal: "/portal",
@@ -131,19 +131,19 @@ function buildRoutes(slug: ProjectSlug): ProjectRouteConfig {
     material: (id) => `${base}/materials/${id}`,
   };
 }
- 
+
 // ---------------------------------------------------------------------------
 // МАППЕРЫ (raw row → config)
 // ---------------------------------------------------------------------------
- 
+
 function asBoolean(v: unknown, fallback = false): boolean {
   return typeof v === "boolean" ? v : fallback;
 }
- 
+
 function asString(v: unknown, fallback = ""): string {
   return typeof v === "string" ? v : fallback;
 }
- 
+
 function asInt(v: unknown, fallback = 0): number {
   if (typeof v === "number" && Number.isFinite(v)) return Math.trunc(v);
   if (typeof v === "string" && v.trim() !== "") {
@@ -152,17 +152,17 @@ function asInt(v: unknown, fallback = 0): number {
   }
   return fallback;
 }
- 
+
 function buildTheme(raw: ProjectThemeJson | null): ProjectThemeConfig {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_THEME };
- 
+
   const incoming = raw.colors ?? {};
   const colors: ProjectThemeColors = { ...DEFAULT_COLORS };
   (Object.keys(colors) as (keyof ProjectThemeColors)[]).forEach((key) => {
     const v = incoming[key];
     if (typeof v === "string" && v.length > 0) colors[key] = v;
   });
- 
+
   return {
     tone: asString(raw.tone, DEFAULT_THEME.tone),
     rootClassName: asString(raw.rootClassName, DEFAULT_THEME.rootClassName),
@@ -171,7 +171,7 @@ function buildTheme(raw: ProjectThemeJson | null): ProjectThemeConfig {
     colors,
   };
 }
- 
+
 function buildPortalCard(
   slug: ProjectSlug,
   name: string,
@@ -189,7 +189,7 @@ function buildPortalCard(
     fallbackIcon,
   };
 }
- 
+
 function mapTab(row: ProjectTabRow): ProjectTabConfig {
   const ui = (row.ui_texts ?? {}) as ProjectUiTextsJson;
   const isPlaceholder = row.component_type === "placeholder";
@@ -207,7 +207,7 @@ function mapTab(row: ProjectTabRow): ProjectTabConfig {
     uiTexts: ui,
   };
 }
- 
+
 function mapLevel(row: ProjectLevelRow): ProjectLevelConfig {
   return {
     id: row.id,
@@ -219,14 +219,14 @@ function mapLevel(row: ProjectLevelRow): ProjectLevelConfig {
     description: asString(row.description, ""),
   };
 }
- 
+
 function buildConfig(row: ProjectRow, tabs: ProjectTabRow[], levels: ProjectLevelRow[]): ProjectConfig {
   const theme = buildTheme(row.theme);
   const features = (row.features ?? {}) as ProjectFeaturesJson;
   const ui = (row.ui_texts ?? {}) as ProjectUiTextsJson;
   const routes = buildRoutes(row.slug);
   const fallbackIcon = asString(row.fallback_icon, "📁");
- 
+
   return {
     id: row.id,
     slug: row.slug,
@@ -253,25 +253,28 @@ function buildConfig(row: ProjectRow, tabs: ProjectTabRow[], levels: ProjectLeve
       .filter((l) => l.project_id === row.id)
       .sort((a, b) => a.order_index - b.order_index)
       .map(mapLevel),
+    // ✅ Фаза 2: добавлено поле sheetName
+    sheetName: row.sheet_name ?? null,
+    // ✅ Фаза 2: флаг стриков (уже был)
     hasOlympiadStreaks: asBoolean(features.streaks, false),
   };
 }
- 
+
 // ---------------------------------------------------------------------------
 // ЗАГРУЗКА ИЗ БД
 // ---------------------------------------------------------------------------
- 
+
 async function fetchRawProjectBySlug(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, slug: ProjectSlug) {
   const { data, error } = await supabase
     .from("projects")
     .select("*")
     .eq("slug", slug)
     .maybeSingle();
- 
+
   if (error) throw new Error(`Не удалось загрузить проект ${slug}: ${error.message}`);
   return data as ProjectRow | null;
 }
- 
+
 async function fetchRawProjects(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>) {
   const { data, error } = await supabase
     .from("projects")
@@ -279,11 +282,11 @@ async function fetchRawProjects(supabase: Awaited<ReturnType<typeof createSupaba
     .eq("is_active", true)
     .order("order_index", { ascending: true })
     .order("slug", { ascending: true });
- 
+
   if (error) throw new Error(`Не удалось загрузить список проектов: ${error.message}`);
   return (data ?? []) as ProjectRow[];
 }
- 
+
 async function fetchTabs(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, projectIds: string[]) {
   if (projectIds.length === 0) return [];
   const { data, error } = await supabase
@@ -291,11 +294,11 @@ async function fetchTabs(supabase: Awaited<ReturnType<typeof createSupabaseServe
     .select("*")
     .in("project_id", projectIds)
     .order("order_index", { ascending: true, nullsFirst: false });
- 
+
   if (error) throw new Error(`Не удалось загрузить табы проектов: ${error.message}`);
   return (data ?? []) as ProjectTabRow[];
 }
- 
+
 async function fetchLevels(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, projectIds: string[]) {
   if (projectIds.length === 0) return [];
   const { data, error } = await supabase
@@ -303,46 +306,46 @@ async function fetchLevels(supabase: Awaited<ReturnType<typeof createSupabaseSer
     .select("*")
     .in("project_id", projectIds)
     .order("order_index", { ascending: true });
- 
+
   if (error) throw new Error(`Не удалось загрузить уровни проектов: ${error.message}`);
   return (data ?? []) as ProjectLevelRow[];
 }
- 
+
 // ---------------------------------------------------------------------------
 // ПУБЛИЧНЫЕ ФУНКЦИИ
 // ---------------------------------------------------------------------------
- 
+
 /** Возвращает полный список активных проектов. */
 export async function getProjects(): Promise<ProjectConfig[]> {
   if (cache.list && isFresh(cache.list.fetchedAt)) {
     return cache.list.items;
   }
- 
+
   const supabase = await createSupabaseServerClient();
   const rows = await fetchRawProjects(supabase);
- 
+
   const projectIds = rows.map((r) => r.id);
   const [tabs, levels] = await Promise.all([
     fetchTabs(supabase, projectIds),
     fetchLevels(supabase, projectIds),
   ]);
- 
+
   const items = rows.map((row) => buildConfig(row, tabs, levels));
- 
+
   cache.list = { items, fetchedAt: Date.now() };
   return items;
 }
- 
+
 /** Возвращает конфиг одного проекта по slug. null, если не найден/неактивен. */
 export async function getProjectBySlug(slug: unknown): Promise<ProjectConfig | null> {
   const key = typeof slug === "string" ? slug : "";
- 
+
   const cached = cache.bySlug.get(key);
   if (cached && isFresh(cached.fetchedAt)) return cached.config;
- 
+
   const supabase = await createSupabaseServerClient();
   const row = await fetchRawProjectBySlug(supabase, key);
- 
+
   let config: ProjectConfig | null = null;
   if (row && row.is_active) {
     const [tabs, levels] = await Promise.all([
@@ -351,23 +354,23 @@ export async function getProjectBySlug(slug: unknown): Promise<ProjectConfig | n
     ]);
     config = buildConfig(row, tabs, levels);
   }
- 
+
   cache.bySlug.set(key, { config, fetchedAt: Date.now() });
   return config;
 }
- 
+
 /** Возвращает конфиг проекта. Если не найден — бросает. */
 export async function requireProject(slug: unknown): Promise<ProjectConfig> {
   const config = await getProjectBySlug(slug);
   if (!config) throw new Error(`Проект "${slug}" не найден или неактивен.`);
   return config;
 }
- 
+
 /** Быстрая проверка: существует ли проект. */
 export async function projectExists(slug: unknown): Promise<boolean> {
   const config = await getProjectBySlug(slug);
   return Boolean(config);
 }
- 
+
 /** Сбросить кэш (вызывать из админки после изменения данных). */
 export { invalidateProjectsCache as invalidateProjectCache };

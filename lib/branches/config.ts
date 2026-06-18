@@ -1,11 +1,22 @@
 // lib/branches/config.ts
+// ⚠️ ВАЖНО: этот файл содержит только seed-конфиги для двух legacy-веток (olympiad, gatehouse).
+// Для динамических веток используйте lib/projects/loader.ts и lib/projects/types.ts.
+// Этот файл НЕ ДОЛЖЕН содержать runtime-фолбэков для неизвестных веток.
+
 import type { BranchConfig, BranchType } from "@/lib/branches/types";
 
-// Для обратной совместимости со старыми типами кастуем к BranchType
+// ----------------------------------------------------------------------------
+// Константы legacy-веток
+// ----------------------------------------------------------------------------
+
 export const OLYMPIAD_BRANCH = "olympiad" as BranchType;
 export const GATEHOUSE_BRANCH = "gatehouse" as BranchType;
 
 export const BRANCH_TYPES = [OLYMPIAD_BRANCH, GATEHOUSE_BRANCH] as const;
+
+// ----------------------------------------------------------------------------
+// Seed-конфиги для legacy-веток
+// ----------------------------------------------------------------------------
 
 export const BRANCH_CONFIGS: Record<string, BranchConfig> = {
   olympiad: {
@@ -141,15 +152,32 @@ export const BRANCH_CONFIGS: Record<string, BranchConfig> = {
   },
 };
 
+// ----------------------------------------------------------------------------
+// Вспомогательные функции (только для legacy-веток)
+// ----------------------------------------------------------------------------
+
+/**
+ * Проверяет, является ли строка валидным BranchType.
+ * Для динамических веток возвращает false.
+ */
 export function isBranchType(value: unknown): value is BranchType {
-  return typeof value === "string" && value.trim().length > 0;
+  if (typeof value !== "string") return false;
+  const v = value.trim();
+  return v === OLYMPIAD_BRANCH || v === GATEHOUSE_BRANCH;
 }
 
-export function normalizeBranchType(value: unknown): BranchType {
+/**
+ * Нормализует branch_type.
+ * Возвращает "olympiad" или "gatehouse" для известных алиасов.
+ * Для всех остальных — возвращает переданную строку как есть (динамическая ветка).
+ * ВАЖНО: если передан неизвестный slug, возвращается он же, а не "olympiad".
+ * Это позволяет отличать динамические ветки от legacy.
+ */
+export function normalizeBranchType(value: unknown): string {
   const v = String(value ?? "").trim().toLowerCase();
-  
   if (!v) return OLYMPIAD_BRANCH;
 
+  // Алиасы для gatehouse
   if (
     v === "gatehouse" ||
     v === "gatehouse_awards" ||
@@ -161,84 +189,52 @@ export function normalizeBranchType(value: unknown): BranchType {
     return GATEHOUSE_BRANCH;
   }
 
-  // Важно: Возвращаем динамическое название (например, "hippo"), а не глушим его до "olympiad"
-  return v as BranchType;
+  // Для olympiad — только точное совпадение
+  if (v === "olympiad") return OLYMPIAD_BRANCH;
+
+  // Неизвестный slug — возвращаем как есть (динамическая ветка)
+  return v;
 }
 
-export function getBranchConfig(value: unknown): BranchConfig {
+/**
+ * Возвращает конфиг для legacy-ветки.
+ * Для динамических веток возвращает null — используйте getProjectBySlug() из loader.
+ */
+export function getBranchConfig(value: unknown): BranchConfig | null {
   const branch = normalizeBranchType(value);
-  
-  // 1. Если ветка есть в статичном словаре
-  if (BRANCH_CONFIGS[branch]) {
-    return BRANCH_CONFIGS[branch];
-  }
-
-  // 2. 🚀 ГЕНЕРАЦИЯ ДИНАМИЧЕСКОГО КОНФИГА ДЛЯ НОВЫХ ВЕТОК (ПРОЕКТОВ) 🚀
-  // Делаем красивое название (например "hippo" -> "Hippo")
-  const titleName = branch.charAt(0).toUpperCase() + branch.slice(1);
-
-  return {
-    type: branch as BranchType,
-    label: `Проект ${titleName}`,
-    shortLabel: titleName,
-    adminLabel: titleName,
-    description: `Материалы, задания и тесты раздела ${titleName}.`,
-    hasOlympiadStreaks: false,
-    theme: {
-      tone: "dark-indigo", // Нейтральная современная тема для новых проектов
-      rootClassName: `branch-${branch}`,
-      fontFamily: "inherit",
-      cssFile: undefined,
-      colors: {
-        pageBg: "#f8fafc",
-        cardBg: "#ffffff",
-        cardBgSoft: "#f1f5f9",
-        primary: "#3b82f6",
-        primarySoft: "rgba(59, 130, 246, 0.1)",
-        secondary: "#8b5cf6",
-        accent: "#10b981",
-        accentSoft: "rgba(16, 185, 129, 0.1)",
-        text: "#0f172a",
-        muted: "#64748b",
-        border: "rgba(0,0,0,0.1)",
-        glow: "rgba(59, 130, 246, 0.35)",
-      },
-    },
-    routes: {
-      portal: "/portal",
-      // Используем новый универсальный роутер для проектов `app/(app)/projects/[slug]/...`
-      profile: `/projects/${branch}/profile`,
-      materials: `/projects/${branch}/materials`,
-      requests: `/projects/${branch}/requests`,
-      assignment: (id: string) => `/projects/${branch}/assignment/${id}`,
-      material: (id: string) => `/projects/${branch}/materials/${id}`,
-    },
-    portalCard: {
-      title: titleName,
-      subtitle: "Новый проект",
-      description: "Материалы, тесты и статистика.",
-      badge: "Project",
-      href: `/projects/${branch}/profile`,
-      image: null,
-      fallbackIcon: "📁",
-    },
-    materialTabs: [],
-    requests: {
-      targetMode: "target_levels", // Новые проекты используют уровни (target_levels) как Gatehouse
-      materialKinds: [],
-      defaultMaterialKinds: [],
-    },
-  } as unknown as BranchConfig;
+  const config = BRANCH_CONFIGS[branch];
+  if (config) return config;
+  // Для динамических веток возвращаем null (runtime fallback убран)
+  return null;
 }
 
+/**
+ * Возвращает label для ветки.
+ * Для динамических веток возвращает сам slug (или пустую строку).
+ */
 export function getBranchLabel(value: unknown): string {
-  return getBranchConfig(value).label;
+  const branch = normalizeBranchType(value);
+  const config = getBranchConfig(branch);
+  if (config) return config.label;
+  // Динамическая ветка — возвращаем slug
+  return branch.charAt(0).toUpperCase() + branch.slice(1);
 }
 
+/**
+ * Возвращает adminLabel для ветки.
+ * Для динамических веток возвращает slug.
+ */
 export function getBranchAdminLabel(value: unknown): string {
-  return getBranchConfig(value).adminLabel;
+  const branch = normalizeBranchType(value);
+  const config = getBranchConfig(branch);
+  if (config) return config.adminLabel;
+  return branch;
 }
 
+/**
+ * Возвращает PortalCard-конфиги для legacy-веток.
+ * (Только для olympiad и gatehouse, динамические ветки здесь не учитываются.)
+ */
 export function getBranchPortalCards() {
   return BRANCH_TYPES.map((branchType) => BRANCH_CONFIGS[branchType].portalCard);
 }
