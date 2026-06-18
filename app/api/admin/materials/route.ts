@@ -19,6 +19,11 @@ function normalizeNullableString(value: unknown): string | null {
   return str || null;
 }
 
+// Защита от мусора вместо ID
+function isValidUUID(str: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
 function normalizePayload(body: any, userId: string) {
   const branch_type = normalizeBranchType(body?.branch_type);
   const material_kind = normalizeMaterialKind(body?.material_kind || "mock_test");
@@ -32,7 +37,20 @@ function normalizePayload(body: any, userId: string) {
   const target_levels = uniqueStrings(toStringArray(body?.target_levels ?? body?.target_level));
   const meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
 
+  // ❗️ ФИКС ТАБА: Ловим и очищаем project_tab_id
+  let project_tab_id = normalizeNullableString(body?.project_tab_id ?? body?.tab_id);
+  
+  if (project_tab_id === "00000000-0000-0000-0000-000000000000" || project_tab_id === "none" || project_tab_id === "null" || project_tab_id === "") {
+    project_tab_id = null;
+  }
+
+  // Если прилетел текст вместо UUID — сбрасываем в null
+  if (project_tab_id && !isValidUUID(project_tab_id)) {
+    project_tab_id = null;
+  }
+
   return {
+    project_tab_id, // Теперь материал привяжется к табу!
     branch_type,
     material_kind,
     title,
@@ -100,22 +118,25 @@ export async function GET(req: NextRequest) {
     }
 
     const ids = materials.map((material: any) => material.id).filter(Boolean);
+    const idsString = ids.join(',');
 
+    // ❗️ ФИКС СЧЕТЧИКА: Ищем задания и по новой, и по легаси привязке
     const { data: assignments, error: countError } = await supabase
       .from("assignments")
-      .select("id, material_id")
-      .in("material_id", ids);
+      .select("id, material_id, textbook_id, crossword_id")
+      .or(`material_id.in.(${idsString}),textbook_id.in.(${idsString}),crossword_id.in.(${idsString})`);
 
     if (countError) {
+      console.error("🔴 [ADMIN GET MATERIALS] Ошибка подсчета заданий:", countError.message);
       return ok({ materials });
     }
 
     const counts: Record<string, number> = {};
 
     for (const assignment of assignments ?? []) {
-      const materialId = String((assignment as any).material_id ?? "");
-      if (!materialId) continue;
-      counts[materialId] = (counts[materialId] || 0) + 1;
+      const matId = String(assignment.material_id || assignment.textbook_id || assignment.crossword_id || "");
+      if (!matId) continue;
+      counts[matId] = (counts[matId] || 0) + 1;
     }
 
     return ok({
@@ -125,6 +146,7 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error: any) {
+    console.error("🔴 [ADMIN GET MATERIALS] Серверная ошибка:", error);
     return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
 }
@@ -146,6 +168,7 @@ export async function POST(req: NextRequest) {
   const validationError = validateMaterial(payload);
 
   if (validationError) {
+    console.error("🔴 [ADMIN POST MATERIAL] Ошибка валидации:", validationError);
     return fail(validationError, 400, "VALIDATION");
   }
 
@@ -156,10 +179,14 @@ export async function POST(req: NextRequest) {
       .select("*")
       .single();
 
-    if (error) return fail(error.message, 500, "DB_ERROR");
+    if (error) {
+      console.error("🔴 [ADMIN POST MATERIAL] Ошибка БД:", error.message, error.details);
+      return fail(error.message, 500, "DB_ERROR");
+    }
 
     return ok({ material: data });
   } catch (error: any) {
+    console.error("🔴 [ADMIN POST MATERIAL] Серверная ошибка:", error);
     return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
 }
