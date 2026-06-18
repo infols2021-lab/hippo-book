@@ -132,6 +132,7 @@ app/api/admin/projects/[id]/levels/route.ts
 app/api/admin/projects/[id]/materials/route.ts
 app/api/admin/projects/[id]/route.ts
 app/api/admin/projects/[id]/tabs/route.ts
+app/api/admin/projects/[projectId]/materials/[materialId]/route.ts
 app/api/admin/projects/route.ts
 app/api/admin/requests/grants/route.ts
 app/api/admin/requests/route.ts
@@ -3784,331 +3785,6 @@ export async function POST(req: NextRequest) {
   if (error) return fail(error.message, 500, "DB_ERROR");
 
   return ok({ crossword: data });
-}
-</file>
-
-<file path="app/api/admin/materials/[id]/route.ts">
-import type { NextRequest } from "next/server";
-import { ok, fail } from "@/lib/api/response";
-import { requireAdmin } from "@/lib/api/admin";
-import { normalizeBranchType } from "@/lib/branches/config";
-import { normalizeMaterialKind, toStringArray, uniqueStrings } from "@/lib/materials/format";
-
-function normalizeBool(value: unknown): boolean {
-  return value === true || value === "true" || value === 1 || value === "1";
-}
-
-function normalizeOrderIndex(value: unknown): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function normalizeNullableString(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  const str = String(value).trim();
-  return str || null;
-}
-
-function normalizePatchPayload(body: any) {
-  const payload: Record<string, any> = {};
-
-  if ("branch_type" in body) payload.branch_type = normalizeBranchType(body.branch_type);
-  if ("material_kind" in body) payload.material_kind = normalizeMaterialKind(body.material_kind);
-  if ("title" in body) payload.title = String(body.title ?? "").trim();
-  if ("description" in body) payload.description = normalizeNullableString(body.description);
-  if ("cover_image_url" in body) payload.cover_image_url = normalizeNullableString(body.cover_image_url);
-  if ("is_available" in body) payload.is_available = normalizeBool(body.is_available);
-  if ("is_active" in body) payload.is_active = normalizeBool(body.is_active);
-  if ("order_index" in body) payload.order_index = normalizeOrderIndex(body.order_index);
-  if ("class_levels" in body || "class_level" in body) {
-    payload.class_levels = uniqueStrings(toStringArray(body.class_levels ?? body.class_level));
-  }
-  if ("target_levels" in body || "target_level" in body) {
-    payload.target_levels = uniqueStrings(toStringArray(body.target_levels ?? body.target_level));
-  }
-  if ("meta" in body) {
-    payload.meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
-  }
-
-  return payload;
-}
-
-function validatePatchPayload(payload: Record<string, any>) {
-  if ("title" in payload && !payload.title) return "title required";
-  if ("material_kind" in payload && !payload.material_kind) return "material_kind required";
-  if ("branch_type" in payload && payload.branch_type === "gatehouse" && "target_levels" in payload && payload.target_levels.length === 0) {
-    return "target_levels required";
-  }
-  if ("branch_type" in payload && payload.branch_type === "olympiad" && "class_levels" in payload && payload.class_levels.length === 0) {
-    return "class_levels required";
-  }
-
-  return null;
-}
-
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-  const { id } = await ctx.params;
-
-  if (!id) return fail("id required", 400, "VALIDATION");
-
-  try {
-    const { data, error } = await supabase
-      .from("materials")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error) return fail(error.message, 404, "NOT_FOUND");
-
-    const { count } = await supabase
-      .from("assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("material_id", id);
-
-    return ok({
-      material: {
-        ...data,
-        assignments_count: count ?? 0,
-      },
-    });
-  } catch (error: any) {
-    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
-  }
-}
-
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-  const { id } = await ctx.params;
-
-  if (!id) return fail("id required", 400, "VALIDATION");
-
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Bad JSON", 400, "BAD_JSON");
-  }
-
-  const payload = normalizePatchPayload(body);
-  const validationError = validatePatchPayload(payload);
-
-  if (validationError) {
-    return fail(validationError, 400, "VALIDATION");
-  }
-
-  if (Object.keys(payload).length === 0) {
-    return fail("Nothing to update", 400, "VALIDATION");
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("materials")
-      .update(payload)
-      .eq("id", id)
-      .select("*")
-      .single();
-
-    if (error) return fail(error.message, 500, "DB_ERROR");
-
-    return ok({ material: data });
-  } catch (error: any) {
-    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
-  }
-}
-
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-  const { id } = await ctx.params;
-
-  if (!id) return fail("id required", 400, "VALIDATION");
-
-  try {
-    const { error } = await supabase.from("materials").delete().eq("id", id);
-
-    if (error) return fail(error.message, 500, "DB_ERROR");
-
-    return ok({ deleted: true });
-  } catch (error: any) {
-    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
-  }
-}
-</file>
-
-<file path="app/api/admin/materials/route.ts">
-import type { NextRequest } from "next/server";
-import { ok, fail } from "@/lib/api/response";
-import { requireAdmin } from "@/lib/api/admin";
-import { normalizeBranchType } from "@/lib/branches/config";
-import { normalizeMaterialKind, toStringArray, uniqueStrings } from "@/lib/materials/format";
-
-function normalizeBool(value: unknown): boolean {
-  return value === true || value === "true" || value === 1 || value === "1";
-}
-
-function normalizeOrderIndex(value: unknown): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function normalizeNullableString(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  const str = String(value).trim();
-  return str || null;
-}
-
-function normalizePayload(body: any, userId: string) {
-  const branch_type = normalizeBranchType(body?.branch_type);
-  const material_kind = normalizeMaterialKind(body?.material_kind || "mock_test");
-  const title = String(body?.title ?? "").trim();
-  const description = normalizeNullableString(body?.description);
-  const cover_image_url = normalizeNullableString(body?.cover_image_url);
-  const is_available = normalizeBool(body?.is_available);
-  const is_active = body?.is_active === undefined ? true : normalizeBool(body?.is_active);
-  const order_index = normalizeOrderIndex(body?.order_index);
-  const class_levels = uniqueStrings(toStringArray(body?.class_levels ?? body?.class_level));
-  const target_levels = uniqueStrings(toStringArray(body?.target_levels ?? body?.target_level));
-  const meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
-
-  return {
-    branch_type,
-    material_kind,
-    title,
-    description,
-    cover_image_url,
-    is_available,
-    is_active,
-    order_index,
-    class_levels,
-    target_levels,
-    created_by: userId,
-    meta,
-  };
-}
-
-function validateMaterial(payload: ReturnType<typeof normalizePayload>) {
-  if (!payload.title) return "title required";
-  if (!payload.material_kind) return "material_kind required";
-
-  if (payload.branch_type === "olympiad" && payload.class_levels.length === 0) {
-    return "class_levels required";
-  }
-
-  if (payload.branch_type === "gatehouse" && payload.target_levels.length === 0) {
-    return "target_levels required";
-  }
-
-  return null;
-}
-
-export async function GET(req: NextRequest) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-  const { searchParams } = new URL(req.url);
-
-  const branch_type = searchParams.get("branch_type");
-  const material_kind = searchParams.get("material_kind");
-  const includeCounts = searchParams.get("include_counts") !== "false";
-
-  try {
-    let query = supabase
-      .from("materials")
-      .select("*")
-      .order("order_index", { ascending: true })
-      .order("created_at", { ascending: false });
-
-    if (branch_type) {
-      query = query.eq("branch_type", normalizeBranchType(branch_type));
-    }
-
-    if (material_kind) {
-      query = query.eq("material_kind", normalizeMaterialKind(material_kind));
-    }
-
-    const { data, error } = await query;
-
-    if (error) return fail(error.message, 500, "DB_ERROR");
-
-    const materials = data ?? [];
-
-    if (!includeCounts || materials.length === 0) {
-      return ok({ materials });
-    }
-
-    const ids = materials.map((material: any) => material.id).filter(Boolean);
-
-    const { data: assignments, error: countError } = await supabase
-      .from("assignments")
-      .select("id, material_id")
-      .in("material_id", ids);
-
-    if (countError) {
-      return ok({ materials });
-    }
-
-    const counts: Record<string, number> = {};
-
-    for (const assignment of assignments ?? []) {
-      const materialId = String((assignment as any).material_id ?? "");
-      if (!materialId) continue;
-      counts[materialId] = (counts[materialId] || 0) + 1;
-    }
-
-    return ok({
-      materials: materials.map((material: any) => ({
-        ...material,
-        assignments_count: counts[String(material.id)] || 0,
-      })),
-    });
-  } catch (error: any) {
-    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
-  }
-}
-
-export async function POST(req: NextRequest) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase, user } = auth;
-
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Bad JSON", 400, "BAD_JSON");
-  }
-
-  const payload = normalizePayload(body, user.id);
-  const validationError = validateMaterial(payload);
-
-  if (validationError) {
-    return fail(validationError, 400, "VALIDATION");
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("materials")
-      .insert(payload)
-      .select("*")
-      .single();
-
-    if (error) return fail(error.message, 500, "DB_ERROR");
-
-    return ok({ material: data });
-  } catch (error: any) {
-    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
-  }
 }
 </file>
 
@@ -8318,6 +7994,747 @@ export default function RootLayout({
       <body>{children}</body>
     </html>
   );
+}
+</file>
+
+<file path="app/login/login.css">
+/* app/login/login.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap');
+
+.page-login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+
+  font-family: "Montserrat", "Poppins", sans-serif;
+  color: #1e293b;
+
+  background-color: #eaf7ff;
+  background-image:
+    radial-gradient(1200px 700px at 10% 10%, rgba(78, 205, 196, 0.25), transparent 60%),
+    radial-gradient(1100px 700px at 90% 20%, rgba(110, 190, 255, 0.3), transparent 62%),
+    linear-gradient(135deg, #f0f9ff 0%, #d2edf1 50%, #e0f2fe 100%);
+  background-attachment: fixed;
+  overflow-x: hidden;
+}
+
+.page-login::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(1000px 600px at 50% 40%, rgba(255, 255, 255, 0.2), transparent 70%);
+  z-index: 0;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 440px;
+  position: relative;
+  z-index: 1;
+  perspective: 1000px;
+}
+
+/* ===== Liquid Glass Card ===== */
+.login-card {
+  border-radius: 32px;
+  padding: 32px 28px;
+
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.25) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 
+    0 24px 60px rgba(15, 65, 95, 0.12),
+    inset 0 1px 2px rgba(255, 255, 255, 0.7),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.02);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.login-card:hover {
+  box-shadow: 
+    0 28px 70px rgba(15, 65, 95, 0.16),
+    inset 0 1px 3px rgba(255, 255, 255, 0.8);
+}
+
+/* ===== Brand ===== */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: center;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
+  margin-bottom: 20px;
+}
+
+.brand-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+
+  background: linear-gradient(135deg, #6ebeff 0%, #4ecdc4 100%);
+  box-shadow: 0 8px 24px rgba(78, 205, 196, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-mark::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+  transform: rotate(45deg);
+  animation: shine 4s infinite linear;
+}
+
+@keyframes shine {
+  0% { transform: translate(-50%, -50%) rotate(45deg); }
+  100% { transform: translate(50%, 50%) rotate(45deg); }
+}
+
+.brand-title {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #1e293b;
+  letter-spacing: -0.5px;
+}
+
+.brand-subtitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(30, 41, 59, 0.6);
+  margin-top: 4px;
+}
+
+/* ===== Headline ===== */
+.login-card h2 {
+  margin: 10px 0 24px 0;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: -0.3px;
+}
+
+/* ===== Form ===== */
+.form-group {
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(30, 41, 59, 0.7);
+  padding-left: 4px;
+}
+
+.input-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 14px 16px;
+
+  border-radius: 16px;
+  border: 1px solid rgba(110, 190, 255, 0.3);
+  background: rgba(255, 255, 255, 0.5);
+
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+
+  box-sizing: border-box;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 2px 4px rgba(15, 65, 95, 0.03);
+}
+
+.input-wrapper input {
+  padding-right: 48px;
+}
+
+.login-card input::placeholder {
+  color: rgba(30, 41, 59, 0.35);
+  font-weight: 400;
+}
+
+.login-card input:focus {
+  border-color: #4ecdc4;
+  outline: none;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 
+    0 8px 20px rgba(78, 205, 196, 0.15),
+    inset 0 1px 2px rgba(255,255,255,1);
+  transform: translateY(-1px);
+}
+
+/* Кнопка показа пароля */
+.toggle-password {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(30, 41, 59, 0.4);
+  transition: transform 0.1s ease, color 0.2s ease;
+  user-select: none;
+  z-index: 2;
+}
+
+.toggle-password:hover {
+  color: #2eb4aa;
+  transform: scale(1.1);
+}
+
+.toggle-password:active {
+  transform: scale(0.95);
+}
+
+/* ===== Buttons ===== */
+.btn {
+  width: 100%;
+  margin-top: 14px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  border: 0;
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+
+  padding: 15px 20px;
+  border-radius: 18px;
+
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 12px 24px rgba(15, 65, 95, 0.15);
+}
+
+.btn:hover { 
+  transform: translateY(-2px); 
+  box-shadow: 0 16px 32px rgba(15, 65, 95, 0.2);
+  filter: brightness(1.04);
+}
+
+.btn:active { 
+  transform: translateY(0px); 
+  filter: brightness(0.96);
+}
+
+.btn:disabled { 
+  opacity: 0.5; 
+  cursor: not-allowed; 
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn.student {
+  background: linear-gradient(135deg, #4ecdc4 0%, #5bbbe2 100%);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Блок нижних кнопок */
+.bottom-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn.info, .btn.help {
+  flex: 1;
+  margin-top: 0;
+  padding: 14px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 16px;
+}
+
+.btn.info {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(3, 105, 161, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.btn.info:hover {
+  box-shadow: 0 12px 24px rgba(3, 105, 161, 0.45);
+}
+
+.btn.help {
+  background: rgba(255, 255, 255, 0.45);
+  color: #1e293b;
+  border: 1px solid rgba(110, 190, 255, 0.25);
+  box-shadow: 0 6px 16px rgba(15, 65, 95, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+.btn.help:hover {
+  background: rgba(255, 255, 255, 0.65);
+}
+
+/* ===== Links ===== */
+.link {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(30, 41, 59, 0.6);
+}
+
+.link p {
+  margin: 12px 0;
+}
+
+.link a {
+  color: #2eb4aa;
+  text-decoration: none;
+  font-weight: 700;
+  transition: color 0.15s ease;
+  display: inline-block;
+  position: relative;
+}
+
+.link a::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  transform: scaleX(0);
+  height: 2px;
+  bottom: -2px;
+  left: 0;
+  background-color: #2eb4aa;
+  transform-origin: bottom right;
+  transition: transform 0.25s ease-out;
+}
+
+.link a:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+/* ===== Banners ===== */
+.error, .success, .warning {
+  padding: 14px 16px;
+  border-radius: 16px;
+  margin: 16px 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  border: 1px solid rgba(255,255,255,0.5);
+  box-shadow: 0 10px 25px rgba(15, 65, 95, 0.06);
+  backdrop-filter: blur(8px);
+}
+
+.error {
+  background: rgba(255, 107, 107, 0.12);
+  color: #991b1b;
+  border-left: 4px solid #ff6b6b;
+}
+
+.success {
+  background: rgba(78, 205, 196, 0.12);
+  color: #065f46;
+  border-left: 4px solid #4ecdc4;
+}
+
+.warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #92400e;
+  border-left: 4px solid #f59e0b;
+}
+
+/* ===== Loading ===== */
+.loading {
+  margin: 14px 0;
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #1a7bb9;
+  background: rgba(110, 190, 255, 0.1);
+  padding: 10px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.spinner {
+  border: 3px solid rgba(78, 205, 196, 0.2);
+  border-top: 3px solid #4ecdc4;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.existing-account-help {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(78, 205, 196, 0.3);
+  border-left: 4px solid #4ecdc4;
+  border-radius: 16px;
+  padding: 14px;
+  margin: 16px 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  color: #1e293b;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.02);
+}
+
+/* ===== Help Modal Liquid Glass ===== */
+.help-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 32, 45, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.help-modal-content {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.86) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 28px;
+  max-width: 760px;
+  width: 100%;
+  max-height: 85vh;
+  overflow: hidden;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(30px);
+  display: flex;
+  flex-direction: column;
+}
+
+.help-modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.help-modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #0f172a;
+}
+
+.help-modal-tabs {
+  display: flex;
+  background: rgba(30, 41, 59, 0.03);
+  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
+}
+
+.help-tab {
+  flex: 1;
+  padding: 16px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: rgba(30, 41, 59, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.help-tab:hover {
+  color: #1e293b;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.help-tab.active {
+  background: rgba(255, 255, 255, 0.8);
+  color: #0284c7;
+  box-shadow: inset 0 -3px 0 #0284c7;
+}
+
+.help-tab-content {
+  display: none;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.help-tab-content.active { 
+  display: block; 
+}
+
+.help-html-inner {
+  padding: 28px 24px;
+}
+
+.help-section-title {
+  margin: 0 0 24px 0;
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  border-bottom: 2px solid rgba(30, 41, 59, 0.04);
+  padding-bottom: 8px;
+}
+
+/* ===== HTML Стили вёрстки: Вкладка Регистрация ===== */
+.registration-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.guide-step {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.step-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #0284c7;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3);
+}
+
+.step-body {
+  flex: 1;
+}
+
+.step-body h5 {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.step-body p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.step-body strong {
+  color: #0f172a;
+  background: rgba(15, 23, 42, 0.04);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.step-body a {
+  color: #0284c7;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.step-body a:hover {
+  text-decoration: underline;
+}
+
+/* ===== Новые Стили Вёрстки: Вкладка Правила (Один в один как на скрине image_cc4d3b.jpg) ===== */
+.rules-tab-bg {
+  background-color: #fefce8;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(14, 165, 233, 0.15), transparent 40%),
+    radial-gradient(circle at 90% 10%, rgba(234, 179, 8, 0.15), transparent 40%),
+    radial-gradient(circle at 85% 85%, rgba(34, 197, 94, 0.15), transparent 40%),
+    radial-gradient(circle at 15% 80%, rgba(236, 72, 153, 0.15), transparent 40%);
+  border-radius: 24px;
+  padding: 32px 24px !important;
+  position: relative;
+}
+
+/* Фоновые декоративные облака из скрипта */
+.rules-tab-bg::before {
+  content: "☁️";
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  font-size: 48px;
+  opacity: 0.15;
+  filter: grayscale(100%) brightness(2);
+}
+
+.rules-tab-bg::after {
+  content: "☁️";
+  position: absolute;
+  top: 40px;
+  right: 30px;
+  font-size: 42px;
+  opacity: 0.15;
+  filter: grayscale(100%) brightness(2);
+}
+
+.rules-main-title {
+  text-align: center;
+  font-size: 54px !important;
+  font-weight: 900 !important;
+  color: #000000;
+  margin: 0 0 36px 0 !important;
+  letter-spacing: -1px;
+  text-transform: lowercase;
+}
+
+.help-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.rule-card {
+  background: #ffffff;
+  border-radius: 36px;
+  padding: 32px 24px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.01);
+  min-height: 160px;
+}
+
+.rule-card p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: #000000;
+  text-align: center;
+  white-space: pre-line;
+}
+
+/* Особенная карточка с кубком */
+.trophy-card {
+  justify-content: space-between;
+  padding: 28px 24px 16px 24px;
+}
+
+.trophy-card p {
+  margin-bottom: 12px;
+}
+
+.trophy-vector {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: floatTrophy 4s ease-in-out infinite;
+}
+
+@keyframes floatTrophy {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Кнопка закрытия модалки */
+.help-close {
+  background: rgba(30, 41, 59, 0.05);
+  border: none;
+  font-size: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #1e293b;
+  display: grid;
+  place-items: center;
+  transition: all 0.2s ease;
+}
+
+.help-close:hover {
+  background: rgba(255, 107, 107, 0.15);
+  color: #991b1b;
+}
+
+/* ===== Mobile Adaptive ===== */
+@media (max-width: 768px) {
+  .help-rules-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .rules-main-title {
+    font-size: 42px !important;
+    margin-bottom: 24px !important;
+  }
+  .rule-card {
+    border-radius: 28px;
+    padding: 24px 20px;
+    min-height: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-login { padding: 16px; }
+  .login-card { padding: 24px 20px; border-radius: 24px; }
+  .brand-title { font-size: 19px; }
+  .brand-mark { width: 48px; height: 48px; font-size: 18px; }
+  .btn { padding: 14px 16px; }
+  .bottom-actions { flex-direction: column; gap: 10px; }
+  .btn.info, .btn.help { width: 100%; }
+  
+  .help-modal-content { max-height: 90vh; border-radius: 24px; }
+  .help-modal-tabs { flex-direction: column; }
+  .help-tab { padding: 12px; font-size: 12px; }
+  .help-html-inner { padding: 16px 12px; }
 }
 </file>
 
@@ -30170,120 +30587,88 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
 }
 </file>
 
-<file path="app/api/admin/assignments/route.ts">
+<file path="app/api/admin/materials/route.ts">
+import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
-import type { NextRequest } from "next/server";
+import { normalizeBranchType } from "@/lib/branches/config";
+import { normalizeMaterialKind, toStringArray, uniqueStrings } from "@/lib/materials/format";
 
-type BranchType = "olympiad" | "gatehouse";
-
-type MatPick =
-  | {
-      branch_type: "olympiad";
-      kind: "textbook";
-      material_id: null;
-      textbook_id: string;
-      crossword_id: null;
-      error?: undefined;
-    }
-  | {
-      branch_type: "olympiad";
-      kind: "crossword";
-      material_id: null;
-      textbook_id: null;
-      crossword_id: string;
-      error?: undefined;
-    }
-  | {
-      branch_type: "gatehouse";
-      kind: "material";
-      material_id: string;
-      textbook_id: null;
-      crossword_id: null;
-      error?: undefined;
-    }
-  | {
-      error: string;
-      branch_type?: undefined;
-      kind?: undefined;
-      material_id?: undefined;
-      textbook_id?: undefined;
-      crossword_id?: undefined;
-    };
-
-function normalizeBranchType(value: unknown): BranchType {
-  const v = String(value ?? "").trim().toLowerCase();
-
-  if (v === "gatehouse" || v === "ga" || v === "ga_exam" || v === "exam" || v === "gatehouse_awards") {
-    return "gatehouse";
-  }
-
-  return "olympiad";
+function normalizeBool(value: unknown): boolean {
+  return value === true || value === "true" || value === 1 || value === "1";
 }
 
-function pickMaterial(body: any): MatPick {
+function normalizeOrderIndex(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeNullableString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const str = String(value).trim();
+  return str || null;
+}
+
+// Защита от мусора вместо ID
+function isValidUUID(str: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
+function normalizePayload(body: any, userId: string) {
   const branch_type = normalizeBranchType(body?.branch_type);
-  const kind = String(body?.kind || "").trim().toLowerCase();
-  const material_id = String(body?.material_id || "").trim();
+  const material_kind = normalizeMaterialKind(body?.material_kind || "mock_test");
+  const title = String(body?.title ?? "").trim();
+  const description = normalizeNullableString(body?.description);
+  const cover_image_url = normalizeNullableString(body?.cover_image_url);
+  const is_available = normalizeBool(body?.is_available);
+  const is_active = body?.is_active === undefined ? true : normalizeBool(body?.is_active);
+  const order_index = normalizeOrderIndex(body?.order_index);
+  const class_levels = uniqueStrings(toStringArray(body?.class_levels ?? body?.class_level));
+  const target_levels = uniqueStrings(toStringArray(body?.target_levels ?? body?.target_level));
+  const meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
 
-  const textbook_id = body?.textbook_id ? String(body.textbook_id).trim() : "";
-  const crossword_id = body?.crossword_id ? String(body.crossword_id).trim() : "";
-
-  if (branch_type === "gatehouse" || kind === "material") {
-    if (!material_id) return { error: "material_id required for gatehouse assignment" };
-
-    return {
-      branch_type: "gatehouse",
-      kind: "material",
-      material_id,
-      textbook_id: null,
-      crossword_id: null,
-    };
+  // ❗️ ФИКС ТАБА: Ловим и очищаем project_tab_id
+  let project_tab_id = normalizeNullableString(body?.project_tab_id ?? body?.tab_id);
+  
+  if (project_tab_id === "00000000-0000-0000-0000-000000000000" || project_tab_id === "none" || project_tab_id === "null" || project_tab_id === "") {
+    project_tab_id = null;
   }
 
-  if (kind && material_id) {
-    if (kind !== "textbook" && kind !== "crossword") return { error: "Bad kind" };
-
-    if (kind === "textbook") {
-      return {
-        branch_type: "olympiad",
-        kind: "textbook",
-        material_id: null,
-        textbook_id: material_id,
-        crossword_id: null,
-      };
-    }
-
-    return {
-      branch_type: "olympiad",
-      kind: "crossword",
-      material_id: null,
-      textbook_id: null,
-      crossword_id: material_id,
-    };
+  // Если прилетел текст вместо UUID — сбрасываем в null
+  if (project_tab_id && !isValidUUID(project_tab_id)) {
+    project_tab_id = null;
   }
 
-  if (textbook_id) {
-    return {
-      branch_type: "olympiad",
-      kind: "textbook",
-      material_id: null,
-      textbook_id,
-      crossword_id: null,
-    };
+  return {
+    project_tab_id, // Теперь материал привяжется к табу!
+    branch_type,
+    material_kind,
+    title,
+    description,
+    cover_image_url,
+    is_available,
+    is_active,
+    order_index,
+    class_levels,
+    target_levels,
+    created_by: userId,
+    meta,
+  };
+}
+
+function validateMaterial(payload: ReturnType<typeof normalizePayload>) {
+  if (!payload.title) return "title required";
+  if (!payload.material_kind) return "material_kind required";
+
+  if (payload.branch_type === "olympiad" && payload.class_levels.length === 0) {
+    return "class_levels required";
   }
 
-  if (crossword_id) {
-    return {
-      branch_type: "olympiad",
-      kind: "crossword",
-      material_id: null,
-      textbook_id: null,
-      crossword_id,
-    };
+  if (payload.branch_type === "gatehouse" && payload.target_levels.length === 0) {
+    return "target_levels required";
   }
 
-  return { error: "kind/material_id or textbook_id/crossword_id required" };
+  return null;
 }
 
 export async function GET(req: NextRequest) {
@@ -30291,33 +30676,69 @@ export async function GET(req: NextRequest) {
   if ("response" in auth) return auth.response;
 
   const { supabase } = auth;
+  const { searchParams } = new URL(req.url);
 
-  const branch_type = normalizeBranchType(req.nextUrl.searchParams.get("branch_type"));
-  const kind = String(req.nextUrl.searchParams.get("kind") || "").trim().toLowerCase();
-  const id = String(req.nextUrl.searchParams.get("id") || "").trim();
-  const material_id = String(req.nextUrl.searchParams.get("material_id") || id || "").trim();
+  const branch_type = searchParams.get("branch_type");
+  const material_kind = searchParams.get("material_kind");
+  const includeCounts = searchParams.get("include_counts") !== "false";
 
-  if (!kind || !id) return ok({ assignments: [] });
+  try {
+    let query = supabase
+      .from("materials")
+      .select("*")
+      .order("order_index", { ascending: true })
+      .order("created_at", { ascending: false });
 
-  let q = supabase.from("assignments").select("*");
+    if (branch_type) {
+      query = query.eq("branch_type", normalizeBranchType(branch_type));
+    }
 
-  if (branch_type === "gatehouse" || kind === "material") {
-    if (!material_id) return ok({ assignments: [] });
+    if (material_kind) {
+      query = query.eq("material_kind", normalizeMaterialKind(material_kind));
+    }
 
-    q = q.eq("branch_type", "gatehouse").eq("material_id", material_id);
-  } else if (kind === "textbook") {
-    q = q.eq("textbook_id", id).or("branch_type.eq.olympiad,branch_type.is.null");
-  } else if (kind === "crossword") {
-    q = q.eq("crossword_id", id).or("branch_type.eq.olympiad,branch_type.is.null");
-  } else {
-    return fail("Bad kind", 400, "VALIDATION");
+    const { data, error } = await query;
+
+    if (error) return fail(error.message, 500, "DB_ERROR");
+
+    const materials = data ?? [];
+
+    if (!includeCounts || materials.length === 0) {
+      return ok({ materials });
+    }
+
+    const ids = materials.map((material: any) => material.id).filter(Boolean);
+    const idsString = ids.join(',');
+
+    // ❗️ ФИКС СЧЕТЧИКА: Ищем задания и по новой, и по легаси привязке
+    const { data: assignments, error: countError } = await supabase
+      .from("assignments")
+      .select("id, material_id, textbook_id, crossword_id")
+      .or(`material_id.in.(${idsString}),textbook_id.in.(${idsString}),crossword_id.in.(${idsString})`);
+
+    if (countError) {
+      console.error("🔴 [ADMIN GET MATERIALS] Ошибка подсчета заданий:", countError.message);
+      return ok({ materials });
+    }
+
+    const counts: Record<string, number> = {};
+
+    for (const assignment of assignments ?? []) {
+      const matId = String(assignment.material_id || assignment.textbook_id || assignment.crossword_id || "");
+      if (!matId) continue;
+      counts[matId] = (counts[matId] || 0) + 1;
+    }
+
+    return ok({
+      materials: materials.map((material: any) => ({
+        ...material,
+        assignments_count: counts[String(material.id)] || 0,
+      })),
+    });
+  } catch (error: any) {
+    console.error("🔴 [ADMIN GET MATERIALS] Серверная ошибка:", error);
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
-
-  const { data, error } = await q.order("order_index", { ascending: false }).order("created_at", { ascending: false });
-
-  if (error) return fail(error.message, 500, "DB_ERROR");
-
-  return ok({ assignments: data ?? [] });
 }
 
 export async function POST(req: NextRequest) {
@@ -30333,38 +30754,31 @@ export async function POST(req: NextRequest) {
     return fail("Bad JSON", 400, "BAD_JSON");
   }
 
-  const title = String(body?.title ?? "").trim();
-  const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
-  const content = body?.content;
-  
-  // Получаем тип задания, по умолчанию test
-  const assignment_type = body?.assignment_type === "intro" ? "intro" : "test";
+  const payload = normalizePayload(body, user.id);
+  const validationError = validateMaterial(payload);
 
-  if (!title) return fail("title required", 400, "VALIDATION");
-  if (!content || typeof content !== "object") return fail("content required", 400, "VALIDATION");
+  if (validationError) {
+    console.error("🔴 [ADMIN POST MATERIAL] Ошибка валидации:", validationError);
+    return fail(validationError, 400, "VALIDATION");
+  }
 
-  const mat = pickMaterial(body);
-  if (mat.error) return fail(mat.error, 400, "VALIDATION");
+  try {
+    const { data, error } = await supabase
+      .from("materials")
+      .insert(payload)
+      .select("*")
+      .single();
 
-  const payload: any = {
-    title,
-    order_index,
-    content,
-    assignment_type, // Добавляем поле для сохранения в БД
-    created_by: user.id,
+    if (error) {
+      console.error("🔴 [ADMIN POST MATERIAL] Ошибка БД:", error.message, error.details);
+      return fail(error.message, 500, "DB_ERROR");
+    }
 
-    branch_type: mat.branch_type,
-    material_id: mat.material_id,
-
-    textbook_id: mat.textbook_id,
-    crossword_id: mat.crossword_id,
-  };
-
-  const { data, error } = await supabase.from("assignments").insert(payload).select("*").single();
-
-  if (error) return fail(error.message, 500, "DB_ERROR");
-
-  return ok({ assignment: data });
+    return ok({ material: data });
+  } catch (error: any) {
+    console.error("🔴 [ADMIN POST MATERIAL] Серверная ошибка:", error);
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
 }
 </file>
 
@@ -30873,6 +31287,210 @@ export async function DELETE(
 }
 </file>
 
+<file path="app/api/admin/projects/[projectId]/materials/[materialId]/route.ts">
+import type { NextRequest } from "next/server";
+import { ok, fail } from "@/lib/api/response";
+import { requireAdmin } from "@/lib/api/admin";
+import { normalizeBranchType } from "@/lib/branches/config";
+import { normalizeMaterialKind, toStringArray, uniqueStrings } from "@/lib/materials/format";
+
+function normalizeBool(value: unknown): boolean {
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+
+function normalizeOrderIndex(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeNullableString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const str = String(value).trim();
+  return str || null;
+}
+
+// Защита от мусора вместо ID
+function isValidUUID(str: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
+function normalizePatchPayload(body: any) {
+  const payload: Record<string, any> = {};
+
+  const branchType = body.branch_type ?? body.branchType;
+  if (branchType !== undefined) payload.branch_type = normalizeBranchType(branchType);
+
+  const materialKind = body.material_kind ?? body.materialKind;
+  if (materialKind !== undefined) payload.material_kind = normalizeMaterialKind(materialKind);
+
+  if ("title" in body) payload.title = String(body.title ?? "").trim();
+  if ("description" in body) payload.description = normalizeNullableString(body.description);
+  
+  const coverUrl = body.cover_image_url ?? body.coverImageUrl;
+  if (coverUrl !== undefined) payload.cover_image_url = normalizeNullableString(coverUrl);
+  
+  if ("is_available" in body) payload.is_available = normalizeBool(body.is_available);
+  if ("is_active" in body) payload.is_active = normalizeBool(body.is_active);
+  if ("order_index" in body) payload.order_index = normalizeOrderIndex(body.order_index);
+  
+  const classLevels = body.class_levels ?? body.class_level ?? body.classLevels;
+  if (classLevels !== undefined) {
+    payload.class_levels = uniqueStrings(toStringArray(classLevels));
+  }
+  
+  const targetLevels = body.target_levels ?? body.target_level ?? body.targetLevels;
+  if (targetLevels !== undefined) {
+    payload.target_levels = uniqueStrings(toStringArray(targetLevels));
+  }
+  
+  if ("meta" in body) {
+    payload.meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
+  }
+  
+  // ❗️ УЛЬТРА-ФИКС ДЛЯ ТАБОВ:
+  const rawTabId = body.project_tab_id ?? body.tab_id ?? body.projectTabId ?? body.tabId;
+  if (rawTabId !== undefined) {
+    let tid = normalizeNullableString(rawTabId);
+    
+    // Очищаем от нулей и заглушек фронтенда
+    if (tid === "00000000-0000-0000-0000-000000000000" || tid === "none" || tid === "null" || tid === "") {
+      tid = null;
+    }
+
+    // Если фронт прислал текст вместо ID — сбрасываем в null, чтобы БД не упала
+    if (tid && !isValidUUID(tid)) {
+      tid = null;
+    }
+    
+    payload.project_tab_id = tid;
+  }
+
+  return payload;
+}
+
+function validatePatchPayload(payload: Record<string, any>) {
+  if ("title" in payload && !payload.title) return "title required";
+  if ("material_kind" in payload && !payload.material_kind) return "material_kind required";
+  if ("branch_type" in payload && payload.branch_type === "gatehouse" && "target_levels" in payload && payload.target_levels.length === 0) {
+    return "target_levels required";
+  }
+  if ("branch_type" in payload && payload.branch_type === "olympiad" && "class_levels" in payload && payload.class_levels.length === 0) {
+    return "class_levels required";
+  }
+  return null;
+}
+
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ projectId: string; materialId: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { materialId } = await ctx.params;
+
+  if (!materialId) return fail("materialId required", 400, "VALIDATION");
+
+  try {
+    const { data, error } = await supabase
+      .from("materials")
+      .select("*")
+      .eq("id", materialId)
+      .single();
+
+    if (error) return fail(error.message, 404, "NOT_FOUND");
+
+    const { count } = await supabase
+      .from("assignments")
+      .select("id", { count: "exact", head: true })
+      .or(`material_id.eq.${materialId},textbook_id.eq.${materialId},crossword_id.eq.${materialId}`);
+
+    return ok({
+      material: {
+        ...data,
+        assignments_count: count ?? 0,
+      },
+    });
+  } catch (error: any) {
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+
+// ❗️ Обрабатываем PUT (именно его присылает твой фронтенд)
+export async function PUT(req: NextRequest, ctx: { params: Promise<{ projectId: string; materialId: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { materialId } = await ctx.params;
+
+  if (!materialId) return fail("materialId required", 400, "VALIDATION");
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return fail("Bad JSON", 400, "BAD_JSON");
+  }
+
+  const payload = normalizePatchPayload(body);
+  const validationError = validatePatchPayload(payload);
+
+  if (validationError) {
+    console.error("🔴 [ADMIN PUT MATERIAL] Провал валидации:", validationError);
+    return fail(validationError, 400, "VALIDATION");
+  }
+
+  if (Object.keys(payload).length === 0) {
+    return fail("Nothing to update", 400, "VALIDATION");
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("materials")
+      .update(payload)
+      .eq("id", materialId)
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("🔴 [ADMIN PUT MATERIAL] Ошибка БД при сохранении:", error.message, error.details);
+      let errorMsg = error.message;
+      if (errorMsg.includes("foreign key")) errorMsg = "Ошибка привязки таба (несуществующий ID)";
+      return fail(errorMsg, 500, "DB_ERROR");
+    }
+
+    return ok({ material: data });
+  } catch (error: any) {
+    console.error("🔴 [ADMIN PUT MATERIAL] Серверная ошибка:", error);
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+
+// Для безопасности дублируем логику и на PATCH
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ projectId: string; materialId: string }> }) {
+  return PUT(req, ctx);
+}
+
+export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ projectId: string; materialId: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { materialId } = await ctx.params;
+
+  if (!materialId) return fail("materialId required", 400, "VALIDATION");
+
+  try {
+    const { error } = await supabase.from("materials").delete().eq("id", materialId);
+
+    if (error) return fail(error.message, 500, "DB_ERROR");
+
+    return ok({ deleted: true });
+  } catch (error: any) {
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+</file>
+
 <file path="app/api/admin/projects/route.ts">
 // app/api/admin/projects/route.ts
 // ADMIN: список всех проектов (включая неактивные) + создание нового.
@@ -31335,173 +31953,6 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-  }
-}
-</file>
-
-<file path="app/api/profile-progress/route.ts">
-// app/api/profile-progress/route.ts
-import { ok, fail } from "@/lib/api/response";
-import { requireUser } from "@/lib/api/auth";
-import { type NextRequest } from "next/server";
-
-export async function GET(req: NextRequest) {
-  const auth = await requireUser();
-  if ("response" in auth) return auth.response;
-  const { supabase, user } = auth;
-
-  // Получаем slug из URL, если нужно фильтровать по проекту
-  const url = new URL(req.url);
-  const projectSlug = url.searchParams.get("slug");
-
-  try {
-    // 1. Найдём ID проекта по slug (если передан)
-    let projectId: string | null = null;
-    if (projectSlug) {
-      const { data: project, error: projectError } = await supabase
-        .from("projects")
-        .select("id")
-        .eq("slug", projectSlug)
-        .single();
-
-      if (projectError) {
-        // Если проект не найден, возвращаем пустой результат, а не ошибку
-        return ok({
-          stats: {
-            totalMaterials: 0,
-            completedMaterials: 0,
-            totalAvailableAssignments: 0,
-            completedAvailableAssignments: 0,
-            successRate: 0,
-          },
-          materialsProgress: [],
-        });
-      }
-      projectId = project?.id ?? null;
-    }
-
-    // 2. Получаем материалы, привязанные к проекту
-    //    Используем связь через project_tabs, т.к. материалы привязаны к табам,
-    //    а табы — к проекту.
-    let materialsQuery = supabase
-      .from("materials")
-      .select("id, title, material_kind, is_available, project_tab_id")
-      .eq("is_active", true);
-
-    if (projectId) {
-      // Сначала получим все табы этого проекта
-      const { data: tabs, error: tabsError } = await supabase
-        .from("project_tabs")
-        .select("id")
-        .eq("project_id", projectId)
-        .eq("is_active", true);
-
-      if (tabsError) {
-        throw new Error(tabsError.message);
-      }
-
-      const tabIds = tabs?.map((t: { id: string }) => t.id) || [];
-      if (tabIds.length === 0) {
-        // Если у проекта нет табов, материалов быть не может
-        return ok({
-          stats: {
-            totalMaterials: 0,
-            completedMaterials: 0,
-            totalAvailableAssignments: 0,
-            completedAvailableAssignments: 0,
-            successRate: 0,
-          },
-          materialsProgress: [],
-        });
-      }
-
-      materialsQuery = materialsQuery.in("project_tab_id", tabIds);
-    }
-
-    const { data: materials, error: matErr } = await materialsQuery;
-    if (matErr) throw matErr;
-
-    // 3. Получаем прогресс пользователя по всем заданиям
-    const { data: userProgress, error: progErr } = await supabase
-      .from("user_progress")
-      .select("assignment_id, is_completed")
-      .eq("user_id", user.id);
-    if (progErr) throw progErr;
-
-    const completedSet = new Set(
-      (userProgress || [])
-        .filter((p) => p.is_completed)
-        .map((p) => p.assignment_id)
-    );
-
-    // 4. Для каждого материала получаем список заданий и считаем прогресс
-    const materialsProgress = await Promise.all(
-      (materials || []).map(async (m) => {
-        const { data: assignments } = await supabase
-          .from("assignments")
-          .select("id")
-          .eq("material_id", m.id);
-
-        const total = assignments?.length ?? 0;
-        const completed = (assignments || [])
-          .filter((a) => completedSet.has(a.id))
-          .length;
-
-        const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-        // Определяем тип материала (для иконки в UI)
-        const kind = m.material_kind === "crossword" ? "crossword" : "textbook";
-
-        // Строим корректную ссылку на страницу материала
-        const href = projectSlug
-          ? `/projects/${projectSlug}/materials/${m.id}`
-          : `/materials/${m.id}`; // fallback для старых ссылок
-
-        return {
-          kind,
-          id: m.id,
-          title: m.title,
-          total,
-          completed,
-          progressPercent,
-          href,
-        };
-      })
-    );
-
-    // 5. Общая статистика
-    const totalMaterials = materials?.length ?? 0;
-    const completedMaterials = materialsProgress.filter(
-      (m) => m.total > 0 && m.completed === m.total
-    ).length;
-
-    const totalAvailableAssignments = materialsProgress.reduce(
-      (acc, m) => acc + m.total,
-      0
-    );
-    const completedAvailableAssignments = materialsProgress.reduce(
-      (acc, m) => acc + m.completed,
-      0
-    );
-
-    const successRate =
-      totalAvailableAssignments > 0
-        ? Math.round(
-            (completedAvailableAssignments / totalAvailableAssignments) * 100
-          )
-        : 0;
-
-    const stats = {
-      totalMaterials,
-      completedMaterials,
-      totalAvailableAssignments,
-      completedAvailableAssignments,
-      successRate,
-    };
-
-    return ok({ stats, materialsProgress });
-  } catch (error: any) {
-    return fail(error?.message || "Server error", 500, "DB_ERROR");
   }
 }
 </file>
@@ -32513,6 +32964,639 @@ export async function GET() {
       headers: { 'Content-Type': 'application/javascript' },
     });
   }
+}
+</file>
+
+<file path="app/login/page.tsx">
+"use client";
+
+import "./login.css";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
+type BannerType = "error" | "success" | "warning" | null;
+
+type ApiPayload = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  code?: string;
+  data?: any;
+  authenticated?: boolean;
+  profile?: any;
+  redirectTo?: string;
+};
+
+function isValidEmail(email: string) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+function looksLikeNetworkError(err: unknown) {
+  const msg = String((err as any)?.message ?? err ?? "").toLowerCase().trim();
+  return (
+    msg.includes("failed to fetch") ||
+    msg.includes("fetch failed") ||
+    msg.includes("networkerror") ||
+    msg.includes("network error") ||
+    msg.includes("load failed") ||
+    msg.includes("request failed") ||
+    msg.includes("typeerror: failed to fetch")
+  );
+}
+
+async function readApiPayload(res: Response): Promise<ApiPayload | null> {
+  const text = await res.text();
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as ApiPayload;
+  } catch {
+    return {
+      ok: false,
+      error: text,
+    };
+  }
+}
+
+function unwrapApiData(json: ApiPayload | null) {
+  if (!json) return null;
+  if (json.data && typeof json.data === "object") return json.data;
+  return json;
+}
+
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [bannerType, setBannerType] = useState<BannerType>(null);
+  const [bannerText, setBannerText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const [networkIssue, setNetworkIssue] = useState(false);
+
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"registration" | "rules">("registration");
+
+  const msgParam = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get("message");
+  }, []);
+
+  function showBanner(type: BannerType, text: string) {
+    setBannerType(type);
+    setBannerText(text);
+  }
+
+  function showNetworkBanner(extra?: string) {
+    setNetworkIssue(true);
+    const base =
+      "🌐 Не удалось подключиться к серверу входа.\n" +
+      "Проверьте интернет-соединение и попробуйте обновить страницу.\n" +
+      "Если проблема повторяется — попробуйте открыть сайт позже.";
+    showBanner("error", extra ? `${base}\n\nДетали: ${extra}` : base);
+  }
+
+  useEffect(() => {
+    if (!msgParam) return;
+
+    if (msgParam === "confirmed") {
+      setNetworkIssue(false);
+      showBanner("success", "✅ Email успешно подтвержден! Теперь вы можете войти в систему.");
+    } else if (msgParam === "check_email") {
+      setNetworkIssue(false);
+      showBanner("warning", "📧 Проверьте вашу почту для подтверждения регистрации.");
+    } else if (msgParam === "email_exists") {
+      setNetworkIssue(false);
+      showBanner(
+        "error",
+        "❌ Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.",
+      );
+    }
+  }, [msgParam]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      try {
+        const res = await fetch("/api/auth/session", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        const json = await readApiPayload(res);
+        const payload = unwrapApiData(json);
+
+        if (cancelled) return;
+
+        if (res.ok && json?.ok && payload?.authenticated) {
+          const isAdmin = Boolean(payload?.profile?.is_admin);
+          window.location.href = isAdmin ? "/admin" : "/portal";
+        }
+      } catch (e: any) {
+        if (cancelled) return;
+        if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function resendConfirmation(emailValue: string) {
+    try {
+      const res = await fetch("/api/auth/resend-confirmation", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          email: emailValue,
+        }),
+      });
+
+      const json = await readApiPayload(res);
+      const payload = unwrapApiData(json);
+
+      if (!res.ok || !json?.ok) {
+        showBanner(
+          "error",
+          payload?.error || payload?.message || json?.error || "Не удалось отправить письмо подтверждения.",
+        );
+        return;
+      }
+
+      showBanner(
+        "success",
+        payload?.message || json?.message || "📧 Письмо с подтверждением отправлено повторно. Проверьте почту.",
+      );
+    } catch (e: any) {
+      if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
+      else showBanner("error", "❌ Не удалось отправить письмо: " + (e?.message || String(e)));
+    }
+  }
+
+  async function doLogin(isAdmin: boolean) {
+    const e = email.trim().toLowerCase();
+
+    if (!e || !password) {
+      setNetworkIssue(false);
+      showBanner("error", "Введите email и пароль");
+      return;
+    }
+
+    if (!isValidEmail(e)) {
+      setNetworkIssue(false);
+      showBanner("error", "Неверный формат email");
+      return;
+    }
+
+    setNetworkIssue(false);
+
+    try {
+      setBusy(true);
+      showBanner("warning", "🔐 Проверяем данные...");
+
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          email: e,
+          password,
+          isAdmin,
+          mode: isAdmin ? "admin" : "student",
+        }),
+      });
+
+      const json = await readApiPayload(res);
+      const payload = unwrapApiData(json);
+
+      if (!res.ok || !json?.ok) {
+        const msg = String(payload?.error || payload?.message || json?.error || "Ошибка входа");
+        const code = String(payload?.code || json?.code || "").toUpperCase();
+
+        if (looksLikeNetworkError(msg)) {
+          showNetworkBanner(msg);
+          setBusy(false);
+          return;
+        }
+
+        if (code === "EMAIL_NOT_CONFIRMED" || msg.toLowerCase().includes("email не подтверж")) {
+          showBanner("error", "❌ Email не подтвержден. Проверьте вашу почту и подтвердите регистрацию.");
+
+          const resend = window.confirm("Отправить письмо с подтверждением повторно?");
+          if (resend) {
+            await resendConfirmation(e);
+          }
+        } else if (code === "INVALID_CREDENTIALS") {
+          showBanner("error", "❌ Неверный email или пароль. Если вы забыли пароль, воспользуйтесь восстановлением.");
+        } else if (code === "RATE_LIMIT") {
+          showBanner("error", "⚠️ Слишком много попыток. Попробуйте через несколько минут.");
+        } else if (code === "USER_NOT_FOUND") {
+          showBanner("error", "❌ Пользователь с таким email не найден. Проверьте email или зарегистрируйтесь.");
+        } else {
+          showBanner("error", msg);
+        }
+
+        setBusy(false);
+        return;
+      }
+
+      const redirectTo = String(payload?.redirectTo || (isAdmin ? "/admin" : "/portal"));
+      window.location.href = redirectTo;
+    } catch (err: any) {
+      if (looksLikeNetworkError(err)) showNetworkBanner(String(err?.message || err));
+      else showBanner("error", "❌ Неожиданная ошибка: " + (err?.message || String(err)));
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (helpOpen) {
+          setHelpOpen(false);
+          document.body.style.overflow = "";
+        }
+        if (supportOpen) {
+          setSupportOpen(false);
+          document.body.style.overflow = "";
+        }
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [helpOpen, supportOpen]);
+
+  function openHelp() {
+    setHelpOpen(true);
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeHelp() {
+    setHelpOpen(false);
+    document.body.style.overflow = "";
+  }
+
+  function openSupport() {
+    setSupportOpen(true);
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeSupport() {
+    setSupportOpen(false);
+    document.body.style.overflow = "";
+  }
+
+  function renderBanner() {
+    if (!bannerType) return null;
+    const cls = bannerType === "error" ? "error" : bannerType === "success" ? "success" : "warning";
+
+    return (
+      <div className={cls} style={{ display: "block", whiteSpace: "pre-line" }}>
+        {bannerText}
+      </div>
+    );
+  }
+
+  function renderNetworkActions() {
+    if (!networkIssue) return null;
+
+    return (
+      <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button className="btn student" type="button" onClick={() => window.location.reload()}>
+          🔄 Обновить страницу
+        </button>
+        <Link className="btn info" href="/info">
+          📄 Информация
+        </Link>
+      </div>
+    );
+  }
+
+  function renderExistingAccountHelp() {
+    if (msgParam !== "confirmed") return null;
+
+    return (
+      <div className="existing-account-help">
+        <strong>🎉 Отлично! Ваш аккаунт активирован.</strong>
+        <br />
+        Теперь вы можете войти в систему используя ваш email и пароль.
+      </div>
+    );
+  }
+
+  return (
+    <div className="page-login">
+      <div
+        className="help-modal"
+        style={{ display: helpOpen ? "flex" : "none" }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeHelp();
+        }}
+      >
+        <div className="help-modal-content">
+          <div className="help-modal-header">
+            <h3>Помощь</h3>
+            <button className="help-close" onClick={closeHelp} type="button">
+              ✕
+            </button>
+          </div>
+
+          <div className="help-modal-tabs">
+            <button
+              className={"help-tab " + (activeTab === "registration" ? "active" : "")}
+              onClick={() => setActiveTab("registration")}
+              type="button"
+            >
+              Регистрация
+            </button>
+            <button
+              className={"help-tab " + (activeTab === "rules" ? "active" : "")}
+              onClick={() => setActiveTab("rules")}
+              type="button"
+            >
+              Правила
+            </button>
+          </div>
+
+          <div className={"help-tab-content " + (activeTab === "registration" ? "active" : "")}>
+            <div className="help-html-inner">
+              <h4 className="help-section-title">Как создать профиль и войти</h4>
+              
+              <div className="registration-guide">
+                <div className="guide-step">
+                  <div className="step-badge">1</div>
+                  <div className="step-body">
+                    <h5>Заполните анкету</h5>
+                    <p>
+                      Нажмите кнопку <Link href="/register" onClick={closeHelp}>«Зарегистрироваться»</Link> в самом низу. 
+                      Внимательно введите ваш настоящий рабочий Email и придумайте безопасный пароль.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="guide-step">
+                  <div className="step-badge">2</div>
+                  <div className="step-body">
+                    <h5>Отправка ссылки на почту</h5>
+                    <p>
+                      Сразу после регистрации наша система отправит вам автоматическое письмо. 
+                      Обычно оно долетает быстро — в течение пары минут.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="guide-step">
+                  <div className="step-badge">3</div>
+                  <div className="step-body">
+                    <h5>Проверьте все папки</h5>
+                    <p>
+                      Откройте ваш почтовый ящик. Если во «Входящих» пусто, не пугайтесь — обязательно загляните в папки <strong>«Спам»</strong> and <strong>«Промоакции»</strong>. Фильтры почты иногда путают автоматические письма.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="guide-step">
+                  <div className="step-badge">4</div>
+                  <div className="step-body">
+                    <h5>Подтвердите и учитесь</h5>
+                    <p>
+                      Кликните по ссылке в письме. Ваш аккаунт мгновенно активируется, вас вернет сюда, и вы сможете спокойно зайти под своим логином и паролем.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={"help-tab-content " + (activeTab === "rules" ? "active" : "")}>
+            <div className="help-html-inner rules-tab-bg">
+              <h4 className="rules-main-title">правила</h4>
+              
+              <div className="help-rules-grid">
+                <div className="rule-card">
+                  <p>
+                    Количество попыток не ограничено. Мы верим, что вы сможете! 
+                    Система будет хранить ваш лучший (последний) результат.
+                  </p>
+                </div>
+
+                <div className="rule-card">
+                  <p>
+                    Полный доступ к учебным модулям откроется после покупки.
+                  </p>
+                </div>
+
+                <div className="rule-card">
+                  <p>
+                    Ваша цель — не просто пройти, а понять. Подходите к каждому уроку осознанно, 
+                    чтобы извлечь максимальную пользу.
+                  </p>
+                </div>
+
+                <div className="rule-card trophy-card">
+                  <p>
+                    Помните, главное — это ваше развитие. Этот учебник — ваш инструмент. 
+                    Используйте его по максимуму!
+                  </p>
+                  <div className="trophy-vector">
+                    <svg viewBox="0 0 24 24" width="64" height="64" fill="#f59e0b">
+                      <path d="M18 2H6v2H2v5c0 2.21 1.79 4 4 4h2c.75 2.15 2.6 3.71 4.88 3.97V19H7v2h10v-2h-4.12v-2.03C15.16 16.71 17 15.15 17.75 13h2.25c2.21 0 4-1.79 4-4V4h-4V2zM4 6h2v5c-1.1 0-2-.9-2-2V6zm16 3c0 1.1-.9 2-2 2V6h2v3z"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Мини-модалка технической поддержки */}
+      <div
+        className="help-modal"
+        style={{ display: supportOpen ? "flex" : "none" }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeSupport();
+        }}
+      >
+        <div className="help-modal-content" style={{ maxWidth: "400px" }}>
+          <div className="help-modal-header">
+            <h3>Техническая поддержка</h3>
+            <button className="help-close" onClick={closeSupport} type="button">
+              ✕
+            </button>
+          </div>
+          <div style={{ padding: "20px 0", color: "rgba(15,23,42,0.9)" }}>
+            <p style={{ marginBottom: "20px", fontSize: "14px", lineHeight: "1.5", fontWeight: 600 }}>
+              Обычно администратор отвечает в течение 2 часов. Выберите любой удобный способ для быстрой связи:
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <a
+                href="https://t.me/skebobingg"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "block",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  background: "linear-gradient(135deg, #24a1de, #208ec4)",
+                  color: "#fff",
+                  fontWeight: 900,
+                  fontSize: "14px",
+                  textDecoration: "none",
+                  textAlign: "center",
+                  boxShadow: "0 4px 12px rgba(36, 161, 222, 0.2)"
+                }}
+              >
+                Написать в Telegram
+              </a>
+              <a
+                href="https://vk.com/bluntokyr"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "block",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  background: "linear-gradient(135deg, #0077ff, #0066da)",
+                  color: "#fff",
+                  fontWeight: 900,
+                  fontSize: "14px",
+                  textDecoration: "none",
+                  textAlign: "center",
+                  boxShadow: "0 4px 12px rgba(0, 119, 255, 0.2)"
+                }}
+              >
+                Написать во ВКонтакте
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="login-container">
+        <div className="login-card">
+          <div className="brand">
+            <div className="brand-mark">HH</div>
+            <div>
+              <div className="brand-title">Учебники Хиппоши</div>
+              <div className="brand-subtitle">🎓 Образовательная платформа</div>
+            </div>
+          </div>
+
+          <h2>Вход в аккаунт</h2>
+
+          <div className="loading" style={{ display: busy ? "block" : "none" }}>
+            <div className="spinner" />
+            Проверяем данные...
+          </div>
+
+          {renderBanner()}
+          {renderNetworkActions()}
+          {renderExistingAccountHelp()}
+
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              placeholder="example@gmail.com"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  (document.getElementById("password") as HTMLInputElement | null)?.focus();
+                }
+              }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="password">Пароль</label>
+            <div className="input-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                placeholder="Введите ваш пароль"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void doLogin(false);
+                }}
+              />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                title={showPassword ? "Скрыть пароль" : "Показать пароль"}
+              >
+                {showPassword ? "👁️‍🗨️" : "👁️"}
+              </button>
+            </div>
+          </div>
+
+          <button className="btn student" onClick={() => void doLogin(false)} disabled={busy}>
+            Войти как ученик
+          </button>
+
+          <div className="link">
+            <p>
+              Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
+            </p>
+            <p>
+              <Link href="/reset">Забыли пароль?</Link>
+            </p>
+
+            <div className="bottom-actions">
+              <Link className="btn info" href="/info">
+                Информация
+              </Link>
+
+              <button className="btn help" onClick={openHelp} type="button">
+                Помощь
+              </button>
+            </div>
+
+            {/* Кнопка техподдержки, расположенная под всеми кнопками */}
+            <button
+              className="btn support"
+              onClick={openSupport}
+              type="button"
+              style={{
+                marginTop: "12px",
+                width: "100%",
+                padding: "11px",
+                borderRadius: "12px",
+                background: "rgba(15, 23, 42, 0.05)",
+                border: "1px solid rgba(15, 23, 42, 0.08)",
+                color: "rgba(15, 23, 42, 0.8)",
+                fontWeight: 700,
+                fontSize: "14px",
+                cursor: "pointer"
+              }}
+            >
+              Техническая поддержка
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -38215,6 +39299,169 @@ export default async function ProjectRequestsPage({
 }
 </file>
 
+<file path="app/api/admin/assignments/route.ts">
+import { ok, fail } from "@/lib/api/response";
+import { requireAdmin } from "@/lib/api/admin";
+import type { NextRequest } from "next/server";
+
+// Гибкий тип для поддержки и старой, и новой архитектуры
+type MatPick = {
+  branch_type?: string;
+  kind?: string;
+  material_id: string | null;
+  textbook_id: string | null;
+  crossword_id: string | null;
+  error?: string;
+};
+
+// Больше не форсируем жесткие типы, доверяем фронтенду, но оставляем фолбэк
+function normalizeBranchType(value: unknown): string {
+  const v = String(value ?? "").trim().toLowerCase();
+  if (v === "gatehouse" || v === "ga" || v === "ga_exam" || v === "exam" || v === "gatehouse_awards") {
+    return "gatehouse";
+  }
+  return v || "olympiad"; // Если передали кастомную ветку - сохраним её, иначе olympiad
+}
+
+function pickMaterial(body: any): MatPick {
+  const branch_type = normalizeBranchType(body?.branch_type);
+  const kind = String(body?.kind || "").trim().toLowerCase();
+  const material_id = String(body?.material_id || "").trim();
+  const textbook_id = body?.textbook_id ? String(body.textbook_id).trim() : "";
+  const crossword_id = body?.crossword_id ? String(body.crossword_id).trim() : "";
+
+  // 1. НОВАЯ АРХИТЕКТУРА: Если явно передан material_id или kind === "material"
+  if (material_id && (!kind || kind === "material")) {
+    return {
+      branch_type,
+      kind: "material",
+      material_id,
+      textbook_id: null,
+      crossword_id: null,
+    };
+  }
+
+  // 2. ЛЕГАСИ: Учебники
+  if (kind === "textbook" || textbook_id) {
+    return {
+      branch_type,
+      kind: "textbook",
+      material_id: null,
+      textbook_id: textbook_id || material_id,
+      crossword_id: null,
+    };
+  }
+
+  // 3. ЛЕГАСИ: Кроссворды
+  if (kind === "crossword" || crossword_id) {
+    return {
+      branch_type,
+      kind: "crossword",
+      material_id: null,
+      textbook_id: null,
+      crossword_id: crossword_id || material_id,
+    };
+  }
+
+  // Фоллбэк: если есть хоть какой-то ID, считаем его material_id
+  const anyId = material_id || textbook_id || crossword_id;
+  if (anyId) {
+    return {
+      branch_type,
+      kind: "material",
+      material_id: anyId,
+      textbook_id: null,
+      crossword_id: null,
+    };
+  }
+
+  return { material_id: null, textbook_id: null, crossword_id: null, error: "kind/material_id required" };
+}
+
+export async function GET(req: NextRequest) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+
+  // Фронтенд может передавать ID материала как `id` или `material_id`. Читаем любой доступный.
+  const id = String(req.nextUrl.searchParams.get("id") || req.nextUrl.searchParams.get("material_id") || "").trim();
+
+  if (!id) return ok({ assignments: [] });
+
+  // ❗️ ИДЕАЛЬНОЕ РЕШЕНИЕ: Ищем задания, у которых этот ID совпадает с ЛЮБЫМ из полей привязки.
+  // Это автоматически покрывает и старые олимпиады (textbook_id), и новые табы (material_id),
+  // игнорируя жесткие привязки к branch_type.
+  const { data, error } = await supabase
+    .from("assignments")
+    .select("*")
+    .or(`material_id.eq.${id},textbook_id.eq.${id},crossword_id.eq.${id}`)
+    .order("order_index", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("🔴 [ADMIN GET ASSIGNMENTS] Ошибка БД:", error.message);
+    return fail(error.message, 500, "DB_ERROR");
+  }
+
+  return ok({ assignments: data ?? [] });
+}
+
+export async function POST(req: NextRequest) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase, user } = auth;
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return fail("Bad JSON", 400, "BAD_JSON");
+  }
+
+  const title = String(body?.title ?? "").trim();
+  const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
+  const content = body?.content;
+  
+  // Получаем тип задания, по умолчанию test
+  const assignment_type = body?.assignment_type === "intro" ? "intro" : "test";
+
+  if (!title) return fail("title required", 400, "VALIDATION");
+  if (!content || typeof content !== "object") return fail("content required", 400, "VALIDATION");
+
+  const mat = pickMaterial(body);
+  if (mat.error) return fail(mat.error, 400, "VALIDATION");
+
+  const payload: any = {
+    title,
+    order_index,
+    content,
+    assignment_type,
+    created_by: user.id,
+
+    branch_type: mat.branch_type,
+    material_id: mat.material_id,
+    textbook_id: mat.textbook_id,
+    crossword_id: mat.crossword_id,
+  };
+
+  // Если фронтенд передает project_tab_id, бережно его сохраняем
+  if (body?.project_tab_id) {
+    payload.project_tab_id = body.project_tab_id;
+  }
+
+  const { data, error } = await supabase.from("assignments").insert(payload).select("*").single();
+
+  if (error) {
+    console.error("🔴 [ADMIN POST ASSIGNMENT] Ошибка создания:", error.message);
+    return fail(error.message, 500, "DB_ERROR");
+  }
+
+  return ok({ assignment: data });
+}
+</file>
+
 <file path="app/api/admin/projects/[id]/tabs/route.ts">
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -38752,6 +39999,188 @@ export async function POST(req: Request) {
     return ok({ message: "✅ Пароль успешно изменён! Теперь войдите в систему." });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
+  }
+}
+</file>
+
+<file path="app/api/profile-progress/route.ts">
+// app/api/profile-progress/route.ts
+import { ok, fail } from "@/lib/api/response";
+import { requireUser } from "@/lib/api/auth";
+import { type NextRequest } from "next/server";
+
+export async function GET(req: NextRequest) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+  const { supabase, user } = auth;
+
+  // Получаем slug из URL, если нужно фильтровать по проекту
+  const url = new URL(req.url);
+  const projectSlug = url.searchParams.get("slug");
+
+  try {
+    // 1. Найдём ID проекта по slug (если передан)
+    let projectId: string | null = null;
+    if (projectSlug) {
+      const { data: project, error: projectError } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("slug", projectSlug)
+        .single();
+
+      if (projectError) {
+        // Если проект не найден, возвращаем пустой результат, а не ошибку
+        return ok({
+          stats: {
+            totalMaterials: 0,
+            completedMaterials: 0,
+            totalAvailableAssignments: 0,
+            completedAvailableAssignments: 0,
+            successRate: 0,
+          },
+          materialsProgress: [],
+        });
+      }
+      projectId = project?.id ?? null;
+    }
+
+    // 2. Получаем материалы, привязанные к проекту (через табы)
+    let materialsQuery = supabase
+      .from("materials")
+      .select("id, title, material_kind, is_available, project_tab_id")
+      .eq("is_active", true);
+
+    if (projectId) {
+      // Сначала получим все табы этого проекта
+      const { data: tabs, error: tabsError } = await supabase
+        .from("project_tabs")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("is_active", true);
+
+      if (tabsError) {
+        throw new Error(tabsError.message);
+      }
+
+      const tabIds = tabs?.map((t: { id: string }) => t.id) || [];
+      if (tabIds.length === 0) {
+        return ok({
+          stats: {
+            totalMaterials: 0,
+            completedMaterials: 0,
+            totalAvailableAssignments: 0,
+            completedAvailableAssignments: 0,
+            successRate: 0,
+          },
+          materialsProgress: [],
+        });
+      }
+
+      materialsQuery = materialsQuery.in("project_tab_id", tabIds);
+    }
+
+    const { data: materials, error: matErr } = await materialsQuery;
+    if (matErr) throw matErr;
+
+    // ❗️ 2.5 ИСПРАВЛЕНИЕ: Получаем реальные доступы пользователя к материалам
+    const { data: accessData, error: accessErr } = await supabase
+      .from("material_access")
+      .select("material_id")
+      .eq("user_id", user.id);
+
+    if (accessErr) throw accessErr;
+
+    const grantedMaterialIds = new Set(accessData?.map((a) => a.material_id) || []);
+
+    // ❗️ Оставляем ТОЛЬКО те материалы, которые публичны (is_available) или выданы пользователю
+    const accessibleMaterials = (materials || []).filter(
+      (m) => m.is_available || grantedMaterialIds.has(m.id)
+    );
+
+    // 3. Получаем прогресс пользователя по всем заданиям
+    const { data: userProgress, error: progErr } = await supabase
+      .from("user_progress")
+      .select("assignment_id, is_completed")
+      .eq("user_id", user.id);
+    if (progErr) throw progErr;
+
+    const completedSet = new Set(
+      (userProgress || [])
+        .filter((p) => p.is_completed)
+        .map((p) => p.assignment_id)
+    );
+
+    // 4. Для каждого ДОСТУПНОГО материала получаем список заданий и считаем прогресс
+    const materialsProgress = await Promise.all(
+      accessibleMaterials.map(async (m) => {
+        
+        // ❗️ ИСПРАВЛЕНИЕ: Считаем задания с учетом старой и новой архитектуры (textbook_id / crossword_id / material_id)
+        const { data: assignments } = await supabase
+          .from("assignments")
+          .select("id")
+          .or(`material_id.eq.${m.id},textbook_id.eq.${m.id},crossword_id.eq.${m.id}`);
+
+        const total = assignments?.length ?? 0;
+        const completed = (assignments || [])
+          .filter((a) => completedSet.has(a.id))
+          .length;
+
+        const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        // Определяем тип материала (для иконки в UI)
+        const kind = m.material_kind === "crossword" ? "crossword" : "textbook";
+
+        // Строим корректную ссылку на страницу материала
+        const href = projectSlug
+          ? `/projects/${projectSlug}/materials/${m.id}`
+          : `/materials/${m.id}`; // fallback для старых ссылок
+
+        return {
+          kind,
+          id: m.id,
+          title: m.title,
+          total,
+          completed,
+          progressPercent,
+          href,
+        };
+      })
+    );
+
+    // 5. Общая статистика (строим только по доступным материалам)
+    const totalMaterials = accessibleMaterials.length;
+    const completedMaterials = materialsProgress.filter(
+      (m) => m.total > 0 && m.completed === m.total
+    ).length;
+
+    const totalAvailableAssignments = materialsProgress.reduce(
+      (acc, m) => acc + m.total,
+      0
+    );
+    const completedAvailableAssignments = materialsProgress.reduce(
+      (acc, m) => acc + m.completed,
+      0
+    );
+
+    const successRate =
+      totalAvailableAssignments > 0
+        ? Math.round(
+            (completedAvailableAssignments / totalAvailableAssignments) * 100
+          )
+        : 0;
+
+    const stats = {
+      totalMaterials,
+      completedMaterials,
+      totalAvailableAssignments,
+      completedAvailableAssignments,
+      successRate,
+    };
+
+    return ok({ stats, materialsProgress });
+  } catch (error: any) {
+    console.error("🔴 [API PROFILE PROGRESS] Ошибка:", error);
+    return fail(error?.message || "Server error", 500, "DB_ERROR");
   }
 }
 </file>
@@ -41720,6 +43149,358 @@ export type AssignmentData = {
 };
 </file>
 
+<file path="lib/integrations/googleSheets.ts">
+/* lib/integrations/googleSheets.ts */
+import "server-only";
+
+import { google } from "googleapis";
+
+const ACCOUNTING_COLUMNS = "A:G";
+const ACCOUNTING_LAST_COLUMN = "G";
+const ACCOUNTING_COLUMNS_COUNT = 7;
+const GOOGLE_API_TIMEOUT_MS = 15_000;
+
+export type AccountingRowValue = string | number | null | undefined;
+
+export type SheetRowInfo = {
+  rowNumber: number;
+  values: string[];
+};
+
+function mustEnv(name: string) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing env: ${name}`);
+  }
+
+  return value;
+}
+
+function norm(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function getPrivateKey() {
+  return mustEnv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY")
+    .replace(/^"|"$/g, "")
+    .replace(/\\n/g, "\n");
+}
+
+function quoteSheetName(tab: string) {
+  const safe = String(tab || "Учёт").replace(/'/g, "''");
+  return `'${safe}'`;
+}
+
+function range(tab: string, address: string) {
+  return `${quoteSheetName(tab)}!${address}`;
+}
+
+export function getSpreadsheetConfig() {
+  return {
+    spreadsheetId: mustEnv("GOOGLE_SHEETS_SPREADSHEET_ID"),
+    tab: process.env.GOOGLE_SHEETS_TAB || "Учёт",
+  };
+}
+
+function getSheetsClient() {
+  const auth = new google.auth.JWT({
+    email: mustEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
+    key: getPrivateKey(),
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+
+  return google.sheets({ version: "v4", auth });
+}
+
+function parseRowNumber(updatedRange?: string | null): number | null {
+  if (!updatedRange) return null;
+
+  const match = updatedRange.match(/![A-Z]+(\d+):/);
+  if (!match) return null;
+
+  const rowNumber = Number(match[1]);
+  return Number.isFinite(rowNumber) && rowNumber > 0 ? rowNumber : null;
+}
+
+function normalizeAccountingValues(values: AccountingRowValue[]) {
+  return Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, index) => {
+    const value = values[index];
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    return norm(value);
+  });
+}
+
+function isLikelyRequestNumber(value: string) {
+  return /^(PR|GA)-/i.test(norm(value));
+}
+
+async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
+  const sheets = getSheetsClient();
+
+  const meta = await sheets.spreadsheets.get(
+    {
+      spreadsheetId,
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  const found = meta.data.sheets?.find((sheet) => sheet.properties?.title === tab);
+  const sheetId = found?.properties?.sheetId;
+
+  if (sheetId === undefined || sheetId === null) {
+    throw new Error(`Google Sheets tab not found: "${tab}"`);
+  }
+
+  return sheetId;
+}
+
+/**
+ * Append строки заявки в конец A:G.
+ */
+export async function appendAccountingRow(values: AccountingRowValue[]) {
+  const sheets = getSheetsClient();
+  const { spreadsheetId, tab } = getSpreadsheetConfig();
+
+  const res = await sheets.spreadsheets.values.append(
+    {
+      spreadsheetId,
+      range: range(tab, ACCOUNTING_COLUMNS),
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values: [normalizeAccountingValues(values)],
+      },
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  const updatedRange = res.data.updates?.updatedRange ?? null;
+  const rowNumber = parseRowNumber(updatedRange);
+
+  return {
+    updatedRange,
+    rowNumber,
+  };
+}
+
+/**
+ * Читает колонку A и возвращает Set request_number.
+ */
+export async function getExistingRequestNumbersSet() {
+  const sheets = getSheetsClient();
+  const { spreadsheetId, tab } = getSpreadsheetConfig();
+
+  const res = await sheets.spreadsheets.values.get(
+    {
+      spreadsheetId,
+      range: range(tab, "A:A"),
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  const rows = res.data.values ?? [];
+  const set = new Set<string>();
+
+  for (const row of rows) {
+    const requestNumber = norm(row?.[0]);
+
+    if (!requestNumber) continue;
+    if (!isLikelyRequestNumber(requestNumber)) continue;
+
+    set.add(requestNumber);
+  }
+
+  return set;
+}
+
+/**
+ * Мапа request_number -> { rowNumber, values[0..6] }.
+ * Читает A:G и учитывает только строки, где колонка A похожа на номер заявки.
+ */
+export async function getSheetRequestRowMap() {
+  const sheets = getSheetsClient();
+  const { spreadsheetId, tab } = getSpreadsheetConfig();
+
+  const res = await sheets.spreadsheets.values.get(
+    {
+      spreadsheetId,
+      range: range(tab, ACCOUNTING_COLUMNS),
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  const rows = res.data.values ?? [];
+  const map = new Map<string, SheetRowInfo>();
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index] ?? [];
+    const requestNumber = norm(row[0]);
+
+    if (!requestNumber) continue;
+    if (!isLikelyRequestNumber(requestNumber)) continue;
+
+    const values = Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, valueIndex) => norm(row[valueIndex]));
+
+    map.set(requestNumber, {
+      rowNumber: index + 1,
+      values,
+    });
+  }
+
+  return map;
+}
+
+/**
+ * Обновить конкретную строку A:G по номеру строки.
+ */
+export async function updateAccountingRow(rowNumber: number, values: AccountingRowValue[]) {
+  if (!Number.isFinite(rowNumber) || rowNumber <= 0) {
+    throw new Error(`Invalid row number: ${rowNumber}`);
+  }
+
+  const sheets = getSheetsClient();
+  const { spreadsheetId, tab } = getSpreadsheetConfig();
+
+  await sheets.spreadsheets.values.update(
+    {
+      spreadsheetId,
+      range: range(tab, `A${rowNumber}:${ACCOUNTING_LAST_COLUMN}${rowNumber}`),
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [normalizeAccountingValues(values)],
+      },
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  return { rowNumber };
+}
+
+/**
+ * Удалить строки по номерам 1-based.
+ * Важно: удаляем снизу вверх, иначе номера строк съедут.
+ */
+export async function deleteAccountingRows(rowNumbers: number[]) {
+  const nums = Array.from(new Set(rowNumbers))
+    .filter((rowNumber) => Number.isFinite(rowNumber) && rowNumber > 0)
+    .sort((a, b) => b - a);
+
+  if (!nums.length) {
+    return { deleted: 0 };
+  }
+
+  const sheets = getSheetsClient();
+  const { spreadsheetId, tab } = getSpreadsheetConfig();
+  const sheetId = await getSheetIdByTitle(spreadsheetId, tab);
+
+  const requests = nums.map((rowNumber) => ({
+    deleteDimension: {
+      range: {
+        sheetId,
+        dimension: "ROWS",
+        startIndex: rowNumber - 1,
+        endIndex: rowNumber,
+      },
+    },
+  }));
+
+  await sheets.spreadsheets.batchUpdate(
+    {
+      spreadsheetId,
+      requestBody: { requests },
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  return {
+    deleted: nums.length,
+  };
+}
+
+/**
+ * Найти строку в Google Sheets по request_number.
+ */
+export async function findRowNumberByRequestNumber(requestNumber: string) {
+  const normalized = norm(requestNumber);
+  if (!normalized) return null;
+
+  const map = await getSheetRequestRowMap();
+  const found = map.get(normalized);
+
+  return found?.rowNumber ?? null;
+}
+
+/**
+ * UPSERT строки A:G по request_number из колонки A.
+ */
+export async function upsertRequestRowByNumber(valuesAtoG: AccountingRowValue[]) {
+  const requestNumber = norm(valuesAtoG?.[0]);
+
+  if (!requestNumber) {
+    throw new Error("Missing request_number in values[0]");
+  }
+
+  const map = await getSheetRequestRowMap();
+  const found = map.get(requestNumber);
+
+  if (found) {
+    await updateAccountingRow(found.rowNumber, valuesAtoG);
+
+    return {
+      action: "updated" as const,
+      rowNumber: found.rowNumber,
+    };
+  }
+
+  const appended = await appendAccountingRow(valuesAtoG);
+
+  return {
+    action: "inserted" as const,
+    rowNumber: appended.rowNumber ?? null,
+  };
+}
+
+/**
+ * DELETE строки из Google Sheets по request_number.
+ */
+export async function deleteRequestRowByNumber(requestNumber: string) {
+  const rowNumber = await findRowNumberByRequestNumber(requestNumber);
+
+  if (!rowNumber) {
+    return {
+      ok: true,
+      deleted: 0,
+      rowNumber: null as number | null,
+    };
+  }
+
+  const deleted = await deleteAccountingRows([rowNumber]);
+
+  return {
+    ok: true,
+    deleted: deleted.deleted,
+    rowNumber,
+  };
+}
+</file>
+
 <file path="app/(admin)/admin/projects/ProjectsTab.tsx">
 // app/(admin)/admin/projects/ProjectsTab.tsx
 "use client";
@@ -42548,141 +44329,217 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
 }
 </file>
 
-<file path="app/api/assignment-data/[id]/route.ts">
+<file path="app/api/admin/materials/[id]/route.ts">
+import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
-import { requireUser } from "@/lib/api/auth";
-import { NextResponse, type NextRequest } from "next/server";
-import { mockDebugAll, mockDebugReview, mockDebugSingle } from "@/lib/assignments/mockDebugData";
-import type { AssignmentData } from "@/lib/assignments/types"; // 🔥 Идеальный глобальный тип
+import { requireAdmin } from "@/lib/api/admin";
+import { normalizeBranchType } from "@/lib/branches/config";
+import { normalizeMaterialKind, toStringArray, uniqueStrings } from "@/lib/materials/format";
 
-function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
+function normalizeBool(value: unknown): boolean {
+  return value === true || value === "true" || value === 1 || value === "1";
 }
 
-// Теперь TypeScript знает структуру задания, никаких any
-function isGatehouseAssignment(assignment: AssignmentData | null) {
-  const material = firstOrNull(assignment?.materials);
-  return assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
+function normalizeOrderIndex(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
 }
 
-function getMaterialId(assignment: AssignmentData | null): string | null {
-  const material = firstOrNull(assignment?.materials);
-  const direct = typeof assignment?.material_id === "string" ? assignment.material_id : null;
-  const fromMaterial = typeof material?.id === "string" ? material.id : null;
-  return direct || fromMaterial || null;
+function normalizeNullableString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const str = String(value).trim();
+  return str || null;
+}
+
+// Проверка, является ли строка настоящим UUID
+function isValidUUID(str: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
+function normalizePatchPayload(body: any) {
+  const payload: Record<string, any> = {};
+
+  // Поддержка snake_case и camelCase с фронтенда
+  const branchType = body.branch_type ?? body.branchType;
+  if (branchType !== undefined) payload.branch_type = normalizeBranchType(branchType);
+
+  const materialKind = body.material_kind ?? body.materialKind;
+  if (materialKind !== undefined) payload.material_kind = normalizeMaterialKind(materialKind);
+
+  if ("title" in body) payload.title = String(body.title ?? "").trim();
+  if ("description" in body) payload.description = normalizeNullableString(body.description);
+  
+  const coverUrl = body.cover_image_url ?? body.coverImageUrl;
+  if (coverUrl !== undefined) payload.cover_image_url = normalizeNullableString(coverUrl);
+  
+  if ("is_available" in body) payload.is_available = normalizeBool(body.is_available);
+  if ("is_active" in body) payload.is_active = normalizeBool(body.is_active);
+  if ("order_index" in body) payload.order_index = normalizeOrderIndex(body.order_index);
+  
+  const classLevels = body.class_levels ?? body.class_level ?? body.classLevels;
+  if (classLevels !== undefined) {
+    payload.class_levels = uniqueStrings(toStringArray(classLevels));
+  }
+  
+  const targetLevels = body.target_levels ?? body.target_level ?? body.targetLevels;
+  if (targetLevels !== undefined) {
+    payload.target_levels = uniqueStrings(toStringArray(targetLevels));
+  }
+  
+  if ("meta" in body) {
+    payload.meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
+  }
+  
+  // ❗️ УЛЬТРА-ФИКС ДЛЯ ТАБОВ:
+  // Ловим все варианты ключей от фронтенда
+  const rawTabId = body.project_tab_id ?? body.tab_id ?? body.projectTabId ?? body.tabId;
+  if (rawTabId !== undefined) {
+    let tid = normalizeNullableString(rawTabId);
+    
+    // Очищаем от заглушек фронтенда
+    if (tid === "00000000-0000-0000-0000-000000000000" || tid === "none" || tid === "null" || tid === "") {
+      tid = null;
+    }
+
+    // Защита от краша базы: если фронт прислал текст вместо ID (например, "что то") — сбрасываем в null
+    if (tid && !isValidUUID(tid)) {
+      console.warn("⚠️ [ADMIN PATCH MATERIAL] Получен невалидный UUID для таба:", tid, "Сбрасываем в null, чтобы БД не упала.");
+      tid = null;
+    }
+    
+    payload.project_tab_id = tid;
+  }
+
+  return payload;
+}
+
+function validatePatchPayload(payload: Record<string, any>) {
+  if ("title" in payload && !payload.title) return "title required";
+  if ("material_kind" in payload && !payload.material_kind) return "material_kind required";
+  if ("branch_type" in payload && payload.branch_type === "gatehouse" && "target_levels" in payload && payload.target_levels.length === 0) {
+    return "target_levels required";
+  }
+  if ("branch_type" in payload && payload.branch_type === "olympiad" && "class_levels" in payload && payload.class_levels.length === 0) {
+    return "class_levels required";
+  }
+
+  return null;
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireUser();
+  const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
 
-  const { supabase, user } = auth;
+  const { supabase } = auth;
   const { id } = await ctx.params;
 
-  // ====== БЭКДОР ДЛЯ ДЕБАГА ======
-  if (id === "debug-all") return NextResponse.json(mockDebugAll);
-  if (id === "debug-review") return NextResponse.json(mockDebugReview);
-  if (id === "debug-single") return NextResponse.json(mockDebugSingle);
-  // ===============================
+  if (!id) return fail("id required", 400, "VALIDATION");
 
   try {
-    const { data: rawAssignment, error: aErr } = await supabase
-      .from("assignments")
-      .select(
-        `*,
-        materials(
-          id,
-          title,
-          branch_type,
-          material_kind,
-          is_active,
-          is_available,
-          target_levels,
-          class_levels
-        )
-      `)
+    const { data, error } = await supabase
+      .from("materials")
+      .select("*")
       .eq("id", id)
       .single();
 
-    if (aErr || !rawAssignment) return fail(aErr?.message || "Assignment not found", 404, "NOT_FOUND");
-
-    // Жестко типизируем данные из БД
-    const assignment = rawAssignment as AssignmentData;
-
-    // --- ПРОВЕРКА НА ПУСТОЕ ЗАДАНИЕ С УЧЕТОМ ТИПА (TEST / INTRO) ---
-    const content = assignment.content || {};
-    const assignmentType = assignment.assignment_type || 'test';
-    const isIntro = assignmentType === 'intro' || content.mode === 'informational';
-    
-    const questions = Array.isArray(content.questions) ? content.questions : [];
-    const blocks = Array.isArray(content.blocks) ? content.blocks : [];
-
-    // Блокируем, только если это ТЕСТ (с проверкой) и в нем 0 вопросов
-    if (!isIntro && questions.length === 0) {
-      return fail("Задание еще не готово (нет вопросов)", 403, "NOT_READY");
+    if (error) {
+      console.error("🔴 [ADMIN GET MATERIAL] Ошибка поиска:", error.message);
+      return fail(error.message, 404, "NOT_FOUND");
     }
 
-    // Защита от пустых ознакомительных материалов (если нет ни блоков, ни вопросов)
-    if (isIntro && blocks.length === 0 && questions.length === 0) {
-      return fail("Ознакомительный материал еще не заполнен", 403, "NOT_READY");
+    const { count, error: countErr } = await supabase
+      .from("assignments")
+      .select("id", { count: "exact", head: true })
+      .or(`material_id.eq.${id},textbook_id.eq.${id},crossword_id.eq.${id}`);
+
+    if (countErr) {
+      console.error("🔴 [ADMIN GET MATERIAL] Ошибка подсчета заданий:", countErr.message);
     }
-    // -----------------------------------------------------------------
-
-    const material = firstOrNull(assignment.materials);
-    const gatehouse = isGatehouseAssignment(assignment);
-
-    if (gatehouse) {
-      const materialId = getMaterialId(assignment);
-
-      if (!materialId) {
-        return fail("Gatehouse assignment has no material", 404, "NOT_FOUND");
-      }
-
-      if (material && material.is_active === false) {
-        return fail("Material is not active", 404, "NOT_FOUND");
-      }
-
-      const { data: access, error: accessErr } = await supabase
-        .from("material_access")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("material_id", materialId)
-        .maybeSingle();
-
-      if (accessErr) {
-        return fail(accessErr.message, 500, "DB_ERROR");
-      }
-
-      const hasAccess = Boolean(material?.is_available || access);
-
-      if (!hasAccess) {
-        return fail("No access to this Gatehouse material", 403, "FORBIDDEN");
-      }
-    }
-
-    const { data: progress, error: pErr } = await supabase
-      .from("user_progress")
-      .select("is_completed, score, completed_at, answers")
-      .eq("user_id", user.id)
-      .eq("assignment_id", id)
-      .maybeSingle();
-
-    if (pErr) return fail(pErr.message, 500, "DB_ERROR");
 
     return ok({
-      assignment,
-      progress: progress
-        ? {
-            is_completed: Boolean(progress.is_completed),
-            score: progress.score ?? null,
-            completed_at: progress.completed_at ?? null,
-            answers: progress.answers ?? {},
-          }
-        : null,
+      material: {
+        ...data,
+        assignments_count: count ?? 0,
+      },
     });
-  } catch (e: any) {
-    return fail(e?.message || "Server error", 500, "SERVER_ERROR");
+  } catch (error: any) {
+    console.error("🔴 [ADMIN GET MATERIAL] Серверная ошибка:", error);
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { id } = await ctx.params;
+
+  if (!id) return fail("id required", 400, "VALIDATION");
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return fail("Bad JSON", 400, "BAD_JSON");
+  }
+
+  const payload = normalizePatchPayload(body);
+  const validationError = validatePatchPayload(payload);
+
+  if (validationError) {
+    console.error("🔴 [ADMIN PATCH MATERIAL] Провал валидации:", validationError);
+    return fail(validationError, 400, "VALIDATION");
+  }
+
+  if (Object.keys(payload).length === 0) {
+    return fail("Nothing to update", 400, "VALIDATION");
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("materials")
+      .update(payload)
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("🔴 [ADMIN PATCH MATERIAL] Ошибка БД при сохранении:", error.message, error.details);
+      
+      let errorMsg = error.message;
+      if (errorMsg.includes("foreign key")) errorMsg = "Ошибка привязки таба (несуществующий ID)";
+      
+      return fail(errorMsg, 500, "DB_ERROR");
+    }
+
+    return ok({ material: data });
+  } catch (error: any) {
+    console.error("🔴 [ADMIN PATCH MATERIAL] Серверная ошибка:", error);
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+
+export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { id } = await ctx.params;
+
+  if (!id) return fail("id required", 400, "VALIDATION");
+
+  try {
+    const { error } = await supabase.from("materials").delete().eq("id", id);
+
+    if (error) {
+      console.error("🔴 [ADMIN DELETE MATERIAL] Ошибка удаления:", error.message);
+      return fail(error.message, 500, "DB_ERROR");
+    }
+
+    return ok({ deleted: true });
+  } catch (error: any) {
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
 }
 </file>
@@ -42878,747 +44735,6 @@ export default async function ContactsPage({
       </div>
     </div>
   );
-}
-</file>
-
-<file path="app/login/login.css">
-/* app/login/login.css */
-
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap');
-
-.page-login {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-
-  font-family: "Montserrat", "Poppins", sans-serif;
-  color: #1e293b;
-
-  background-color: #eaf7ff;
-  background-image:
-    radial-gradient(1200px 700px at 10% 10%, rgba(78, 205, 196, 0.25), transparent 60%),
-    radial-gradient(1100px 700px at 90% 20%, rgba(110, 190, 255, 0.3), transparent 62%),
-    linear-gradient(135deg, #f0f9ff 0%, #d2edf1 50%, #e0f2fe 100%);
-  background-attachment: fixed;
-  overflow-x: hidden;
-}
-
-.page-login::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(1000px 600px at 50% 40%, rgba(255, 255, 255, 0.2), transparent 70%);
-  z-index: 0;
-}
-
-.login-container {
-  width: 100%;
-  max-width: 440px;
-  position: relative;
-  z-index: 1;
-  perspective: 1000px;
-}
-
-/* ===== Liquid Glass Card ===== */
-.login-card {
-  border-radius: 32px;
-  padding: 32px 28px;
-
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.25) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 
-    0 24px 60px rgba(15, 65, 95, 0.12),
-    inset 0 1px 2px rgba(255, 255, 255, 0.7),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.02);
-  backdrop-filter: blur(24px) saturate(170%);
-  -webkit-backdrop-filter: blur(24px) saturate(170%);
-  
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.login-card:hover {
-  box-shadow: 
-    0 28px 70px rgba(15, 65, 95, 0.16),
-    inset 0 1px 3px rgba(255, 255, 255, 0.8);
-}
-
-/* ===== Brand ===== */
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  justify-content: center;
-  padding-bottom: 20px;
-  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
-  margin-bottom: 20px;
-}
-
-.brand-mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-
-  font-size: 20px;
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  color: #ffffff;
-
-  background: linear-gradient(135deg, #6ebeff 0%, #4ecdc4 100%);
-  box-shadow: 0 8px 24px rgba(78, 205, 196, 0.35);
-  position: relative;
-  overflow: hidden;
-}
-
-.brand-mark::before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
-  transform: rotate(45deg);
-  animation: shine 4s infinite linear;
-}
-
-@keyframes shine {
-  0% { transform: translate(-50%, -50%) rotate(45deg); }
-  100% { transform: translate(50%, 50%) rotate(45deg); }
-}
-
-.brand-title {
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1.1;
-  color: #1e293b;
-  letter-spacing: -0.5px;
-}
-
-.brand-subtitle {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(30, 41, 59, 0.6);
-  margin-top: 4px;
-}
-
-/* ===== Headline ===== */
-.login-card h2 {
-  margin: 10px 0 24px 0;
-  text-align: center;
-  font-size: 20px;
-  font-weight: 800;
-  color: #1e293b;
-  letter-spacing: -0.3px;
-}
-
-/* ===== Form ===== */
-.form-group {
-  margin-bottom: 18px;
-  text-align: left;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 700;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: rgba(30, 41, 59, 0.7);
-  padding-left: 4px;
-}
-
-.input-wrapper {
-  position: relative;
-  width: 100%;
-  display: flex;
-  align-items: center;
-}
-
-.login-card input {
-  width: 100%;
-  padding: 14px 16px;
-
-  border-radius: 16px;
-  border: 1px solid rgba(110, 190, 255, 0.3);
-  background: rgba(255, 255, 255, 0.5);
-
-  font-size: 15px;
-  font-weight: 600;
-  color: #1e293b;
-
-  box-sizing: border-box;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: inset 0 2px 4px rgba(15, 65, 95, 0.03);
-}
-
-.input-wrapper input {
-  padding-right: 48px;
-}
-
-.login-card input::placeholder {
-  color: rgba(30, 41, 59, 0.35);
-  font-weight: 400;
-}
-
-.login-card input:focus {
-  border-color: #4ecdc4;
-  outline: none;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 
-    0 8px 20px rgba(78, 205, 196, 0.15),
-    inset 0 1px 2px rgba(255,255,255,1);
-  transform: translateY(-1px);
-}
-
-/* Кнопка показа пароля */
-.toggle-password {
-  position: absolute;
-  right: 14px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(30, 41, 59, 0.4);
-  transition: transform 0.1s ease, color 0.2s ease;
-  user-select: none;
-  z-index: 2;
-}
-
-.toggle-password:hover {
-  color: #2eb4aa;
-  transform: scale(1.1);
-}
-
-.toggle-password:active {
-  transform: scale(0.95);
-}
-
-/* ===== Buttons ===== */
-.btn {
-  width: 100%;
-  margin-top: 14px;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-
-  border: 0;
-  cursor: pointer;
-  user-select: none;
-  text-decoration: none;
-
-  padding: 15px 20px;
-  border-radius: 18px;
-
-  font-size: 15px;
-  font-weight: 700;
-  color: white;
-
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 12px 24px rgba(15, 65, 95, 0.15);
-}
-
-.btn:hover { 
-  transform: translateY(-2px); 
-  box-shadow: 0 16px 32px rgba(15, 65, 95, 0.2);
-  filter: brightness(1.04);
-}
-
-.btn:active { 
-  transform: translateY(0px); 
-  filter: brightness(0.96);
-}
-
-.btn:disabled { 
-  opacity: 0.5; 
-  cursor: not-allowed; 
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-.btn.student {
-  background: linear-gradient(135deg, #4ecdc4 0%, #5bbbe2 100%);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
-}
-
-/* Блок нижних кнопок */
-.bottom-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.btn.info, .btn.help {
-  flex: 1;
-  margin-top: 0;
-  padding: 14px 14px;
-  font-size: 14px;
-  font-weight: 700;
-  border-radius: 16px;
-}
-
-.btn.info {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  color: #ffffff;
-  box-shadow: 0 8px 20px rgba(3, 105, 161, 0.3);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-}
-
-.btn.info:hover {
-  box-shadow: 0 12px 24px rgba(3, 105, 161, 0.45);
-}
-
-.btn.help {
-  background: rgba(255, 255, 255, 0.45);
-  color: #1e293b;
-  border: 1px solid rgba(110, 190, 255, 0.25);
-  box-shadow: 0 6px 16px rgba(15, 65, 95, 0.05);
-  backdrop-filter: blur(8px);
-}
-
-.btn.help:hover {
-  background: rgba(255, 255, 255, 0.65);
-}
-
-/* ===== Links ===== */
-.link {
-  margin-top: 24px;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(30, 41, 59, 0.6);
-}
-
-.link p {
-  margin: 12px 0;
-}
-
-.link a {
-  color: #2eb4aa;
-  text-decoration: none;
-  font-weight: 700;
-  transition: color 0.15s ease;
-  display: inline-block;
-  position: relative;
-}
-
-.link a::after {
-  content: "";
-  position: absolute;
-  width: 100%;
-  transform: scaleX(0);
-  height: 2px;
-  bottom: -2px;
-  left: 0;
-  background-color: #2eb4aa;
-  transform-origin: bottom right;
-  transition: transform 0.25s ease-out;
-}
-
-.link a:hover::after {
-  transform: scaleX(1);
-  transform-origin: bottom left;
-}
-
-/* ===== Banners ===== */
-.error, .success, .warning {
-  padding: 14px 16px;
-  border-radius: 16px;
-  margin: 16px 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  line-height: 1.4;
-  border: 1px solid rgba(255,255,255,0.5);
-  box-shadow: 0 10px 25px rgba(15, 65, 95, 0.06);
-  backdrop-filter: blur(8px);
-}
-
-.error {
-  background: rgba(255, 107, 107, 0.12);
-  color: #991b1b;
-  border-left: 4px solid #ff6b6b;
-}
-
-.success {
-  background: rgba(78, 205, 196, 0.12);
-  color: #065f46;
-  border-left: 4px solid #4ecdc4;
-}
-
-.warning {
-  background: rgba(245, 158, 11, 0.12);
-  color: #92400e;
-  border-left: 4px solid #f59e0b;
-}
-
-/* ===== Loading ===== */
-.loading {
-  margin: 14px 0;
-  text-align: center;
-  font-weight: 700;
-  font-size: 14px;
-  color: #1a7bb9;
-  background: rgba(110, 190, 255, 0.1);
-  padding: 10px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.spinner {
-  border: 3px solid rgba(78, 205, 196, 0.2);
-  border-top: 3px solid #4ecdc4;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.existing-account-help {
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(78, 205, 196, 0.3);
-  border-left: 4px solid #4ecdc4;
-  border-radius: 16px;
-  padding: 14px;
-  margin: 16px 0;
-  font-size: 13.5px;
-  font-weight: 500;
-  text-align: left;
-  color: #1e293b;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.02);
-}
-
-/* ===== Help Modal Liquid Glass ===== */
-.help-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 32, 45, 0.4);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  display: none;
-  justify-content: center;
-  align-items: center;
-  z-index: 10000;
-  padding: 20px;
-  animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.help-modal-content {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.86) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 28px;
-  max-width: 760px;
-  width: 100%;
-  max-height: 85vh;
-  overflow: hidden;
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(30px);
-  display: flex;
-  flex-direction: column;
-}
-
-.help-modal-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.help-modal-header h3 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  color: #0f172a;
-}
-
-.help-modal-tabs {
-  display: flex;
-  background: rgba(30, 41, 59, 0.03);
-  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
-}
-
-.help-tab {
-  flex: 1;
-  padding: 16px;
-  border: none;
-  background: none;
-  font-size: 14px;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: rgba(30, 41, 59, 0.5);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.help-tab:hover {
-  color: #1e293b;
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.help-tab.active {
-  background: rgba(255, 255, 255, 0.8);
-  color: #0284c7;
-  box-shadow: inset 0 -3px 0 #0284c7;
-}
-
-.help-tab-content {
-  display: none;
-  overflow-y: auto;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.help-tab-content.active { 
-  display: block; 
-}
-
-.help-html-inner {
-  padding: 28px 24px;
-}
-
-.help-section-title {
-  margin: 0 0 24px 0;
-  font-size: 16px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #64748b;
-  border-bottom: 2px solid rgba(30, 41, 59, 0.04);
-  padding-bottom: 8px;
-}
-
-/* ===== HTML Стили вёрстки: Вкладка Регистрация ===== */
-.registration-guide {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.guide-step {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-
-.step-badge {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #0284c7;
-  color: white;
-  font-weight: 700;
-  font-size: 14px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3);
-}
-
-.step-body {
-  flex: 1;
-}
-
-.step-body h5 {
-  margin: 0 0 6px 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.step-body p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #475569;
-}
-
-.step-body strong {
-  color: #0f172a;
-  background: rgba(15, 23, 42, 0.04);
-  padding: 1px 4px;
-  border-radius: 4px;
-}
-
-.step-body a {
-  color: #0284c7;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.step-body a:hover {
-  text-decoration: underline;
-}
-
-/* ===== Новые Стили Вёрстки: Вкладка Правила (Один в один как на скрине image_cc4d3b.jpg) ===== */
-.rules-tab-bg {
-  background-color: #fefce8;
-  background-image: 
-    radial-gradient(circle at 10% 20%, rgba(14, 165, 233, 0.15), transparent 40%),
-    radial-gradient(circle at 90% 10%, rgba(234, 179, 8, 0.15), transparent 40%),
-    radial-gradient(circle at 85% 85%, rgba(34, 197, 94, 0.15), transparent 40%),
-    radial-gradient(circle at 15% 80%, rgba(236, 72, 153, 0.15), transparent 40%);
-  border-radius: 24px;
-  padding: 32px 24px !important;
-  position: relative;
-}
-
-/* Фоновые декоративные облака из скрипта */
-.rules-tab-bg::before {
-  content: "☁️";
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  font-size: 48px;
-  opacity: 0.15;
-  filter: grayscale(100%) brightness(2);
-}
-
-.rules-tab-bg::after {
-  content: "☁️";
-  position: absolute;
-  top: 40px;
-  right: 30px;
-  font-size: 42px;
-  opacity: 0.15;
-  filter: grayscale(100%) brightness(2);
-}
-
-.rules-main-title {
-  text-align: center;
-  font-size: 54px !important;
-  font-weight: 900 !important;
-  color: #000000;
-  margin: 0 0 36px 0 !important;
-  letter-spacing: -1px;
-  text-transform: lowercase;
-}
-
-.help-rules-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-}
-
-.rule-card {
-  background: #ffffff;
-  border-radius: 36px;
-  padding: 32px 24px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.04);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  border: 1px solid rgba(0, 0, 0, 0.01);
-  min-height: 160px;
-}
-
-.rule-card p {
-  margin: 0;
-  font-size: 14.5px;
-  line-height: 1.5;
-  font-weight: 700;
-  color: #000000;
-  text-align: center;
-  white-space: pre-line;
-}
-
-/* Особенная карточка с кубком */
-.trophy-card {
-  justify-content: space-between;
-  padding: 28px 24px 16px 24px;
-}
-
-.trophy-card p {
-  margin-bottom: 12px;
-}
-
-.trophy-vector {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  animation: floatTrophy 4s ease-in-out infinite;
-}
-
-@keyframes floatTrophy {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-
-/* Кнопка закрытия модалки */
-.help-close {
-  background: rgba(30, 41, 59, 0.05);
-  border: none;
-  font-size: 16px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  cursor: pointer;
-  color: #1e293b;
-  display: grid;
-  place-items: center;
-  transition: all 0.2s ease;
-}
-
-.help-close:hover {
-  background: rgba(255, 107, 107, 0.15);
-  color: #991b1b;
-}
-
-/* ===== Mobile Adaptive ===== */
-@media (max-width: 768px) {
-  .help-rules-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  .rules-main-title {
-    font-size: 42px !important;
-    margin-bottom: 24px !important;
-  }
-  .rule-card {
-    border-radius: 28px;
-    padding: 24px 20px;
-    min-height: auto;
-  }
-}
-
-@media (max-width: 480px) {
-  .page-login { padding: 16px; }
-  .login-card { padding: 24px 20px; border-radius: 24px; }
-  .brand-title { font-size: 19px; }
-  .brand-mark { width: 48px; height: 48px; font-size: 18px; }
-  .btn { padding: 14px 16px; }
-  .bottom-actions { flex-direction: column; gap: 10px; }
-  .btn.info, .btn.help { width: 100%; }
-  
-  .help-modal-content { max-height: 90vh; border-radius: 24px; }
-  .help-modal-tabs { flex-direction: column; }
-  .help-tab { padding: 12px; font-size: 12px; }
-  .help-html-inner { padding: 16px 12px; }
 }
 </file>
 
@@ -44259,358 +45375,6 @@ export default function RegisterPage() {
       </div>
     </div>
   );
-}
-</file>
-
-<file path="lib/integrations/googleSheets.ts">
-/* lib/integrations/googleSheets.ts */
-import "server-only";
-
-import { google } from "googleapis";
-
-const ACCOUNTING_COLUMNS = "A:G";
-const ACCOUNTING_LAST_COLUMN = "G";
-const ACCOUNTING_COLUMNS_COUNT = 7;
-const GOOGLE_API_TIMEOUT_MS = 15_000;
-
-export type AccountingRowValue = string | number | null | undefined;
-
-export type SheetRowInfo = {
-  rowNumber: number;
-  values: string[];
-};
-
-function mustEnv(name: string) {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing env: ${name}`);
-  }
-
-  return value;
-}
-
-function norm(value: unknown) {
-  return String(value ?? "").trim();
-}
-
-function getPrivateKey() {
-  return mustEnv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY")
-    .replace(/^"|"$/g, "")
-    .replace(/\\n/g, "\n");
-}
-
-function quoteSheetName(tab: string) {
-  const safe = String(tab || "Учёт").replace(/'/g, "''");
-  return `'${safe}'`;
-}
-
-function range(tab: string, address: string) {
-  return `${quoteSheetName(tab)}!${address}`;
-}
-
-export function getSpreadsheetConfig() {
-  return {
-    spreadsheetId: mustEnv("GOOGLE_SHEETS_SPREADSHEET_ID"),
-    tab: process.env.GOOGLE_SHEETS_TAB || "Учёт",
-  };
-}
-
-function getSheetsClient() {
-  const auth = new google.auth.JWT({
-    email: mustEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
-    key: getPrivateKey(),
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-
-  return google.sheets({ version: "v4", auth });
-}
-
-function parseRowNumber(updatedRange?: string | null): number | null {
-  if (!updatedRange) return null;
-
-  const match = updatedRange.match(/![A-Z]+(\d+):/);
-  if (!match) return null;
-
-  const rowNumber = Number(match[1]);
-  return Number.isFinite(rowNumber) && rowNumber > 0 ? rowNumber : null;
-}
-
-function normalizeAccountingValues(values: AccountingRowValue[]) {
-  return Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, index) => {
-    const value = values[index];
-
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
-
-    return norm(value);
-  });
-}
-
-function isLikelyRequestNumber(value: string) {
-  return /^(PR|GA)-/i.test(norm(value));
-}
-
-async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
-  const sheets = getSheetsClient();
-
-  const meta = await sheets.spreadsheets.get(
-    {
-      spreadsheetId,
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  const found = meta.data.sheets?.find((sheet) => sheet.properties?.title === tab);
-  const sheetId = found?.properties?.sheetId;
-
-  if (sheetId === undefined || sheetId === null) {
-    throw new Error(`Google Sheets tab not found: "${tab}"`);
-  }
-
-  return sheetId;
-}
-
-/**
- * Append строки заявки в конец A:G.
- */
-export async function appendAccountingRow(values: AccountingRowValue[]) {
-  const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
-
-  const res = await sheets.spreadsheets.values.append(
-    {
-      spreadsheetId,
-      range: range(tab, ACCOUNTING_COLUMNS),
-      valueInputOption: "USER_ENTERED",
-      insertDataOption: "INSERT_ROWS",
-      requestBody: {
-        values: [normalizeAccountingValues(values)],
-      },
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  const updatedRange = res.data.updates?.updatedRange ?? null;
-  const rowNumber = parseRowNumber(updatedRange);
-
-  return {
-    updatedRange,
-    rowNumber,
-  };
-}
-
-/**
- * Читает колонку A и возвращает Set request_number.
- */
-export async function getExistingRequestNumbersSet() {
-  const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
-
-  const res = await sheets.spreadsheets.values.get(
-    {
-      spreadsheetId,
-      range: range(tab, "A:A"),
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  const rows = res.data.values ?? [];
-  const set = new Set<string>();
-
-  for (const row of rows) {
-    const requestNumber = norm(row?.[0]);
-
-    if (!requestNumber) continue;
-    if (!isLikelyRequestNumber(requestNumber)) continue;
-
-    set.add(requestNumber);
-  }
-
-  return set;
-}
-
-/**
- * Мапа request_number -> { rowNumber, values[0..6] }.
- * Читает A:G и учитывает только строки, где колонка A похожа на номер заявки.
- */
-export async function getSheetRequestRowMap() {
-  const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
-
-  const res = await sheets.spreadsheets.values.get(
-    {
-      spreadsheetId,
-      range: range(tab, ACCOUNTING_COLUMNS),
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  const rows = res.data.values ?? [];
-  const map = new Map<string, SheetRowInfo>();
-
-  for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index] ?? [];
-    const requestNumber = norm(row[0]);
-
-    if (!requestNumber) continue;
-    if (!isLikelyRequestNumber(requestNumber)) continue;
-
-    const values = Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, valueIndex) => norm(row[valueIndex]));
-
-    map.set(requestNumber, {
-      rowNumber: index + 1,
-      values,
-    });
-  }
-
-  return map;
-}
-
-/**
- * Обновить конкретную строку A:G по номеру строки.
- */
-export async function updateAccountingRow(rowNumber: number, values: AccountingRowValue[]) {
-  if (!Number.isFinite(rowNumber) || rowNumber <= 0) {
-    throw new Error(`Invalid row number: ${rowNumber}`);
-  }
-
-  const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
-
-  await sheets.spreadsheets.values.update(
-    {
-      spreadsheetId,
-      range: range(tab, `A${rowNumber}:${ACCOUNTING_LAST_COLUMN}${rowNumber}`),
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [normalizeAccountingValues(values)],
-      },
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  return { rowNumber };
-}
-
-/**
- * Удалить строки по номерам 1-based.
- * Важно: удаляем снизу вверх, иначе номера строк съедут.
- */
-export async function deleteAccountingRows(rowNumbers: number[]) {
-  const nums = Array.from(new Set(rowNumbers))
-    .filter((rowNumber) => Number.isFinite(rowNumber) && rowNumber > 0)
-    .sort((a, b) => b - a);
-
-  if (!nums.length) {
-    return { deleted: 0 };
-  }
-
-  const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
-  const sheetId = await getSheetIdByTitle(spreadsheetId, tab);
-
-  const requests = nums.map((rowNumber) => ({
-    deleteDimension: {
-      range: {
-        sheetId,
-        dimension: "ROWS",
-        startIndex: rowNumber - 1,
-        endIndex: rowNumber,
-      },
-    },
-  }));
-
-  await sheets.spreadsheets.batchUpdate(
-    {
-      spreadsheetId,
-      requestBody: { requests },
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  return {
-    deleted: nums.length,
-  };
-}
-
-/**
- * Найти строку в Google Sheets по request_number.
- */
-export async function findRowNumberByRequestNumber(requestNumber: string) {
-  const normalized = norm(requestNumber);
-  if (!normalized) return null;
-
-  const map = await getSheetRequestRowMap();
-  const found = map.get(normalized);
-
-  return found?.rowNumber ?? null;
-}
-
-/**
- * UPSERT строки A:G по request_number из колонки A.
- */
-export async function upsertRequestRowByNumber(valuesAtoG: AccountingRowValue[]) {
-  const requestNumber = norm(valuesAtoG?.[0]);
-
-  if (!requestNumber) {
-    throw new Error("Missing request_number in values[0]");
-  }
-
-  const map = await getSheetRequestRowMap();
-  const found = map.get(requestNumber);
-
-  if (found) {
-    await updateAccountingRow(found.rowNumber, valuesAtoG);
-
-    return {
-      action: "updated" as const,
-      rowNumber: found.rowNumber,
-    };
-  }
-
-  const appended = await appendAccountingRow(valuesAtoG);
-
-  return {
-    action: "inserted" as const,
-    rowNumber: appended.rowNumber ?? null,
-  };
-}
-
-/**
- * DELETE строки из Google Sheets по request_number.
- */
-export async function deleteRequestRowByNumber(requestNumber: string) {
-  const rowNumber = await findRowNumberByRequestNumber(requestNumber);
-
-  if (!rowNumber) {
-    return {
-      ok: true,
-      deleted: 0,
-      rowNumber: null as number | null,
-    };
-  }
-
-  const deleted = await deleteAccountingRows([rowNumber]);
-
-  return {
-    ok: true,
-    deleted: deleted.deleted,
-    rowNumber,
-  };
 }
 </file>
 
@@ -48028,101 +48792,6 @@ export default function ProfileClient({
 }
 </file>
 
-<file path="app/api/admin/projects/[id]/materials/route.ts">
-import { NextRequest } from "next/server";
-import { ok, fail } from "@/lib/api/response";
-import { requireAdmin } from "@/lib/api/admin";
-
-export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-  const { supabase } = auth;
-
-  const { searchParams } = req.nextUrl;
-  const tabId = searchParams.get("tab_id");
-
-  try {
-    // В таблице materials нет project_id, фильтруем через project_tabs
-    let query = supabase
-      .from("materials")
-      .select(`
-        *,
-        project_tabs!inner ( id, title, slug, project_id ) 
-      `)
-      .order("order_index", { ascending: false })
-      .order("created_at", { ascending: false });
-
-    // Если админ выбрал конкретный таб в селекте
-    if (tabId) {
-      query = query.eq("project_tab_id", tabId);
-    } else {
-      // Иначе показываем все материалы этого проекта (через связь с project_tabs)
-      const { id: projectId } = await ctx.params;
-      query = query.eq("project_tabs.project_id", projectId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) return fail(error.message, 500, "DB_ERROR");
-
-    return ok({ materials: data ?? [] });
-  } catch (e: any) {
-    return fail(e?.message || "Внутренняя ошибка сервера", 500, "SERVER_ERROR");
-  }
-}
-
-export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-  const { supabase } = auth;
-
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Неверный формат JSON", 400, "BAD_JSON");
-  }
-
-  const title = String(body?.title ?? "").trim();
-  const description = body?.description ? String(body.description).trim() : null;
-  const project_tab_id = String(body?.project_tab_id ?? "").trim();
-  const target_levels = Array.isArray(body?.target_levels) ? body.target_levels.map(String).filter(Boolean) : [];
-  const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
-  const is_available = Boolean(body?.is_available);
-  const is_active = body?.is_active !== undefined ? Boolean(body?.is_active) : true;
-  const cover_image_url = body?.cover_image_url ? String(body.cover_image_url).trim() : null;
-
-  if (!title) return fail("Название материала обязательно", 400, "VALIDATION");
-  if (!project_tab_id) return fail("Необходимо выбрать вкладку (Таб)", 400, "VALIDATION");
-
-  try {
-    const { data, error } = await supabase
-      .from("materials")
-      .insert({
-        project_tab_id, 
-        title,
-        description,
-        target_levels, 
-        class_levels: target_levels, // Дублируем для обратной совместимости с БД
-        material_kind: "textbook",   // Обходим легаси-ограничение БД 
-        branch_type: "olympiad",     // Обходим ограничение "materials_branch_type_check"
-        order_index,
-        is_available,
-        is_active,
-        cover_image_url,
-      })
-      .select("*")
-      .single();
-
-    if (error) return fail(error.message, 500, "DB_ERROR");
-
-    return ok({ material: data });
-  } catch (e: any) {
-    return fail(e?.message || "Внутренняя ошибка сервера", 500, "SERVER_ERROR");
-  }
-}
-</file>
-
 <file path="app/api/admin/requests/route.ts">
 /* app/api/admin/requests/route.ts */
 import type { NextRequest } from "next/server";
@@ -49214,6 +49883,164 @@ export async function PATCH(req: NextRequest) {
 }
 </file>
 
+<file path="app/api/assignment-data/[id]/route.ts">
+import { ok, fail } from "@/lib/api/response";
+import { requireUser } from "@/lib/api/auth";
+import { NextResponse, type NextRequest } from "next/server";
+import { mockDebugAll, mockDebugReview, mockDebugSingle } from "@/lib/assignments/mockDebugData";
+import type { AssignmentData } from "@/lib/assignments/types";
+
+// Умная функция-хэлпер для извлечения материала из разных вариантов JOIN-ответов Supabase
+// (Гарантирует совместимость и с новой архитектурой, и с легаси-кодом)
+function getMaterial(assignment: any) {
+  if (!assignment) return null;
+  
+  // Если пришел как объект (новый синтаксис)
+  if (assignment.material && !Array.isArray(assignment.material)) return assignment.material;
+  if (assignment.materials && !Array.isArray(assignment.materials)) return assignment.materials;
+  
+  // Если пришел как массив (старый синтаксис)
+  if (Array.isArray(assignment.materials)) return assignment.materials[0] || null;
+  if (Array.isArray(assignment.material)) return assignment.material[0] || null;
+  
+  return null;
+}
+
+function isGatehouseAssignment(assignment: any) {
+  const mat = getMaterial(assignment);
+  return assignment?.branch_type === "gatehouse" || mat?.branch_type === "gatehouse";
+}
+
+function getMaterialId(assignment: any): string | null {
+  const mat = getMaterial(assignment);
+  return assignment?.material_id || mat?.id || null;
+}
+
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
+  const { supabase, user } = auth;
+  const { id } = await ctx.params;
+
+  // ====== БЭКДОР ДЛЯ ДЕБАГА ======
+  if (id === "debug-all") return NextResponse.json(mockDebugAll);
+  if (id === "debug-review") return NextResponse.json(mockDebugReview);
+  if (id === "debug-single") return NextResponse.json(mockDebugSingle);
+  // ===============================
+
+  try {
+    // ❗️ ИСПРАВЛЕННЫЙ JOIN-ЗАПРОС
+    // Мы используем алиас "material:materials", чтобы явно указать связь 
+    // и избежать краша "Could not find a relationship between materials and projects"
+    const { data: rawAssignment, error: aErr } = await supabase
+      .from("assignments")
+      .select(`
+        *,
+        material:materials (
+          id,
+          title,
+          branch_type,
+          material_kind,
+          is_active,
+          is_available,
+          target_levels,
+          class_levels
+        )
+      `)
+      .eq("id", id)
+      .single();
+
+    if (aErr || !rawAssignment) {
+      console.error("🔴 [API ASSIGNMENT-DATA] Ошибка поиска задания:", aErr?.message);
+      return fail(aErr?.message || "Assignment not found", 404, "NOT_FOUND");
+    }
+
+    const assignment = rawAssignment as any;
+
+    // --- ПРОВЕРКА НА ПУСТОЕ ЗАДАНИЕ С УЧЕТОМ ТИПА (TEST / INTRO) ---
+    const content = assignment.content || {};
+    const assignmentType = assignment.assignment_type || 'test';
+    const isIntro = assignmentType === 'intro' || content.mode === 'informational';
+    
+    const questions = Array.isArray(content.questions) ? content.questions : [];
+    const blocks = Array.isArray(content.blocks) ? content.blocks : [];
+
+    // Блокируем, только если это ТЕСТ (с проверкой) и в нем 0 вопросов
+    if (!isIntro && questions.length === 0) {
+      return fail("Задание еще не готово (нет вопросов)", 403, "NOT_READY");
+    }
+
+    // Защита от пустых ознакомительных материалов (если нет ни блоков, ни вопросов)
+    if (isIntro && blocks.length === 0 && questions.length === 0) {
+      return fail("Ознакомительный материал еще не заполнен", 403, "NOT_READY");
+    }
+    // -----------------------------------------------------------------
+
+    const gatehouse = isGatehouseAssignment(assignment);
+    const mat = getMaterial(assignment);
+
+    if (gatehouse) {
+      const materialId = getMaterialId(assignment);
+
+      if (!materialId) {
+        return fail("Gatehouse assignment has no material", 404, "NOT_FOUND");
+      }
+
+      if (mat && mat.is_active === false) {
+        return fail("Material is not active", 404, "NOT_FOUND");
+      }
+
+      const { data: access, error: accessErr } = await supabase
+        .from("material_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("material_id", materialId)
+        .maybeSingle();
+
+      if (accessErr) {
+        console.error("🔴 [API ASSIGNMENT-DATA] Ошибка доступа:", accessErr.message);
+        return fail(accessErr.message, 500, "DB_ERROR");
+      }
+
+      const hasAccess = Boolean(mat?.is_available || access);
+
+      if (!hasAccess) {
+        return fail("No access to this Gatehouse material", 403, "FORBIDDEN");
+      }
+    }
+
+    const { data: progress, error: pErr } = await supabase
+      .from("user_progress")
+      .select("is_completed, score, completed_at, answers")
+      .eq("user_id", user.id)
+      .eq("assignment_id", id)
+      .maybeSingle();
+
+    if (pErr) {
+      console.error("🔴 [API ASSIGNMENT-DATA] Ошибка прогресса:", pErr.message);
+      return fail(pErr.message, 500, "DB_ERROR");
+    }
+
+    // Возвращаем данные, совместимые с AssignmentClient
+    return ok({
+      assignment,
+      progress: progress
+        ? {
+            is_completed: Boolean(progress.is_completed),
+            score: progress.score ?? null,
+            completed_at: progress.completed_at ?? null,
+            answers: progress.answers ?? {},
+          }
+        : null,
+    });
+  } catch (e: any) {
+    console.error("🔴 [API ASSIGNMENT-DATA] Внутренняя ошибка:", e);
+    return fail(e?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+</file>
+
 <file path="components/gatehouse/GatehouseHeader.tsx">
 "use client";
 
@@ -49467,636 +50294,133 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
 }
 </file>
 
-<file path="app/login/page.tsx">
-"use client";
+<file path="app/api/admin/projects/[id]/materials/route.ts">
+import { NextRequest } from "next/server";
+import { ok, fail } from "@/lib/api/response";
+import { requireAdmin } from "@/lib/api/admin";
 
-import "./login.css";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-
-type BannerType = "error" | "success" | "warning" | null;
-
-type ApiPayload = {
-  ok?: boolean;
-  error?: string;
-  message?: string;
-  code?: string;
-  data?: any;
-  authenticated?: boolean;
-  profile?: any;
-  redirectTo?: string;
-};
-
-function isValidEmail(email: string) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+// Утилиты для безопасной обработки данных
+function normalizeNullableString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const str = String(value).trim();
+  return str || null;
 }
 
-function looksLikeNetworkError(err: unknown) {
-  const msg = String((err as any)?.message ?? err ?? "").toLowerCase().trim();
-  return (
-    msg.includes("failed to fetch") ||
-    msg.includes("fetch failed") ||
-    msg.includes("networkerror") ||
-    msg.includes("network error") ||
-    msg.includes("load failed") ||
-    msg.includes("request failed") ||
-    msg.includes("typeerror: failed to fetch")
-  );
+function isValidUUID(str: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
 }
 
-async function readApiPayload(res: Response): Promise<ApiPayload | null> {
-  const text = await res.text();
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+  const { supabase } = auth;
 
-  if (!text) return null;
+  const { searchParams } = req.nextUrl;
+  const tabId = searchParams.get("tab_id");
 
   try {
-    return JSON.parse(text) as ApiPayload;
+    // В таблице materials нет project_id, фильтруем через project_tabs
+    let query = supabase
+      .from("materials")
+      .select(`
+        *,
+        project_tabs!inner ( id, title, slug, project_id ) 
+      `)
+      .order("order_index", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    // Если админ выбрал конкретный таб в селекте
+    if (tabId) {
+      query = query.eq("project_tab_id", tabId);
+    } else {
+      // Иначе показываем все материалы этого проекта (через связь с project_tabs)
+      const { id: projectId } = await ctx.params;
+      query = query.eq("project_tabs.project_id", projectId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) return fail(error.message, 500, "DB_ERROR");
+
+    return ok({ materials: data ?? [] });
+  } catch (e: any) {
+    return fail(e?.message || "Внутренняя ошибка сервера", 500, "SERVER_ERROR");
+  }
+}
+
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+  const { supabase, user } = auth;
+
+  let body: any;
+  try {
+    body = await req.json();
   } catch {
-    return {
-      ok: false,
-      error: text,
-    };
-  }
-}
-
-function unwrapApiData(json: ApiPayload | null) {
-  if (!json) return null;
-  if (json.data && typeof json.data === "object") return json.data;
-  return json;
-}
-
-export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
-  const [bannerType, setBannerType] = useState<BannerType>(null);
-  const [bannerText, setBannerText] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const [networkIssue, setNetworkIssue] = useState(false);
-
-  const [helpOpen, setHelpOpen] = useState(false);
-  const [supportOpen, setSupportOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"registration" | "rules">("registration");
-
-  const msgParam = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get("message");
-  }, []);
-
-  function showBanner(type: BannerType, text: string) {
-    setBannerType(type);
-    setBannerText(text);
+    return fail("Неверный формат JSON", 400, "BAD_JSON");
   }
 
-  function showNetworkBanner(extra?: string) {
-    setNetworkIssue(true);
-    const base =
-      "🌐 Не удалось подключиться к серверу входа.\n" +
-      "Проверьте интернет-соединение и попробуйте обновить страницу.\n" +
-      "Если проблема повторяется — попробуйте открыть сайт позже.";
-    showBanner("error", extra ? `${base}\n\nДетали: ${extra}` : base);
+  const title = String(body?.title ?? "").trim();
+  if (!title) return fail("Название материала обязательно", 400, "VALIDATION");
+
+  // ❗️ ЗАЩИТА ТАБА: Читаем и проверяем UUID
+  let project_tab_id = normalizeNullableString(body?.project_tab_id ?? body?.tab_id);
+  
+  if (project_tab_id === "00000000-0000-0000-0000-000000000000" || project_tab_id === "none" || project_tab_id === "null") {
+    project_tab_id = null;
+  }
+  
+  // Если прилетел кривой текст вместо UUID
+  if (project_tab_id && !isValidUUID(project_tab_id)) {
+    project_tab_id = null;
   }
 
-  useEffect(() => {
-    if (!msgParam) return;
+  if (!project_tab_id) {
+    return fail("Необходимо выбрать корректную вкладку (Таб)", 400, "VALIDATION");
+  }
 
-    if (msgParam === "confirmed") {
-      setNetworkIssue(false);
-      showBanner("success", "✅ Email успешно подтвержден! Теперь вы можете войти в систему.");
-    } else if (msgParam === "check_email") {
-      setNetworkIssue(false);
-      showBanner("warning", "📧 Проверьте вашу почту для подтверждения регистрации.");
-    } else if (msgParam === "email_exists") {
-      setNetworkIssue(false);
-      showBanner(
-        "error",
-        "❌ Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.",
-      );
-    }
-  }, [msgParam]);
+  const description = normalizeNullableString(body?.description);
+  const cover_image_url = normalizeNullableString(body?.cover_image_url);
+  const target_levels = Array.isArray(body?.target_levels) ? body.target_levels.map(String).filter(Boolean) : [];
+  const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
+  const is_available = Boolean(body?.is_available);
+  const is_active = body?.is_active !== undefined ? Boolean(body?.is_active) : true;
 
-  useEffect(() => {
-    let cancelled = false;
+  // ❗️ УБИРАЕМ ХАРДКОД: Читаем реальные значения от фронта. 
+  // Дефолты оставляем только для обхода ограничений старой БД (если фронт их не прислал)
+  const branch_type = normalizeNullableString(body?.branch_type) || "olympiad"; 
+  const material_kind = normalizeNullableString(body?.material_kind) || "mock_test"; 
 
-    async function run() {
-      try {
-        const res = await fetch("/api/auth/session", {
-          method: "GET",
-          cache: "no-store",
-        });
+  try {
+    const { data, error } = await supabase
+      .from("materials")
+      .insert({
+        project_tab_id, 
+        title,
+        description,
+        target_levels, 
+        class_levels: target_levels, // Дублируем для обратной совместимости
+        material_kind,
+        branch_type,
+        order_index,
+        is_available,
+        is_active,
+        cover_image_url,
+        created_by: user.id // Логируем, кто создал материал
+      })
+      .select("*")
+      .single();
 
-        const json = await readApiPayload(res);
-        const payload = unwrapApiData(json);
-
-        if (cancelled) return;
-
-        if (res.ok && json?.ok && payload?.authenticated) {
-          const isAdmin = Boolean(payload?.profile?.is_admin);
-          window.location.href = isAdmin ? "/admin" : "/portal";
-        }
-      } catch (e: any) {
-        if (cancelled) return;
-        if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
-      }
+    if (error) {
+      console.error("🔴 [ADMIN POST MATERIAL] Ошибка Базы Данных:", error.message);
+      return fail(error.message, 500, "DB_ERROR");
     }
 
-    run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function resendConfirmation(emailValue: string) {
-    try {
-      const res = await fetch("/api/auth/resend-confirmation", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          email: emailValue,
-        }),
-      });
-
-      const json = await readApiPayload(res);
-      const payload = unwrapApiData(json);
-
-      if (!res.ok || !json?.ok) {
-        showBanner(
-          "error",
-          payload?.error || payload?.message || json?.error || "Не удалось отправить письмо подтверждения.",
-        );
-        return;
-      }
-
-      showBanner(
-        "success",
-        payload?.message || json?.message || "📧 Письмо с подтверждением отправлено повторно. Проверьте почту.",
-      );
-    } catch (e: any) {
-      if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
-      else showBanner("error", "❌ Не удалось отправить письмо: " + (e?.message || String(e)));
-    }
+    return ok({ material: data });
+  } catch (e: any) {
+    console.error("🔴 [ADMIN POST MATERIAL] Ошибка сервера:", e);
+    return fail(e?.message || "Внутренняя ошибка сервера", 500, "SERVER_ERROR");
   }
-
-  async function doLogin(isAdmin: boolean) {
-    const e = email.trim().toLowerCase();
-
-    if (!e || !password) {
-      setNetworkIssue(false);
-      showBanner("error", "Введите email и пароль");
-      return;
-    }
-
-    if (!isValidEmail(e)) {
-      setNetworkIssue(false);
-      showBanner("error", "Неверный формат email");
-      return;
-    }
-
-    setNetworkIssue(false);
-
-    try {
-      setBusy(true);
-      showBanner("warning", "🔐 Проверяем данные...");
-
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          email: e,
-          password,
-          isAdmin,
-          mode: isAdmin ? "admin" : "student",
-        }),
-      });
-
-      const json = await readApiPayload(res);
-      const payload = unwrapApiData(json);
-
-      if (!res.ok || !json?.ok) {
-        const msg = String(payload?.error || payload?.message || json?.error || "Ошибка входа");
-        const code = String(payload?.code || json?.code || "").toUpperCase();
-
-        if (looksLikeNetworkError(msg)) {
-          showNetworkBanner(msg);
-          setBusy(false);
-          return;
-        }
-
-        if (code === "EMAIL_NOT_CONFIRMED" || msg.toLowerCase().includes("email не подтверж")) {
-          showBanner("error", "❌ Email не подтвержден. Проверьте вашу почту и подтвердите регистрацию.");
-
-          const resend = window.confirm("Отправить письмо с подтверждением повторно?");
-          if (resend) {
-            await resendConfirmation(e);
-          }
-        } else if (code === "INVALID_CREDENTIALS") {
-          showBanner("error", "❌ Неверный email или пароль. Если вы забыли пароль, воспользуйтесь восстановлением.");
-        } else if (code === "RATE_LIMIT") {
-          showBanner("error", "⚠️ Слишком много попыток. Попробуйте через несколько минут.");
-        } else if (code === "USER_NOT_FOUND") {
-          showBanner("error", "❌ Пользователь с таким email не найден. Проверьте email или зарегистрируйтесь.");
-        } else {
-          showBanner("error", msg);
-        }
-
-        setBusy(false);
-        return;
-      }
-
-      const redirectTo = String(payload?.redirectTo || (isAdmin ? "/admin" : "/portal"));
-      window.location.href = redirectTo;
-    } catch (err: any) {
-      if (looksLikeNetworkError(err)) showNetworkBanner(String(err?.message || err));
-      else showBanner("error", "❌ Неожиданная ошибка: " + (err?.message || String(err)));
-      setBusy(false);
-    }
-  }
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        if (helpOpen) {
-          setHelpOpen(false);
-          document.body.style.overflow = "";
-        }
-        if (supportOpen) {
-          setSupportOpen(false);
-          document.body.style.overflow = "";
-        }
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [helpOpen, supportOpen]);
-
-  function openHelp() {
-    setHelpOpen(true);
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeHelp() {
-    setHelpOpen(false);
-    document.body.style.overflow = "";
-  }
-
-  function openSupport() {
-    setSupportOpen(true);
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeSupport() {
-    setSupportOpen(false);
-    document.body.style.overflow = "";
-  }
-
-  function renderBanner() {
-    if (!bannerType) return null;
-    const cls = bannerType === "error" ? "error" : bannerType === "success" ? "success" : "warning";
-
-    return (
-      <div className={cls} style={{ display: "block", whiteSpace: "pre-line" }}>
-        {bannerText}
-      </div>
-    );
-  }
-
-  function renderNetworkActions() {
-    if (!networkIssue) return null;
-
-    return (
-      <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button className="btn student" type="button" onClick={() => window.location.reload()}>
-          🔄 Обновить страницу
-        </button>
-        <Link className="btn info" href="/info">
-          📄 Информация
-        </Link>
-      </div>
-    );
-  }
-
-  function renderExistingAccountHelp() {
-    if (msgParam !== "confirmed") return null;
-
-    return (
-      <div className="existing-account-help">
-        <strong>🎉 Отлично! Ваш аккаунт активирован.</strong>
-        <br />
-        Теперь вы можете войти в систему используя ваш email и пароль.
-      </div>
-    );
-  }
-
-  return (
-    <div className="page-login">
-      <div
-        className="help-modal"
-        style={{ display: helpOpen ? "flex" : "none" }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) closeHelp();
-        }}
-      >
-        <div className="help-modal-content">
-          <div className="help-modal-header">
-            <h3>Помощь</h3>
-            <button className="help-close" onClick={closeHelp} type="button">
-              ✕
-            </button>
-          </div>
-
-          <div className="help-modal-tabs">
-            <button
-              className={"help-tab " + (activeTab === "registration" ? "active" : "")}
-              onClick={() => setActiveTab("registration")}
-              type="button"
-            >
-              Регистрация
-            </button>
-            <button
-              className={"help-tab " + (activeTab === "rules" ? "active" : "")}
-              onClick={() => setActiveTab("rules")}
-              type="button"
-            >
-              Правила
-            </button>
-          </div>
-
-          <div className={"help-tab-content " + (activeTab === "registration" ? "active" : "")}>
-            <div className="help-html-inner">
-              <h4 className="help-section-title">Как создать профиль и войти</h4>
-              
-              <div className="registration-guide">
-                <div className="guide-step">
-                  <div className="step-badge">1</div>
-                  <div className="step-body">
-                    <h5>Заполните анкету</h5>
-                    <p>
-                      Нажмите кнопку <Link href="/register" onClick={closeHelp}>«Зарегистрироваться»</Link> в самом низу. 
-                      Внимательно введите ваш настоящий рабочий Email и придумайте безопасный пароль.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="guide-step">
-                  <div className="step-badge">2</div>
-                  <div className="step-body">
-                    <h5>Отправка ссылки на почту</h5>
-                    <p>
-                      Сразу после регистрации наша система отправит вам автоматическое письмо. 
-                      Обычно оно долетает быстро — в течение пары минут.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="guide-step">
-                  <div className="step-badge">3</div>
-                  <div className="step-body">
-                    <h5>Проверьте все папки</h5>
-                    <p>
-                      Откройте ваш почтовый ящик. Если во «Входящих» пусто, не пугайтесь — обязательно загляните в папки <strong>«Спам»</strong> and <strong>«Промоакции»</strong>. Фильтры почты иногда путают автоматические письма.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="guide-step">
-                  <div className="step-badge">4</div>
-                  <div className="step-body">
-                    <h5>Подтвердите и учитесь</h5>
-                    <p>
-                      Кликните по ссылке в письме. Ваш аккаунт мгновенно активируется, вас вернет сюда, и вы сможете спокойно зайти под своим логином и паролем.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className={"help-tab-content " + (activeTab === "rules" ? "active" : "")}>
-            <div className="help-html-inner rules-tab-bg">
-              <h4 className="rules-main-title">правила</h4>
-              
-              <div className="help-rules-grid">
-                <div className="rule-card">
-                  <p>
-                    Количество попыток не ограничено. Мы верим, что вы сможете! 
-                    Система будет хранить ваш лучший (последний) результат.
-                  </p>
-                </div>
-
-                <div className="rule-card">
-                  <p>
-                    Полный доступ к учебным модулям откроется после покупки.
-                  </p>
-                </div>
-
-                <div className="rule-card">
-                  <p>
-                    Ваша цель — не просто пройти, а понять. Подходите к каждому уроку осознанно, 
-                    чтобы извлечь максимальную пользу.
-                  </p>
-                </div>
-
-                <div className="rule-card trophy-card">
-                  <p>
-                    Помните, главное — это ваше развитие. Этот учебник — ваш инструмент. 
-                    Используйте его по максимуму!
-                  </p>
-                  <div className="trophy-vector">
-                    <svg viewBox="0 0 24 24" width="64" height="64" fill="#f59e0b">
-                      <path d="M18 2H6v2H2v5c0 2.21 1.79 4 4 4h2c.75 2.15 2.6 3.71 4.88 3.97V19H7v2h10v-2h-4.12v-2.03C15.16 16.71 17 15.15 17.75 13h2.25c2.21 0 4-1.79 4-4V4h-4V2zM4 6h2v5c-1.1 0-2-.9-2-2V6zm16 3c0 1.1-.9 2-2 2V6h2v3z"/>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Мини-модалка технической поддержки */}
-      <div
-        className="help-modal"
-        style={{ display: supportOpen ? "flex" : "none" }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) closeSupport();
-        }}
-      >
-        <div className="help-modal-content" style={{ maxWidth: "400px" }}>
-          <div className="help-modal-header">
-            <h3>Техническая поддержка</h3>
-            <button className="help-close" onClick={closeSupport} type="button">
-              ✕
-            </button>
-          </div>
-          <div style={{ padding: "20px 0", color: "rgba(15,23,42,0.9)" }}>
-            <p style={{ marginBottom: "20px", fontSize: "14px", lineHeight: "1.5", fontWeight: 600 }}>
-              Обычно администратор отвечает в течение 2 часов. Выберите любой удобный способ для быстрой связи:
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <a
-                href="https://t.me/skebobingg"
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  display: "block",
-                  padding: "12px",
-                  borderRadius: "12px",
-                  background: "linear-gradient(135deg, #24a1de, #208ec4)",
-                  color: "#fff",
-                  fontWeight: 900,
-                  fontSize: "14px",
-                  textDecoration: "none",
-                  textAlign: "center",
-                  boxShadow: "0 4px 12px rgba(36, 161, 222, 0.2)"
-                }}
-              >
-                Написать в Telegram
-              </a>
-              <a
-                href="https://vk.com/bluntokyr"
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  display: "block",
-                  padding: "12px",
-                  borderRadius: "12px",
-                  background: "linear-gradient(135deg, #0077ff, #0066da)",
-                  color: "#fff",
-                  fontWeight: 900,
-                  fontSize: "14px",
-                  textDecoration: "none",
-                  textAlign: "center",
-                  boxShadow: "0 4px 12px rgba(0, 119, 255, 0.2)"
-                }}
-              >
-                Написать во ВКонтакте
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="login-container">
-        <div className="login-card">
-          <div className="brand">
-            <div className="brand-mark">HH</div>
-            <div>
-              <div className="brand-title">Учебники Хиппоши</div>
-              <div className="brand-subtitle">🎓 Образовательная платформа</div>
-            </div>
-          </div>
-
-          <h2>Вход в аккаунт</h2>
-
-          <div className="loading" style={{ display: busy ? "block" : "none" }}>
-            <div className="spinner" />
-            Проверяем данные...
-          </div>
-
-          {renderBanner()}
-          {renderNetworkActions()}
-          {renderExistingAccountHelp()}
-
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              placeholder="example@gmail.com"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  (document.getElementById("password") as HTMLInputElement | null)?.focus();
-                }
-              }}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password">Пароль</label>
-            <div className="input-wrapper">
-              <input
-                type={showPassword ? "text" : "password"}
-                id="password"
-                placeholder="Введите ваш пароль"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void doLogin(false);
-                }}
-              />
-              <button
-                type="button"
-                className="toggle-password"
-                onClick={() => setShowPassword(!showPassword)}
-                tabIndex={-1}
-                title={showPassword ? "Скрыть пароль" : "Показать пароль"}
-              >
-                {showPassword ? "👁️‍🗨️" : "👁️"}
-              </button>
-            </div>
-          </div>
-
-          <button className="btn student" onClick={() => void doLogin(false)} disabled={busy}>
-            Войти как ученик
-          </button>
-
-          <div className="link">
-            <p>
-              Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
-            </p>
-            <p>
-              <Link href="/reset">Забыли пароль?</Link>
-            </p>
-
-            <div className="bottom-actions">
-              <Link className="btn info" href="/info">
-                Информация
-              </Link>
-
-              <button className="btn help" onClick={openHelp} type="button">
-                Помощь
-              </button>
-            </div>
-
-            {/* Кнопка техподдержки, расположенная под всеми кнопками */}
-            <button
-              className="btn support"
-              onClick={openSupport}
-              type="button"
-              style={{
-                marginTop: "12px",
-                width: "100%",
-                padding: "11px",
-                borderRadius: "12px",
-                background: "rgba(15, 23, 42, 0.05)",
-                border: "1px solid rgba(15, 23, 42, 0.08)",
-                color: "rgba(15, 23, 42, 0.8)",
-                fontWeight: 700,
-                fontSize: "14px",
-                cursor: "pointer"
-              }}
-            >
-              Техническая поддержка
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 </file>
 
@@ -50172,279 +50496,6 @@ export default async function ProjectProfilePage({
       initialProfile={initialProfile}
       backgroundUrl={backgroundUrl}
     />
-  );
-}
-</file>
-
-<file path="app/api/assignment-progress/route.ts">
-// app/api/assignment-progress/route.ts
-import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { calcAndBuildReview } from "@/lib/assignments/scoring";
-import type { AssignmentData } from "@/lib/assignments/types"; // 🔥 Подключаем наш глобальный тип
-
-// TODO: В будущем (когда отвяжемся от легаси) заменим на универсальный assertProjectAssignmentAccess
-import {
-  assertOlympiadAssignmentAccess,
-  assertGatehouseAssignmentAccess,
-} from "@/lib/assignments/access";
-
-// НА ЗАМЕТКУ: Когда закончишь ЭТАП 1, измени этот импорт на: 
-// import { recommendLevel } from "@/lib/projects/recommendLevel";
-import { recommendGatehouseLevel as recommendLevel } from "@/lib/exams/recommendLevel";
-
-type Body = {
-  assignmentId: string;
-  answers: Record<string, any>;
-  isCompleted: boolean;
-  score: number | null;    // присланный клиентом балл игнорируется
-  source?: string;
-  sourceId?: string;
-  branchType?: string;
-};
-
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-
-function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
-}
-
-function normalizeScore(value: unknown): number {
-  const score = Number(value);
-  return Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0;
-}
-
-function normalizeStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item ?? "").trim()).filter(Boolean);
-}
-
-// 🔧 Заменили any на AssignmentData
-function getMaterialLevels(assignment: AssignmentData | null): string[] {
-  const material = firstOrNull(assignment?.materials);
-  return normalizeStringArray(material?.target_levels);
-}
-
-// 🔧 Заменили any на AssignmentData
-function getMaterialId(assignment: AssignmentData | null): string | null {
-  const material = firstOrNull(assignment?.materials);
-  const direct = typeof assignment?.material_id === "string" ? assignment?.material_id : null;
-  const fromMaterial = typeof material?.id === "string" ? material.id : null;
-  return direct || fromMaterial || null;
-}
-
-// УНИВЕРСАЛЬНЫЙ ЧТЕНИЯ ФИЧ (Фоллбэк для старых материалов без project_id)
-function getProjectConfig(assignment: AssignmentData | null) {
-  const material = firstOrNull(assignment?.materials);
-  const project = material?.projects;
-  
-  const isLegacyGatehouse = assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
-  
-  return {
-    slug: project?.slug ?? (isLegacyGatehouse ? "gatehouse" : "olympiad"),
-    hasStreaks: project?.features?.hasStreaks ?? !isLegacyGatehouse, // Олимпиада по умолчанию со стриками
-    hasRecommendations: project?.features?.hasRecommendations ?? isLegacyGatehouse, // Экзамены по умолчанию с рекомендациями
-  };
-}
-
-// ПЕРЕПИСАНО: Надежный агрегатор счетчиков (поддерживает и старый branch_type и новый project.slug)
-async function recalcCompletedCounters(supabase: any, userId: string) {
-  const { data } = await supabase
-    .from("user_progress")
-    .select(`
-      id,
-      assignments (
-        branch_type,
-        materials ( projects ( slug ) )
-      )
-    `)
-    .eq("user_id", userId)
-    .eq("is_completed", true);
-
-  let olympiadCount = 0;
-  let gatehouseCount = 0;
-
-  for (const row of data || []) {
-    const assignment = row.assignments;
-    if (!assignment) continue;
-
-    const legacyBranch = assignment.branch_type;
-    const material = firstOrNull(assignment.materials);
-    const projectSlug = material?.projects?.slug;
-
-    if (projectSlug === "gatehouse" || (!projectSlug && legacyBranch === "gatehouse")) {
-      gatehouseCount++;
-    } else {
-      olympiadCount++; // Все остальные проекты и олимпиада летят сюда
-    }
-  }
-
-  await supabase
-    .from("profiles")
-    .update({
-      completed_assignments_count: olympiadCount,
-      ga_completed_assignments_count: gatehouseCount,
-    })
-    .eq("id", userId);
-
-  return {
-    olympiadCompletedAssignmentsCount: olympiadCount,
-    gatehouseCompletedAssignmentsCount: gatehouseCount,
-  };
-}
-
-// ─────────────────────────────────────────────────────────────
-// POST handler
-// ─────────────────────────────────────────────────────────────
-
-export async function POST(req: Request) {
-  const supabase = await createSupabaseServerClient();
-  const { data: auth, error: authErr } = await supabase.auth.getUser();
-
-  if (authErr) return NextResponse.json({ ok: false, error: "Auth fetch failed" }, { status: 500 });
-  if (!auth.user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-
-  let body: Body;
-  try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Bad JSON" }, { status: 400 }); }
-  if (!body?.assignmentId) return NextResponse.json({ ok: false, error: "assignmentId required" }, { status: 400 });
-
-  // ─────────────────────────────────────────────────────────────
-  // Дебаг-задания (не существуют в БД)
-  // ─────────────────────────────────────────────────────────────
-  const debugIds = ["debug-all", "debug-review", "debug-perfect", "debug-mode-choice", "debug-gatehouse"];
-  if (debugIds.includes(body.assignmentId) || body.assignmentId?.startsWith("debug-single-")) {
-    return NextResponse.json({
-      ok: true, score: body.score, branch_type: "olympiad",
-      counters: { olympiadCompletedAssignmentsCount: 0, gatehouseCompletedAssignmentsCount: 0 },
-    });
-  }
-
-  if (!body.isCompleted) return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
-
-  // ─────────────────────────────────────────────────────────────
-  // ПОЛУЧЕНИЕ ЗАДАНИЯ + ДАННЫЕ ПРОЕКТА (NEW ARCHITECTURE)
-  // ─────────────────────────────────────────────────────────────
-  const { data: rawAssignment, error: assignmentErr } = await supabase
-    .from("assignments")
-    .select(`
-      id, branch_type, material_id, textbook_id, crossword_id, content,
-      materials(
-        id, branch_type, project_id, material_kind, target_levels, is_active, is_available,
-        projects ( id, slug, features )
-      )
-    `)
-    .eq("id", body.assignmentId)
-    .single();
-
-  if (assignmentErr || !rawAssignment) {
-    return NextResponse.json({ ok: false, error: assignmentErr?.message || "Assignment not found" }, { status: 404 });
-  }
-
-  // Строго типизируем задание
-  const assignment = rawAssignment as AssignmentData;
-  const projectConfig = getProjectConfig(assignment);
-
-  // ─────────────────────────────────────────────────────────────
-  // ДОСТУПЫ (Временный фоллбэк до полного переезда на единый assert)
-  // ─────────────────────────────────────────────────────────────
-  try {
-    if (projectConfig.slug === "gatehouse") {
-      await assertGatehouseAssignmentAccess(supabase, auth.user.id, assignment);
-    } else {
-      await assertOlympiadAssignmentAccess(supabase, auth.user.id, assignment);
-    }
-  } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message || "Access denied" }, { status: err.status || 403 });
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // ОЦЕНКА (Интерактивный vs Ознакомительный)
-  // ─────────────────────────────────────────────────────────────
-  const isInformational = assignment.content?.mode === "informational";
-  let realScore: number | null = null;
-
-  if (!isInformational) {
-    const questions = assignment.content?.questions;
-    if (!Array.isArray(questions)) return NextResponse.json({ ok: false, error: "Некорректное содержимое" }, { status: 500 });
-    const { stats } = calcAndBuildReview(questions, body.answers);
-    realScore = normalizeScore(stats.score);
-  }
-
-  const payload = {
-    user_id: auth.user.id,
-    assignment_id: body.assignmentId,
-    answers: body.answers ?? {},
-    is_completed: true,
-    completed_at: new Date().toISOString(),
-    score: realScore,
-  };
-
-  const { error: upsertError } = await supabase
-    .from("user_progress")
-    .upsert(payload, { onConflict: "user_id,assignment_id" });
-
-  if (upsertError) {
-    console.error("[ERROR] user_progress upsert failed:", upsertError.message);
-    return NextResponse.json({ ok: false, error: upsertError.message }, { status: 500 });
-  }
-
-  const counters = await recalcCompletedCounters(supabase, auth.user.id);
-
-  // ─────────────────────────────────────────────────────────────
-  // ДИНАМИЧЕСКИЕ МОДУЛИ (ПО ФЛАГАМ ПРОЕКТА)
-  // ─────────────────────────────────────────────────────────────
-  let recommendation: any = null;
-  let streak: any = null;
-
-  // 1. Модуль Рекомендаций (ранее только для Gatehouse)
-  if (projectConfig.hasRecommendations) {
-    const materialId = getMaterialId(assignment);
-    
-    if (!isInformational && realScore !== null) {
-      recommendation = recommendLevel({
-        score: realScore, maxScore: 100, percent: realScore,
-        materialLevels: getMaterialLevels(assignment),
-      });
-    }
-
-    const { error: examErr } = await supabase
-      .from("exam_results")
-      .upsert({
-        user_id: auth.user.id, assignment_id: body.assignmentId, material_id: materialId,
-        score: realScore, recommended_level: recommendation?.recommendedLevel || null,
-        breakdown: { recommendation, source: body.source ?? null, sourceId: body.sourceId ?? null },
-        answers: body.answers ?? {}, completed_at: payload.completed_at,
-      }, { onConflict: "user_id,assignment_id" });
-
-    if (examErr) console.error("[ERROR] exam_results upsert failed:", examErr.message);
-  }
-
-  // 2. Модуль Стриков (ранее только для Олимпиады)
-  if (projectConfig.hasStreaks) {
-    const { data: streakData, error: streakErr } = await supabase.rpc(
-      "record_streak_completion",
-      { _assignment_id: body.assignmentId }
-    );
-    if (!streakErr) streak = streakData ?? null;
-    else console.error("[ERROR] record_streak_completion RPC failed:", streakErr.message);
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // ЕДИНЫЙ ОТВЕТ СЕРВЕРА
-  // ─────────────────────────────────────────────────────────────
-  return NextResponse.json(
-    { 
-      ok: true, 
-      branch_type: projectConfig.slug, // Клиент получит актуальный слаг (olympiad, exam и т.д.)
-      score: realScore, 
-      recommendation, 
-      streak, 
-      counters 
-    },
-    { status: 200 }
   );
 }
 </file>
@@ -50544,6 +50595,282 @@ export default async function ProjectLayout({
     >
       {children}
     </div>
+  );
+}
+</file>
+
+<file path="app/api/assignment-progress/route.ts">
+// app/api/assignment-progress/route.ts
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { calcAndBuildReview } from "@/lib/assignments/scoring";
+import type { AssignmentData } from "@/lib/assignments/types"; 
+
+import {
+  assertOlympiadAssignmentAccess,
+  assertGatehouseAssignmentAccess,
+} from "@/lib/assignments/access";
+
+import { recommendGatehouseLevel as recommendLevel } from "@/lib/exams/recommendLevel";
+
+type Body = {
+  assignmentId: string;
+  answers: Record<string, any>;
+  isCompleted: boolean;
+  score: number | null;
+  source?: string;
+  sourceId?: string;
+  branchType?: string;
+};
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function normalizeScore(value: unknown): number {
+  const score = Number(value);
+  return Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+}
+
+// 🔧 Извлекаем материал из нового или старого формата JOIN
+function getMaterial(assignment: any) {
+  if (!assignment) return null;
+  if (assignment.material && !Array.isArray(assignment.material)) return assignment.material;
+  if (assignment.materials && !Array.isArray(assignment.materials)) return assignment.materials;
+  if (Array.isArray(assignment.materials)) return assignment.materials[0] || null;
+  if (Array.isArray(assignment.material)) return assignment.material[0] || null;
+  return null;
+}
+
+function getMaterialLevels(assignment: AssignmentData | null): string[] {
+  const material = getMaterial(assignment);
+  return normalizeStringArray(material?.target_levels);
+}
+
+function getMaterialId(assignment: AssignmentData | null): string | null {
+  const material = getMaterial(assignment);
+  return assignment?.material_id || material?.id || null;
+}
+
+// УНИВЕРСАЛЬНЫЙ ЧТЕНИЯ ФИЧ (Использует новую связь project_tabs -> projects)
+function getProjectConfig(assignment: AssignmentData | null) {
+  const material = getMaterial(assignment);
+  
+  // Читаем проект через таб (Новая архитектура)
+  const project = material?.project_tabs?.projects; 
+  
+  const isLegacyGatehouse = assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
+  
+  return {
+    slug: project?.slug ?? (isLegacyGatehouse ? "gatehouse" : "olympiad"),
+    hasStreaks: project?.features?.hasStreaks ?? !isLegacyGatehouse,
+    hasRecommendations: project?.features?.hasRecommendations ?? isLegacyGatehouse, 
+  };
+}
+
+// ПЕРЕПИСАНО: Надежный агрегатор без ошибочных JOIN-ов напрямую
+async function recalcCompletedCounters(supabase: any, userId: string) {
+  // Вытаскиваем прогресс и базовые поля заданий
+  const { data } = await supabase
+    .from("user_progress")
+    .select(`
+      id,
+      assignments (
+        branch_type,
+        material_id,
+        textbook_id,
+        crossword_id
+      )
+    `)
+    .eq("user_id", userId)
+    .eq("is_completed", true);
+
+  let olympiadCount = 0;
+  let gatehouseCount = 0;
+
+  for (const row of data || []) {
+    const assignment = row.assignments;
+    if (!assignment) continue;
+
+    // В легаси архитектуре gatehouse определялся по branch_type
+    if (assignment.branch_type === "gatehouse") {
+      gatehouseCount++;
+    } else {
+      olympiadCount++;
+    }
+  }
+
+  // Обновляем статистику в профиле пользователя
+  await supabase
+    .from("profiles")
+    .update({
+      completed_assignments_count: olympiadCount,
+      ga_completed_assignments_count: gatehouseCount,
+    })
+    .eq("id", userId);
+
+  return {
+    olympiadCompletedAssignmentsCount: olympiadCount,
+    gatehouseCompletedAssignmentsCount: gatehouseCount,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// POST handler
+// ─────────────────────────────────────────────────────────────
+
+export async function POST(req: Request) {
+  const supabase = await createSupabaseServerClient();
+  const { data: auth, error: authErr } = await supabase.auth.getUser();
+
+  if (authErr) return NextResponse.json({ ok: false, error: "Auth fetch failed" }, { status: 500 });
+  if (!auth.user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
+  let body: Body;
+  try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Bad JSON" }, { status: 400 }); }
+  if (!body?.assignmentId) return NextResponse.json({ ok: false, error: "assignmentId required" }, { status: 400 });
+
+  // ─────────────────────────────────────────────────────────────
+  // Дебаг-задания
+  // ─────────────────────────────────────────────────────────────
+  const debugIds = ["debug-all", "debug-review", "debug-perfect", "debug-mode-choice", "debug-gatehouse"];
+  if (debugIds.includes(body.assignmentId) || body.assignmentId?.startsWith("debug-single-")) {
+    return NextResponse.json({
+      ok: true, score: body.score, branch_type: "olympiad",
+      counters: { olympiadCompletedAssignmentsCount: 0, gatehouseCompletedAssignmentsCount: 0 },
+    });
+  }
+
+  if (!body.isCompleted) return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
+
+  // ─────────────────────────────────────────────────────────────
+  // ПОЛУЧЕНИЕ ЗАДАНИЯ + ДАННЫЕ ПРОЕКТА (ИСПРАВЛЕНО: Правильный JOIN через project_tabs)
+  // ─────────────────────────────────────────────────────────────
+  const { data: rawAssignment, error: assignmentErr } = await supabase
+    .from("assignments")
+    .select(`
+      id, branch_type, material_id, textbook_id, crossword_id, content, assignment_type,
+      material:materials(
+        id, branch_type, project_tab_id, material_kind, target_levels, is_active, is_available,
+        project_tabs ( projects ( id, slug, features ) )
+      )
+    `)
+    .eq("id", body.assignmentId)
+    .single();
+
+  if (assignmentErr || !rawAssignment) {
+    console.error("🔴 [API ASSIGNMENT-PROGRESS] Ошибка получения задания:", assignmentErr?.message);
+    return NextResponse.json({ ok: false, error: assignmentErr?.message || "Assignment not found" }, { status: 404 });
+  }
+
+  const assignment = rawAssignment as AssignmentData;
+  const projectConfig = getProjectConfig(assignment);
+
+  // ─────────────────────────────────────────────────────────────
+  // ДОСТУПЫ
+  // ─────────────────────────────────────────────────────────────
+  try {
+    if (projectConfig.slug === "gatehouse") {
+      await assertGatehouseAssignmentAccess(supabase, auth.user.id, assignment);
+    } else {
+      await assertOlympiadAssignmentAccess(supabase, auth.user.id, assignment);
+    }
+  } catch (err: any) {
+    return NextResponse.json({ ok: false, error: err.message || "Access denied" }, { status: err.status || 403 });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // ОЦЕНКА (Интерактивный vs Ознакомительный)
+  // ─────────────────────────────────────────────────────────────
+  const assignmentType = assignment.assignment_type || 'test';
+  const isInformational = assignmentType === 'intro' || assignment.content?.mode === "informational";
+  
+  let realScore: number | null = null;
+
+  if (!isInformational) {
+    const questions = assignment.content?.questions;
+    if (!Array.isArray(questions)) return NextResponse.json({ ok: false, error: "Некорректное содержимое" }, { status: 500 });
+    const { stats } = calcAndBuildReview(questions, body.answers);
+    realScore = normalizeScore(stats.score);
+  }
+
+  const payload = {
+    user_id: auth.user.id,
+    assignment_id: body.assignmentId,
+    answers: body.answers ?? {},
+    is_completed: true,
+    completed_at: new Date().toISOString(),
+    score: realScore,
+  };
+
+  const { error: upsertError } = await supabase
+    .from("user_progress")
+    .upsert(payload, { onConflict: "user_id,assignment_id" });
+
+  if (upsertError) {
+    console.error("🔴 [ERROR] user_progress upsert failed:", upsertError.message);
+    return NextResponse.json({ ok: false, error: upsertError.message }, { status: 500 });
+  }
+
+  const counters = await recalcCompletedCounters(supabase, auth.user.id);
+
+  // ─────────────────────────────────────────────────────────────
+  // ДИНАМИЧЕСКИЕ МОДУЛИ
+  // ─────────────────────────────────────────────────────────────
+  let recommendation: any = null;
+  let streak: any = null;
+
+  if (projectConfig.hasRecommendations) {
+    const materialId = getMaterialId(assignment);
+    
+    if (!isInformational && realScore !== null) {
+      recommendation = recommendLevel({
+        score: realScore, maxScore: 100, percent: realScore,
+        materialLevels: getMaterialLevels(assignment),
+      });
+    }
+
+    const { error: examErr } = await supabase
+      .from("exam_results")
+      .upsert({
+        user_id: auth.user.id, assignment_id: body.assignmentId, material_id: materialId,
+        score: realScore, recommended_level: recommendation?.recommendedLevel || null,
+        breakdown: { recommendation, source: body.source ?? null, sourceId: body.sourceId ?? null },
+        answers: body.answers ?? {}, completed_at: payload.completed_at,
+      }, { onConflict: "user_id,assignment_id" });
+
+    if (examErr) console.error("🔴 [ERROR] exam_results upsert failed:", examErr.message);
+  }
+
+  if (projectConfig.hasStreaks) {
+    const { data: streakData, error: streakErr } = await supabase.rpc(
+      "record_streak_completion",
+      { _assignment_id: body.assignmentId }
+    );
+    if (!streakErr) streak = streakData ?? null;
+    else console.error("🔴 [ERROR] record_streak_completion RPC failed:", streakErr.message);
+  }
+
+  return NextResponse.json(
+    { 
+      ok: true, 
+      branch_type: projectConfig.slug, 
+      score: realScore, 
+      recommendation, 
+      streak, 
+      counters 
+    },
+    { status: 200 }
   );
 }
 </file>

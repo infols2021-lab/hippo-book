@@ -422,51 +422,56 @@ async function findGatehouseMaterialsForRequest(supabase: any, r: ReqRow) {
   return materials.filter((m) => gatehouseMaterialMatchesRequest(m, r));
 }
 
-// 🚀 УМНАЯ СИСТЕМА ВЫДАЧИ ДИНАМИЧЕСКИХ ДОСТУПОВ
+// 🚀 УМНАЯ СИСТЕМА ВЫДАЧИ ДИНАМИЧЕСКИХ ДОСТУПОВ (ИСПРАВЛЕНА ПОД НОВУЮ БД)
 async function grantDynamicProjectAccessForRequest(supabase: any, adminId: string, r: ReqRow) {
   const nowISO = new Date().toISOString();
   const grantedLabels: string[] = [];
   const grantsToStore: any[] = [];
 
-  // Пользователь присылает реальные названия с фронта (Лейблы)
+  // Пользователь присылает реальные названия с фронта (Лейблы) или ID
   const targetLevels = toArr(r.class_level).length ? toArr(r.class_level) : toArr(r.target_levels);
   const requestedTabs = toArr(r.material_kinds).length ? toArr(r.material_kinds) : toArr(r.textbook_types);
 
-  if (!targetLevels.length) return { grantedLabels, grantsToStore };
-
-  // 1. Получаем все табы этого проекта, чтобы сматчить их ID с названиями из заявки
+  // 1. Получаем все активные табы этого проекта (т.к. материалы теперь лежат в них)
   const { data: tabsRes } = await runDbQuery<any[]>(
-    () => supabase.from("project_tabs").select("id, title").eq("project_id", r.project_id),
+    () => supabase.from("project_tabs").select("id, title").eq("project_id", r.project_id).eq("is_active", true),
     "fetchTabsForGrant"
   );
   
-  const requestedTabIds: string[] = [];
-  for (const reqTab of requestedTabs) {
-    const matched = (tabsRes ?? []).find((t: any) => 
-      t.id === reqTab || String(t.title).toLowerCase() === String(reqTab).toLowerCase()
-    );
-    if (matched) requestedTabIds.push(matched.id);
+  let tabIdsToQuery: string[] = [];
+  
+  if (requestedTabs.length > 0) {
+    for (const reqTab of requestedTabs) {
+      const matched = (tabsRes ?? []).find((t: any) => 
+        t.id === reqTab || String(t.title).toLowerCase() === String(reqTab).toLowerCase()
+      );
+      if (matched) tabIdsToQuery.push(matched.id);
+    }
+  } else {
+    // Если табы не указаны, ищем по всем активным табам проекта
+    tabIdsToQuery = (tabsRes ?? []).map((t: any) => t.id);
   }
 
-  // 2. Достаем активные материалы по найденным табам
-  let q = supabase
+  // Если табов в проекте нет, то и материалов нет
+  if (tabIdsToQuery.length === 0) return { grantedLabels, grantsToStore };
+
+  // ❗️ 2. Достаем активные материалы по найденным табам (БЕЗ project_id)
+  const { data: materials, error } = await runDbQuery<any[]>(() => supabase
     .from("materials")
-    .select("id, title, material_kind, target_levels, class_levels")
-    .eq("project_id", r.project_id)
-    .eq("is_active", true);
+    .select("id, title, material_kind, target_levels, class_levels, project_tab_id")
+    .in("project_tab_id", tabIdsToQuery)
+    .eq("is_active", true), 
+  "grantDynamicProjectAccess");
 
-  if (requestedTabIds.length > 0) {
-    q = q.in("project_tab_id", requestedTabIds);
-  }
-
-  const { data: materials, error } = await runDbQuery<any[]>(() => q, "grantDynamicProjectAccess");
   if (error) throw new Error(error.message);
 
   // 3. Мягкая фильтрация (Fuzzy match) уровней. 
-  // Ищем совпадение текста (например: "Hippo 1" == "hippo-1")
   const userLevels = targetLevels.map(x => String(x).toLowerCase());
   
   const matchedMaterials = (materials ?? []).filter(mat => {
+    // Если юзер не указал уровни в заявке, выдаем всё из найденных табов
+    if (userLevels.length === 0) return true;
+
     const matLevels = [...toArr(mat.target_levels), ...toArr(mat.class_levels)].map(x => String(x).toLowerCase());
     
     // Если материал доступен всем уровням (массив пуст) -> выдаем

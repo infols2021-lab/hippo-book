@@ -11,7 +11,6 @@ type Body = {
 
 function toUniqueStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-
   return Array.from(
     new Set(
       value
@@ -28,7 +27,6 @@ export async function POST(req: NextRequest) {
   const { supabase, user } = auth;
 
   let body: Body;
-
   try {
     body = (await req.json()) as Body;
   } catch {
@@ -36,65 +34,107 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = String(body?.user_id || "").trim();
-
   if (!userId) return fail("user_id required", 400, "VALIDATION");
 
-  const textbookIds = toUniqueStringArray(body.textbook_ids);
-  const crosswordIds = toUniqueStringArray(body.crossword_ids);
-  const materialIds = toUniqueStringArray(body.material_ids);
-
   try {
-    const [{ error: dt }, { error: dc }, { error: dm }] = await Promise.all([
-      supabase.from("textbook_access").delete().eq("user_id", userId),
-      supabase.from("crossword_access").delete().eq("user_id", userId),
-      supabase.from("material_access").delete().eq("user_id", userId),
-    ]);
+    // ❗️ ИСПРАВЛЕНО: Меняем тип на any[], чтобы TypeScript не ругался на формат Supabase PostgrestBuilder
+    const promises: any[] = [];
 
-    if (dt) return fail(dt.message, 500, "DB_ERROR");
-    if (dc) return fail(dc.message, 500, "DB_ERROR");
-    if (dm) return fail(dm.message, 500, "DB_ERROR");
+    // ==========================================
+    // 1. УМНАЯ СИНХРОНИЗАЦИЯ УЧЕБНИКОВ (LEGACY)
+    // ==========================================
+    if (body.textbook_ids !== undefined) {
+      const targetIds = toUniqueStringArray(body.textbook_ids);
+      const { data: current } = await supabase.from("textbook_access").select("textbook_id").eq("user_id", userId);
+      const currentIds = (current || []).map((row) => row.textbook_id);
 
-    if (textbookIds.length) {
-      const { error } = await supabase.from("textbook_access").insert(
-        textbookIds.map((id) => ({
-          user_id: userId,
-          textbook_id: id,
-          granted_by: user.id,
-          granted_at: new Date().toISOString(),
-        })),
-      );
+      const toAdd = targetIds.filter((id) => !currentIds.includes(id));
+      const toRemove = currentIds.filter((id) => !targetIds.includes(id));
 
-      if (error) return fail(error.message, 500, "DB_ERROR");
+      if (toRemove.length > 0) {
+        promises.push(supabase.from("textbook_access").delete().eq("user_id", userId).in("textbook_id", toRemove));
+      }
+      if (toAdd.length > 0) {
+        promises.push(
+          supabase.from("textbook_access").insert(
+            toAdd.map((id) => ({
+              user_id: userId,
+              textbook_id: id,
+              granted_by: user.id,
+              granted_at: new Date().toISOString(),
+            }))
+          )
+        );
+      }
     }
 
-    if (crosswordIds.length) {
-      const { error } = await supabase.from("crossword_access").insert(
-        crosswordIds.map((id) => ({
-          user_id: userId,
-          crossword_id: id,
-          granted_by: user.id,
-          granted_at: new Date().toISOString(),
-        })),
-      );
+    // ==========================================
+    // 2. УМНАЯ СИНХРОНИЗАЦИЯ КРОССВОРДОВ (LEGACY)
+    // ==========================================
+    if (body.crossword_ids !== undefined) {
+      const targetIds = toUniqueStringArray(body.crossword_ids);
+      const { data: current } = await supabase.from("crossword_access").select("crossword_id").eq("user_id", userId);
+      const currentIds = (current || []).map((row) => row.crossword_id);
 
-      if (error) return fail(error.message, 500, "DB_ERROR");
+      const toAdd = targetIds.filter((id) => !currentIds.includes(id));
+      const toRemove = currentIds.filter((id) => !targetIds.includes(id));
+
+      if (toRemove.length > 0) {
+        promises.push(supabase.from("crossword_access").delete().eq("user_id", userId).in("crossword_id", toRemove));
+      }
+      if (toAdd.length > 0) {
+        promises.push(
+          supabase.from("crossword_access").insert(
+            toAdd.map((id) => ({
+              user_id: userId,
+              crossword_id: id,
+              granted_by: user.id,
+              granted_at: new Date().toISOString(),
+            }))
+          )
+        );
+      }
     }
 
-    if (materialIds.length) {
-      const { error } = await supabase.from("material_access").insert(
-        materialIds.map((id) => ({
-          user_id: userId,
-          material_id: id,
-          granted_by: user.id,
-          granted_at: new Date().toISOString(),
-        })),
-      );
+    // ==========================================
+    // 3. УМНАЯ СИНХРОНИЗАЦИЯ МАТЕРИАЛОВ (NEW ARCHITECTURE)
+    // ==========================================
+    if (body.material_ids !== undefined) {
+      const targetIds = toUniqueStringArray(body.material_ids);
+      const { data: current } = await supabase.from("material_access").select("material_id").eq("user_id", userId);
+      const currentIds = (current || []).map((row) => row.material_id);
 
-      if (error) return fail(error.message, 500, "DB_ERROR");
+      const toAdd = targetIds.filter((id) => !currentIds.includes(id));
+      const toRemove = currentIds.filter((id) => !targetIds.includes(id));
+
+      if (toRemove.length > 0) {
+        promises.push(supabase.from("material_access").delete().eq("user_id", userId).in("material_id", toRemove));
+      }
+      if (toAdd.length > 0) {
+        promises.push(
+          supabase.from("material_access").insert(
+            toAdd.map((id) => ({
+              user_id: userId,
+              material_id: id,
+              granted_by: user.id,
+              granted_at: new Date().toISOString(),
+            }))
+          )
+        );
+      }
+    }
+
+    // Выполняем все операции параллельно
+    if (promises.length > 0) {
+      const results = await Promise.all(promises);
+      for (const res of results) {
+        if (res.error) throw new Error(res.error.message);
+      }
     }
 
     return ok({ saved: true });
   } catch (e: any) {
+    console.error("🔴 [ADMIN USER ACCESS] Ошибка сохранения:", e);
     return fail(e?.message || "Server error", 500, "SERVER_ERROR");
   }
 }
