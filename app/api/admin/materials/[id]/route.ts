@@ -19,35 +19,59 @@ function normalizeNullableString(value: unknown): string | null {
   return str || null;
 }
 
+// Проверка, является ли строка настоящим UUID
+function isValidUUID(str: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
 function normalizePatchPayload(body: any) {
   const payload: Record<string, any> = {};
 
-  if ("branch_type" in body) payload.branch_type = normalizeBranchType(body.branch_type);
-  if ("material_kind" in body) payload.material_kind = normalizeMaterialKind(body.material_kind);
+  // Поддержка snake_case и camelCase с фронтенда
+  const branchType = body.branch_type ?? body.branchType;
+  if (branchType !== undefined) payload.branch_type = normalizeBranchType(branchType);
+
+  const materialKind = body.material_kind ?? body.materialKind;
+  if (materialKind !== undefined) payload.material_kind = normalizeMaterialKind(materialKind);
+
   if ("title" in body) payload.title = String(body.title ?? "").trim();
   if ("description" in body) payload.description = normalizeNullableString(body.description);
-  if ("cover_image_url" in body) payload.cover_image_url = normalizeNullableString(body.cover_image_url);
+  
+  const coverUrl = body.cover_image_url ?? body.coverImageUrl;
+  if (coverUrl !== undefined) payload.cover_image_url = normalizeNullableString(coverUrl);
+  
   if ("is_available" in body) payload.is_available = normalizeBool(body.is_available);
   if ("is_active" in body) payload.is_active = normalizeBool(body.is_active);
   if ("order_index" in body) payload.order_index = normalizeOrderIndex(body.order_index);
   
-  if ("class_levels" in body || "class_level" in body) {
-    payload.class_levels = uniqueStrings(toStringArray(body.class_levels ?? body.class_level));
+  const classLevels = body.class_levels ?? body.class_level ?? body.classLevels;
+  if (classLevels !== undefined) {
+    payload.class_levels = uniqueStrings(toStringArray(classLevels));
   }
-  if ("target_levels" in body || "target_level" in body) {
-    payload.target_levels = uniqueStrings(toStringArray(body.target_levels ?? body.target_level));
+  
+  const targetLevels = body.target_levels ?? body.target_level ?? body.targetLevels;
+  if (targetLevels !== undefined) {
+    payload.target_levels = uniqueStrings(toStringArray(targetLevels));
   }
+  
   if ("meta" in body) {
     payload.meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
   }
   
-  // ❗️ ГЛАВНЫЙ ФИКС ЗДЕСЬ:
-  // Перехватываем нулевой UUID и превращаем его в null, чтобы БД не падала
-  if ("project_tab_id" in body || "tab_id" in body) {
-    let tid = normalizeNullableString(body.project_tab_id ?? body.tab_id);
+  // ❗️ УЛЬТРА-ФИКС ДЛЯ ТАБОВ:
+  // Ловим все варианты ключей от фронтенда
+  const rawTabId = body.project_tab_id ?? body.tab_id ?? body.projectTabId ?? body.tabId;
+  if (rawTabId !== undefined) {
+    let tid = normalizeNullableString(rawTabId);
     
-    // Если фронт прислал "заглушку" пустого таба - превращаем в null
-    if (tid === "00000000-0000-0000-0000-000000000000" || tid === "none" || tid === "") {
+    // Очищаем от заглушек фронтенда
+    if (tid === "00000000-0000-0000-0000-000000000000" || tid === "none" || tid === "null" || tid === "") {
+      tid = null;
+    }
+
+    // Защита от краша базы: если фронт прислал текст вместо ID (например, "что то") — сбрасываем в null
+    if (tid && !isValidUUID(tid)) {
+      console.warn("⚠️ [ADMIN PATCH MATERIAL] Получен невалидный UUID для таба:", tid, "Сбрасываем в null, чтобы БД не упала.");
       tid = null;
     }
     
@@ -132,6 +156,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const validationError = validatePatchPayload(payload);
 
   if (validationError) {
+    console.error("🔴 [ADMIN PATCH MATERIAL] Провал валидации:", validationError);
     return fail(validationError, 400, "VALIDATION");
   }
 
