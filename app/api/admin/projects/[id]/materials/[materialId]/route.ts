@@ -90,7 +90,7 @@ function validatePatchPayload(payload: Record<string, any>) {
   return null;
 }
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ projectId: string; materialId: string }> }) {
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string; materialId: string }> }) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
 
@@ -125,7 +125,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ projectId:
 }
 
 // ❗️ Обрабатываем PUT (именно его присылает твой фронтенд)
-export async function PUT(req: NextRequest, ctx: { params: Promise<{ projectId: string; materialId: string }> }) {
+export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string; materialId: string }> }) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
 
@@ -176,11 +176,11 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ projectId: 
 }
 
 // Для безопасности дублируем логику и на PATCH
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ projectId: string; materialId: string }> }) {
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string; materialId: string }> }) {
   return PUT(req, ctx);
 }
 
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ projectId: string; materialId: string }> }) {
+export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string; materialId: string }> }) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
 

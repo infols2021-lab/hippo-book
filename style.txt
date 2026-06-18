@@ -2405,379 +2405,6 @@ export default function AdminPage() {
 }
 </file>
 
-<file path="app/(admin)/admin/users/UserAccessModal.tsx">
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import Modal from "@/components/Modal";
-import LoadingBlock from "@/components/LoadingBlock";
-import ErrorBox from "@/components/ErrorBox";
-import type { UserRow } from "./UsersTab";
-
-/* ================= helpers ================= */
-
-type ApiOk<T> = { ok: true } & T;
-type ApiErr = { ok: false; error: string; code?: string };
-
-async function safeJson(res: Response) {
-  const txt = await res.text();
-
-  if (!txt) return null;
-
-  try {
-    return JSON.parse(txt);
-  } catch {
-    return null;
-  }
-}
-
-async function apiGet<T>(url: string): Promise<ApiOk<T>> {
-  const res = await fetch(url, { cache: "no-store" });
-  const json = await safeJson(res);
-
-  if (!res.ok || !json?.ok) {
-    const msg = (json as ApiErr | null)?.error || `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-
-  return json as ApiOk<T>;
-}
-
-async function apiPost<T>(url: string, body: any): Promise<ApiOk<T>> {
-  const res = await fetch(url, {
-    method: "POST",
-    cache: "no-store",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  const json = await safeJson(res);
-
-  if (!res.ok || !json?.ok) {
-    const msg = (json as ApiErr | null)?.error || `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-
-  return json as ApiOk<T>;
-}
-
-/* ================= types ================= */
-
-type AccessLoad = {
-  textbooks: Array<{ id: string; title: string; class_level: string[] | null }>;
-  crosswords: Array<{ id: string; title: string; class_level: string[] | null }>;
-
-  materials?: Array<{
-    id: string;
-    title: string;
-    branch_type: string | null;
-    material_kind: string | null;
-    target_levels: string[] | null;
-  }>;
-
-  selectedTextbookIds: string[];
-  selectedCrosswordIds: string[];
-  selectedMaterialIds?: string[];
-};
-
-type Props = {
-  open: boolean;
-  user: UserRow | null;
-  onClose: () => void;
-  onSaved?: () => Promise<void> | void;
-};
-
-/* ================= component ================= */
-
-export default function UserAccessModal({ open, user, onClose, onSaved }: Props) {
-  const userId = user?.id ?? null;
-  const userName = user?.full_name || user?.email || "Пользователь";
-
-  const [section, setSection] = useState<"olympiad" | "gatehouse">("olympiad");
-
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const [textbooks, setTextbooks] = useState<AccessLoad["textbooks"]>([]);
-  const [crosswords, setCrosswords] = useState<AccessLoad["crosswords"]>([]);
-  const [materials, setMaterials] = useState<NonNullable<AccessLoad["materials"]>>([]);
-
-  const [tbChecked, setTbChecked] = useState<Set<string>>(new Set());
-  const [cwChecked, setCwChecked] = useState<Set<string>>(new Set());
-  const [materialChecked, setMaterialChecked] = useState<Set<string>>(new Set());
-
-  const title = useMemo(() => `🔐 Управление доступом — ${userName}`, [userName]);
-
-  /* ================= load ================= */
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      if (!open || !userId) return;
-
-      setLoading(true);
-      setErr(null);
-
-      try {
-        const data = await apiGet<AccessLoad>(`/api/admin/users/${encodeURIComponent(userId)}`);
-
-        if (cancelled) return;
-
-        setTextbooks(data.textbooks ?? []);
-        setCrosswords(data.crosswords ?? []);
-        setMaterials(data.materials ?? []);
-
-        setTbChecked(new Set((data.selectedTextbookIds ?? []).map(String)));
-        setCwChecked(new Set((data.selectedCrosswordIds ?? []).map(String)));
-        setMaterialChecked(new Set((data.selectedMaterialIds ?? []).map(String)));
-      } catch (e: any) {
-        if (cancelled) return;
-
-        setErr(e?.message || String(e));
-        setTextbooks([]);
-        setCrosswords([]);
-        setMaterials([]);
-        setTbChecked(new Set());
-        setCwChecked(new Set());
-        setMaterialChecked(new Set());
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, userId]);
-
-  /* ================= save ================= */
-
-  async function save() {
-    if (!userId) return;
-
-    setErr(null);
-    setLoading(true);
-
-    try {
-      const payload = {
-        user_id: userId,
-
-        textbook_ids: Array.from(tbChecked),
-        crossword_ids: Array.from(cwChecked),
-
-        material_ids: Array.from(materialChecked),
-      };
-
-      await apiPost(`/api/admin/users/access`, payload);
-
-      if (onSaved) await onSaved();
-      onClose();
-    } catch (e: any) {
-      setErr(e?.message || String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  /* ================= render ================= */
-
-  return (
-    <Modal open={open} onClose={onClose} title={title} maxWidth={1000}>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-        <button
-          className={section === "olympiad" ? "btn small" : "btn small ghost"}
-          type="button"
-          onClick={() => setSection("olympiad")}
-        >
-          🏆 Олимпиада
-        </button>
-
-        <button
-          className={section === "gatehouse" ? "btn small" : "btn small ghost"}
-          type="button"
-          onClick={() => setSection("gatehouse")}
-        >
-          🎓 Gatehouse Awards
-        </button>
-      </div>
-
-      {loading ? <LoadingBlock text="Загружаем доступы..." /> : null}
-      {err ? <ErrorBox message={err} retryMode="none" /> : null}
-
-      {!loading && section === "olympiad" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <div>
-            <h3 style={{ marginTop: 0 }}>📚 Учебники</h3>
-
-            <div style={{ display: "grid", gap: 8, maxHeight: 380, overflowY: "auto" }}>
-              {textbooks.length === 0 ? (
-                <div className="small-muted">Нет учебников</div>
-              ) : (
-                textbooks.map((t) => {
-                  const id = String(t.id);
-                  const checked = tbChecked.has(id);
-
-                  return (
-                    <label
-                      key={id}
-                      style={{
-                        display: "flex",
-                        gap: 10,
-                        alignItems: "center",
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: "1px solid rgba(0,0,0,0.08)",
-                        background: checked ? "rgba(78,205,196,0.10)" : "#fff",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          setTbChecked((prev) => {
-                            const next = new Set(prev);
-                            e.target.checked ? next.add(id) : next.delete(id);
-                            return next;
-                          });
-                        }}
-                      />
-
-                      <div>
-                        <div style={{ fontWeight: 800 }}>{t.title}</div>
-                        <div className="small-muted">
-                          {Array.isArray(t.class_level) ? t.class_level.join(", ") : "без класса"}
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          <div>
-            <h3 style={{ marginTop: 0 }}>🧩 Кроссворды</h3>
-
-            <div style={{ display: "grid", gap: 8, maxHeight: 380, overflowY: "auto" }}>
-              {crosswords.length === 0 ? (
-                <div className="small-muted">Нет кроссвордов</div>
-              ) : (
-                crosswords.map((c) => {
-                  const id = String(c.id);
-                  const checked = cwChecked.has(id);
-
-                  return (
-                    <label
-                      key={id}
-                      style={{
-                        display: "flex",
-                        gap: 10,
-                        alignItems: "center",
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: "1px solid rgba(0,0,0,0.08)",
-                        background: checked ? "rgba(78,205,196,0.10)" : "#fff",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          setCwChecked((prev) => {
-                            const next = new Set(prev);
-                            e.target.checked ? next.add(id) : next.delete(id);
-                            return next;
-                          });
-                        }}
-                      />
-
-                      <div>
-                        <div style={{ fontWeight: 800 }}>{c.title}</div>
-                        <div className="small-muted">
-                          {Array.isArray(c.class_level) ? c.class_level.join(", ") : "без класса"}
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {!loading && section === "gatehouse" ? (
-        <div>
-          <h3 style={{ marginTop: 0 }}>🎓 Материалы Gatehouse Awards</h3>
-
-          <div style={{ display: "grid", gap: 8, maxHeight: 440, overflowY: "auto" }}>
-            {materials.length === 0 ? (
-              <div className="small-muted">Нет материалов Gatehouse</div>
-            ) : (
-              materials.map((m) => {
-                const id = String(m.id);
-                const checked = materialChecked.has(id);
-                const levels = Array.isArray(m.target_levels) ? m.target_levels : [];
-
-                return (
-                  <label
-                    key={id}
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "center",
-                      padding: "10px 12px",
-                      borderRadius: 10,
-                      border: "1px solid rgba(0,0,0,0.08)",
-                      background: checked ? "rgba(99,102,241,0.10)" : "#fff",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => {
-                        setMaterialChecked((prev) => {
-                          const next = new Set(prev);
-                          e.target.checked ? next.add(id) : next.delete(id);
-                          return next;
-                        });
-                      }}
-                    />
-
-                    <div>
-                      <div style={{ fontWeight: 800 }}>{m.title}</div>
-                      <div className="small-muted">
-                        {levels.length ? levels.join(", ") : "уровни не указаны"}
-                      </div>
-                    </div>
-                  </label>
-                );
-              })
-            )}
-          </div>
-        </div>
-      ) : null}
-
-      <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <button className="btn secondary" onClick={onClose} type="button">
-          ❌ Закрыть
-        </button>
-
-        <button className="btn" onClick={() => void save()} type="button" disabled={loading || !userId}>
-          💾 Сохранить
-        </button>
-      </div>
-    </Modal>
-  );
-}
-</file>
-
 <file path="app/(admin)/admin/users/UsersTab.tsx">
 "use client";
 
@@ -4658,178 +4285,6 @@ export async function POST(req: Request) {
 }
 </file>
 
-<file path="app/api/admin/users/[id]/route.ts">
-import { ok, fail } from "@/lib/api/response";
-import { requireAdmin } from "@/lib/api/admin";
-import type { NextRequest } from "next/server";
-
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-  const { id: userId } = await ctx.params;
-
-  try {
-    const [
-      { data: textbooks, error: tErr },
-      { data: crosswords, error: cErr },
-      { data: materials, error: mErr },
-      { data: ta, error: taErr },
-      { data: ca, error: caErr },
-      { data: ma, error: maErr },
-    ] = await Promise.all([
-      supabase
-        .from("textbooks")
-        .select("id,title,class_level,is_active,order_index,branch_type")
-        .eq("is_active", true)
-        .or("branch_type.eq.olympiad,branch_type.is.null")
-        .order("order_index", { ascending: true }),
-
-      supabase
-        .from("crosswords")
-        .select("id,title,class_level,is_active,order_index,branch_type")
-        .eq("is_active", true)
-        .or("branch_type.eq.olympiad,branch_type.is.null")
-        .order("order_index", { ascending: true }),
-
-      supabase
-        .from("materials")
-        .select("id,title,branch_type,material_kind,target_levels,is_active,is_available,order_index")
-        .eq("branch_type", "gatehouse")
-        .eq("is_active", true)
-        .order("order_index", { ascending: true }),
-
-      supabase.from("textbook_access").select("textbook_id").eq("user_id", userId),
-      supabase.from("crossword_access").select("crossword_id").eq("user_id", userId),
-      supabase.from("material_access").select("material_id").eq("user_id", userId),
-    ]);
-
-    const err = tErr || cErr || mErr || taErr || caErr || maErr;
-
-    if (err) return fail(err.message, 500, "DB_ERROR");
-
-    const selectedTextbookIds = (ta ?? []).map((x: any) => String(x.textbook_id));
-    const selectedCrosswordIds = (ca ?? []).map((x: any) => String(x.crossword_id));
-    const selectedMaterialIds = (ma ?? []).map((x: any) => String(x.material_id));
-
-    return ok({
-      textbooks: textbooks ?? [],
-      crosswords: crosswords ?? [],
-      materials: materials ?? [],
-      selectedTextbookIds,
-      selectedCrosswordIds,
-      selectedMaterialIds,
-    });
-  } catch (e: any) {
-    return fail(e?.message || "Server error", 500, "SERVER_ERROR");
-  }
-}
-</file>
-
-<file path="app/api/admin/users/access/route.ts">
-import { ok, fail } from "@/lib/api/response";
-import { requireAdmin } from "@/lib/api/admin";
-import type { NextRequest } from "next/server";
-
-type Body = {
-  user_id: string;
-  textbook_ids?: string[];
-  crossword_ids?: string[];
-  material_ids?: string[];
-};
-
-function toUniqueStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-
-  return Array.from(
-    new Set(
-      value
-        .map((item) => String(item ?? "").trim())
-        .filter(Boolean),
-    ),
-  );
-}
-
-export async function POST(req: NextRequest) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase, user } = auth;
-
-  let body: Body;
-
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return fail("Bad JSON", 400, "BAD_JSON");
-  }
-
-  const userId = String(body?.user_id || "").trim();
-
-  if (!userId) return fail("user_id required", 400, "VALIDATION");
-
-  const textbookIds = toUniqueStringArray(body.textbook_ids);
-  const crosswordIds = toUniqueStringArray(body.crossword_ids);
-  const materialIds = toUniqueStringArray(body.material_ids);
-
-  try {
-    const [{ error: dt }, { error: dc }, { error: dm }] = await Promise.all([
-      supabase.from("textbook_access").delete().eq("user_id", userId),
-      supabase.from("crossword_access").delete().eq("user_id", userId),
-      supabase.from("material_access").delete().eq("user_id", userId),
-    ]);
-
-    if (dt) return fail(dt.message, 500, "DB_ERROR");
-    if (dc) return fail(dc.message, 500, "DB_ERROR");
-    if (dm) return fail(dm.message, 500, "DB_ERROR");
-
-    if (textbookIds.length) {
-      const { error } = await supabase.from("textbook_access").insert(
-        textbookIds.map((id) => ({
-          user_id: userId,
-          textbook_id: id,
-          granted_by: user.id,
-          granted_at: new Date().toISOString(),
-        })),
-      );
-
-      if (error) return fail(error.message, 500, "DB_ERROR");
-    }
-
-    if (crosswordIds.length) {
-      const { error } = await supabase.from("crossword_access").insert(
-        crosswordIds.map((id) => ({
-          user_id: userId,
-          crossword_id: id,
-          granted_by: user.id,
-          granted_at: new Date().toISOString(),
-        })),
-      );
-
-      if (error) return fail(error.message, 500, "DB_ERROR");
-    }
-
-    if (materialIds.length) {
-      const { error } = await supabase.from("material_access").insert(
-        materialIds.map((id) => ({
-          user_id: userId,
-          material_id: id,
-          granted_by: user.id,
-          granted_at: new Date().toISOString(),
-        })),
-      );
-
-      if (error) return fail(error.message, 500, "DB_ERROR");
-    }
-
-    return ok({ saved: true });
-  } catch (e: any) {
-    return fail(e?.message || "Server error", 500, "SERVER_ERROR");
-  }
-}
-</file>
-
 <file path="app/api/admin/users/route.ts">
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -6451,6 +5906,464 @@ export async function PATCH(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   return PATCH(req);
+}
+</file>
+
+<file path="app/api/requests/create/route.ts">
+/* app/api/requests/create/route.ts */
+import { NextRequest } from "next/server";
+import { ok, fail } from "@/lib/api/response";
+import { requireUser } from "@/lib/api/auth";
+import { appendAccountingRow } from "@/lib/integrations/googleSheets";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+type BranchType = "olympiad" | "gatehouse";
+
+const SHEETS_TIMEOUT_MS = 12_000;
+
+function noStoreInit(): ResponseInit {
+  return {
+    headers: {
+      "cache-control": "no-store, max-age=0",
+    },
+  };
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+function normalizeBranchType(value: unknown): BranchType {
+  const v = String(value ?? "").trim().toLowerCase();
+
+  if (
+    v === "gatehouse" ||
+    v === "gatehouse_awards" ||
+    v === "ga" ||
+    v === "ga_exam" ||
+    v === "exam" ||
+    v === "exams"
+  ) {
+    return "gatehouse";
+  }
+
+  return "olympiad";
+}
+
+function normalizeString(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeString(item)).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const text = value.trim();
+
+    if (!text) return [];
+
+    if (text.startsWith("[") && text.endsWith("]")) {
+      try {
+        return toStringArray(JSON.parse(text));
+      } catch {
+        return [];
+      }
+    }
+
+    return text
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  const single = normalizeString(value);
+  return single ? [single] : [];
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map((value) => normalizeString(value)).filter(Boolean)));
+}
+
+function normalizeGatehouseLevel(value: unknown) {
+  const raw = normalizeString(value);
+  const v = raw.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+
+  if (v === "stage 1" || v === "stage1") return "stage_1";
+  if (v === "stage 2" || v === "stage2") return "stage_2";
+  if (v === "stage 3" || v === "stage3") return "stage_3";
+
+  if (v === "a1") return "a1";
+  if (v === "a2") return "a2";
+  if (v === "b1") return "b1";
+  if (v === "b2") return "b2";
+  if (v === "c1") return "c1";
+  if (v === "c2") return "c2";
+
+  return v || raw;
+}
+
+function formatGatehouseLevel(value: unknown) {
+  const v = normalizeGatehouseLevel(value);
+
+  const map: Record<string, string> = {
+    stage_1: "Stage 1",
+    stage_2: "Stage 2",
+    stage_3: "Stage 3",
+    a1: "A1",
+    a2: "A2",
+    b1: "B1",
+    b2: "B2",
+    c1: "C1",
+    c2: "C2",
+  };
+
+  return map[v] || normalizeString(value) || v;
+}
+
+function normalizeGatehouseMaterialKind(value: unknown) {
+  const v = normalizeString(value).toLowerCase();
+
+  if (
+    v === "mock_test" ||
+    v === "mock_tests" ||
+    v === "mock-test" ||
+    v === "mock test" ||
+    v === "мок-тест" ||
+    v === "мок тест" ||
+    v === "пробный тест" ||
+    v === "пробные тесты"
+  ) {
+    return "mock_test";
+  }
+
+  return v;
+}
+
+function normalizeOlympiadMaterialKind(value: unknown) {
+  const v = normalizeString(value).toLowerCase();
+
+  if (v === "учебник" || v === "textbook") return "textbook";
+  if (v === "кроссворд" || v === "crossword") return "crossword";
+
+  return v;
+}
+
+function formatClassLevel(classLevel: string) {
+  const classMap: Record<string, string> = {
+    "1-2": "1-2 класс",
+    "3-4": "3-4 класс",
+    "5-6": "5-6 класс",
+    "7": "7 класс",
+    "8-9": "8-9 класс",
+    "10-11": "10-11 класс (Техникум, колледж - 1й курс)",
+    "12": "12 класс (Техникум, college)",
+  };
+
+  return classMap[classLevel] || classLevel;
+}
+
+function formatTarget(branchType: BranchType, classLevel: string | null, targetLevels: string[]) {
+  if (branchType === "gatehouse") {
+    return targetLevels.length ? targetLevels.map(formatGatehouseLevel).join(", ") : "—";
+  }
+
+  return classLevel ? formatClassLevel(classLevel) : "—";
+}
+
+function formatMaterialTypes(branchType: BranchType, types: unknown) {
+  const arr = toStringArray(types);
+
+  if (branchType === "gatehouse") {
+    const typeMap: Record<string, string> = {
+      mock_test: "📝 Пробные тесты",
+      mock_tests: "📝 Пробные тесты",
+      "mock-test": "📝 Пробные тесты",
+      "mock test": "📝 Пробные тесты",
+      "мок-тест": "📝 Пробные тесты",
+      "мок тест": "📝 Пробные тесты",
+      "пробный тест": "📝 Пробные тесты",
+      "пробные тесты": "📝 Пробные тесты",
+    };
+
+    return arr.map((type) => typeMap[String(type).toLowerCase()] || String(type)).join(", ");
+  }
+
+  const typeMap: Record<string, string> = {
+    учебник: "📚 Учебник",
+    кроссворд: "🧩 Кроссворд",
+    textbook: "📚 Учебник",
+    crossword: "🧩 Кроссворд",
+  };
+
+  return arr.map((type) => typeMap[String(type).toLowerCase()] || String(type)).join(", ");
+}
+
+function formatDateTimeRU(dateString: string) {
+  const d = new Date(dateString);
+  if (Number.isNaN(d.getTime())) return "—";
+
+  return d.toLocaleString("ru-RU", {
+    timeZone: "Europe/Moscow",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatStatus(isProcessed: boolean, processedAt?: string | null) {
+  if (!isProcessed) return "⏳ Ожидает";
+  if (processedAt) return `✅ Обработана · ${formatDateTimeRU(processedAt)}`;
+  return "✅ Обработана";
+}
+
+/**
+ * Google Sheets A:G:
+ * A Номер заявки
+ * B Дата и время создания
+ * C Класс / уровень
+ * D Типы материалов
+ * E Email
+ * F ФИО ученика
+ * G Статус заявки
+ */
+function buildSheetValues(row: any) {
+  const branchType = normalizeBranchType(row?.branch_type);
+  const targetLevels = toStringArray(row?.target_levels ?? row?.target_level);
+
+  const materialTypes =
+    branchType === "gatehouse"
+      ? toStringArray(row?.material_kinds).length
+        ? row.material_kinds
+        : row.textbook_types
+      : row?.textbook_types;
+
+  return [
+    String(row?.request_number || ""),
+    formatDateTimeRU(String(row?.created_at || "")),
+    formatTarget(branchType, row?.class_level ? String(row.class_level) : null, targetLevels),
+    formatMaterialTypes(branchType, materialTypes),
+    String(row?.email || ""),
+    String(row?.full_name || ""),
+    formatStatus(Boolean(row?.is_processed), row?.processed_at ?? null),
+  ];
+}
+
+async function safeJson(req: NextRequest) {
+  try {
+    return await req.json();
+  } catch {
+    return null;
+  }
+}
+
+function createFallbackRequestNumber(branchType: BranchType) {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
+  const prefix = branchType === "gatehouse" ? "GA" : "PR";
+
+  return `${prefix}-${yyyy}${mm}${dd}-${random}`;
+}
+
+async function resolveRequestNumber(supabase: any, rawValue: unknown, branchType: BranchType) {
+  const provided = normalizeString(rawValue);
+  if (provided) return provided;
+
+  if (branchType === "gatehouse") {
+    return createFallbackRequestNumber(branchType);
+  }
+
+  const { data, error } = await supabase.rpc("generate_request_number");
+
+  if (!error && data) {
+    return String(data);
+  }
+
+  return createFallbackRequestNumber(branchType);
+}
+
+function normalizeRequestBody(body: any) {
+  const branch_type = normalizeBranchType(body?.branch_type);
+  const class_level = normalizeString(body?.class_level);
+
+  const rawTargetLevels =
+    body?.target_levels !== undefined
+      ? body.target_levels
+      : body?.target_level !== undefined
+        ? body.target_level
+        : [];
+
+  const target_levels =
+    branch_type === "gatehouse"
+      ? uniqueStrings(toStringArray(rawTargetLevels).map(normalizeGatehouseLevel))
+      : [];
+
+  const rawTextbookTypes =
+    body?.textbook_types !== undefined
+      ? body.textbook_types
+      : body?.material_kinds !== undefined
+        ? body.material_kinds
+        : branch_type === "gatehouse"
+          ? ["mock_test"]
+          : [];
+
+  const textbook_types =
+    branch_type === "gatehouse"
+      ? uniqueStrings(toStringArray(rawTextbookTypes).map(normalizeGatehouseMaterialKind))
+      : uniqueStrings(toStringArray(rawTextbookTypes).map(normalizeOlympiadMaterialKind));
+
+  const rawMaterialKinds =
+    body?.material_kinds !== undefined
+      ? body.material_kinds
+      : branch_type === "gatehouse"
+        ? textbook_types
+        : textbook_types;
+
+  const material_kinds =
+    branch_type === "gatehouse"
+      ? uniqueStrings(toStringArray(rawMaterialKinds).map(normalizeGatehouseMaterialKind))
+      : uniqueStrings(toStringArray(rawMaterialKinds).map(normalizeOlympiadMaterialKind));
+
+  return {
+    branch_type,
+    class_level,
+    target_levels,
+    textbook_types,
+    material_kinds,
+  };
+}
+
+export async function POST(req: NextRequest) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
+  const { supabase, user, profile } = auth as any;
+
+  const body = await safeJson(req);
+  if (!body || typeof body !== "object") {
+    return fail("Bad JSON", 400, "BAD_JSON", noStoreInit());
+  }
+
+  const normalized = normalizeRequestBody(body);
+
+  if (!normalized.textbook_types.length) {
+    return fail("Выберите тип материала", 400, "VALIDATION", noStoreInit());
+  }
+
+  if (normalized.branch_type === "olympiad" && !normalized.class_level) {
+    return fail("Выберите класс", 400, "VALIDATION", noStoreInit());
+  }
+
+  if (normalized.branch_type === "gatehouse" && normalized.target_levels.length === 0) {
+    return fail("Выберите уровень экзамена", 400, "VALIDATION", noStoreInit());
+  }
+
+  const email = normalizeString(profile?.email || user?.email || body?.email);
+  const full_name = normalizeString(profile?.full_name || body?.full_name);
+  const contact_phone = normalizeString(profile?.contact_phone || body?.contact_phone);
+
+  if (!email || !full_name) {
+    return fail("Missing profile data (email/full_name)", 400, "PROFILE_MISSING", noStoreInit());
+  }
+
+  try {
+    const request_number = await resolveRequestNumber(supabase, body?.request_number, normalized.branch_type);
+
+    const payload: Record<string, any> = {
+      user_id: user.id,
+      request_number,
+      branch_type: normalized.branch_type,
+      class_level: normalized.branch_type === "olympiad" ? normalized.class_level : null,
+      target_level: normalized.branch_type === "gatehouse" ? normalized.target_levels : null,
+      target_levels: normalized.branch_type === "gatehouse" ? normalized.target_levels : null,
+      textbook_types: normalized.textbook_types,
+      material_kinds: normalized.material_kinds,
+      email,
+      full_name,
+      contact_phone: contact_phone || null,
+      is_processed: false,
+      processed_at: null,
+      sheet_synced_at: null,
+      sheet_row: null,
+      sheet_sync_error: null,
+    };
+
+    const { data: insertedRow, error: insertError } = await supabase
+      .from("purchase_requests")
+      .insert(payload)
+      .select("*")
+      .single();
+
+    if (insertError) {
+      return fail(insertError.message, 500, "DB_ERROR", noStoreInit());
+    }
+
+    const row = insertedRow as any;
+    const sheetValues = buildSheetValues(row);
+
+    let sheetOk = true;
+    let sheetRow: number | null = null;
+    let sheetError: string | null = null;
+
+    try {
+      const res = await withTimeout(appendAccountingRow(sheetValues), SHEETS_TIMEOUT_MS, "Sheets append");
+      sheetRow = res.rowNumber ?? null;
+
+      await supabase
+        .from("purchase_requests")
+        .update({
+          sheet_synced_at: new Date().toISOString(),
+          sheet_row: sheetRow,
+          sheet_sync_error: null,
+        })
+        .eq("id", row.id)
+        .eq("user_id", user.id);
+    } catch (e: any) {
+      sheetOk = false;
+      sheetError = String(e?.message || e || "Sheets sync error").slice(0, 500);
+
+      await supabase
+        .from("purchase_requests")
+        .update({
+          sheet_synced_at: null,
+          sheet_row: null,
+          sheet_sync_error: sheetError,
+        })
+        .eq("id", row.id)
+        .eq("user_id", user.id);
+    }
+
+    return ok(
+      {
+        request: row,
+        sheet: {
+          ok: sheetOk,
+          row: sheetRow,
+          error: sheetError,
+        },
+      },
+      noStoreInit(),
+    );
+  } catch (e: any) {
+    return fail(e?.message || "Server error", 500, "SERVER_ERROR", noStoreInit());
+  }
 }
 </file>
 
@@ -16089,6 +16002,358 @@ export const processImages = async (files: File[], quality: number) => {
 };
 </file>
 
+<file path="lib/integrations/googleSheets.ts">
+/* lib/integrations/googleSheets.ts */
+import "server-only";
+
+import { google } from "googleapis";
+
+const ACCOUNTING_COLUMNS = "A:G";
+const ACCOUNTING_LAST_COLUMN = "G";
+const ACCOUNTING_COLUMNS_COUNT = 7;
+const GOOGLE_API_TIMEOUT_MS = 15_000;
+
+export type AccountingRowValue = string | number | null | undefined;
+
+export type SheetRowInfo = {
+  rowNumber: number;
+  values: string[];
+};
+
+function mustEnv(name: string) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing env: ${name}`);
+  }
+
+  return value;
+}
+
+function norm(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function getPrivateKey() {
+  return mustEnv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY")
+    .replace(/^"|"$/g, "")
+    .replace(/\\n/g, "\n");
+}
+
+function quoteSheetName(tab: string) {
+  const safe = String(tab || "Учёт").replace(/'/g, "''");
+  return `'${safe}'`;
+}
+
+function range(tab: string, address: string) {
+  return `${quoteSheetName(tab)}!${address}`;
+}
+
+export function getSpreadsheetConfig() {
+  return {
+    spreadsheetId: mustEnv("GOOGLE_SHEETS_SPREADSHEET_ID"),
+    tab: process.env.GOOGLE_SHEETS_TAB || "Учёт",
+  };
+}
+
+function getSheetsClient() {
+  const auth = new google.auth.JWT({
+    email: mustEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
+    key: getPrivateKey(),
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+
+  return google.sheets({ version: "v4", auth });
+}
+
+function parseRowNumber(updatedRange?: string | null): number | null {
+  if (!updatedRange) return null;
+
+  const match = updatedRange.match(/![A-Z]+(\d+):/);
+  if (!match) return null;
+
+  const rowNumber = Number(match[1]);
+  return Number.isFinite(rowNumber) && rowNumber > 0 ? rowNumber : null;
+}
+
+function normalizeAccountingValues(values: AccountingRowValue[]) {
+  return Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, index) => {
+    const value = values[index];
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    return norm(value);
+  });
+}
+
+function isLikelyRequestNumber(value: string) {
+  return /^(PR|GA)-/i.test(norm(value));
+}
+
+async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
+  const sheets = getSheetsClient();
+
+  const meta = await sheets.spreadsheets.get(
+    {
+      spreadsheetId,
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  const found = meta.data.sheets?.find((sheet) => sheet.properties?.title === tab);
+  const sheetId = found?.properties?.sheetId;
+
+  if (sheetId === undefined || sheetId === null) {
+    throw new Error(`Google Sheets tab not found: "${tab}"`);
+  }
+
+  return sheetId;
+}
+
+/**
+ * Append строки заявки в конец A:G.
+ */
+export async function appendAccountingRow(values: AccountingRowValue[]) {
+  const sheets = getSheetsClient();
+  const { spreadsheetId, tab } = getSpreadsheetConfig();
+
+  const res = await sheets.spreadsheets.values.append(
+    {
+      spreadsheetId,
+      range: range(tab, ACCOUNTING_COLUMNS),
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values: [normalizeAccountingValues(values)],
+      },
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  const updatedRange = res.data.updates?.updatedRange ?? null;
+  const rowNumber = parseRowNumber(updatedRange);
+
+  return {
+    updatedRange,
+    rowNumber,
+  };
+}
+
+/**
+ * Читает колонку A и возвращает Set request_number.
+ */
+export async function getExistingRequestNumbersSet() {
+  const sheets = getSheetsClient();
+  const { spreadsheetId, tab } = getSpreadsheetConfig();
+
+  const res = await sheets.spreadsheets.values.get(
+    {
+      spreadsheetId,
+      range: range(tab, "A:A"),
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  const rows = res.data.values ?? [];
+  const set = new Set<string>();
+
+  for (const row of rows) {
+    const requestNumber = norm(row?.[0]);
+
+    if (!requestNumber) continue;
+    if (!isLikelyRequestNumber(requestNumber)) continue;
+
+    set.add(requestNumber);
+  }
+
+  return set;
+}
+
+/**
+ * Мапа request_number -> { rowNumber, values[0..6] }.
+ * Читает A:G и учитывает только строки, где колонка A похожа на номер заявки.
+ */
+export async function getSheetRequestRowMap() {
+  const sheets = getSheetsClient();
+  const { spreadsheetId, tab } = getSpreadsheetConfig();
+
+  const res = await sheets.spreadsheets.values.get(
+    {
+      spreadsheetId,
+      range: range(tab, ACCOUNTING_COLUMNS),
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  const rows = res.data.values ?? [];
+  const map = new Map<string, SheetRowInfo>();
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index] ?? [];
+    const requestNumber = norm(row[0]);
+
+    if (!requestNumber) continue;
+    if (!isLikelyRequestNumber(requestNumber)) continue;
+
+    const values = Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, valueIndex) => norm(row[valueIndex]));
+
+    map.set(requestNumber, {
+      rowNumber: index + 1,
+      values,
+    });
+  }
+
+  return map;
+}
+
+/**
+ * Обновить конкретную строку A:G по номеру строки.
+ */
+export async function updateAccountingRow(rowNumber: number, values: AccountingRowValue[]) {
+  if (!Number.isFinite(rowNumber) || rowNumber <= 0) {
+    throw new Error(`Invalid row number: ${rowNumber}`);
+  }
+
+  const sheets = getSheetsClient();
+  const { spreadsheetId, tab } = getSpreadsheetConfig();
+
+  await sheets.spreadsheets.values.update(
+    {
+      spreadsheetId,
+      range: range(tab, `A${rowNumber}:${ACCOUNTING_LAST_COLUMN}${rowNumber}`),
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [normalizeAccountingValues(values)],
+      },
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  return { rowNumber };
+}
+
+/**
+ * Удалить строки по номерам 1-based.
+ * Важно: удаляем снизу вверх, иначе номера строк съедут.
+ */
+export async function deleteAccountingRows(rowNumbers: number[]) {
+  const nums = Array.from(new Set(rowNumbers))
+    .filter((rowNumber) => Number.isFinite(rowNumber) && rowNumber > 0)
+    .sort((a, b) => b - a);
+
+  if (!nums.length) {
+    return { deleted: 0 };
+  }
+
+  const sheets = getSheetsClient();
+  const { spreadsheetId, tab } = getSpreadsheetConfig();
+  const sheetId = await getSheetIdByTitle(spreadsheetId, tab);
+
+  const requests = nums.map((rowNumber) => ({
+    deleteDimension: {
+      range: {
+        sheetId,
+        dimension: "ROWS",
+        startIndex: rowNumber - 1,
+        endIndex: rowNumber,
+      },
+    },
+  }));
+
+  await sheets.spreadsheets.batchUpdate(
+    {
+      spreadsheetId,
+      requestBody: { requests },
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  return {
+    deleted: nums.length,
+  };
+}
+
+/**
+ * Найти строку в Google Sheets по request_number.
+ */
+export async function findRowNumberByRequestNumber(requestNumber: string) {
+  const normalized = norm(requestNumber);
+  if (!normalized) return null;
+
+  const map = await getSheetRequestRowMap();
+  const found = map.get(normalized);
+
+  return found?.rowNumber ?? null;
+}
+
+/**
+ * UPSERT строки A:G по request_number из колонки A.
+ */
+export async function upsertRequestRowByNumber(valuesAtoG: AccountingRowValue[]) {
+  const requestNumber = norm(valuesAtoG?.[0]);
+
+  if (!requestNumber) {
+    throw new Error("Missing request_number in values[0]");
+  }
+
+  const map = await getSheetRequestRowMap();
+  const found = map.get(requestNumber);
+
+  if (found) {
+    await updateAccountingRow(found.rowNumber, valuesAtoG);
+
+    return {
+      action: "updated" as const,
+      rowNumber: found.rowNumber,
+    };
+  }
+
+  const appended = await appendAccountingRow(valuesAtoG);
+
+  return {
+    action: "inserted" as const,
+    rowNumber: appended.rowNumber ?? null,
+  };
+}
+
+/**
+ * DELETE строки из Google Sheets по request_number.
+ */
+export async function deleteRequestRowByNumber(requestNumber: string) {
+  const rowNumber = await findRowNumberByRequestNumber(requestNumber);
+
+  if (!rowNumber) {
+    return {
+      ok: true,
+      deleted: 0,
+      rowNumber: null as number | null,
+    };
+  }
+
+  const deleted = await deleteAccountingRows([rowNumber]);
+
+  return {
+    ok: true,
+    deleted: deleted.deleted,
+    rowNumber,
+  };
+}
+</file>
+
 <file path="lib/materials/format.ts">
 import { getBranchConfig, normalizeBranchType } from "@/lib/branches/config";
 import type { BranchType } from "@/lib/branches/types";
@@ -18737,68 +19002,6 @@ const config = {
 };
 
 export default config;
-</file>
-
-<file path="proxy.ts">
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware";
-
-/**
- * Роуты, требующие авторизации.
- * Незалогиненный пользователь → редирект на /login
- */
-const PROTECTED_PREFIXES = [
-  "/portal",
-  "/profile",
-  "/assignment",
-  "/textbook",
-  "/materials",
-  "/crossword",
-  "/gatehouse",
-  "/requests",
-  "/admin",
-];
-
-export async function proxy(req: NextRequest) {
-  const res = NextResponse.next();
-
-  // Обновляем сессионные куки Supabase на каждом запросе.
-  // Без этого JWT истекает и пользователя выбивает.
-  const supabase = createSupabaseMiddlewareClient(req, res);
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { pathname } = req.nextUrl;
-
-  const needsAuth = PROTECTED_PREFIXES.some((prefix) =>
-    pathname.startsWith(prefix)
-  );
-
-  if (needsAuth && !user) {
-    const loginUrl = new URL("/login", req.url);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return res;
-}
-
-export const config = {
-  matcher: [
-    /*
-     * Матчим всё кроме:
-     * - _next/static  (статика Next.js)
-     * - _next/image   (оптимизация картинок)
-     * - favicon.ico
-     * - /api/         (API-роуты проверяют сессию сами)
-     * - /info/        (публичные страницы)
-     * - /login, /register, /reset, /update-password
-     */
-    "/((?!_next/static|_next/image|favicon\\.ico|api/|info/|login|register|reset|update-password).*)",
-  ],
-};
 </file>
 
 <file path="README.md">
@@ -22824,6 +23027,341 @@ export default function AdminTabsPage() {
         </div>
       </div>
     </div>
+  );
+}
+</file>
+
+<file path="app/(admin)/admin/users/UserAccessModal.tsx">
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Modal from "@/components/Modal";
+import LoadingBlock from "@/components/LoadingBlock";
+import ErrorBox from "@/components/ErrorBox";
+import type { UserRow } from "./UsersTab";
+
+/* ================= helpers ================= */
+
+type ApiOk<T> = { ok: true } & T;
+type ApiErr = { ok: false; error: string; code?: string };
+
+async function safeJson(res: Response) {
+  const txt = await res.text();
+  if (!txt) return null;
+  try { return JSON.parse(txt); } catch { return null; }
+}
+
+async function apiGet<T>(url: string): Promise<ApiOk<T>> {
+  const res = await fetch(url, { cache: "no-store" });
+  const json = await safeJson(res);
+  if (!res.ok || !json?.ok) throw new Error((json as ApiErr | null)?.error || `HTTP ${res.status}`);
+  return json as ApiOk<T>;
+}
+
+async function apiPost<T>(url: string, body: any): Promise<ApiOk<T>> {
+  const res = await fetch(url, {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json = await safeJson(res);
+  if (!res.ok || !json?.ok) throw new Error((json as ApiErr | null)?.error || `HTTP ${res.status}`);
+  return json as ApiOk<T>;
+}
+
+/* ================= types ================= */
+
+type AccessLoad = {
+  textbooks: Array<{ id: string; title: string; class_level: string[] | null }>;
+  crosswords: Array<{ id: string; title: string; class_level: string[] | null }>;
+  materials: Array<{ id: string; title: string; project_tab_id: string | null; target_levels: string[] | null; class_levels: string[] | null }>;
+  projects: Array<{ id: string; name: string; slug: string }>;
+  project_tabs: Array<{ id: string; title: string; project_id: string }>;
+  selectedTextbookIds: string[];
+  selectedCrosswordIds: string[];
+  selectedMaterialIds: string[];
+};
+
+type Props = {
+  open: boolean;
+  user: UserRow | null;
+  onClose: () => void;
+  onSaved?: () => Promise<void> | void;
+};
+
+/* ================= component ================= */
+
+export default function UserAccessModal({ open, user, onClose, onSaved }: Props) {
+  const userId = user?.id ?? null;
+  const userName = user?.full_name || user?.email || "Пользователь";
+
+  // Секции: "Новые проекты" или "Старые легаси материалы"
+  const [section, setSection] = useState<"projects" | "legacy">("projects");
+
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const [textbooks, setTextbooks] = useState<AccessLoad["textbooks"]>([]);
+  const [crosswords, setCrosswords] = useState<AccessLoad["crosswords"]>([]);
+  const [materials, setMaterials] = useState<AccessLoad["materials"]>([]);
+  const [projects, setProjects] = useState<AccessLoad["projects"]>([]);
+  const [tabs, setTabs] = useState<AccessLoad["project_tabs"]>([]);
+
+  // Состояния для выпадающих списков
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [selectedTabId, setSelectedTabId] = useState<string>("");
+
+  const [tbChecked, setTbChecked] = useState<Set<string>>(new Set());
+  const [cwChecked, setCwChecked] = useState<Set<string>>(new Set());
+  const [materialChecked, setMaterialChecked] = useState<Set<string>>(new Set());
+
+  const title = useMemo(() => `🔐 Управление доступом — ${userName}`, [userName]);
+
+  /* ================= load ================= */
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!open || !userId) return;
+      setLoading(true);
+      setErr(null);
+
+      try {
+        const data = await apiGet<AccessLoad>(`/api/admin/users/${encodeURIComponent(userId)}`);
+        if (cancelled) return;
+
+        setTextbooks(data.textbooks ?? []);
+        setCrosswords(data.crosswords ?? []);
+        setMaterials(data.materials ?? []);
+        setProjects(data.projects ?? []);
+        setTabs(data.project_tabs ?? []);
+
+        setTbChecked(new Set((data.selectedTextbookIds ?? []).map(String)));
+        setCwChecked(new Set((data.selectedCrosswordIds ?? []).map(String)));
+        setMaterialChecked(new Set((data.selectedMaterialIds ?? []).map(String)));
+
+        // Авто-выбор первого проекта, если они есть
+        if (data.projects && data.projects.length > 0) {
+          setSelectedProjectId(data.projects[0].id);
+        }
+      } catch (e: any) {
+        if (cancelled) return;
+        setErr(e?.message || String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [open, userId]);
+
+  // Авто-выбор первого таба при смене проекта
+  useEffect(() => {
+    const projectTabs = tabs.filter(t => t.project_id === selectedProjectId);
+    if (projectTabs.length > 0) {
+      setSelectedTabId(projectTabs[0].id);
+    } else {
+      setSelectedTabId("");
+    }
+  }, [selectedProjectId, tabs]);
+
+  /* ================= save ================= */
+
+  async function save() {
+    if (!userId) return;
+    setErr(null);
+    setLoading(true);
+
+    try {
+      const payload = {
+        user_id: userId,
+        textbook_ids: Array.from(tbChecked),
+        crossword_ids: Array.from(cwChecked),
+        material_ids: Array.from(materialChecked),
+      };
+
+      await apiPost(`/api/admin/users/access`, payload);
+      if (onSaved) await onSaved();
+      onClose();
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Фильтруем материалы под выбранный таб
+  const currentTabMaterials = materials.filter(m => m.project_tab_id === selectedTabId);
+  const currentProjectTabs = tabs.filter(t => t.project_id === selectedProjectId);
+
+  /* ================= render ================= */
+
+  return (
+    <Modal open={open} onClose={onClose} title={title} maxWidth={1000}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        <button
+          className={section === "projects" ? "btn small" : "btn small ghost"}
+          type="button"
+          onClick={() => setSection("projects")}
+        >
+          📁 Проекты и Материалы
+        </button>
+        <button
+          className={section === "legacy" ? "btn small" : "btn small ghost"}
+          type="button"
+          onClick={() => setSection("legacy")}
+        >
+          🏛️ Легаси (Старые учебники)
+        </button>
+      </div>
+
+      {loading ? <LoadingBlock text="Загружаем доступы..." /> : null}
+      {err ? <ErrorBox message={err} retryMode="none" /> : null}
+
+      {/* =========== НОВАЯ АРХИТЕКТУРА (ПРОЕКТЫ И ТАБЫ) =========== */}
+      {!loading && section === "projects" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          
+          <div style={{ display: "flex", gap: 16 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: "block", fontWeight: "bold", marginBottom: 6 }}>1. Выберите ветку (Проект):</label>
+              <select 
+                className="input" 
+                value={selectedProjectId} 
+                onChange={e => setSelectedProjectId(e.target.value)}
+                style={{ width: "100%" }}
+              >
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: 1 }}>
+              <label style={{ display: "block", fontWeight: "bold", marginBottom: 6 }}>2. Выберите вкладку (Таб):</label>
+              <select 
+                className="input" 
+                value={selectedTabId} 
+                onChange={e => setSelectedTabId(e.target.value)}
+                style={{ width: "100%" }}
+                disabled={currentProjectTabs.length === 0}
+              >
+                {currentProjectTabs.length === 0 && <option value="">Нет вкладок</option>}
+                {currentProjectTabs.map(t => (
+                  <option key={t.id} value={t.id}>{t.title}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 10 }}>
+            <h3 style={{ margin: "0 0 10px 0" }}>Доступные материалы:</h3>
+            <div style={{ display: "grid", gap: 8, maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
+              {currentTabMaterials.length === 0 ? (
+                <div className="small-muted" style={{ padding: 20, textAlign: "center", background: "#f9fafb", borderRadius: 10 }}>
+                  В этом табе пока нет материалов.
+                </div>
+              ) : (
+                currentTabMaterials.map((m) => {
+                  const id = String(m.id);
+                  const checked = materialChecked.has(id);
+                  const levels = [...(m.target_levels || []), ...(m.class_levels || [])];
+
+                  return (
+                    <label key={id} style={{
+                      display: "flex", gap: 10, alignItems: "center", padding: "10px 12px",
+                      borderRadius: 10, border: "1px solid rgba(0,0,0,0.08)",
+                      background: checked ? "rgba(99,102,241,0.10)" : "#fff", cursor: "pointer",
+                      transition: "all 0.2s"
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setMaterialChecked((prev) => {
+                            const next = new Set(prev);
+                            e.target.checked ? next.add(id) : next.delete(id);
+                            return next;
+                          });
+                        }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 800 }}>{m.title}</div>
+                        <div className="small-muted">
+                          {levels.length ? levels.join(", ") : "уровни не указаны"}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========== СТАРАЯ АРХИТЕКТУРА (ЛЕГАСИ) =========== */}
+      {!loading && section === "legacy" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div>
+            <h3 style={{ marginTop: 0 }}>📚 Учебники</h3>
+            <div style={{ display: "grid", gap: 8, maxHeight: 380, overflowY: "auto" }}>
+              {textbooks.length === 0 ? <div className="small-muted">Нет учебников</div> : textbooks.map((t) => {
+                const checked = tbChecked.has(String(t.id));
+                return (
+                  <label key={t.id} style={{
+                    display: "flex", gap: 10, alignItems: "center", padding: "10px 12px",
+                    borderRadius: 10, border: "1px solid rgba(0,0,0,0.08)",
+                    background: checked ? "rgba(78,205,196,0.10)" : "#fff", cursor: "pointer"
+                  }}>
+                    <input type="checkbox" checked={checked} onChange={(e) => {
+                      setTbChecked(prev => { const n = new Set(prev); e.target.checked ? n.add(t.id) : n.delete(t.id); return n; });
+                    }} />
+                    <div>
+                      <div style={{ fontWeight: 800 }}>{t.title}</div>
+                      <div className="small-muted">{t.class_level?.join(", ") || "без класса"}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0 }}>🧩 Кроссворды</h3>
+            <div style={{ display: "grid", gap: 8, maxHeight: 380, overflowY: "auto" }}>
+              {crosswords.length === 0 ? <div className="small-muted">Нет кроссвордов</div> : crosswords.map((c) => {
+                const checked = cwChecked.has(String(c.id));
+                return (
+                  <label key={c.id} style={{
+                    display: "flex", gap: 10, alignItems: "center", padding: "10px 12px",
+                    borderRadius: 10, border: "1px solid rgba(0,0,0,0.08)",
+                    background: checked ? "rgba(78,205,196,0.10)" : "#fff", cursor: "pointer"
+                  }}>
+                    <input type="checkbox" checked={checked} onChange={(e) => {
+                      setCwChecked(prev => { const n = new Set(prev); e.target.checked ? n.add(c.id) : n.delete(c.id); return n; });
+                    }} />
+                    <div>
+                      <div style={{ fontWeight: 800 }}>{c.title}</div>
+                      <div className="small-muted">{c.class_level?.join(", ") || "без класса"}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border-color)", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        <button className="btn secondary" onClick={onClose} type="button">
+          ❌ Отмена
+        </button>
+        <button className="btn" onClick={() => void save()} type="button" disabled={loading || !userId}>
+          💾 Сохранить доступы
+        </button>
+      </div>
+    </Modal>
   );
 }
 </file>
@@ -30587,201 +31125,6 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
 }
 </file>
 
-<file path="app/api/admin/materials/route.ts">
-import type { NextRequest } from "next/server";
-import { ok, fail } from "@/lib/api/response";
-import { requireAdmin } from "@/lib/api/admin";
-import { normalizeBranchType } from "@/lib/branches/config";
-import { normalizeMaterialKind, toStringArray, uniqueStrings } from "@/lib/materials/format";
-
-function normalizeBool(value: unknown): boolean {
-  return value === true || value === "true" || value === 1 || value === "1";
-}
-
-function normalizeOrderIndex(value: unknown): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function normalizeNullableString(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  const str = String(value).trim();
-  return str || null;
-}
-
-// Защита от мусора вместо ID
-function isValidUUID(str: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
-}
-
-function normalizePayload(body: any, userId: string) {
-  const branch_type = normalizeBranchType(body?.branch_type);
-  const material_kind = normalizeMaterialKind(body?.material_kind || "mock_test");
-  const title = String(body?.title ?? "").trim();
-  const description = normalizeNullableString(body?.description);
-  const cover_image_url = normalizeNullableString(body?.cover_image_url);
-  const is_available = normalizeBool(body?.is_available);
-  const is_active = body?.is_active === undefined ? true : normalizeBool(body?.is_active);
-  const order_index = normalizeOrderIndex(body?.order_index);
-  const class_levels = uniqueStrings(toStringArray(body?.class_levels ?? body?.class_level));
-  const target_levels = uniqueStrings(toStringArray(body?.target_levels ?? body?.target_level));
-  const meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
-
-  // ❗️ ФИКС ТАБА: Ловим и очищаем project_tab_id
-  let project_tab_id = normalizeNullableString(body?.project_tab_id ?? body?.tab_id);
-  
-  if (project_tab_id === "00000000-0000-0000-0000-000000000000" || project_tab_id === "none" || project_tab_id === "null" || project_tab_id === "") {
-    project_tab_id = null;
-  }
-
-  // Если прилетел текст вместо UUID — сбрасываем в null
-  if (project_tab_id && !isValidUUID(project_tab_id)) {
-    project_tab_id = null;
-  }
-
-  return {
-    project_tab_id, // Теперь материал привяжется к табу!
-    branch_type,
-    material_kind,
-    title,
-    description,
-    cover_image_url,
-    is_available,
-    is_active,
-    order_index,
-    class_levels,
-    target_levels,
-    created_by: userId,
-    meta,
-  };
-}
-
-function validateMaterial(payload: ReturnType<typeof normalizePayload>) {
-  if (!payload.title) return "title required";
-  if (!payload.material_kind) return "material_kind required";
-
-  if (payload.branch_type === "olympiad" && payload.class_levels.length === 0) {
-    return "class_levels required";
-  }
-
-  if (payload.branch_type === "gatehouse" && payload.target_levels.length === 0) {
-    return "target_levels required";
-  }
-
-  return null;
-}
-
-export async function GET(req: NextRequest) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-  const { searchParams } = new URL(req.url);
-
-  const branch_type = searchParams.get("branch_type");
-  const material_kind = searchParams.get("material_kind");
-  const includeCounts = searchParams.get("include_counts") !== "false";
-
-  try {
-    let query = supabase
-      .from("materials")
-      .select("*")
-      .order("order_index", { ascending: true })
-      .order("created_at", { ascending: false });
-
-    if (branch_type) {
-      query = query.eq("branch_type", normalizeBranchType(branch_type));
-    }
-
-    if (material_kind) {
-      query = query.eq("material_kind", normalizeMaterialKind(material_kind));
-    }
-
-    const { data, error } = await query;
-
-    if (error) return fail(error.message, 500, "DB_ERROR");
-
-    const materials = data ?? [];
-
-    if (!includeCounts || materials.length === 0) {
-      return ok({ materials });
-    }
-
-    const ids = materials.map((material: any) => material.id).filter(Boolean);
-    const idsString = ids.join(',');
-
-    // ❗️ ФИКС СЧЕТЧИКА: Ищем задания и по новой, и по легаси привязке
-    const { data: assignments, error: countError } = await supabase
-      .from("assignments")
-      .select("id, material_id, textbook_id, crossword_id")
-      .or(`material_id.in.(${idsString}),textbook_id.in.(${idsString}),crossword_id.in.(${idsString})`);
-
-    if (countError) {
-      console.error("🔴 [ADMIN GET MATERIALS] Ошибка подсчета заданий:", countError.message);
-      return ok({ materials });
-    }
-
-    const counts: Record<string, number> = {};
-
-    for (const assignment of assignments ?? []) {
-      const matId = String(assignment.material_id || assignment.textbook_id || assignment.crossword_id || "");
-      if (!matId) continue;
-      counts[matId] = (counts[matId] || 0) + 1;
-    }
-
-    return ok({
-      materials: materials.map((material: any) => ({
-        ...material,
-        assignments_count: counts[String(material.id)] || 0,
-      })),
-    });
-  } catch (error: any) {
-    console.error("🔴 [ADMIN GET MATERIALS] Серверная ошибка:", error);
-    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
-  }
-}
-
-export async function POST(req: NextRequest) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase, user } = auth;
-
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Bad JSON", 400, "BAD_JSON");
-  }
-
-  const payload = normalizePayload(body, user.id);
-  const validationError = validateMaterial(payload);
-
-  if (validationError) {
-    console.error("🔴 [ADMIN POST MATERIAL] Ошибка валидации:", validationError);
-    return fail(validationError, 400, "VALIDATION");
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("materials")
-      .insert(payload)
-      .select("*")
-      .single();
-
-    if (error) {
-      console.error("🔴 [ADMIN POST MATERIAL] Ошибка БД:", error.message, error.details);
-      return fail(error.message, 500, "DB_ERROR");
-    }
-
-    return ok({ material: data });
-  } catch (error: any) {
-    console.error("🔴 [ADMIN POST MATERIAL] Серверная ошибка:", error);
-    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
-  }
-}
-</file>
-
 <file path="app/api/admin/projects/[id]/levels/route.ts">
 // app/api/admin/projects/[id]/levels/route.ts
 // ADMIN: управление уровнями проекта (GET список / POST upsert / DELETE по id).
@@ -31957,6 +32300,240 @@ export async function DELETE(req: Request) {
 }
 </file>
 
+<file path="app/api/admin/users/[id]/route.ts">
+import { ok, fail } from "@/lib/api/response";
+import { requireAdmin } from "@/lib/api/admin";
+import type { NextRequest } from "next/server";
+
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { id: userId } = await ctx.params;
+
+  try {
+    const [
+      { data: textbooks, error: tErr },
+      { data: crosswords, error: cErr },
+      { data: materials, error: mErr },
+      { data: projects, error: pErr },
+      { data: tabs, error: tabErr },
+      { data: ta, error: taErr },
+      { data: ca, error: caErr },
+      { data: ma, error: maErr },
+    ] = await Promise.all([
+      // Легаси: Учебники
+      supabase
+        .from("textbooks")
+        .select("id,title,class_level,is_active,order_index,branch_type")
+        .eq("is_active", true)
+        .or("branch_type.eq.olympiad,branch_type.is.null")
+        .order("order_index", { ascending: true }),
+
+      // Легаси: Кроссворды
+      supabase
+        .from("crosswords")
+        .select("id,title,class_level,is_active,order_index,branch_type")
+        .eq("is_active", true)
+        .or("branch_type.eq.olympiad,branch_type.is.null")
+        .order("order_index", { ascending: true }),
+
+      // ❗️ НОВОЕ: Грузим ВСЕ активные материалы без жесткой привязки к gatehouse
+      supabase
+        .from("materials")
+        .select("id,title,branch_type,material_kind,target_levels,class_levels,project_tab_id,is_active,is_available,order_index")
+        .eq("is_active", true)
+        .order("order_index", { ascending: true }),
+
+      // ❗️ НОВОЕ: Грузим все проекты для модалки
+      supabase
+        .from("projects")
+        .select("id,name,slug")
+        .eq("is_active", true)
+        .order("created_at", { ascending: true }),
+
+      // ❗️ НОВОЕ: Грузим табы для фильтрации внутри проектов
+      supabase
+        .from("project_tabs")
+        .select("id,title,project_id")
+        .eq("is_active", true)
+        .order("order_index", { ascending: true }),
+
+      // Текущие доступы юзера
+      supabase.from("textbook_access").select("textbook_id").eq("user_id", userId),
+      supabase.from("crossword_access").select("crossword_id").eq("user_id", userId),
+      supabase.from("material_access").select("material_id").eq("user_id", userId),
+    ]);
+
+    const err = tErr || cErr || mErr || pErr || tabErr || taErr || caErr || maErr;
+
+    if (err) return fail(err.message, 500, "DB_ERROR");
+
+    const selectedTextbookIds = (ta ?? []).map((x: any) => String(x.textbook_id));
+    const selectedCrosswordIds = (ca ?? []).map((x: any) => String(x.crossword_id));
+    const selectedMaterialIds = (ma ?? []).map((x: any) => String(x.material_id));
+
+    return ok({
+      textbooks: textbooks ?? [],
+      crosswords: crosswords ?? [],
+      materials: materials ?? [],
+      projects: projects ?? [],
+      project_tabs: tabs ?? [],
+      selectedTextbookIds,
+      selectedCrosswordIds,
+      selectedMaterialIds,
+    });
+  } catch (e: any) {
+    console.error("🔴 [ADMIN GET USER DATA] Ошибка:", e);
+    return fail(e?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+</file>
+
+<file path="app/api/admin/users/access/route.ts">
+import { ok, fail } from "@/lib/api/response";
+import { requireAdmin } from "@/lib/api/admin";
+import type { NextRequest } from "next/server";
+
+type Body = {
+  user_id: string;
+  textbook_ids?: string[];
+  crossword_ids?: string[];
+  material_ids?: string[];
+};
+
+function toUniqueStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map((item) => String(item ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+export async function POST(req: NextRequest) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase, user } = auth;
+
+  let body: Body;
+  try {
+    body = (await req.json()) as Body;
+  } catch {
+    return fail("Bad JSON", 400, "BAD_JSON");
+  }
+
+  const userId = String(body?.user_id || "").trim();
+  if (!userId) return fail("user_id required", 400, "VALIDATION");
+
+  try {
+    // ❗️ ИСПРАВЛЕНО: Меняем тип на any[], чтобы TypeScript не ругался на формат Supabase PostgrestBuilder
+    const promises: any[] = [];
+
+    // ==========================================
+    // 1. УМНАЯ СИНХРОНИЗАЦИЯ УЧЕБНИКОВ (LEGACY)
+    // ==========================================
+    if (body.textbook_ids !== undefined) {
+      const targetIds = toUniqueStringArray(body.textbook_ids);
+      const { data: current } = await supabase.from("textbook_access").select("textbook_id").eq("user_id", userId);
+      const currentIds = (current || []).map((row) => row.textbook_id);
+
+      const toAdd = targetIds.filter((id) => !currentIds.includes(id));
+      const toRemove = currentIds.filter((id) => !targetIds.includes(id));
+
+      if (toRemove.length > 0) {
+        promises.push(supabase.from("textbook_access").delete().eq("user_id", userId).in("textbook_id", toRemove));
+      }
+      if (toAdd.length > 0) {
+        promises.push(
+          supabase.from("textbook_access").insert(
+            toAdd.map((id) => ({
+              user_id: userId,
+              textbook_id: id,
+              granted_by: user.id,
+              granted_at: new Date().toISOString(),
+            }))
+          )
+        );
+      }
+    }
+
+    // ==========================================
+    // 2. УМНАЯ СИНХРОНИЗАЦИЯ КРОССВОРДОВ (LEGACY)
+    // ==========================================
+    if (body.crossword_ids !== undefined) {
+      const targetIds = toUniqueStringArray(body.crossword_ids);
+      const { data: current } = await supabase.from("crossword_access").select("crossword_id").eq("user_id", userId);
+      const currentIds = (current || []).map((row) => row.crossword_id);
+
+      const toAdd = targetIds.filter((id) => !currentIds.includes(id));
+      const toRemove = currentIds.filter((id) => !targetIds.includes(id));
+
+      if (toRemove.length > 0) {
+        promises.push(supabase.from("crossword_access").delete().eq("user_id", userId).in("crossword_id", toRemove));
+      }
+      if (toAdd.length > 0) {
+        promises.push(
+          supabase.from("crossword_access").insert(
+            toAdd.map((id) => ({
+              user_id: userId,
+              crossword_id: id,
+              granted_by: user.id,
+              granted_at: new Date().toISOString(),
+            }))
+          )
+        );
+      }
+    }
+
+    // ==========================================
+    // 3. УМНАЯ СИНХРОНИЗАЦИЯ МАТЕРИАЛОВ (NEW ARCHITECTURE)
+    // ==========================================
+    if (body.material_ids !== undefined) {
+      const targetIds = toUniqueStringArray(body.material_ids);
+      const { data: current } = await supabase.from("material_access").select("material_id").eq("user_id", userId);
+      const currentIds = (current || []).map((row) => row.material_id);
+
+      const toAdd = targetIds.filter((id) => !currentIds.includes(id));
+      const toRemove = currentIds.filter((id) => !targetIds.includes(id));
+
+      if (toRemove.length > 0) {
+        promises.push(supabase.from("material_access").delete().eq("user_id", userId).in("material_id", toRemove));
+      }
+      if (toAdd.length > 0) {
+        promises.push(
+          supabase.from("material_access").insert(
+            toAdd.map((id) => ({
+              user_id: userId,
+              material_id: id,
+              granted_by: user.id,
+              granted_at: new Date().toISOString(),
+            }))
+          )
+        );
+      }
+    }
+
+    // Выполняем все операции параллельно
+    if (promises.length > 0) {
+      const results = await Promise.all(promises);
+      for (const res of results) {
+        if (res.error) throw new Error(res.error.message);
+      }
+    }
+
+    return ok({ saved: true });
+  } catch (e: any) {
+    console.error("🔴 [ADMIN USER ACCESS] Ошибка сохранения:", e);
+    return fail(e?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+</file>
+
 <file path="app/api/profile-streak-icon/route.ts">
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -32466,464 +33043,6 @@ export async function GET() {
 }
 </file>
 
-<file path="app/api/requests/create/route.ts">
-/* app/api/requests/create/route.ts */
-import { NextRequest } from "next/server";
-import { ok, fail } from "@/lib/api/response";
-import { requireUser } from "@/lib/api/auth";
-import { appendAccountingRow } from "@/lib/integrations/googleSheets";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-type BranchType = "olympiad" | "gatehouse";
-
-const SHEETS_TIMEOUT_MS = 12_000;
-
-function noStoreInit(): ResponseInit {
-  return {
-    headers: {
-      "cache-control": "no-store, max-age=0",
-    },
-  };
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
-  });
-
-  return Promise.race([promise, timeout]).finally(() => {
-    if (timer) clearTimeout(timer);
-  });
-}
-
-function normalizeBranchType(value: unknown): BranchType {
-  const v = String(value ?? "").trim().toLowerCase();
-
-  if (
-    v === "gatehouse" ||
-    v === "gatehouse_awards" ||
-    v === "ga" ||
-    v === "ga_exam" ||
-    v === "exam" ||
-    v === "exams"
-  ) {
-    return "gatehouse";
-  }
-
-  return "olympiad";
-}
-
-function normalizeString(value: unknown) {
-  return String(value ?? "").trim();
-}
-
-function toStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeString(item)).filter(Boolean);
-  }
-
-  if (typeof value === "string") {
-    const text = value.trim();
-
-    if (!text) return [];
-
-    if (text.startsWith("[") && text.endsWith("]")) {
-      try {
-        return toStringArray(JSON.parse(text));
-      } catch {
-        return [];
-      }
-    }
-
-    return text
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
-  const single = normalizeString(value);
-  return single ? [single] : [];
-}
-
-function uniqueStrings(values: string[]) {
-  return Array.from(new Set(values.map((value) => normalizeString(value)).filter(Boolean)));
-}
-
-function normalizeGatehouseLevel(value: unknown) {
-  const raw = normalizeString(value);
-  const v = raw.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-
-  if (v === "stage 1" || v === "stage1") return "stage_1";
-  if (v === "stage 2" || v === "stage2") return "stage_2";
-  if (v === "stage 3" || v === "stage3") return "stage_3";
-
-  if (v === "a1") return "a1";
-  if (v === "a2") return "a2";
-  if (v === "b1") return "b1";
-  if (v === "b2") return "b2";
-  if (v === "c1") return "c1";
-  if (v === "c2") return "c2";
-
-  return v || raw;
-}
-
-function formatGatehouseLevel(value: unknown) {
-  const v = normalizeGatehouseLevel(value);
-
-  const map: Record<string, string> = {
-    stage_1: "Stage 1",
-    stage_2: "Stage 2",
-    stage_3: "Stage 3",
-    a1: "A1",
-    a2: "A2",
-    b1: "B1",
-    b2: "B2",
-    c1: "C1",
-    c2: "C2",
-  };
-
-  return map[v] || normalizeString(value) || v;
-}
-
-function normalizeGatehouseMaterialKind(value: unknown) {
-  const v = normalizeString(value).toLowerCase();
-
-  if (
-    v === "mock_test" ||
-    v === "mock_tests" ||
-    v === "mock-test" ||
-    v === "mock test" ||
-    v === "мок-тест" ||
-    v === "мок тест" ||
-    v === "пробный тест" ||
-    v === "пробные тесты"
-  ) {
-    return "mock_test";
-  }
-
-  return v;
-}
-
-function normalizeOlympiadMaterialKind(value: unknown) {
-  const v = normalizeString(value).toLowerCase();
-
-  if (v === "учебник" || v === "textbook") return "textbook";
-  if (v === "кроссворд" || v === "crossword") return "crossword";
-
-  return v;
-}
-
-function formatClassLevel(classLevel: string) {
-  const classMap: Record<string, string> = {
-    "1-2": "1-2 класс",
-    "3-4": "3-4 класс",
-    "5-6": "5-6 класс",
-    "7": "7 класс",
-    "8-9": "8-9 класс",
-    "10-11": "10-11 класс (Техникум, колледж - 1й курс)",
-    "12": "12 класс (Техникум, college)",
-  };
-
-  return classMap[classLevel] || classLevel;
-}
-
-function formatTarget(branchType: BranchType, classLevel: string | null, targetLevels: string[]) {
-  if (branchType === "gatehouse") {
-    return targetLevels.length ? targetLevels.map(formatGatehouseLevel).join(", ") : "—";
-  }
-
-  return classLevel ? formatClassLevel(classLevel) : "—";
-}
-
-function formatMaterialTypes(branchType: BranchType, types: unknown) {
-  const arr = toStringArray(types);
-
-  if (branchType === "gatehouse") {
-    const typeMap: Record<string, string> = {
-      mock_test: "📝 Пробные тесты",
-      mock_tests: "📝 Пробные тесты",
-      "mock-test": "📝 Пробные тесты",
-      "mock test": "📝 Пробные тесты",
-      "мок-тест": "📝 Пробные тесты",
-      "мок тест": "📝 Пробные тесты",
-      "пробный тест": "📝 Пробные тесты",
-      "пробные тесты": "📝 Пробные тесты",
-    };
-
-    return arr.map((type) => typeMap[String(type).toLowerCase()] || String(type)).join(", ");
-  }
-
-  const typeMap: Record<string, string> = {
-    учебник: "📚 Учебник",
-    кроссворд: "🧩 Кроссворд",
-    textbook: "📚 Учебник",
-    crossword: "🧩 Кроссворд",
-  };
-
-  return arr.map((type) => typeMap[String(type).toLowerCase()] || String(type)).join(", ");
-}
-
-function formatDateTimeRU(dateString: string) {
-  const d = new Date(dateString);
-  if (Number.isNaN(d.getTime())) return "—";
-
-  return d.toLocaleString("ru-RU", {
-    timeZone: "Europe/Moscow",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatStatus(isProcessed: boolean, processedAt?: string | null) {
-  if (!isProcessed) return "⏳ Ожидает";
-  if (processedAt) return `✅ Обработана · ${formatDateTimeRU(processedAt)}`;
-  return "✅ Обработана";
-}
-
-/**
- * Google Sheets A:G:
- * A Номер заявки
- * B Дата и время создания
- * C Класс / уровень
- * D Типы материалов
- * E Email
- * F ФИО ученика
- * G Статус заявки
- */
-function buildSheetValues(row: any) {
-  const branchType = normalizeBranchType(row?.branch_type);
-  const targetLevels = toStringArray(row?.target_levels ?? row?.target_level);
-
-  const materialTypes =
-    branchType === "gatehouse"
-      ? toStringArray(row?.material_kinds).length
-        ? row.material_kinds
-        : row.textbook_types
-      : row?.textbook_types;
-
-  return [
-    String(row?.request_number || ""),
-    formatDateTimeRU(String(row?.created_at || "")),
-    formatTarget(branchType, row?.class_level ? String(row.class_level) : null, targetLevels),
-    formatMaterialTypes(branchType, materialTypes),
-    String(row?.email || ""),
-    String(row?.full_name || ""),
-    formatStatus(Boolean(row?.is_processed), row?.processed_at ?? null),
-  ];
-}
-
-async function safeJson(req: NextRequest) {
-  try {
-    return await req.json();
-  } catch {
-    return null;
-  }
-}
-
-function createFallbackRequestNumber(branchType: BranchType) {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  const prefix = branchType === "gatehouse" ? "GA" : "PR";
-
-  return `${prefix}-${yyyy}${mm}${dd}-${random}`;
-}
-
-async function resolveRequestNumber(supabase: any, rawValue: unknown, branchType: BranchType) {
-  const provided = normalizeString(rawValue);
-  if (provided) return provided;
-
-  if (branchType === "gatehouse") {
-    return createFallbackRequestNumber(branchType);
-  }
-
-  const { data, error } = await supabase.rpc("generate_request_number");
-
-  if (!error && data) {
-    return String(data);
-  }
-
-  return createFallbackRequestNumber(branchType);
-}
-
-function normalizeRequestBody(body: any) {
-  const branch_type = normalizeBranchType(body?.branch_type);
-  const class_level = normalizeString(body?.class_level);
-
-  const rawTargetLevels =
-    body?.target_levels !== undefined
-      ? body.target_levels
-      : body?.target_level !== undefined
-        ? body.target_level
-        : [];
-
-  const target_levels =
-    branch_type === "gatehouse"
-      ? uniqueStrings(toStringArray(rawTargetLevels).map(normalizeGatehouseLevel))
-      : [];
-
-  const rawTextbookTypes =
-    body?.textbook_types !== undefined
-      ? body.textbook_types
-      : body?.material_kinds !== undefined
-        ? body.material_kinds
-        : branch_type === "gatehouse"
-          ? ["mock_test"]
-          : [];
-
-  const textbook_types =
-    branch_type === "gatehouse"
-      ? uniqueStrings(toStringArray(rawTextbookTypes).map(normalizeGatehouseMaterialKind))
-      : uniqueStrings(toStringArray(rawTextbookTypes).map(normalizeOlympiadMaterialKind));
-
-  const rawMaterialKinds =
-    body?.material_kinds !== undefined
-      ? body.material_kinds
-      : branch_type === "gatehouse"
-        ? textbook_types
-        : textbook_types;
-
-  const material_kinds =
-    branch_type === "gatehouse"
-      ? uniqueStrings(toStringArray(rawMaterialKinds).map(normalizeGatehouseMaterialKind))
-      : uniqueStrings(toStringArray(rawMaterialKinds).map(normalizeOlympiadMaterialKind));
-
-  return {
-    branch_type,
-    class_level,
-    target_levels,
-    textbook_types,
-    material_kinds,
-  };
-}
-
-export async function POST(req: NextRequest) {
-  const auth = await requireUser();
-  if ("response" in auth) return auth.response;
-
-  const { supabase, user, profile } = auth as any;
-
-  const body = await safeJson(req);
-  if (!body || typeof body !== "object") {
-    return fail("Bad JSON", 400, "BAD_JSON", noStoreInit());
-  }
-
-  const normalized = normalizeRequestBody(body);
-
-  if (!normalized.textbook_types.length) {
-    return fail("Выберите тип материала", 400, "VALIDATION", noStoreInit());
-  }
-
-  if (normalized.branch_type === "olympiad" && !normalized.class_level) {
-    return fail("Выберите класс", 400, "VALIDATION", noStoreInit());
-  }
-
-  if (normalized.branch_type === "gatehouse" && normalized.target_levels.length === 0) {
-    return fail("Выберите уровень экзамена", 400, "VALIDATION", noStoreInit());
-  }
-
-  const email = normalizeString(profile?.email || user?.email || body?.email);
-  const full_name = normalizeString(profile?.full_name || body?.full_name);
-  const contact_phone = normalizeString(profile?.contact_phone || body?.contact_phone);
-
-  if (!email || !full_name) {
-    return fail("Missing profile data (email/full_name)", 400, "PROFILE_MISSING", noStoreInit());
-  }
-
-  try {
-    const request_number = await resolveRequestNumber(supabase, body?.request_number, normalized.branch_type);
-
-    const payload: Record<string, any> = {
-      user_id: user.id,
-      request_number,
-      branch_type: normalized.branch_type,
-      class_level: normalized.branch_type === "olympiad" ? normalized.class_level : null,
-      target_level: normalized.branch_type === "gatehouse" ? normalized.target_levels : null,
-      target_levels: normalized.branch_type === "gatehouse" ? normalized.target_levels : null,
-      textbook_types: normalized.textbook_types,
-      material_kinds: normalized.material_kinds,
-      email,
-      full_name,
-      contact_phone: contact_phone || null,
-      is_processed: false,
-      processed_at: null,
-      sheet_synced_at: null,
-      sheet_row: null,
-      sheet_sync_error: null,
-    };
-
-    const { data: insertedRow, error: insertError } = await supabase
-      .from("purchase_requests")
-      .insert(payload)
-      .select("*")
-      .single();
-
-    if (insertError) {
-      return fail(insertError.message, 500, "DB_ERROR", noStoreInit());
-    }
-
-    const row = insertedRow as any;
-    const sheetValues = buildSheetValues(row);
-
-    let sheetOk = true;
-    let sheetRow: number | null = null;
-    let sheetError: string | null = null;
-
-    try {
-      const res = await withTimeout(appendAccountingRow(sheetValues), SHEETS_TIMEOUT_MS, "Sheets append");
-      sheetRow = res.rowNumber ?? null;
-
-      await supabase
-        .from("purchase_requests")
-        .update({
-          sheet_synced_at: new Date().toISOString(),
-          sheet_row: sheetRow,
-          sheet_sync_error: null,
-        })
-        .eq("id", row.id)
-        .eq("user_id", user.id);
-    } catch (e: any) {
-      sheetOk = false;
-      sheetError = String(e?.message || e || "Sheets sync error").slice(0, 500);
-
-      await supabase
-        .from("purchase_requests")
-        .update({
-          sheet_synced_at: null,
-          sheet_row: null,
-          sheet_sync_error: sheetError,
-        })
-        .eq("id", row.id)
-        .eq("user_id", user.id);
-    }
-
-    return ok(
-      {
-        request: row,
-        sheet: {
-          ok: sheetOk,
-          row: sheetRow,
-          error: sheetError,
-        },
-      },
-      noStoreInit(),
-    );
-  } catch (e: any) {
-    return fail(e?.message || "Server error", 500, "SERVER_ERROR", noStoreInit());
-  }
-}
-</file>
-
 <file path="app/api/turnstile-script/route.ts">
 export const runtime = 'nodejs';
 
@@ -32964,6 +33083,470 @@ export async function GET() {
       headers: { 'Content-Type': 'application/javascript' },
     });
   }
+}
+</file>
+
+<file path="app/info/page.tsx">
+// app/info/page.tsx
+import Link from "next/link";
+import SmartBackButton from "@/components/SmartBackButton";
+
+type SP = { source?: string; sourceId?: string };
+
+function lastDayOfCurrentMonthUTC(): Date {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  return new Date(Date.UTC(y, m + 1, 0, 12, 0, 0));
+}
+
+function formatRuDate(d: Date) {
+  return new Intl.DateTimeFormat("ru-RU", { year: "numeric", month: "long", day: "2-digit" }).format(d);
+}
+
+export const metadata = {
+  title: "Информация",
+  description: "Прайс, контакты и документы. Оплата по QR в заявке, доступ выдаём после проверки.",
+};
+
+function buildQs(sp: SP) {
+  const q = new URLSearchParams();
+  if (sp.source) q.set("source", sp.source);
+  if (sp.sourceId) q.set("sourceId", sp.sourceId);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export default async function InfoPage({
+  searchParams,
+}: {
+  searchParams?: Promise<SP>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const qs = buildQs(sp);
+
+  const stamp = lastDayOfCurrentMonthUTC();
+
+  return (
+    <div className="info-wrap">
+      <div className="info-shell">
+        <section className="info-hero">
+          <div className="info-topbar">
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              
+              {/* Умная кнопка назад: сама вернет туда, откуда пришел юзер */}
+              <SmartBackButton />
+
+              <div className="info-badge" aria-label="Дата обновления">
+                <span className="info-badge-dot" />
+                <div className="info-badge-text">
+                  <strong>Обновление страницы</strong>
+                  <span>{formatRuDate(stamp)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="info-note">
+              Важно: оплата происходит через QR-код в заявке. Проверяем вручную и выдаём доступ обычно в течение 24 часов.
+            </div>
+          </div>
+
+          <h1 className="info-title">Информация для участников</h1>
+          <p className="info-subtitle">
+            Здесь всё, чтобы было понятно: что можно купить, сколько стоит, как происходит оплата и когда выдаётся доступ.
+          </p>
+
+          <div className="info-grid">
+            <div className="info-card">
+              <h3>🧾 Как проходит оплата</h3>
+              <p>
+                В заявке генерируется QR-код. Вы оплачиваете по QR, затем мы вручную проверяем оплату в банке и выдаём доступ.
+                Обычно это занимает до 24 часов.
+              </p>
+            </div>
+
+            <div className="info-card">
+              <h3>🧩 Что можно купить</h3>
+              <p>
+                В одной заявке можно купить <strong>1 учебник</strong> и <strong>1 кроссворд</strong>. Материалы выдаются
+                автоматически под выбранный класс/уровень (после подтверждения оплаты).
+              </p>
+            </div>
+
+            <div className="info-card">
+              <h3>📮 Поддержка</h3>
+              <p>
+                Если прошло больше 24 часов — напишите в поддержку, указав почту и номер заявки. Мы поможем быстрее найти оплату.
+              </p>
+            </div>
+          </div>
+
+          {/* ✅ ВАЖНО: протаскиваем qs во все внутренние ссылки */}
+          <div className="info-actions">
+            <Link className="info-btn" href={`/info/pricing${qs}`}>
+              <span>
+                Прайс
+                <br />
+                <small>цены и правила покупки</small>
+              </span>
+              <span className="arrow">→</span>
+            </Link>
+
+            <Link className="info-btn" href={`/info/contacts${qs}`}>
+              <span>
+                Контакты
+                <br />
+                <small>связаться с нами</small>
+              </span>
+              <span className="arrow">→</span>
+            </Link>
+
+            <Link className="info-btn" href={`/info/documents${qs}`}>
+              <span>
+                Документы
+                <br />
+                <small>пока заглушка</small>
+              </span>
+              <span className="arrow">→</span>
+            </Link>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="app/info/pricing/page.tsx">
+/* app/info/pricing/page.tsx */
+import Link from "next/link";
+
+type SP = { source?: string; sourceId?: string; tab?: string };
+
+function lastDayOfCurrentMonthUTC(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 12, 0, 0));
+}
+function formatRuDate(d: Date) {
+  return new Intl.DateTimeFormat("ru-RU", { year: "numeric", month: "long", day: "2-digit" }).format(d);
+}
+
+export const metadata = {
+  title: "Прайс",
+  description: "Цены на учебники и кроссворды, правила покупки, выдача после проверки оплаты.",
+};
+
+const BOOKS = ["Baby Hippo", "Little Hippo", "Hippo 1", "Hippo 2", "Hippo 3", "Hippo 4"] as const;
+const CROSSWORDS = ["Below Scale", "CEFR A1", "CEFR A2", "CEFR B1", "CEFR B2", "CEFR C1"] as const;
+
+function buildQs(sp: SP) {
+  const q = new URLSearchParams();
+  if (sp.source) q.set("source", sp.source);
+  if (sp.sourceId) q.set("sourceId", sp.sourceId);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+function buildTabLink(sp: SP, tabName: string) {
+  const q = new URLSearchParams();
+  if (sp.source) q.set("source", sp.source);
+  if (sp.sourceId) q.set("sourceId", sp.sourceId);
+  q.set("tab", tabName);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export default async function PricingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<SP>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const qs = buildQs(sp);
+  const currentTab = sp.tab === "exams" ? "exams" : "olympiad";
+
+  const stamp = lastDayOfCurrentMonthUTC();
+
+  return (
+    <div className="info-wrap">
+      <div className="info-shell">
+        <section className="info-hero">
+          <div className="info-topbar">
+            <div className="info-badge" aria-label="Дата обновления прайса">
+              <span className="info-badge-dot" />
+              <div className="info-badge-text">
+                <strong>Прайс актуален на</strong>
+                <span>{formatRuDate(stamp)}</span>
+              </div>
+            </div>
+
+            <div className="info-note">
+              Оплата по QR в заявке. Проверяем вручную и выдаём доступ обычно в течение 24 часов.
+            </div>
+          </div>
+
+          <h1 className="info-title">Прайс</h1>
+          <p className="info-subtitle">
+            Выберите интересующий вас раздел ниже, чтобы ознакомиться со стоимостью учебных материалов и проверочных тестов.
+          </p>
+
+          {/* Вкладки переключения категорий материалов */}
+          <div style={{ display: "flex", gap: "10px", marginTop: "18px", marginBottom: "6px" }}>
+            <Link 
+              href={buildTabLink(sp, "olympiad")}
+              style={{
+                padding: "11px 18px",
+                borderRadius: "14px",
+                textDecoration: "none",
+                fontWeight: 900,
+                fontSize: "14px",
+                transition: "all 0.12s ease",
+                background: currentTab === "olympiad" ? "linear-gradient(135deg, var(--accent2), #6dd3c0)" : "rgba(255, 255, 255, 0.82)",
+                color: currentTab === "olympiad" ? "#fff" : "rgba(15, 23, 42, 0.8)",
+                boxShadow: "0 8px 22px rgba(0,0,0,0.06)",
+                border: "1px solid rgba(15, 23, 42, 0.08)"
+              }}
+            >
+              Олимпиада
+            </Link>
+            <Link 
+              href={buildTabLink(sp, "exams")}
+              style={{
+                padding: "11px 18px",
+                borderRadius: "14px",
+                textDecoration: "none",
+                fontWeight: 900,
+                fontSize: "14px",
+                transition: "all 0.12s ease",
+                background: currentTab === "exams" ? "linear-gradient(135deg, var(--accent2), #6dd3c0)" : "rgba(255, 255, 255, 0.82)",
+                color: currentTab === "exams" ? "#fff" : "rgba(15, 23, 42, 0.8)",
+                boxShadow: "0 8px 22px rgba(0,0,0,0.06)",
+                border: "1px solid rgba(15, 23, 42, 0.08)"
+              }}
+            >
+              Экзамены
+            </Link>
+          </div>
+
+          <div className="pricing-wrap">
+            {currentTab === "olympiad" ? (
+              <>
+                <div className="section-card">
+                  <div className="section-head">
+                    <h2>Учебники</h2>
+                    <div className="pill">1000 ₽ / учебник</div>
+                  </div>
+
+                  <div className="price-grid">
+                    {BOOKS.map((name) => (
+                      <div className="price-item" key={name}>
+                        <div className="name">{name}</div>
+                        <div className="meta">Доступ выдаём после проверки оплаты</div>
+                        <div className="price">1000 ₽</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <ul className="rules-list">
+                    <li>
+                      В одной заявке можно купить только <strong>один</strong> учебник.
+                    </li>
+                    <li>Учебник подбирается автоматически под выбранный класс (см. соответствие ниже).</li>
+                  </ul>
+                </div>
+
+                <div className="section-card">
+                  <div className="section-head">
+                    <h2>Кроссворды</h2>
+                    <div className="pill">1000 ₽ / кроссворд</div>
+                  </div>
+
+                  <div className="price-grid">
+                    {CROSSWORDS.map((name) => (
+                      <div className="price-item" key={name}>
+                        <div className="name">{name}</div>
+                        <div className="meta">Доступ выдаём после проверки оплаты</div>
+                        <div className="price">1000 ₽</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <ul className="rules-list">
+                    <li>
+                      В одной заявке можно купить только <strong>один</strong> кроссворд.
+                    </li>
+                    <li>Кроссворд подбирается автоматически под выбранный класс (см. соответствие ниже).</li>
+                  </ul>
+                </div>
+
+                <div className="section-card">
+                  <div className="section-head">
+                    <h2>Как это работает</h2>
+                    <div className="pill">важно</div>
+                  </div>
+
+                  <ul className="rules-list">
+                    <li>Вы создаёте заявку и получаете QR-код для оплаты.</li>
+                    <li>Оплачиваете по QR-коду (как обычный перевод).</li>
+                    <li>
+                      Мы вручную проверяем оплату и выдаём доступ обычно в течение <strong>24 часов</strong>.
+                    </li>
+                    <li>Если прошло больше 24 часов — напишите в поддержку (почта + номер заявки).</li>
+                  </ul>
+                </div>
+
+                <div className="section-card">
+                  <div className="section-head">
+                    <h2>Соответствие по классам</h2>
+                    <div className="pill">автовыдача после проверки</div>
+                  </div>
+
+                  <div className="mapping-grid">
+                    <div className="map-row">
+                      <strong>1–2 класс</strong>
+                      <div>
+                        Учебник: <strong>Baby Hippo</strong>
+                        <br />
+                        Кроссворд: <strong>Below Scale</strong>
+                      </div>
+                    </div>
+
+                    <div className="map-row">
+                      <strong>3–4 класс</strong>
+                      <div>
+                        Учебник: <strong>Little Hippo</strong>
+                        <br />
+                        Кроссворд: <strong>CEFR A1</strong>
+                      </div>
+                    </div>
+
+                    <div className="map-row">
+                      <strong>5–6 класс</strong>
+                      <div>
+                        Учебник: <strong>Hippo 1</strong>
+                        <br />
+                        Кроссворд: <strong>CEFR A2</strong>
+                      </div>
+                    </div>
+
+                    <div className="map-row">
+                      <strong>7 класс</strong>
+                      <div>
+                        Учебник: <strong>Hippo 2</strong>
+                        <br />
+                        Кроссворд: <strong>CEFR B1</strong>
+                      </div>
+                    </div>
+
+                    <div className="map-row">
+                      <strong>8–9 класс</strong>
+                      <div>
+                        Учебник: <strong>Hippo 3</strong>
+                        <br />
+                        Кроссворд: <strong>CEFR B2</strong>
+                      </div>
+                    </div>
+
+                    <div className="map-row">
+                      <strong>10–11 класс (колледж/1 курс)</strong>
+                      <div>
+                        Учебник: <strong>Hippo 4</strong>
+                        <br />
+                        Кроссворд: <strong>CEFR C1</strong>
+                      </div>
+                    </div>
+
+                    <div className="map-row">
+                      <strong>12 (колледж)</strong>
+                      <div>
+                        Материалы подбираются по внутренним настройкам заявки.
+                        <br />
+                        Если сомневаетесь — напишите в поддержку перед оплатой.
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="info-subtitle" style={{ marginTop: 12 }}>
+                    Мы выдаём материалы под выбранный класс/уровень после подтверждения оплаты. Если в заявке указан неверный класс —
+                    лучше исправить до оплаты.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="section-card">
+                  <div className="section-head">
+                    <h2>Пробные тестирования</h2>
+                    <div className="pill">199 ₽ / тест</div>
+                  </div>
+
+                  <div className="price-grid">
+                    {["Cadets Stage 1", "Cadets Stage 2", "Cadets Stage 3"].map((name) => (
+                      <div className="price-item" key={name}>
+                        <div className="name">{name}</div>
+                        <div className="meta">Доступ выдаём после проверки оплаты</div>
+                        <div className="price">199 ₽</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <ul className="rules-list">
+                    <li>Официальные сертифицированные тесты для проверки реального уровня подготовки.</li>
+                    <li>Доступ ко всем заданиям выбранного уровня предоставляется без ограничений.</li>
+                  </ul>
+                </div>
+
+                <div className="section-card">
+                  <div className="section-head">
+                    <h2>Подготовительные пособия</h2>
+                    <div className="pill" style={{ background: "rgba(245, 158, 11, 0.14)", color: "#b45309", border: "1px solid rgba(245, 158, 11, 0.26)" }}>в разработке</div>
+                  </div>
+
+                  <div 
+                    style={{ 
+                      padding: "16px", 
+                      background: "rgba(245, 158, 11, 0.06)", 
+                      borderRadius: "14px", 
+                      border: "1px dashed rgba(245, 158, 11, 0.25)", 
+                      marginTop: "12px",
+                      color: "#b45309",
+                      fontWeight: 800,
+                      fontSize: "14px"
+                    }}
+                  >
+                    Данный блок находится в разработке, но совсем скоро будет доступен для всех уровней.
+                  </div>
+                </div>
+
+                <div className="section-card">
+                  <div className="section-head">
+                    <h2>Как это работает</h2>
+                    <div className="pill">важно</div>
+                  </div>
+
+                  <ul className="rules-list">
+                    <li>Вы создаёте заявку в личном кабинете экзаменов и получаете QR-код.</li>
+                    <li>Производите оплату по QR-коду через мобильное приложение любого банка.</li>
+                    <li>
+                      Мы вручную проверяем поступление средств и открываем доступ в течение <strong>24 часов</strong>.
+                    </li>
+                    <li>Для ускорения проверки вы всегда можете написать администратору в Telegram или ВК.</li>
+                  </ul>
+                </div>
+              </>
+            )}
+
+            {/* ✅ Возврат в /info с теми же query, чтобы кнопка “назад” там работала правильно */}
+            <div className="back-row">
+              <Link className="back-link" href={`/info${qs}`}>
+                ← Назад к информации
+              </Link>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -39462,6 +40045,195 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
+<file path="app/api/admin/materials/route.ts">
+import type { NextRequest } from "next/server";
+import { ok, fail } from "@/lib/api/response";
+import { requireAdmin } from "@/lib/api/admin";
+import { normalizeBranchType } from "@/lib/branches/config";
+import { normalizeMaterialKind, toStringArray, uniqueStrings } from "@/lib/materials/format";
+
+function normalizeBool(value: unknown): boolean {
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+
+function normalizeOrderIndex(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeNullableString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const str = String(value).trim();
+  return str || null;
+}
+
+function isValidUUID(str: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
+function normalizePayload(body: any, userId: string) {
+  const branch_type = normalizeBranchType(body?.branch_type);
+  const material_kind = normalizeMaterialKind(body?.material_kind || "mock_test");
+  const title = String(body?.title ?? "").trim();
+  const description = normalizeNullableString(body?.description);
+  const cover_image_url = normalizeNullableString(body?.cover_image_url);
+  const is_available = normalizeBool(body?.is_available);
+  const is_active = body?.is_active === undefined ? true : normalizeBool(body?.is_active);
+  const order_index = normalizeOrderIndex(body?.order_index);
+  const class_levels = uniqueStrings(toStringArray(body?.class_levels ?? body?.class_level));
+  const target_levels = uniqueStrings(toStringArray(body?.target_levels ?? body?.target_level));
+  const meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
+
+  let project_tab_id = normalizeNullableString(body?.project_tab_id ?? body?.tab_id);
+  
+  if (project_tab_id === "00000000-0000-0000-0000-000000000000" || project_tab_id === "none" || project_tab_id === "null" || project_tab_id === "") {
+    project_tab_id = null;
+  }
+
+  if (project_tab_id && !isValidUUID(project_tab_id)) {
+    project_tab_id = null;
+  }
+
+  return {
+    project_tab_id,
+    branch_type,
+    material_kind,
+    title,
+    description,
+    cover_image_url,
+    is_available,
+    is_active,
+    order_index,
+    class_levels,
+    target_levels,
+    created_by: userId,
+    meta,
+  };
+}
+
+function validateMaterial(payload: ReturnType<typeof normalizePayload>) {
+  if (!payload.title) return "title required";
+  if (!payload.material_kind) return "material_kind required";
+
+  if (payload.branch_type === "olympiad" && payload.class_levels.length === 0) {
+    return "class_levels required";
+  }
+
+  if (payload.branch_type === "gatehouse" && payload.target_levels.length === 0) {
+    return "target_levels required";
+  }
+
+  return null;
+}
+
+export async function GET(req: NextRequest) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { searchParams } = new URL(req.url);
+
+  const branch_type = searchParams.get("branch_type");
+  const material_kind = searchParams.get("material_kind");
+  const includeCounts = searchParams.get("include_counts") !== "false";
+
+  try {
+    let query = supabase
+      .from("materials")
+      .select("*")
+      .order("order_index", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    if (branch_type) {
+      query = query.eq("branch_type", normalizeBranchType(branch_type));
+    }
+
+    if (material_kind) {
+      query = query.eq("material_kind", normalizeMaterialKind(material_kind));
+    }
+
+    const { data, error } = await query;
+
+    if (error) return fail(error.message, 500, "DB_ERROR");
+
+    const materials = data ?? [];
+
+    if (!includeCounts || materials.length === 0) {
+      return ok({ materials });
+    }
+
+    // ❗️ УБИТА ПРИЧИНА ЗАВИСАНИЯ: Больше никаких гигантских .or() строк
+    // Просто забираем связи и считаем в памяти. 
+    const { data: assignments, error: countError } = await supabase
+      .from("assignments")
+      .select("id, material_id, textbook_id, crossword_id");
+
+    if (countError) {
+      console.error("🔴 [ADMIN GET MATERIALS] Ошибка подсчета заданий:", countError.message);
+      return ok({ materials });
+    }
+
+    const counts: Record<string, number> = {};
+
+    for (const assignment of assignments ?? []) {
+      const matId = String(assignment.material_id || assignment.textbook_id || assignment.crossword_id || "");
+      if (!matId) continue;
+      counts[matId] = (counts[matId] || 0) + 1;
+    }
+
+    return ok({
+      materials: materials.map((material: any) => ({
+        ...material,
+        assignments_count: counts[String(material.id)] || 0,
+      })),
+    });
+  } catch (error: any) {
+    console.error("🔴 [ADMIN GET MATERIALS] Серверная ошибка:", error);
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase, user } = auth;
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return fail("Bad JSON", 400, "BAD_JSON");
+  }
+
+  const payload = normalizePayload(body, user.id);
+  const validationError = validateMaterial(payload);
+
+  if (validationError) {
+    console.error("🔴 [ADMIN POST MATERIAL] Ошибка валидации:", validationError);
+    return fail(validationError, 400, "VALIDATION");
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("materials")
+      .insert(payload)
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("🔴 [ADMIN POST MATERIAL] Ошибка БД:", error.message, error.details);
+      return fail(error.message, 500, "DB_ERROR");
+    }
+
+    return ok({ material: data });
+  } catch (error: any) {
+    console.error("🔴 [ADMIN POST MATERIAL] Серверная ошибка:", error);
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+</file>
+
 <file path="app/api/admin/projects/[id]/tabs/route.ts">
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -40355,28 +41127,20 @@ body {
 }
 </file>
 
-<file path="app/info/page.tsx">
-// app/info/page.tsx
+<file path="app/info/contacts/page.tsx">
 import Link from "next/link";
-import SmartBackButton from "@/components/SmartBackButton";
 
 type SP = { source?: string; sourceId?: string };
 
-function lastDayOfCurrentMonthUTC(): Date {
-  const now = new Date();
-  const y = now.getUTCFullYear();
-  const m = now.getUTCMonth();
-  return new Date(Date.UTC(y, m + 1, 0, 12, 0, 0));
-}
-
-function formatRuDate(d: Date) {
-  return new Intl.DateTimeFormat("ru-RU", { year: "numeric", month: "long", day: "2-digit" }).format(d);
-}
-
 export const metadata = {
-  title: "Информация",
-  description: "Прайс, контакты и документы. Оплата по QR в заявке, доступ выдаём после проверки.",
+  title: "Контакты",
+  description: "Контакты поддержки: Telegram, ВКонтакте, почта и официальный Telegram-канал ЦФО.",
 };
+
+const SUPPORT_EMAIL = "info.ls.2021@gmail.com";
+const OFFICIAL_CHANNEL = "https://t.me/hippo_ga_cfo";
+const TG_ADMIN_LINK = "https://t.me/skebobingg";
+const VK_ADMIN_LINK = "https://vk.com/bluntokyr";
 
 function buildQs(sp: SP) {
   const q = new URLSearchParams();
@@ -40386,7 +41150,7 @@ function buildQs(sp: SP) {
   return s ? `?${s}` : "";
 }
 
-export default async function InfoPage({
+export default async function ContactsPage({
   searchParams,
 }: {
   searchParams?: Promise<SP>;
@@ -40394,418 +41158,156 @@ export default async function InfoPage({
   const sp = (await searchParams) ?? {};
   const qs = buildQs(sp);
 
-  const stamp = lastDayOfCurrentMonthUTC();
-
   return (
     <div className="info-wrap">
       <div className="info-shell">
         <section className="info-hero">
           <div className="info-topbar">
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              
-              {/* Умная кнопка назад: сама вернет туда, откуда пришел юзер */}
-              <SmartBackButton />
-
-              <div className="info-badge" aria-label="Дата обновления">
-                <span className="info-badge-dot" />
-                <div className="info-badge-text">
-                  <strong>Обновление страницы</strong>
-                  <span>{formatRuDate(stamp)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="info-note">
-              Важно: оплата происходит через QR-код в заявке. Проверяем вручную и выдаём доступ обычно в течение 24 часов.
-            </div>
-          </div>
-
-          <h1 className="info-title">Информация для участников</h1>
-          <p className="info-subtitle">
-            Здесь всё, чтобы было понятно: что можно купить, сколько стоит, как происходит оплата и когда выдаётся доступ.
-          </p>
-
-          <div className="info-grid">
-            <div className="info-card">
-              <h3>🧾 Как проходит оплата</h3>
-              <p>
-                В заявке генерируется QR-код. Вы оплачиваете по QR, затем мы вручную проверяем оплату в банке и выдаём доступ.
-                Обычно это занимает до 24 часов.
-              </p>
-            </div>
-
-            <div className="info-card">
-              <h3>🧩 Что можно купить</h3>
-              <p>
-                В одной заявке можно купить <strong>1 учебник</strong> и <strong>1 кроссворд</strong>. Материалы выдаются
-                автоматически под выбранный класс/уровень (после подтверждения оплаты).
-              </p>
-            </div>
-
-            <div className="info-card">
-              <h3>📮 Поддержка</h3>
-              <p>
-                Если прошло больше 24 часов — напишите в поддержку, указав почту и номер заявки. Мы поможем быстрее найти оплату.
-              </p>
-            </div>
-          </div>
-
-          {/* ✅ ВАЖНО: протаскиваем qs во все внутренние ссылки */}
-          <div className="info-actions">
-            <Link className="info-btn" href={`/info/pricing${qs}`}>
-              <span>
-                Прайс
-                <br />
-                <small>цены и правила покупки</small>
-              </span>
-              <span className="arrow">→</span>
-            </Link>
-
-            <Link className="info-btn" href={`/info/contacts${qs}`}>
-              <span>
-                Контакты
-                <br />
-                <small>связаться с нами</small>
-              </span>
-              <span className="arrow">→</span>
-            </Link>
-
-            <Link className="info-btn" href={`/info/documents${qs}`}>
-              <span>
-                Документы
-                <br />
-                <small>пока заглушка</small>
-              </span>
-              <span className="arrow">→</span>
-            </Link>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="app/info/pricing/page.tsx">
-/* app/info/pricing/page.tsx */
-import Link from "next/link";
-
-type SP = { source?: string; sourceId?: string; tab?: string };
-
-function lastDayOfCurrentMonthUTC(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 12, 0, 0));
-}
-function formatRuDate(d: Date) {
-  return new Intl.DateTimeFormat("ru-RU", { year: "numeric", month: "long", day: "2-digit" }).format(d);
-}
-
-export const metadata = {
-  title: "Прайс",
-  description: "Цены на учебники и кроссворды, правила покупки, выдача после проверки оплаты.",
-};
-
-const BOOKS = ["Baby Hippo", "Little Hippo", "Hippo 1", "Hippo 2", "Hippo 3", "Hippo 4"] as const;
-const CROSSWORDS = ["Below Scale", "CEFR A1", "CEFR A2", "CEFR B1", "CEFR B2", "CEFR C1"] as const;
-
-function buildQs(sp: SP) {
-  const q = new URLSearchParams();
-  if (sp.source) q.set("source", sp.source);
-  if (sp.sourceId) q.set("sourceId", sp.sourceId);
-  const s = q.toString();
-  return s ? `?${s}` : "";
-}
-
-function buildTabLink(sp: SP, tabName: string) {
-  const q = new URLSearchParams();
-  if (sp.source) q.set("source", sp.source);
-  if (sp.sourceId) q.set("sourceId", sp.sourceId);
-  q.set("tab", tabName);
-  const s = q.toString();
-  return s ? `?${s}` : "";
-}
-
-export default async function PricingPage({
-  searchParams,
-}: {
-  searchParams?: Promise<SP>;
-}) {
-  const sp = (await searchParams) ?? {};
-  const qs = buildQs(sp);
-  const currentTab = sp.tab === "exams" ? "exams" : "olympiad";
-
-  const stamp = lastDayOfCurrentMonthUTC();
-
-  return (
-    <div className="info-wrap">
-      <div className="info-shell">
-        <section className="info-hero">
-          <div className="info-topbar">
-            <div className="info-badge" aria-label="Дата обновления прайса">
+            <div className="info-badge" aria-label="Контакты">
               <span className="info-badge-dot" />
               <div className="info-badge-text">
-                <strong>Прайс актуален на</strong>
-                <span>{formatRuDate(stamp)}</span>
+                <strong>Поддержка</strong>
+                <span>как связаться</span>
               </div>
             </div>
 
             <div className="info-note">
-              Оплата по QR в заявке. Проверяем вручную и выдаём доступ обычно в течение 24 часов.
+              Если прошли сутки, а доступ не появился — лучше сразу пишите в ВКонтакте или Telegram для максимально быстрого ответа, либо отправьте письмо на почту с номером заявки.
             </div>
           </div>
 
-          <h1 className="info-title">Прайс</h1>
+          <h1 className="info-title">Контакты</h1>
           <p className="info-subtitle">
-            Выберите интересующий вас раздел ниже, чтобы ознакомиться со стоимостью учебных материалов и проверочных тестов.
+            Оплата по QR в заявке. Выдача доступа после проверки — обычно до 24 часов. По любым вопросам пишите в личные сообщения администратору или на почту.
           </p>
 
-          {/* Вкладки переключения категорий материалов */}
-          <div style={{ display: "flex", gap: "10px", marginTop: "18px", marginBottom: "6px" }}>
-            <Link 
-              href={buildTabLink(sp, "olympiad")}
-              style={{
-                padding: "11px 18px",
-                borderRadius: "14px",
-                textDecoration: "none",
-                fontWeight: 900,
-                fontSize: "14px",
-                transition: "all 0.12s ease",
-                background: currentTab === "olympiad" ? "linear-gradient(135deg, var(--accent2), #6dd3c0)" : "rgba(255, 255, 255, 0.82)",
-                color: currentTab === "olympiad" ? "#fff" : "rgba(15, 23, 42, 0.8)",
-                boxShadow: "0 8px 22px rgba(0,0,0,0.06)",
-                border: "1px solid rgba(15, 23, 42, 0.08)"
-              }}
-            >
-              Олимпиада
-            </Link>
-            <Link 
-              href={buildTabLink(sp, "exams")}
-              style={{
-                padding: "11px 18px",
-                borderRadius: "14px",
-                textDecoration: "none",
-                fontWeight: 900,
-                fontSize: "14px",
-                transition: "all 0.12s ease",
-                background: currentTab === "exams" ? "linear-gradient(135deg, var(--accent2), #6dd3c0)" : "rgba(255, 255, 255, 0.82)",
-                color: currentTab === "exams" ? "#fff" : "rgba(15, 23, 42, 0.8)",
-                boxShadow: "0 8px 22px rgba(0,0,0,0.06)",
-                border: "1px solid rgba(15, 23, 42, 0.08)"
-              }}
-            >
-              Экзамены
-            </Link>
-          </div>
+          <div className="section-card">
+            <div className="section-head">
+              <h2>Связь</h2>
+              <div className="pill">support</div>
+            </div>
 
-          <div className="pricing-wrap">
-            {currentTab === "olympiad" ? (
-              <>
-                <div className="section-card">
-                  <div className="section-head">
-                    <h2>Учебники</h2>
-                    <div className="pill">1000 ₽ / учебник</div>
-                  </div>
+            <div className="contacts-grid">
+              <div className="contact-tile">
+                <div className="label">Telegram администратора</div>
+                <a 
+                  href={TG_ADMIN_LINK} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    boxSizing: "border-box",
+                    marginTop: "8px",
+                    marginBottom: "4px",
+                    padding: "12px 20px",
+                    borderRadius: "14px",
+                    background: "linear-gradient(135deg, #24a1de, #208ec4)",
+                    color: "#fff",
+                    fontWeight: 900,
+                    fontSize: "14px",
+                    textDecoration: "none",
+                    boxShadow: "0 6px 20px rgba(36, 161, 222, 0.3)",
+                    textAlign: "center",
+                    transition: "transform 0.1s ease"
+                  }}
+                >
+                  Написать в Telegram
+                </a>
+                <div className="info-note">Самый быстрый способ решения любых вопросов по материалам и оплате.</div>
+              </div>
 
-                  <div className="price-grid">
-                    {BOOKS.map((name) => (
-                      <div className="price-item" key={name}>
-                        <div className="name">{name}</div>
-                        <div className="meta">Доступ выдаём после проверки оплаты</div>
-                        <div className="price">1000 ₽</div>
-                      </div>
-                    ))}
-                  </div>
+              <div className="contact-tile">
+                <div className="label">ВКонтакте администратора</div>
+                <a 
+                  href={VK_ADMIN_LINK} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    boxSizing: "border-box",
+                    marginTop: "8px",
+                    marginBottom: "4px",
+                    padding: "12px 20px",
+                    borderRadius: "14px",
+                    background: "linear-gradient(135deg, #0077ff, #0066da)",
+                    color: "#fff",
+                    fontWeight: 900,
+                    fontSize: "14px",
+                    textDecoration: "none",
+                    boxShadow: "0 6px 20px rgba(0, 119, 255, 0.3)",
+                    textAlign: "center",
+                    transition: "transform 0.1s ease"
+                  }}
+                >
+                  Написать во ВКонтакте
+                </a>
+                <div className="info-note">Оперативная поддержка пользователей, разбор ошибок и доступов.</div>
+              </div>
 
-                  <ul className="rules-list">
-                    <li>
-                      В одной заявке можно купить только <strong>один</strong> учебник.
-                    </li>
-                    <li>Учебник подбирается автоматически под выбранный класс (см. соответствие ниже).</li>
-                  </ul>
-                </div>
+              <div className="contact-tile">
+                <div className="label">Email поддержки</div>
+                <a 
+                  href={`mailto:${SUPPORT_EMAIL}`}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    boxSizing: "border-box",
+                    marginTop: "8px",
+                    marginBottom: "4px",
+                    padding: "12px 20px",
+                    borderRadius: "14px",
+                    background: "rgba(15, 23, 42, 0.05)",
+                    border: "1px solid rgba(15, 23, 42, 0.1)",
+                    color: "rgba(15, 23, 42, 0.9)",
+                    fontWeight: 900,
+                    fontSize: "14px",
+                    textDecoration: "none",
+                    textAlign: "center"
+                  }}
+                >
+                  {SUPPORT_EMAIL}
+                </a>
+                <div className="info-note">В письме обязательно укажи: номер заявки, область, ФИО и дату оплаты.</div>
+              </div>
 
-                <div className="section-card">
-                  <div className="section-head">
-                    <h2>Кроссворды</h2>
-                    <div className="pill">1000 ₽ / кроссворд</div>
-                  </div>
+              <div className="contact-tile">
+                <div className="label">Официальный канал олимпиады в ЦФО</div>
+                <a 
+                  href={OFFICIAL_CHANNEL} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    boxSizing: "border-box",
+                    marginTop: "8px",
+                    marginBottom: "4px",
+                    padding: "12px 20px",
+                    borderRadius: "14px",
+                    background: "rgba(78, 205, 196, 0.12)",
+                    border: "1px solid rgba(78, 205, 196, 0.25)",
+                    color: "#0f766e",
+                    fontWeight: 900,
+                    fontSize: "14px",
+                    textDecoration: "none",
+                    textAlign: "center"
+                  }}
+                >
+                  Открыть Telegram-канал
+                </a>
+                <div className="info-note">Официальные новости, важные объявления и графики проведения по региону.</div>
+              </div>
 
-                  <div className="price-grid">
-                    {CROSSWORDS.map((name) => (
-                      <div className="price-item" key={name}>
-                        <div className="name">{name}</div>
-                        <div className="meta">Доступ выдаём после проверки оплаты</div>
-                        <div className="price">1000 ₽</div>
-                      </div>
-                    ))}
-                  </div>
+              <div className="contact-tile">
+                <div className="label">Сроки проверки оплаты</div>
+                <div style={{ fontWeight: 1000, color: "rgba(15,23,42,0.92)", marginTop: "14px", fontSize: "15px" }}>обычно до 24 часов</div>
+                <div className="info-note">Если этот срок прошел, а материалы не открылись — обязательно напишите нам.</div>
+              </div>
+            </div>
 
-                  <ul className="rules-list">
-                    <li>
-                      В одной заявке можно купить только <strong>один</strong> кроссворд.
-                    </li>
-                    <li>Кроссворд подбирается автоматически под выбранный класс (см. соответствие ниже).</li>
-                  </ul>
-                </div>
-
-                <div className="section-card">
-                  <div className="section-head">
-                    <h2>Как это работает</h2>
-                    <div className="pill">важно</div>
-                  </div>
-
-                  <ul className="rules-list">
-                    <li>Вы создаёте заявку и получаете QR-код для оплаты.</li>
-                    <li>Оплачиваете по QR-коду (как обычный перевод).</li>
-                    <li>
-                      Мы вручную проверяем оплату и выдаём доступ обычно в течение <strong>24 часов</strong>.
-                    </li>
-                    <li>Если прошло больше 24 часов — напишите в поддержку (почта + номер заявки).</li>
-                  </ul>
-                </div>
-
-                <div className="section-card">
-                  <div className="section-head">
-                    <h2>Соответствие по классам</h2>
-                    <div className="pill">автовыдача после проверки</div>
-                  </div>
-
-                  <div className="mapping-grid">
-                    <div className="map-row">
-                      <strong>1–2 класс</strong>
-                      <div>
-                        Учебник: <strong>Baby Hippo</strong>
-                        <br />
-                        Кроссворд: <strong>Below Scale</strong>
-                      </div>
-                    </div>
-
-                    <div className="map-row">
-                      <strong>3–4 класс</strong>
-                      <div>
-                        Учебник: <strong>Little Hippo</strong>
-                        <br />
-                        Кроссворд: <strong>CEFR A1</strong>
-                      </div>
-                    </div>
-
-                    <div className="map-row">
-                      <strong>5–6 класс</strong>
-                      <div>
-                        Учебник: <strong>Hippo 1</strong>
-                        <br />
-                        Кроссворд: <strong>CEFR A2</strong>
-                      </div>
-                    </div>
-
-                    <div className="map-row">
-                      <strong>7 класс</strong>
-                      <div>
-                        Учебник: <strong>Hippo 2</strong>
-                        <br />
-                        Кроссворд: <strong>CEFR B1</strong>
-                      </div>
-                    </div>
-
-                    <div className="map-row">
-                      <strong>8–9 класс</strong>
-                      <div>
-                        Учебник: <strong>Hippo 3</strong>
-                        <br />
-                        Кроссворд: <strong>CEFR B2</strong>
-                      </div>
-                    </div>
-
-                    <div className="map-row">
-                      <strong>10–11 класс (колледж/1 курс)</strong>
-                      <div>
-                        Учебник: <strong>Hippo 4</strong>
-                        <br />
-                        Кроссворд: <strong>CEFR C1</strong>
-                      </div>
-                    </div>
-
-                    <div className="map-row">
-                      <strong>12 (колледж)</strong>
-                      <div>
-                        Материалы подбираются по внутренним настройкам заявки.
-                        <br />
-                        Если сомневаетесь — напишите в поддержку перед оплатой.
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="info-subtitle" style={{ marginTop: 12 }}>
-                    Мы выдаём материалы под выбранный класс/уровень после подтверждения оплаты. Если в заявке указан неверный класс —
-                    лучше исправить до оплаты.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="section-card">
-                  <div className="section-head">
-                    <h2>Пробные тестирования</h2>
-                    <div className="pill">199 ₽ / тест</div>
-                  </div>
-
-                  <div className="price-grid">
-                    {["Cadets Stage 1", "Cadets Stage 2", "Cadets Stage 3"].map((name) => (
-                      <div className="price-item" key={name}>
-                        <div className="name">{name}</div>
-                        <div className="meta">Доступ выдаём после проверки оплаты</div>
-                        <div className="price">199 ₽</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <ul className="rules-list">
-                    <li>Официальные сертифицированные тесты для проверки реального уровня подготовки.</li>
-                    <li>Доступ ко всем заданиям выбранного уровня предоставляется без ограничений.</li>
-                  </ul>
-                </div>
-
-                <div className="section-card">
-                  <div className="section-head">
-                    <h2>Подготовительные пособия</h2>
-                    <div className="pill" style={{ background: "rgba(245, 158, 11, 0.14)", color: "#b45309", border: "1px solid rgba(245, 158, 11, 0.26)" }}>в разработке</div>
-                  </div>
-
-                  <div 
-                    style={{ 
-                      padding: "16px", 
-                      background: "rgba(245, 158, 11, 0.06)", 
-                      borderRadius: "14px", 
-                      border: "1px dashed rgba(245, 158, 11, 0.25)", 
-                      marginTop: "12px",
-                      color: "#b45309",
-                      fontWeight: 800,
-                      fontSize: "14px"
-                    }}
-                  >
-                    Данный блок находится в разработке, но совсем скоро будет доступен для всех уровней.
-                  </div>
-                </div>
-
-                <div className="section-card">
-                  <div className="section-head">
-                    <h2>Как это работает</h2>
-                    <div className="pill">важно</div>
-                  </div>
-
-                  <ul className="rules-list">
-                    <li>Вы создаёте заявку в личном кабинете экзаменов и получаете QR-код.</li>
-                    <li>Производите оплату по QR-коду через мобильное приложение любого банка.</li>
-                    <li>
-                      Мы вручную проверяем поступление средств и открываем доступ в течение <strong>24 часов</strong>.
-                    </li>
-                    <li>Для ускорения проверки вы всегда можете написать администратору в Telegram или ВК.</li>
-                  </ul>
-                </div>
-              </>
-            )}
-
-            {/* ✅ Возврат в /info с теми же query, чтобы кнопка “назад” там работала правильно */}
+            {/* ✅ Возврат в /info с теми же query */}
             <div className="back-row">
               <Link className="back-link" href={`/info${qs}`}>
                 ← Назад к информации
@@ -43149,356 +43651,42 @@ export type AssignmentData = {
 };
 </file>
 
-<file path="lib/integrations/googleSheets.ts">
-/* lib/integrations/googleSheets.ts */
-import "server-only";
+<file path="proxy.ts">
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware";
 
-import { google } from "googleapis";
+const PROTECTED_PREFIXES = [
+  "/portal",
+  "/profile",
+  "/assignment",
+  "/textbook",
+  "/materials",
+  "/crossword",
+  "/gatehouse",
+  "/requests",
+  "/admin",
+];
 
-const ACCOUNTING_COLUMNS = "A:G";
-const ACCOUNTING_LAST_COLUMN = "G";
-const ACCOUNTING_COLUMNS_COUNT = 7;
-const GOOGLE_API_TIMEOUT_MS = 15_000;
+export async function proxy(req: NextRequest) {
+  const res = NextResponse.next();
+  const supabase = createSupabaseMiddlewareClient(req, res);
+  const { data: { user } } = await supabase.auth.getUser();
+  const { pathname } = req.nextUrl;
+  const needsAuth = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
-export type AccountingRowValue = string | number | null | undefined;
+  if (needsAuth && !user) {
+    const loginUrl = new URL("/login", req.url);
+    return NextResponse.redirect(loginUrl);
+  }
+  return res;
+}
 
-export type SheetRowInfo = {
-  rowNumber: number;
-  values: string[];
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon\\.ico|api/|info/|login|register|reset|update-password).*)"
+  ],
 };
-
-function mustEnv(name: string) {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing env: ${name}`);
-  }
-
-  return value;
-}
-
-function norm(value: unknown) {
-  return String(value ?? "").trim();
-}
-
-function getPrivateKey() {
-  return mustEnv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY")
-    .replace(/^"|"$/g, "")
-    .replace(/\\n/g, "\n");
-}
-
-function quoteSheetName(tab: string) {
-  const safe = String(tab || "Учёт").replace(/'/g, "''");
-  return `'${safe}'`;
-}
-
-function range(tab: string, address: string) {
-  return `${quoteSheetName(tab)}!${address}`;
-}
-
-export function getSpreadsheetConfig() {
-  return {
-    spreadsheetId: mustEnv("GOOGLE_SHEETS_SPREADSHEET_ID"),
-    tab: process.env.GOOGLE_SHEETS_TAB || "Учёт",
-  };
-}
-
-function getSheetsClient() {
-  const auth = new google.auth.JWT({
-    email: mustEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
-    key: getPrivateKey(),
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-
-  return google.sheets({ version: "v4", auth });
-}
-
-function parseRowNumber(updatedRange?: string | null): number | null {
-  if (!updatedRange) return null;
-
-  const match = updatedRange.match(/![A-Z]+(\d+):/);
-  if (!match) return null;
-
-  const rowNumber = Number(match[1]);
-  return Number.isFinite(rowNumber) && rowNumber > 0 ? rowNumber : null;
-}
-
-function normalizeAccountingValues(values: AccountingRowValue[]) {
-  return Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, index) => {
-    const value = values[index];
-
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
-
-    return norm(value);
-  });
-}
-
-function isLikelyRequestNumber(value: string) {
-  return /^(PR|GA)-/i.test(norm(value));
-}
-
-async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
-  const sheets = getSheetsClient();
-
-  const meta = await sheets.spreadsheets.get(
-    {
-      spreadsheetId,
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  const found = meta.data.sheets?.find((sheet) => sheet.properties?.title === tab);
-  const sheetId = found?.properties?.sheetId;
-
-  if (sheetId === undefined || sheetId === null) {
-    throw new Error(`Google Sheets tab not found: "${tab}"`);
-  }
-
-  return sheetId;
-}
-
-/**
- * Append строки заявки в конец A:G.
- */
-export async function appendAccountingRow(values: AccountingRowValue[]) {
-  const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
-
-  const res = await sheets.spreadsheets.values.append(
-    {
-      spreadsheetId,
-      range: range(tab, ACCOUNTING_COLUMNS),
-      valueInputOption: "USER_ENTERED",
-      insertDataOption: "INSERT_ROWS",
-      requestBody: {
-        values: [normalizeAccountingValues(values)],
-      },
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  const updatedRange = res.data.updates?.updatedRange ?? null;
-  const rowNumber = parseRowNumber(updatedRange);
-
-  return {
-    updatedRange,
-    rowNumber,
-  };
-}
-
-/**
- * Читает колонку A и возвращает Set request_number.
- */
-export async function getExistingRequestNumbersSet() {
-  const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
-
-  const res = await sheets.spreadsheets.values.get(
-    {
-      spreadsheetId,
-      range: range(tab, "A:A"),
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  const rows = res.data.values ?? [];
-  const set = new Set<string>();
-
-  for (const row of rows) {
-    const requestNumber = norm(row?.[0]);
-
-    if (!requestNumber) continue;
-    if (!isLikelyRequestNumber(requestNumber)) continue;
-
-    set.add(requestNumber);
-  }
-
-  return set;
-}
-
-/**
- * Мапа request_number -> { rowNumber, values[0..6] }.
- * Читает A:G и учитывает только строки, где колонка A похожа на номер заявки.
- */
-export async function getSheetRequestRowMap() {
-  const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
-
-  const res = await sheets.spreadsheets.values.get(
-    {
-      spreadsheetId,
-      range: range(tab, ACCOUNTING_COLUMNS),
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  const rows = res.data.values ?? [];
-  const map = new Map<string, SheetRowInfo>();
-
-  for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index] ?? [];
-    const requestNumber = norm(row[0]);
-
-    if (!requestNumber) continue;
-    if (!isLikelyRequestNumber(requestNumber)) continue;
-
-    const values = Array.from({ length: ACCOUNTING_COLUMNS_COUNT }, (_, valueIndex) => norm(row[valueIndex]));
-
-    map.set(requestNumber, {
-      rowNumber: index + 1,
-      values,
-    });
-  }
-
-  return map;
-}
-
-/**
- * Обновить конкретную строку A:G по номеру строки.
- */
-export async function updateAccountingRow(rowNumber: number, values: AccountingRowValue[]) {
-  if (!Number.isFinite(rowNumber) || rowNumber <= 0) {
-    throw new Error(`Invalid row number: ${rowNumber}`);
-  }
-
-  const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
-
-  await sheets.spreadsheets.values.update(
-    {
-      spreadsheetId,
-      range: range(tab, `A${rowNumber}:${ACCOUNTING_LAST_COLUMN}${rowNumber}`),
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [normalizeAccountingValues(values)],
-      },
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  return { rowNumber };
-}
-
-/**
- * Удалить строки по номерам 1-based.
- * Важно: удаляем снизу вверх, иначе номера строк съедут.
- */
-export async function deleteAccountingRows(rowNumbers: number[]) {
-  const nums = Array.from(new Set(rowNumbers))
-    .filter((rowNumber) => Number.isFinite(rowNumber) && rowNumber > 0)
-    .sort((a, b) => b - a);
-
-  if (!nums.length) {
-    return { deleted: 0 };
-  }
-
-  const sheets = getSheetsClient();
-  const { spreadsheetId, tab } = getSpreadsheetConfig();
-  const sheetId = await getSheetIdByTitle(spreadsheetId, tab);
-
-  const requests = nums.map((rowNumber) => ({
-    deleteDimension: {
-      range: {
-        sheetId,
-        dimension: "ROWS",
-        startIndex: rowNumber - 1,
-        endIndex: rowNumber,
-      },
-    },
-  }));
-
-  await sheets.spreadsheets.batchUpdate(
-    {
-      spreadsheetId,
-      requestBody: { requests },
-    },
-    {
-      timeout: GOOGLE_API_TIMEOUT_MS,
-    },
-  );
-
-  return {
-    deleted: nums.length,
-  };
-}
-
-/**
- * Найти строку в Google Sheets по request_number.
- */
-export async function findRowNumberByRequestNumber(requestNumber: string) {
-  const normalized = norm(requestNumber);
-  if (!normalized) return null;
-
-  const map = await getSheetRequestRowMap();
-  const found = map.get(normalized);
-
-  return found?.rowNumber ?? null;
-}
-
-/**
- * UPSERT строки A:G по request_number из колонки A.
- */
-export async function upsertRequestRowByNumber(valuesAtoG: AccountingRowValue[]) {
-  const requestNumber = norm(valuesAtoG?.[0]);
-
-  if (!requestNumber) {
-    throw new Error("Missing request_number in values[0]");
-  }
-
-  const map = await getSheetRequestRowMap();
-  const found = map.get(requestNumber);
-
-  if (found) {
-    await updateAccountingRow(found.rowNumber, valuesAtoG);
-
-    return {
-      action: "updated" as const,
-      rowNumber: found.rowNumber,
-    };
-  }
-
-  const appended = await appendAccountingRow(valuesAtoG);
-
-  return {
-    action: "inserted" as const,
-    rowNumber: appended.rowNumber ?? null,
-  };
-}
-
-/**
- * DELETE строки из Google Sheets по request_number.
- */
-export async function deleteRequestRowByNumber(requestNumber: string) {
-  const rowNumber = await findRowNumberByRequestNumber(requestNumber);
-
-  if (!rowNumber) {
-    return {
-      ok: true,
-      deleted: 0,
-      rowNumber: null as number | null,
-    };
-  }
-
-  const deleted = await deleteAccountingRows([rowNumber]);
-
-  return {
-    ok: true,
-    deleted: deleted.deleted,
-    rowNumber,
-  };
-}
 </file>
 
 <file path="app/(admin)/admin/projects/ProjectsTab.tsx">
@@ -44541,200 +44729,6 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   } catch (error: any) {
     return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
-}
-</file>
-
-<file path="app/info/contacts/page.tsx">
-import Link from "next/link";
-
-type SP = { source?: string; sourceId?: string };
-
-export const metadata = {
-  title: "Контакты",
-  description: "Контакты поддержки: Telegram, ВКонтакте, почта и официальный Telegram-канал ЦФО.",
-};
-
-const SUPPORT_EMAIL = "info.ls.2021@gmail.com";
-const OFFICIAL_CHANNEL = "https://t.me/hippo_ga_cfo";
-const TG_ADMIN_LINK = "https://t.me/skebobingg";
-const VK_ADMIN_LINK = "https://vk.com/bluntokyr";
-
-function buildQs(sp: SP) {
-  const q = new URLSearchParams();
-  if (sp.source) q.set("source", sp.source);
-  if (sp.sourceId) q.set("sourceId", sp.sourceId);
-  const s = q.toString();
-  return s ? `?${s}` : "";
-}
-
-export default async function ContactsPage({
-  searchParams,
-}: {
-  searchParams?: Promise<SP>;
-}) {
-  const sp = (await searchParams) ?? {};
-  const qs = buildQs(sp);
-
-  return (
-    <div className="info-wrap">
-      <div className="info-shell">
-        <section className="info-hero">
-          <div className="info-topbar">
-            <div className="info-badge" aria-label="Контакты">
-              <span className="info-badge-dot" />
-              <div className="info-badge-text">
-                <strong>Поддержка</strong>
-                <span>как связаться</span>
-              </div>
-            </div>
-
-            <div className="info-note">
-              Если прошли сутки, а доступ не появился — лучше сразу пишите в ВКонтакте или Telegram для максимально быстрого ответа, либо отправьте письмо на почту с номером заявки.
-            </div>
-          </div>
-
-          <h1 className="info-title">Контакты</h1>
-          <p className="info-subtitle">
-            Оплата по QR в заявке. Выдача доступа после проверки — обычно до 24 часов. По любым вопросам пишите в личные сообщения администратору или на почту.
-          </p>
-
-          <div className="section-card">
-            <div className="section-head">
-              <h2>Связь</h2>
-              <div className="pill">support</div>
-            </div>
-
-            <div className="contacts-grid">
-              <div className="contact-tile">
-                <div className="label">Telegram администратора</div>
-                <a 
-                  href={TG_ADMIN_LINK} 
-                  target="_blank" 
-                  rel="noreferrer"
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    boxSizing: "border-box",
-                    marginTop: "8px",
-                    marginBottom: "4px",
-                    padding: "12px 20px",
-                    borderRadius: "14px",
-                    background: "linear-gradient(135deg, #24a1de, #208ec4)",
-                    color: "#fff",
-                    fontWeight: 900,
-                    fontSize: "14px",
-                    textDecoration: "none",
-                    boxShadow: "0 6px 20px rgba(36, 161, 222, 0.3)",
-                    textAlign: "center",
-                    transition: "transform 0.1s ease"
-                  }}
-                >
-                  Написать в Telegram
-                </a>
-                <div className="info-note">Самый быстрый способ решения любых вопросов по материалам и оплате.</div>
-              </div>
-
-              <div className="contact-tile">
-                <div className="label">ВКонтакте администратора</div>
-                <a 
-                  href={VK_ADMIN_LINK} 
-                  target="_blank" 
-                  rel="noreferrer"
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    boxSizing: "border-box",
-                    marginTop: "8px",
-                    marginBottom: "4px",
-                    padding: "12px 20px",
-                    borderRadius: "14px",
-                    background: "linear-gradient(135deg, #0077ff, #0066da)",
-                    color: "#fff",
-                    fontWeight: 900,
-                    fontSize: "14px",
-                    textDecoration: "none",
-                    boxShadow: "0 6px 20px rgba(0, 119, 255, 0.3)",
-                    textAlign: "center",
-                    transition: "transform 0.1s ease"
-                  }}
-                >
-                  Написать во ВКонтакте
-                </a>
-                <div className="info-note">Оперативная поддержка пользователей, разбор ошибок и доступов.</div>
-              </div>
-
-              <div className="contact-tile">
-                <div className="label">Email поддержки</div>
-                <a 
-                  href={`mailto:${SUPPORT_EMAIL}`}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    boxSizing: "border-box",
-                    marginTop: "8px",
-                    marginBottom: "4px",
-                    padding: "12px 20px",
-                    borderRadius: "14px",
-                    background: "rgba(15, 23, 42, 0.05)",
-                    border: "1px solid rgba(15, 23, 42, 0.1)",
-                    color: "rgba(15, 23, 42, 0.9)",
-                    fontWeight: 900,
-                    fontSize: "14px",
-                    textDecoration: "none",
-                    textAlign: "center"
-                  }}
-                >
-                  {SUPPORT_EMAIL}
-                </a>
-                <div className="info-note">В письме обязательно укажи: номер заявки, область, ФИО и дату оплаты.</div>
-              </div>
-
-              <div className="contact-tile">
-                <div className="label">Официальный канал олимпиады в ЦФО</div>
-                <a 
-                  href={OFFICIAL_CHANNEL} 
-                  target="_blank" 
-                  rel="noreferrer"
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    boxSizing: "border-box",
-                    marginTop: "8px",
-                    marginBottom: "4px",
-                    padding: "12px 20px",
-                    borderRadius: "14px",
-                    background: "rgba(78, 205, 196, 0.12)",
-                    border: "1px solid rgba(78, 205, 196, 0.25)",
-                    color: "#0f766e",
-                    fontWeight: 900,
-                    fontSize: "14px",
-                    textDecoration: "none",
-                    textAlign: "center"
-                  }}
-                >
-                  Открыть Telegram-канал
-                </a>
-                <div className="info-note">Официальные новости, важные объявления и графики проведения по региону.</div>
-              </div>
-
-              <div className="contact-tile">
-                <div className="label">Сроки проверки оплаты</div>
-                <div style={{ fontWeight: 1000, color: "rgba(15,23,42,0.92)", marginTop: "14px", fontSize: "15px" }}>обычно до 24 часов</div>
-                <div className="info-note">Если этот срок прошел, а материалы не открылись — обязательно напишите нам.</div>
-              </div>
-            </div>
-
-            {/* ✅ Возврат в /info с теми же query */}
-            <div className="back-row">
-              <Link className="back-link" href={`/info${qs}`}>
-                ← Назад к информации
-              </Link>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
 }
 </file>
 
@@ -49217,51 +49211,56 @@ async function findGatehouseMaterialsForRequest(supabase: any, r: ReqRow) {
   return materials.filter((m) => gatehouseMaterialMatchesRequest(m, r));
 }
 
-// 🚀 УМНАЯ СИСТЕМА ВЫДАЧИ ДИНАМИЧЕСКИХ ДОСТУПОВ
+// 🚀 УМНАЯ СИСТЕМА ВЫДАЧИ ДИНАМИЧЕСКИХ ДОСТУПОВ (ИСПРАВЛЕНА ПОД НОВУЮ БД)
 async function grantDynamicProjectAccessForRequest(supabase: any, adminId: string, r: ReqRow) {
   const nowISO = new Date().toISOString();
   const grantedLabels: string[] = [];
   const grantsToStore: any[] = [];
 
-  // Пользователь присылает реальные названия с фронта (Лейблы)
+  // Пользователь присылает реальные названия с фронта (Лейблы) или ID
   const targetLevels = toArr(r.class_level).length ? toArr(r.class_level) : toArr(r.target_levels);
   const requestedTabs = toArr(r.material_kinds).length ? toArr(r.material_kinds) : toArr(r.textbook_types);
 
-  if (!targetLevels.length) return { grantedLabels, grantsToStore };
-
-  // 1. Получаем все табы этого проекта, чтобы сматчить их ID с названиями из заявки
+  // 1. Получаем все активные табы этого проекта (т.к. материалы теперь лежат в них)
   const { data: tabsRes } = await runDbQuery<any[]>(
-    () => supabase.from("project_tabs").select("id, title").eq("project_id", r.project_id),
+    () => supabase.from("project_tabs").select("id, title").eq("project_id", r.project_id).eq("is_active", true),
     "fetchTabsForGrant"
   );
   
-  const requestedTabIds: string[] = [];
-  for (const reqTab of requestedTabs) {
-    const matched = (tabsRes ?? []).find((t: any) => 
-      t.id === reqTab || String(t.title).toLowerCase() === String(reqTab).toLowerCase()
-    );
-    if (matched) requestedTabIds.push(matched.id);
+  let tabIdsToQuery: string[] = [];
+  
+  if (requestedTabs.length > 0) {
+    for (const reqTab of requestedTabs) {
+      const matched = (tabsRes ?? []).find((t: any) => 
+        t.id === reqTab || String(t.title).toLowerCase() === String(reqTab).toLowerCase()
+      );
+      if (matched) tabIdsToQuery.push(matched.id);
+    }
+  } else {
+    // Если табы не указаны, ищем по всем активным табам проекта
+    tabIdsToQuery = (tabsRes ?? []).map((t: any) => t.id);
   }
 
-  // 2. Достаем активные материалы по найденным табам
-  let q = supabase
+  // Если табов в проекте нет, то и материалов нет
+  if (tabIdsToQuery.length === 0) return { grantedLabels, grantsToStore };
+
+  // ❗️ 2. Достаем активные материалы по найденным табам (БЕЗ project_id)
+  const { data: materials, error } = await runDbQuery<any[]>(() => supabase
     .from("materials")
-    .select("id, title, material_kind, target_levels, class_levels")
-    .eq("project_id", r.project_id)
-    .eq("is_active", true);
+    .select("id, title, material_kind, target_levels, class_levels, project_tab_id")
+    .in("project_tab_id", tabIdsToQuery)
+    .eq("is_active", true), 
+  "grantDynamicProjectAccess");
 
-  if (requestedTabIds.length > 0) {
-    q = q.in("project_tab_id", requestedTabIds);
-  }
-
-  const { data: materials, error } = await runDbQuery<any[]>(() => q, "grantDynamicProjectAccess");
   if (error) throw new Error(error.message);
 
   // 3. Мягкая фильтрация (Fuzzy match) уровней. 
-  // Ищем совпадение текста (например: "Hippo 1" == "hippo-1")
   const userLevels = targetLevels.map(x => String(x).toLowerCase());
   
   const matchedMaterials = (materials ?? []).filter(mat => {
+    // Если юзер не указал уровни в заявке, выдаем всё из найденных табов
+    if (userLevels.length === 0) return true;
+
     const matLevels = [...toArr(mat.target_levels), ...toArr(mat.class_levels)].map(x => String(x).toLowerCase());
     
     // Если материал доступен всем уровням (массив пуст) -> выдаем
