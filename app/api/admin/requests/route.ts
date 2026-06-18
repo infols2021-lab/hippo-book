@@ -26,6 +26,7 @@ import {
   formatRequestStatus,
   buildSheetValues,
 } from "@/lib/requests/normalize";
+import { sanitizeLikeQuery } from "@/lib/api/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -187,8 +188,13 @@ export async function GET(req: NextRequest) {
         q = q.eq("is_processed", true);
       }
 
-      if (name) q = q.ilike("full_name", `%${name}%`);
-      if (email) q = q.ilike("email", `%${email}%`);
+      // ✅ Безопасный поиск через ILIKE с экранированием
+      if (name) {
+        q = q.ilike("full_name", sanitizeLikeQuery(name));
+      }
+      if (email) {
+        q = q.ilike("email", sanitizeLikeQuery(email));
+      }
 
       return q;
     };
@@ -287,14 +293,11 @@ export async function PATCH(req: NextRequest) {
         const grantsHistory: any = { ok: true };
 
         if (is_processed) {
-          // Выдача доступов через вынесенную логику
           const { grantedLabels, grantsToStore } = await grantAccessForRequest(supabase, user.id, r);
 
-          // Удаляем старую историю
           const delHistory = await supabase.from("purchase_request_grants").delete().eq("request_id", r.id);
           if (delHistory.error) throw new Error(delHistory.error.message);
 
-          // Сохраняем новые записи
           if (grantsToStore.length) {
             const ins = await supabase.from("purchase_request_grants").insert(grantsToStore);
             if (ins.error) throw new Error(ins.error.message);
@@ -302,7 +305,6 @@ export async function PATCH(req: NextRequest) {
 
           granted = grantedLabels;
         } else {
-          // Отзыв доступов
           const targets = await getTargetsForUnprocess(supabase, r);
 
           for (const rawTarget of targets) {
@@ -367,14 +369,12 @@ export async function PATCH(req: NextRequest) {
             }
           }
 
-          // Удаляем историю выдачи
           const delHistory = await supabase.from("purchase_request_grants").delete().eq("request_id", r.id);
           if (delHistory.error) throw new Error(delHistory.error.message);
         }
 
         const processed_at = is_processed ? new Date().toISOString() : null;
 
-        // Обновляем статус заявки
         const upd = await supabase
           .from("purchase_requests")
           .update({
@@ -390,7 +390,6 @@ export async function PATCH(req: NextRequest) {
         const updatedRow = upd.data as any;
         const sheetName = r.sheet_name;
 
-        // Обновляем Google Sheets
         const sheetValues = buildSheetValues(
           updatedRow.request_number || "",
           updatedRow.created_at || "",

@@ -1,7 +1,9 @@
+// app/api/auth/request-password-reset/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ok, fail } from "@/lib/api/response";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
+import { isAllowedRedirectUrl } from "@/lib/api/validate";
 
 function isValidEmail(email: string) {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -54,12 +56,22 @@ export async function POST(req: Request) {
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !anon) return fail("Supabase env missing", 500, "ENV_MISSING");
 
+    // Build redirect URL and validate it to prevent open redirect
+    let redirectTo: string | undefined;
+    const appUrl = getAppUrl(req);
+    if (appUrl) {
+      const fullRedirect = `${appUrl}/update-password`;
+      if (isAllowedRedirectUrl(fullRedirect)) {
+        redirectTo = fullRedirect;
+      } else {
+        // fallback: use only relative path if domain is not allowed
+        redirectTo = "/update-password";
+      }
+    }
+
     const supabaseAnon = createClient(url, anon, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
-
-    const appUrl = getAppUrl(req);
-    const redirectTo = appUrl ? `${appUrl}/update-password` : undefined;
 
     const { error } = await supabaseAnon.auth.resetPasswordForEmail(email, {
       ...(redirectTo ? { redirectTo } : {}),

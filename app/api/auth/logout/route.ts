@@ -1,3 +1,4 @@
+// app/api/auth/logout/route.ts
 import { NextResponse } from "next/server";
 import { ok } from "@/lib/api/response";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -47,6 +48,7 @@ async function logout() {
   return ok({ message: "Вы вышли из аккаунта." }, noStoreInit());
 }
 
+// ✅ Только POST — безопаснее, чем GET (GET не должен менять состояние)
 export async function POST() {
   try {
     return await logout();
@@ -67,22 +69,4 @@ export async function POST() {
   }
 }
 
-export async function GET() {
-  try {
-    return await logout();
-  } catch (e: any) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: e?.message || String(e),
-        code: "SERVER_ERROR",
-      },
-      {
-        status: 500,
-        headers: {
-          "cache-control": "no-store, max-age=0",
-        },
-      },
-    );
-  }
-}
+// ❌ GET удалён — используйте POST для выхода

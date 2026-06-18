@@ -1,13 +1,16 @@
+// app/api/auth/resend-confirmation/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ok, fail } from "@/lib/api/response";
 import { directFetch } from "@/lib/net/directFetch";
+import { verifyTurnstileToken } from "@/lib/security/turnstile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type ResendBody = {
   email?: string;
+  captchaToken?: string;
 };
 
 function noStoreInit(): ResponseInit {
@@ -20,6 +23,13 @@ function noStoreInit(): ResponseInit {
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function getRemoteIp(req: Request): string | null {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0]?.trim() || null;
+  const xr = req.headers.get("x-real-ip");
+  return xr || null;
 }
 
 function getAppUrl(req: Request): string | null {
@@ -71,6 +81,18 @@ export async function POST(req: Request) {
     if (!body) return fail("Bad request", 400, "BAD_REQUEST", noStoreInit());
 
     const email = String(body.email ?? "").trim().toLowerCase();
+    const captchaToken = String(body.captchaToken ?? "");
+
+    // ✅ Turnstile проверка (как в reset-password)
+    const captcha = await verifyTurnstileToken({
+      token: captchaToken,
+      expectedAction: "resend_confirmation",
+      remoteIp: getRemoteIp(req) ?? undefined,
+    });
+
+    if (!captcha.ok) {
+      return fail("Капча не пройдена", 400, captcha.code, noStoreInit());
+    }
 
     if (!email || !isValidEmail(email)) {
       return fail("Неверный формат email", 400, "VALIDATION", noStoreInit());

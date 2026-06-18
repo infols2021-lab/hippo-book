@@ -1,4 +1,4 @@
-/* app/api/profile/update/route.ts */
+// app/api/profile/update/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
@@ -8,13 +8,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+// ⚠️ is_admin убран из ответа — это чувствительное поле
 const PROFILE_SELECT = `
   id,
   email,
   full_name,
   contact_phone,
   region,
-  is_admin,
   completed_assignments_count,
   ga_completed_assignments_count
 `;
@@ -122,6 +122,7 @@ export async function PATCH(req: NextRequest) {
 
     revalidateUserData(user.id);
 
+    // ✅ is_admin уже не возвращается
     return ok(
       {
         profile: data,

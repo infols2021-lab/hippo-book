@@ -1,5 +1,7 @@
+// app/api/admin/users/route.ts
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
+import { sanitizeLikeQuery } from "@/lib/api/validate";
 import type { NextRequest } from "next/server";
 
 type ProfileRow = {
@@ -29,8 +31,12 @@ export async function GET(req: NextRequest) {
       .select("id,full_name,email,contact_phone,region,is_admin,created_at")
       .order("created_at", { ascending: false });
 
+    // ✅ Безопасный поиск через ILIKE с экранированием
     if (q) {
-      query = query.or(`full_name.ilike.%${q}%,email.ilike.%${q}%,contact_phone.ilike.%${q}%`);
+      const safeQ = sanitizeLikeQuery(q); // возвращает %экранированная_строка%
+      query = query.or(
+        `full_name.ilike.${safeQ},email.ilike.${safeQ},contact_phone.ilike.${safeQ}`
+      );
     }
 
     if (region) {
