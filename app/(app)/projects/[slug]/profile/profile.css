@@ -326,3 +326,14 @@
   .progress-right { justify-content: space-between; } 
   .progress-bar { width: 100%; } 
 }
+/* ===== Action Buttons (Кнопки в левой панели) ===== */
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* Вот он, спасительный отступ! */
+  width: 100%;
+}
+.profile-actions .btn {
+  width: 100%;
+  justify-content: center;
+}

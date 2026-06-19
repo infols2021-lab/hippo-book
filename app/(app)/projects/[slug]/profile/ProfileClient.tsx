@@ -40,6 +40,7 @@ export type MaterialProgressItem = {
   total: number;
   progressPercent: number;
   href: string;
+  tabTitle?: string; // 🚀 Добавили поле для названия таба
 };
 
 export type StreakSnapshot = {
@@ -1299,7 +1300,7 @@ export default function ProfileClient({
               </div>
             )}
 
-            <div className="profile-actions" style={{ flexDirection: "column" }}>
+            <div className="profile-actions">
               <button className="btn ghost" onClick={openEdit} type="button">Редактировать профиль</button>
               <button className="btn secondary" onClick={() => router.push(`/projects/${projectSlug}/requests`)} type="button">Заявки на покупку</button>
               {profile.is_admin && <Link className="btn info" href="/admin">Панель управления</Link>}
@@ -1348,8 +1349,9 @@ export default function ProfileClient({
                 {materialsProgress.map((m) => (
                   <Link key={`${m.kind}-${m.id}`} href={m.href} className="progress-row" style={{ textDecoration: "none" }}>
                     <div className="progress-left">
+                      {/* 🚀 ИСПРАВЛЕНИЕ: Выводим tabTitle, если есть, иначе fallback */}
                       <div className="progress-type">
-                        {m.kind === "textbook" ? "УЧЕБНИК" : "КРОССВОРД"}
+                        {m.tabTitle ? m.tabTitle.toUpperCase() : (m.kind === "textbook" ? "УЧЕБНИК" : "КРОССВОРД")}
                       </div>
                       <div className="progress-title">{m.title}</div>
                       <div className="progress-sub">

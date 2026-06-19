@@ -38,6 +38,9 @@ export async function GET(req: NextRequest) {
       projectId = project?.id ?? null;
     }
 
+    // Карта для быстрого поиска названий табов: id таба -> title таба
+    const tabTitleMap = new Map<string, string>();
+
     // 2. Получаем материалы, привязанные к проекту (через табы)
     let materialsQuery = supabase
       .from("materials")
@@ -45,10 +48,10 @@ export async function GET(req: NextRequest) {
       .eq("is_active", true);
 
     if (projectId) {
-      // Сначала получим все табы этого проекта
+      // 🚀 ИСПРАВЛЕНИЕ: Вытягиваем id вместе с title таба
       const { data: tabs, error: tabsError } = await supabase
         .from("project_tabs")
-        .select("id")
+        .select("id, title")
         .eq("project_id", projectId)
         .eq("is_active", true);
 
@@ -57,6 +60,16 @@ export async function GET(req: NextRequest) {
       }
 
       const tabIds = tabs?.map((t: { id: string }) => t.id) || [];
+      
+      // Заполняем карту соответствия названий
+      if (tabs) {
+        tabs.forEach((t: { id: string; title: string }) => {
+          if (t.id && t.title) {
+            tabTitleMap.set(t.id, t.title);
+          }
+        });
+      }
+
       if (tabIds.length === 0) {
         return ok({
           stats: {
@@ -76,7 +89,7 @@ export async function GET(req: NextRequest) {
     const { data: materials, error: matErr } = await materialsQuery;
     if (matErr) throw matErr;
 
-    // ❗️ 2.5 ИСПРАВЛЕНИЕ: Получаем реальные доступы пользователя к материалам
+    // Получаем реальные доступы пользователя к материалам
     const { data: accessData, error: accessErr } = await supabase
       .from("material_access")
       .select("material_id")
@@ -86,7 +99,7 @@ export async function GET(req: NextRequest) {
 
     const grantedMaterialIds = new Set(accessData?.map((a) => a.material_id) || []);
 
-    // ❗️ Оставляем ТОЛЬКО те материалы, которые публичны (is_available) или выданы пользователю
+    // Оставляем ТОЛЬКО те материалы, которые публичны (is_available) или выданы пользователю
     const accessibleMaterials = (materials || []).filter(
       (m) => m.is_available || grantedMaterialIds.has(m.id)
     );
@@ -108,7 +121,7 @@ export async function GET(req: NextRequest) {
     const materialsProgress = await Promise.all(
       accessibleMaterials.map(async (m) => {
         
-        // ❗️ ИСПРАВЛЕНИЕ: Считаем задания с учетом старой и новой архитектуры (textbook_id / crossword_id / material_id)
+        // Считаем задания с учетом старой и новой архитектуры
         const { data: assignments } = await supabase
           .from("assignments")
           .select("id")
@@ -121,13 +134,16 @@ export async function GET(req: NextRequest) {
 
         const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-        // Определяем тип материала (для иконки в UI)
+        // Определяем тип материала
         const kind = m.material_kind === "crossword" ? "crossword" : "textbook";
 
         // Строим корректную ссылку на страницу материала
         const href = projectSlug
           ? `/projects/${projectSlug}/materials/${m.id}`
-          : `/materials/${m.id}`; // fallback для старых ссылок
+          : `/materials/${m.id}`;
+
+        // 🚀 НАХОДИМ НАЗВАНИЕ ТАБА ИЗ НАШЕЙ КАРТЫ
+        const tabTitle = m.project_tab_id ? tabTitleMap.get(m.project_tab_id) : undefined;
 
         return {
           kind,
@@ -137,6 +153,7 @@ export async function GET(req: NextRequest) {
           completed,
           progressPercent,
           href,
+          tabTitle, // Отправляем название таба (например: "что то") на фронтенд
         };
       })
     );
