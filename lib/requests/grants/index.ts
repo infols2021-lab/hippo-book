@@ -1,15 +1,9 @@
 // lib/requests/grants/index.ts
 // Единая точка бизнес-логики выдачи и отзыва доступов по заявкам.
-// Production-ready версия: полностью удалены легаси-зависимости (textbooks, crosswords).
-// Вся работа идет исключительно через универсальную таблицу materials и material_access.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toStringArray, uniqueStrings, normalizeBranchType } from "@/lib/materials/normalize";
 import { getRequestMaterialKinds } from "@/lib/requests/normalize";
-
-// ----------------------------------------------------------------------------
-// Типы
-// ----------------------------------------------------------------------------
 
 export type GrantKind = "textbook" | "crossword" | "mock_test" | "material";
 
@@ -51,22 +45,11 @@ export type ReqRow = {
   is_processed?: boolean | null;
 };
 
-// ----------------------------------------------------------------------------
-// Вспомогательные утилиты
-// ----------------------------------------------------------------------------
-
 function overlaps(a: string[], b: string[]): boolean {
   const set = new Set(a.map(String));
   return b.some((x) => set.has(String(x)));
 }
 
-// ----------------------------------------------------------------------------
-// Выдача доступов
-// ----------------------------------------------------------------------------
-
-/**
- * Выдача доступов для проектов (модульный доступ по табам/вкладкам).
- */
 export async function grantDynamicProjectAccessForRequest(
   supabase: SupabaseClient,
   adminId: string,
@@ -76,7 +59,6 @@ export async function grantDynamicProjectAccessForRequest(
   const grantedLabels: string[] = [];
   const grantsToStore: GrantResult["grantsToStore"] = [];
 
-  // Собираем все возможные упоминания уровней из заявки для максимальной надежности
   const userRawLevels = uniqueStrings([
     ...toStringArray(r.class_level),
     ...toStringArray(r.target_levels),
@@ -88,7 +70,6 @@ export async function grantDynamicProjectAccessForRequest(
     ...toStringArray(r.textbook_types)
   ]);
 
-  // 1. Загружаем справочники табов и уровней проекта для точного сопоставления
   const [levelsRes, tabsRes] = await Promise.all([
     supabase.from("project_levels").select("code, label").eq("project_id", r.project_id),
     supabase.from("project_tabs").select("id, title").eq("project_id", r.project_id).eq("is_active", true)
@@ -97,7 +78,6 @@ export async function grantDynamicProjectAccessForRequest(
   if (levelsRes.error) throw new Error(levelsRes.error.message);
   if (tabsRes.error) throw new Error(tabsRes.error.message);
 
-  // Маппим пользовательский ввод уровней (будь то label или code) в валидные коды уровней
   const validUserLevelCodes = new Set<string>();
   (levelsRes.data || []).forEach((lvl: any) => {
     const code = String(lvl.code).toLowerCase().trim();
@@ -107,12 +87,10 @@ export async function grantDynamicProjectAccessForRequest(
     }
   });
 
-  // Фолбэк на случай, если в справочнике нет совпадений
   if (validUserLevelCodes.size === 0) {
     userRawLevels.forEach(x => validUserLevelCodes.add(x));
   }
 
-  // Определяем ID табов, которые запросил пользователь
   let tabIdsToQuery: string[] = [];
   if (requestedTabs.length > 0) {
     for (const reqTab of requestedTabs) {
@@ -127,7 +105,6 @@ export async function grantDynamicProjectAccessForRequest(
 
   if (tabIdsToQuery.length === 0) return { grantedLabels, grantsToStore };
 
-  // 2. Достаем активные материалы по найденным табам
   const { data: materials, error: matError } = await supabase
     .from("materials")
     .select("id, title, material_kind, target_levels, class_levels, project_tab_id")
@@ -136,7 +113,6 @@ export async function grantDynamicProjectAccessForRequest(
 
   if (matError) throw new Error(matError.message);
 
-  // 3. Фильтруем материалы: выдаем все материалы выбранного таба, совпадающие с уровнем пользователя
   const matchedMaterials = (materials || []).filter((mat) => {
     if (validUserLevelCodes.size === 0) return true;
 
@@ -152,7 +128,6 @@ export async function grantDynamicProjectAccessForRequest(
     );
   });
 
-  // 4. Записываем доступы в единую таблицу material_access
   for (const mat of matchedMaterials) {
     const { error: upsertError } = await supabase
       .from("material_access")
@@ -168,10 +143,16 @@ export async function grantDynamicProjectAccessForRequest(
 
     if (!upsertError) {
       grantedLabels.push(`📘 ${mat.title}`);
+      
+      // 🚀 ИСПРАВЛЕНИЕ: Обходим легаси-констрейнт БД. Если не textbook/crossword, пишем mock_test
+      const safeKind = (mat.material_kind === "textbook" || mat.material_kind === "crossword") 
+        ? mat.material_kind 
+        : "mock_test";
+
       grantsToStore.push({
         request_id: r.id,
         user_id: r.user_id,
-        kind: "material",
+        kind: safeKind as GrantKind, 
         item_id: mat.id,
         title: mat.title,
         granted_by: adminId,
@@ -185,9 +166,6 @@ export async function grantDynamicProjectAccessForRequest(
   return { grantedLabels, grantsToStore };
 }
 
-/**
- * Универсальная выдача доступов для ЛЮБОЙ ветки (Olympiad, Gatehouse и кастомные без project_id).
- */
 export async function grantGenericBranchAccessForRequest(
   supabase: SupabaseClient,
   adminId: string,
@@ -246,10 +224,15 @@ export async function grantGenericBranchAccessForRequest(
 
     if (!upsertError) {
       grantedLabels.push(`📁 ${mat.title}`);
+      
+      const safeKind = (mat.material_kind === "textbook" || mat.material_kind === "crossword") 
+        ? mat.material_kind 
+        : "mock_test";
+
       grantsToStore.push({
         request_id: r.id,
         user_id: r.user_id,
-        kind: "material",
+        kind: safeKind as GrantKind,
         item_id: mat.id,
         title: mat.title,
         granted_by: adminId,
@@ -264,10 +247,6 @@ export async function grantGenericBranchAccessForRequest(
   return { grantedLabels: uniqueStrings(grantedLabels), grantsToStore };
 }
 
-// ----------------------------------------------------------------------------
-// Главная функция выдачи доступов (выбор стратегии)
-// ----------------------------------------------------------------------------
-
 export async function grantAccessForRequest(
   supabase: SupabaseClient,
   adminId: string,
@@ -278,10 +257,6 @@ export async function grantAccessForRequest(
   }
   return grantGenericBranchAccessForRequest(supabase, adminId, r);
 }
-
-// ----------------------------------------------------------------------------
-// Отзыв доступов (unprocess)
-// ----------------------------------------------------------------------------
 
 export async function existsOtherProcessedGrant(
   supabase: SupabaseClient,
@@ -392,9 +367,6 @@ export async function enrichMockTestTargetIfNeeded(
   };
 }
 
-/**
- * Функция отзыва доступов. Удаляет доступы только из единой material_access.
- */
 export async function revokeAccessForRequest(
   supabase: SupabaseClient,
   r: ReqRow,

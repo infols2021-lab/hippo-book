@@ -68,12 +68,10 @@ function fmtDate(v: string | null) {
   }
 }
 
-// Проверка на UUID (та самая длинная ссылка)
 function isValidUUID(str: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
 }
 
-// 🚀 ДИНАМИЧЕСКИЙ РЕНДЕР ИМЕНИ ПРОЕКТА
 function renderProjectName(row: RequestRow) {
   if (row.projects?.name) {
     return <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">{row.projects.name}</span>;
@@ -116,7 +114,6 @@ function renderClassLevels(row: RequestRow) {
   );
 }
 
-// 🚀 УЛУЧШЕННОЕ ОТОБРАЖЕНИЕ ТИПОВ МАТЕРИАЛОВ (С МАСКИРОВКОЙ UUID)
 function renderTypes(row: RequestRow) {
   const mk = arrOf(row.material_kinds);
   const tt = arrOf(row.textbook_types);
@@ -134,7 +131,6 @@ function renderTypes(row: RequestRow) {
         let color = "bg-gray-50 text-gray-700 border-gray-200";
 
         if (isValidUUID(str)) {
-          // Если это UUID таба проекта, выводим красивую плашку
           label = "📁 Раздел проекта"; 
           color = "bg-indigo-50 text-indigo-700 border-indigo-200";
         }
@@ -418,14 +414,22 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
         body: JSON.stringify({ ids, is_processed }),
       });
 
-      const json = (await safeJson(res)) as { ok: boolean; error?: string } | null;
+      const json = (await safeJson(res)) as { ok: boolean; error?: string; results?: Record<string, { ok: boolean, error?: string }> } | null;
 
       if (!res.ok || !json) throw new Error(`HTTP ${res.status}`);
       if (!json.ok) throw new Error(json.error || "Не удалось обновить заявки");
 
+      // 🚀 ИСПРАВЛЕНИЕ: Распаковываем скрытые ошибки базы данных и показываем их админу
+      if (json.results) {
+        const rowErrors = Object.values(json.results).filter(r => !r.ok).map(r => r.error);
+        if (rowErrors.length > 0) {
+          throw new Error(`Ошибка БД: ${rowErrors.join("; ")}`);
+        }
+      }
+
       await Promise.all([loadStats(), loadList(true)]);
     } catch (e: any) {
-      setErr(e?.message || String(e));
+      setErr(e?.message || String(e)); // Теперь ошибка будет показана красным блоком на странице!
     } finally {
       setLoading(false);
       setProcessingOpen(false);
