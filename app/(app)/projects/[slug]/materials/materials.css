@@ -1,227 +1,193 @@
 /* app/(app)/projects/[slug]/materials/materials.css */
 
-/* Определяем мягкие версии цветов на основе переменных темы */
-:root {
-  --project-primary-soft: color-mix(in srgb, var(--project-primary, #4ecdc4) 18%, transparent);
-  --project-secondary-soft: color-mix(in srgb, var(--project-secondary, #6ebeff) 22%, transparent);
-  --project-primary-glow: color-mix(in srgb, var(--project-primary, #4ecdc4) 14%, transparent);
-}
-
-/* фон страницы как в профиле/логине */
 .materials-page {
   min-height: 100vh;
-  padding: 22px 0;
-
-  background-color: var(--project-bg, #eaf7ff);
-  background-image:
-    radial-gradient(1200px 700px at 15% 10%, var(--project-primary-soft, rgba(78, 205, 196, 0.18)), transparent 60%),
-    radial-gradient(1100px 700px at 85% 20%, var(--project-secondary-soft, rgba(110, 190, 255, 0.22)), transparent 62%),
-    linear-gradient(180deg, var(--project-bg, #f5fbff) 0%, color-mix(in srgb, var(--project-bg, #d7eefc) 80%, var(--project-primary, #d7eefc)) 58%, var(--project-bg, #f0fbff) 100%);
-  background-attachment: fixed;
-
-  color: var(--project-text, #1f2937);
-}
-
-.materials-page::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(900px 520px at 50% 35%, rgba(0, 0, 0, 0.03), transparent 60%);
+  padding: 0 0 40px 0; 
+  /* Фон теперь тянется глобально из body */
 }
 
 .materials-container {
   width: 95%;
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
   position: relative;
   z-index: 1;
 }
 
-/* Заголовок секции (h3) приятнее */
+/* Typo */
 .materials-title {
   margin: 0 0 6px 0;
-  font-size: 18px;
-  font-weight: 1000;
-  color: var(--project-text, rgba(44, 62, 80, 0.86));
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--project-text);
+  letter-spacing: -0.01em;
 }
 
 .materials-subtitle {
-  margin: 0 0 14px 0;
-  font-size: 13px;
-  font-weight: 850;
-  color: var(--project-muted, rgba(44, 62, 80, 0.60));
+  margin: 0 0 20px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--project-text) 60%, transparent);
 }
 
-/* “Стеклянная” плашка под табами */
+/* Panel (Главная стеклянная подложка) */
 .materials-panel {
-  background: var(--project-card-bg, rgba(255,255,255,0.62));
-  border: 1px solid var(--project-border, rgba(255,255,255,0.75));
-  box-shadow: 0 20px 60px var(--project-glow, rgba(15, 65, 95, 0.14));
-  backdrop-filter: blur(14px);
-  border-radius: 22px;
-  padding: 14px;
-  margin-top: 14px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 1px var(--glass-highlight), var(--glass-shadow);
+  border-radius: 24px;
+  padding: 24px;
+  margin-top: 16px;
 }
 
 /* Tabs */
 .materials-tabs {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   padding: 8px;
-
-  background: var(--project-card-bg, rgba(255,255,255,0.60));
-  border: 1px solid var(--project-border, rgba(255,255,255,0.75));
-  backdrop-filter: blur(14px);
-  border-radius: 999px;
-
-  box-shadow: 0 16px 40px var(--project-glow, rgba(15, 65, 95, 0.12));
-  margin: 14px 0 16px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 99px;
+  box-shadow: inset 0 1px 1px var(--glass-highlight), var(--glass-shadow);
+  margin: 0 0 24px 0;
 }
 
 .material-tab {
-  padding: 10px 16px;
-  border: 0;
-  border-radius: 999px;
+  padding: 10px 20px;
+  border: 1px solid transparent;
+  border-radius: 99px;
   cursor: pointer;
-
   font-size: 14px;
-  font-weight: 1000;
-  color: var(--project-muted, rgba(44, 62, 80, 0.70));
-  background: var(--project-card-bg, rgba(255,255,255,0.55));
-  border: 1px solid var(--project-secondary-soft, rgba(110,190,255,0.18));
-
-  transition: transform .12s ease, filter .12s ease, background .12s ease;
-  box-shadow: 0 14px 26px var(--project-glow, rgba(15,65,95,0.10));
+  font-weight: 700;
+  color: color-mix(in srgb, var(--project-text) 70%, transparent);
+  background: transparent;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .material-tab:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.02);
-}
-
-.material-tab:active {
-  transform: translateY(0px);
-  filter: brightness(0.98);
+  background: color-mix(in srgb, var(--project-text) 5%, transparent);
+  color: var(--project-text);
 }
 
 .material-tab.active {
   color: #fff;
-  background: linear-gradient(135deg, var(--project-primary, #4ecdc4), var(--project-secondary, #6ebeff));
-  border-color: transparent;
-  box-shadow: 0 18px 36px var(--project-glow, rgba(78,205,196,0.18));
+  background: var(--project-primary);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.2), 0 4px 12px -4px color-mix(in srgb, var(--project-primary) 50%, transparent);
 }
 
-.materials-section {
-  display: none;
-}
-
-.materials-section.active {
-  display: block;
-}
+.materials-section { display: none; }
+.materials-section.active { display: block; }
 
 /* Grid */
 .materials-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-  gap: 18px;
-  margin-top: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 16px;
 }
 
 /* Card */
 .material-card {
   position: relative;
   cursor: pointer;
-
-  border-radius: 18px;
+  border-radius: 20px;
   padding: 16px;
-
-  background: var(--project-card-bg, rgba(255,255,255,0.70));
-  border: 1px solid var(--project-border, rgba(255,255,255,0.80));
-  backdrop-filter: blur(14px);
-
-  box-shadow: 0 16px 46px var(--project-glow, rgba(15, 65, 95, 0.14));
-  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, filter .12s ease;
+  background: var(--project-card-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--project-text) 5%, transparent);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
 }
 
 .material-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 24px 68px var(--project-glow, rgba(15, 65, 95, 0.18));
-  border-color: var(--project-primary-soft, rgba(78, 205, 196, 0.45));
-  filter: brightness(1.01);
+  box-shadow: 0 12px 24px -8px color-mix(in srgb, var(--project-text) 15%, transparent);
+  border-color: color-mix(in srgb, var(--project-primary) 30%, transparent);
 }
 
-/* ✅ FIX: обложка теперь держит 16:9 */
+/* Cover */
 .material-cover {
   width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: 14px;
-  margin-bottom: 12px;
-
+  margin-bottom: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  color: #fff;
-  font-size: 46px;
-  font-weight: 1000;
-
   overflow: hidden;
-  background: linear-gradient(135deg, var(--project-secondary, rgba(110, 190, 255, 0.92)), var(--project-primary, rgba(78, 205, 196, 0.92)));
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+  background: color-mix(in srgb, var(--project-text) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--project-text) 6%, transparent);
 }
 
 .material-cover img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  object-position: center;
-  border-radius: 14px;
+  object-fit: cover;
   display: block;
+  transition: transform 0.5s ease;
+}
+
+.material-card:hover .material-cover img {
+  transform: scale(1.03);
+}
+
+.material-cover-placeholder {
+  font-size: 3rem;
+  opacity: 0.5;
 }
 
 .material-title {
   font-size: 16px;
-  font-weight: 1000;
+  font-weight: 800;
   margin-bottom: 6px;
-  color: var(--project-text, rgba(44, 62, 80, 0.86));
+  color: var(--project-text);
+  line-height: 1.3;
 }
 
 .material-description {
-  color: var(--project-muted, rgba(44, 62, 80, 0.62));
+  color: color-mix(in srgb, var(--project-text) 60%, transparent);
   font-size: 13px;
-  font-weight: 800;
-  margin-bottom: 10px;
-  line-height: 1.35;
+  font-weight: 500;
+  margin-bottom: 16px;
+  line-height: 1.4;
+  flex-grow: 1;
 }
 
 /* Progress */
 .progress-bar {
   width: 100%;
-  height: 8px;
-  background: var(--project-muted, rgba(44, 62, 80, 0.10));
+  height: 6px;
+  background: color-mix(in srgb, var(--project-text) 8%, transparent);
   border-radius: 999px;
   overflow: hidden;
-  margin: 10px 0 8px;
+  margin-bottom: 10px;
 }
 
 .progress-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(135deg, var(--project-primary, rgba(78, 205, 196, 0.95)), var(--project-secondary, rgba(110, 190, 255, 0.92)));
+  background: var(--project-primary);
   border-radius: 999px;
-  transition: width 0.3s ease;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .material-stats {
   display: flex;
   justify-content: space-between;
   align-items: center;
-
-  font-size: 12px;
-  font-weight: 900;
-  color: var(--project-muted, rgba(44, 62, 80, 0.55));
+  font-size: 13px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--project-text) 50%, transparent);
 }
 
 .material-stats .pct {
@@ -229,74 +195,84 @@
   align-items: center;
   justify-content: center;
   padding: 4px 10px;
-  border-radius: 999px;
-
-  background: var(--project-primary-soft, rgba(78, 205, 196, 0.14));
-  border: 1px solid var(--project-primary-soft, rgba(78, 205, 196, 0.22));
-  color: var(--project-text, rgba(44, 62, 80, 0.78));
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--project-primary) 10%, transparent);
+  color: var(--project-primary);
+  font-weight: 800;
 }
 
-/* Locked */
+/* Locked (Эффект размытого стекла) */
 .material-card.locked {
   cursor: not-allowed;
-  filter: grayscale(1) saturate(0.6);
-  opacity: 0.85;
+  opacity: 0.8;
 }
 
 .material-card.locked:hover {
   transform: none;
-  box-shadow: 0 16px 46px var(--project-glow, rgba(15, 65, 95, 0.14));
-  border-color: var(--project-border, rgba(255,255,255,0.80));
+  box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--project-text) 5%, transparent);
+  border-color: var(--glass-border);
+}
+
+.material-card.locked .material-cover img {
+  filter: grayscale(1);
 }
 
 .locked-overlay {
   position: absolute;
   inset: 0;
-  border-radius: 18px;
-
-  background: rgba(0,0,0,0.55);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--project-card-bg) 60%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 10;
+}
 
-  color: #fff;
-  font-weight: 1000;
+.locked-badge {
+  background: var(--project-card-bg);
+  color: var(--project-text);
+  padding: 8px 16px;
+  border-radius: 99px;
+  font-weight: 800;
   font-size: 14px;
-  letter-spacing: 0.2px;
+  box-shadow: 0 8px 24px -6px color-mix(in srgb, var(--project-text) 15%, transparent);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Empty state */
 .materials-empty {
   grid-column: 1 / -1;
   text-align: center;
-  padding: 34px 16px;
-  border-radius: 18px;
-
-  background: var(--project-card-bg, rgba(255,255,255,0.60));
-  border: 1px solid var(--project-border, rgba(255,255,255,0.75));
-  backdrop-filter: blur(14px);
-  box-shadow: 0 16px 40px var(--project-glow, rgba(15,65,95,0.10));
-
-  color: var(--project-muted, rgba(44, 62, 80, 0.70));
-  font-weight: 900;
+  padding: 60px 20px;
+  border-radius: 24px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px dashed var(--glass-border);
+  box-shadow: none;
 }
 
-.materials-empty p {
-  margin: 8px 0;
+.materials-empty p:first-child {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--project-text);
+  margin-bottom: 8px;
+}
+
+.materials-empty .materials-subtitle {
+  margin: 0;
 }
 
 /* Mobile */
 @media (max-width: 768px) {
-  .materials-container {
-    width: 100%;
-    padding: 0 10px;
-  }
-  .materials-grid {
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
-  .material-tab {
-    padding: 10px 14px;
-    font-size: 13px;
-  }
+  .materials-container { width: 100%; padding: 0 12px; }
+  .materials-grid { grid-template-columns: 1fr; gap: 16px; }
+  .materials-tabs { padding: 6px; gap: 4px; border-radius: 16px; }
+  .material-tab { padding: 10px 16px; font-size: 13px; border-radius: 12px; }
+  .materials-panel { padding: 16px; border-radius: 20px; }
 }

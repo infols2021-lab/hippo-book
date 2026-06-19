@@ -31,12 +31,10 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
   const { slug } = await params;
   const { tab: activeTabSlug } = await searchParams;
 
-  // 1. Проверка авторизации
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // 2. Получение профиля (нужно для DataAuthContext)
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select(
@@ -47,18 +45,16 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
 
   if (profileError) {
     console.error("Ошибка загрузки профиля:", profileError.message);
-    // Можно выбросить ошибку или показать страницу с ошибкой
     return (
-      <div className="materials-page" style={{ backgroundColor: "var(--project-bg)", color: "var(--project-text)" }}>
+      <div className="materials-page">
         <div className="materials-container">
           <AppHeader
-            themeColor="#3b82f6"
             nav={[
-              { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn" },
+              { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn ghost" },
               { kind: "logout", label: "Выйти", className: "btn secondary" },
             ]}
           />
-          <div className="materials-empty">
+          <div className="materials-empty card">
             <p>⚠️ Не удалось загрузить профиль</p>
             <p className="materials-subtitle">{profileError.message}</p>
           </div>
@@ -67,23 +63,21 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
     );
   }
 
-  // 3. Получаем конфиг проекта
   const project = await getProjectBySlug(slug);
   if (!project) notFound();
 
   const tabs = project.tabs;
   if (tabs.length === 0) {
     return (
-      <div className="materials-page" style={{ backgroundColor: "var(--project-bg)", color: "var(--project-text)" }}>
+      <div className="materials-page">
         <div className="materials-container">
           <AppHeader
-            themeColor={project.themeColor}
             nav={[
-              { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn" },
+              { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn ghost" },
               { kind: "logout", label: "Выйти", className: "btn secondary" },
             ]}
           />
-          <div className="materials-empty">
+          <div className="materials-empty card">
             <p>📭 В этом проекте пока нет разделов</p>
             <p className="materials-subtitle">Обратитесь к администратору</p>
           </div>
@@ -92,13 +86,11 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
     );
   }
 
-  // 4. Определяем активный таб
   let activeTab = tabs.find((t) => t.slug === activeTabSlug);
   if (!activeTab) {
     redirect(`/projects/${slug}/materials?tab=${tabs[0].slug}`);
   }
 
-  // 5. Загружаем материалы через унифицированный слой (передаём полный контекст)
   const materialsResult = await loadProjectMaterialsData(
     { supabase, user, profile },
     slug,
@@ -108,16 +100,15 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
   if (materialsResult.error) {
     console.error("Ошибка загрузки материалов:", materialsResult.error);
     return (
-      <div className="materials-page" style={{ backgroundColor: "var(--project-bg)", color: "var(--project-text)" }}>
+      <div className="materials-page">
         <div className="materials-container">
           <AppHeader
-            themeColor={project.themeColor}
             nav={[
-              { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn" },
+              { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn ghost" },
               { kind: "logout", label: "Выйти", className: "btn secondary" },
             ]}
           />
-          <div className="materials-empty">
+          <div className="materials-empty card">
             <p>⚠️ Не удалось загрузить материалы</p>
             <p className="materials-subtitle">{materialsResult.error}</p>
           </div>
@@ -140,13 +131,12 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
   }
 
   return (
-    <div className="materials-page" style={{ backgroundColor: "var(--project-bg)", color: "var(--project-text)" }}>
+    <div className="materials-page">
       <div className="materials-container">
         <AppHeader
-          themeColor={project.themeColor}
           nav={[
-            { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn" },
-            { kind: "logout", label: "Выйти", className: "btn secondary" },
+            { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn ghost" },
+            { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
           ]}
         />
 
@@ -161,15 +151,6 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
                   className={`material-tab ${isActive ? "active" : ""}`}
                   role="tab"
                   aria-selected={isActive}
-                  style={
-                    isActive
-                      ? {
-                          backgroundColor: "var(--project-primary)",
-                          borderColor: "var(--project-primary)",
-                          color: "#fff",
-                        }
-                      : {}
-                  }
                 >
                   {tab.icon || ""} {tab.title}
                 </Link>
@@ -197,19 +178,18 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
                         {coverUrl ? (
                           <img src={coverUrl} alt={m.title || "Обложка"} loading="lazy" decoding="async" />
                         ) : (
-                          <div style={{ fontSize: "3rem", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
-                            📄
-                          </div>
+                          <div className="material-cover-placeholder">📄</div>
                         )}
                       </div>
                       <div className="material-title">{m.title || "Без названия"}</div>
                       <div className="material-description">{m.description || "Материалы и задания для выполнения"}</div>
+                      
                       <div className="progress-bar">
-                        <div className="progress-fill" style={{ width: `${m.progress}%`, backgroundColor: "var(--project-primary)" }} />
+                        <div className="progress-fill" style={{ width: `${m.progress}%` }} />
                       </div>
                       <div className="material-stats">
                         <span>{m.completedAssignments}/{m.totalAssignments} заданий</span>
-                        <span className="pct" style={{ color: "var(--project-primary)" }}>{m.progress}%</span>
+                        <span className="pct">{m.progress}%</span>
                       </div>
                     </Link>
                   );
@@ -223,20 +203,20 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
                         {coverUrl ? (
                           <img src={coverUrl} alt={m.title || "Обложка"} loading="lazy" decoding="async" />
                         ) : (
-                          <div style={{ fontSize: "3rem", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
-                            📄
-                          </div>
+                          <div className="material-cover-placeholder">📄</div>
                         )}
                       </div>
                       <div className="material-title">{m.title || "Без названия"}</div>
                       <div className="material-description">{m.description || "Материал временно недоступен"}</div>
-                      <div className="locked-overlay">🔒 Недоступен</div>
+                      <div className="locked-overlay">
+                        <span className="locked-badge">🔒 Недоступен</span>
+                      </div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div className="materials-empty">
+              <div className="materials-empty card">
                 <p>📭 В этом разделе пока пусто</p>
                 <p className="materials-subtitle" style={{ margin: 0 }}>Ожидайте, когда администратор загрузит сюда материалы.</p>
               </div>

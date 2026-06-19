@@ -22,14 +22,15 @@ export default function MaterialClient({
 }: Props) {
   
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const primaryColor = project.theme?.colors?.primary || project.theme?.primaryColor || project.theme_color || "#3b82f6";
 
   if (!hasAccess) {
     return (
       <div className="container" style={{ textAlign: "center", paddingTop: 100 }}>
-        <div className="card">
-          <h2 style={{ color: "var(--project-text)" }}>У вас нет доступа к этому материалу 🔒</h2>
-          <Link href={`/projects/${slug}/materials`} className="btn ghost" style={{ marginTop: 16 }}>
+        <div className="card" style={{ maxWidth: "500px", margin: "0 auto", padding: "40px" }}>
+          <h2 style={{ color: "var(--project-text)", margin: "0 0 16px 0", fontWeight: 800 }}>
+            У вас нет доступа к этому материалу 🔒
+          </h2>
+          <Link href={`/projects/${slug}/materials`} className="btn ghost">
             Вернуться назад
           </Link>
         </div>
@@ -38,74 +39,119 @@ export default function MaterialClient({
   }
 
   return (
-    <div style={{ backgroundColor: "var(--project-bg)", color: "var(--project-text)", minHeight: "100vh", paddingBottom: "60px" }}>
+    <div style={{ paddingBottom: "60px" }}>
       <AppHeader
-        themeColor={primaryColor}
         nav={[
           { kind: "link", href: `/projects/${slug}/materials`, label: "К материалам", className: "btn ghost" },
           { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn secondary" },
         ]}
       />
 
-      <div style={{ maxWidth: 840, margin: "0 auto", padding: "0 20px" }}>
+      <div className="container" style={{ maxWidth: "840px" }}>
         
         <Link 
           href={`/projects/${slug}/materials`} 
-          style={{ display: "inline-block", marginBottom: 20, color: "var(--project-primary)", textDecoration: "none", fontWeight: 700 }}
+          style={{ 
+            display: "inline-flex", 
+            alignItems: "center", 
+            gap: "8px", 
+            marginBottom: "24px", 
+            color: "var(--project-primary)", 
+            textDecoration: "none", 
+            fontWeight: 800,
+            fontSize: "14px",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em"
+          }}
         >
           ← Назад к материалам
         </Link>
 
-        {/* Карточка материала (Шапка) */}
-        <div style={{ 
-          display: "flex", gap: 24, padding: 24, 
-          backgroundColor: "var(--project-card-bg)", 
-          border: "1px solid var(--project-border)",
-          borderRadius: 20, 
-          boxShadow: "0 4px 20px var(--project-glow)", 
-          marginBottom: 32,
-          flexWrap: "wrap" 
+        {/* Главная карточка материала */}
+        <div className="card" style={{ 
+          display: "flex", 
+          gap: "24px", 
+          marginBottom: "32px",
+          flexWrap: "wrap",
+          padding: "32px",
+          borderRadius: "28px"
         }}>
           <div style={{ 
-            flexShrink: 0, width: 140, height: 140, borderRadius: 16, overflow: "hidden", 
-            backgroundColor: "var(--project-bg)", 
-            border: "1px solid var(--project-border)",
-            display: "flex", alignItems: "center", justifyContent: "center" 
+            flexShrink: 0, 
+            width: "160px", 
+            height: "160px", 
+            borderRadius: "20px", 
+            overflow: "hidden", 
+            backgroundColor: "color-mix(in srgb, var(--project-text) 4%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--project-text) 6%, transparent)",
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center" 
           }}>
             {coverUrl ? (
               <img src={coverUrl} alt={material.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <span style={{ fontSize: "3.5rem", opacity: 0.5 }}>📄</span>
+              <span style={{ fontSize: "3.5rem", opacity: 0.3 }}>📄</span>
             )}
           </div>
-          <div style={{ flex: 1, minWidth: 250, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <h1 style={{ margin: "0 0 8px 0", fontSize: 26, fontWeight: 900, color: "var(--project-text)" }}>
+
+          <div style={{ flex: 1, minWidth: "250px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <h1 style={{ margin: "0 0 12px 0", fontSize: "28px", fontWeight: 900, color: "var(--project-text)", lineHeight: 1.2 }}>
               {material.title}
             </h1>
-            <p style={{ color: "var(--project-muted)", margin: "0 0 20px 0", lineHeight: 1.5, fontSize: "15px" }}>
-              {material.description || "Учебные материалы и задания"}
+            <p style={{ color: "color-mix(in srgb, var(--project-text) 60%, transparent)", margin: "0 0 24px 0", lineHeight: 1.5, fontSize: "15px", fontWeight: 500 }}>
+              {material.description || "Учебные материалы и задания для изучения"}
             </p>
             
-            {/* Полоска прогресса */}
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ flex: 1, height: 10, backgroundColor: "var(--project-border)", borderRadius: 5, overflow: "hidden" }}>
-                <div style={{ width: `${progressPct}%`, height: "100%", backgroundColor: "var(--project-primary)", transition: "width 0.5s ease-out" }} />
+            {/* Прогресс-бар */}
+            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              <div style={{ 
+                flex: 1, 
+                height: "8px", 
+                backgroundColor: "color-mix(in srgb, var(--project-text) 8%, transparent)", 
+                borderRadius: "999px", 
+                overflow: "hidden" 
+              }}>
+                <div style={{ 
+                  width: `${progressPct}%`, 
+                  height: "100%", 
+                  backgroundColor: "var(--project-primary)", 
+                  transition: "width 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+                  borderRadius: "999px"
+                }} />
               </div>
-              <span style={{ fontWeight: 800, fontSize: "15px", color: "var(--project-primary)" }}>{progressPct}%</span>
+              <span style={{ 
+                fontWeight: 900, 
+                fontSize: "16px", 
+                color: "var(--project-primary)",
+                minWidth: "44px",
+                textAlign: "right"
+              }}>
+                {progressPct}%
+              </span>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--project-muted)", marginTop: 8 }}>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "color-mix(in srgb, var(--project-text) 50%, transparent)", marginTop: "10px" }}>
               Выполнено {completedCount} из {totalCount} заданий
             </div>
           </div>
         </div>
 
-        {/* Список заданий */}
-        <div style={{ marginBottom: 16, fontSize: 13, textTransform: "uppercase", letterSpacing: "1px", fontWeight: 800, color: "var(--project-muted)" }}>
+        {/* Заголовок списка заданий */}
+        <div style={{ 
+          marginBottom: "20px", 
+          fontSize: "14px", 
+          textTransform: "uppercase", 
+          letterSpacing: "0.05em", 
+          fontWeight: 800, 
+          color: "color-mix(in srgb, var(--project-text) 50%, transparent)",
+          paddingLeft: "8px"
+        }}>
           Задания учебника
         </div>
         
+        {/* Список заданий */}
         {assignments.length > 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {assignments.map((a, index) => {
               const isDone = completedIds.includes(a.id);
               const assignTypeLabel = a.assignment_type === 'intro' ? 'ОЗНАКОМИТЕЛЬНОЕ' : 'ТЕСТ';
@@ -121,31 +167,44 @@ export default function MaterialClient({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    padding: "14px 18px",
+                    padding: "20px 24px",
                     backgroundColor: "var(--project-card-bg)",
-                    borderRadius: "16px",
+                    borderRadius: "20px",
                     textDecoration: "none",
                     color: "inherit",
-                    border: `1px solid ${isHovered ? "var(--project-primary)" : "var(--project-border)"}`,
-                    transform: isHovered ? "translateY(-2px)" : "translateY(0)",
-                    boxShadow: isHovered ? "0 8px 24px var(--project-glow)" : "none",
-                    transition: "transform 0.2s, border-color 0.2s, box-shadow 0.2s"
+                    border: `1px solid ${isHovered ? "color-mix(in srgb, var(--project-primary) 40%, transparent)" : "var(--glass-border)"}`,
+                    transform: isHovered ? "translateY(-3px)" : "translateY(0)",
+                    boxShadow: isHovered 
+                      ? "0 12px 32px -8px color-mix(in srgb, var(--project-text) 12%, transparent)" 
+                      : "0 4px 12px -4px color-mix(in srgb, var(--project-text) 5%, transparent)",
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
                     <div style={{
-                      width: 42, height: 42, flexShrink: 0, borderRadius: 12,
-                      backgroundColor: "color-mix(in srgb, var(--project-primary) 12%, transparent)",
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20
+                      width: "48px", 
+                      height: "48px", 
+                      flexShrink: 0, 
+                      borderRadius: "14px",
+                      backgroundColor: "color-mix(in srgb, var(--project-primary) 10%, transparent)",
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "center", 
+                      fontSize: "22px"
                     }}>
                       📝
                     </div>
                     
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <div style={{ fontWeight: 800, fontSize: 15, color: "var(--project-text)" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <div style={{ fontWeight: 800, fontSize: "16px", color: "var(--project-text)" }}>
                         {index + 1}. {a.title || "Задание без названия"}
                       </div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--project-muted)", letterSpacing: "0.5px" }}>
+                      <div style={{ 
+                        fontSize: "12px", 
+                        fontWeight: 800, 
+                        color: "color-mix(in srgb, var(--project-text) 50%, transparent)", 
+                        letterSpacing: "0.05em" 
+                      }}>
                         {assignTypeLabel}
                       </div>
                     </div>
@@ -153,11 +212,25 @@ export default function MaterialClient({
                   
                   {/* Кнопка-статус */}
                   <div style={{
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    padding: "6px 16px", borderRadius: 999, fontWeight: 800, fontSize: 12, whiteSpace: "nowrap", transition: "all 0.2s",
-                    background: isDone ? "color-mix(in srgb, #10b981 15%, transparent)" : (isHovered ? "var(--project-primary)" : "transparent"),
-                    color: isDone ? "#10b981" : (isHovered ? "#fff" : "var(--project-text)"),
-                    border: isDone ? "1px solid color-mix(in srgb, #10b981 30%, transparent)" : `1px solid ${isHovered ? "var(--project-primary)" : "color-mix(in srgb, var(--project-text) 20%, transparent)"}`
+                    display: "inline-flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    padding: "8px 20px", 
+                    borderRadius: "99px", 
+                    fontWeight: 800, 
+                    fontSize: "13px", 
+                    whiteSpace: "nowrap", 
+                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                    background: isDone 
+                      ? "color-mix(in srgb, #10b981 12%, transparent)" 
+                      : (isHovered ? "var(--project-primary)" : "color-mix(in srgb, var(--project-text) 4%, transparent)"),
+                    color: isDone 
+                      ? "#059669" 
+                      : (isHovered ? "#fff" : "var(--project-text)"),
+                    border: isDone 
+                      ? "1px solid color-mix(in srgb, #10b981 25%, transparent)" 
+                      : `1px solid ${isHovered ? "var(--project-primary)" : "color-mix(in srgb, var(--project-text) 8%, transparent)"}`,
+                    boxShadow: (isHovered && !isDone) ? "inset 0 1px 1px rgba(255,255,255,0.3)" : "none"
                   }}>
                     {isDone ? "✅ Выполнено" : "▶ Начать"}
                   </div>
@@ -167,11 +240,17 @@ export default function MaterialClient({
           </div>
         ) : (
           <div style={{ 
-            padding: 40, textAlign: "center", backgroundColor: "var(--project-card-bg)", 
-            borderRadius: 16, color: "var(--project-muted)", border: "1px solid var(--project-border)" 
+            padding: "60px 20px", 
+            textAlign: "center", 
+            backgroundColor: "var(--glass-bg)",
+            backdropFilter: "var(--glass-blur)",
+            borderRadius: "24px", 
+            color: "color-mix(in srgb, var(--project-text) 60%, transparent)", 
+            border: "1px dashed var(--glass-border)" 
           }}>
-            <span style={{ fontSize: "2rem", display: "block", marginBottom: 12 }}>📭</span>
-            <div style={{ fontWeight: 600 }}>В этом материале пока нет заданий</div>
+            <span style={{ fontSize: "2.5rem", display: "block", marginBottom: "16px", opacity: 0.8 }}>📭</span>
+            <div style={{ fontWeight: 800, fontSize: "16px", color: "var(--project-text)" }}>В этом материале пока нет заданий</div>
+            <p style={{ marginTop: "8px", fontSize: "14px" }}>Ожидайте, когда они будут добавлены администратором.</p>
           </div>
         )}
       </div>

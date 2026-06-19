@@ -11,7 +11,6 @@ import StreakLeaderboardModal, { type StreakLeaderboardRow } from "@/components/
 import TitlePickerModal, { type TitlePickerChoice, type TitleCatalogItem } from "@/components/profile/TitlePickerModal";
 import { getTierCodeByStreak } from "@/lib/streaks/roadmap";
 
-// 🔥 Идеальный локальный импорт стилей (Co-location)
 import "./profile.css";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -921,7 +920,6 @@ export default function ProfileClient({
       try {
         setProgressLoading(true);
         setProgressError(null);
-        // ⬇️ ИСПРАВЛЕНИЕ: Добавляем параметр slug для фильтрации по проекту
         const res = await fetch(`/api/profile-progress?slug=${projectSlug}`, {
           method: "GET",
           cache: "no-store",
@@ -942,7 +940,7 @@ export default function ProfileClient({
     }
     runWhenIdle(() => void loadProgress(), 1200);
     return () => { cancelled = true; progressAbortRef.current?.abort(); };
-  }, [statsProp, progressProp, projectSlug]); // добавил projectSlug в зависимости
+  }, [statsProp, progressProp, projectSlug]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1113,11 +1111,10 @@ export default function ProfileClient({
   const streakChipSub = streakLoading ? "серия" : streak?.done_today ? "сделано сегодня" : streakDisplay > 0 ? "сохранить сегодня" : "начни серию";
   const titleSavingNow = customUpdateDialog.open && customUpdateDialog.scope === "title" && customUpdateDialog.mode === "loading";
 
-  // Сгенерируем 2 буквы логотипа из названия проекта (например: "Английский" -> "АН")
   const brandMark = projectName.substring(0, 2).toUpperCase() || "EK";
 
   return (
-    <div id="profileBody" style={{ ["--profile-overlay" as any]: overlayCss }}>
+    <div id="profileBody" className="profile-page" style={{ ["--profile-overlay" as any]: overlayCss }}>
       {bgLoading && (
         <div className="background-loading" style={{ display: "block" }}>
           <span className="spinner" /> Загружаем фон...
@@ -1154,17 +1151,16 @@ export default function ProfileClient({
           </div>
           <div className="form-group">
             <label>Email:</label>
-            <input type="email" value={userEmail} disabled style={{ backgroundColor: "#f5f5f5", color: "#666" }} />
+            <input type="email" value={userEmail} disabled />
             <div className="small-muted" style={{ marginTop: 5 }}>Email нельзя изменить</div>
           </div>
           <div className="modal-actions">
-            <button type="button" className="btn secondary" onClick={closeEdit}>Отмена</button>
+            <button type="button" className="btn ghost" onClick={closeEdit}>Отмена</button>
             <button type="submit" className="btn" disabled={saving}>{saving ? "Сохранение..." : "Сохранить изменения"}</button>
           </div>
         </form>
       </Modal>
 
-      {/* Модалки рендерятся всегда, но открываются только если фича включена */}
       <TitlePickerModal open={titleModalOpen} onClose={() => setTitleModalOpen(false)} longestStreak={longestStreakDisplay} currentStreak={streakDisplay} currentTitleCode={effectiveTitleCodeForUi} currentTitleLabel={effectiveTitleLabelForUi} titleCatalog={titleCatalogState} onSelectTitle={(choice) => { if (isCustomizationUpdateLocked) return; void handleSelectTitle(choice); }} onClearLocalTitle={() => { if (isCustomizationUpdateLocked) return; void handleClearSelectedTitle(); }} loading={streakLoading || titleSavingNow} />
       <StreakRoadmapModal open={streakModalOpen} onClose={() => setStreakModalOpen(false)} streak={streak} loading={streakLoading} error={streakError} equippedTitleLabel={effectiveTitleLabelForUi} unlockedIconCodes={unlockedIconCodesForUi} selectedIconCode={effectiveSelectedStreakIconCode} onSelectIconCode={isCustomizationUpdateLocked ? undefined : handleSelectStreakIcon} />
       <StreakLeaderboardModal open={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} loading={leaderboardLoading} error={leaderboardError} top={leaderboardTop} around={leaderboardAround} myPlace={leaderboardMyPlace} myCurrent={leaderboardMyCurrent} myLongest={leaderboardMyLongest} onRetry={() => void refreshLeaderboardFromApi({ force: true })} />
@@ -1173,25 +1169,25 @@ export default function ProfileClient({
         <div style={{ display: "grid", gap: 14 }}>
           {customUpdateDialog.mode === "loading" ? (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 2px", fontWeight: 800, color: "#324a5f" }}>
-                <span className="spinner" /><span>{customUpdateDialog.message || "Обновляем..."}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 2px", fontWeight: 800, color: "var(--project-text)" }}>
+                <span className="spinner" style={{ borderColor: "var(--glass-border)", borderTopColor: "var(--project-primary)" }} /><span>{customUpdateDialog.message || "Обновляем..."}</span>
               </div>
-              <div style={{ fontSize: 14, lineHeight: 1.4, color: "rgba(50,74,95,0.78)", background: "rgba(255,255,255,0.55)", borderRadius: 12, padding: "10px 12px" }}>
+              <div style={{ fontSize: 14, lineHeight: 1.4, color: "var(--project-muted)", background: "color-mix(in srgb, var(--project-text) 5%, transparent)", borderRadius: 12, padding: "12px" }}>
                 Пожалуйста, дождитесь завершения. Пока окно открыто, выбор новой иконки/титула временно заблокирован.
               </div>
               <div className="modal-actions" style={{ justifyContent: "flex-end" }}><button type="button" className="btn secondary" disabled>Обновление...</button></div>
             </>
           ) : (
             <>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "rgba(244,67,54,0.08)", border: "1px solid rgba(244,67,54,0.18)", borderRadius: 14, padding: "12px 14px" }}>
-                <span style={{ fontSize: 20, lineHeight: 1, fontWeight: 900 }}>!</span>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "color-mix(in srgb, #ef4444 8%, transparent)", border: "1px solid color-mix(in srgb, #ef4444 20%, transparent)", borderRadius: 14, padding: "12px 14px" }}>
+                <span style={{ fontSize: 20, lineHeight: 1, fontWeight: 900, color: "#ef4444" }}>!</span>
                 <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ fontWeight: 900, color: "#b71c1c" }}>Не удалось обновить</div>
-                  <div style={{ color: "#7f1d1d", fontWeight: 700, lineHeight: 1.35 }}>{customUpdateDialog.message || "Ошибка соединения с сервером"}</div>
+                  <div style={{ fontWeight: 900, color: "#ef4444" }}>Не удалось обновить</div>
+                  <div style={{ color: "#ef4444", fontWeight: 700, lineHeight: 1.35, opacity: 0.9 }}>{customUpdateDialog.message || "Ошибка соединения с сервером"}</div>
                 </div>
               </div>
               <div className="modal-actions">
-                <button type="button" className="btn secondary" onClick={closeCustomUpdateDialog}>Закрыть</button>
+                <button type="button" className="btn ghost" onClick={closeCustomUpdateDialog}>Закрыть</button>
                 <button type="button" className="btn" onClick={() => void retryCustomUpdateDialogAction()}>Повторить</button>
               </div>
             </>
@@ -1199,7 +1195,7 @@ export default function ProfileClient({
         </div>
       </Modal>
 
-      <div className="container">
+      <div className="profile-container">
         <div className="profile-topbar">
           <div className="brand">
             <div className="brand-mark">{brandMark}</div>
@@ -1211,7 +1207,7 @@ export default function ProfileClient({
 
           <div className="top-actions">
             {features?.streaks && (
-              <button type="button" className={`streak-chip streak-chip--button ${streakUiBase.className} ${streakLoading ? "streak-chip--loading" : ""}`} title={streakChipTitle} aria-label="Открыть информацию о серии" onClick={openStreakModal}>
+              <button type="button" className={`streak-chip ${streakUiBase.className} ${streakLoading ? "streak-chip--loading" : ""}`} title={streakChipTitle} aria-label="Открыть информацию о серии" onClick={openStreakModal}>
                 <span className="streak-chip-icon" aria-hidden="true">
                   <StreakIconVisual iconCode={effectiveSelectedStreakIconCode ?? null} cacheTag={cacheTagForCurrentIcon} preferredUrls={preferredUrlsForCurrentIcon} variant={null} emojiFallback={chipEmojiFallback} alt="Иконка серии" wrapperClassName="streak-visual--chip" imgClassName="streak-visual__img--chip" emojiClassName="streak-visual__emoji--chip" />
                 </span>
@@ -1224,194 +1220,160 @@ export default function ProfileClient({
             )}
 
             {features?.leaderboard && (
-              <button type="button" className="nav-pill nav-pill--info" onClick={openLeaderboardModal} title="Открыть топ по сериям" aria-label="Открыть топ по сериям">
-                Топ серий
+              <button type="button" className="nav-pill" onClick={openLeaderboardModal} title="Открыть топ по сериям" aria-label="Открыть топ по сериям">
+                🏆 Топ серий
               </button>
             )}
 
-            <Link className="nav-pill nav-pill--materials" href={`/projects/${projectSlug}/materials`}>Материалы</Link>
-            <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}>Выйти</button>
+            <Link className="nav-pill" href={`/projects/${projectSlug}/materials`}>📚 Материалы</Link>
+            <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}>🚪 Выйти</button>
           </div>
         </div>
 
-        <div className="profile-layout">
-          <aside className="panel">
-            <div className="profile-card">
-              
-              <div
-                className={features?.streaks ? `avatar-circle avatar-circle--${(() => {
-                  const allowed = new Set(["none", "bronze", "silver", "gold", "platinum", "diamond", "legendary"]);
-                  return allowed.has(String(uiTierCodeForColors)) ? String(uiTierCodeForColors) : "none";
-                })()}` : "avatar-circle avatar-circle--none"}
-                role={features?.streaks ? "button" : "presentation"}
-                tabIndex={features?.streaks ? 0 : -1}
-                onClick={features?.streaks ? openStreakModal : undefined}
-                style={{ cursor: features?.streaks ? "pointer" : "default" }}
-                aria-label={features?.streaks ? "Иконка награды профиля" : "Аватар профиля"}
-                title={features?.streaks ? "Открыть серию активности" : ""}
+        <div className="profile-grid">
+          
+          {/* ЛЕВАЯ КОЛОНКА */}
+          <aside className="profile-panel profile-sidebar">
+            <div
+              className={`profile-avatar-wrapper ${features?.streaks ? `avatar-circle--${(() => {
+                const allowed = new Set(["none", "bronze", "silver", "gold", "platinum", "diamond", "legendary"]);
+                return allowed.has(String(uiTierCodeForColors)) ? String(uiTierCodeForColors) : "none";
+              })()}` : "avatar-circle--none"}`}
+              role={features?.streaks ? "button" : "presentation"}
+              tabIndex={features?.streaks ? 0 : -1}
+              onClick={features?.streaks ? openStreakModal : undefined}
+              style={{ cursor: features?.streaks ? "pointer" : "default" }}
+              aria-label={features?.streaks ? "Иконка награды профиля" : "Аватар профиля"}
+              title={features?.streaks ? "Открыть серию активности" : ""}
+            >
+              {features?.streaks ? (
+                <>
+                  <div className="avatar-icon-bg" />
+                  <StreakIconVisual iconCode={effectiveSelectedStreakIconCode ?? null} cacheTag={cacheTagForCurrentIcon} preferredUrls={preferredUrlsForCurrentIcon} variant={null} emojiFallback={avatarEmojiFallback} alt="Иконка награды" priority wrapperClassName="streak-visual--avatar" imgClassName="streak-visual__img--avatar" emojiClassName="streak-visual__emoji--avatar" />
+                  <button type="button" className={`streak-mini-badge ${streakUiBase.ringClassName}`} title={`Стрик: ${streakLoading ? "…" : streakDisplay} дн.`} onClick={openStreakModal}>
+                    {streakLoading ? "…" : streakDisplay}
+                  </button>
+                </>
+              ) : (
+                <span>👤</span>
+              )}
+            </div>
+
+            <div className="profile-name">{nameLabel(profile.full_name)}</div>
+            <div className="profile-email">{userEmail || "—"}</div>
+
+            {features?.titles && (
+              <button
+                type="button"
+                className="profile-title-slot"
+                onClick={() => setTitleModalOpen(true)}
+                title="Выбрать титул"
+                style={{ cursor: customUpdateDialog.open ? "not-allowed" : "pointer", opacity: customUpdateDialog.open ? 0.7 : 1, border: "none", marginBottom: "24px" }}
               >
-                <div className="avatar-inner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-                  {features?.streaks ? (
-                    <>
-                      <div className="avatar-icon" aria-hidden="true">
-                        <span className="avatar-icon-bg" />
-                        <StreakIconVisual iconCode={effectiveSelectedStreakIconCode ?? null} cacheTag={cacheTagForCurrentIcon} preferredUrls={preferredUrlsForCurrentIcon} variant={null} emojiFallback={avatarEmojiFallback} alt="Иконка награды" wrapperClassName="streak-visual--avatar" imgClassName="streak-visual__img--avatar" emojiClassName="streak-visual__emoji--avatar" priority />
-                      </div>
-                      <button type="button" className={`streak-mini-badge ${streakUiBase.ringClassName}`} title={`Стрик: ${streakLoading ? "…" : streakDisplay} дн. Нажмите для подробностей`} aria-label="Открыть серию активности" onClick={openStreakModal}>
-                        <b>{streakLoading ? "…" : streakDisplay}</b>
-                      </button>
-                    </>
-                  ) : (
-                    <span style={{ fontSize: '3.5rem', opacity: 0.9 }}>👤</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="profile-name">{nameLabel(profile.full_name)}</div>
-
-              {features?.titles && (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setTitleModalOpen(true)}
-                  title="Выбрать титул"
-                  aria-label="Открыть выбор титула"
-                  style={{ width: "100%", display: "block", cursor: customUpdateDialog.open ? "not-allowed" : "pointer", opacity: customUpdateDialog.open ? 0.88 : 1 }}
-                >
-                  <div className="profile-title-slot">
-                    <span className="profile-title-slot-icon">Т</span>
-                    <span className="profile-title-slot-text">{titleText}</span>
-                    <span aria-hidden="true" style={{ marginLeft: "auto", opacity: 0.9, fontWeight: 900, fontSize: 12, paddingLeft: 10, lineHeight: 1, color: "var(--accent-blue)" }}>
-                      {titleSavingNow ? "Ожидание..." : "Изменить"}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <div className="profile-mini" style={{ display: "flex", flexDirection: "column", padding: "4px 0", maxWidth: "100%", marginTop: features?.titles ? 0 : 12 }}>
-                <div className="mini-col" style={{ padding: "10px 16px" }}>
-                  <div className="mini-cap">EMAIL</div>
-                  <div className="mini-val" style={{ wordBreak: "break-all" }}>{userEmail || "—"}</div>
-                </div>
-                <div className="profile-mini-divider" style={{ width: "100%", height: "1px" }} />
-                <div className="mini-col" style={{ padding: "10px 16px" }}>
-                  <div className="mini-cap">ТЕЛЕФОН</div>
-                  <div className="mini-val">{phoneLabel(profile.contact_phone)}</div>
-                </div>
-                <div className="profile-mini-divider" style={{ width: "100%", height: "1px" }} />
-                <div className="mini-col" style={{ padding: "10px 16px" }}>
-                  <div className="mini-cap">РЕГИОН</div>
-                  <div className="mini-val">{regionLabel(profile.region)}</div>
-                </div>
-              </div>
-
-              <div className="streak-summary-card" style={{ padding: "12px 16px", maxWidth: "100%" }}>
-                {features?.streaks && (
-                  <>
-                    <button type="button" className="streak-summary-row streak-summary-row--button" onClick={openStreakModal} title="Открыть подробности серии" style={{ padding: "6px" }}>
-                      <span className="streak-summary-key">Текущая серия</span>
-                      <span className="streak-summary-value">{streakLoading ? "…" : `${streakDisplay} дн.`}</span>
-                    </button>
-                    <button type="button" className="streak-summary-row streak-summary-row--button" onClick={openStreakModal} title="Открыть подробности серии" style={{ padding: "6px" }}>
-                      <span className="streak-summary-key">Рекорд</span>
-                      <span className="streak-summary-value">{streakLoading ? "…" : `${longestStreakDisplay} дн.`}</span>
-                    </button>
-                  </>
-                )}
-                <div className="streak-summary-row" style={{ padding: "6px" }}>
-                  <span className="streak-summary-key">Доступно заданий</span>
-                  <span className="streak-summary-value">{stats?.totalAvailableAssignments ?? "—"}</span>
-                </div>
-                <div className="streak-summary-row" style={{ padding: "6px" }}>
-                  <span className="streak-summary-key">Выполнено</span>
-                  <span className="streak-summary-value">{stats?.completedAvailableAssignments ?? "—"}</span>
-                </div>
-              </div>
-
-              <button className="action-btn action-btn--soft" onClick={openEdit} type="button">
-                Редактировать профиль
+                <span className="profile-title-slot-icon">Т</span>
+                <span className="profile-title-slot-text">{titleText}</span>
               </button>
+            )}
 
-              <div className="support-card" style={{ maxWidth: "100%" }}>
-                <div className="support-title">Служба поддержки</div>
-                <div className="support-links">
-                  <a href="https://t.me/skebobingg" target="_blank" rel="noopener noreferrer" className="support-link support-link--tg">Telegram</a>
-                  <a href="https://vk.com/bluntokyr" target="_blank" rel="noopener noreferrer" className="support-link support-link--vk">ВКонтакте</a>
+            <div className="details-list" style={{ width: "100%", marginBottom: "16px" }}>
+              <div className="detail-item">
+                <span className="detail-label">Телефон</span>
+                <span className="detail-value">{phoneLabel(profile.contact_phone)}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Регион</span>
+                <span className="detail-value">{regionLabel(profile.region)}</span>
+              </div>
+            </div>
+
+            {features?.streaks && (
+              <div className="details-list" style={{ width: "100%", marginBottom: "24px" }}>
+                <div className="detail-item" style={{ cursor: "pointer" }} onClick={openStreakModal}>
+                  <span className="detail-label">Текущая серия</span>
+                  <span className="detail-value" style={{ color: "var(--project-primary)" }}>{streakLoading ? "…" : `${streakDisplay} дн.`}</span>
+                </div>
+                <div className="detail-item" style={{ cursor: "pointer" }} onClick={openStreakModal}>
+                  <span className="detail-label">Рекорд</span>
+                  <span className="detail-value">{streakLoading ? "…" : `${longestStreakDisplay} дн.`}</span>
                 </div>
               </div>
+            )}
 
-              <button className="action-btn action-btn--dangerSoft" onClick={() => router.push(`/projects/${projectSlug}/requests`)} type="button">
-                Заявки на покупку
-              </button>
-
-              {profile.is_admin && (
-                <Link className="action-btn action-btn--soft" href="/admin">Панель управления</Link>
-              )}
+            <div className="profile-actions" style={{ flexDirection: "column" }}>
+              <button className="btn ghost" onClick={openEdit} type="button">Редактировать профиль</button>
+              <button className="btn secondary" onClick={() => router.push(`/projects/${projectSlug}/requests`)} type="button">Заявки на покупку</button>
+              {profile.is_admin && <Link className="btn info" href="/admin">Панель управления</Link>}
             </div>
           </aside>
 
-          <main className="panel">
-            <section className="section">
-              <div className="section-title">Статистика по доступным <b>материалам</b></div>
-              <div className="mini-stats">
-                <div className="mini-stat">
-                  <div className="mini-stat-number">{stats?.totalMaterials ?? "—"}</div>
-                  <div className="mini-stat-label">Доступных материала</div>
-                </div>
-                <div className="mini-stat">
-                  <div className="mini-stat-number">{stats?.completedMaterials ?? "—"}</div>
-                  <div className="mini-stat-label">Пройдено материалов</div>
-                </div>
-                <div className="mini-stat">
-                  <div className="mini-stat-number">{stats ? `${stats.successRate}%` : "—"}</div>
-                  <div className="mini-stat-label">Общий прогресс</div>
-                </div>
+          {/* ПРАВАЯ КОЛОНКА */}
+          <main className="profile-panel">
+            
+            <div className="section-title">Статистика <b>материалов</b></div>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-value">{stats?.totalMaterials ?? "—"}</div>
+                <div className="stat-label">Доступно материалов</div>
               </div>
-              {progressLoading && <div style={{ marginTop: 12, fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>Подгружаем прогресс...</div>}
-              {progressError && <div style={{ marginTop: 12, fontWeight: 900, color: "#c62828" }}>Прогресс не загрузился: {progressError}</div>}
-            </section>
+              <div className="stat-card">
+                <div className="stat-value">{stats?.completedMaterials ?? "—"}</div>
+                <div className="stat-label">Пройдено полностью</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value">{stats ? `${stats.successRate}%` : "—"}</div>
+                <div className="stat-label">Общий прогресс</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value">{stats?.totalAvailableAssignments ?? "—"}</div>
+                <div className="stat-label">Доступно заданий</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value">{stats?.completedAvailableAssignments ?? "—"}</div>
+                <div className="stat-label">Решено заданий</div>
+              </div>
+            </div>
+            {progressLoading && <div style={{ marginBottom: 24, fontWeight: 700, color: "var(--project-muted)" }}>Подгружаем прогресс...</div>}
+            {progressError && <div style={{ marginBottom: 24, fontWeight: 800, color: "#ef4444" }}>Прогресс не загрузился: {progressError}</div>}
 
-            <section className="section">
-              <div className="section-title">Прогресс по доступным <b>материалам</b></div>
-              {!materialsProgress ? (
-                <div style={{ fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>Загрузка материалов...</div>
-              ) : materialsProgress.length === 0 ? (
-                <div style={{ fontWeight: 800, color: "rgba(44,62,80,0.6)" }}>
-                  Материалы пока не доступны
-                  <div style={{ marginTop: 6, fontWeight: 700 }}>Обратитесь к администратору для получения доступа</div>
-                </div>
-              ) : (
-                <div className="progress-list">
-                  {materialsProgress.map((m) => (
-                    <div key={`${m.kind}-${m.id}`} className="progress-row" onClick={() => router.push(m.href)}>
-                      <div className="progress-left">
-                        <div className={"progress-type " + (m.kind === "textbook" ? "progress-type--textbook" : "progress-type--crossword")}>
-                          {m.kind === "textbook" ? "УЧЕБНИК" : "КРОССВОРД"}
-                        </div>
-                        <div className="progress-title">{m.title}</div>
-                        <div className="progress-sub">
-                          {m.kind === "textbook" ? `${m.completed} из ${m.total} заданий выполнено` : `${m.completed} из ${m.total} слов отгадано`}
-                          {m.total === 0 ? " (нет заданий)" : ""}
-                        </div>
+            <div className="section-title">Прогресс <b>обучения</b></div>
+            {!materialsProgress ? (
+              <div style={{ fontWeight: 700, color: "var(--project-muted)" }}>Загрузка материалов...</div>
+            ) : materialsProgress.length === 0 ? (
+              <div style={{ fontWeight: 700, color: "var(--project-muted)", textAlign: "center", padding: "40px", background: "color-mix(in srgb, var(--project-text) 2%, transparent)", borderRadius: "20px" }}>
+                Материалы пока не доступны
+                <div style={{ marginTop: 8, fontSize: "14px" }}>Обратитесь к администратору для получения доступа</div>
+              </div>
+            ) : (
+              <div className="progress-list">
+                {materialsProgress.map((m) => (
+                  <Link key={`${m.kind}-${m.id}`} href={m.href} className="progress-row" style={{ textDecoration: "none" }}>
+                    <div className="progress-left">
+                      <div className="progress-type">
+                        {m.kind === "textbook" ? "УЧЕБНИК" : "КРОССВОРД"}
                       </div>
-                      <div className="progress-right">
-                        <div className="progress-bar"><div className="progress-fill" style={{ width: `${m.progressPercent}%` }} /></div>
-                        <div className="progress-percent">{m.progressPercent}%</div>
+                      <div className="progress-title">{m.title}</div>
+                      <div className="progress-sub">
+                        {m.kind === "textbook" ? `${m.completed} из ${m.total} заданий выполнено` : `${m.completed} из ${m.total} слов отгадано`}
+                        {m.total === 0 ? " (нет заданий)" : ""}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </section>
+                    <div className="progress-right">
+                      <div className="progress-bar"><div className="progress-fill" style={{ width: `${m.progressPercent}%` }} /></div>
+                      <div className="progress-percent">{m.progressPercent}%</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
 
-            <section className="section">
-              <div className="section-title"><b>Информация</b></div>
-              <ul className="info-list">
-                <li className="info-li"><span className="info-bullet" /> На этой странице отображается ваш прогресс по доступным материалам.</li>
-                <li className="info-li"><span className="info-bullet" /> В разделе "Прогресс по материалам" показаны все пособия, к которым у вас есть доступ.</li>
-                <li className="info-li"><span className="info-bullet" /> <span><b>Совет:</b> регулярно занимайтесь для достижения лучших результатов!</span></li>
-              </ul>
-            </section>
+            <div className="section-title" style={{ marginTop: "32px" }}>Служба <b>поддержки</b></div>
+            <ul className="info-list">
+              <li className="info-li">
+                <span className="info-bullet" />
+                <span>Возникли вопросы по материалам или платформе? Свяжитесь с нами: <b><a href="https://t.me/skebobingg" target="_blank" rel="noopener noreferrer" style={{ color: "var(--project-primary)", textDecoration: "none" }}>Telegram</a></b> или <b><a href="https://vk.com/bluntokyr" target="_blank" rel="noopener noreferrer" style={{ color: "var(--project-primary)", textDecoration: "none" }}>ВКонтакте</a></b>.</span>
+              </li>
+            </ul>
+
           </main>
         </div>
       </div>

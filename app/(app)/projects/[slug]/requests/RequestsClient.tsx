@@ -245,6 +245,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
       full_name: currentFullName,
       user_id: userId,
       is_processed: false,
+      total_price: totalAmount,
     };
 
     setBusy(true);
@@ -388,13 +389,13 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
       </Modal>
 
       <Modal open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="✅ Оплата заявки" maxWidth={540}>
-        <div style={{ background: "rgba(78, 205, 196, 0.12)", padding: "18px", borderRadius: "14px", border: "1px solid rgba(78, 205, 196, 0.25)", marginBottom: "20px" }}>
-          <h4 style={{ margin: "0 0 14px 0", color: "#0f766e", fontSize: "16px" }}>📋 Инструкция по оплате</h4>
-          <ul style={{ margin: 0, paddingLeft: "18px", color: "#111827", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px" }}>
+        <div style={{ background: "color-mix(in srgb, var(--project-primary) 12%, transparent)", padding: "18px", borderRadius: "14px", border: "1px solid color-mix(in srgb, var(--project-primary) 25%, transparent)", marginBottom: "20px" }}>
+          <h4 style={{ margin: "0 0 14px 0", color: "var(--project-primary)", fontSize: "16px", filter: "brightness(0.7)" }}>📋 Инструкция по оплате</h4>
+          <ul style={{ margin: 0, paddingLeft: "18px", color: "var(--project-text)", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px" }}>
             <li><strong>Отсканируйте QR-код</strong> в вашем банковском приложении.</li>
             <li>Сумма к оплате: <strong style={{ fontSize: "16px", color: "var(--project-primary)" }}>{paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "Сумма не определена"}</strong></li>
             <li>В назначении платежа (сообщении) <strong>ОБЯЗАТЕЛЬНО</strong> укажите: <br/>
-              <span style={{ background: "#fff", padding: "6px 10px", borderRadius: "8px", display: "inline-block", marginTop: "6px", border: "1px solid #ddd", fontWeight: 700 }}>
+              <span style={{ background: "var(--project-card-bg)", padding: "6px 10px", borderRadius: "8px", display: "inline-block", marginTop: "6px", border: "1px solid var(--glass-border)", fontWeight: 700 }}>
                 ФИО ребенка, оплата за учебные материалы
               </span>
             </li>
@@ -442,7 +443,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
         </div>
 
         <div className="modal-actions" style={{ marginTop: "24px" }}>
-          <button className="btn" type="button" onClick={() => setPaymentModalOpen(false)} style={{ width: "100%", backgroundColor: "var(--project-primary)" }}>
+          <button className="btn" style={{ width: "100%" }} type="button" onClick={() => setPaymentModalOpen(false)}>
             Я всё оплатил(а)
           </button>
         </div>
@@ -476,7 +477,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
           </div>
 
           <div className="requests-actions">
-            <button className="btn" onClick={openCreate} type="button" disabled={busy} style={{ backgroundColor: "var(--project-primary)" }}>
+            <button className="btn" onClick={openCreate} type="button" disabled={busy}>
               ➕ Создать новую заявку
             </button>
             <button className="btn ghost qr-open" type="button" onClick={() => { 
@@ -494,7 +495,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
             <div className="empty-state">
               <h3>📭 Заявок пока нет</h3>
               <p>Создайте свою первую заявку на покупку доступа к материалам</p>
-              <button className="btn" onClick={openCreate} type="button" disabled={busy} style={{ backgroundColor: "var(--project-primary)" }}>
+              <button className="btn" onClick={openCreate} type="button" disabled={busy}>
                 ➕ Создать заявку
               </button>
             </div>
@@ -523,11 +524,11 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
 
                   return (
                     <tr key={r.id}>
-                      <td><strong>{r.request_number}</strong></td>
+                      <td className="font-bold">{r.request_number}</td>
                       <td>{formatDateTime(r.created_at)}</td>
                       <td>{r.class_level || "—"}</td>
                       <td>{displayTabs.length > 0 ? displayTabs.join(", ") : "—"}</td>
-                      <td style={{ fontWeight: 'bold' }}>{r.total_price != null ? formatPrice(r.total_price) : "—"}</td>
+                      <td className="font-bold">{r.total_price != null ? formatPrice(r.total_price) : "—"}</td>
                       <td>
                         <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
                           {r.is_processed ? "✅ Выдано" : "⏳ Ожидает"}
@@ -537,7 +538,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
                         <button className={`btn btn-small ${locked ? "disabled" : ""}`} onClick={() => openEdit(r)} type="button" disabled={locked || busy}>
                           ✏️ Изменить
                         </button>{" "}
-                        <button className={`btn btn-small ${locked ? "disabled" : ""}`} onClick={() => void deleteRequest(r)} type="button" disabled={locked || busy}>
+                        <button className={`btn btn-small secondary ${locked ? "disabled" : ""}`} onClick={() => void deleteRequest(r)} type="button" disabled={locked || busy}>
                           🗑️ Удалить
                         </button>
                       </td>

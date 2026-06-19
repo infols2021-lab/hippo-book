@@ -1,19 +1,30 @@
+/* app/globals.css */
 @import "tailwindcss";
 
 :root {
-  /* Дефолтные цвета для всего сайта (fallback) */
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  
-  /* Дефолтные переменные для веток (переопределяются через layout.tsx) */
-  --project-primary: #3b82f6;
-  --project-secondary: #1d4ed8;
+  /* 1. Дефолтные базовые цвета (если админ ничего не задал) */
+  --project-primary: #0ea5e9; 
+  --project-secondary: #38bdf8;
   --project-bg: #f8fafc;
   --project-text: #0f172a;
-  --project-muted: #64748b;
   --project-card-bg: #ffffff;
-  --project-border: rgba(15, 23, 42, 0.12);
-  --project-glow: rgba(59, 130, 246, 0.25);
+  --danger-color: #ef4444;
+  
+  /* 2. ДВИЖОК ПРЕМИУМ-СТЕКЛА (генерируется автоматически) */
+  /* Прозрачный фон карточки (75% заливки) */
+  --glass-bg: color-mix(in srgb, var(--project-card-bg) 75%, transparent);
+  
+  /* Тончайшая полупрозрачная рамка (берет цвет текста с прозрачностью 8%) */
+  --glass-border: color-mix(in srgb, var(--project-text) 8%, transparent);
+  
+  /* Внутренний блик сверху (создает физический объем стекла) */
+  --glass-highlight: color-mix(in srgb, #ffffff 70%, transparent);
+  
+  /* Мягкая, рассеянная тень (без грязи и свечения) */
+  --glass-shadow: 0 12px 40px -12px color-mix(in srgb, var(--project-text) 12%, transparent);
+  
+  /* Сила размытия заднего фона */
+  --glass-blur: blur(24px);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,48 +34,33 @@
   }
 }
 
-/* ==========================================
-   ГЛОБАЛЬНЫЙ ФОН И ТЕКСТ (переопределяются веткой)
-   ========================================== */
+/* ГЛОБАЛЬНЫЙ ФОН И ТЕКСТ */
 body {
-  background-color: var(--project-bg, var(--background));
-  color: var(--project-text, var(--foreground));
+  background-color: var(--project-bg);
+  color: var(--project-text);
   min-height: 100vh;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  /* Если у проекта есть картинка на фоне, она будет плавно фиксироваться */
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
-/* ==========================================
-   УТИЛИТЫ ДЛЯ НОВОГО ДИЗАЙНА 
-   ========================================== */
-
-/* Скрытие стандартного скроллбара для горизонтальных меню (AppHeader, ProjectShell) */
+/* УТИЛИТЫ */
 .hide-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 .hide-scrollbar::-webkit-scrollbar {
-  display: none; /* Chrome, Safari and Opera */
+  display: none;
 }
 
-/* ==========================================
-   АДМИНКА (Инструмент сжатия)
-   ========================================== */
-
-/* Кастомный скроллбар для компонентов инструмента сжатия */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { 
+  background: color-mix(in srgb, var(--project-text) 20%, transparent); 
+  border-radius: 10px; 
 }
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(30, 41, 59, 0.5);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.8);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 1);
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { 
+  background: color-mix(in srgb, var(--project-text) 40%, transparent); 
 }

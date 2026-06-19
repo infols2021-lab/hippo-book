@@ -1,54 +1,20 @@
 /* public/styles/base.css */
 
-:root {
-  /* Базовая палитра (единая на всех страницах) – используется как fallback */
-  --bg1: var(--project-bg, #eaf6ff);
-  --bg2: #d8f2ff;
-
-  --accent: #ff6b6b;   /* красный (опасное/выйти) */
-  --accent2: var(--project-primary, #4ecdc4);  /* Динамический цвет проекта или бирюза */
-  --accent3: var(--project-secondary, #74b9ff); /* Вторичный динамический цвет или голубой */
-
-  --card: var(--project-card-bg, rgba(255, 255, 255, 0.78));
-  --card-border: var(--project-border, rgba(255, 255, 255, 0.65));
-  --muted: var(--project-muted, #6b7280);
-}
-
 /* ===== Hard reset ===== */
-* {
-  box-sizing: border-box;
-}
-
-html {
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
-
-html,
-body {
-  height: 100%;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: var(--bg1);
-}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html, body { height: 100%; margin: 0 !important; padding: 0 !important; }
 
 body {
   min-height: 100vh;
   overflow-x: hidden;
-  font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-               Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   font-style: normal;
-  color: var(--project-text, #1f2937);
-  background: transparent;
+  color: var(--project-text);
   position: relative;
-  isolation: isolate;
 }
 
-button,
-input,
-optgroup,
-select,
-textarea {
+button, input, optgroup, select, textarea {
   font-family: inherit;
   font-style: inherit;
 }
@@ -66,72 +32,63 @@ textarea {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 24px;
 }
 
 .logo {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
 }
 
 .logo .mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--accent3), var(--project-glow, rgba(116, 185, 255, 0.55)));
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--project-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
   color: #fff;
   font-size: 20px;
-  box-shadow: 0 10px 24px var(--project-glow, rgba(15, 23, 42, 0.10));
+  /* Мягкая тень в цвет акцента */
+  box-shadow: 0 8px 24px -6px color-mix(in srgb, var(--project-primary) 50%, transparent);
 }
 
 .header .nav {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
 }
 
-/* ===== Cards (Glassmorphism) ===== */
+/* ===== Cards (Идеальное Жидкое Стекло) ===== */
 .card {
-  background: var(--card);
-  border-radius: 16px;
-  padding: 18px;
-  border: 1px solid var(--card-border);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05); /* Уменьшил тень, чтобы не было "грязи" на фоне */
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: 24px;
+  padding: 24px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 
+    inset 0 1px 1px var(--glass-highlight), /* Блик сверху для объема */
+    var(--glass-shadow); /* Рассеянная тень */
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-@supports ((-webkit-backdrop-filter: blur(10px)) or (backdrop-filter: blur(10px))) {
-  @media (min-width: 1024px) {
-    .card {
-      -webkit-backdrop-filter: blur(10px);
-      backdrop-filter: blur(10px);
-      /* Фикс для темной темы: если цвет фона темный, карточка будет смотреться гармоничнее */
-      background: color-mix(in srgb, var(--card) 80%, transparent); 
-    }
-  }
-}
-
-@media (max-width: 1023px) {
-  .card {
-    background: var(--project-card-bg, rgba(255, 255, 255, 0.92));
-  }
-}
-
-/* ===== Buttons ===== */
+/* ===== Buttons (Премиум-матовость) ===== */
 .btn {
-  background: linear-gradient(135deg, var(--accent2), color-mix(in srgb, var(--accent2) 80%, white));
-  color: #fff;
-  border: 0;
-  padding: 10px 16px;
+  background: var(--project-primary);
+  color: #ffffff;
+  border: 1px solid color-mix(in srgb, #000000 10%, transparent); /* Едва заметный контур */
+  padding: 10px 20px;
   border-radius: 12px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
-  transition: transform .12s ease, box-shadow .12s, filter .12s ease;
-  box-shadow: 0 10px 18px var(--project-glow, rgba(78, 205, 196, 0.18));
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.2), 
+    0 4px 12px -4px color-mix(in srgb, var(--project-primary) 50%, transparent);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -139,32 +96,43 @@ textarea {
   gap: 8px;
 }
 .btn:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   filter: brightness(1.05);
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.3), 
+    0 8px 20px -6px color-mix(in srgb, var(--project-primary) 60%, transparent);
 }
 .btn:active {
-  transform: translateY(-1px);
-}
-
-.btn.secondary {
-  background: linear-gradient(135deg, var(--accent), #ff8e8e);
-  box-shadow: 0 10px 18px rgba(255, 107, 107, 0.16);
-}
-
-.btn.info {
-  background: linear-gradient(135deg, var(--accent3), color-mix(in srgb, var(--accent3) 80%, white));
-  box-shadow: 0 10px 18px var(--project-glow, rgba(116, 185, 255, 0.16));
-}
-
-.btn.ghost {
-  background: color-mix(in srgb, var(--project-card-bg, #fff) 55%, transparent);
-  color: var(--accent2);
-  border: 2px solid color-mix(in srgb, var(--accent2) 25%, transparent);
+  transform: translateY(0);
   box-shadow: none;
 }
 
+.btn.secondary {
+  background: var(--danger-color);
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.2), 
+    0 4px 12px -4px color-mix(in srgb, var(--danger-color) 50%, transparent);
+}
+
+.btn.info {
+  background: var(--project-secondary);
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.2), 
+    0 4px 12px -4px color-mix(in srgb, var(--project-secondary) 50%, transparent);
+}
+
+.btn.ghost {
+  background: color-mix(in srgb, var(--project-text) 5%, transparent);
+  color: var(--project-text);
+  border: 1px solid var(--glass-border);
+  box-shadow: none;
+}
+.btn.ghost:hover {
+  background: color-mix(in srgb, var(--project-text) 8%, transparent);
+}
+
 .btn.small {
-  padding: 6px 10px;
+  padding: 8px 14px;
   font-size: 13px;
   border-radius: 10px;
 }
@@ -173,41 +141,39 @@ textarea {
 .grid-2 {
   display: grid;
   grid-template-columns: 360px 1fr;
-  gap: 18px;
+  gap: 24px;
 }
 @media (max-width: 880px) {
-  .grid-2 {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
+  .grid-2 { grid-template-columns: 1fr; gap: 16px; }
 }
 
-/* ===== Profile (общие элементы) ===== */
+/* ===== Profile (Обновленный чистый дизайн) ===== */
 .profile-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   text-align: center;
 }
 
 .profile-avatar {
-  width: 220px;
-  height: 220px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--project-card-bg, #fff) 85%, transparent), color-mix(in srgb, var(--project-card-bg, #fff) 55%, transparent));
+  width: 200px;
+  height: 200px;
+  border-radius: 24px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 1px var(--glass-highlight), var(--glass-shadow);
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.10);
-  border: 6px solid color-mix(in srgb, var(--project-card-bg, #fff) 75%, transparent);
+  padding: 8px;
 }
 
 .profile-avatar svg {
   width: 100%;
   height: 100%;
-  border-radius: 14px;
+  border-radius: 16px;
 }
 
 .key-circles {
@@ -216,18 +182,19 @@ textarea {
   pointer-events: none;
 }
 .key-circle {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #111;
-  opacity: 0.9;
+  background: var(--project-card-bg);
+  border: 1px solid var(--glass-border);
   position: absolute;
   transform: translate(-50%, -50%);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 .key-circle.filled {
-  background: linear-gradient(135deg, #ffd166, #ff6b6b);
-  box-shadow: 0 8px 18px rgba(255, 107, 107, 0.28), 0 2px 6px rgba(0, 0, 0, 0.12);
+  background: var(--project-primary);
+  border: none;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 4px 12px color-mix(in srgb, var(--project-primary) 40%, transparent);
 }
 
 .kpos1 { left: 20%; top: 28%; }
@@ -238,24 +205,23 @@ textarea {
 .kpos6 { left: 50%; top: 66%; }
 .kpos7 { left: 26%; top: 58%; }
 
-.profile-info {
-  width: 100%;
-}
+.profile-info { width: 100%; }
 .badge {
   display: inline-block;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: var(--accent2);
-  color: #fff;
-  font-weight: 800;
+  padding: 6px 12px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--project-primary) 15%, transparent);
+  color: var(--project-primary);
+  font-weight: 700;
+  font-size: 13px;
 }
 
 /* ===== Admin ===== */
 .admin-controls {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 .table {
   width: 100%;
@@ -264,13 +230,19 @@ textarea {
 }
 .table th,
 .table td {
-  padding: 10px;
-  border-bottom: 1px solid var(--card-border);
+  padding: 14px;
+  border-bottom: 1px solid var(--glass-border);
   text-align: left;
-  background: color-mix(in srgb, var(--project-card-bg, #fff) 55%, transparent);
+}
+.table th {
+  font-weight: 700;
+  color: color-mix(in srgb, var(--project-text) 60%, transparent);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-/* ===== Modal ===== */
+/* ===== Modals (Стеклянные) ===== */
 .modal-overlay,
 .modal-backdrop {
   position: fixed;
@@ -279,25 +251,27 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 18px;
-  background: rgba(12, 25, 35, 0.55);
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .modal-panel,
 .modal-body {
   width: 100%;
-  border-radius: 22px;
-  background: var(--project-card-bg, #ffffff) !important;
-  border: 1px solid var(--card-border);
-  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35), 0 2px 0 rgba(15, 23, 42, 0.04);
+  border-radius: 24px;
+  background: var(--project-card-bg) !important;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   outline: none;
 }
 
 .modal-content {
-  background: var(--project-card-bg, #ffffff) !important;
+  background: var(--project-card-bg) !important;
   padding: 0;
-  max-height: min(78vh, 720px);
+  max-height: min(85vh, 800px);
   overflow: hidden;
 }
 
@@ -306,198 +280,82 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px;
-  background: color-mix(in srgb, var(--project-card-bg, #f3f6fb) 95%, black);
-  border-bottom: 1px solid var(--card-border);
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .modal-title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 900;
+  font-size: 18px;
+  font-weight: 800;
   color: var(--project-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .modal-close {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
-  border: 1px solid var(--card-border);
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: none;
   cursor: pointer;
-  background: var(--project-card-bg, #ffffff);
+  background: color-mix(in srgb, var(--project-text) 5%, transparent);
   color: var(--project-text);
   font-size: 18px;
-  font-weight: 900;
-  box-shadow: 0 12px 28px rgba(15, 65, 95, 0.12);
-  transition: transform 0.12s ease, filter 0.12s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
-.modal-close:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.03);
-}
-.modal-close:active {
-  transform: translateY(0px);
-  filter: brightness(0.98);
-}
+.modal-close:hover { background: color-mix(in srgb, var(--project-text) 10%, transparent); }
 
 .modal-body,
 .modal-content > *:not(.modal-header) {
-  padding: 16px;
-  max-height: min(78vh, 720px);
+  padding: 24px;
+  max-height: min(85vh, 800px);
   overflow: auto;
 }
 
-.modal-body::-webkit-scrollbar,
-.modal-content > *:not(.modal-header)::-webkit-scrollbar {
-  width: 10px;
-}
-.modal-body::-webkit-scrollbar-thumb,
-.modal-content > *:not(.modal-header)::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--project-text, #2c3e50) 18%, transparent);
-  border-radius: 999px;
-  border: 3px solid var(--project-card-bg, #fff);
-}
-.modal-body::-webkit-scrollbar-track,
-.modal-content > *:not(.modal-header)::-webkit-scrollbar-track {
-  background: transparent;
-}
+/* ===== Form Helpers ===== */
+.row { display: flex; gap: 12px; align-items: center; }
+.col { display: flex; flex-direction: column; gap: 12px; }
 
-@media (max-width: 640px) {
-  .modal-overlay,
-  .modal-backdrop {
-    padding: 12px;
-  }
-  .modal-body,
-  .modal-content > *:not(.modal-header) {
-    max-height: 82vh;
-  }
-}
-
-/* ===== Helpers ===== */
-.row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.col {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.input,
-textarea,
-select {
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 2px solid var(--card-border);
-  background: var(--project-card-bg, #fff);
+/* Полупрозрачные инпуты */
+.input, textarea, select {
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--project-text) 3%, transparent);
   color: var(--project-text);
   font-size: 15px;
   width: 100%;
+  transition: all 0.2s ease;
 }
+.input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--project-primary);
+  background: var(--project-card-bg);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--project-primary) 15%, transparent);
+}
+
 .small-muted {
   font-size: 13px;
-  color: var(--muted);
-}
-
-/* ===== Mobile ===== */
-@media (max-width: 768px) {
-  .container {
-    width: 100%;
-    margin: 0;
-    padding: 10px;
-    border-radius: 0;
-  }
-  .header {
-    flex-direction: column;
-    gap: 15px;
-    text-align: center;
-  }
-  .logo {
-    justify-content: center;
-  }
-  .nav {
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  .profile-avatar {
-    width: 180px;
-    height: 180px;
-  }
-  .card {
-    padding: 15px;
-    margin: 8px 0;
-  }
-  .btn {
-    padding: 12px 16px;
-    font-size: 14px;
-  }
-  .key-circle {
-    width: 28px;
-    height: 28px;
-  }
-}
-
-@media (max-width: 480px) {
-  .profile-avatar {
-    width: 150px;
-    height: 150px;
-  }
-  .key-circle {
-    width: 24px;
-    height: 24px;
-  }
-  .badge {
-    padding: 4px 8px;
-    font-size: 12px;
-  }
-  .grid-2 {
-    gap: 8px;
-  }
-}
-
-/* ===== Timer / fixed header ===== */
-body.with-fixed-timer {
-  padding-top: 70px;
-}
-@media (max-width: 768px) {
-  body.with-fixed-timer {
-    padding-top: 90px;
-  }
-}
-@media (max-width: 480px) {
-  body.with-fixed-timer {
-    padding-top: 100px;
-  }
+  color: color-mix(in srgb, var(--project-text) 60%, transparent);
 }
 
 /* ===== Score pill ===== */
-.assignment-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.assignment-status { display: flex; align-items: center; gap: 8px; }
 .score-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 48px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-weight: 900;
-  font-size: 12px;
-  line-height: 1;
-  background: color-mix(in srgb, var(--accent2) 18%, transparent);
-  color: var(--accent2);
-  border: 1px solid color-mix(in srgb, var(--accent2) 30%, transparent);
-  box-shadow: 0 6px 12px color-mix(in srgb, var(--accent2) 12%, transparent);
+  min-width: 50px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  font-weight: 800;
+  font-size: 13px;
+  background: color-mix(in srgb, var(--project-primary) 12%, transparent);
+  color: var(--project-primary);
 }
 .score-pill.red {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
-  box-shadow: 0 6px 12px color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, var(--danger-color) 12%, transparent);
+  color: var(--danger-color);
 }
