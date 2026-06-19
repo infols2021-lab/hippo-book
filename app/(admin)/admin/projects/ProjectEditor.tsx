@@ -18,7 +18,7 @@ type FeatureKey =
   | "requestMode";
 
 // ============================================================
-// 🖼️ Живое превью – 100% точная копия Glassmorphism-движка
+// 🖼️ Живое превью – точная копия движка Glassmorphism
 // ============================================================
 function LivePreview({ colors }: { colors: Record<string, string> }) {
   const primary = colors.primary || "#0ea5e9";
@@ -27,7 +27,6 @@ function LivePreview({ colors }: { colors: Record<string, string> }) {
   const cardBg = colors.cardBg || "#ffffff";
   const text = colors.textColor || "#0f172a";
 
-  // Генерируем стеклянные переменные прямо здесь для превью
   const previewStyles = {
     "--project-primary": primary,
     "--project-secondary": secondary,
@@ -43,7 +42,7 @@ function LivePreview({ colors }: { colors: Record<string, string> }) {
     fontFamily: "Inter, ui-sans-serif, sans-serif",
     padding: "24px",
     borderRadius: "24px",
-    minHeight: "400px",
+    minHeight: "450px",
     border: "1px solid rgba(0,0,0,0.04)",
     transition: "all 0.4s ease"
   } as React.CSSProperties;
@@ -68,10 +67,16 @@ function LivePreview({ colors }: { colors: Record<string, string> }) {
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <div 
             style={{
-              width: "42px", height: "42px", borderRadius: "12px",
-              background: "var(--project-primary)", color: "#fff",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontWeight: 900, fontSize: "16px",
+              width: "42px", 
+              height: "42px", 
+              borderRadius: "12px",
+              background: "var(--project-primary)", 
+              color: "#fff",
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center",
+              fontWeight: 900, 
+              fontSize: "16px",
               boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3), 0 8px 16px -4px color-mix(in srgb, var(--project-primary) 50%, transparent)"
             }}
           >
@@ -114,27 +119,36 @@ function LivePreview({ colors }: { colors: Record<string, string> }) {
         >
           <div 
             style={{
-              width: "120px", height: "120px", borderRadius: "20px",
+              width: "120px", 
+              height: "120px", 
+              borderRadius: "50%",
               background: "color-mix(in srgb, var(--project-primary) 10%, transparent)",
-              border: "2px solid color-mix(in srgb, var(--project-primary) 20%, transparent)",
+              border: "4px solid color-mix(in srgb, var(--project-primary) 20%, transparent)",
               boxShadow: "0 12px 32px -8px color-mix(in srgb, var(--project-primary) 30%, transparent)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "40px",
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center", 
+              fontSize: "40px",
               marginBottom: "16px"
             }}
           >
             👤
           </div>
           <div style={{ fontWeight: 900, fontSize: "20px", color: "var(--project-text)", marginBottom: "4px" }}>
-            Солнцев Алексей
+            Ученик
           </div>
           <div style={{ fontSize: "13px", color: "color-mix(in srgb, var(--project-text) 60%, transparent)", fontWeight: 700, marginBottom: "16px" }}>
             student@mail.ru
           </div>
           <div 
             style={{
-              width: "100%", padding: "12px", borderRadius: "14px",
-              background: "var(--project-primary)", color: "#fff",
-              fontWeight: 800, fontSize: "13px",
+              width: "100%", 
+              padding: "12px", 
+              borderRadius: "14px",
+              background: "var(--project-primary)", 
+              color: "#fff",
+              fontWeight: 800, 
+              fontSize: "13px",
               boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3), 0 8px 20px -6px color-mix(in srgb, var(--project-primary) 50%, transparent)"
             }}
           >
@@ -160,7 +174,7 @@ function LivePreview({ colors }: { colors: Record<string, string> }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
               <div style={{ background: "color-mix(in srgb, var(--project-primary) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--project-primary) 15%, transparent)", borderRadius: "16px", padding: "16px" }}>
                 <div style={{ fontSize: "24px", fontWeight: 900, color: "var(--project-primary)" }}>
-                  14
+                  12
                 </div>
                 <div style={{ fontSize: "11px", fontWeight: 700, color: "color-mix(in srgb, var(--project-text) 60%, transparent)", marginTop: "4px" }}>
                   МАТЕРИАЛОВ
@@ -247,15 +261,16 @@ export default function ProjectEditor({
     }
   }, [project]);
 
+  // ✅ ИСПРАВЛЕННЫЙ МЕТОД СОХРАНЕНИЯ (PUT)
   const saveProject = async (e: React.FormEvent) => {
     e.preventDefault();
     const url = project?.id ? `/api/admin/projects/${project.id}` : "/api/admin/projects";
     
     try {
       const res = await fetch(url, {
-        method: project?.id ? "PATCH" : "POST",
+        method: project?.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(project?.id ? { id: project.id, ...formData } : formData),
+        body: JSON.stringify(formData),
         cache: "no-store",
       });
       
@@ -432,7 +447,9 @@ export default function ProjectEditor({
         {/* БАЗОВЫЕ НАСТРОЙКИ */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <label className="block text-sm font-bold mb-2 text-gray-700">Название ветки</label>
+            <label className="block text-sm font-bold mb-2 text-gray-700">
+              Название ветки
+            </label>
             <input 
               required 
               className="w-full border-2 rounded-xl px-4 py-2.5 font-medium outline-none focus:border-blue-500" 
@@ -442,7 +459,9 @@ export default function ProjectEditor({
             />
           </div>
           <div>
-            <label className="block text-sm font-bold mb-2 text-gray-700">URL (Slug)</label>
+            <label className="block text-sm font-bold mb-2 text-gray-700">
+              URL (Slug)
+            </label>
             <input 
               required 
               className="w-full border-2 rounded-xl px-4 py-2.5 font-medium outline-none focus:border-blue-500 font-mono" 
@@ -463,7 +482,9 @@ export default function ProjectEditor({
             />
           </div>
           <div className="col-span-1 md:col-span-3">
-            <label className="block text-sm font-bold mb-2 text-gray-700">Описание на портале</label>
+            <label className="block text-sm font-bold mb-2 text-gray-700">
+              Описание на портале
+            </label>
             <textarea 
               className="w-full border-2 rounded-xl px-4 py-2.5 font-medium outline-none focus:border-blue-500" 
               rows={2} 
@@ -489,7 +510,7 @@ export default function ProjectEditor({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 border-t pt-8">
           <div className="space-y-6">
             <div>
-              <h3 className="text-xl font-black mb-2 text-gray-800">🎨 Цвета и Тема (Glassmorphism)</h3>
+              <h3 className="text-xl font-black mb-2 text-gray-800">🎨 Цвета и Тема</h3>
               <p className="text-sm text-gray-500 mb-4 font-medium">
                 Создайте уникальный стиль. Движок сам рассчитает прозрачность, тени и матовое стекло.
               </p>
