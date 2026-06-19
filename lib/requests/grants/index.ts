@@ -5,14 +5,12 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toStringArray, uniqueStrings, normalizeBranchType } from "@/lib/materials/normalize";
-import { getRequestTargetLevels, getRequestMaterialKinds } from "@/lib/requests/normalize";
+import { getRequestMaterialKinds } from "@/lib/requests/normalize";
 
 // ----------------------------------------------------------------------------
 // Типы
 // ----------------------------------------------------------------------------
 
-// Оставляем легаси-типы в union для обратной совместимости при парсинге СТАРЫХ записей
-// из таблицы purchase_request_grants. Новые выдачи всегда используют "material".
 export type GrantKind = "textbook" | "crossword" | "mock_test" | "material";
 
 export type GrantTarget = {
@@ -78,34 +76,53 @@ export async function grantDynamicProjectAccessForRequest(
   const grantedLabels: string[] = [];
   const grantsToStore: GrantResult["grantsToStore"] = [];
 
-  const targetLevels = toStringArray(r.class_level).length
-    ? toStringArray(r.class_level)
-    : toStringArray(r.target_levels);
+  // Собираем все возможные упоминания уровней из заявки для максимальной надежности
+  const userRawLevels = uniqueStrings([
+    ...toStringArray(r.class_level),
+    ...toStringArray(r.target_levels),
+    ...toStringArray(r.target_level)
+  ]).map(x => x.toLowerCase().trim());
     
-  const requestedTabs = toStringArray(r.material_kinds).length
-    ? toStringArray(r.material_kinds)
-    : toStringArray(r.textbook_types);
+  const requestedTabs = uniqueStrings([
+    ...toStringArray(r.material_kinds),
+    ...toStringArray(r.textbook_types)
+  ]);
 
-  // 1. Получаем все активные табы этого проекта
-  const { data: tabsRes, error: tabsError } = await supabase
-    .from("project_tabs")
-    .select("id, title")
-    .eq("project_id", r.project_id)
-    .eq("is_active", true);
+  // 1. Загружаем справочники табов и уровней проекта для точного сопоставления
+  const [levelsRes, tabsRes] = await Promise.all([
+    supabase.from("project_levels").select("code, label").eq("project_id", r.project_id),
+    supabase.from("project_tabs").select("id, title").eq("project_id", r.project_id).eq("is_active", true)
+  ]);
 
-  if (tabsError) throw new Error(tabsError.message);
+  if (levelsRes.error) throw new Error(levelsRes.error.message);
+  if (tabsRes.error) throw new Error(tabsRes.error.message);
 
+  // Маппим пользовательский ввод уровней (будь то label или code) в валидные коды уровней
+  const validUserLevelCodes = new Set<string>();
+  (levelsRes.data || []).forEach((lvl: any) => {
+    const code = String(lvl.code).toLowerCase().trim();
+    const label = String(lvl.label).toLowerCase().trim();
+    if (userRawLevels.includes(code) || userRawLevels.includes(label)) {
+      validUserLevelCodes.add(code);
+    }
+  });
+
+  // Фолбэк на случай, если в справочнике нет совпадений
+  if (validUserLevelCodes.size === 0) {
+    userRawLevels.forEach(x => validUserLevelCodes.add(x));
+  }
+
+  // Определяем ID табов, которые запросил пользователь
   let tabIdsToQuery: string[] = [];
-
   if (requestedTabs.length > 0) {
     for (const reqTab of requestedTabs) {
-      const matched = (tabsRes ?? []).find(
-        (t: any) => t.id === reqTab || String(t.title).toLowerCase() === String(reqTab).toLowerCase(),
+      const matched = (tabsRes.data || []).find(
+        (t: any) => t.id === reqTab || String(t.title).toLowerCase().trim() === String(reqTab).toLowerCase().trim(),
       );
       if (matched) tabIdsToQuery.push(matched.id);
     }
   } else {
-    tabIdsToQuery = (tabsRes ?? []).map((t: any) => t.id);
+    tabIdsToQuery = (tabsRes.data || []).map((t: any) => t.id);
   }
 
   if (tabIdsToQuery.length === 0) return { grantedLabels, grantsToStore };
@@ -119,17 +136,20 @@ export async function grantDynamicProjectAccessForRequest(
 
   if (matError) throw new Error(matError.message);
 
-  // 3. Мягкая фильтрация (Fuzzy match) уровней/классов
-  const userLevels = targetLevels.map((x) => String(x).toLowerCase());
+  // 3. Фильтруем материалы: выдаем все материалы выбранного таба, совпадающие с уровнем пользователя
+  const matchedMaterials = (materials || []).filter((mat) => {
+    if (validUserLevelCodes.size === 0) return true;
 
-  const matchedMaterials = (materials ?? []).filter((mat) => {
-    if (userLevels.length === 0) return true;
     const matLevels = [
       ...toStringArray(mat.target_levels),
       ...toStringArray(mat.class_levels),
-    ].map((x) => String(x).toLowerCase());
+    ].map((x) => String(x).toLowerCase().trim());
+    
     if (matLevels.length === 0) return true;
-    return matLevels.some((ml) => userLevels.some((ul) => ml === ul || ml.includes(ul) || ul.includes(ml)));
+
+    return matLevels.some((ml) => 
+      Array.from(validUserLevelCodes).some((ul) => ml === ul || ml.includes(ul) || ul.includes(ml))
+    );
   });
 
   // 4. Записываем доступы в единую таблицу material_access
@@ -166,8 +186,7 @@ export async function grantDynamicProjectAccessForRequest(
 }
 
 /**
- * Универсальная выдача доступов для ЛЮБОЙ ветки (Olympiad, Gatehouse и новые).
- * Заменяет собой весь старый легаси код.
+ * Универсальная выдача доступов для ЛЮБОЙ ветки (Olympiad, Gatehouse и кастомные без project_id).
  */
 export async function grantGenericBranchAccessForRequest(
   supabase: SupabaseClient,
@@ -179,9 +198,11 @@ export async function grantGenericBranchAccessForRequest(
   const grantsToStore: GrantResult["grantsToStore"] = [];
 
   const branchType = normalizeBranchType(r.branch_type);
-  const targetLevels = toStringArray(r.class_level).length
-    ? toStringArray(r.class_level)
-    : toStringArray(r.target_levels);
+  const targetLevels = uniqueStrings([
+    ...toStringArray(r.class_level),
+    ...toStringArray(r.target_levels),
+    ...toStringArray(r.target_level)
+  ]);
   const kinds = getRequestMaterialKinds(r);
 
   let query = supabase
@@ -197,14 +218,14 @@ export async function grantGenericBranchAccessForRequest(
   const { data: materials, error } = await query;
   if (error) throw new Error(error.message);
 
-  const userLevels = targetLevels.map((x) => String(x).toLowerCase());
+  const userLevels = targetLevels.map((x) => String(x).toLowerCase().trim());
 
   const matchedMaterials = (materials ?? []).filter((mat) => {
     if (userLevels.length === 0) return true;
     const matLevels = [
       ...toStringArray(mat.target_levels),
       ...toStringArray(mat.class_levels),
-    ].map((x) => String(x).toLowerCase());
+    ].map((x) => String(x).toLowerCase().trim());
     
     if (matLevels.length === 0) return true;
     return matLevels.some((ml) => userLevels.some((ul) => ml === ul || ml.includes(ul) || ul.includes(ml)));
@@ -228,7 +249,7 @@ export async function grantGenericBranchAccessForRequest(
       grantsToStore.push({
         request_id: r.id,
         user_id: r.user_id,
-        kind: "material", // Теперь всегда "material"
+        kind: "material",
         item_id: mat.id,
         title: mat.title,
         granted_by: adminId,
@@ -252,12 +273,9 @@ export async function grantAccessForRequest(
   adminId: string,
   r: ReqRow,
 ): Promise<GrantResult> {
-  // Приоритет динамическим проектам (табы)
   if (r.project_id) {
     return grantDynamicProjectAccessForRequest(supabase, adminId, r);
   }
-
-  // Если не проект, используем единый универсальный флоу для всех веток
   return grantGenericBranchAccessForRequest(supabase, adminId, r);
 }
 
@@ -312,9 +330,12 @@ export async function existsOtherProcessedGenericRequestForMaterial(
   for (const row of data ?? []) {
     const req = row as ReqRow;
     const rowLevels = [...toStringArray(req.class_level), ...toStringArray(req.target_levels)];
+    const rowLevelsNormalized = rowLevels.map(x => String(x).toLowerCase().trim());
+    const levelsNormalized = levels.map(x => String(x).toLowerCase().trim());
+    
     const rowKinds = getRequestMaterialKinds(req);
 
-    const levelMatches = overlaps(rowLevels, levels);
+    const levelMatches = overlaps(rowLevelsNormalized, levelsNormalized);
     const kindMatches = rowKinds.length ? rowKinds.includes(kind) : true;
 
     if (levelMatches && kindMatches) return true;
@@ -372,8 +393,7 @@ export async function enrichMockTestTargetIfNeeded(
 }
 
 /**
- * Идеальная функция отзыва доступов. Удалена вся логика легаси-таблиц.
- * Мы удаляем доступы только из единой material_access.
+ * Функция отзыва доступов. Удаляет доступы только из единой material_access.
  */
 export async function revokeAccessForRequest(
   supabase: SupabaseClient,
@@ -401,10 +421,8 @@ export async function revokeAccessForRequest(
       t.target_levels,
     );
 
-    // Если материал нужен другой активной заявке - не удаляем доступ к нему
     if (keepByGrant || keepByRequest) continue;
 
-    // Универсальное удаление из единой таблицы
     const { error: delError } = await supabase
       .from("material_access")
       .delete()
@@ -414,7 +432,6 @@ export async function revokeAccessForRequest(
     if (delError) throw new Error(delError.message);
   }
 
-  // Очистка истории выдачи
   const { error: delHistory } = await supabase
     .from("purchase_request_grants")
     .delete()
