@@ -23,6 +23,7 @@ type PurchaseRequest = {
   is_processed: boolean;
   user_id: string;
   project_id?: string | null;
+  total_price?: number | null;
 };
 
 type Props = {
@@ -96,6 +97,7 @@ function normalizeRequestRow(row: any): PurchaseRequest {
     full_name: String(row?.full_name ?? ""),
     is_processed: Boolean(row?.is_processed),
     project_id: row?.project_id ?? null,
+    total_price: row?.total_price ?? null,
   };
 }
 
@@ -111,7 +113,11 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
   const [requestNumber, setRequestNumber] = useState("");
   const [requestDateTime, setRequestDateTime] = useState("");
   const [classLevel, setClassLevel] = useState("");
-  const [selectedTabs, setSelectedTabs] = useState<string[]>([]); // теперь это ID табов
+  const [selectedTabs, setSelectedTabs] = useState<string[]>([]);
+  
+  // Добавляем редактируемые поля для ФИО и Email
+  const [currentEmail, setCurrentEmail] = useState(userEmail);
+  const [currentFullName, setCurrentFullName] = useState(userFullName);
 
   const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
   const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
@@ -121,7 +127,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
 
   const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
 
-  // Маппинг названия таба → ID для обратной совместимости со старыми заявками
   const tabTitleToId = useMemo(() => {
     const map = new Map<string, string>();
     for (const t of tabs) {
@@ -130,26 +135,24 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
     return map;
   }, [tabs]);
 
-  // Функция для получения цены таба по ID
   const getTabPrice = (tabId: string): number => {
     const tab = tabs.find(t => t.id === tabId);
     return tab?.price ?? 0;
   };
 
-  // Сумма выбранных табов
   const totalAmount = selectedTabs.reduce((sum, id) => sum + getTabPrice(id), 0);
 
-  // Последняя необработанная заявка
   const lastPendingRequest = useMemo(() => {
     return requests.find((r) => !r.is_processed) ?? null;
   }, [requests]);
 
-  // Сумма для последней необработанной заявки (считаем по её разделам)
   const lastPendingAmount = useMemo(() => {
     if (!lastPendingRequest) return 0;
+    // Берем цену прямо из сохраненной заявки, либо вычисляем на лету
+    if (lastPendingRequest.total_price != null) return lastPendingRequest.total_price;
+
     const tabNames = lastPendingRequest.material_kinds?.length ? lastPendingRequest.material_kinds : (lastPendingRequest.textbook_types || []);
-    // Преобразуем названия в ID (если есть)
-    const ids = tabNames.map(name => tabTitleToId.get(name) || name); // если не нашли, оставляем как есть (может быть ID)
+    const ids = tabNames.map(name => tabTitleToId.get(name) || name); 
     return ids.reduce((sum, id) => sum + getTabPrice(id), 0);
   }, [lastPendingRequest, tabTitleToId, tabs]);
 
@@ -185,6 +188,9 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
     setRequestDateTime(localISO);
     setClassLevel("");
     setSelectedTabs([]);
+    // При создании сбрасываем на значения профиля
+    setCurrentEmail(userEmail);
+    setCurrentFullName(userFullName);
     setRequestModalOpen(true);
   }
 
@@ -201,11 +207,14 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
     setRequestDateTime(localISO);
     setClassLevel(r.class_level || "");
 
-    // Извлекаем названия/ID табов из заявки
     const rawTabs = r.material_kinds?.length ? r.material_kinds : (r.textbook_types || []);
-    // Преобразуем названия в ID (если возможно)
     const tabIds = rawTabs.map(name => tabTitleToId.get(name) || name);
     setSelectedTabs(tabIds);
+
+    // При редактировании подтягиваем ФИО и Email из сохраненной заявки
+    setCurrentEmail(r.email || userEmail);
+    setCurrentFullName(r.full_name || userFullName);
+    
     setRequestModalOpen(true);
   }
 
@@ -229,19 +238,23 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
       }
     }
 
-    // Отправляем ID табов (они сохранятся в material_kinds / textbook_types)
+    // 🚀 ИСПРАВЛЕНИЯ ЗДЕСЬ:
+    // 1. branch_type теперь равен slug текущего проекта
+    // 2. Отправляем email и full_name из стейта, а не захардкоженные
+    // 3. Отправляем total_price
     const payload = {
       request_number: requestNumber,
       created_at: requestDateTime + ":00Z",
-      branch_type: "olympiad",
+      branch_type: project.slug,
       project_id: project.id,
       class_level: classLevel,
       textbook_types: selectedTabs,
       material_kinds: selectedTabs,
-      email: userEmail,
-      full_name: userFullName,
+      email: currentEmail,
+      full_name: currentFullName,
       user_id: userId,
       is_processed: false,
+      total_price: totalAmount,
     };
 
     setBusy(true);
@@ -302,7 +315,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
 
   const brandMark = project.name.substring(0, 2).toUpperCase() || "EK";
 
-  // Вспомогательная функция для отображения цены таба
   const formatPrice = (price: number) => {
     if (price === 0) return "бесплатно";
     return `${price} ₽`;
@@ -316,7 +328,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
         <form onSubmit={(e) => { e.preventDefault(); void saveRequest(); }}>
           <div className="form-group">
             <label>Номер заявки:</label>
-            <input type="text" value={requestNumber} readOnly />
+            <input type="text" value={requestNumber} readOnly className="bg-gray-100" />
           </div>
 
           <div className="form-group">
@@ -353,14 +365,25 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
             </div>
           </div>
 
+          {/* 🚀 ИСПРАВЛЕНИЕ: Инпуты больше не readOnly, пользователь может менять ФИО */}
           <div className="form-group">
             <label>Email:</label>
-            <input type="email" value={userEmail} readOnly />
+            <input 
+              type="email" 
+              value={currentEmail} 
+              onChange={(e) => setCurrentEmail(e.target.value)}
+              required
+            />
           </div>
 
           <div className="form-group">
             <label>ФИО ученика:</label>
-            <input type="text" value={userFullName} readOnly />
+            <input 
+              type="text" 
+              value={currentFullName} 
+              onChange={(e) => setCurrentFullName(e.target.value)}
+              required
+            />
           </div>
 
           <div className="total-amount" style={{ display: totalAmount > 0 ? "block" : "none" }}>
@@ -482,6 +505,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
                   <th>Дата создания</th>
                   <th>Уровень (Класс)</th>
                   <th>Разделы материалов</th>
+                  <th>Цена</th>
                   <th>Статус</th>
                   <th>Действия</th>
                 </tr>
@@ -490,7 +514,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
                 {requests.map((r) => {
                   const locked = r.is_processed;
                   const rawTabs = r.material_kinds?.length ? r.material_kinds : (r.textbook_types || []);
-                  // Отображаем названия (если можем сопоставить с ID – пытаемся найти по ID)
+                  
                   const displayTabs = rawTabs.map(id => {
                     const tab = tabs.find(t => t.id === id);
                     return tab ? `${tab.icon || ''} ${tab.title}` : id;
@@ -502,6 +526,8 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
                       <td>{formatDateTime(r.created_at)}</td>
                       <td>{r.class_level || "—"}</td>
                       <td>{displayTabs.length > 0 ? displayTabs.join(", ") : "—"}</td>
+                      {/* 🚀 ИСПРАВЛЕНИЕ: Выводим цену заявки со стороны клиента */}
+                      <td style={{ fontWeight: 'bold' }}>{r.total_price != null ? formatPrice(r.total_price) : "—"}</td>
                       <td>
                         <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
                           {r.is_processed ? "✅ Выдано" : "⏳ Ожидает"}

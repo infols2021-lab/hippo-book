@@ -68,7 +68,12 @@ function fmtDate(v: string | null) {
   }
 }
 
-// 🚀 ДИНАМИЧЕСКИЙ РЕНДЕР ИМЕНИ ПРОЕКТА (ИСПРАВЛЕН ПОД НОВЫЕ ВЕТКИ)
+// Проверка на UUID (та самая длинная ссылка)
+function isValidUUID(str: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
+// 🚀 ДИНАМИЧЕСКИЙ РЕНДЕР ИМЕНИ ПРОЕКТА
 function renderProjectName(row: RequestRow) {
   if (row.projects?.name) {
     return <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">{row.projects.name}</span>;
@@ -84,7 +89,6 @@ function renderProjectName(row: RequestRow) {
     return <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">🏆 Олимпиада (Легаси)</span>;
   }
 
-  // Для новых веток, которые еще не переведены в таблицу projects
   const capitalizedBranch = branch.charAt(0).toUpperCase() + branch.slice(1);
   return (
     <span className="bg-teal-100 text-teal-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">
@@ -98,7 +102,6 @@ function renderClassLevels(row: RequestRow) {
   const tLevel = arrOf(row.target_level);
   const cLevel = arrOf(row.class_level);
   
-  // Приоритет: target_levels -> target_level -> class_level
   const arr = tLevels.length ? tLevels : tLevel.length ? tLevel : cLevel;
   if (!arr.length) return <span className="text-gray-400 font-medium">—</span>;
 
@@ -113,12 +116,11 @@ function renderClassLevels(row: RequestRow) {
   );
 }
 
-// 🚀 УЛУЧШЕННОЕ ОТОБРАЖЕНИЕ ТИПОВ МАТЕРИАЛОВ (ПОДДЕРЖКА НОВЫХ)
+// 🚀 УЛУЧШЕННОЕ ОТОБРАЖЕНИЕ ТИПОВ МАТЕРИАЛОВ (С МАСКИРОВКОЙ UUID)
 function renderTypes(row: RequestRow) {
   const mk = arrOf(row.material_kinds);
   const tt = arrOf(row.textbook_types);
   
-  // Объединяем, если пришли оба, или берем что есть
   const arrSet = new Set([...mk, ...tt]);
   const arr = Array.from(arrSet);
 
@@ -131,7 +133,12 @@ function renderTypes(row: RequestRow) {
         let label = String(t);
         let color = "bg-gray-50 text-gray-700 border-gray-200";
 
-        if (str.includes("mock") || str.includes("пробн") || str.includes("мок")) {
+        if (isValidUUID(str)) {
+          // Если это UUID таба проекта, выводим красивую плашку
+          label = "📁 Раздел проекта"; 
+          color = "bg-indigo-50 text-indigo-700 border-indigo-200";
+        }
+        else if (str.includes("mock") || str.includes("пробн") || str.includes("мок")) {
           label = "📝 Пробный тест"; color = "bg-purple-50 text-purple-700 border-purple-200";
         }
         else if (str.includes("учебник") || str.includes("textbook")) {
@@ -140,7 +147,6 @@ function renderTypes(row: RequestRow) {
         else if (str.includes("кроссворд") || str.includes("crossword")) {
           label = "🧩 Кроссворд"; color = "bg-green-50 text-green-700 border-green-200";
         } else {
-          // Универсальное отображение для любых других (новых) типов материалов
           label = `📁 ${str.charAt(0).toUpperCase() + str.slice(1)}`;
         }
 
@@ -209,7 +215,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
   const [processingOpen, setProcessingOpen] = useState(false);
   const [processingMode, setProcessingMode] = useState<"process" | "unprocess">("process");
 
-  // ЗАГРУЗКА СПИСКА ПРОЕКТОВ
   useEffect(() => {
     fetch("/api/admin/projects")
       .then(r => r.json())
@@ -229,7 +234,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
     try {
       const qs = new URLSearchParams();
-      // Улучшена фильтрация для API статистики
       if (projectFilter === "legacy_olympiad") qs.set("branch_type", "olympiad");
       else if (projectFilter === "legacy_gatehouse") qs.set("branch_type", "gatehouse");
       else if (projectFilter !== "all") qs.set("project_id", projectFilter);
@@ -328,7 +332,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
       if (!reset && nextCursor?.created_at) qs.set("cursor_created_at", nextCursor.created_at);
       
-      // ИСПОЛЬЗОВАНИЕ ФИЛЬТРА ПРОЕКТОВ (ВЕТОК)
       if (projectFilter === "legacy_olympiad") qs.set("branch_type", "olympiad");
       else if (projectFilter === "legacy_gatehouse") qs.set("branch_type", "gatehouse");
       else if (projectFilter !== "all") qs.set("project_id", projectFilter);
@@ -346,7 +349,7 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       if (seq !== listSeqRef.current) return;
 
       if (!res.ok || !json) throw new Error(`HTTP ${res.status}`);
-      if (!json.ok) throw new Error((json as ApiErr).error || "Не удалось загрузить заявки");
+      if (!json.ok) throw new Error((json as ApiErr).error || "Не удалось загрузить заявок");
 
       const rawRows = (json as ApiOkList).requests ?? [];
       const safeRows = tab === "processed" ? rawRows.filter(r => Boolean(r.is_processed)) : tab === "pending" ? rawRows.filter(r => !Boolean(r.is_processed)) : rawRows;
