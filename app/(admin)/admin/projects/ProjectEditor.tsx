@@ -419,6 +419,11 @@ export default function ProjectEditor({
     { name: "Dark Premium", colors: { primary: "#3b82f6", secondary: "#8b5cf6", pageBg: "#0a0a0a", cardBg: "#171717", textColor: "#f8fafc" } },
     { name: "Emerald", colors: { primary: "#10b981", secondary: "#34d399", pageBg: "#ecfdf5", cardBg: "#ffffff", textColor: "#064e3b" } },
     { name: "Sunset", colors: { primary: "#f97316", secondary: "#f43f5e", pageBg: "#fff7ed", cardBg: "#ffffff", textColor: "#431407" } },
+    { name: "Indigo Night", colors: { primary: "#6366f1", secondary: "#a78bfa", pageBg: "#0f0f1a", cardBg: "#1e1e2e", textColor: "#e0e7ff" } },
+    { name: "Soft Lavender", colors: { primary: "#8b5cf6", secondary: "#c4b5fd", pageBg: "#faf5ff", cardBg: "#ffffff", textColor: "#4c1d95" } },
+    { name: "Mint Breeze", colors: { primary: "#14b8a6", secondary: "#5eead4", pageBg: "#f0fdfa", cardBg: "#ffffff", textColor: "#134e4a" } },
+    { name: "Warm Sand", colors: { primary: "#d97706", secondary: "#fcd34d", pageBg: "#fffbeb", cardBg: "#ffffff", textColor: "#78350f" } },
+    { name: "Midnight Slate", colors: { primary: "#64748b", secondary: "#94a3b8", pageBg: "#0f172a", cardBg: "#1e293b", textColor: "#f1f5f9" } },
   ];
 
   const colorSettings: ColorSettings[] = [
