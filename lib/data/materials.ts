@@ -2,12 +2,7 @@
 // Универсальный слой запроса материалов по табу проекта (project_tab_id).
 // Не зависит от хардкода olympiad/gatehouse. Используется новыми роутами
 // /projects/[slug]/materials.
-//
-// Важно: старые lib/data/olympiad.ts и lib/data/gatehouse.ts НЕ трогаются
-// и продолжают работать для legacy-роутов (/materials, /gatehouse/*).
 
-// Сайд-эффект импорт, защищающий файл от использования на клиенте.
-// Декларация модуля лежит в types/server-only.d.ts
 import "server-only";
 
 import type { DataAuthContext } from "@/lib/data/auth";
@@ -100,7 +95,6 @@ function formatDate(value: unknown): string {
   }
 }
  
-/** Нормализация сырой строки materials в MaterialDbRow. */
 function normalizeProjectMaterial(row: any): MaterialDbRow {
   const branchType = String(row?.branch_type ?? "olympiad") as BranchType;
   return {
@@ -129,7 +123,6 @@ function normalizeProjectMaterial(row: any): MaterialDbRow {
   };
 }
  
-/** Сборка материалов с прогрессом и доступом. */
 function buildMaterialsWithProgress(params: {
   materials: MaterialDbRow[];
   assignments: ProjectAssignmentLink[];
@@ -178,13 +171,6 @@ function buildMaterialsWithProgress(params: {
 // Запросы
 // ---------------------------------------------------------------------------
  
-/**
- * Список материалов таба проекта с прогрессом текущего пользователя.
- *
- * Логика фильтра:
- *  1) Если у материала проставлен project_tab_id — фильтруем по нему.
- *  2) Иначе (legacy-данные) — фильтруем по (branch_type=slug, material_kind=tab.material_kind).
- */
 export async function loadProjectMaterialsData(
   ctx: DataAuthContext,
   projectSlug: ProjectSlug,
@@ -192,7 +178,6 @@ export async function loadProjectMaterialsData(
 ): Promise<ProjectMaterialsData> {
   const { supabase, user } = ctx;
  
-  // 1. Находим таб проекта (из кэша конфига проекта).
   const project = await getProjectBySlug(projectSlug);
   if (!project) {
     return { tab: null, materials: [], error: `Проект «${projectSlug}» не найден.` };
@@ -203,7 +188,6 @@ export async function loadProjectMaterialsData(
     return { tab: null, materials: [], error: `Таб «${tabSlug}» не найден в проекте «${projectSlug}».` };
   }
  
-  // 2. Параллельные запросы.
   const materialsQuery = supabase
     .from("materials")
     .select("*")
@@ -211,7 +195,6 @@ export async function loadProjectMaterialsData(
     .order("order_index", { ascending: true })
     .order("created_at", { ascending: true });
  
-  // Приоритет — project_tab_id. Если у таба есть material_kind — фолбэк по нему.
   if (tab.id) {
     materialsQuery.eq("project_tab_id", tab.id);
   } else if (tab.materialKind) {
@@ -220,27 +203,13 @@ export async function loadProjectMaterialsData(
       .eq("material_kind", tab.materialKind);
   }
  
-  const assignmentsQuery = supabase
-    .from("assignments")
-    .select("id, material_id, title, order_index")
-    .order("order_index", { ascending: true, nullsFirst: false });
- 
-  if (tab.id) {
-    assignmentsQuery.eq("project_tab_id", tab.id);
-  } else if (tab.materialKind) {
-    assignmentsQuery
-      .eq("branch_type", projectSlug)
-      .eq("material_kind", tab.materialKind);
-  }
- 
+  // Делаем запросы параллельно, но пока без заданий
   const [
     { data: materialRows, error: materialsError },
-    { data: assignmentRows, error: assignmentsError },
     { data: progressRows, error: progressError },
     { data: accessRows, error: accessError },
   ] = await Promise.all([
     materialsQuery,
-    assignmentsQuery,
     supabase
       .from("user_progress")
       .select("assignment_id, is_completed, score, completed_at")
@@ -248,14 +217,31 @@ export async function loadProjectMaterialsData(
     supabase.from("material_access").select("material_id").eq("user_id", user.id),
   ]);
  
+  const materials = Array.isArray(materialRows) ? materialRows.map(normalizeProjectMaterial) : [];
+  const materialIds = materials.map(m => m.id); // Собираем ID найденных материалов
+
+  let assignmentRows: any[] = [];
+  let assignmentsError: any = null;
+
+  // 🚀 ИСПРАВЛЕНИЕ: Ищем задания строго по ID найденных материалов!
+  // Теперь это работает точно так же, как внутри страницы самого материала.
+  if (materialIds.length > 0) {
+    const { data, error } = await supabase
+      .from("assignments")
+      .select("id, material_id, title, order_index")
+      .in("material_id", materialIds)
+      .order("order_index", { ascending: true, nullsFirst: false });
+    
+    assignmentRows = data || [];
+    assignmentsError = error;
+  }
+
   const error =
     materialsError?.message ||
     assignmentsError?.message ||
     progressError?.message ||
     accessError?.message ||
     null;
- 
-  const materials = Array.isArray(materialRows) ? materialRows.map(normalizeProjectMaterial) : [];
  
   const assignments: ProjectAssignmentLink[] = Array.isArray(assignmentRows)
     ? assignmentRows.map((row: any) => ({
@@ -294,9 +280,6 @@ export async function loadProjectMaterialsData(
   };
 }
  
-/**
- * Страница одного материала + список его заданий с прогрессом.
- */
 export async function loadProjectMaterialPageData(
   ctx: DataAuthContext,
   projectSlug: ProjectSlug,
@@ -314,7 +297,6 @@ export async function loadProjectMaterialPageData(
   const tab = project.tabs.find((t) => t.slug === tabSlug) ?? null;
   if (!tab) return { data: null, error: `Таб «${tabSlug}» не найден.` };
  
-  // Материал: фильтруем по табу (project_tab_id или фолбэк branch_type+material_kind).
   const materialQuery = supabase.from("materials").select("*").eq("id", id).eq("is_active", true);
   if (tab.id) {
     materialQuery.eq("project_tab_id", tab.id);
@@ -397,10 +379,6 @@ export async function loadProjectMaterialPageData(
   };
 }
  
-/**
- * Утилита для рендера: дата завершения в ru-формате.
- * (Дублируем formatDate, чтобы держать файл самодостаточным для новых роутов.)
- */
 export function formatMaterialDate(value: unknown): string {
   return formatDate(value);
 }

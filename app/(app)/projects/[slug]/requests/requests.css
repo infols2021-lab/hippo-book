@@ -1,5 +1,4 @@
-/* app/(app)/requests/requests.css */
-/* Inline CSS from requests.html (почти 1:1) */
+/* app/(app)/projects/[slug]/requests/requests.css */
 
 .page-requests {
   margin: 0;
@@ -50,7 +49,7 @@
   text-align: center;
 }
 
-/* Modal (оставляем — но базовые стили модалок сейчас в base.css, эти не мешают) */
+/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -198,31 +197,82 @@
 }
 .btn-secondary:hover { background: #7f8c8d; }
 
-/* Table */
+/* =========================================================
+   ✅ УЛУЧШЕННАЯ ТАБЛИЦА (Визуал, Отступы, Flex-кнопки)
+   ========================================================= */
+
 .requests-table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 20px;
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border: 1px solid rgba(15,23,42,0.08);
+  box-shadow: 0 14px 34px rgba(15,23,42,0.08);
 }
 
 .requests-table th, .requests-table td {
-  padding: 12px 15px;
+  padding: 18px 20px; /* Даем больше воздуха ячейкам */
   text-align: left;
+  vertical-align: middle;
   border-bottom: 1px solid rgba(0,0,0,0.06);
 }
 
 .requests-table th {
-  background-color: var(--bg1);
-  font-weight: 700;
+  background: linear-gradient(180deg, rgba(248,250,252,0.95), rgba(255,255,255,0.85));
+  font-weight: 800;
+  color: #334155;
+  white-space: nowrap; /* Запрет на перенос шапки таблицы */
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.requests-table td {
+  color: #1e293b;
+  font-size: 15px;
+}
+
+/* Колонка "Действия" - делаем кнопки аккуратно друг под другом */
+.requests-table td:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Расстояние между кнопками */
+  min-width: 130px;
 }
 
 .requests-table tr:last-child td { border-bottom: none; }
 
-.btn-small { padding: 6px 12px; font-size: 14px; }
+.btn-small { 
+  padding: 8px 14px; 
+  font-size: 13px; 
+  font-weight: 700;
+  white-space: nowrap; /* Запрет на перенос текста внутри кнопки */
+  width: 100%; /* Кнопки выровнены по ширине */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Status Badge - делаем неразрывной и закругляем */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap; /* Запрет на перенос внутри бейджа */
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+}
+
+.status-pending { background: #fef3c7; color: #b45309; }
+.status-processed { background: #dcfce7; color: #15803d; }
+
 
 .empty-state {
   text-align: center;
@@ -288,16 +338,6 @@
   color: #e65100;
 }
 
-.status-badge {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.status-pending { background: #fff3cd; color: #856404; }
-.status-processed { background: #d4edda; color: #155724; }
-
 .notification {
   position: fixed;
   top: 20px;
@@ -318,7 +358,7 @@
   to { transform: translateX(0); opacity: 1; }
 }
 
-/* ✅ Новое: кнопки сверху (создать + показать qr) */
+/* Новые кнопки сверху */
 .requests-actions{
   display:flex;
   align-items:center;
@@ -331,7 +371,7 @@
   border-width: 2px !important;
 }
 
-/* ✅ Новое: QR loader + refresh */
+/* QR Loader + Refresh */
 .qr-head{
   display:flex;
   align-items:center;
@@ -414,6 +454,7 @@
   display:none;
 }
 
+/* Мобильная адаптация */
 @media (max-width: 768px) {
   .container { width: 100%; margin: 0; padding: 10px; }
 
@@ -421,6 +462,11 @@
     display: block;
     overflow-x: auto;
     white-space: nowrap;
+  }
+
+  /* На мобильных колонку "Действия" возвращаем в строку, если нужно */
+  .requests-table td:last-child {
+    flex-direction: row;
   }
 
   .modal-content { margin: 10px; padding: 20px; }
@@ -432,11 +478,11 @@
 
 @media (max-width: 480px) {
   .requests-table th, .requests-table td {
-    padding: 8px 10px;
+    padding: 12px 10px;
     font-size: 14px;
   }
 
-  .btn-small { padding: 4px 8px; font-size: 12px; }
+  .btn-small { padding: 6px 10px; font-size: 12px; width: auto; }
   .payment-qr img { max-width: 180px; }
 
   .checkbox-item {
@@ -448,18 +494,6 @@
   .checkbox-item input[type="checkbox"] { margin-right: 0; }
 }
 
-/* =========================================================
-   ✅ ДОПОЛНЕНИЕ: “крутой” стиль + красная “Удалить” + disabled
-   ========================================================= */
-
-.requests-table {
-  border: 1px solid rgba(15,23,42,0.08);
-  box-shadow: 0 14px 34px rgba(15,23,42,0.10);
-}
-
-.requests-table th {
-  background: linear-gradient(180deg, rgba(233,246,255,0.95), rgba(255,255,255,0.85));
-}
 
 .processed-row td{
   background: rgba(44,62,80,0.02);
@@ -479,7 +513,6 @@
   box-shadow: none !important;
 }
 
-/* ✅ Новое: пояснение для обработанных заявок */
 .locked-hint{
   margin-top: 8px;
   font-size: 12px;
