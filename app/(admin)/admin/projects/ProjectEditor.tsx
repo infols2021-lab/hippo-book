@@ -424,6 +424,14 @@ export default function ProjectEditor({
     { name: "Mint Breeze", colors: { primary: "#14b8a6", secondary: "#5eead4", pageBg: "#f0fdfa", cardBg: "#ffffff", textColor: "#134e4a" } },
     { name: "Warm Sand", colors: { primary: "#d97706", secondary: "#fcd34d", pageBg: "#fffbeb", cardBg: "#ffffff", textColor: "#78350f" } },
     { name: "Midnight Slate", colors: { primary: "#64748b", secondary: "#94a3b8", pageBg: "#0f172a", cardBg: "#1e293b", textColor: "#f1f5f9" } },
+    { name: "Rose Gold", colors: { primary: "#e11d48", secondary: "#fda4af", pageBg: "#fff1f2", cardBg: "#ffffff", textColor: "#4c0519" } },
+    { name: "Ocean Depth", colors: { primary: "#0e7490", secondary: "#22d3ee", pageBg: "#f0f9ff", cardBg: "#ffffff", textColor: "#082f49" } },
+    { name: "Forest Night", colors: { primary: "#15803d", secondary: "#4ade80", pageBg: "#0f172a", cardBg: "#1e293b", textColor: "#f0fdf4" } },
+    { name: "Peach Cream", colors: { primary: "#f97316", secondary: "#fdba74", pageBg: "#fff7ed", cardBg: "#ffffff", textColor: "#431407" } },
+    { name: "Arctic Frost", colors: { primary: "#06b6d4", secondary: "#67e8f9", pageBg: "#ecfeff", cardBg: "#ffffff", textColor: "#164e63" } },
+    { name: "Amethyst Haze", colors: { primary: "#7c3aed", secondary: "#c084fc", pageBg: "#faf5ff", cardBg: "#1e1b4b", textColor: "#e0e7ff" } },
+    { name: "Crimson Night", colors: { primary: "#b91c1c", secondary: "#f87171", pageBg: "#0a0a0a", cardBg: "#171717", textColor: "#fecaca" } },
+    { name: "Lilac Dream", colors: { primary: "#d8b4fe", secondary: "#ede9fe", pageBg: "#faf5ff", cardBg: "#ffffff", textColor: "#4c1d95" } },
   ];
 
   const colorSettings: ColorSettings[] = [
