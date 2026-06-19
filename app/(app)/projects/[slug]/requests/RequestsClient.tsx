@@ -535,15 +535,19 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
                         </span>
                       </td>
                       <td>
-                        {!locked && (
-                          <>
+                        {locked ? (
+                          <span className="text-xs text-gray-400 font-medium italic">
+                            🔒 Действия недоступны
+                          </span>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                             <button className="btn btn-small" onClick={() => openEdit(r)} type="button" disabled={busy}>
                               ✏️ Изменить
-                            </button>{" "}
+                            </button>
                             <button className="btn btn-small secondary" onClick={() => void deleteRequest(r)} type="button" disabled={busy}>
                               🗑️ Удалить
                             </button>
-                          </>
+                          </div>
                         )}
                       </td>
                     </tr>

@@ -15,7 +15,7 @@
 }
 
 /* =========================================================
-   ✅ УЛУЧШЕННАЯ ТАБЛИЦА (Стеклянная)
+   ✅ УЛУЧШЕННАЯ ТАБЛИЦА (Стеклянная, без вылезаний)
    ========================================================= */
 
 .requests-table {
@@ -29,10 +29,13 @@
   overflow: hidden;
   border: 1px solid var(--glass-border);
   box-shadow: inset 0 1px 1px var(--glass-highlight), var(--glass-shadow);
+  table-layout: auto;           /* чтобы колонки подстраивались под контент */
+  word-break: break-word;       /* длинные названия не ломают таблицу */
 }
 
-.requests-table th, .requests-table td {
-  padding: 18px 20px; 
+.requests-table th,
+.requests-table td {
+  padding: 18px 20px;
   text-align: left;
   vertical-align: middle;
   border-bottom: 1px solid var(--glass-border);
@@ -42,7 +45,7 @@
   background: color-mix(in srgb, var(--project-text) 4%, transparent);
   font-weight: 800;
   color: color-mix(in srgb, var(--project-text) 70%, transparent);
-  white-space: nowrap; 
+  white-space: nowrap;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -53,13 +56,28 @@
   font-size: 15px;
 }
 
-.requests-table tr:last-child td { border-bottom: none; }
+.requests-table tr:last-child td {
+  border-bottom: none;
+}
 
-.requests-table td:last-child {
+/* ⚡ Ячейка действий – больше НЕ используем td:last-child flex,
+   вместо этого добавляем класс .actions-cell в разметке */
+.actions-cell {
   display: flex;
   flex-direction: column;
-  gap: 8px; 
+  gap: 8px;
+  align-items: stretch;
   min-width: 130px;
+}
+
+/* Текст «Действия недоступны» — красиво и ненавязчиво */
+.actions-locked {
+  font-size: 13px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--project-text) 45%, transparent);
+  text-align: center;
+  opacity: 0.8;
+  align-self: center;
 }
 
 /* Status Badge */
@@ -72,22 +90,26 @@
   border-radius: 99px;
   font-size: 13px;
   font-weight: 800;
-  white-space: nowrap; 
+  white-space: nowrap;
 }
-.status-pending { 
-  background: color-mix(in srgb, #f59e0b 15%, transparent); 
-  color: #d97706; 
+
+.status-pending {
+  background: color-mix(in srgb, #f59e0b 15%, transparent);
+  color: #d97706;
 }
-.status-processed { 
-  background: color-mix(in srgb, #10b981 15%, transparent); 
-  color: #059669; 
+
+.status-processed {
+  background: color-mix(in srgb, #10b981 15%, transparent);
+  color: #059669;
 }
 
 /* =========================================================
    ✅ ФОРМЫ И ЧЕКБОКСЫ (Матовые)
    ========================================================= */
 
-.form-group { margin-bottom: 18px; }
+.form-group {
+  margin-bottom: 18px;
+}
 
 .form-group label {
   display: block;
@@ -97,7 +119,8 @@
   font-size: 14px;
 }
 
-.form-group input, .form-group select {
+.form-group input,
+.form-group select {
   width: 100%;
   padding: 14px 16px;
   border: 1px solid var(--glass-border);
@@ -110,20 +133,27 @@
   color: var(--project-text);
 }
 
-.form-group input:focus, .form-group select:focus {
+.form-group input:focus,
+.form-group select:focus {
   outline: none;
   border-color: var(--project-primary);
   background: var(--project-card-bg);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--project-primary) 15%, transparent);
 }
 
-.form-group input:read-only, .form-group input:disabled {
+.form-group input:read-only,
+.form-group input:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
 /* Checkbox group */
-.checkbox-group { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.checkbox-group {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
 .checkbox-item {
   display: flex;
@@ -240,7 +270,10 @@
   place-items: center;
   transition: all 0.2s ease;
 }
-.qr-refresh:hover { background: color-mix(in srgb, var(--project-text) 8%, transparent); }
+
+.qr-refresh:hover {
+  background: color-mix(in srgb, var(--project-text) 8%, transparent);
+}
 
 .payment-qr--smart {
   position: relative;
@@ -307,12 +340,39 @@
 
 /* Мобильная адаптация */
 @media (max-width: 768px) {
-  .container { width: 100%; margin: 0; padding: 12px; }
-  .requests-table { display: block; overflow-x: auto; white-space: nowrap; }
-  .requests-table td:last-child { flex-direction: row; }
+  .container {
+    width: 100%;
+    margin: 0;
+    padding: 12px;
+  }
+
+  .requests-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .actions-cell {
+    flex-direction: row;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .actions-locked {
+    white-space: normal;
+    text-align: center;
+  }
 }
 
 @media (max-width: 480px) {
-  .requests-table th, .requests-table td { padding: 14px 12px; font-size: 14px; }
-  .checkbox-item { flex-direction: column; align-items: flex-start; }
+  .requests-table th,
+  .requests-table td {
+    padding: 14px 12px;
+    font-size: 14px;
+  }
+
+  .checkbox-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
