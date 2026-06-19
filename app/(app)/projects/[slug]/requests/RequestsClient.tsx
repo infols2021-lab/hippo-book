@@ -535,12 +535,16 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
                         </span>
                       </td>
                       <td>
-                        <button className={`btn btn-small ${locked ? "disabled" : ""}`} onClick={() => openEdit(r)} type="button" disabled={locked || busy}>
-                          ✏️ Изменить
-                        </button>{" "}
-                        <button className={`btn btn-small secondary ${locked ? "disabled" : ""}`} onClick={() => void deleteRequest(r)} type="button" disabled={locked || busy}>
-                          🗑️ Удалить
-                        </button>
+                        {!locked && (
+                          <>
+                            <button className="btn btn-small" onClick={() => openEdit(r)} type="button" disabled={busy}>
+                              ✏️ Изменить
+                            </button>{" "}
+                            <button className="btn btn-small secondary" onClick={() => void deleteRequest(r)} type="button" disabled={busy}>
+                              🗑️ Удалить
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   );
