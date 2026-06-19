@@ -43,12 +43,11 @@ type ReqRow = {
   project_id?: string | null;
   projects?: any;
   sheet_name?: string | null;
-  total_price?: number; // 👈 ДОБАВЛЕНО ПОЛЕ ДЛЯ ЦЕНЫ
 };
 
-// ❗️ ВАЖНО: Добавили total_price в селект
+// ❗️ ИСПРАВЛЕНИЕ: Убрали total_price, так как его нет в БД
 const REQUEST_SELECT =
-  "id,user_id,request_number,created_at,processed_at,is_processed,full_name,email,contact_phone,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,project_id,total_price,projects(name, sheet_name)";
+  "id,user_id,request_number,created_at,processed_at,is_processed,full_name,email,contact_phone,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,project_id,projects(name, sheet_name)";
 
 const DB_RETRY_COUNT = 1;
 const DB_RETRY_DELAY_MS = 350;
@@ -179,7 +178,6 @@ export async function GET(req: NextRequest) {
       ...r,
       projects: Array.isArray(r.projects) ? r.projects[0] : r.projects,
       sheet_name: r.projects?.sheet_name || null,
-      total_price: r.total_price ? Number(r.total_price) : null, // 👈 Парсим цену для ответа
     }));
 
     const last = rows[rows.length - 1] ?? null;

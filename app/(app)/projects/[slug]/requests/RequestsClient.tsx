@@ -71,7 +71,6 @@ function formatDateTime(dateString: string | null | undefined) {
   return d.toLocaleString("ru-RU", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-// 🚀 ИСПРАВЛЕНИЕ: Теперь картинка загружается через наш безотказный прокси
 function getPaymentQRUrl(seed?: number) {
   const t = encodeURIComponent(String(seed ?? Date.now()));
   return `/api/storage/public/help-images/oplata.png?t=${t}`;
@@ -120,7 +119,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
 
   const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
   const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
-  const [qrLoading, setQrLoading] = useState(true); // По умолчанию грузится
+  const [qrLoading, setQrLoading] = useState(true); 
   const [qrError, setQrError] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -246,7 +245,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
       full_name: currentFullName,
       user_id: userId,
       is_processed: false,
-      total_price: totalAmount,
     };
 
     setBusy(true);
@@ -389,7 +387,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
         </form>
       </Modal>
 
-      {/* 🚀 ИСПРАВЛЕНИЕ: Новая модалка оплаты с точными инструкциями */}
       <Modal open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="✅ Оплата заявки" maxWidth={540}>
         <div style={{ background: "rgba(78, 205, 196, 0.12)", padding: "18px", borderRadius: "14px", border: "1px solid rgba(78, 205, 196, 0.25)", marginBottom: "20px" }}>
           <h4 style={{ margin: "0 0 14px 0", color: "#0f766e", fontSize: "16px" }}>📋 Инструкция по оплате</h4>
