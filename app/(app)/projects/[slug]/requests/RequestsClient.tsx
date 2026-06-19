@@ -1,3 +1,4 @@
+// app/(app)/projects/[slug]/requests/RequestsClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -70,11 +71,10 @@ function formatDateTime(dateString: string | null | undefined) {
   return d.toLocaleString("ru-RU", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
+// 🚀 ИСПРАВЛЕНИЕ: Теперь картинка загружается через наш безотказный прокси
 function getPaymentQRUrl(seed?: number) {
-  const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
   const t = encodeURIComponent(String(seed ?? Date.now()));
-  if (!supabaseUrl) return "";
-  return `${supabaseUrl}/storage/v1/object/public/help-images/oplata.png?t=${t}`;
+  return `/api/storage/public/help-images/oplata.png?t=${t}`;
 }
 
 async function safeReadJson(res: Response) {
@@ -115,13 +115,12 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
   const [classLevel, setClassLevel] = useState("");
   const [selectedTabs, setSelectedTabs] = useState<string[]>([]);
   
-  // Добавляем редактируемые поля для ФИО и Email
   const [currentEmail, setCurrentEmail] = useState(userEmail);
   const [currentFullName, setCurrentFullName] = useState(userFullName);
 
   const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
   const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
-  const [qrLoading, setQrLoading] = useState(false);
+  const [qrLoading, setQrLoading] = useState(true); // По умолчанию грузится
   const [qrError, setQrError] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -148,7 +147,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
 
   const lastPendingAmount = useMemo(() => {
     if (!lastPendingRequest) return 0;
-    // Берем цену прямо из сохраненной заявки, либо вычисляем на лету
     if (lastPendingRequest.total_price != null) return lastPendingRequest.total_price;
 
     const tabNames = lastPendingRequest.material_kinds?.length ? lastPendingRequest.material_kinds : (lastPendingRequest.textbook_types || []);
@@ -188,7 +186,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
     setRequestDateTime(localISO);
     setClassLevel("");
     setSelectedTabs([]);
-    // При создании сбрасываем на значения профиля
     setCurrentEmail(userEmail);
     setCurrentFullName(userFullName);
     setRequestModalOpen(true);
@@ -211,7 +208,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
     const tabIds = rawTabs.map(name => tabTitleToId.get(name) || name);
     setSelectedTabs(tabIds);
 
-    // При редактировании подтягиваем ФИО и Email из сохраненной заявки
     setCurrentEmail(r.email || userEmail);
     setCurrentFullName(r.full_name || userFullName);
     
@@ -238,10 +234,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
       }
     }
 
-    // 🚀 ИСПРАВЛЕНИЯ ЗДЕСЬ:
-    // 1. branch_type теперь равен slug текущего проекта
-    // 2. Отправляем email и full_name из стейта, а не захардкоженные
-    // 3. Отправляем total_price
     const payload = {
       request_number: requestNumber,
       created_at: requestDateTime + ":00Z",
@@ -365,7 +357,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
             </div>
           </div>
 
-          {/* 🚀 ИСПРАВЛЕНИЕ: Инпуты больше не readOnly, пользователь может менять ФИО */}
           <div className="form-group">
             <label>Email:</label>
             <input 
@@ -398,58 +389,65 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
         </form>
       </Modal>
 
-      <Modal open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="✅ Заявка" maxWidth={520}>
-        <div className="success-message">
-          <h4>📋 Информация</h4>
-          <p><strong>Доступ к выбранным материалам будет открыт после подтверждения оплаты.</strong></p>
-          <p>Оплатить можно по QR-коду ниже.</p>
+      {/* 🚀 ИСПРАВЛЕНИЕ: Новая модалка оплаты с точными инструкциями */}
+      <Modal open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="✅ Оплата заявки" maxWidth={540}>
+        <div style={{ background: "rgba(78, 205, 196, 0.12)", padding: "18px", borderRadius: "14px", border: "1px solid rgba(78, 205, 196, 0.25)", marginBottom: "20px" }}>
+          <h4 style={{ margin: "0 0 14px 0", color: "#0f766e", fontSize: "16px" }}>📋 Инструкция по оплате</h4>
+          <ul style={{ margin: 0, paddingLeft: "18px", color: "#111827", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px" }}>
+            <li><strong>Отсканируйте QR-код</strong> в вашем банковском приложении.</li>
+            <li>Сумма к оплате: <strong style={{ fontSize: "16px", color: "var(--project-primary)" }}>{paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "Сумма не определена"}</strong></li>
+            <li>В назначении платежа (сообщении) <strong>ОБЯЗАТЕЛЬНО</strong> укажите: <br/>
+              <span style={{ background: "#fff", padding: "6px 10px", borderRadius: "8px", display: "inline-block", marginTop: "6px", border: "1px solid #ddd", fontWeight: 700 }}>
+                ФИО ребенка, оплата за учебные материалы
+              </span>
+            </li>
+          </ul>
         </div>
 
-        {paymentTotalAmount > 0 ? (
-          <div className="total-amount">
-            <h4>💰 Сумма к оплате:</h4>
-            <div className="amount">{paymentTotalAmount} руб.</div>
-            <p className="small-muted" style={{ marginTop: 8 }}>В платеже обязательно укажите ФИО, а в назначении платежа — «за учебные пособия».</p>
-          </div>
-        ) : (
-          <div className="small-muted" style={{ marginTop: 8 }}>
-            {lastPendingRequest ? "Сумма к оплате не определена." : "Нет необработанных заявок."}
-          </div>
-        )}
-
         <div className="qr-head">
-          <div className="qr-title">QR-код для оплаты</div>
+          <div className="qr-title">QR-код для перевода</div>
           <button type="button" className="qr-refresh" onClick={resetQrStateAndRefresh} title="Обновить QR" aria-label="Обновить QR">↻</button>
         </div>
 
-        <div className="payment-qr payment-qr--smart">
-          {qrLoading ? (
+        <div className="payment-qr payment-qr--smart" style={{ minHeight: "220px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {qrLoading && !qrError ? (
             <div className="qr-loader" role="status">
               <span className="qr-spinner" />
-              <div className="qr-loader-text">Загружаю QR-код…</div>
+              <div className="qr-loader-text" style={{ marginTop: "12px", fontWeight: 700 }}>Загружаем QR-код...</div>
             </div>
           ) : null}
 
           {qrError ? (
-            <div className="qr-error" role="alert">
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>Не удалось загрузить QR-код</div>
-              <button type="button" className="btn" onClick={resetQrStateAndRefresh}>↻ Обновить QR</button>
+            <div className="qr-error" role="alert" style={{ textAlign: "center" }}>
+              <div style={{ fontWeight: 800, marginBottom: 6, color: "#d32f2f" }}>Не удалось загрузить QR-код</div>
+              <div style={{ fontSize: "12px", color: "#666", marginBottom: 12 }}>Возможно, файл oplata.png отсутствует на сервере.</div>
+              <button type="button" className="btn secondary" onClick={resetQrStateAndRefresh}>↻ Попробовать снова</button>
             </div>
           ) : null}
 
           <img
             key={qrUrl}
             src={qrUrl}
-            alt=""
-            aria-hidden="true"
-            className={`qr-img ${qrLoading || qrError ? "is-hidden" : ""}`}
+            alt="QR-код для оплаты"
+            className={`qr-img`}
             onLoad={() => { setQrLoading(false); setQrError(false); }}
             onError={() => { setQrLoading(false); setQrError(true); }}
+            style={{ 
+              display: qrLoading || qrError ? "none" : "block", 
+              width: "100%", 
+              maxWidth: "240px", 
+              margin: "0 auto", 
+              borderRadius: "16px", 
+              border: "1px solid rgba(0,0,0,0.1)", 
+              boxShadow: "0 12px 30px rgba(0,0,0,0.08)" 
+            }}
           />
         </div>
 
-        <div className="modal-actions">
-          <button className="btn" type="button" onClick={() => setPaymentModalOpen(false)}>Понятно</button>
+        <div className="modal-actions" style={{ marginTop: "24px" }}>
+          <button className="btn" type="button" onClick={() => setPaymentModalOpen(false)} style={{ width: "100%", backgroundColor: "var(--project-primary)" }}>
+            Я всё оплатил(а)
+          </button>
         </div>
       </Modal>
 
@@ -484,7 +482,13 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
             <button className="btn" onClick={openCreate} type="button" disabled={busy} style={{ backgroundColor: "var(--project-primary)" }}>
               ➕ Создать новую заявку
             </button>
-            <button className="btn ghost qr-open" type="button" onClick={() => { openPaymentModal(lastPendingAmount); if (!lastPendingRequest) showNotification("ℹ️ Не найдено необработанных заявок.", "error"); }}>
+            <button className="btn ghost qr-open" type="button" onClick={() => { 
+              if (!lastPendingRequest) {
+                showNotification("ℹ️ Не найдено необработанных заявок.", "error");
+                return;
+              }
+              openPaymentModal(lastPendingAmount); 
+            }}>
               📷 Показать qr
             </button>
           </div>
@@ -526,7 +530,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
                       <td>{formatDateTime(r.created_at)}</td>
                       <td>{r.class_level || "—"}</td>
                       <td>{displayTabs.length > 0 ? displayTabs.join(", ") : "—"}</td>
-                      {/* 🚀 ИСПРАВЛЕНИЕ: Выводим цену заявки со стороны клиента */}
                       <td style={{ fontWeight: 'bold' }}>{r.total_price != null ? formatPrice(r.total_price) : "—"}</td>
                       <td>
                         <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
