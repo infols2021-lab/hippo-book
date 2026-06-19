@@ -16,11 +16,9 @@ export default function MaterialsManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [editingMaterial, setEditingMaterial] = useState<any | null>(null);
 
-  // Для загрузки изображений
   const [uploadingCover, setUploadingCover] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  // 1. Грузим проекты
   useEffect(() => {
     fetch("/api/admin/projects").then(r => r.json()).then(d => {
       setProjects(d.projects || d || []);
@@ -28,7 +26,6 @@ export default function MaterialsManager() {
     });
   }, []);
 
-  // 2. Грузим Табы и Уровни при выборе Проекта
   useEffect(() => {
     if (!selectedProjectId) {
       setTabs([]); setLevels([]); setMaterials([]); setSelectedTabId("");
@@ -40,11 +37,10 @@ export default function MaterialsManager() {
     ]).then(([tabsData, levelsData]) => {
       setTabs(tabsData.tabs || []);
       setLevels(levelsData.levels || levelsData.data || []);
-      setSelectedTabId(""); // Сбрасываем таб при смене проекта
+      setSelectedTabId(""); 
     });
   }, [selectedProjectId]);
 
-  // 3. Грузим материалы при выборе Таба
   useEffect(() => {
     if (!selectedProjectId || !selectedTabId) {
       setMaterials([]);
@@ -68,33 +64,14 @@ export default function MaterialsManager() {
       ? `/api/admin/projects/${selectedProjectId}/materials/${editingMaterial.id}` 
       : `/api/admin/projects/${selectedProjectId}/materials`;
     
-    // ✅ Формируем payload с правильными полями
+    // 🔥 Фронтенд больше не занимается сложным парсингом и приведением типов.
+    // Бэкенд (через normalize.ts) сам приведет всё к идеалу. 
+    // Мы только страхуем project_tab_id от значений "none" или пустых строк.
     const payload = {
-      // Обязательные поля
-      title: editingMaterial.title?.trim() || "",
-      project_tab_id: selectedTabId,
-      
-      // Опциональные с нормализацией
-      description: editingMaterial.description?.trim() || null,
-      cover_image_url: editingMaterial.cover_image_url?.trim() || null,
-      
-      // ⚡️ Важно: передаём branch_type и material_kind (берём из editingMaterial, если есть, иначе дефолты)
-      branch_type: editingMaterial.branch_type || "olympiad",
-      material_kind: editingMaterial.material_kind || "mock_test",
-      
-      // Уровни
-      target_levels: Array.isArray(editingMaterial.target_levels) ? editingMaterial.target_levels : [],
-      class_levels: Array.isArray(editingMaterial.class_levels) 
-        ? editingMaterial.class_levels 
-        : (Array.isArray(editingMaterial.target_levels) ? editingMaterial.target_levels : []),
-      
-      // Числовые поля
-      order_index: Number.isFinite(Number(editingMaterial.order_index)) ? Number(editingMaterial.order_index) : 0,
-      price: Number.isFinite(Number(editingMaterial.price)) ? Number(editingMaterial.price) : 1000,
-      
-      // Булевы
-      is_available: Boolean(editingMaterial.is_available),
-      is_active: editingMaterial.is_active !== undefined ? Boolean(editingMaterial.is_active) : true,
+      ...editingMaterial,
+      project_tab_id: selectedTabId === "none" || !selectedTabId ? null : selectedTabId,
+      // Дублируем для обратной совместимости, если бэкенду вдруг понадобятся оба массива
+      class_levels: editingMaterial.target_levels || [],
     };
 
     try {
@@ -110,7 +87,6 @@ export default function MaterialsManager() {
       }
       
       setEditingMaterial(null);
-      // Обновляем список
       const mRes = await fetch(`/api/admin/projects/${selectedProjectId}/materials?tab_id=${selectedTabId}`);
       const mData = await mRes.json();
       setMaterials(mData.materials || []);
@@ -173,12 +149,12 @@ export default function MaterialsManager() {
             description: "", 
             cover_image_url: "", 
             target_levels: [], 
-            price: 1000, 
+            price: 0,                   // 👈 Дефолтная цена теперь 0 (безопасно)
             is_active: true, 
             is_available: false, 
             order_index: 0,
-            branch_type: "olympiad",    // 👈 явно задаём дефолт
-            material_kind: "mock_test", // 👈 явно задаём дефолт
+            branch_type: "olympiad",
+            material_kind: "material",  // 👈 Перешли на универсальный тип
           })}
           className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -196,16 +172,16 @@ export default function MaterialsManager() {
               <input required type="text" className="w-full border-2 rounded-xl px-4 py-2" value={editingMaterial.title} onChange={e => setEditingMaterial({...editingMaterial, title: e.target.value})} />
             </div>
 
-            {/* Поле Цена */}
             <div>
               <label className="block text-sm font-bold mb-1">Стоимость (₽)</label>
               <input 
                 type="number" 
                 min="0" 
+                step="0.01" 
                 required 
                 className="w-full border-2 rounded-xl px-4 py-2" 
-                value={editingMaterial.price ?? 1000} 
-                onChange={e => setEditingMaterial({...editingMaterial, price: Number(e.target.value)})} 
+                value={editingMaterial.price ?? 0} 
+                onChange={e => setEditingMaterial({...editingMaterial, price: e.target.value})} 
               />
             </div>
             
@@ -301,7 +277,7 @@ export default function MaterialsManager() {
                       </div>
                     </td>
                     <td className="p-4 text-center font-bold">
-                      {mat.price ?? 1000} ₽
+                      {mat.price ?? 0} ₽
                     </td>
                     <td className="p-4">
                       <div className="flex flex-wrap gap-1">

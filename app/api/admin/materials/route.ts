@@ -1,91 +1,11 @@
-// app/api/admin/materials/route.ts
-import type { NextRequest } from "next/server";
+import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
-import { normalizeBranchType } from "@/lib/branches/config";
-import { normalizeMaterialKind, toStringArray, uniqueStrings } from "@/lib/materials/format";
-
-function normalizeBool(value: unknown): boolean {
-  return value === true || value === "true" || value === 1 || value === "1";
-}
-
-function normalizeOrderIndex(value: unknown): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function normalizePrice(value: unknown): number {
-  const n = Number(value);
-  // Дефолтная цена 1000, если не передана или передана некорректно
-  return Number.isFinite(n) && n >= 0 ? n : 1000;
-}
-
-function normalizeNullableString(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  const str = String(value).trim();
-  return str || null;
-}
-
-function isValidUUID(str: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
-}
-
-function normalizePayload(body: any, userId: string) {
-  const branch_type = normalizeBranchType(body?.branch_type);
-  const material_kind = normalizeMaterialKind(body?.material_kind || "mock_test");
-  const title = String(body?.title ?? "").trim();
-  const description = normalizeNullableString(body?.description);
-  const cover_image_url = normalizeNullableString(body?.cover_image_url);
-  const is_available = normalizeBool(body?.is_available);
-  const is_active = body?.is_active === undefined ? true : normalizeBool(body?.is_active);
-  const order_index = normalizeOrderIndex(body?.order_index);
-  const price = normalizePrice(body?.price); // 🚀 НОВОЕ ПОЛЕ: Парсинг цены
-  const class_levels = uniqueStrings(toStringArray(body?.class_levels ?? body?.class_level));
-  const target_levels = uniqueStrings(toStringArray(body?.target_levels ?? body?.target_level));
-  const meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
-
-  let project_tab_id = normalizeNullableString(body?.project_tab_id ?? body?.tab_id);
-  
-  if (project_tab_id === "00000000-0000-0000-0000-000000000000" || project_tab_id === "none" || project_tab_id === "null" || project_tab_id === "") {
-    project_tab_id = null;
-  }
-
-  if (project_tab_id && !isValidUUID(project_tab_id)) {
-    project_tab_id = null;
-  }
-
-  return {
-    project_tab_id,
-    branch_type,
-    material_kind,
-    title,
-    description,
-    cover_image_url,
-    is_available,
-    is_active,
-    order_index,
-    price, // 🚀 НОВОЕ ПОЛЕ: Запись в Payload для БД
-    class_levels,
-    target_levels,
-    created_by: userId,
-    meta,
-  };
-}
-
-function validateMaterial(payload: ReturnType<typeof normalizePayload>) {
-  if (!payload.title) return "title required";
-  if (!payload.material_kind) return "material_kind required";
-
-  if (payload.branch_type === "olympiad" && payload.class_levels.length === 0) {
-    return "class_levels required";
-  }
-
-  if (payload.branch_type === "gatehouse" && payload.target_levels.length === 0) {
-    return "target_levels required";
-  }
-
-  return null;
-}
+import { 
+  normalizeMaterialInput, 
+  normalizeBranchType, 
+  normalizeMaterialKind 
+} from "@/lib/materials/normalize";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin();
@@ -123,8 +43,7 @@ export async function GET(req: NextRequest) {
       return ok({ materials });
     }
 
-    // ❗️ УБИТА ПРИЧИНА ЗАВИСАНИЯ: Больше никаких гигантских .or() строк
-    // Просто забираем связи и считаем в памяти. 
+    // Подсчет заданий в памяти для обхода лимитов PostgREST
     const { data: assignments, error: countError } = await supabase
       .from("assignments")
       .select("id, material_id, textbook_id, crossword_id");
@@ -167,12 +86,18 @@ export async function POST(req: NextRequest) {
     return fail("Bad JSON", 400, "BAD_JSON");
   }
 
-  const payload = normalizePayload(body, user.id);
-  const validationError = validateMaterial(payload);
+  // Делегируем всю нормализацию единому файлу-источнику истины
+  const payload = normalizeMaterialInput(body, user.id);
 
-  if (validationError) {
-    console.error("🔴 [ADMIN POST MATERIAL] Ошибка валидации:", validationError);
-    return fail(validationError, 400, "VALIDATION");
+  // Локальная валидация критических для бизнес-логики полей
+  if (!payload.title) {
+    return fail("title required", 400, "VALIDATION");
+  }
+  if (payload.branch_type === "olympiad" && payload.class_levels.length === 0) {
+    return fail("class_levels required", 400, "VALIDATION");
+  }
+  if (payload.branch_type === "gatehouse" && payload.target_levels.length === 0) {
+    return fail("target_levels required", 400, "VALIDATION");
   }
 
   try {

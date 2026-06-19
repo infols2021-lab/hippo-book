@@ -14,16 +14,6 @@ import {
   getRequestTargetLevels,
   getRequestMaterialKinds,
   normalizeBranchType,
-  normalizeGatehouseLevel,
-  normalizeGatehouseMaterialKind,
-  toArr,
-  uniq,
-  overlaps,
-  overlapsGatehouseLevels,
-  formatDateTimeRU,
-  formatTargetForSheet,
-  formatMaterialTypesForSheet,
-  formatRequestStatus,
   buildSheetValues,
 } from "@/lib/requests/normalize";
 import { sanitizeLikeQuery } from "@/lib/api/validate";
@@ -32,6 +22,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+// Оставляем легаси-типы в GrantKind для обратной совместимости с логикой парсинга старых заявок,
+// но физически в БД теперь всё это пишется и удаляется только из material_access
 type GrantKind = "textbook" | "crossword" | "mock_test" | "material";
 
 type ReqRow = {
@@ -55,22 +47,6 @@ type ReqRow = {
   sheet_name?: string | null;
 };
 
-type GrantTarget = {
-  kind: GrantKind;
-  item_id: string;
-  title: string;
-  granted_by?: string;
-  material_kind?: string | null;
-  target_levels?: string[] | null;
-};
-
-type GatehouseMaterialRow = {
-  id: string;
-  title: string;
-  material_kind: string | null;
-  target_levels: string[] | null;
-};
-
 const REQUEST_SELECT =
   "id,user_id,request_number,created_at,processed_at,is_processed,full_name,email,contact_phone,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,project_id,projects(name, sheet_name)";
 
@@ -78,11 +54,7 @@ const DB_RETRY_COUNT = 1;
 const DB_RETRY_DELAY_MS = 350;
 
 function noStoreInit(): ResponseInit {
-  return {
-    headers: {
-      "cache-control": "no-store, max-age=0",
-    },
-  };
+  return { headers: { "cache-control": "no-store, max-age=0" } };
 }
 
 function sleep(ms: number) {
@@ -188,7 +160,6 @@ export async function GET(req: NextRequest) {
         q = q.eq("is_processed", true);
       }
 
-      // ✅ Безопасный поиск через ILIKE с экранированием
       if (name) {
         q = q.ilike("full_name", sanitizeLikeQuery(name));
       }
@@ -219,12 +190,7 @@ export async function GET(req: NextRequest) {
         requests: rows,
         materialsByRequest: {},
         materialsError: null,
-        page: {
-          limit,
-          returned: rows.length,
-          hasMore: Boolean(nextCursor),
-          nextCursor,
-        },
+        page: { limit, returned: rows.length, hasMore: Boolean(nextCursor), nextCursor },
       },
       noStoreInit(),
     );
@@ -244,7 +210,6 @@ export async function PATCH(req: NextRequest) {
   const { supabase, user } = auth;
 
   let body: any;
-
   try {
     body = await req.json();
   } catch {
@@ -261,11 +226,7 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const { data: reqs, error: rErr } = await runDbQuery<ReqRow[]>(
-      () =>
-        supabase
-          .from("purchase_requests")
-          .select("*, projects(sheet_name)")
-          .in("id", ids),
+      () => supabase.from("purchase_requests").select("*, projects(sheet_name)").in("id", ids),
       "patchLoadRequests",
     );
 
@@ -276,16 +237,7 @@ export async function PATCH(req: NextRequest) {
       sheet_name: r.projects?.sheet_name || null,
     })) as ReqRow[];
 
-    const results: Record<
-      string,
-      {
-        ok: boolean;
-        granted?: string[];
-        error?: string;
-        sheet?: any;
-        grants_history?: any;
-      }
-    > = {};
+    const results: Record<string, { ok: boolean; granted?: string[]; error?: string; sheet?: any; grants_history?: any }> = {};
 
     for (const r of rows) {
       try {
@@ -305,68 +257,34 @@ export async function PATCH(req: NextRequest) {
 
           granted = grantedLabels;
         } else {
+          // ❗️ ИДЕАЛЬНАЯ ЛОГИКА ОТЗЫВА ДОСТУПОВ (UNPROCESS)
+          // Мы навсегда избавились от легаси таблиц textbook_access и crossword_access. 
+          // Теперь всё удаляется из единой таблицы material_access.
           const targets = await getTargetsForUnprocess(supabase, r);
 
           for (const rawTarget of targets) {
             const t = await enrichMockTestTargetIfNeeded(supabase, rawTarget);
 
-            if (t.kind === "mock_test" || t.kind === "material") {
-              const keepByGrant = await existsOtherProcessedGrant(
-                supabase,
-                r.id,
-                r.user_id,
-                t.kind,
-                t.item_id,
-              );
-
-              const keepByRequest = await existsOtherProcessedGenericRequestForMaterial(
-                supabase,
-                r.id,
-                r.user_id,
-                r.branch_type || "olympiad",
-                t.material_kind,
-                t.target_levels,
-              );
-
-              if (keepByGrant || keepByRequest) continue;
-
-              const del = await supabase
-                .from("material_access")
-                .delete()
-                .eq("user_id", r.user_id)
-                .eq("material_id", t.item_id);
-
-              if (del.error) throw new Error(del.error.message);
-              continue;
-            }
-
-            const keep = await existsOtherProcessedGrant(
-              supabase,
-              r.id,
-              r.user_id,
-              t.kind,
-              t.item_id,
+            // Проверяем, не выдан ли этот материал другой одобренной заявкой
+            const keepByGrant = await existsOtherProcessedGrant(
+              supabase, r.id, r.user_id, t.kind, t.item_id
             );
 
-            if (keep) continue;
+            // Проверяем, нет ли другой активной заявки на эту же категорию/класс
+            const keepByRequest = await existsOtherProcessedGenericRequestForMaterial(
+              supabase, r.id, r.user_id, r.branch_type || "olympiad", t.material_kind, t.target_levels
+            );
 
-            if (t.kind === "textbook") {
-              const del = await supabase
-                .from("textbook_access")
-                .delete()
-                .eq("user_id", r.user_id)
-                .eq("textbook_id", t.item_id);
+            if (keepByGrant || keepByRequest) continue;
 
-              if (del.error) throw new Error(del.error.message);
-            } else if (t.kind === "crossword") {
-              const del = await supabase
-                .from("crossword_access")
-                .delete()
-                .eq("user_id", r.user_id)
-                .eq("crossword_id", t.item_id);
+            // Единое место удаления (никаких if (t.kind === 'textbook') и т.д.)
+            const del = await supabase
+              .from("material_access")
+              .delete()
+              .eq("user_id", r.user_id)
+              .eq("material_id", t.item_id);
 
-              if (del.error) throw new Error(del.error.message);
-            }
+            if (del.error) throw new Error(del.error.message);
           }
 
           const delHistory = await supabase.from("purchase_request_grants").delete().eq("request_id", r.id);
@@ -377,10 +295,7 @@ export async function PATCH(req: NextRequest) {
 
         const upd = await supabase
           .from("purchase_requests")
-          .update({
-            is_processed,
-            processed_at,
-          })
+          .update({ is_processed, processed_at })
           .eq("id", r.id)
           .select("*")
           .single();
@@ -419,38 +334,25 @@ export async function PATCH(req: NextRequest) {
             ok: true,
             granted,
             grants_history: grantsHistory,
-            sheet: {
-              ok: true,
-              action: sres.action,
-              row: sres.rowNumber ?? null,
-            },
+            sheet: { ok: true, action: sres.action, row: sres.rowNumber ?? null },
           };
         } catch (e: any) {
           const msg = String(e?.message || e || "Sheets sync error").slice(0, 500);
 
           await supabase
             .from("purchase_requests")
-            .update({
-              sheet_synced_at: null,
-              sheet_sync_error: msg,
-            })
+            .update({ sheet_synced_at: null, sheet_sync_error: msg })
             .eq("id", updatedRow.id);
 
           results[r.id] = {
             ok: true,
             granted,
             grants_history: grantsHistory,
-            sheet: {
-              ok: false,
-              error: msg,
-            },
+            sheet: { ok: false, error: msg },
           };
         }
       } catch (e: any) {
-        results[r.id] = {
-          ok: false,
-          error: e?.message || String(e),
-        };
+        results[r.id] = { ok: false, error: e?.message || String(e) };
       }
     }
 

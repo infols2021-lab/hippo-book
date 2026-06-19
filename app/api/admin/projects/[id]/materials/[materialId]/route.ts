@@ -1,78 +1,79 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
-import { normalizeBranchType } from "@/lib/branches/config";
-import { normalizeMaterialKind, toStringArray, uniqueStrings } from "@/lib/materials/format";
 
-function normalizeBool(value: unknown): boolean {
-  return value === true || value === "true" || value === 1 || value === "1";
-}
+// Импортируем всё из нашей новой единой точки истины (Single Source of Truth)
+import {
+  normalizeString,
+  normalizeNullableString,
+  normalizeBool,
+  normalizeOrderIndex,
+  normalizePrice,
+  normalizeUUID,
+  normalizeBranchType,
+  normalizeMaterialKind,
+  normalizeClassLevels,
+  normalizeTargetLevels
+} from "@/lib/materials/normalize";
 
-function normalizeOrderIndex(value: unknown): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function normalizeNullableString(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  const str = String(value).trim();
-  return str || null;
-}
-
-// Защита от мусора вместо ID
-function isValidUUID(str: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
-}
-
+// Создаем чистый payload, поддерживающий частичное обновление (PATCH/PUT)
 function normalizePatchPayload(body: any) {
   const payload: Record<string, any> = {};
 
-  const branchType = body.branch_type ?? body.branchType;
-  if (branchType !== undefined) payload.branch_type = normalizeBranchType(branchType);
-
-  const materialKind = body.material_kind ?? body.materialKind;
-  if (materialKind !== undefined) payload.material_kind = normalizeMaterialKind(materialKind);
-
-  if ("title" in body) payload.title = String(body.title ?? "").trim();
-  if ("description" in body) payload.description = normalizeNullableString(body.description);
-  
-  const coverUrl = body.cover_image_url ?? body.coverImageUrl;
-  if (coverUrl !== undefined) payload.cover_image_url = normalizeNullableString(coverUrl);
-  
-  if ("is_available" in body) payload.is_available = normalizeBool(body.is_available);
-  if ("is_active" in body) payload.is_active = normalizeBool(body.is_active);
-  if ("order_index" in body) payload.order_index = normalizeOrderIndex(body.order_index);
-  
-  const classLevels = body.class_levels ?? body.class_level ?? body.classLevels;
-  if (classLevels !== undefined) {
-    payload.class_levels = uniqueStrings(toStringArray(classLevels));
+  if ("branch_type" in body || "branchType" in body) {
+    payload.branch_type = normalizeBranchType(body.branch_type ?? body.branchType);
   }
   
-  const targetLevels = body.target_levels ?? body.target_level ?? body.targetLevels;
-  if (targetLevels !== undefined) {
-    payload.target_levels = uniqueStrings(toStringArray(targetLevels));
+  if ("material_kind" in body || "materialKind" in body) {
+    payload.material_kind = normalizeMaterialKind(body.material_kind ?? body.materialKind);
+  }
+  
+  if ("title" in body) {
+    payload.title = normalizeString(body.title);
+  }
+  
+  if ("description" in body) {
+    payload.description = normalizeNullableString(body.description);
+  }
+  
+  if ("cover_image_url" in body || "coverImageUrl" in body) {
+    payload.cover_image_url = normalizeNullableString(body.cover_image_url ?? body.coverImageUrl);
+  }
+  
+  if ("is_available" in body || "isAvailable" in body) {
+    payload.is_available = normalizeBool(body.is_available ?? body.isAvailable);
+  }
+  
+  if ("is_active" in body || "isActive" in body) {
+    payload.is_active = normalizeBool(body.is_active ?? body.isActive);
+  }
+  
+  if ("order_index" in body || "orderIndex" in body) {
+    payload.order_index = normalizeOrderIndex(body.order_index ?? body.orderIndex);
+  }
+
+  // ❗️ ИСПРАВЛЕНА ПРОБЛЕМА: Цена теперь сохраняется
+  if ("price" in body) {
+    payload.price = normalizePrice(body.price);
+  }
+  
+  if ("class_levels" in body || "class_level" in body || "classLevels" in body) {
+    payload.class_levels = normalizeClassLevels(body.class_levels ?? body.class_level ?? body.classLevels);
+  }
+  
+  if ("target_levels" in body || "target_level" in body || "targetLevels" in body) {
+    payload.target_levels = normalizeTargetLevels(body.target_levels ?? body.target_level ?? body.targetLevels);
   }
   
   if ("meta" in body) {
     payload.meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
   }
   
-  // ❗️ УЛЬТРА-ФИКС ДЛЯ ТАБОВ:
-  const rawTabId = body.project_tab_id ?? body.tab_id ?? body.projectTabId ?? body.tabId;
-  if (rawTabId !== undefined) {
-    let tid = normalizeNullableString(rawTabId);
-    
-    // Очищаем от нулей и заглушек фронтенда
-    if (tid === "00000000-0000-0000-0000-000000000000" || tid === "none" || tid === "null" || tid === "") {
-      tid = null;
-    }
-
-    // Если фронт прислал текст вместо ID — сбрасываем в null, чтобы БД не упала
-    if (tid && !isValidUUID(tid)) {
-      tid = null;
-    }
-    
-    payload.project_tab_id = tid;
+  // ❗️ ИСПРАВЛЕНА ПРОБЛЕМА: Ультра-фикс для табов теперь под капотом в normalizeUUID
+  const hasTabId = "project_tab_id" in body || "tab_id" in body || "projectTabId" in body || "tabId" in body;
+  if (hasTabId) {
+    const rawTabId = body.project_tab_id ?? body.tab_id ?? body.projectTabId ?? body.tabId;
+    payload.project_tab_id = normalizeUUID(rawTabId);
   }
 
   return payload;
@@ -81,12 +82,25 @@ function normalizePatchPayload(body: any) {
 function validatePatchPayload(payload: Record<string, any>) {
   if ("title" in payload && !payload.title) return "title required";
   if ("material_kind" in payload && !payload.material_kind) return "material_kind required";
-  if ("branch_type" in payload && payload.branch_type === "gatehouse" && "target_levels" in payload && payload.target_levels.length === 0) {
+  
+  if (
+    "branch_type" in payload && 
+    payload.branch_type === "gatehouse" && 
+    "target_levels" in payload && 
+    (!payload.target_levels || payload.target_levels.length === 0)
+  ) {
     return "target_levels required";
   }
-  if ("branch_type" in payload && payload.branch_type === "olympiad" && "class_levels" in payload && payload.class_levels.length === 0) {
+  
+  if (
+    "branch_type" in payload && 
+    payload.branch_type === "olympiad" && 
+    "class_levels" in payload && 
+    (!payload.class_levels || payload.class_levels.length === 0)
+  ) {
     return "class_levels required";
   }
+  
   return null;
 }
 
@@ -124,7 +138,6 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   }
 }
 
-// ❗️ Обрабатываем PUT (именно его присылает твой фронтенд)
 export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string; materialId: string }> }) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
@@ -175,7 +188,6 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string;
   }
 }
 
-// Для безопасности дублируем логику и на PATCH
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string; materialId: string }> }) {
   return PUT(req, ctx);
 }

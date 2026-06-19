@@ -9,16 +9,14 @@ type ColorSettings = {
   value: string;
 };
 
+// Полностью удалены легаси-ключи (hasStreaks, hasTitles, hasLeaderboard)
 type FeatureKey =
   | "streaks"
   | "titles"
   | "leaderboard"
   | "avatars"
   | "profileProgress"
-  | "requestMode"
-  | "hasStreaks"
-  | "hasTitles"
-  | "hasLeaderboard";
+  | "requestMode";
 
 // ============================================================
 // 🖼️ Живое превью – точная копия реального профиля
@@ -489,7 +487,8 @@ export default function ProjectEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  // Читаем цвета с обратной совместимостью (старый и новый формат)
+  // Читаем цвета с обратной совместимостью (если в БД ещё лежат старые форматы),
+  // но сохранять будем ИСКЛЮЧИТЕЛЬНО в новом едином формате `colors: {...}`
   const initialPrimaryColor =
     project?.theme?.colors?.primary || project?.theme?.primaryColor || "#3b82f6";
   const initialSecondaryColor =
@@ -506,30 +505,23 @@ export default function ProjectEditor({
     sheet_name: project?.sheet_name || "",
     is_active: project?.is_active ?? true,
     theme: {
-      ...project?.theme,
       colors: {
-        ...project?.theme?.colors,
         primary: initialPrimaryColor,
         secondary: initialSecondaryColor,
         pageBg: initialPageBg,
         cardBg: initialCardBg,
         textColor: initialTextColor,
       },
-      primaryColor: initialPrimaryColor,
-      secondaryColor: initialSecondaryColor,
-      backgroundColor: initialPageBg,
+      // Мы полностью удалили дубликаты `primaryColor`, `secondaryColor`, `backgroundColor` отсюда.
     },
     features: {
-      ...project?.features,
       streaks: project?.features?.streaks || project?.features?.hasStreaks || false,
       titles: project?.features?.titles || project?.features?.hasTitles || false,
       leaderboard: project?.features?.leaderboard || project?.features?.hasLeaderboard || false,
       avatars: project?.features?.avatars || project?.features?.hasAvatars || false,
       profileProgress: project?.features?.profileProgress || false,
       requestMode: project?.features?.requestMode || "target_levels",
-      hasStreaks: project?.features?.streaks || project?.features?.hasStreaks || false,
-      hasTitles: project?.features?.titles || project?.features?.hasTitles || false,
-      hasLeaderboard: project?.features?.leaderboard || project?.features?.hasLeaderboard || false,
+      // Мы полностью удалили дубликаты `hasStreaks`, `hasTitles`, `hasLeaderboard` отсюда.
     },
   });
 
@@ -662,21 +654,16 @@ export default function ProjectEditor({
     }
   };
 
-  const toggleFeature = (newKey: FeatureKey, legacyKey: FeatureKey) => {
-    setFormData((prev) => {
-      const newValue = !prev.features[newKey];
-      return {
-        ...prev,
-        features: {
-          ...prev.features,
-          [newKey]: newValue,
-          [legacyKey]: newValue,
-        },
-      };
-    });
+  const toggleFeature = (key: FeatureKey) => {
+    setFormData((prev) => ({
+      ...prev,
+      features: {
+        ...prev.features,
+        [key]: !prev.features[key],
+      },
+    }));
   };
 
-  // Обработчик изменения requestMode
   const handleRequestModeChange = (mode: "class_level" | "target_levels") => {
     setFormData((prev) => ({
       ...prev,
@@ -691,19 +678,16 @@ export default function ProjectEditor({
     colorKey: "primary" | "secondary" | "pageBg" | "cardBg" | "textColor",
     colorValue: string
   ) => {
-    setFormData((prev) => {
-      const newColors = { ...prev.theme.colors, [colorKey]: colorValue };
-      return {
-        ...prev,
-        theme: {
-          ...prev.theme,
-          colors: newColors,
-          primaryColor: newColors.primary,
-          secondaryColor: newColors.secondary,
-          backgroundColor: newColors.pageBg,
+    setFormData((prev) => ({
+      ...prev,
+      theme: {
+        ...prev.theme,
+        colors: {
+          ...prev.theme.colors,
+          [colorKey]: colorValue,
         },
-      };
-    });
+      },
+    }));
   };
 
   const colorSettings: ColorSettings[] = [
@@ -844,7 +828,7 @@ export default function ProjectEditor({
                 type="checkbox"
                 className="w-4 h-4 text-blue-600 rounded"
                 checked={formData.features.streaks}
-                onChange={() => toggleFeature("streaks", "hasStreaks")}
+                onChange={() => toggleFeature("streaks")}
               />
               <span className="font-bold text-gray-800">🔥 Огненные стрики</span>
             </label>
@@ -853,7 +837,7 @@ export default function ProjectEditor({
                 type="checkbox"
                 className="w-4 h-4 text-blue-600 rounded"
                 checked={formData.features.titles}
-                onChange={() => toggleFeature("titles", "hasTitles")}
+                onChange={() => toggleFeature("titles")}
               />
               <span className="font-bold text-gray-800">👑 Титулы</span>
             </label>
@@ -862,7 +846,7 @@ export default function ProjectEditor({
                 type="checkbox"
                 className="w-4 h-4 text-blue-600 rounded"
                 checked={formData.features.leaderboard}
-                onChange={() => toggleFeature("leaderboard", "hasLeaderboard")}
+                onChange={() => toggleFeature("leaderboard")}
               />
               <span className="font-bold text-gray-800">🏆 Лидерборд</span>
             </label>

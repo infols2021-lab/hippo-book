@@ -3,18 +3,11 @@ import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
 import { upsertRequestRowByNumber } from "@/lib/integrations/googleSheets";
-import {
-  normalizeBranchType,
-  normalizeString,
-  toStringArray,
-  uniqueStrings,
-  normalizeGatehouseLevel,
-  normalizeMaterialKind,
-} from "@/lib/materials/normalize";
+import { normalizeString } from "@/lib/materials/normalize";
 import {
   buildSheetValues,
   validateRequest,
-  normalizeGatehouseMaterialKind,
+  normalizeRequestPayload,
 } from "@/lib/requests/normalize";
 
 export const runtime = "nodejs";
@@ -47,67 +40,6 @@ async function safeJson(req: NextRequest) {
   } catch {
     return null;
   }
-}
-
-function normalizeRequestBody(body: any, existing: any) {
-  const branch_type = normalizeBranchType(body?.branch_type ?? existing?.branch_type);
-
-  const class_level = normalizeString(
-    body?.class_level !== undefined ? body.class_level : existing?.class_level
-  );
-
-  const rawTargetLevels =
-    body?.target_levels !== undefined
-      ? body.target_levels
-      : body?.target_level !== undefined
-        ? body.target_level
-        : existing?.target_levels !== undefined
-          ? existing.target_levels
-          : existing?.target_level;
-
-  const target_levels = uniqueStrings(
-    toStringArray(rawTargetLevels).map((l) =>
-      branch_type === "gatehouse" ? normalizeGatehouseLevel(l) : normalizeString(l)
-    )
-  );
-
-  const rawTextbookTypes =
-    body?.textbook_types !== undefined
-      ? body.textbook_types
-      : body?.material_kinds !== undefined
-        ? body.material_kinds
-        : existing?.textbook_types !== undefined
-          ? existing.textbook_types
-          : branch_type === "gatehouse"
-            ? ["mock_test"]
-            : [];
-
-  const textbook_types = uniqueStrings(
-    toStringArray(rawTextbookTypes).map((t) =>
-      branch_type === "gatehouse" ? normalizeGatehouseMaterialKind(t) : normalizeMaterialKind(t)
-    )
-  );
-
-  const rawMaterialKinds =
-    body?.material_kinds !== undefined
-      ? body.material_kinds
-      : existing?.material_kinds !== undefined
-        ? existing.material_kinds
-        : textbook_types;
-
-  const material_kinds = uniqueStrings(
-    toStringArray(rawMaterialKinds).map((k) =>
-      branch_type === "gatehouse" ? normalizeGatehouseMaterialKind(k) : normalizeMaterialKind(k)
-    )
-  );
-
-  return {
-    branch_type,
-    class_level,
-    target_levels,
-    textbook_types,
-    material_kinds,
-  };
 }
 
 export async function POST(req: NextRequest) {
@@ -143,28 +75,22 @@ export async function POST(req: NextRequest) {
       return fail("Processed request can't be updated", 403, "LOCKED", noStoreInit());
     }
 
-    const normalized = normalizeRequestBody(body, existing);
+    // Мержим существующие данные и новые из body перед нормализацией
+    const mergedBody = { ...existing, ...body };
 
-    // Валидация через общую функцию
-    const validation = validateRequest({
-      branch_type: normalized.branch_type,
-      class_level: normalized.class_level,
-      target_levels: normalized.target_levels,
-      textbook_types: normalized.textbook_types,
-      material_kinds: normalized.material_kinds,
-      email: normalizeString(profile?.email || user?.email || body?.email || existing.email),
-      full_name: normalizeString(profile?.full_name || body?.full_name || existing.full_name),
-      contact_phone: normalizeString(profile?.contact_phone || body?.contact_phone || existing.contact_phone),
-      is_processed: false,
-    });
+    // Единая нормализация всех полей
+    const normalized = normalizeRequestPayload(
+      mergedBody,
+      profile?.email || user?.email || existing.email,
+      profile?.full_name || existing.full_name,
+      profile?.contact_phone || existing.contact_phone
+    );
+
+    const validation = validateRequest(normalized);
 
     if (!validation.valid) {
       return fail(validation.error || "Неверные данные заявки", 400, "VALIDATION", noStoreInit());
     }
-
-    const email = normalizeString(profile?.email || user?.email || body?.email || existing.email);
-    const full_name = normalizeString(profile?.full_name || body?.full_name || existing.full_name);
-    const contact_phone = normalizeString(profile?.contact_phone || body?.contact_phone || existing.contact_phone);
 
     const payload: Record<string, any> = {
       branch_type: normalized.branch_type,
@@ -173,9 +99,9 @@ export async function POST(req: NextRequest) {
       target_levels: normalized.target_levels.length > 0 ? normalized.target_levels : null,
       textbook_types: normalized.textbook_types,
       material_kinds: normalized.material_kinds,
-      email,
-      full_name,
-      contact_phone: contact_phone || null,
+      email: normalized.email,
+      full_name: normalized.full_name,
+      contact_phone: normalized.contact_phone || null,
       sheet_synced_at: null,
       sheet_sync_error: null,
     };
@@ -193,7 +119,6 @@ export async function POST(req: NextRequest) {
 
     const row = updatedRow as any;
 
-    // Получаем sheet_name из проекта
     let sheetName = null;
     if (existing.project_id) {
       const { data: projectInfo } = await supabase
@@ -207,16 +132,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Строим значения для Google Sheets через общую функцию
     const sheetValues = buildSheetValues(
       row.request_number || "",
       row.created_at || "",
-      normalizeBranchType(row.branch_type),
-      row.class_level,
-      toStringArray(row.target_levels).length ? toStringArray(row.target_levels) : toStringArray(row.target_level),
-      toStringArray(row.material_kinds).length ? toStringArray(row.material_kinds) : toStringArray(row.textbook_types),
-      row.email || "",
-      row.full_name || "",
+      normalized.branch_type,
+      normalized.class_level,
+      normalized.target_levels,
+      normalized.material_kinds.length > 0 ? normalized.material_kinds : normalized.textbook_types,
+      normalized.email,
+      normalized.full_name,
       Boolean(row.is_processed),
       row.processed_at ?? null
     );

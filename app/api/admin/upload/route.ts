@@ -14,22 +14,14 @@ import { Readable } from "stream";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// ====== КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ДЛЯ 413 ======
-// Говорим Next.js принимать тела запросов до 20 МБ,
-// чтобы API-роут не резал файлы до того, как Busboy их прочитает.
-// Vercel Serverless: по умолчанию таймаут 10 сек — для загрузки 20 МБ не хватит.
-// Увеличиваем до 60 сек. На других платформах игнорируется.
+// Увеличиваем таймаут для Vercel (до 60 секунд), чтобы успевали загружаться тяжелые файлы.
 export const maxDuration = 60;
 
-// Максимальный размер одного файла (совпадает с serverBodySizeLimit в next.config.ts)
-const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 МБ
+// Берем лимит из .env или ставим 100 МБ по умолчанию (вместо жестких 20 МБ)
+const MAX_FILE_SIZE_BYTES = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE) || 100 * 1024 * 1024;
 
 function noStoreInit(): ResponseInit {
-  return {
-    headers: {
-      "cache-control": "no-store, max-age=0",
-    },
-  };
+  return { headers: { "cache-control": "no-store, max-age=0" } };
 }
 
 function randomId() {
@@ -42,14 +34,9 @@ function randomId() {
 function cleanFolder(folder: string) {
   const raw = folder.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
   if (!raw) return "";
-  return raw
-    .split("/")
-    .map((part) => safeStorageFileName(part))
-    .filter(Boolean)
-    .join("/");
+  return raw.split("/").map((part) => safeStorageFileName(part)).filter(Boolean).join("/");
 }
 
-// mp4 добавлен: аудиофайлы с мобильных устройств часто приходят в формате .mp4
 function getMediaType(ext: string): "image" | "audio" | "pdf" | "unknown" {
   if (["jpg", "jpeg", "png", "gif", "webp", "avif"].includes(ext)) return "image";
   if (["mp3", "wav", "ogg", "m4a", "mp4"].includes(ext)) return "audio";
@@ -62,23 +49,13 @@ export async function POST(req: Request) {
   if ("response" in auth) return auth.response;
 
   const headers: Record<string, string> = {};
-  req.headers.forEach((value, key) => {
-    headers[key] = value;
-  });
+  req.headers.forEach((value, key) => { headers[key] = value; });
 
   const bodyStream = Readable.fromWeb(req.body as any);
 
-  // Лимиты Busboy: защита от слишком больших файлов и от злоупотреблений.
-  // fileSize — максимальный размер одного файла в байтах.
-  // Если файл превысит лимит, Busboy установит stream.truncated = true
-  // и прекратит читать данные (файл будет обрезан — мы это отловим ниже).
   const busboy = Busboy({
     headers,
-    limits: {
-      fileSize: MAX_FILE_SIZE_BYTES,
-      files: 10,
-      fields: 20,
-    },
+    limits: { fileSize: MAX_FILE_SIZE_BYTES, files: 10, fields: 20 },
   });
 
   const fields: Record<string, string> = {};
@@ -91,22 +68,18 @@ export async function POST(req: Request) {
   }> = [];
 
   const parsePromise = new Promise<void>((resolve, reject) => {
-    busboy.on("field", (name, val) => {
-      fields[name] = val;
-    });
+    busboy.on("field", (name, val) => { fields[name] = val; });
 
     busboy.on("file", (fieldname, stream, { filename, mimeType }) => {
       const chunks: Buffer[] = [];
       stream.on("data", (chunk: Buffer) => chunks.push(chunk));
       stream.on("end", () => {
-        // stream.truncated становится true, если Busboy обрезал файл из-за fileSize
-        const truncated = (stream as any).truncated === true;
         files.push({
           fieldname,
           file: Buffer.concat(chunks),
           filename,
           mimeType,
-          truncated,
+          truncated: (stream as any).truncated === true,
         });
       });
     });
@@ -122,11 +95,10 @@ export async function POST(req: Request) {
     return fail("Error parsing upload: " + String(err.message), 400, "PARSE_ERROR", noStoreInit());
   }
 
-  // Проверяем обрезанные файлы — значит файл превысил MAX_FILE_SIZE_BYTES
   for (const f of files) {
     if (f.truncated) {
       return fail(
-        `Файл "${f.filename}" превышает максимально допустимый размер ${MAX_FILE_SIZE_BYTES / 1024 / 1024} МБ`,
+        `Файл "${f.filename}" превышает максимально допустимый размер ${Math.round(MAX_FILE_SIZE_BYTES / 1024 / 1024)} МБ`,
         413,
         "FILE_TOO_LARGE",
         noStoreInit()
@@ -143,11 +115,9 @@ export async function POST(req: Request) {
     return fail("Не указан bucket для загрузки", 400, "MISSING_BUCKET", noStoreInit());
   }
 
-  // Валидация расширений
   const validFiles: typeof files = [];
   for (const f of files) {
     const ext = getFileExtension(f.filename);
-
     if (!isAllowedMediaExtension(ext)) {
       return fail(
         `Тип файла .${ext} не поддерживается. Разрешены: jpg, jpeg, png, gif, webp, avif, mp3, wav, ogg, m4a, mp4, pdf`,
@@ -156,7 +126,6 @@ export async function POST(req: Request) {
         noStoreInit()
       );
     }
-
     validFiles.push(f);
   }
 

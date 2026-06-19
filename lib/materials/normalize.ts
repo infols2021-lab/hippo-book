@@ -1,5 +1,6 @@
 // lib/materials/normalize.ts
-// Единая точка нормализации для материалов, заданий и связанных сущностей.
+// Единая точка нормализации для материалов, доступов и связанных сущностей.
+// Production-ready версия: строгая типизация, полная динамика, защита от мусорных данных.
 
 // ----------------------------------------------------------------------------
 // Базовые утилиты
@@ -24,6 +25,7 @@ export function normalizeNullableString(value: unknown): string | null {
 
 /**
  * Нормализует массив строк: фильтрует пустые и обрезает пробелы.
+ * Поддерживает JSON-массивы и строки, разделённые запятыми.
  */
 export function toStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -32,16 +34,14 @@ export function toStringArray(value: unknown): string[] {
   if (typeof value === "string") {
     const text = value.trim();
     if (!text) return [];
-    // Поддержка JSON-массивов
+    
     if (text.startsWith("[") && text.endsWith("]")) {
       try {
-        const parsed = JSON.parse(text);
-        return toStringArray(parsed);
+        return toStringArray(JSON.parse(text));
       } catch {
         return [];
       }
     }
-    // Поддержка строк, разделённых запятыми
     return text.split(",").map((s) => s.trim()).filter(Boolean);
   }
   const single = normalizeString(value);
@@ -68,33 +68,34 @@ export function normalizeBool(value: unknown): boolean {
 
 /**
  * Нормализует число (целое или с плавающей точкой).
- * Если число не валидно, возвращает fallback.
  */
 export function normalizeNumber(value: unknown, fallback = 0): number {
-  const n = Number(value);
+  if (value === null || value === undefined || value === "") return fallback;
+  
+  // Если пришла строка, меняем запятую на точку и убираем пробелы (защита от кривого ввода)
+  let parsedValue = value;
+  if (typeof value === "string") {
+    parsedValue = value.replace(/,/g, ".").replace(/\s/g, "");
+  }
+  
+  const n = Number(parsedValue);
   return Number.isFinite(n) ? n : fallback;
-}
-
-/**
- * Нормализует целое число (отбрасывает дробную часть).
- */
-export function normalizeInteger(value: unknown, fallback = 0): number {
-  return Math.trunc(normalizeNumber(value, fallback));
 }
 
 /**
  * Нормализует порядковый индекс (неотрицательное целое).
  */
 export function normalizeOrderIndex(value: unknown): number {
-  return Math.max(0, normalizeInteger(value, 0));
+  return Math.max(0, Math.trunc(normalizeNumber(value, 0)));
 }
 
 /**
- * Нормализует цену (неотрицательное число, по умолчанию 1000).
+ * Нормализует цену (неотрицательное число).
+ * По умолчанию 0, чтобы избежать случайных списаний при ошибке фронтенда.
  */
 export function normalizePrice(value: unknown): number {
-  const n = normalizeNumber(value, 1000);
-  return Math.max(0, n);
+  const n = normalizeNumber(value, 0);
+  return Math.max(0, n); // Цена не может быть отрицательной
 }
 
 // ----------------------------------------------------------------------------
@@ -109,170 +110,81 @@ export function isValidUUID(str: string): boolean {
 }
 
 /**
- * Нормализует UUID: если строка невалидна или является "заглушкой", возвращает null.
- * Заглушки: "00000000-0000-0000-0000-000000000000", "none", "null", "".
+ * Нормализует UUID: убивает любые "костыли" фронтенда ("none", "null", нули).
+ * Если строка невалидна, возвращает настоящий SQL null.
  */
 export function normalizeUUID(value: unknown): string | null {
   const s = normalizeNullableString(value);
   if (!s) return null;
-  if (s === "00000000-0000-0000-0000-000000000000") return null;
-  if (s.toLowerCase() === "none" || s.toLowerCase() === "null") return null;
+  
+  const lower = s.toLowerCase();
+  if (
+    lower === "00000000-0000-0000-0000-000000000000" || 
+    lower === "none" || 
+    lower === "null" ||
+    lower === "undefined"
+  ) {
+    return null;
+  }
+  
   return isValidUUID(s) ? s : null;
 }
 
 // ----------------------------------------------------------------------------
-// Ветки (branch_type)
+// Динамическая классификация (Ветки и Типы)
 // ----------------------------------------------------------------------------
 
 /**
  * Нормализует branch_type.
- * Возвращает переданную строку в нижнем регистре, или "olympiad" как fallback.
- * Специальные алиасы: "gatehouse", "ga", "ga_exam", "exam", "exams", "gatehouse_awards" → "gatehouse".
- * Для остальных — возвращает как есть (поддержка динамических веток).
+ * Обрабатывает легаси-алиасы, но пропускает любые новые динамические ветки как есть.
  */
 export function normalizeBranchType(value: unknown): string {
   const raw = normalizeString(value);
-  if (!raw) return "olympiad";
+  if (!raw) return "olympiad"; // Базовый фолбэк
+  
   const lower = raw.toLowerCase();
-  if (
-    lower === "gatehouse" ||
-    lower === "ga" ||
-    lower === "ga_exam" ||
-    lower === "exam" ||
-    lower === "exams" ||
-    lower === "gatehouse_awards"
-  ) {
+  // Легаси алиасы для обратной совместимости
+  if (["gatehouse", "ga", "ga_exam", "exam", "exams", "gatehouse_awards"].includes(lower)) {
     return "gatehouse";
   }
-  return lower;
+  
+  return lower; // Полная поддержка новых динамических веток
 }
-
-// ----------------------------------------------------------------------------
-// Типы материалов (material_kind)
-// ----------------------------------------------------------------------------
 
 /**
  * Нормализует material_kind.
- * Поддерживает алиасы: "учебник", "textbook" → "textbook"; "кроссворд", "crossword" → "crossword";
- * "пробный тест", "mock_test", "mock-test", "mocktest" → "mock_test".
- * Если тип не распознан, возвращает как есть (поддержка кастомных типов).
+ * Идеально для универсальной таблицы materials. Поддерживает любые новые типы.
  */
 export function normalizeMaterialKind(value: unknown): string {
   const raw = normalizeString(value);
-  if (!raw) return "material"; // универсальный фолбэк
+  if (!raw) return "material"; 
+  
   const lower = raw.toLowerCase();
+  // Легаси алиасы
+  if (["учебник", "textbook"].includes(lower)) return "textbook";
+  if (["кроссворд", "crossword"].includes(lower)) return "crossword";
+  if (["пробный тест", "пробные тесты", "mock_test", "mock-test", "mocktest"].includes(lower)) return "mock_test";
 
-  // Алиасы для учебников
-  if (lower === "учебник" || lower === "textbook") return "textbook";
-
-  // Алиасы для кроссвордов
-  if (lower === "кроссворд" || lower === "crossword") return "crossword";
-
-  // Алиасы для пробных тестов
-  if (
-    lower === "пробный тест" ||
-    lower === "пробные тесты" ||
-    lower === "mock_test" ||
-    lower === "mock-test" ||
-    lower === "mocktest"
-  ) {
-    return "mock_test";
-  }
-
-  // Возвращаем как есть (поддержка будущих типов)
-  return lower;
-}
-
-/**
- * Нормализует массив material_kind.
- */
-export function normalizeMaterialKinds(value: unknown): string[] {
-  return uniqueStrings(toStringArray(value).map(normalizeMaterialKind));
+  return lower; // Поддержка кастомных типов (например "video", "audio", "interactive")
 }
 
 // ----------------------------------------------------------------------------
-// Уровни (target_levels, class_levels)
+// Уровни и Классы
 // ----------------------------------------------------------------------------
 
 /**
- * Нормализует уровни для Gatehouse (Stage / CEFR).
- * Приводит к каноническому виду: "stage_1", "stage_2", "stage_3", "A1", "A2", "B1", "B2", "C1", "C2".
- * Для остальных — возвращает как есть (нижний регистр).
+ * Нормализует массивы уровней и классов.
  */
-export function normalizeGatehouseLevel(value: unknown): string {
-  const raw = normalizeString(value);
-  if (!raw) return "";
-  const v = raw.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-
-  if (v === "stage 1" || v === "stage1") return "stage_1";
-  if (v === "stage 2" || v === "stage2") return "stage_2";
-  if (v === "stage 3" || v === "stage3") return "stage_3";
-
-  const upper = raw.toUpperCase();
-  if (["A1", "A2", "B1", "B2", "C1", "C2"].includes(upper)) return upper;
-
-  return v || raw;
+export function normalizeTargetLevels(value: unknown): string[] {
+  return uniqueStrings(toStringArray(value).map(s => s.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, "_")));
 }
 
-/**
- * Нормализует массив уровней для Gatehouse.
- */
-export function normalizeGatehouseLevels(value: unknown): string[] {
-  return uniqueStrings(toStringArray(value).map(normalizeGatehouseLevel));
-}
-
-// ----------------------------------------------------------------------------
-// Классы (для олимпиад)
-// ----------------------------------------------------------------------------
-
-/**
- * Нормализует класс (class_level) — просто обрезает пробелы.
- * Возвращает null, если строка пустая.
- */
-export function normalizeClassLevel(value: unknown): string | null {
-  return normalizeNullableString(value);
-}
-
-/**
- * Нормализует массив классов.
- */
 export function normalizeClassLevels(value: unknown): string[] {
-  return uniqueStrings(toStringArray(value).map(normalizeString));
+  return uniqueStrings(toStringArray(value));
 }
 
 // ----------------------------------------------------------------------------
-// Защита от SQL-инъекций (для поисковых запросов)
-// ----------------------------------------------------------------------------
-
-/**
- * Экранирует строку для использования в ILIKE (%...%).
- * Удаляет символы %, _ и \\ (учитывая особенность PostgREST).
- */
-export function sanitizeSearchQuery(value: unknown): string {
-  const s = normalizeString(value);
-  // Экранируем опасные символы для ILIKE: %, _, \
-  return s.replace(/[%_\\]/g, (match) => {
-    if (match === "%") return "\\%";
-    if (match === "_") return "\\_";
-    if (match === "\\") return "\\\\";
-    return match;
-  });
-}
-
-// ----------------------------------------------------------------------------
-// Slug-валидация
-// ----------------------------------------------------------------------------
-
-/**
- * Проверяет, что slug состоит только из латиницы, цифр, дефиса и подчёркивания.
- * Первый символ — буква или цифра (не дефис/подчёркивание).
- */
-export function isValidSlug(slug: string): boolean {
-  return /^[a-z0-9][a-z0-9-_]*$/i.test(slug);
-}
-
-// ----------------------------------------------------------------------------
-// Комплексная нормализация материала (для создания/обновления)
+// Комплексная нормализация материала (Главный экспорт для API)
 // ----------------------------------------------------------------------------
 
 export type NormalizedMaterial = {
@@ -293,61 +205,51 @@ export type NormalizedMaterial = {
 };
 
 /**
- * Нормализует входные данные материала для вставки/обновления в БД.
- * Принимает сырой объект body и userId (опционально).
- * Возвращает объект, готовый для Supabase.
+ * ГЛАВНАЯ ФУНКЦИЯ: Нормализует входящий JSON (body) в идеальный объект для БД.
+ * Решает проблемы со snake_case / camelCase и потерянными полями.
  */
 export function normalizeMaterialInput(
   body: Record<string, unknown>,
   userId?: string | null,
 ): NormalizedMaterial {
-  // Извлечение всех полей с поддержкой разных вариантов ключей (snake_case / camelCase)
-  const title = normalizeString(body.title ?? body.name);
-  const description = normalizeNullableString(body.description);
-  const cover_image_url = normalizeNullableString(
-    body.cover_image_url ?? body.coverImageUrl ?? body.image_url ?? body.imageUrl,
-  );
-  const branch_type = normalizeBranchType(body.branch_type ?? body.branchType);
-  const material_kind = normalizeMaterialKind(body.material_kind ?? body.materialKind);
-  const target_levels = uniqueStrings(
-    toStringArray(body.target_levels ?? body.target_level ?? body.targetLevels),
-  );
-  const class_levels = uniqueStrings(
-    toStringArray(body.class_levels ?? body.class_level ?? body.classLevels),
-  );
-  const is_available = normalizeBool(body.is_available ?? body.isAvailable);
-  const is_active =
-    body.is_active !== undefined ? normalizeBool(body.is_active) : true;
-  const order_index = normalizeOrderIndex(body.order_index ?? body.orderIndex);
-  const price = normalizePrice(body.price);
-  const project_tab_id = normalizeUUID(
-    body.project_tab_id ?? body.tab_id ?? body.projectTabId ?? body.tabId,
-  );
-  const meta =
-    body.meta && typeof body.meta === "object" && !Array.isArray(body.meta)
-      ? (body.meta as Record<string, unknown>)
-      : {};
+  // Гарантируем, что body это объект
+  const safeBody = body && typeof body === "object" ? body : {};
 
   return {
-    title,
-    description,
-    cover_image_url,
-    branch_type,
-    material_kind,
-    target_levels,
-    class_levels,
-    is_available,
-    is_active,
-    order_index,
-    price,
-    project_tab_id,
-    meta,
+    title: normalizeString(safeBody.title ?? safeBody.name),
+    description: normalizeNullableString(safeBody.description),
+    cover_image_url: normalizeNullableString(
+      safeBody.cover_image_url ?? safeBody.coverImageUrl ?? safeBody.image_url ?? safeBody.imageUrl
+    ),
+    branch_type: normalizeBranchType(safeBody.branch_type ?? safeBody.branchType),
+    material_kind: normalizeMaterialKind(safeBody.material_kind ?? safeBody.materialKind),
+    
+    target_levels: normalizeTargetLevels(safeBody.target_levels ?? safeBody.target_level ?? safeBody.targetLevels),
+    class_levels: normalizeClassLevels(safeBody.class_levels ?? safeBody.class_level ?? safeBody.classLevels),
+    
+    is_available: normalizeBool(safeBody.is_available ?? safeBody.isAvailable ?? true),
+    is_active: normalizeBool(safeBody.is_active ?? safeBody.isActive ?? true),
+    
+    order_index: normalizeOrderIndex(safeBody.order_index ?? safeBody.orderIndex),
+    
+    // БАГ С ЦЕНОЙ ИСПРАВЛЕН ЗДЕСЬ: строгое извлечение и парсинг
+    price: normalizePrice(safeBody.price),
+    
+    // БАГ С ID ВКЛАДКИ ИСПРАВЛЕН ЗДЕСЬ: "none" превратится в null
+    project_tab_id: normalizeUUID(
+      safeBody.project_tab_id ?? safeBody.tab_id ?? safeBody.projectTabId ?? safeBody.tabId
+    ),
+    
+    meta: safeBody.meta && typeof safeBody.meta === "object" && !Array.isArray(safeBody.meta)
+      ? (safeBody.meta as Record<string, unknown>)
+      : {},
+      
     created_by: userId ?? null,
   };
 }
 
 // ----------------------------------------------------------------------------
-// Экспорт всех утилит для удобства
+// Экспорт
 // ----------------------------------------------------------------------------
 
 export default {
@@ -357,19 +259,13 @@ export default {
   uniqueStrings,
   normalizeBool,
   normalizeNumber,
-  normalizeInteger,
   normalizeOrderIndex,
   normalizePrice,
   isValidUUID,
   normalizeUUID,
   normalizeBranchType,
   normalizeMaterialKind,
-  normalizeMaterialKinds,
-  normalizeGatehouseLevel,
-  normalizeGatehouseLevels,
-  normalizeClassLevel,
+  normalizeTargetLevels,
   normalizeClassLevels,
-  sanitizeSearchQuery,
-  isValidSlug,
   normalizeMaterialInput,
 };
