@@ -13,23 +13,16 @@ export function normalizeText(text: any): string {
   normalized = normalized.replace(/\s*'\s*/g, "'");
   normalized = normalized.replace(/\s+/g, " ");
 
-  const hasLatin = /[a-z]/.test(normalized);
-  const hasCyrillic = /[а-я]/.test(normalized);
-  if (hasLatin && hasCyrillic) {
-    const cyrillicToLatin: Record<string, string> = {
-      'а': 'a', 'с': 'c', 'е': 'e', 'о': 'o', 'р': 'p', 'х': 'x', 'у': 'y'
-    };
-    const latinToCyrillic: Record<string, string> = {
-      'a': 'а', 'c': 'с', 'e': 'е', 'o': 'о', 'p': 'р', 'x': 'х', 'y': 'у'
-    };
-    const latinCount = (normalized.match(/[a-z]/g) || []).length;
-    const cyrillicCount = (normalized.match(/[а-я]/g) || []).length;
-    if (latinCount >= cyrillicCount) {
-      normalized = normalized.replace(/[асеорху]/g, match => cyrillicToLatin[match] || match);
-    } else {
-      normalized = normalized.replace(/[aceopxy]/g, match => latinToCyrillic[match] || match);
-    }
-  }
+  // ИСПРАВЛЕНИЕ (Баг #4 - Омоглифы):
+  // Убрана зависимость от подсчета большинства символов.
+  // Теперь все кириллические омоглифы ЖЕСТКО приводятся к латинским.
+  // Это гарантирует 100% совпадение, даже если админ сохранил "Stage-А" (с кириллической А), 
+  // а ученик ввел "Stage-A" (с латинской).
+  const homoglyphs: Record<string, string> = {
+    'а': 'a', 'с': 'c', 'е': 'e', 'о': 'o', 'р': 'p', 'х': 'x', 'у': 'y'
+  };
+  normalized = normalized.replace(/[асеорху]/g, match => homoglyphs[match] || match);
+
   return normalized;
 }
 
@@ -135,13 +128,10 @@ function safeFraction(earned: number, total: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Shared Logic (Решение багов #2, #4, #9)
+// Shared Logic
 // ---------------------------------------------------------------------------
 
-// Единая логика расчета заполненности кроссворда
 export function getCrosswordStats(q: any, a: any) {
-  const grid = ensureArray(q.grid);
-  const blocks = ensureArray(q.blocks);
   const words = ensureArray(q.words);
   const userGrid = ensureArray(a);
 
@@ -171,7 +161,6 @@ export function getCrosswordStats(q: any, a: any) {
   return { totalActiveCells, filledCells, percent };
 }
 
-// Единая логика проверки "отвечен ли вопрос"
 export function isQuestionAnswered(q: any, a: any): boolean {
   if (!q || typeof q !== "object") return false;
 
@@ -239,7 +228,6 @@ export function validateAllAnswered(
     const q = qs[i];
     if (!q || typeof q !== "object") continue;
 
-    // Решение бага #3: Приоритет ответа по ID, фолбэк на индекс (для старых прохождений)
     const a = safeAnswers[q.id] !== undefined ? safeAnswers[q.id] : safeAnswers[i];
 
     if (q.type === "complex" || q.type === "reading") {
@@ -286,9 +274,7 @@ export function calcAndBuildReview(
     const pointsTotal = getPointsTotal(q);
     const media = ensureArray(q.media).length > 0 ? ensureArray(q.media) : undefined;
 
-    // ---------------------------------------------------------------
     // COMPLEX / READING
-    // ---------------------------------------------------------------
     if (q.type === "complex" || q.type === "reading") {
       const subQs = ensureArray(q.subQuestions);
       const subAns = a && typeof a === "object" ? a : {};
@@ -320,9 +306,7 @@ export function calcAndBuildReview(
       } as ReviewItem;
     }
 
-    // ---------------------------------------------------------------
     // TEST
-    // ---------------------------------------------------------------
     if (q.type === "test") {
       const isMultiple = !!q.multiple;
       const optionsArr = ensureArray(q.options);
@@ -372,8 +356,12 @@ export function calcAndBuildReview(
         });
 
         const totalCorrect = correctSet.size || 1;
-        // Решение бага #7: Штрафуем за неправильные варианты, чтобы не кликали "выбрать всё"
-        fraction = Math.max(0, correctSelected - wrongSelected) / totalCorrect;
+        
+        // ИСПРАВЛЕНИЕ (Баг #2 - Штрафы за ответы):
+        // Заменяем жесткое вычитание (correctSelected - wrongSelected) / totalCorrect
+        // на пропорциональный штраф. Ошибочный клик просто размывает вес правильных ответов,
+        // не уводя балл в глубокий минус, при этом защищает от читерского "выбрать всё".
+        fraction = correctSelected / (totalCorrect + wrongSelected);
         fraction = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
       } else {
         const userIdx = Number(a);
@@ -395,9 +383,7 @@ export function calcAndBuildReview(
       } as ReviewItem;
     }
 
-    // ---------------------------------------------------------------
     // FILL & SENTENCE 
-    // ---------------------------------------------------------------
     if (q.type === "fill" || q.type === "sentence") {
       let correctAnswers = ensureArray(q.answers);
       if (correctAnswers.length === 0) correctAnswers = ensureArray(q.correct);
@@ -443,9 +429,7 @@ export function calcAndBuildReview(
       } as ReviewItem;
     }
 
-    // ---------------------------------------------------------------
     // MATCHING
-    // ---------------------------------------------------------------
     if (q.type === "matching") {
       const pairs = ensureArray(q.pairs);
       const totalPairsCount = pairs.length;
@@ -500,9 +484,7 @@ export function calcAndBuildReview(
       } as ReviewItem;
     }
 
-    // ---------------------------------------------------------------
     // IMAGEMAP
-    // ---------------------------------------------------------------
     if (q.type === "imagemap") {
       const answersArr = ensureArray(q.answers);
       const pointsArr = ensureArray(q.points);
@@ -557,9 +539,7 @@ export function calcAndBuildReview(
       } as ReviewItem;
     }
 
-    // ---------------------------------------------------------------
     // CROSSWORD
-    // ---------------------------------------------------------------
     if (q.type === "crossword") {
       const grid: string[][] = ensureArray(q.grid);
       const words: any[] = ensureArray(q.words);
@@ -622,9 +602,7 @@ export function calcAndBuildReview(
       } as ReviewItem;
     }
 
-    // ---------------------------------------------------------------
     // OTHER
-    // ---------------------------------------------------------------
     statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
     
     return {
