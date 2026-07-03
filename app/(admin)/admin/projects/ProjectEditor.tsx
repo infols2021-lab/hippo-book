@@ -240,7 +240,8 @@ export default function ProjectEditor({
   });
 
   const [levels, setLevels] = useState<any[]>([]);
-  const [newLevel, setNewLevel] = useState({ code: "", label: "" });
+  // Добавлено поле цены
+  const [newLevel, setNewLevel] = useState({ code: "", label: "", price: "" });
 
   const [tabs, setTabs] = useState<any[]>([]);
   const [editingTab, setEditingTab] = useState<any | null>(null);
@@ -300,7 +301,8 @@ export default function ProjectEditor({
           code: newLevel.code, 
           label: newLevel.label, 
           order_index: levels.length * 10, 
-          is_active: true 
+          is_active: true,
+          price: newLevel.price ? Number(newLevel.price) : null // Цена отправляется на бэкенд
         }),
       });
       
@@ -312,7 +314,7 @@ export default function ProjectEditor({
       const refreshData = await refreshRes.json();
       
       setLevels(refreshData.levels || refreshData.data || []);
-      setNewLevel({ code: "", label: "" });
+      setNewLevel({ code: "", label: "", price: "" }); // Сбрасываем цену
     } catch (err: any) { 
       alert("❌ Ошибка: " + err.message); 
     }
@@ -670,7 +672,12 @@ export default function ProjectEditor({
                   key={l.id} 
                   className="bg-white border shadow-sm p-4 rounded-2xl flex items-center justify-between hover:border-blue-300 transition-colors"
                 >
-                  <span className="font-bold text-gray-800">{l.label}</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-bold text-gray-800">{l.label}</span>
+                    <span className="text-xs text-gray-500 font-medium">
+                      {l.price != null ? `${l.price} ₽` : "0 ₽ (бесплатно)"}
+                    </span>
+                  </div>
                   <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded-lg">
                     {l.code}
                   </span>
@@ -694,6 +701,13 @@ export default function ProjectEditor({
                 placeholder="Название (Hippo 1)" 
                 value={newLevel.label} 
                 onChange={(e) => setNewLevel({ ...newLevel, label: e.target.value })} 
+              />
+              <input 
+                type="number" 
+                className="border-2 rounded-xl px-4 py-2.5 w-[120px] outline-none focus:border-blue-500 font-medium" 
+                placeholder="Цена (₽)" 
+                value={newLevel.price} 
+                onChange={(e) => setNewLevel({ ...newLevel, price: e.target.value })} 
               />
               <button 
                 onClick={addLevel} 

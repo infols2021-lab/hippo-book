@@ -8,8 +8,8 @@ import { useRouter } from "next/navigation";
 
 import "./requests.css";
 
-type ProjectLevel = { id: string; code: string; label: string; };
-type ProjectTab = { id: string; slug: string; title: string; icon: string | null; price?: number };
+type ProjectLevel = { id: string; code: string; label: string; price?: number | null; };
+type ProjectTab = { id: string; slug: string; title: string; icon: string | null; };
 type Project = { id: string; name: string; slug: string; };
 
 type PurchaseRequest = {
@@ -133,12 +133,11 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
     return map;
   }, [tabs]);
 
-  const getTabPrice = (tabId: string): number => {
-    const tab = tabs.find(t => t.id === tabId);
-    return tab?.price ?? 0;
-  };
-
-  const totalAmount = selectedTabs.reduce((sum, id) => sum + getTabPrice(id), 0);
+  // Цена теперь берется не из разделов, а из выбранного уровня
+  const totalAmount = useMemo(() => {
+    const selectedLevel = levels.find(l => l.code === classLevel);
+    return selectedLevel?.price ?? 0;
+  }, [classLevel, levels]);
 
   const lastPendingRequest = useMemo(() => {
     return requests.find((r) => !r.is_processed) ?? null;
@@ -148,10 +147,10 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
     if (!lastPendingRequest) return 0;
     if (lastPendingRequest.total_price != null) return lastPendingRequest.total_price;
 
-    const tabNames = lastPendingRequest.material_kinds?.length ? lastPendingRequest.material_kinds : (lastPendingRequest.textbook_types || []);
-    const ids = tabNames.map(name => tabTitleToId.get(name) || name); 
-    return ids.reduce((sum, id) => sum + getTabPrice(id), 0);
-  }, [lastPendingRequest, tabTitleToId, tabs]);
+    const lvlCode = lastPendingRequest.class_level || "";
+    const matchedLevel = levels.find(l => l.code === lvlCode || l.label === lvlCode);
+    return matchedLevel?.price ?? 0;
+  }, [lastPendingRequest, levels]);
 
   useEffect(() => {
     setRequests(initialRequests.map(normalizeRequestRow));
@@ -201,7 +200,11 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
     const tzOffset = d.getTimezoneOffset() * 60000;
     const localISO = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
     setRequestDateTime(localISO);
-    setClassLevel(r.class_level || "");
+    
+    // Обратная совместимость для старых заявок, где мог сохраниться label вместо code
+    const rawClassLevel = r.class_level || "";
+    const matchedLevel = levels.find(l => l.code === rawClassLevel || l.label === rawClassLevel);
+    setClassLevel(matchedLevel ? matchedLevel.code : rawClassLevel);
 
     const rawTabs = r.material_kinds?.length ? r.material_kinds : (r.textbook_types || []);
     const tabIds = rawTabs.map(name => tabTitleToId.get(name) || name);
@@ -238,7 +241,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
       created_at: requestDateTime + ":00Z",
       branch_type: project.slug,
       project_id: project.id,
-      class_level: classLevel,
+      class_level: classLevel, // Теперь сюда четко улетает технический code, а не label
       textbook_types: selectedTabs,
       material_kinds: selectedTabs,
       email: currentEmail,
@@ -323,11 +326,11 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
           </div>
 
           <div className="form-group">
-            <label>Класс (Уровень):</label>
+            <label>Уровень:</label>
             <select value={classLevel} onChange={(e) => setClassLevel(e.target.value)} required>
               <option value="">-- Выберите уровень --</option>
               {levels.map(l => (
-                <option key={l.id} value={l.label}>{l.label}</option>
+                <option key={l.id} value={l.code}>{l.label}</option>
               ))}
             </select>
           </div>
@@ -337,7 +340,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
             <div className="checkbox-group">
               {tabs.map(t => {
                 const isChecked = selectedTabs.includes(t.id);
-                const price = t.price ?? 0;
                 return (
                   <div
                     key={t.id}
@@ -347,7 +349,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
                     <input type="checkbox" checked={isChecked} readOnly />
                     <label>
                       {t.icon} {t.title}
-                      <span className="price-info">({formatPrice(price)})</span>
                     </label>
                   </div>
                 );
@@ -377,7 +378,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
           </div>
 
           <div className="total-amount" style={{ display: totalAmount > 0 ? "block" : "none" }}>
-            <h4>💰 Общая сумма к оплате:</h4>
+            <h4>💰 Стоимость уровня:</h4>
             <div className="amount">{totalAmount} руб.</div>
           </div>
 
@@ -471,7 +472,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
           <div className="payment-info">
             <h4>💰 Информация об оплате</h4>
             <p>
-              Стоимость каждого раздела указывается индивидуально. QR-код для оплаты появляется сразу после создания заявки.
+              Стоимость зависит от выбранного уровня. QR-код для оплаты появляется сразу после создания заявки.
               После подтверждения оплаты администратором доступ к материалам будет открыт автоматически.
             </p>
           </div>
@@ -522,11 +523,15 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
                     return tab ? `${tab.icon || ''} ${tab.title}` : id;
                   }).filter(Boolean);
 
+                  // Обратная совместимость для отображения названия уровня в таблице
+                  const matchedLevel = levels.find(l => l.code === r.class_level || l.label === r.class_level);
+                  const displayLevel = matchedLevel ? matchedLevel.label : (r.class_level || "—");
+
                   return (
                     <tr key={r.id}>
                       <td className="font-bold">{r.request_number}</td>
                       <td>{formatDateTime(r.created_at)}</td>
-                      <td>{r.class_level || "—"}</td>
+                      <td>{displayLevel}</td>
                       <td>{displayTabs.length > 0 ? displayTabs.join(", ") : "—"}</td>
                       <td className="font-bold">{r.total_price != null ? formatPrice(r.total_price) : "—"}</td>
                       <td>

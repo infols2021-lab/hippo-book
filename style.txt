@@ -3645,6 +3645,208 @@ export async function POST(req: Request) {
 }
 </file>
 
+<file path="app/api/auth/register/route.ts">
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { ok, fail } from "@/lib/api/response";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { verifyTurnstileToken } from "@/lib/security/turnstile";
+
+const BLOCKED_DOMAINS = [
+  "tempmail.com",
+  "10minutemail.com",
+  "guerrillamail.com",
+  "mailinator.com",
+  "yopmail.com",
+  "throwawaymail.com",
+  "fakeinbox.com",
+  "temp-mail.org",
+  "trashmail.com",
+  "getnada.com",
+  "tmpmail.org",
+  "maildrop.cc",
+  "disposablemail.com",
+  "fake-mail.com",
+  "tempinbox.com",
+  "jetable.org",
+  "mailnesia.com",
+  "sharklasers.com",
+  "guerrillamail.biz",
+  "grr.la",
+  "guerrillamail.info",
+  "spam4.me",
+  "tmpmail.net",
+];
+
+function isValidEmail(email: string) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
+function validateDomain(email: string) {
+  const domain = email.split("@")[1]?.toLowerCase().trim();
+  if (!domain) return { ok: false as const, message: "Неверный формат email" };
+
+  if (BLOCKED_DOMAINS.includes(domain)) {
+    return { ok: false as const, message: "Временные email адреса запрещены" };
+  }
+
+  return { ok: true as const };
+}
+
+function getRemoteIp(req: Request): string | null {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0]?.trim() || null;
+  const xr = req.headers.get("x-real-ip");
+  return xr || null;
+}
+
+function getPublicOrigin(req: Request): string | undefined {
+  const proto = req.headers.get("x-forwarded-proto") || undefined;
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || undefined;
+  if (host) return `${proto || "https"}://${host}`;
+  const origin = req.headers.get("origin") || undefined;
+  return origin;
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = (await req.json().catch(() => null)) as
+      | {
+          fullName?: string;
+          phone?: string;
+          region?: string;
+          email?: string;
+          password?: string;
+          captchaToken?: string;
+        }
+      | null;
+
+    if (!body) return fail("Bad request", 400, "BAD_REQUEST");
+
+    const fullName = String(body.fullName ?? "").trim();
+    const phone = String(body.phone ?? "").trim();
+    const region = String(body.region ?? "").trim();
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const password = String(body.password ?? "");
+    const captchaToken = String(body.captchaToken ?? "");
+
+    const remoteIp = getRemoteIp(req) ?? undefined;
+
+    const captcha = await verifyTurnstileToken({
+      token: captchaToken,
+      expectedAction: "register",
+      remoteIp,
+    });
+
+    if (!captcha.ok) {
+      return fail("Капча не пройдена. Перезагрузите и попробуйте снова.", 400, captcha.code);
+    }
+
+    if (!fullName || fullName.length < 3) return fail("Введите ФИО", 400, "VALIDATION");
+    if (!phone) return fail("Введите телефон", 400, "VALIDATION");
+    if (!region) return fail("Выберите область", 400, "VALIDATION");
+    if (!email || !isValidEmail(email)) return fail("Неверный формат email", 400, "VALIDATION");
+
+    const d = validateDomain(email);
+    if (!d.ok) return fail(d.message, 400, "VALIDATION");
+
+    if (!password || password.length < 6) {
+      return fail("Пароль должен быть не менее 6 символов", 400, "VALIDATION");
+    }
+
+    try {
+      const admin = getSupabaseAdminClient();
+      const { data: existing } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (existing?.id) {
+        return fail(
+          "Аккаунт с таким email уже существует. Нажмите «Войти» или «Забыли пароль?»",
+          400,
+          "USER_EXISTS",
+        );
+      }
+    } catch {
+      // если admin недоступен — не валим, просто идём дальше
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !anon) return fail("Supabase env missing", 500, "ENV_MISSING");
+
+    const supabaseAnon = createClient(url, anon, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+
+    const origin = getPublicOrigin(req);
+    const redirectTo = origin ? `${origin}/login?message=confirmed` : undefined;
+
+    const { data, error } = await supabaseAnon.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName, contact_phone: phone, region },
+        ...(redirectTo ? { emailRedirectTo: redirectTo } : {}),
+      },
+    });
+
+    if (error) {
+      const msg = (error.message || "").toLowerCase();
+      const code = (error as any).code as string | undefined;
+
+      if (
+        msg.includes("already registered") ||
+        msg.includes("already exists") ||
+        msg.includes("user already exists") ||
+        code === "user_already_exists"
+      ) {
+        return fail(
+          "Аккаунт с таким email уже существует. Нажмите «Войти» или «Забыли пароль?»",
+          400,
+          "USER_EXISTS",
+        );
+      }
+
+      if (msg.includes("rate limit") || code === "rate_limit_exceeded") {
+        return fail("Слишком много попыток. Попробуйте позже.", 429, "RATE_LIMIT");
+      }
+
+      return fail("Ошибка регистрации: " + error.message, 400, "SIGNUP_FAILED");
+    }
+
+    if (!data.user?.id) return fail("Не удалось создать пользователя", 500, "NO_USER");
+
+    try {
+      const admin = getSupabaseAdminClient();
+      const { error: pErr } = await admin.from("profiles").upsert(
+        {
+          id: data.user.id,
+          full_name: fullName,
+          contact_phone: phone,
+          region,
+        } as any,
+        { onConflict: "id" },
+      );
+
+      if (pErr) console.error("[register] profile upsert error", pErr);
+    } catch (e) {
+      console.error("[register] profile upsert exception", e);
+    }
+
+    return ok({
+      message:
+        "✅ Регистрация принята!\n\n📧 Мы отправили письмо на вашу почту. Откройте письмо и подтвердите email.\nБез подтверждения вход невозможен.",
+    });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
+  }
+}
+</file>
+
 <file path="app/api/auth/session/route.ts">
 import { NextResponse } from "next/server";
 import { ok, fail } from "@/lib/api/response";
@@ -3759,6 +3961,61 @@ export async function GET() {
         },
       },
     );
+  }
+}
+</file>
+
+<file path="app/api/auth/update-password/route.ts">
+import { NextResponse } from "next/server";
+import { ok, fail } from "@/lib/api/response";
+import { verifyTurnstileToken } from "@/lib/security/turnstile";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+function getRemoteIp(req: Request): string | null {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0]?.trim() || null;
+  const xr = req.headers.get("x-real-ip");
+  return xr || null;
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = (await req.json().catch(() => null)) as
+      | { password?: string; captchaToken?: string }
+      | null;
+
+    if (!body) return fail("Bad request", 400, "BAD_REQUEST");
+
+    const password = String(body.password ?? "");
+    const captchaToken = String(body.captchaToken ?? "");
+
+    const captcha = await verifyTurnstileToken({
+      token: captchaToken,
+      expectedAction: "update_password",
+      remoteIp: getRemoteIp(req) ?? undefined,
+    });
+
+    if (!captcha.ok) {
+      return fail("Капча не пройдена", 400, captcha.code);
+    }
+
+    if (!password || password.length < 6) {
+      return fail("Пароль должен быть не менее 6 символов", 400, "VALIDATION");
+    }
+
+    const supabase = await createSupabaseServerClient();
+
+    const { data: u, error: uErr } = await supabase.auth.getUser();
+    if (uErr || !u?.user) {
+      return fail("Сессия восстановления не найдена или устарела. Запросите восстановление заново.", 401, "NO_SESSION");
+    }
+
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return fail("Не удалось обновить пароль: " + error.message, 400, "UPDATE_FAILED");
+
+    return ok({ message: "✅ Пароль успешно изменён! Теперь войдите в систему." });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
   }
 }
 </file>
@@ -7517,6 +7774,646 @@ export default function Home() {
 }
 </file>
 
+<file path="app/register/page.tsx">
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import TurnstileWidget from "@/components/TurnstileWidget";
+import "./register.css";
+
+type BannerType = "error" | "success" | "warning" | null;
+type ModalKind = "error" | "success" | "warning";
+
+const BLOCKED_DOMAINS = [
+  "tempmail.com",
+  "10minutemail.com",
+  "guerrillamail.com",
+  "mailinator.com",
+  "yopmail.com",
+  "throwawaymail.com",
+  "fakeinbox.com",
+  "temp-mail.org",
+  "trashmail.com",
+  "getnada.com",
+  "tmpmail.org",
+  "maildrop.cc",
+  "disposablemail.com",
+  "fake-mail.com",
+  "tempinbox.com",
+  "jetable.org",
+  "mailnesia.com",
+  "sharklasers.com",
+  "guerrillamail.biz",
+  "grr.la",
+  "guerrillamail.info",
+  "spam4.me",
+  "tmpmail.net",
+];
+
+const REGISTRATION_LIMIT = {
+  maxAttempts: 3,
+  timeWindow: 60 * 60 * 1000,
+  key: "edu-keys-registration-limits",
+};
+
+function isValidEmail(email: string) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+function validateDomain(email: string) {
+  const domain = email.split("@")[1]?.toLowerCase().trim();
+  if (!domain) return { valid: false, message: "Неверный формат email" };
+
+  if (BLOCKED_DOMAINS.includes(domain)) {
+    return { valid: false, message: "Временные email адреса запрещены" };
+  }
+
+  return { valid: true, message: "" };
+}
+
+function checkRateLimit() {
+  try {
+    const now = Date.now();
+    const limits = JSON.parse(
+      localStorage.getItem(REGISTRATION_LIMIT.key) || '{"attempts":[]}',
+    ) as { attempts: number[] };
+
+    const recentAttempts = (limits.attempts || []).filter(
+      (t) => now - t < REGISTRATION_LIMIT.timeWindow,
+    );
+
+    if (recentAttempts.length >= REGISTRATION_LIMIT.maxAttempts) {
+      const nextAttempt = Math.min(...recentAttempts) + REGISTRATION_LIMIT.timeWindow;
+      const minutesLeft = Math.ceil((nextAttempt - now) / (60 * 1000));
+      return {
+        allowed: false,
+        message: `Превышен лимит регистраций. Попробуйте через ${minutesLeft} минут.`,
+      };
+    }
+
+    recentAttempts.push(now);
+    localStorage.setItem(
+      REGISTRATION_LIMIT.key,
+      JSON.stringify({ attempts: recentAttempts }),
+    );
+
+    return { allowed: true, message: "" };
+  } catch {
+    return { allowed: true, message: "" };
+  }
+}
+
+export default function RegisterPage() {
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [region, setRegion] = useState("");
+  const [email, setEmail] = useState("");
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
+
+  const [bannerType, setBannerType] = useState<BannerType>(null);
+  const [bannerText, setBannerText] = useState("");
+
+  const [busy, setBusy] = useState(false);
+  const [registered, setRegistered] = useState(false);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalKind, setModalKind] = useState<ModalKind>("success");
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalBody, setModalBody] = useState("");
+
+  function showBanner(type: BannerType, text: string) {
+    setBannerType(type);
+    setBannerText(text);
+  }
+
+  function clearBanner() {
+    setBannerType(null);
+    setBannerText("");
+  }
+
+  function openModal(kind: ModalKind, title: string, body: string) {
+    setModalKind(kind);
+    setModalTitle(title);
+    setModalBody(body);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setBusy(false);
+    clearBanner();
+  }
+
+  const formatValid = useMemo(() => isValidEmail(email.trim()), [email]);
+
+  const matchValid = useMemo(() => {
+    const e = email.trim().toLowerCase();
+    const c = confirmEmail.trim().toLowerCase();
+    return !!e && !!c && e === c;
+  }, [email, confirmEmail]);
+
+  const passwordValid = useMemo(() => password.length >= 6, [password]);
+
+  const domainValid = useMemo(() => {
+    const e = email.trim().toLowerCase();
+    return e ? validateDomain(e).valid : false;
+  }, [email]);
+
+  const phoneValid = useMemo(() => phone.trim().length > 0, [phone]);
+  const regionValid = useMemo(() => region !== "", [region]);
+  const nameValid = useMemo(() => fullName.trim().length >= 3, [fullName]);
+
+  const canSubmit = useMemo(() => {
+    return (
+      !busy &&
+      !registered &&
+      formatValid &&
+      matchValid &&
+      passwordValid &&
+      domainValid &&
+      phoneValid &&
+      regionValid &&
+      nameValid &&
+      !!captchaToken &&
+      !!siteKey
+    );
+  }, [
+    busy,
+    registered,
+    formatValid,
+    matchValid,
+    passwordValid,
+    domainValid,
+    phoneValid,
+    regionValid,
+    nameValid,
+    captchaToken,
+    siteKey,
+  ]);
+
+  function resetCaptchaHard() {
+    setCaptchaToken(null);
+    setReloadNonce((n) => n + 1);
+  }
+
+  function friendlyErrorFromApi(payload: any, status: number) {
+    const code = String(payload?.code || "").toUpperCase();
+    const err = String(payload?.error || payload?.message || "").trim();
+
+    if (code === "USER_EXISTS" || err.toLowerCase().includes("уже существует")) {
+      return (
+        "Аккаунт с таким email уже существует.\n\n" +
+        "Что можно сделать:\n" +
+        "• Нажмите «Войти в систему»\n" +
+        "• Или используйте «Забыли пароль?» для восстановления"
+      );
+    }
+
+    if (code === "RATE_LIMIT" || status === 429) {
+      return "Слишком много попыток. Подождите несколько минут и попробуйте снова.";
+    }
+
+    if (
+      code.includes("CAPTCHA") ||
+      code.includes("TURNSTILE") ||
+      err.toLowerCase().includes("капч")
+    ) {
+      return (
+        (err || "Капча не пройдена или не загрузилась.") +
+        "\n\nПопробуйте:\n" +
+        "• Нажать «Перезагрузить капчу»\n" +
+        "• Отключить VPN/прокси (если включены)\n" +
+        "• Обновить страницу"
+      );
+    }
+
+    if (code === "VALIDATION") {
+      return err || "Проверьте правильность заполнения полей.";
+    }
+
+    if (err) return err;
+    return `Ошибка регистрации (${status}). Попробуйте перезагрузить капчу и повторить.`;
+  }
+
+  async function onRegister() {
+    if (busy || registered) return;
+
+    const fn = fullName.trim();
+    const ph = phone.trim();
+    const rg = region.trim();
+    const em = email.trim().toLowerCase();
+    const cem = confirmEmail.trim().toLowerCase();
+
+    if (!fn || !ph || !rg || !em || !cem || !password) {
+      openModal("error", "Ошибка", "Заполните все поля.");
+      return;
+    }
+    if (password.length < 6) {
+      openModal("error", "Ошибка", "Пароль должен быть не менее 6 символов.");
+      return;
+    }
+    if (em !== cem) {
+      openModal("error", "Ошибка", "Email адреса не совпадают.");
+      return;
+    }
+    if (!isValidEmail(em)) {
+      openModal("error", "Ошибка", "Неверный формат email.");
+      return;
+    }
+
+    const dc = validateDomain(em);
+    if (!dc.valid) {
+      openModal("error", "Ошибка", dc.message);
+      return;
+    }
+
+    if (!captchaToken) {
+      openModal(
+        "warning",
+        "Нужна капча",
+        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
+      );
+      return;
+    }
+
+    const rl = checkRateLimit();
+    if (!rl.allowed) {
+      openModal("error", "Лимит", rl.message);
+      return;
+    }
+
+    try {
+      setBusy(true);
+      showBanner("warning", "🔄 Создаем ваш аккаунт...");
+
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          fullName: fn,
+          phone: ph,
+          region: rg,
+          email: em,
+          password,
+          captchaToken,
+        }),
+      });
+
+      const text = await res.text();
+      let json: any = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+
+      if (!res.ok) {
+        const msg = friendlyErrorFromApi(json, res.status);
+
+        setBusy(false);
+        clearBanner();
+        resetCaptchaHard();
+
+        openModal("error", "Ошибка регистрации", msg);
+        return;
+      }
+
+      if (!json?.ok) {
+        const msg = friendlyErrorFromApi(json, 400);
+
+        setBusy(false);
+        clearBanner();
+        resetCaptchaHard();
+
+        openModal("error", "Ошибка регистрации", msg);
+        return;
+      }
+
+      setBusy(false);
+      clearBanner();
+
+      openModal(
+        "success",
+        "Успешно!",
+        json.message ||
+          "✅ Регистрация принята!\n\n📧 Проверьте почту (и папку Спам) и подтвердите email.\nБез подтверждения вход невозможен.",
+      );
+
+      setRegistered(true);
+
+      setFullName("");
+      setPhone("");
+      setRegion("");
+      setEmail("");
+      setConfirmEmail("");
+      setPassword("");
+      setCaptchaToken(null);
+
+      setTimeout(() => {
+        window.location.href = "/login?message=check_email";
+      }, 8000);
+    } catch (e: any) {
+      setBusy(false);
+      clearBanner();
+      resetCaptchaHard();
+
+      openModal(
+        "error",
+        "Ошибка",
+        "Не удалось отправить запрос.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n• Отключить VPN/прокси\n\nДетали: " +
+          (e?.message || String(e)),
+      );
+    }
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Enter" && canSubmit) {
+        e.preventDefault();
+        void onRegister();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [canSubmit]);
+
+  function validationRow(ok: boolean, activeInvalid: boolean, text: string) {
+    return (
+      <div className={"validation-item " + (ok ? "valid" : activeInvalid ? "invalid" : "")}>
+        <span className="validation-icon">{ok ? "✅" : activeInvalid ? "❌" : "⭕"}</span>
+        {text}
+      </div>
+    );
+  }
+
+  const bannerClass =
+    bannerType === "warning"
+      ? "warning"
+      : bannerType === "error"
+        ? "error-message"
+        : bannerType === "success"
+          ? "success"
+          : "";
+
+  const showTopBanner = bannerType === "warning" && !!bannerText;
+
+  return (
+    <div className="page-register">
+      {modalOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.38)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 520,
+              background: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 18px 60px rgba(0,0,0,0.25)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "14px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                borderBottom: "1px solid rgba(0,0,0,0.06)",
+              }}
+            >
+              <div style={{ fontWeight: 800, color: "#222" }}>
+                {modalKind === "success" ? "✅ " : modalKind === "error" ? "❌ " : "⚠️ "}
+                {modalTitle}
+              </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  fontSize: 20,
+                  cursor: "pointer",
+                  lineHeight: 1,
+                  padding: 6,
+                  color: "#333",
+                }}
+                aria-label="Закрыть"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: 16, color: "#333", whiteSpace: "pre-line", lineHeight: 1.5 }}>
+              {modalBody}
+            </div>
+
+            <div style={{ padding: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              {modalKind === "error" || modalKind === "warning" ? (
+                <button
+                  type="button"
+                  className="btn btn-captcha-reload"
+                  onClick={() => {
+                    resetCaptchaHard();
+                    closeModal();
+                  }}
+                >
+                  Перезагрузить капчу
+                </button>
+              ) : null}
+
+              <button type="button" className="btn btn-primary" onClick={closeModal}>
+                Ок
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="register-container">
+        <div className="register-card">
+          <h2>Регистрация в Edu Keys</h2>
+
+          {showTopBanner ? <div className={bannerClass}>{bannerText}</div> : null}
+
+          <div className="info-box">
+            ✅ <strong>Подтверждение email обязательно!</strong> Без подтверждения вход в систему
+            невозможен.
+          </div>
+
+          <div className="rate-limit">
+            ⚠️ <strong>Защита от спама:</strong> Максимум 3 регистрации в час с одного устройства
+          </div>
+
+          {!siteKey ? (
+            <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div>
+          ) : null}
+
+          <div className="form-group">
+            <label htmlFor="fullname">ФИО:</label>
+            <input
+              id="fullname"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Иванов Иван Иванович"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="phone">Контактный телефон:</label>
+            <input
+              id="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+7 (999) 123-45-67"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="region">Область проживания:</label>
+            <select id="region" value={region} onChange={(e) => setRegion(e.target.value)}>
+              <option value="">-- Выберите область --</option>
+              <option value="Белгородская">Белгородская область</option>
+              <option value="Курская">Курская область</option>
+              <option value="Тамбовская">Тамбовская область</option>
+              <option value="Воронежская">Воронежская область</option>
+              <option value="Липецкая">Липецкая область</option>
+              <option value="Другое">Другая область</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="email">Email:</label>
+            <input
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="example@gmail.com"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="confirmEmail">Подтверждение email:</label>
+            <input
+              id="confirmEmail"
+              value={confirmEmail}
+              onChange={(e) => setConfirmEmail(e.target.value)}
+              placeholder="example@gmail.com"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="password">Пароль:</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Не менее 6 символов"
+            />
+          </div>
+
+          <div className="email-validation">
+            {validationRow(formatValid, !!email.trim(), "Правильный формат email")}
+            {validationRow(matchValid, !!confirmEmail.trim(), "Email адреса совпадают")}
+            {validationRow(passwordValid, !!password, "Пароль не менее 6 символов")}
+            {validationRow(domainValid, !!email.trim(), "Почтовый домен не является временным")}
+            {validationRow(phoneValid, false, "Телефон заполнен")}
+            {validationRow(regionValid, false, "Область выбрана")}
+          </div>
+
+          {siteKey ? (
+            <>
+              <TurnstileWidget
+                siteKey={siteKey}
+                action="register"
+                reloadNonce={reloadNonce}
+                onToken={(t) => setCaptchaToken(t)}
+              />
+
+              {!captchaToken ? (
+                <div className="rate-limit" style={{ marginTop: 10 }}>
+                  🧩 <strong>Если вы не видите капчу</strong> — нажмите{" "}
+                  <strong>«Перезагрузить капчу»</strong>.
+                  <br />
+                  Если не помогло: отключите VPN/прокси и обновите страницу.
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                className="btn btn-captcha-reload"
+                disabled={false}
+                onClick={() => resetCaptchaHard()}
+              >
+                Перезагрузить капчу
+              </button>
+            </>
+          ) : null}
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!canSubmit}
+            onClick={() => void onRegister()}
+          >
+            {busy ? "Создаем аккаунт..." : "Создать аккаунт"}
+          </button>
+
+          <div className="consent-text">
+            Нажимая на кнопку "Создать аккаунт", вы соглашаетесь с{" "}
+            <a
+              href="https://drive.google.com/file/d/1L9kEnkMatFa7I-jT6OImTAw3Bxpjld9l/view?usp=sharing"
+              target="_blank"
+              rel="noreferrer"
+            >
+              положением о персональных данных
+            </a>
+            .
+          </div>
+
+          <div className="link">
+            <p>
+              Уже есть аккаунт? <a href="/login">Войти в систему</a>
+            </p>
+          </div>
+
+          {registered ? (
+            <div className="existing-account-help">
+              <strong>📧 Что делать дальше?</strong>
+              <br />• Проверьте папку "Входящие" и "Спам" в вашей почте
+              <br />• Нажмите на ссылку подтверждения в письме
+              <br />• После подтверждения войдите в систему
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="app/register/register.css">
 /* app/register/register.css */
 /* 1:1 стили из твоего register.html + новые кнопки */
@@ -7981,6 +8878,368 @@ export default function Home() {
 }
 </file>
 
+<file path="app/reset/page.tsx">
+"use client";
+
+import "./reset.css";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import TurnstileWidget from "@/components/TurnstileWidget";
+
+type BannerType = "error" | "success" | "warning" | null;
+type ModalKind = "error" | "success" | "warning";
+
+function isValidEmail(email: string) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
+const ALLOWED_DOMAINS = [
+  "gmail.com",
+  "yandex.ru",
+  "mail.ru",
+  "ya.ru",
+  "yandex.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "yahoo.com",
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  "rambler.ru",
+  "bk.ru",
+  "list.ru",
+  "inbox.ru",
+  "yandex.ua",
+  "mail.ua",
+  "ukr.net",
+  "i.ua",
+  "meta.ua",
+  "email.ua",
+];
+
+const BLOCKED_DOMAINS = [
+  "tempmail.com",
+  "10minutemail.com",
+  "guerrillamail.com",
+  "mailinator.com",
+  "yopmail.com",
+  "throwawaymail.com",
+  "fakeinbox.com",
+  "temp-mail.org",
+  "trashmail.com",
+  "getnada.com",
+  "tmpmail.org",
+  "maildrop.cc",
+  "disposablemail.com",
+  "fake-mail.com",
+  "tempinbox.com",
+  "jetable.org",
+  "mailnesia.com",
+  "sharklasers.com",
+  "guerrillamail.biz",
+  "grr.la",
+  "guerrillamail.info",
+  "spam4.me",
+  "tmpmail.net",
+];
+
+function validateDomain(email: string) {
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (!domain) return { ok: false, message: "Неверный формат email" };
+  if (BLOCKED_DOMAINS.includes(domain)) return { ok: false, message: "Временные email адреса запрещены" };
+  if (!ALLOWED_DOMAINS.includes(domain))
+    return { ok: false, message: "Разрешены только email от популярных сервисов (Gmail, Yandex, Mail.ru, Outlook и др.)" };
+  return { ok: true, message: "" };
+}
+
+export default function ResetPage() {
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+
+  const [email, setEmail] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
+
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const [bannerType, setBannerType] = useState<BannerType>(null);
+  const [bannerText, setBannerText] = useState("");
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalKind, setModalKind] = useState<ModalKind>("success");
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalBody, setModalBody] = useState("");
+
+  function showBanner(type: BannerType, text: string) {
+    setBannerType(type);
+    setBannerText(text);
+  }
+  function clearBanner() {
+    setBannerType(null);
+    setBannerText("");
+  }
+
+  function openModal(kind: ModalKind, title: string, body: string) {
+    setModalKind(kind);
+    setModalTitle(title);
+    setModalBody(body);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setBusy(false);
+    clearBanner();
+  }
+
+  function resetCaptchaHard() {
+    setCaptchaToken(null);
+    setReloadNonce((n) => n + 1);
+  }
+
+  const canSubmit = useMemo(() => {
+    const e = email.trim().toLowerCase();
+    return !!siteKey && !busy && !sent && isValidEmail(e) && !!captchaToken;
+  }, [siteKey, busy, sent, email, captchaToken]);
+
+  function friendlyErrorFromApi(payload: any, status: number) {
+    const code = String(payload?.code || "").toUpperCase();
+    const err = String(payload?.error || payload?.message || "").trim();
+
+    if (code.includes("CAPTCHA") || code.includes("TURNSTILE") || err.toLowerCase().includes("captcha") || err.toLowerCase().includes("капч")) {
+      return (
+        (err || "Капча не пройдена или не загрузилась.") +
+        "\n\nПопробуйте:\n" +
+        "• Нажать «Перезагрузить капчу»\n" +
+        "• Отключить VPN/прокси\n" +
+        "• Обновить страницу"
+      );
+    }
+
+    if (code === "VALIDATION") return err || "Проверьте правильность email.";
+    if (status === 429 || code === "RATE_LIMIT") return "Слишком много попыток. Попробуйте позже.";
+
+    if (err) return err;
+    return `Не удалось отправить письмо (${status}). Попробуйте перезагрузить капчу и повторить.`;
+  }
+
+  async function onSend() {
+    const e = email.trim().toLowerCase();
+
+    if (!e) {
+      openModal("error", "Ошибка", "Введите email.");
+      return;
+    }
+    if (!isValidEmail(e)) {
+      openModal("error", "Ошибка", "Неверный формат email.");
+      return;
+    }
+
+    const d = validateDomain(e);
+    if (!d.ok) {
+      openModal("error", "Ошибка", d.message);
+      return;
+    }
+
+    if (!captchaToken) {
+      openModal(
+        "warning",
+        "Нужна капча",
+        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
+      );
+      return;
+    }
+
+    try {
+      setBusy(true);
+      showBanner("warning", "📧 Отправляем письмо для восстановления...");
+
+      const res = await fetch("/api/auth/request-password-reset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: e, captchaToken }),
+      });
+
+      const text = await res.text();
+      let json: any = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+
+      if (!res.ok) {
+        const msg = friendlyErrorFromApi(json, res.status);
+
+        setBusy(false);
+        clearBanner();
+        resetCaptchaHard();
+
+        openModal("error", "Ошибка", msg);
+        return;
+      }
+
+      if (!json?.ok) {
+        const msg = friendlyErrorFromApi(json, 400);
+
+        setBusy(false);
+        clearBanner();
+        resetCaptchaHard();
+
+        openModal("error", "Ошибка", msg);
+        return;
+      }
+
+      setBusy(false);
+      clearBanner();
+      setSent(true);
+
+      openModal(
+        "success",
+        "Готово!",
+        json.message ||
+          "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\n\nПроверьте «Входящие» и «Спам».",
+      );
+
+      setCaptchaToken(null);
+    } catch (e: any) {
+      setBusy(false);
+      clearBanner();
+      resetCaptchaHard();
+
+      openModal(
+        "error",
+        "Ошибка",
+        "Не удалось отправить запрос.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n• Отключить VPN/прокси\n\nДетали: " +
+          (e?.message || String(e)),
+      );
+    }
+  }
+
+  const showTopBanner = bannerType === "warning" && !!bannerText;
+
+  return (
+    <div className="page-reset">
+      {modalOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="reset-modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+        >
+          <div className="reset-modal">
+            <div className="reset-modal-header">
+              <div className="reset-modal-title">
+                {modalKind === "success" ? "✅ " : modalKind === "error" ? "❌ " : "⚠️ "}
+                {modalTitle}
+              </div>
+              <button type="button" className="reset-modal-close" onClick={closeModal} aria-label="Закрыть">
+                ✕
+              </button>
+            </div>
+
+            <div className="reset-modal-body">{modalBody}</div>
+
+            <div className="reset-modal-actions">
+              {(modalKind === "error" || modalKind === "warning") ? (
+                <button
+                  type="button"
+                  className="btn btn-captcha-reload"
+                  onClick={() => {
+                    resetCaptchaHard();
+                    closeModal();
+                  }}
+                >
+                  Перезагрузить капчу
+                </button>
+              ) : null}
+
+              <button type="button" className="btn btn-primary" onClick={closeModal}>
+                Ок
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="reset-container">
+        <div className="reset-card">
+          <h2>Восстановление пароля</h2>
+
+          {showTopBanner ? (
+            <div className="warning" style={{ whiteSpace: "pre-line" }}>
+              {bannerText}
+            </div>
+          ) : null}
+
+          <div className="info-box">
+            🔒 Мы отправим письмо со ссылкой. <strong>Пароль меняется только после перехода по ссылке из письма.</strong>
+            <br />
+            Проверьте также папку <strong>Спам</strong>.
+          </div>
+
+          {!siteKey ? <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div> : null}
+
+          <div className="form-group">
+            <label htmlFor="email">Email:</label>
+            <input
+              id="email"
+              value={email}
+              onChange={(ev) => setEmail(ev.target.value)}
+              placeholder="example@gmail.com"
+              autoComplete="email"
+            />
+          </div>
+
+          {siteKey ? (
+            <>
+              <TurnstileWidget
+                siteKey={siteKey}
+                action="reset_request"
+                reloadNonce={reloadNonce}
+                onToken={(t) => setCaptchaToken(t)}
+              />
+
+              {!captchaToken ? (
+                <div className="captcha-hint">
+                  🧩 <strong>Если вы не видите капчу</strong> — нажмите{" "}
+                  <strong>«Перезагрузить капчу»</strong>.
+                  <br />
+                  Если не помогло: отключите VPN/прокси и обновите страницу.
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                className="btn btn-captcha-reload"
+                disabled={false}
+                onClick={() => resetCaptchaHard()}
+              >
+                Перезагрузить капчу
+              </button>
+            </>
+          ) : null}
+
+          <button className="btn btn-primary" disabled={!canSubmit} onClick={() => void onSend()}>
+            {busy ? "Отправляем..." : sent ? "Письмо отправлено" : "Отправить письмо"}
+          </button>
+
+          <div className="link">
+            <p>
+              Вспомнили пароль? <Link href="/login">Вернуться ко входу</Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="app/reset/reset.css">
 /* app/reset/reset.css */
 
@@ -8225,6 +9484,480 @@ export default function Home() {
   .page-reset { padding: 15px; }
   .page-reset .reset-card { padding: 20px; border-radius: 16px; }
   .reset-modal-actions { flex-direction: column; }
+}
+</file>
+
+<file path="app/update-password/page.tsx">
+"use client";
+
+import "./update-password.css";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import TurnstileWidget from "@/components/TurnstileWidget";
+
+type BannerType = "error" | "success" | "warning" | null;
+type ModalKind = "error" | "success" | "warning";
+
+type ApiPayload = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  code?: string;
+  data?: any;
+  authenticated?: boolean;
+  hasSession?: boolean;
+};
+
+async function readApiPayload(res: Response): Promise<ApiPayload | null> {
+  const text = await res.text();
+
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as ApiPayload;
+  } catch {
+    return {
+      ok: false,
+      error: text,
+    };
+  }
+}
+
+function unwrapApiData(json: ApiPayload | null) {
+  if (!json) return null;
+  if (json.data && typeof json.data === "object") return json.data;
+  return json;
+}
+
+export default function UpdatePasswordPage() {
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+
+  const [ready, setReady] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
+
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
+
+  const [busy, setBusy] = useState(false);
+
+  const [bannerType, setBannerType] = useState<BannerType>(null);
+  const [bannerText, setBannerText] = useState("");
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalKind, setModalKind] = useState<ModalKind>("success");
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalBody, setModalBody] = useState("");
+
+  function showBanner(type: BannerType, text: string) {
+    setBannerType(type);
+    setBannerText(text);
+  }
+
+  function clearBanner() {
+    setBannerType(null);
+    setBannerText("");
+  }
+
+  function openModal(kind: ModalKind, title: string, body: string) {
+    setModalKind(kind);
+    setModalTitle(title);
+    setModalBody(body);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setBusy(false);
+    clearBanner();
+  }
+
+  function resetCaptchaHard() {
+    setCaptchaToken(null);
+    setReloadNonce((n) => n + 1);
+  }
+
+  function friendlyErrorFromApi(payload: any, status: number) {
+    const code = String(payload?.code || "").toUpperCase();
+    const err = String(payload?.error || payload?.message || "").trim();
+
+    if (
+      code.includes("CAPTCHA") ||
+      code.includes("TURNSTILE") ||
+      err.toLowerCase().includes("captcha") ||
+      err.toLowerCase().includes("капч")
+    ) {
+      return (
+        (err || "Капча не пройдена или не загрузилась.") +
+        "\n\nПопробуйте:\n" +
+        "• Нажать «Перезагрузить капчу»\n" +
+        "• Отключить VPN/прокси\n" +
+        "• Обновить страницу"
+      );
+    }
+
+    if (code === "NO_SESSION" || code === "UNAUTHORIZED" || status === 401) {
+      return (
+        err ||
+        "Сессия восстановления не найдена или устарела.\n\nЗапросите восстановление заново и перейдите по новой ссылке из письма."
+      );
+    }
+
+    if (code === "INVALID_OR_EXPIRED_LINK") {
+      return err || "Ссылка недействительна или устарела. Запросите восстановление заново.";
+    }
+
+    if (code === "VALIDATION") return err || "Проверьте пароль (не менее 6 символов).";
+
+    if (err) return err;
+
+    return `Не удалось обновить пароль (${status}). Попробуйте перезагрузить капчу и повторить.`;
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function exchangeRecoverySession() {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+
+      if (code) {
+        const res = await fetch("/api/auth/exchange-code", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ code }),
+        });
+
+        const json = await readApiPayload(res);
+        const payload = unwrapApiData(json);
+
+        window.history.replaceState({}, "", "/update-password");
+
+        if (!res.ok || !json?.ok) {
+          throw new Error(
+            payload?.error ||
+              payload?.message ||
+              json?.error ||
+              "Ссылка недействительна или устарела. Запросите восстановление заново.",
+          );
+        }
+
+        return Boolean(payload?.hasSession);
+      }
+
+      const hash = window.location.hash || "";
+
+      if (hash.includes("access_token=") && hash.includes("refresh_token=")) {
+        const p = new URLSearchParams(hash.replace(/^#/, ""));
+        const access_token = p.get("access_token") || "";
+        const refresh_token = p.get("refresh_token") || "";
+
+        if (access_token && refresh_token) {
+          const res = await fetch("/api/auth/exchange-code", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              access_token,
+              refresh_token,
+            }),
+          });
+
+          const json = await readApiPayload(res);
+          const payload = unwrapApiData(json);
+
+          window.history.replaceState({}, "", "/update-password");
+
+          if (!res.ok || !json?.ok) {
+            throw new Error(
+              payload?.error ||
+                payload?.message ||
+                json?.error ||
+                "Ссылка недействительна или устарела. Запросите восстановление заново.",
+            );
+          }
+
+          return Boolean(payload?.hasSession);
+        }
+      }
+
+      return null;
+    }
+
+    async function fetchSession() {
+      const res = await fetch("/api/auth/session", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const json = await readApiPayload(res);
+      const payload = unwrapApiData(json);
+
+      if (!res.ok || !json?.ok) return false;
+
+      return Boolean(payload?.authenticated);
+    }
+
+    async function run() {
+      try {
+        const exchanged = await exchangeRecoverySession();
+
+        if (cancelled) return;
+
+        const sessionExists = exchanged === true ? true : await fetchSession();
+
+        if (cancelled) return;
+
+        setHasSession(sessionExists);
+        setReady(true);
+
+        if (!sessionExists) {
+          showBanner("warning", "ℹ️ Откройте эту страницу по ссылке из письма восстановления пароля.");
+        }
+      } catch (e: any) {
+        if (cancelled) return;
+
+        setReady(true);
+        setHasSession(false);
+        showBanner("error", "❌ " + (e?.message || "Не удалось обработать ссылку. Попробуйте запросить восстановление заново."));
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const canSubmit = useMemo(() => {
+    return (
+      !busy &&
+      ready &&
+      hasSession &&
+      password.length >= 6 &&
+      password === confirm &&
+      !!captchaToken &&
+      !!siteKey
+    );
+  }, [busy, ready, hasSession, password, confirm, captchaToken, siteKey]);
+
+  async function onUpdate() {
+    if (!ready) return;
+
+    if (!hasSession) {
+      openModal("warning", "Нет сессии восстановления", "Откройте эту страницу по ссылке из письма восстановления пароля.");
+      return;
+    }
+
+    if (password.length < 6) {
+      openModal("error", "Ошибка", "Пароль должен быть не менее 6 символов.");
+      return;
+    }
+
+    if (password !== confirm) {
+      openModal("error", "Ошибка", "Пароли не совпадают.");
+      return;
+    }
+
+    if (!captchaToken) {
+      openModal(
+        "warning",
+        "Нужна капча",
+        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
+      );
+      return;
+    }
+
+    try {
+      setBusy(true);
+      showBanner("warning", "🔄 Обновляем пароль...");
+
+      const res = await fetch("/api/auth/update-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password, captchaToken }),
+      });
+
+      const json = await readApiPayload(res);
+      const payload = unwrapApiData(json);
+
+      if (!res.ok || !json?.ok) {
+        const msg = friendlyErrorFromApi(payload || json, res.status);
+        setBusy(false);
+        clearBanner();
+        resetCaptchaHard();
+        openModal("error", "Ошибка", msg);
+        return;
+      }
+
+      setBusy(false);
+      clearBanner();
+
+      openModal("success", "Пароль изменён", payload?.message || json?.message || "✅ Пароль успешно изменён! Теперь войдите в систему.");
+
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        cache: "no-store",
+      }).catch(() => null);
+
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 2500);
+    } catch (e: any) {
+      setBusy(false);
+      clearBanner();
+      resetCaptchaHard();
+
+      openModal(
+        "error",
+        "Ошибка",
+        "Не удалось обновить пароль.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n\nДетали: " +
+          (e?.message || String(e)),
+      );
+    }
+  }
+
+  const showTopBanner = bannerType === "warning" && !!bannerText;
+
+  return (
+    <div className="page-update-password">
+      {modalOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="upd-modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+        >
+          <div className="upd-modal">
+            <div className="upd-modal-header">
+              <div className="upd-modal-title">
+                {modalKind === "success" ? "✅ " : modalKind === "error" ? "❌ " : "⚠️ "}
+                {modalTitle}
+              </div>
+              <button type="button" className="upd-modal-close" onClick={closeModal} aria-label="Закрыть">
+                ✕
+              </button>
+            </div>
+
+            <div className="upd-modal-body">{modalBody}</div>
+
+            <div className="upd-modal-actions">
+              {modalKind === "error" || modalKind === "warning" ? (
+                <button
+                  type="button"
+                  className="btn btn-captcha-reload"
+                  onClick={() => {
+                    resetCaptchaHard();
+                    closeModal();
+                  }}
+                >
+                  Перезагрузить капчу
+                </button>
+              ) : null}
+
+              <button type="button" className="btn btn-primary" onClick={closeModal}>
+                Ок
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="upd-container">
+        <div className="upd-card">
+          <h2>Смена пароля</h2>
+
+          {showTopBanner ? (
+            <div className="warning" style={{ whiteSpace: "pre-line" }}>
+              {bannerText}
+            </div>
+          ) : null}
+
+          {!ready ? (
+            <div className="warning">⏳ Проверяем ссылку...</div>
+          ) : !hasSession ? (
+            <div className="info-box">
+              ℹ️ Чтобы сменить пароль, сначала запросите восстановление:
+              <div style={{ marginTop: 10 }}>
+                <Link className="btn btn-primary" href="/reset">
+                  Перейти к восстановлению
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <>
+              {!siteKey ? <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div> : null}
+
+              <div className="form-group">
+                <label htmlFor="password">Новый пароль:</label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Не менее 6 символов"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="confirm">Повторите пароль:</label>
+                <input
+                  id="confirm"
+                  type="password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  placeholder="Повторите пароль"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              {siteKey ? (
+                <>
+                  <TurnstileWidget
+                    siteKey={siteKey}
+                    action="update_password"
+                    reloadNonce={reloadNonce}
+                    onToken={(t) => setCaptchaToken(t)}
+                  />
+
+                  {!captchaToken ? (
+                    <div className="captcha-hint">
+                      🧩 <strong>Если вы не видите капчу</strong> — нажмите <strong>«Перезагрузить капчу»</strong>.
+                      <br />
+                      Если не помогло: обновите страницу.
+                    </div>
+                  ) : null}
+
+                  <button type="button" className="btn btn-captcha-reload" disabled={false} onClick={() => resetCaptchaHard()}>
+                    Перезагрузить капчу
+                  </button>
+                </>
+              ) : null}
+
+              <button className="btn btn-primary" disabled={!canSubmit} onClick={() => void onUpdate()}>
+                {busy ? "Сохраняем..." : "Сменить пароль"}
+              </button>
+
+              <div className="link" style={{ marginTop: 16 }}>
+                <p>
+                  Вернуться ко входу: <Link href="/login">Войти</Link>
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -28289,53 +30022,17 @@ export async function POST() {
 // ❌ GET удалён — используйте POST для выхода
 </file>
 
-<file path="app/api/auth/register/route.ts">
+<file path="app/api/auth/request-password-reset/route.ts">
+// app/api/auth/request-password-reset/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ok, fail } from "@/lib/api/response";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
-
-const BLOCKED_DOMAINS = [
-  "tempmail.com",
-  "10minutemail.com",
-  "guerrillamail.com",
-  "mailinator.com",
-  "yopmail.com",
-  "throwawaymail.com",
-  "fakeinbox.com",
-  "temp-mail.org",
-  "trashmail.com",
-  "getnada.com",
-  "tmpmail.org",
-  "maildrop.cc",
-  "disposablemail.com",
-  "fake-mail.com",
-  "tempinbox.com",
-  "jetable.org",
-  "mailnesia.com",
-  "sharklasers.com",
-  "guerrillamail.biz",
-  "grr.la",
-  "guerrillamail.info",
-  "spam4.me",
-  "tmpmail.net",
-];
+import { isAllowedRedirectUrl } from "@/lib/api/validate";
 
 function isValidEmail(email: string) {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return re.test(email);
-}
-
-function validateDomain(email: string) {
-  const domain = email.split("@")[1]?.toLowerCase().trim();
-  if (!domain) return { ok: false as const, message: "Неверный формат email" };
-
-  if (BLOCKED_DOMAINS.includes(domain)) {
-    return { ok: false as const, message: "Временные email адреса запрещены" };
-  }
-
-  return { ok: true as const };
 }
 
 function getRemoteIp(req: Request): string | null {
@@ -28345,145 +30042,77 @@ function getRemoteIp(req: Request): string | null {
   return xr || null;
 }
 
-function getPublicOrigin(req: Request): string | undefined {
-  const proto = req.headers.get("x-forwarded-proto") || undefined;
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || undefined;
-  if (host) return `${proto || "https"}://${host}`;
-  const origin = req.headers.get("origin") || undefined;
-  return origin;
+function getAppUrl(req: Request): string | null {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+  if (envUrl) return envUrl.replace(/\/$/, "");
+
+  const proto = req.headers.get("x-forwarded-proto") || "http";
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  if (!host) return null;
+  return `${proto}://${host}`;
 }
 
 export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => null)) as
-      | {
-          fullName?: string;
-          phone?: string;
-          region?: string;
-          email?: string;
-          password?: string;
-          captchaToken?: string;
-        }
+      | { email?: string; captchaToken?: string }
       | null;
 
     if (!body) return fail("Bad request", 400, "BAD_REQUEST");
 
-    const fullName = String(body.fullName ?? "").trim();
-    const phone = String(body.phone ?? "").trim();
-    const region = String(body.region ?? "").trim();
     const email = String(body.email ?? "").trim().toLowerCase();
-    const password = String(body.password ?? "");
     const captchaToken = String(body.captchaToken ?? "");
-
-    const remoteIp = getRemoteIp(req) ?? undefined;
 
     const captcha = await verifyTurnstileToken({
       token: captchaToken,
-      expectedAction: "register",
-      remoteIp,
+      expectedAction: "reset_request",
+      remoteIp: getRemoteIp(req) ?? undefined,
     });
 
     if (!captcha.ok) {
-      return fail("Капча не пройдена. Перезагрузите и попробуйте снова.", 400, captcha.code);
+      return fail("Капча не пройдена", 400, captcha.code);
     }
 
-    if (!fullName || fullName.length < 3) return fail("Введите ФИО", 400, "VALIDATION");
-    if (!phone) return fail("Введите телефон", 400, "VALIDATION");
-    if (!region) return fail("Выберите область", 400, "VALIDATION");
-    if (!email || !isValidEmail(email)) return fail("Неверный формат email", 400, "VALIDATION");
-
-    const d = validateDomain(email);
-    if (!d.ok) return fail(d.message, 400, "VALIDATION");
-
-    if (!password || password.length < 6) {
-      return fail("Пароль должен быть не менее 6 символов", 400, "VALIDATION");
-    }
-
-    try {
-      const admin = getSupabaseAdminClient();
-      const { data: existing } = await admin
-        .from("profiles")
-        .select("id")
-        .eq("email", email)
-        .maybeSingle();
-
-      if (existing?.id) {
-        return fail(
-          "Аккаунт с таким email уже существует. Нажмите «Войти» или «Забыли пароль?»",
-          400,
-          "USER_EXISTS",
-        );
-      }
-    } catch {
-      // если admin недоступен — не валим, просто идём дальше
+    if (!email || !isValidEmail(email)) {
+      return fail("Неверный формат email", 400, "VALIDATION");
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !anon) return fail("Supabase env missing", 500, "ENV_MISSING");
 
+    // Build redirect URL and validate it to prevent open redirect
+    let redirectTo: string | undefined;
+    const appUrl = getAppUrl(req);
+    if (appUrl) {
+      const fullRedirect = `${appUrl}/update-password`;
+      if (isAllowedRedirectUrl(fullRedirect)) {
+        redirectTo = fullRedirect;
+      } else {
+        // fallback: use only relative path if domain is not allowed
+        redirectTo = "/update-password";
+      }
+    }
+
     const supabaseAnon = createClient(url, anon, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
 
-    const origin = getPublicOrigin(req);
-    const redirectTo = origin ? `${origin}/login?message=confirmed` : undefined;
-
-    const { data, error } = await supabaseAnon.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName, contact_phone: phone, region },
-        ...(redirectTo ? { emailRedirectTo: redirectTo } : {}),
-      },
+    const { error } = await supabaseAnon.auth.resetPasswordForEmail(email, {
+      ...(redirectTo ? { redirectTo } : {}),
     });
 
+    // Не раскрываем существование email
     if (error) {
-      const msg = (error.message || "").toLowerCase();
-      const code = (error as any).code as string | undefined;
-
-      if (
-        msg.includes("already registered") ||
-        msg.includes("already exists") ||
-        msg.includes("user already exists") ||
-        code === "user_already_exists"
-      ) {
-        return fail(
-          "Аккаунт с таким email уже существует. Нажмите «Войти» или «Забыли пароль?»",
-          400,
-          "USER_EXISTS",
-        );
-      }
-
-      if (msg.includes("rate limit") || code === "rate_limit_exceeded") {
-        return fail("Слишком много попыток. Попробуйте позже.", 429, "RATE_LIMIT");
-      }
-
-      return fail("Ошибка регистрации: " + error.message, 400, "SIGNUP_FAILED");
-    }
-
-    if (!data.user?.id) return fail("Не удалось создать пользователя", 500, "NO_USER");
-
-    try {
-      const admin = getSupabaseAdminClient();
-      const { error: pErr } = await admin.from("profiles").upsert(
-        {
-          id: data.user.id,
-          full_name: fullName,
-          contact_phone: phone,
-          region,
-        } as any,
-        { onConflict: "id" },
-      );
-
-      if (pErr) console.error("[register] profile upsert error", pErr);
-    } catch (e) {
-      console.error("[register] profile upsert exception", e);
+      return ok({
+        message:
+          "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\nПроверьте папку Входящие/Спам.",
+      });
     }
 
     return ok({
       message:
-        "✅ Регистрация принята!\n\n📧 Мы отправили письмо на вашу почту. Откройте письмо и подтвердите email.\nБез подтверждения вход невозможен.",
+        "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\nПроверьте папку Входящие/Спам.",
     });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
@@ -28650,61 +30279,6 @@ export async function POST(req: Request) {
         },
       },
     );
-  }
-}
-</file>
-
-<file path="app/api/auth/update-password/route.ts">
-import { NextResponse } from "next/server";
-import { ok, fail } from "@/lib/api/response";
-import { verifyTurnstileToken } from "@/lib/security/turnstile";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-function getRemoteIp(req: Request): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]?.trim() || null;
-  const xr = req.headers.get("x-real-ip");
-  return xr || null;
-}
-
-export async function POST(req: Request) {
-  try {
-    const body = (await req.json().catch(() => null)) as
-      | { password?: string; captchaToken?: string }
-      | null;
-
-    if (!body) return fail("Bad request", 400, "BAD_REQUEST");
-
-    const password = String(body.password ?? "");
-    const captchaToken = String(body.captchaToken ?? "");
-
-    const captcha = await verifyTurnstileToken({
-      token: captchaToken,
-      expectedAction: "update_password",
-      remoteIp: getRemoteIp(req) ?? undefined,
-    });
-
-    if (!captcha.ok) {
-      return fail("Капча не пройдена", 400, captcha.code);
-    }
-
-    if (!password || password.length < 6) {
-      return fail("Пароль должен быть не менее 6 символов", 400, "VALIDATION");
-    }
-
-    const supabase = await createSupabaseServerClient();
-
-    const { data: u, error: uErr } = await supabase.auth.getUser();
-    if (uErr || !u?.user) {
-      return fail("Сессия восстановления не найдена или устарела. Запросите восстановление заново.", 401, "NO_SESSION");
-    }
-
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) return fail("Не удалось обновить пароль: " + error.message, 400, "UPDATE_FAILED");
-
-    return ok({ message: "✅ Пароль успешно изменён! Теперь войдите в систему." });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
   }
 }
 </file>
@@ -29039,1482 +30613,6 @@ export async function GET() {
       { status: 500 },
     );
   }
-}
-</file>
-
-<file path="app/register/page.tsx">
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import TurnstileWidget from "@/components/TurnstileWidget";
-import "./register.css";
-
-type BannerType = "error" | "success" | "warning" | null;
-type ModalKind = "error" | "success" | "warning";
-
-const BLOCKED_DOMAINS = [
-  "tempmail.com",
-  "10minutemail.com",
-  "guerrillamail.com",
-  "mailinator.com",
-  "yopmail.com",
-  "throwawaymail.com",
-  "fakeinbox.com",
-  "temp-mail.org",
-  "trashmail.com",
-  "getnada.com",
-  "tmpmail.org",
-  "maildrop.cc",
-  "disposablemail.com",
-  "fake-mail.com",
-  "tempinbox.com",
-  "jetable.org",
-  "mailnesia.com",
-  "sharklasers.com",
-  "guerrillamail.biz",
-  "grr.la",
-  "guerrillamail.info",
-  "spam4.me",
-  "tmpmail.net",
-];
-
-const REGISTRATION_LIMIT = {
-  maxAttempts: 3,
-  timeWindow: 60 * 60 * 1000,
-  key: "edu-keys-registration-limits",
-};
-
-function isValidEmail(email: string) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-function validateDomain(email: string) {
-  const domain = email.split("@")[1]?.toLowerCase().trim();
-  if (!domain) return { valid: false, message: "Неверный формат email" };
-
-  if (BLOCKED_DOMAINS.includes(domain)) {
-    return { valid: false, message: "Временные email адреса запрещены" };
-  }
-
-  return { valid: true, message: "" };
-}
-
-function checkRateLimit() {
-  try {
-    const now = Date.now();
-    const limits = JSON.parse(
-      localStorage.getItem(REGISTRATION_LIMIT.key) || '{"attempts":[]}',
-    ) as { attempts: number[] };
-
-    const recentAttempts = (limits.attempts || []).filter(
-      (t) => now - t < REGISTRATION_LIMIT.timeWindow,
-    );
-
-    if (recentAttempts.length >= REGISTRATION_LIMIT.maxAttempts) {
-      const nextAttempt = Math.min(...recentAttempts) + REGISTRATION_LIMIT.timeWindow;
-      const minutesLeft = Math.ceil((nextAttempt - now) / (60 * 1000));
-      return {
-        allowed: false,
-        message: `Превышен лимит регистраций. Попробуйте через ${minutesLeft} минут.`,
-      };
-    }
-
-    recentAttempts.push(now);
-    localStorage.setItem(
-      REGISTRATION_LIMIT.key,
-      JSON.stringify({ attempts: recentAttempts }),
-    );
-
-    return { allowed: true, message: "" };
-  } catch {
-    return { allowed: true, message: "" };
-  }
-}
-
-export default function RegisterPage() {
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
-
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [region, setRegion] = useState("");
-  const [email, setEmail] = useState("");
-  const [confirmEmail, setConfirmEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [reloadNonce, setReloadNonce] = useState(0);
-
-  const [bannerType, setBannerType] = useState<BannerType>(null);
-  const [bannerText, setBannerText] = useState("");
-
-  const [busy, setBusy] = useState(false);
-  const [registered, setRegistered] = useState(false);
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalKind, setModalKind] = useState<ModalKind>("success");
-  const [modalTitle, setModalTitle] = useState("");
-  const [modalBody, setModalBody] = useState("");
-
-  function showBanner(type: BannerType, text: string) {
-    setBannerType(type);
-    setBannerText(text);
-  }
-
-  function clearBanner() {
-    setBannerType(null);
-    setBannerText("");
-  }
-
-  function openModal(kind: ModalKind, title: string, body: string) {
-    setModalKind(kind);
-    setModalTitle(title);
-    setModalBody(body);
-    setModalOpen(true);
-  }
-
-  function closeModal() {
-    setModalOpen(false);
-    setBusy(false);
-    clearBanner();
-  }
-
-  const formatValid = useMemo(() => isValidEmail(email.trim()), [email]);
-
-  const matchValid = useMemo(() => {
-    const e = email.trim().toLowerCase();
-    const c = confirmEmail.trim().toLowerCase();
-    return !!e && !!c && e === c;
-  }, [email, confirmEmail]);
-
-  const passwordValid = useMemo(() => password.length >= 6, [password]);
-
-  const domainValid = useMemo(() => {
-    const e = email.trim().toLowerCase();
-    return e ? validateDomain(e).valid : false;
-  }, [email]);
-
-  const phoneValid = useMemo(() => phone.trim().length > 0, [phone]);
-  const regionValid = useMemo(() => region !== "", [region]);
-  const nameValid = useMemo(() => fullName.trim().length >= 3, [fullName]);
-
-  const canSubmit = useMemo(() => {
-    return (
-      !busy &&
-      !registered &&
-      formatValid &&
-      matchValid &&
-      passwordValid &&
-      domainValid &&
-      phoneValid &&
-      regionValid &&
-      nameValid &&
-      !!captchaToken &&
-      !!siteKey
-    );
-  }, [
-    busy,
-    registered,
-    formatValid,
-    matchValid,
-    passwordValid,
-    domainValid,
-    phoneValid,
-    regionValid,
-    nameValid,
-    captchaToken,
-    siteKey,
-  ]);
-
-  function resetCaptchaHard() {
-    setCaptchaToken(null);
-    setReloadNonce((n) => n + 1);
-  }
-
-  function friendlyErrorFromApi(payload: any, status: number) {
-    const code = String(payload?.code || "").toUpperCase();
-    const err = String(payload?.error || payload?.message || "").trim();
-
-    if (code === "USER_EXISTS" || err.toLowerCase().includes("уже существует")) {
-      return (
-        "Аккаунт с таким email уже существует.\n\n" +
-        "Что можно сделать:\n" +
-        "• Нажмите «Войти в систему»\n" +
-        "• Или используйте «Забыли пароль?» для восстановления"
-      );
-    }
-
-    if (code === "RATE_LIMIT" || status === 429) {
-      return "Слишком много попыток. Подождите несколько минут и попробуйте снова.";
-    }
-
-    if (
-      code.includes("CAPTCHA") ||
-      code.includes("TURNSTILE") ||
-      err.toLowerCase().includes("капч")
-    ) {
-      return (
-        (err || "Капча не пройдена или не загрузилась.") +
-        "\n\nПопробуйте:\n" +
-        "• Нажать «Перезагрузить капчу»\n" +
-        "• Отключить VPN/прокси (если включены)\n" +
-        "• Обновить страницу"
-      );
-    }
-
-    if (code === "VALIDATION") {
-      return err || "Проверьте правильность заполнения полей.";
-    }
-
-    if (err) return err;
-    return `Ошибка регистрации (${status}). Попробуйте перезагрузить капчу и повторить.`;
-  }
-
-  async function onRegister() {
-    if (busy || registered) return;
-
-    const fn = fullName.trim();
-    const ph = phone.trim();
-    const rg = region.trim();
-    const em = email.trim().toLowerCase();
-    const cem = confirmEmail.trim().toLowerCase();
-
-    if (!fn || !ph || !rg || !em || !cem || !password) {
-      openModal("error", "Ошибка", "Заполните все поля.");
-      return;
-    }
-    if (password.length < 6) {
-      openModal("error", "Ошибка", "Пароль должен быть не менее 6 символов.");
-      return;
-    }
-    if (em !== cem) {
-      openModal("error", "Ошибка", "Email адреса не совпадают.");
-      return;
-    }
-    if (!isValidEmail(em)) {
-      openModal("error", "Ошибка", "Неверный формат email.");
-      return;
-    }
-
-    const dc = validateDomain(em);
-    if (!dc.valid) {
-      openModal("error", "Ошибка", dc.message);
-      return;
-    }
-
-    if (!captchaToken) {
-      openModal(
-        "warning",
-        "Нужна капча",
-        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
-      );
-      return;
-    }
-
-    const rl = checkRateLimit();
-    if (!rl.allowed) {
-      openModal("error", "Лимит", rl.message);
-      return;
-    }
-
-    try {
-      setBusy(true);
-      showBanner("warning", "🔄 Создаем ваш аккаунт...");
-
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          fullName: fn,
-          phone: ph,
-          region: rg,
-          email: em,
-          password,
-          captchaToken,
-        }),
-      });
-
-      const text = await res.text();
-      let json: any = null;
-      try {
-        json = text ? JSON.parse(text) : null;
-      } catch {
-        json = null;
-      }
-
-      if (!res.ok) {
-        const msg = friendlyErrorFromApi(json, res.status);
-
-        setBusy(false);
-        clearBanner();
-        resetCaptchaHard();
-
-        openModal("error", "Ошибка регистрации", msg);
-        return;
-      }
-
-      if (!json?.ok) {
-        const msg = friendlyErrorFromApi(json, 400);
-
-        setBusy(false);
-        clearBanner();
-        resetCaptchaHard();
-
-        openModal("error", "Ошибка регистрации", msg);
-        return;
-      }
-
-      setBusy(false);
-      clearBanner();
-
-      openModal(
-        "success",
-        "Успешно!",
-        json.message ||
-          "✅ Регистрация принята!\n\n📧 Проверьте почту (и папку Спам) и подтвердите email.\nБез подтверждения вход невозможен.",
-      );
-
-      setRegistered(true);
-
-      setFullName("");
-      setPhone("");
-      setRegion("");
-      setEmail("");
-      setConfirmEmail("");
-      setPassword("");
-      setCaptchaToken(null);
-
-      setTimeout(() => {
-        window.location.href = "/login?message=check_email";
-      }, 8000);
-    } catch (e: any) {
-      setBusy(false);
-      clearBanner();
-      resetCaptchaHard();
-
-      openModal(
-        "error",
-        "Ошибка",
-        "Не удалось отправить запрос.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n• Отключить VPN/прокси\n\nДетали: " +
-          (e?.message || String(e)),
-      );
-    }
-  }
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Enter" && canSubmit) {
-        e.preventDefault();
-        void onRegister();
-      }
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [canSubmit]);
-
-  function validationRow(ok: boolean, activeInvalid: boolean, text: string) {
-    return (
-      <div className={"validation-item " + (ok ? "valid" : activeInvalid ? "invalid" : "")}>
-        <span className="validation-icon">{ok ? "✅" : activeInvalid ? "❌" : "⭕"}</span>
-        {text}
-      </div>
-    );
-  }
-
-  const bannerClass =
-    bannerType === "warning"
-      ? "warning"
-      : bannerType === "error"
-        ? "error-message"
-        : bannerType === "success"
-          ? "success"
-          : "";
-
-  const showTopBanner = bannerType === "warning" && !!bannerText;
-
-  return (
-    <div className="page-register">
-      {modalOpen ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeModal();
-          }}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.38)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            zIndex: 9999,
-          }}
-        >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 520,
-              background: "#fff",
-              borderRadius: 16,
-              boxShadow: "0 18px 60px rgba(0,0,0,0.25)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                padding: "14px 16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                borderBottom: "1px solid rgba(0,0,0,0.06)",
-              }}
-            >
-              <div style={{ fontWeight: 800, color: "#222" }}>
-                {modalKind === "success" ? "✅ " : modalKind === "error" ? "❌ " : "⚠️ "}
-                {modalTitle}
-              </div>
-              <button
-                type="button"
-                onClick={closeModal}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  fontSize: 20,
-                  cursor: "pointer",
-                  lineHeight: 1,
-                  padding: 6,
-                  color: "#333",
-                }}
-                aria-label="Закрыть"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ padding: 16, color: "#333", whiteSpace: "pre-line", lineHeight: 1.5 }}>
-              {modalBody}
-            </div>
-
-            <div style={{ padding: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              {modalKind === "error" || modalKind === "warning" ? (
-                <button
-                  type="button"
-                  className="btn btn-captcha-reload"
-                  onClick={() => {
-                    resetCaptchaHard();
-                    closeModal();
-                  }}
-                >
-                  Перезагрузить капчу
-                </button>
-              ) : null}
-
-              <button type="button" className="btn btn-primary" onClick={closeModal}>
-                Ок
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="register-container">
-        <div className="register-card">
-          <h2>Регистрация в Edu Keys</h2>
-
-          {showTopBanner ? <div className={bannerClass}>{bannerText}</div> : null}
-
-          <div className="info-box">
-            ✅ <strong>Подтверждение email обязательно!</strong> Без подтверждения вход в систему
-            невозможен.
-          </div>
-
-          <div className="rate-limit">
-            ⚠️ <strong>Защита от спама:</strong> Максимум 3 регистрации в час с одного устройства
-          </div>
-
-          {!siteKey ? (
-            <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div>
-          ) : null}
-
-          <div className="form-group">
-            <label htmlFor="fullname">ФИО:</label>
-            <input
-              id="fullname"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Иванов Иван Иванович"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="phone">Контактный телефон:</label>
-            <input
-              id="phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+7 (999) 123-45-67"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="region">Область проживания:</label>
-            <select id="region" value={region} onChange={(e) => setRegion(e.target.value)}>
-              <option value="">-- Выберите область --</option>
-              <option value="Белгородская">Белгородская область</option>
-              <option value="Курская">Курская область</option>
-              <option value="Тамбовская">Тамбовская область</option>
-              <option value="Воронежская">Воронежская область</option>
-              <option value="Липецкая">Липецкая область</option>
-              <option value="Другое">Другая область</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="email">Email:</label>
-            <input
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="example@gmail.com"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="confirmEmail">Подтверждение email:</label>
-            <input
-              id="confirmEmail"
-              value={confirmEmail}
-              onChange={(e) => setConfirmEmail(e.target.value)}
-              placeholder="example@gmail.com"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password">Пароль:</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Не менее 6 символов"
-            />
-          </div>
-
-          <div className="email-validation">
-            {validationRow(formatValid, !!email.trim(), "Правильный формат email")}
-            {validationRow(matchValid, !!confirmEmail.trim(), "Email адреса совпадают")}
-            {validationRow(passwordValid, !!password, "Пароль не менее 6 символов")}
-            {validationRow(domainValid, !!email.trim(), "Почтовый домен не является временным")}
-            {validationRow(phoneValid, false, "Телефон заполнен")}
-            {validationRow(regionValid, false, "Область выбрана")}
-          </div>
-
-          {siteKey ? (
-            <>
-              <TurnstileWidget
-                siteKey={siteKey}
-                action="register"
-                reloadNonce={reloadNonce}
-                onToken={(t) => setCaptchaToken(t)}
-              />
-
-              {!captchaToken ? (
-                <div className="rate-limit" style={{ marginTop: 10 }}>
-                  🧩 <strong>Если вы не видите капчу</strong> — нажмите{" "}
-                  <strong>«Перезагрузить капчу»</strong>.
-                  <br />
-                  Если не помогло: отключите VPN/прокси и обновите страницу.
-                </div>
-              ) : null}
-
-              <button
-                type="button"
-                className="btn btn-captcha-reload"
-                disabled={false}
-                onClick={() => resetCaptchaHard()}
-              >
-                Перезагрузить капчу
-              </button>
-            </>
-          ) : null}
-
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!canSubmit}
-            onClick={() => void onRegister()}
-          >
-            {busy ? "Создаем аккаунт..." : "Создать аккаунт"}
-          </button>
-
-          <div className="consent-text">
-            Нажимая на кнопку "Создать аккаунт", вы соглашаетесь с{" "}
-            <a
-              href="https://drive.google.com/file/d/1L9kEnkMatFa7I-jT6OImTAw3Bxpjld9l/view?usp=sharing"
-              target="_blank"
-              rel="noreferrer"
-            >
-              положением о персональных данных
-            </a>
-            .
-          </div>
-
-          <div className="link">
-            <p>
-              Уже есть аккаунт? <a href="/login">Войти в систему</a>
-            </p>
-          </div>
-
-          {registered ? (
-            <div className="existing-account-help">
-              <strong>📧 Что делать дальше?</strong>
-              <br />• Проверьте папку "Входящие" и "Спам" в вашей почте
-              <br />• Нажмите на ссылку подтверждения в письме
-              <br />• После подтверждения войдите в систему
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="app/reset/page.tsx">
-"use client";
-
-import "./reset.css";
-import Link from "next/link";
-import { useMemo, useState } from "react";
-import TurnstileWidget from "@/components/TurnstileWidget";
-
-type BannerType = "error" | "success" | "warning" | null;
-type ModalKind = "error" | "success" | "warning";
-
-function isValidEmail(email: string) {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(email);
-}
-
-const ALLOWED_DOMAINS = [
-  "gmail.com",
-  "yandex.ru",
-  "mail.ru",
-  "ya.ru",
-  "yandex.com",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "yahoo.com",
-  "icloud.com",
-  "me.com",
-  "mac.com",
-  "rambler.ru",
-  "bk.ru",
-  "list.ru",
-  "inbox.ru",
-  "yandex.ua",
-  "mail.ua",
-  "ukr.net",
-  "i.ua",
-  "meta.ua",
-  "email.ua",
-];
-
-const BLOCKED_DOMAINS = [
-  "tempmail.com",
-  "10minutemail.com",
-  "guerrillamail.com",
-  "mailinator.com",
-  "yopmail.com",
-  "throwawaymail.com",
-  "fakeinbox.com",
-  "temp-mail.org",
-  "trashmail.com",
-  "getnada.com",
-  "tmpmail.org",
-  "maildrop.cc",
-  "disposablemail.com",
-  "fake-mail.com",
-  "tempinbox.com",
-  "jetable.org",
-  "mailnesia.com",
-  "sharklasers.com",
-  "guerrillamail.biz",
-  "grr.la",
-  "guerrillamail.info",
-  "spam4.me",
-  "tmpmail.net",
-];
-
-function validateDomain(email: string) {
-  const domain = email.split("@")[1]?.toLowerCase();
-  if (!domain) return { ok: false, message: "Неверный формат email" };
-  if (BLOCKED_DOMAINS.includes(domain)) return { ok: false, message: "Временные email адреса запрещены" };
-  if (!ALLOWED_DOMAINS.includes(domain))
-    return { ok: false, message: "Разрешены только email от популярных сервисов (Gmail, Yandex, Mail.ru, Outlook и др.)" };
-  return { ok: true, message: "" };
-}
-
-export default function ResetPage() {
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
-
-  const [email, setEmail] = useState("");
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [reloadNonce, setReloadNonce] = useState(0);
-
-  const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState(false);
-
-  const [bannerType, setBannerType] = useState<BannerType>(null);
-  const [bannerText, setBannerText] = useState("");
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalKind, setModalKind] = useState<ModalKind>("success");
-  const [modalTitle, setModalTitle] = useState("");
-  const [modalBody, setModalBody] = useState("");
-
-  function showBanner(type: BannerType, text: string) {
-    setBannerType(type);
-    setBannerText(text);
-  }
-  function clearBanner() {
-    setBannerType(null);
-    setBannerText("");
-  }
-
-  function openModal(kind: ModalKind, title: string, body: string) {
-    setModalKind(kind);
-    setModalTitle(title);
-    setModalBody(body);
-    setModalOpen(true);
-  }
-
-  function closeModal() {
-    setModalOpen(false);
-    setBusy(false);
-    clearBanner();
-  }
-
-  function resetCaptchaHard() {
-    setCaptchaToken(null);
-    setReloadNonce((n) => n + 1);
-  }
-
-  const canSubmit = useMemo(() => {
-    const e = email.trim().toLowerCase();
-    return !!siteKey && !busy && !sent && isValidEmail(e) && !!captchaToken;
-  }, [siteKey, busy, sent, email, captchaToken]);
-
-  function friendlyErrorFromApi(payload: any, status: number) {
-    const code = String(payload?.code || "").toUpperCase();
-    const err = String(payload?.error || payload?.message || "").trim();
-
-    if (code.includes("CAPTCHA") || code.includes("TURNSTILE") || err.toLowerCase().includes("captcha") || err.toLowerCase().includes("капч")) {
-      return (
-        (err || "Капча не пройдена или не загрузилась.") +
-        "\n\nПопробуйте:\n" +
-        "• Нажать «Перезагрузить капчу»\n" +
-        "• Отключить VPN/прокси\n" +
-        "• Обновить страницу"
-      );
-    }
-
-    if (code === "VALIDATION") return err || "Проверьте правильность email.";
-    if (status === 429 || code === "RATE_LIMIT") return "Слишком много попыток. Попробуйте позже.";
-
-    if (err) return err;
-    return `Не удалось отправить письмо (${status}). Попробуйте перезагрузить капчу и повторить.`;
-  }
-
-  async function onSend() {
-    const e = email.trim().toLowerCase();
-
-    if (!e) {
-      openModal("error", "Ошибка", "Введите email.");
-      return;
-    }
-    if (!isValidEmail(e)) {
-      openModal("error", "Ошибка", "Неверный формат email.");
-      return;
-    }
-
-    const d = validateDomain(e);
-    if (!d.ok) {
-      openModal("error", "Ошибка", d.message);
-      return;
-    }
-
-    if (!captchaToken) {
-      openModal(
-        "warning",
-        "Нужна капча",
-        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
-      );
-      return;
-    }
-
-    try {
-      setBusy(true);
-      showBanner("warning", "📧 Отправляем письмо для восстановления...");
-
-      const res = await fetch("/api/auth/request-password-reset", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: e, captchaToken }),
-      });
-
-      const text = await res.text();
-      let json: any = null;
-      try {
-        json = text ? JSON.parse(text) : null;
-      } catch {
-        json = null;
-      }
-
-      if (!res.ok) {
-        const msg = friendlyErrorFromApi(json, res.status);
-
-        setBusy(false);
-        clearBanner();
-        resetCaptchaHard();
-
-        openModal("error", "Ошибка", msg);
-        return;
-      }
-
-      if (!json?.ok) {
-        const msg = friendlyErrorFromApi(json, 400);
-
-        setBusy(false);
-        clearBanner();
-        resetCaptchaHard();
-
-        openModal("error", "Ошибка", msg);
-        return;
-      }
-
-      setBusy(false);
-      clearBanner();
-      setSent(true);
-
-      openModal(
-        "success",
-        "Готово!",
-        json.message ||
-          "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\n\nПроверьте «Входящие» и «Спам».",
-      );
-
-      setCaptchaToken(null);
-    } catch (e: any) {
-      setBusy(false);
-      clearBanner();
-      resetCaptchaHard();
-
-      openModal(
-        "error",
-        "Ошибка",
-        "Не удалось отправить запрос.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n• Отключить VPN/прокси\n\nДетали: " +
-          (e?.message || String(e)),
-      );
-    }
-  }
-
-  const showTopBanner = bannerType === "warning" && !!bannerText;
-
-  return (
-    <div className="page-reset">
-      {modalOpen ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="reset-modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeModal();
-          }}
-        >
-          <div className="reset-modal">
-            <div className="reset-modal-header">
-              <div className="reset-modal-title">
-                {modalKind === "success" ? "✅ " : modalKind === "error" ? "❌ " : "⚠️ "}
-                {modalTitle}
-              </div>
-              <button type="button" className="reset-modal-close" onClick={closeModal} aria-label="Закрыть">
-                ✕
-              </button>
-            </div>
-
-            <div className="reset-modal-body">{modalBody}</div>
-
-            <div className="reset-modal-actions">
-              {(modalKind === "error" || modalKind === "warning") ? (
-                <button
-                  type="button"
-                  className="btn btn-captcha-reload"
-                  onClick={() => {
-                    resetCaptchaHard();
-                    closeModal();
-                  }}
-                >
-                  Перезагрузить капчу
-                </button>
-              ) : null}
-
-              <button type="button" className="btn btn-primary" onClick={closeModal}>
-                Ок
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="reset-container">
-        <div className="reset-card">
-          <h2>Восстановление пароля</h2>
-
-          {showTopBanner ? (
-            <div className="warning" style={{ whiteSpace: "pre-line" }}>
-              {bannerText}
-            </div>
-          ) : null}
-
-          <div className="info-box">
-            🔒 Мы отправим письмо со ссылкой. <strong>Пароль меняется только после перехода по ссылке из письма.</strong>
-            <br />
-            Проверьте также папку <strong>Спам</strong>.
-          </div>
-
-          {!siteKey ? <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div> : null}
-
-          <div className="form-group">
-            <label htmlFor="email">Email:</label>
-            <input
-              id="email"
-              value={email}
-              onChange={(ev) => setEmail(ev.target.value)}
-              placeholder="example@gmail.com"
-              autoComplete="email"
-            />
-          </div>
-
-          {siteKey ? (
-            <>
-              <TurnstileWidget
-                siteKey={siteKey}
-                action="reset_request"
-                reloadNonce={reloadNonce}
-                onToken={(t) => setCaptchaToken(t)}
-              />
-
-              {!captchaToken ? (
-                <div className="captcha-hint">
-                  🧩 <strong>Если вы не видите капчу</strong> — нажмите{" "}
-                  <strong>«Перезагрузить капчу»</strong>.
-                  <br />
-                  Если не помогло: отключите VPN/прокси и обновите страницу.
-                </div>
-              ) : null}
-
-              <button
-                type="button"
-                className="btn btn-captcha-reload"
-                disabled={false}
-                onClick={() => resetCaptchaHard()}
-              >
-                Перезагрузить капчу
-              </button>
-            </>
-          ) : null}
-
-          <button className="btn btn-primary" disabled={!canSubmit} onClick={() => void onSend()}>
-            {busy ? "Отправляем..." : sent ? "Письмо отправлено" : "Отправить письмо"}
-          </button>
-
-          <div className="link">
-            <p>
-              Вспомнили пароль? <Link href="/login">Вернуться ко входу</Link>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="app/update-password/page.tsx">
-"use client";
-
-import "./update-password.css";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import TurnstileWidget from "@/components/TurnstileWidget";
-
-type BannerType = "error" | "success" | "warning" | null;
-type ModalKind = "error" | "success" | "warning";
-
-type ApiPayload = {
-  ok?: boolean;
-  error?: string;
-  message?: string;
-  code?: string;
-  data?: any;
-  authenticated?: boolean;
-  hasSession?: boolean;
-};
-
-async function readApiPayload(res: Response): Promise<ApiPayload | null> {
-  const text = await res.text();
-
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text) as ApiPayload;
-  } catch {
-    return {
-      ok: false,
-      error: text,
-    };
-  }
-}
-
-function unwrapApiData(json: ApiPayload | null) {
-  if (!json) return null;
-  if (json.data && typeof json.data === "object") return json.data;
-  return json;
-}
-
-export default function UpdatePasswordPage() {
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
-
-  const [ready, setReady] = useState(false);
-  const [hasSession, setHasSession] = useState(false);
-
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [reloadNonce, setReloadNonce] = useState(0);
-
-  const [busy, setBusy] = useState(false);
-
-  const [bannerType, setBannerType] = useState<BannerType>(null);
-  const [bannerText, setBannerText] = useState("");
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalKind, setModalKind] = useState<ModalKind>("success");
-  const [modalTitle, setModalTitle] = useState("");
-  const [modalBody, setModalBody] = useState("");
-
-  function showBanner(type: BannerType, text: string) {
-    setBannerType(type);
-    setBannerText(text);
-  }
-
-  function clearBanner() {
-    setBannerType(null);
-    setBannerText("");
-  }
-
-  function openModal(kind: ModalKind, title: string, body: string) {
-    setModalKind(kind);
-    setModalTitle(title);
-    setModalBody(body);
-    setModalOpen(true);
-  }
-
-  function closeModal() {
-    setModalOpen(false);
-    setBusy(false);
-    clearBanner();
-  }
-
-  function resetCaptchaHard() {
-    setCaptchaToken(null);
-    setReloadNonce((n) => n + 1);
-  }
-
-  function friendlyErrorFromApi(payload: any, status: number) {
-    const code = String(payload?.code || "").toUpperCase();
-    const err = String(payload?.error || payload?.message || "").trim();
-
-    if (
-      code.includes("CAPTCHA") ||
-      code.includes("TURNSTILE") ||
-      err.toLowerCase().includes("captcha") ||
-      err.toLowerCase().includes("капч")
-    ) {
-      return (
-        (err || "Капча не пройдена или не загрузилась.") +
-        "\n\nПопробуйте:\n" +
-        "• Нажать «Перезагрузить капчу»\n" +
-        "• Отключить VPN/прокси\n" +
-        "• Обновить страницу"
-      );
-    }
-
-    if (code === "NO_SESSION" || code === "UNAUTHORIZED" || status === 401) {
-      return (
-        err ||
-        "Сессия восстановления не найдена или устарела.\n\nЗапросите восстановление заново и перейдите по новой ссылке из письма."
-      );
-    }
-
-    if (code === "INVALID_OR_EXPIRED_LINK") {
-      return err || "Ссылка недействительна или устарела. Запросите восстановление заново.";
-    }
-
-    if (code === "VALIDATION") return err || "Проверьте пароль (не менее 6 символов).";
-
-    if (err) return err;
-
-    return `Не удалось обновить пароль (${status}). Попробуйте перезагрузить капчу и повторить.`;
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function exchangeRecoverySession() {
-      const url = new URL(window.location.href);
-      const code = url.searchParams.get("code");
-
-      if (code) {
-        const res = await fetch("/api/auth/exchange-code", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({ code }),
-        });
-
-        const json = await readApiPayload(res);
-        const payload = unwrapApiData(json);
-
-        window.history.replaceState({}, "", "/update-password");
-
-        if (!res.ok || !json?.ok) {
-          throw new Error(
-            payload?.error ||
-              payload?.message ||
-              json?.error ||
-              "Ссылка недействительна или устарела. Запросите восстановление заново.",
-          );
-        }
-
-        return Boolean(payload?.hasSession);
-      }
-
-      const hash = window.location.hash || "";
-
-      if (hash.includes("access_token=") && hash.includes("refresh_token=")) {
-        const p = new URLSearchParams(hash.replace(/^#/, ""));
-        const access_token = p.get("access_token") || "";
-        const refresh_token = p.get("refresh_token") || "";
-
-        if (access_token && refresh_token) {
-          const res = await fetch("/api/auth/exchange-code", {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-            },
-            body: JSON.stringify({
-              access_token,
-              refresh_token,
-            }),
-          });
-
-          const json = await readApiPayload(res);
-          const payload = unwrapApiData(json);
-
-          window.history.replaceState({}, "", "/update-password");
-
-          if (!res.ok || !json?.ok) {
-            throw new Error(
-              payload?.error ||
-                payload?.message ||
-                json?.error ||
-                "Ссылка недействительна или устарела. Запросите восстановление заново.",
-            );
-          }
-
-          return Boolean(payload?.hasSession);
-        }
-      }
-
-      return null;
-    }
-
-    async function fetchSession() {
-      const res = await fetch("/api/auth/session", {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      const json = await readApiPayload(res);
-      const payload = unwrapApiData(json);
-
-      if (!res.ok || !json?.ok) return false;
-
-      return Boolean(payload?.authenticated);
-    }
-
-    async function run() {
-      try {
-        const exchanged = await exchangeRecoverySession();
-
-        if (cancelled) return;
-
-        const sessionExists = exchanged === true ? true : await fetchSession();
-
-        if (cancelled) return;
-
-        setHasSession(sessionExists);
-        setReady(true);
-
-        if (!sessionExists) {
-          showBanner("warning", "ℹ️ Откройте эту страницу по ссылке из письма восстановления пароля.");
-        }
-      } catch (e: any) {
-        if (cancelled) return;
-
-        setReady(true);
-        setHasSession(false);
-        showBanner("error", "❌ " + (e?.message || "Не удалось обработать ссылку. Попробуйте запросить восстановление заново."));
-      }
-    }
-
-    run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const canSubmit = useMemo(() => {
-    return (
-      !busy &&
-      ready &&
-      hasSession &&
-      password.length >= 6 &&
-      password === confirm &&
-      !!captchaToken &&
-      !!siteKey
-    );
-  }, [busy, ready, hasSession, password, confirm, captchaToken, siteKey]);
-
-  async function onUpdate() {
-    if (!ready) return;
-
-    if (!hasSession) {
-      openModal("warning", "Нет сессии восстановления", "Откройте эту страницу по ссылке из письма восстановления пароля.");
-      return;
-    }
-
-    if (password.length < 6) {
-      openModal("error", "Ошибка", "Пароль должен быть не менее 6 символов.");
-      return;
-    }
-
-    if (password !== confirm) {
-      openModal("error", "Ошибка", "Пароли не совпадают.");
-      return;
-    }
-
-    if (!captchaToken) {
-      openModal(
-        "warning",
-        "Нужна капча",
-        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
-      );
-      return;
-    }
-
-    try {
-      setBusy(true);
-      showBanner("warning", "🔄 Обновляем пароль...");
-
-      const res = await fetch("/api/auth/update-password", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ password, captchaToken }),
-      });
-
-      const json = await readApiPayload(res);
-      const payload = unwrapApiData(json);
-
-      if (!res.ok || !json?.ok) {
-        const msg = friendlyErrorFromApi(payload || json, res.status);
-        setBusy(false);
-        clearBanner();
-        resetCaptchaHard();
-        openModal("error", "Ошибка", msg);
-        return;
-      }
-
-      setBusy(false);
-      clearBanner();
-
-      openModal("success", "Пароль изменён", payload?.message || json?.message || "✅ Пароль успешно изменён! Теперь войдите в систему.");
-
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        cache: "no-store",
-      }).catch(() => null);
-
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 2500);
-    } catch (e: any) {
-      setBusy(false);
-      clearBanner();
-      resetCaptchaHard();
-
-      openModal(
-        "error",
-        "Ошибка",
-        "Не удалось обновить пароль.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n\nДетали: " +
-          (e?.message || String(e)),
-      );
-    }
-  }
-
-  const showTopBanner = bannerType === "warning" && !!bannerText;
-
-  return (
-    <div className="page-update-password">
-      {modalOpen ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="upd-modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeModal();
-          }}
-        >
-          <div className="upd-modal">
-            <div className="upd-modal-header">
-              <div className="upd-modal-title">
-                {modalKind === "success" ? "✅ " : modalKind === "error" ? "❌ " : "⚠️ "}
-                {modalTitle}
-              </div>
-              <button type="button" className="upd-modal-close" onClick={closeModal} aria-label="Закрыть">
-                ✕
-              </button>
-            </div>
-
-            <div className="upd-modal-body">{modalBody}</div>
-
-            <div className="upd-modal-actions">
-              {modalKind === "error" || modalKind === "warning" ? (
-                <button
-                  type="button"
-                  className="btn btn-captcha-reload"
-                  onClick={() => {
-                    resetCaptchaHard();
-                    closeModal();
-                  }}
-                >
-                  Перезагрузить капчу
-                </button>
-              ) : null}
-
-              <button type="button" className="btn btn-primary" onClick={closeModal}>
-                Ок
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="upd-container">
-        <div className="upd-card">
-          <h2>Смена пароля</h2>
-
-          {showTopBanner ? (
-            <div className="warning" style={{ whiteSpace: "pre-line" }}>
-              {bannerText}
-            </div>
-          ) : null}
-
-          {!ready ? (
-            <div className="warning">⏳ Проверяем ссылку...</div>
-          ) : !hasSession ? (
-            <div className="info-box">
-              ℹ️ Чтобы сменить пароль, сначала запросите восстановление:
-              <div style={{ marginTop: 10 }}>
-                <Link className="btn btn-primary" href="/reset">
-                  Перейти к восстановлению
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <>
-              {!siteKey ? <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div> : null}
-
-              <div className="form-group">
-                <label htmlFor="password">Новый пароль:</label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Не менее 6 символов"
-                  autoComplete="new-password"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="confirm">Повторите пароль:</label>
-                <input
-                  id="confirm"
-                  type="password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  placeholder="Повторите пароль"
-                  autoComplete="new-password"
-                />
-              </div>
-
-              {siteKey ? (
-                <>
-                  <TurnstileWidget
-                    siteKey={siteKey}
-                    action="update_password"
-                    reloadNonce={reloadNonce}
-                    onToken={(t) => setCaptchaToken(t)}
-                  />
-
-                  {!captchaToken ? (
-                    <div className="captcha-hint">
-                      🧩 <strong>Если вы не видите капчу</strong> — нажмите <strong>«Перезагрузить капчу»</strong>.
-                      <br />
-                      Если не помогло: обновите страницу.
-                    </div>
-                  ) : null}
-
-                  <button type="button" className="btn btn-captcha-reload" disabled={false} onClick={() => resetCaptchaHard()}>
-                    Перезагрузить капчу
-                  </button>
-                </>
-              ) : null}
-
-              <button className="btn btn-primary" disabled={!canSubmit} onClick={() => void onUpdate()}>
-                {busy ? "Сохраняем..." : "Сменить пароль"}
-              </button>
-
-              <div className="link" style={{ marginTop: 16 }}>
-                <p>
-                  Вернуться ко входу: <Link href="/login">Войти</Link>
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 }
 </file>
 
@@ -35872,104 +35970,6 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
-<file path="app/api/auth/request-password-reset/route.ts">
-// app/api/auth/request-password-reset/route.ts
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { ok, fail } from "@/lib/api/response";
-import { verifyTurnstileToken } from "@/lib/security/turnstile";
-import { isAllowedRedirectUrl } from "@/lib/api/validate";
-
-function isValidEmail(email: string) {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(email);
-}
-
-function getRemoteIp(req: Request): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]?.trim() || null;
-  const xr = req.headers.get("x-real-ip");
-  return xr || null;
-}
-
-function getAppUrl(req: Request): string | null {
-  const envUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
-  if (envUrl) return envUrl.replace(/\/$/, "");
-
-  const proto = req.headers.get("x-forwarded-proto") || "http";
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  if (!host) return null;
-  return `${proto}://${host}`;
-}
-
-export async function POST(req: Request) {
-  try {
-    const body = (await req.json().catch(() => null)) as
-      | { email?: string; captchaToken?: string }
-      | null;
-
-    if (!body) return fail("Bad request", 400, "BAD_REQUEST");
-
-    const email = String(body.email ?? "").trim().toLowerCase();
-    const captchaToken = String(body.captchaToken ?? "");
-
-    const captcha = await verifyTurnstileToken({
-      token: captchaToken,
-      expectedAction: "reset_request",
-      remoteIp: getRemoteIp(req) ?? undefined,
-    });
-
-    if (!captcha.ok) {
-      return fail("Капча не пройдена", 400, captcha.code);
-    }
-
-    if (!email || !isValidEmail(email)) {
-      return fail("Неверный формат email", 400, "VALIDATION");
-    }
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !anon) return fail("Supabase env missing", 500, "ENV_MISSING");
-
-    // Build redirect URL and validate it to prevent open redirect
-    let redirectTo: string | undefined;
-    const appUrl = getAppUrl(req);
-    if (appUrl) {
-      const fullRedirect = `${appUrl}/update-password`;
-      if (isAllowedRedirectUrl(fullRedirect)) {
-        redirectTo = fullRedirect;
-      } else {
-        // fallback: use only relative path if domain is not allowed
-        redirectTo = "/update-password";
-      }
-    }
-
-    const supabaseAnon = createClient(url, anon, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    });
-
-    const { error } = await supabaseAnon.auth.resetPasswordForEmail(email, {
-      ...(redirectTo ? { redirectTo } : {}),
-    });
-
-    // Не раскрываем существование email
-    if (error) {
-      return ok({
-        message:
-          "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\nПроверьте папку Входящие/Спам.",
-      });
-    }
-
-    return ok({
-      message:
-        "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\nПроверьте папку Входящие/Спам.",
-    });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
-  }
-}
-</file>
-
 <file path="app/api/requests/delete/route.ts">
 // app/api/requests/delete/route.ts
 import { NextRequest } from "next/server";
@@ -36423,660 +36423,6 @@ export default function PortalCard({ project, index }: PortalCardProps) {
       </div>
     </Link>
   );
-}
-</file>
-
-<file path="lib/assignments/scoring.ts">
-// lib/assignments/scoring.ts
-import type { FinalStats, ReviewItem, TestOption, MatchingPair } from "./types";
-
-// ---------------------------------------------------------------------------
-// Нормализация текста (Единая для клиента и сервера)
-// ---------------------------------------------------------------------------
-export function normalizeText(text: any): string {
-  if (!text) return "";
-  let normalized = String(text).toLowerCase().trim();
-  normalized = normalized.normalize("NFC");
-  normalized = normalized.replace(/ё/g, "е");
-  normalized = normalized.replace(/[''`´’‘]/g, "'");
-  normalized = normalized.replace(/\s*'\s*/g, "'");
-  normalized = normalized.replace(/\s+/g, " ");
-
-  const hasLatin = /[a-z]/.test(normalized);
-  const hasCyrillic = /[а-я]/.test(normalized);
-  if (hasLatin && hasCyrillic) {
-    const cyrillicToLatin: Record<string, string> = {
-      'а': 'a', 'с': 'c', 'е': 'e', 'о': 'o', 'р': 'p', 'х': 'x', 'у': 'y'
-    };
-    const latinToCyrillic: Record<string, string> = {
-      'a': 'а', 'c': 'с', 'e': 'е', 'o': 'о', 'p': 'р', 'x': 'х', 'y': 'у'
-    };
-    const latinCount = (normalized.match(/[a-z]/g) || []).length;
-    const cyrillicCount = (normalized.match(/[а-я]/g) || []).length;
-    if (latinCount >= cyrillicCount) {
-      normalized = normalized.replace(/[асеорху]/g, match => cyrillicToLatin[match] || match);
-    } else {
-      normalized = normalized.replace(/[aceopxy]/g, match => latinToCyrillic[match] || match);
-    }
-  }
-  return normalized;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-export function ensureArray(val: any): any[] {
-  if (val === null || val === undefined || val === "") return [];
-  if (Array.isArray(val)) return val;
-  if (typeof val === "string") {
-    try {
-      const parsed = JSON.parse(val);
-      if (Array.isArray(parsed)) return parsed;
-      if (typeof parsed === "object" && parsed !== null) {
-        return Object.keys(parsed).sort().map(k => parsed[k]);
-      }
-    } catch (e) {
-      return [val];
-    }
-    return [val];
-  }
-  if (typeof val === "object") {
-    return Object.keys(val).sort().map(k => val[k]);
-  }
-  return [val];
-}
-
-export function extractCorrectValue(v: any): string {
-  if (v === null || v === undefined || v === "") return "";
-  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
-    return String(v);
-  }
-  if (typeof v === "object") {
-    if (Array.isArray(v)) {
-      return v.map(extractCorrectValue).filter(Boolean).join(" или ");
-    }
-    if ("text" in v && v.text) return String(v.text);
-    if ("value" in v && v.value) return String(v.value);
-    if ("answer" in v && v.answer) return String(v.answer);
-    if ("label" in v && v.label) return String(v.label);
-    if ("word" in v && v.word) return String(v.word);
-    if ("correct" in v && v.correct) return String(v.correct);
-    if ("variants" in v && v.variants) return extractCorrectValue(v.variants);
-    
-    return JSON.stringify(v);
-  }
-  return String(v);
-}
-
-function buildCorrectStrings(arr: any[]): string[] {
-  return ensureArray(arr).map((variants: any) => {
-    const vArr = ensureArray(variants);
-    const text = vArr.map(extractCorrectValue).filter(Boolean).join(" или ");
-    return text || "Ответ не задан";
-  });
-}
-
-function getPointsTotal(q: any): number {
-  const p = Number(q?.points);
-  return Number.isFinite(p) && p > 0 ? p : 1;
-}
-
-function buildParts(correctAnswers: any[], userArr: string[], totalCount: number) {
-  const parts: any[] = [];
-  for (let idx = 0; idx < totalCount; idx++) {
-    const variants = correctAnswers[idx];
-    const userRaw = String(userArr[idx] ?? "");
-    const userNorm = normalizeText(userRaw);
-
-    const variantsArray = ensureArray(variants);
-
-    const varsNorm = variantsArray.map((v: any) => {
-      return normalizeText(extractCorrectValue(v));
-    });
-
-    const ok = userNorm.length > 0 && varsNorm.some((v) => v === userNorm);
-
-    const correctDisplay = variantsArray
-      .map(extractCorrectValue)
-      .filter(Boolean)
-      .join(" или ");
-
-    parts.push({
-      index: idx,
-      isCorrect: ok,
-      user: userRaw,
-      correct: correctDisplay || "Ответ не задан", 
-    });
-  }
-  return parts;
-}
-
-function clampScore(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function safeFraction(earned: number, total: number): number {
-  if (total <= 0 || !Number.isFinite(earned) || !Number.isFinite(total)) return 0;
-  const f = earned / total;
-  return Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : 0;
-}
-
-// ---------------------------------------------------------------------------
-// Shared Logic (Решение багов #2, #4, #9)
-// ---------------------------------------------------------------------------
-
-// Единая логика расчета заполненности кроссворда
-export function getCrosswordStats(q: any, a: any) {
-  const grid = ensureArray(q.grid);
-  const blocks = ensureArray(q.blocks);
-  const words = ensureArray(q.words);
-  const userGrid = ensureArray(a);
-
-  const activeCells = new Set<string>();
-  for (const w of words) {
-    const len = Number(w?.length ?? 0);
-    const dir = w?.direction;
-    const start = w?.start;
-    if (!start || !dir || !Number.isFinite(len) || len <= 0) continue;
-    for (let step = 0; step < len; step++) {
-      const r = dir === "across" ? start.row : start.row + step;
-      const c = dir === "across" ? start.col + step : start.col;
-      activeCells.add(`${r},${c}`);
-    }
-  }
-
-  let totalActiveCells = activeCells.size;
-  let filledCells = 0;
-
-  for (const key of activeCells) {
-    const [r, c] = key.split(",").map(Number);
-    const userLetter = String(userGrid?.[r]?.[c] ?? "").trim();
-    if (userLetter !== "") filledCells++;
-  }
-
-  const percent = totalActiveCells > 0 ? Math.round((filledCells / totalActiveCells) * 100) : 0;
-  return { totalActiveCells, filledCells, percent };
-}
-
-// Единая логика проверки "отвечен ли вопрос"
-export function isQuestionAnswered(q: any, a: any): boolean {
-  if (!q || typeof q !== "object") return false;
-
-  if (q.type === "test") {
-    if (q.multiple) return ensureArray(a).length > 0;
-    return a !== undefined && a !== null && String(a).trim() !== "";
-  } 
-  
-  if (q.type === "fill") {
-    let correctAnswers = ensureArray(q.answers);
-    if (correctAnswers.length === 0) correctAnswers = ensureArray(q.correct);
-    const correctCount = correctAnswers.length;
-    const arrA = ensureArray(a);
-    return arrA.length >= correctCount && arrA.every((x: any) => String(x ?? "").trim() !== "");
-  } 
-  
-  if (q.type === "sentence") {
-    const gaps = (String(q.sentence || "").match(/___/g) || []).length;
-    const arrA = ensureArray(a);
-    return arrA.length >= gaps && arrA.every((x: any) => String(x ?? "").trim() !== "");
-  } 
-  
-  if (q.type === "complex" || q.type === "reading") {
-    const subQs = ensureArray(q.subQuestions);
-    const subAns = a && typeof a === "object" ? a : {};
-    if (subQs.length === 0) return true;
-    return subQs.every((sq, idx) => {
-      const subA = subAns[sq.id] !== undefined ? subAns[sq.id] : subAns[idx];
-      return isQuestionAnswered(sq, subA);
-    });
-  } 
-  
-  if (q.type === "matching") {
-    const pairs = ensureArray(q.pairs);
-    return a && typeof a === "object" && Object.keys(a).length === pairs.length;
-  } 
-  
-  if (q.type === "imagemap") {
-    const answersCount = ensureArray(q.answers).length;
-    return a && typeof a === "object" && Object.keys(a).length === answersCount;
-  }
-
-  if (q.type === "crossword") {
-    const stats = getCrosswordStats(q, a);
-    return stats.totalActiveCells > 0 && stats.filledCells === stats.totalActiveCells;
-  }
-
-  return false;
-}
-
-// ---------------------------------------------------------------------------
-// Validate
-// ---------------------------------------------------------------------------
-
-export function validateAllAnswered(
-  questions: any[],
-  answers: any
-): { ok: boolean; index: number; subIndex?: number } {
-  const qs = ensureArray(questions);
-  if (qs.length === 0) return { ok: true, index: -1 };
-
-  const safeAnswers = answers && typeof answers === "object" ? answers : {};
-
-  for (let i = 0; i < qs.length; i++) {
-    const q = qs[i];
-    if (!q || typeof q !== "object") continue;
-
-    // Решение бага #3: Приоритет ответа по ID, фолбэк на индекс (для старых прохождений)
-    const a = safeAnswers[q.id] !== undefined ? safeAnswers[q.id] : safeAnswers[i];
-
-    if (q.type === "complex" || q.type === "reading") {
-      const subQs = ensureArray(q.subQuestions);
-      const subRes = validateAllAnswered(subQs, a);
-      if (!subRes.ok) return { ok: false, index: i, subIndex: subRes.index };
-    } else {
-      if (!isQuestionAnswered(q, a)) {
-        return { ok: false, index: i };
-      }
-    }
-  }
-  return { ok: true, index: -1 };
-}
-
-// ---------------------------------------------------------------------------
-// Main Scoring Engine
-// ---------------------------------------------------------------------------
-
-export function calcAndBuildReview(
-  questions: any[],
-  answers: any
-): { stats: FinalStats; review: ReviewItem[] } {
-  const qs = ensureArray(questions);
-
-  if (qs.length === 0) {
-    return {
-      stats: { score: 0, correct: 0, incorrect: 0, skipped: 0, total: 0, pointsEarned: 0, pointsTotal: 0 },
-      review: [],
-    };
-  }
-
-  const safeAnswers = answers !== null && answers !== undefined && typeof answers === "object" ? answers : {};
-  const statsSum = { correct: 0, incorrect: 0, skipped: 0, total: 0, pointsEarned: 0, pointsTotal: 0 };
-  const review: ReviewItem[] = [];
-
-  function processQ(q: any, a: any, idxText: string): ReviewItem {
-    if (!q || typeof q !== "object") {
-      statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += 1;
-      return { type: "other", questionText: `Вопрос ${idxText}`, isCorrect: false, isSkipped: true, pointsEarned: 0, pointsTotal: 1 } as ReviewItem;
-    }
-
-    const questionText = String(q?.q ?? "").trim() || `Вопрос ${idxText}`;
-    const pointsTotal = getPointsTotal(q);
-    const media = ensureArray(q.media).length > 0 ? ensureArray(q.media) : undefined;
-
-    // ---------------------------------------------------------------
-    // COMPLEX / READING
-    // ---------------------------------------------------------------
-    if (q.type === "complex" || q.type === "reading") {
-      const subQs = ensureArray(q.subQuestions);
-      const subAns = a && typeof a === "object" ? a : {};
-
-      const subReviews: ReviewItem[] = [];
-      let earned = 0;
-      let total = 0;
-      let allSkipped = true;
-
-      subQs.forEach((sq: any, subI: number) => {
-        const subA = subAns[sq.id] !== undefined ? subAns[sq.id] : subAns[subI];
-        const sr = processQ(sq, subA, `${idxText}.${subI + 1}`);
-        subReviews.push(sr);
-        earned += Number.isFinite(sr.pointsEarned) ? sr.pointsEarned : 0;
-        total += Number.isFinite(sr.pointsTotal) ? sr.pointsTotal : 0;
-        if (!sr.isSkipped) allSkipped = false;
-      });
-
-      return {
-        type: q.type,
-        questionText,
-        isCorrect: total > 0 && earned >= total,
-        isSkipped: allSkipped,
-        pointsEarned: Number(earned.toFixed(2)),
-        pointsTotal: total,
-        subReviews,
-        media,
-        readingText: q.type === "reading" ? (q.text || "") : undefined
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // TEST
-    // ---------------------------------------------------------------
-    if (q.type === "test") {
-      const isMultiple = !!q.multiple;
-      const optionsArr = ensureArray(q.options);
-      
-      const options: TestOption[] = optionsArr.map((opt: any, idx: number) => {
-        if (typeof opt === "string") return { id: `opt-${idx}`, text: opt, media: [] };
-        return opt as TestOption;
-      });
-
-      const getOptText = (idx: number) => {
-        const opt = options[idx];
-        return opt ? (opt.text || `Вариант ${idx + 1}`) : "—";
-      };
-
-      let correctArr = ensureArray(q.correct);
-      if (correctArr.length === 0) correctArr = ensureArray(q.answer);
-
-      const correctLabels = correctArr.map((c: any) => getOptText(Number(c)));
-      const correctIndices = correctArr.map(Number);
-      const answered = isMultiple ? ensureArray(a).length > 0 : (a !== undefined && a !== null && a !== "");
-
-      if (!answered) {
-        statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
-        return {
-          type: "test", questionText, isCorrect: false, isSkipped: true,
-          userLabel: isMultiple ? [] : "Не отвечено", correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
-          userIndices: [], correctIndices, isMultiple, fraction: 0, pointsEarned: 0, pointsTotal, options, media,
-        } as ReviewItem;
-      }
-
-      let fraction = 0;
-      let userLabels: string | string[] = [];
-      let userArrForIndices: number[] = [];
-
-      if (isMultiple) {
-        const userArr = ensureArray(a).map(Number);
-        userArrForIndices = userArr;
-        userLabels = userArr.map((c: number) => getOptText(c));
-
-        const correctSet = new Set(correctIndices);
-        const userSet = new Set(userArr);
-        let correctSelected = 0, wrongSelected = 0;
-
-        userSet.forEach((val: number) => {
-          if (correctSet.has(val)) correctSelected++;
-          else wrongSelected++;
-        });
-
-        const totalCorrect = correctSet.size || 1;
-        // Решение бага #7: Штрафуем за неправильные варианты, чтобы не кликали "выбрать всё"
-        fraction = Math.max(0, correctSelected - wrongSelected) / totalCorrect;
-        fraction = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
-      } else {
-        const userIdx = Number(a);
-        userArrForIndices = [userIdx];
-        userLabels = getOptText(userIdx);
-        fraction = userIdx === correctIndices[0] ? 1 : 0;
-      }
-
-      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
-      const isCorrect = pointsEarned === pointsTotal;
-      
-      statsSum.pointsEarned += pointsEarned; statsSum.pointsTotal += pointsTotal; statsSum.total++;
-      if (isCorrect) statsSum.correct++; else statsSum.incorrect++;
-
-      return {
-        type: "test", questionText, isCorrect, isSkipped: false, userLabel: userLabels,
-        correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
-        userIndices: userArrForIndices, correctIndices, fraction, isMultiple, pointsEarned, pointsTotal, options, media,
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // FILL & SENTENCE 
-    // ---------------------------------------------------------------
-    if (q.type === "fill" || q.type === "sentence") {
-      let correctAnswers = ensureArray(q.answers);
-      if (correctAnswers.length === 0) correctAnswers = ensureArray(q.correct);
-
-      const isSentence = q.type === "sentence";
-      const totalCount = isSentence 
-        ? (String(q.sentence || "").match(/___/g) || []).length 
-        : correctAnswers.length;
-
-      const userArr: string[] = ensureArray(a).slice(0, totalCount).map((x) => String(x ?? ""));
-      const isSkipped = userArr.length === 0 || userArr.every(x => !x.trim());
-
-      const baseResult = {
-        type: q.type, questionText, pointsTotal, media,
-        sentenceTemplate: isSentence ? String(q.sentence || "") : undefined
-      };
-
-      if (totalCount === 0 || isSkipped) {
-        if (totalCount === 0) statsSum.incorrect++; else statsSum.skipped++;
-        statsSum.total++; statsSum.pointsTotal += pointsTotal;
-        return {
-          ...baseResult, isCorrect: false, isSkipped: totalCount > 0,
-          userAnswers: userArr, correctAnswers: buildCorrectStrings(correctAnswers),
-          parts: [], percent: 0, correctCount: 0, totalCount, pointsEarned: 0,
-        } as ReviewItem;
-      }
-
-      const parts = buildParts(correctAnswers, userArr, totalCount);
-      const correctCount = parts.filter((p) => p.isCorrect).length;
-      const fraction = safeFraction(correctCount, totalCount);
-      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
-
-      statsSum.pointsEarned += pointsEarned; statsSum.pointsTotal += pointsTotal; statsSum.total++;
-
-      const isAllCorrect = correctCount === totalCount;
-      if (isAllCorrect) statsSum.correct++; else statsSum.incorrect++;
-
-      return {
-        ...baseResult, isCorrect: isAllCorrect, isSkipped: false,
-        userAnswers: userArr, correctAnswers: buildCorrectStrings(correctAnswers),
-        parts, percent: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0,
-        correctCount, totalCount, pointsEarned,
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // MATCHING
-    // ---------------------------------------------------------------
-    if (q.type === "matching") {
-      const pairs = ensureArray(q.pairs);
-      const totalPairsCount = pairs.length;
-      const correctMatches: Record<string, string> = {};
-      const rightLabels: Record<string, string> = {};
-      const leftLabels: Record<string, string> = {};
-
-      pairs.forEach((p: any) => {
-        if (p?.id != null) {
-          correctMatches[String(p.id)] = String(p.id);
-          const getLabel = (item: any) => {
-            if (item?.text && String(item.text).trim()) return String(item.text).trim();
-            if (ensureArray(item?.media).length > 0) return item.media[0]?.name?.trim() || `Изображение`;
-            return `Элемент ${String(p.id)}`;
-          };
-          leftLabels[String(p.id)] = getLabel(p.left);
-          rightLabels[String(p.id)] = getLabel(p.right);
-        }
-      });
-
-      const answered = a && typeof a === "object" && Object.keys(a).length > 0;
-
-      if (!answered) {
-        statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
-        return {
-          type: "matching", questionText, isCorrect: false, isSkipped: true,
-          correctPairsCount: 0, totalPairsCount, userMatches: {}, correctMatches,
-          rightLabels, leftLabels, pairs, pointsEarned: 0, pointsTotal, media,
-        } as ReviewItem;
-      }
-
-      let correctPairsCount = 0;
-      const userMatches = a as Record<string, string>;
-
-      pairs.forEach((p: any) => {
-        if (p?.id != null) {
-          const key = String(p.id);
-          if (userMatches[key] === correctMatches[key]) correctPairsCount++;
-        }
-      });
-
-      const fraction = safeFraction(correctPairsCount, totalPairsCount);
-      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
-
-      statsSum.pointsEarned += pointsEarned; statsSum.pointsTotal += pointsTotal; statsSum.total++;
-      if (correctPairsCount === totalPairsCount) statsSum.correct++; else statsSum.incorrect++;
-
-      return {
-        type: "matching", questionText, isCorrect: correctPairsCount === totalPairsCount, isSkipped: false,
-        correctPairsCount, totalPairsCount, userMatches, correctMatches,
-        rightLabels, leftLabels, pairs, pointsEarned, pointsTotal, media,
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // IMAGEMAP
-    // ---------------------------------------------------------------
-    if (q.type === "imagemap") {
-      const answersArr = ensureArray(q.answers);
-      const pointsArr = ensureArray(q.points);
-      const totalPairsCount = answersArr.length;
-
-      const correctMatches: Record<string, string> = {};
-      const answerLabels: Record<string, string> = {};
-      const pointLabels: Record<string, string> = {};
-
-      for (const ans of answersArr) {
-        const point = pointsArr.find((p: any) => p.correctAnswerId === ans.id);
-        if (point) correctMatches[ans.id] = point.id;
-        
-        if (ans.text && String(ans.text).trim()) answerLabels[ans.id] = String(ans.text).trim();
-        else if (ensureArray(ans.media).length > 0) answerLabels[ans.id] = ans.media[0]?.name?.trim() || `Ответ`;
-        else answerLabels[ans.id] = `Ответ #${ans.id}`;
-      }
-
-      for (const point of pointsArr) {
-        pointLabels[point.id] = point.label || `Точка ${point.id}`;
-      }
-
-      const userMatches = (a && typeof a === "object" ? a : {}) as Record<string, string>;
-      const answered = Object.keys(userMatches).length > 0;
-
-      if (!answered) {
-        statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
-        return {
-          type: "imagemap", questionText, isCorrect: false, isSkipped: true,
-          correctPairsCount: 0, totalPairsCount, userMatches: {}, correctMatches,
-          answerLabels, pointLabels, imageUrl: q.image || "", points: pointsArr, answers: answersArr,
-          pointsEarned: 0, pointsTotal, media,
-        } as ReviewItem;
-      }
-
-      let correctPairsCount = 0;
-      for (const ans of answersArr) {
-        if (userMatches[ans.id] === correctMatches[ans.id]) correctPairsCount++;
-      }
-
-      const fraction = safeFraction(correctPairsCount, totalPairsCount);
-      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
-
-      statsSum.pointsEarned += pointsEarned; statsSum.pointsTotal += pointsTotal; statsSum.total++;
-      if (correctPairsCount === totalPairsCount) statsSum.correct++; else statsSum.incorrect++;
-
-      return {
-        type: "imagemap", questionText, isCorrect: correctPairsCount === totalPairsCount, isSkipped: false,
-        correctPairsCount, totalPairsCount, userMatches, correctMatches,
-        answerLabels, pointLabels, imageUrl: q.image || "", points: pointsArr, answers: answersArr,
-        pointsEarned, pointsTotal, media,
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // CROSSWORD
-    // ---------------------------------------------------------------
-    if (q.type === "crossword") {
-      const grid: string[][] = ensureArray(q.grid);
-      const words: any[] = ensureArray(q.words);
-      const blocks: any[] = ensureArray(q.blocks);
-      const cellNumbers: Record<string, number> = q.cellNumbers || {};
-      const userGrid = ensureArray(a);
-
-      const stats = getCrosswordStats(q, a);
-
-      const correctWords: Array<{ number: number; direction: string; word: string }> = [];
-      const wrongWords: Array<{ number: number; direction: string; user: string; correct: string }> = [];
-      let totalWords = words.length;
-
-      for (const w of words) {
-        if (!w || typeof w !== "object") continue;
-        const number = Number(w.number ?? 0);
-        const dir = String(w.direction ?? "");
-        const start = w.start as { row: number; col: number } | undefined;
-        const len = Number(w.length ?? 0);
-
-        if (!start || !Number.isFinite(len) || len <= 0) continue;
-
-        let correctWord = "";
-        let userWord = "";
-
-        for (let i = 0; i < len; i++) {
-          const r = dir === "across" ? start.row : start.row + i;
-          const c = dir === "across" ? start.col + i : start.col;
-
-          correctWord += String(ensureArray(grid[r])[c] ?? "");
-          userWord += String(ensureArray(userGrid[r])[c] ?? "").trim();
-        }
-
-        const isCorrect = userWord.toUpperCase() === correctWord.toUpperCase() && userWord !== "";
-
-        if (isCorrect) {
-          correctWords.push({ number, direction: dir, word: correctWord.toUpperCase() });
-        } else {
-          wrongWords.push({ number, direction: dir, user: userWord || "(пусто)", correct: correctWord.toUpperCase() });
-        }
-      }
-
-      const answered = stats.filledCells > 0;
-      let correctPairsCount = correctWords.length;
-      let fraction = safeFraction(correctPairsCount, totalWords);
-      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
-      
-      statsSum.pointsEarned += pointsEarned; statsSum.pointsTotal += pointsTotal; statsSum.total++;
-
-      if (correctPairsCount === totalWords && totalWords > 0) statsSum.correct++;
-      else if (answered) statsSum.incorrect++;
-      else statsSum.skipped++;
-
-      return {
-        type: "crossword", questionText, isCorrect: correctPairsCount === totalWords && totalWords > 0, isSkipped: !answered,
-        pointsEarned, pointsTotal, note: answered ? `Правильно слов: ${correctPairsCount} из ${totalWords}` : "Кроссворд не заполнен",
-        crosswordStats: { filled: stats.filledCells, total: stats.totalActiveCells, percent: stats.percent },
-        wordReview: { wrong: wrongWords, correct: correctWords },
-        grid, userGrid: (userGrid as string[][]) || [], cellNumbers, blocks, words, media,
-      } as ReviewItem;
-    }
-
-    // ---------------------------------------------------------------
-    // OTHER
-    // ---------------------------------------------------------------
-    statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
-    
-    return {
-      type: "other", questionText, isCorrect: false, isSkipped: true,
-      note: "Тип вопроса пока не поддержан в стандартном Review.",
-      pointsEarned: 0, pointsTotal, media,
-    } as ReviewItem;
-  }
-
-  qs.forEach((q, i) => {
-    const userAns = safeAnswers[q.id] !== undefined ? safeAnswers[q.id] : safeAnswers[i];
-    review.push(processQ(q, userAns, String(i + 1)));
-  });
-
-  const score = clampScore(safeFraction(statsSum.pointsEarned, statsSum.pointsTotal) * 100);
-
-  return {
-    stats: {
-      score, correct: statsSum.correct, incorrect: statsSum.incorrect, skipped: statsSum.skipped,
-      total: statsSum.total, pointsEarned: Number(statsSum.pointsEarned.toFixed(2)), pointsTotal: statsSum.pointsTotal,
-    },
-    review,
-  };
 }
 </file>
 
@@ -41557,6 +40903,638 @@ export default function AppHeader({
       </div>
     </header>
   );
+}
+</file>
+
+<file path="lib/assignments/scoring.ts">
+// lib/assignments/scoring.ts
+import type { FinalStats, ReviewItem, TestOption, MatchingPair } from "./types";
+
+// ---------------------------------------------------------------------------
+// Нормализация текста (Единая для клиента и сервера)
+// ---------------------------------------------------------------------------
+export function normalizeText(text: any): string {
+  if (!text) return "";
+  let normalized = String(text).toLowerCase().trim();
+  normalized = normalized.normalize("NFC");
+  normalized = normalized.replace(/ё/g, "е");
+  normalized = normalized.replace(/[''`´’‘]/g, "'");
+  normalized = normalized.replace(/\s*'\s*/g, "'");
+  normalized = normalized.replace(/\s+/g, " ");
+
+  // ИСПРАВЛЕНИЕ (Баг #4 - Омоглифы):
+  // Убрана зависимость от подсчета большинства символов.
+  // Теперь все кириллические омоглифы ЖЕСТКО приводятся к латинским.
+  // Это гарантирует 100% совпадение, даже если админ сохранил "Stage-А" (с кириллической А), 
+  // а ученик ввел "Stage-A" (с латинской).
+  const homoglyphs: Record<string, string> = {
+    'а': 'a', 'с': 'c', 'е': 'e', 'о': 'o', 'р': 'p', 'х': 'x', 'у': 'y'
+  };
+  normalized = normalized.replace(/[асеорху]/g, match => homoglyphs[match] || match);
+
+  return normalized;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+export function ensureArray(val: any): any[] {
+  if (val === null || val === undefined || val === "") return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+      if (typeof parsed === "object" && parsed !== null) {
+        return Object.keys(parsed).sort().map(k => parsed[k]);
+      }
+    } catch (e) {
+      return [val];
+    }
+    return [val];
+  }
+  if (typeof val === "object") {
+    return Object.keys(val).sort().map(k => val[k]);
+  }
+  return [val];
+}
+
+export function extractCorrectValue(v: any): string {
+  if (v === null || v === undefined || v === "") return "";
+  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+    return String(v);
+  }
+  if (typeof v === "object") {
+    if (Array.isArray(v)) {
+      return v.map(extractCorrectValue).filter(Boolean).join(" или ");
+    }
+    if ("text" in v && v.text) return String(v.text);
+    if ("value" in v && v.value) return String(v.value);
+    if ("answer" in v && v.answer) return String(v.answer);
+    if ("label" in v && v.label) return String(v.label);
+    if ("word" in v && v.word) return String(v.word);
+    if ("correct" in v && v.correct) return String(v.correct);
+    if ("variants" in v && v.variants) return extractCorrectValue(v.variants);
+    
+    return JSON.stringify(v);
+  }
+  return String(v);
+}
+
+function buildCorrectStrings(arr: any[]): string[] {
+  return ensureArray(arr).map((variants: any) => {
+    const vArr = ensureArray(variants);
+    const text = vArr.map(extractCorrectValue).filter(Boolean).join(" или ");
+    return text || "Ответ не задан";
+  });
+}
+
+function getPointsTotal(q: any): number {
+  const p = Number(q?.points);
+  return Number.isFinite(p) && p > 0 ? p : 1;
+}
+
+function buildParts(correctAnswers: any[], userArr: string[], totalCount: number) {
+  const parts: any[] = [];
+  for (let idx = 0; idx < totalCount; idx++) {
+    const variants = correctAnswers[idx];
+    const userRaw = String(userArr[idx] ?? "");
+    const userNorm = normalizeText(userRaw);
+
+    const variantsArray = ensureArray(variants);
+
+    const varsNorm = variantsArray.map((v: any) => {
+      return normalizeText(extractCorrectValue(v));
+    });
+
+    const ok = userNorm.length > 0 && varsNorm.some((v) => v === userNorm);
+
+    const correctDisplay = variantsArray
+      .map(extractCorrectValue)
+      .filter(Boolean)
+      .join(" или ");
+
+    parts.push({
+      index: idx,
+      isCorrect: ok,
+      user: userRaw,
+      correct: correctDisplay || "Ответ не задан", 
+    });
+  }
+  return parts;
+}
+
+function clampScore(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function safeFraction(earned: number, total: number): number {
+  if (total <= 0 || !Number.isFinite(earned) || !Number.isFinite(total)) return 0;
+  const f = earned / total;
+  return Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Shared Logic
+// ---------------------------------------------------------------------------
+
+export function getCrosswordStats(q: any, a: any) {
+  const words = ensureArray(q.words);
+  const userGrid = ensureArray(a);
+
+  const activeCells = new Set<string>();
+  for (const w of words) {
+    const len = Number(w?.length ?? 0);
+    const dir = w?.direction;
+    const start = w?.start;
+    if (!start || !dir || !Number.isFinite(len) || len <= 0) continue;
+    for (let step = 0; step < len; step++) {
+      const r = dir === "across" ? start.row : start.row + step;
+      const c = dir === "across" ? start.col + step : start.col;
+      activeCells.add(`${r},${c}`);
+    }
+  }
+
+  let totalActiveCells = activeCells.size;
+  let filledCells = 0;
+
+  for (const key of activeCells) {
+    const [r, c] = key.split(",").map(Number);
+    const userLetter = String(userGrid?.[r]?.[c] ?? "").trim();
+    if (userLetter !== "") filledCells++;
+  }
+
+  const percent = totalActiveCells > 0 ? Math.round((filledCells / totalActiveCells) * 100) : 0;
+  return { totalActiveCells, filledCells, percent };
+}
+
+export function isQuestionAnswered(q: any, a: any): boolean {
+  if (!q || typeof q !== "object") return false;
+
+  if (q.type === "test") {
+    if (q.multiple) return ensureArray(a).length > 0;
+    return a !== undefined && a !== null && String(a).trim() !== "";
+  } 
+  
+  if (q.type === "fill") {
+    let correctAnswers = ensureArray(q.answers);
+    if (correctAnswers.length === 0) correctAnswers = ensureArray(q.correct);
+    const correctCount = correctAnswers.length;
+    const arrA = ensureArray(a);
+    return arrA.length >= correctCount && arrA.every((x: any) => String(x ?? "").trim() !== "");
+  } 
+  
+  if (q.type === "sentence") {
+    const gaps = (String(q.sentence || "").match(/___/g) || []).length;
+    const arrA = ensureArray(a);
+    return arrA.length >= gaps && arrA.every((x: any) => String(x ?? "").trim() !== "");
+  } 
+  
+  if (q.type === "complex" || q.type === "reading") {
+    const subQs = ensureArray(q.subQuestions);
+    const subAns = a && typeof a === "object" ? a : {};
+    if (subQs.length === 0) return true;
+    return subQs.every((sq, idx) => {
+      const subA = subAns[sq.id] !== undefined ? subAns[sq.id] : subAns[idx];
+      return isQuestionAnswered(sq, subA);
+    });
+  } 
+  
+  if (q.type === "matching") {
+    const pairs = ensureArray(q.pairs);
+    return a && typeof a === "object" && Object.keys(a).length === pairs.length;
+  } 
+  
+  if (q.type === "imagemap") {
+    const answersCount = ensureArray(q.answers).length;
+    return a && typeof a === "object" && Object.keys(a).length === answersCount;
+  }
+
+  if (q.type === "crossword") {
+    const stats = getCrosswordStats(q, a);
+    return stats.totalActiveCells > 0 && stats.filledCells === stats.totalActiveCells;
+  }
+
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Validate
+// ---------------------------------------------------------------------------
+
+export function validateAllAnswered(
+  questions: any[],
+  answers: any
+): { ok: boolean; index: number; subIndex?: number } {
+  const qs = ensureArray(questions);
+  if (qs.length === 0) return { ok: true, index: -1 };
+
+  const safeAnswers = answers && typeof answers === "object" ? answers : {};
+
+  for (let i = 0; i < qs.length; i++) {
+    const q = qs[i];
+    if (!q || typeof q !== "object") continue;
+
+    const a = safeAnswers[q.id] !== undefined ? safeAnswers[q.id] : safeAnswers[i];
+
+    if (q.type === "complex" || q.type === "reading") {
+      const subQs = ensureArray(q.subQuestions);
+      const subRes = validateAllAnswered(subQs, a);
+      if (!subRes.ok) return { ok: false, index: i, subIndex: subRes.index };
+    } else {
+      if (!isQuestionAnswered(q, a)) {
+        return { ok: false, index: i };
+      }
+    }
+  }
+  return { ok: true, index: -1 };
+}
+
+// ---------------------------------------------------------------------------
+// Main Scoring Engine
+// ---------------------------------------------------------------------------
+
+export function calcAndBuildReview(
+  questions: any[],
+  answers: any
+): { stats: FinalStats; review: ReviewItem[] } {
+  const qs = ensureArray(questions);
+
+  if (qs.length === 0) {
+    return {
+      stats: { score: 0, correct: 0, incorrect: 0, skipped: 0, total: 0, pointsEarned: 0, pointsTotal: 0 },
+      review: [],
+    };
+  }
+
+  const safeAnswers = answers !== null && answers !== undefined && typeof answers === "object" ? answers : {};
+  const statsSum = { correct: 0, incorrect: 0, skipped: 0, total: 0, pointsEarned: 0, pointsTotal: 0 };
+  const review: ReviewItem[] = [];
+
+  function processQ(q: any, a: any, idxText: string): ReviewItem {
+    if (!q || typeof q !== "object") {
+      statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += 1;
+      return { type: "other", questionText: `Вопрос ${idxText}`, isCorrect: false, isSkipped: true, pointsEarned: 0, pointsTotal: 1 } as ReviewItem;
+    }
+
+    const questionText = String(q?.q ?? "").trim() || `Вопрос ${idxText}`;
+    const pointsTotal = getPointsTotal(q);
+    const media = ensureArray(q.media).length > 0 ? ensureArray(q.media) : undefined;
+
+    // COMPLEX / READING
+    if (q.type === "complex" || q.type === "reading") {
+      const subQs = ensureArray(q.subQuestions);
+      const subAns = a && typeof a === "object" ? a : {};
+
+      const subReviews: ReviewItem[] = [];
+      let earned = 0;
+      let total = 0;
+      let allSkipped = true;
+
+      subQs.forEach((sq: any, subI: number) => {
+        const subA = subAns[sq.id] !== undefined ? subAns[sq.id] : subAns[subI];
+        const sr = processQ(sq, subA, `${idxText}.${subI + 1}`);
+        subReviews.push(sr);
+        earned += Number.isFinite(sr.pointsEarned) ? sr.pointsEarned : 0;
+        total += Number.isFinite(sr.pointsTotal) ? sr.pointsTotal : 0;
+        if (!sr.isSkipped) allSkipped = false;
+      });
+
+      return {
+        type: q.type,
+        questionText,
+        isCorrect: total > 0 && earned >= total,
+        isSkipped: allSkipped,
+        pointsEarned: Number(earned.toFixed(2)),
+        pointsTotal: total,
+        subReviews,
+        media,
+        readingText: q.type === "reading" ? (q.text || "") : undefined
+      } as ReviewItem;
+    }
+
+    // TEST
+    if (q.type === "test") {
+      const isMultiple = !!q.multiple;
+      const optionsArr = ensureArray(q.options);
+      
+      const options: TestOption[] = optionsArr.map((opt: any, idx: number) => {
+        if (typeof opt === "string") return { id: `opt-${idx}`, text: opt, media: [] };
+        return opt as TestOption;
+      });
+
+      const getOptText = (idx: number) => {
+        const opt = options[idx];
+        return opt ? (opt.text || `Вариант ${idx + 1}`) : "—";
+      };
+
+      let correctArr = ensureArray(q.correct);
+      if (correctArr.length === 0) correctArr = ensureArray(q.answer);
+
+      const correctLabels = correctArr.map((c: any) => getOptText(Number(c)));
+      const correctIndices = correctArr.map(Number);
+      const answered = isMultiple ? ensureArray(a).length > 0 : (a !== undefined && a !== null && a !== "");
+
+      if (!answered) {
+        statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
+        return {
+          type: "test", questionText, isCorrect: false, isSkipped: true,
+          userLabel: isMultiple ? [] : "Не отвечено", correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
+          userIndices: [], correctIndices, isMultiple, fraction: 0, pointsEarned: 0, pointsTotal, options, media,
+        } as ReviewItem;
+      }
+
+      let fraction = 0;
+      let userLabels: string | string[] = [];
+      let userArrForIndices: number[] = [];
+
+      if (isMultiple) {
+        const userArr = ensureArray(a).map(Number);
+        userArrForIndices = userArr;
+        userLabels = userArr.map((c: number) => getOptText(c));
+
+        const correctSet = new Set(correctIndices);
+        const userSet = new Set(userArr);
+        let correctSelected = 0, wrongSelected = 0;
+
+        userSet.forEach((val: number) => {
+          if (correctSet.has(val)) correctSelected++;
+          else wrongSelected++;
+        });
+
+        const totalCorrect = correctSet.size || 1;
+        
+        // ИСПРАВЛЕНИЕ (Баг #2 - Штрафы за ответы):
+        // Заменяем жесткое вычитание (correctSelected - wrongSelected) / totalCorrect
+        // на пропорциональный штраф. Ошибочный клик просто размывает вес правильных ответов,
+        // не уводя балл в глубокий минус, при этом защищает от читерского "выбрать всё".
+        fraction = correctSelected / (totalCorrect + wrongSelected);
+        fraction = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
+      } else {
+        const userIdx = Number(a);
+        userArrForIndices = [userIdx];
+        userLabels = getOptText(userIdx);
+        fraction = userIdx === correctIndices[0] ? 1 : 0;
+      }
+
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+      const isCorrect = pointsEarned === pointsTotal;
+      
+      statsSum.pointsEarned += pointsEarned; statsSum.pointsTotal += pointsTotal; statsSum.total++;
+      if (isCorrect) statsSum.correct++; else statsSum.incorrect++;
+
+      return {
+        type: "test", questionText, isCorrect, isSkipped: false, userLabel: userLabels,
+        correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
+        userIndices: userArrForIndices, correctIndices, fraction, isMultiple, pointsEarned, pointsTotal, options, media,
+      } as ReviewItem;
+    }
+
+    // FILL & SENTENCE 
+    if (q.type === "fill" || q.type === "sentence") {
+      let correctAnswers = ensureArray(q.answers);
+      if (correctAnswers.length === 0) correctAnswers = ensureArray(q.correct);
+
+      const isSentence = q.type === "sentence";
+      const totalCount = isSentence 
+        ? (String(q.sentence || "").match(/___/g) || []).length 
+        : correctAnswers.length;
+
+      const userArr: string[] = ensureArray(a).slice(0, totalCount).map((x) => String(x ?? ""));
+      const isSkipped = userArr.length === 0 || userArr.every(x => !x.trim());
+
+      const baseResult = {
+        type: q.type, questionText, pointsTotal, media,
+        sentenceTemplate: isSentence ? String(q.sentence || "") : undefined
+      };
+
+      if (totalCount === 0 || isSkipped) {
+        if (totalCount === 0) statsSum.incorrect++; else statsSum.skipped++;
+        statsSum.total++; statsSum.pointsTotal += pointsTotal;
+        return {
+          ...baseResult, isCorrect: false, isSkipped: totalCount > 0,
+          userAnswers: userArr, correctAnswers: buildCorrectStrings(correctAnswers),
+          parts: [], percent: 0, correctCount: 0, totalCount, pointsEarned: 0,
+        } as ReviewItem;
+      }
+
+      const parts = buildParts(correctAnswers, userArr, totalCount);
+      const correctCount = parts.filter((p) => p.isCorrect).length;
+      const fraction = safeFraction(correctCount, totalCount);
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+
+      statsSum.pointsEarned += pointsEarned; statsSum.pointsTotal += pointsTotal; statsSum.total++;
+
+      const isAllCorrect = correctCount === totalCount;
+      if (isAllCorrect) statsSum.correct++; else statsSum.incorrect++;
+
+      return {
+        ...baseResult, isCorrect: isAllCorrect, isSkipped: false,
+        userAnswers: userArr, correctAnswers: buildCorrectStrings(correctAnswers),
+        parts, percent: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0,
+        correctCount, totalCount, pointsEarned,
+      } as ReviewItem;
+    }
+
+    // MATCHING
+    if (q.type === "matching") {
+      const pairs = ensureArray(q.pairs);
+      const totalPairsCount = pairs.length;
+      const correctMatches: Record<string, string> = {};
+      const rightLabels: Record<string, string> = {};
+      const leftLabels: Record<string, string> = {};
+
+      pairs.forEach((p: any) => {
+        if (p?.id != null) {
+          correctMatches[String(p.id)] = String(p.id);
+          const getLabel = (item: any) => {
+            if (item?.text && String(item.text).trim()) return String(item.text).trim();
+            if (ensureArray(item?.media).length > 0) return item.media[0]?.name?.trim() || `Изображение`;
+            return `Элемент ${String(p.id)}`;
+          };
+          leftLabels[String(p.id)] = getLabel(p.left);
+          rightLabels[String(p.id)] = getLabel(p.right);
+        }
+      });
+
+      const answered = a && typeof a === "object" && Object.keys(a).length > 0;
+
+      if (!answered) {
+        statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
+        return {
+          type: "matching", questionText, isCorrect: false, isSkipped: true,
+          correctPairsCount: 0, totalPairsCount, userMatches: {}, correctMatches,
+          rightLabels, leftLabels, pairs, pointsEarned: 0, pointsTotal, media,
+        } as ReviewItem;
+      }
+
+      let correctPairsCount = 0;
+      const userMatches = a as Record<string, string>;
+
+      pairs.forEach((p: any) => {
+        if (p?.id != null) {
+          const key = String(p.id);
+          if (userMatches[key] === correctMatches[key]) correctPairsCount++;
+        }
+      });
+
+      const fraction = safeFraction(correctPairsCount, totalPairsCount);
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+
+      statsSum.pointsEarned += pointsEarned; statsSum.pointsTotal += pointsTotal; statsSum.total++;
+      if (correctPairsCount === totalPairsCount) statsSum.correct++; else statsSum.incorrect++;
+
+      return {
+        type: "matching", questionText, isCorrect: correctPairsCount === totalPairsCount, isSkipped: false,
+        correctPairsCount, totalPairsCount, userMatches, correctMatches,
+        rightLabels, leftLabels, pairs, pointsEarned, pointsTotal, media,
+      } as ReviewItem;
+    }
+
+    // IMAGEMAP
+    if (q.type === "imagemap") {
+      const answersArr = ensureArray(q.answers);
+      const pointsArr = ensureArray(q.points);
+      const totalPairsCount = answersArr.length;
+
+      const correctMatches: Record<string, string> = {};
+      const answerLabels: Record<string, string> = {};
+      const pointLabels: Record<string, string> = {};
+
+      for (const ans of answersArr) {
+        const point = pointsArr.find((p: any) => p.correctAnswerId === ans.id);
+        if (point) correctMatches[ans.id] = point.id;
+        
+        if (ans.text && String(ans.text).trim()) answerLabels[ans.id] = String(ans.text).trim();
+        else if (ensureArray(ans.media).length > 0) answerLabels[ans.id] = ans.media[0]?.name?.trim() || `Ответ`;
+        else answerLabels[ans.id] = `Ответ #${ans.id}`;
+      }
+
+      for (const point of pointsArr) {
+        pointLabels[point.id] = point.label || `Точка ${point.id}`;
+      }
+
+      const userMatches = (a && typeof a === "object" ? a : {}) as Record<string, string>;
+      const answered = Object.keys(userMatches).length > 0;
+
+      if (!answered) {
+        statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
+        return {
+          type: "imagemap", questionText, isCorrect: false, isSkipped: true,
+          correctPairsCount: 0, totalPairsCount, userMatches: {}, correctMatches,
+          answerLabels, pointLabels, imageUrl: q.image || "", points: pointsArr, answers: answersArr,
+          pointsEarned: 0, pointsTotal, media,
+        } as ReviewItem;
+      }
+
+      let correctPairsCount = 0;
+      for (const ans of answersArr) {
+        if (userMatches[ans.id] === correctMatches[ans.id]) correctPairsCount++;
+      }
+
+      const fraction = safeFraction(correctPairsCount, totalPairsCount);
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+
+      statsSum.pointsEarned += pointsEarned; statsSum.pointsTotal += pointsTotal; statsSum.total++;
+      if (correctPairsCount === totalPairsCount) statsSum.correct++; else statsSum.incorrect++;
+
+      return {
+        type: "imagemap", questionText, isCorrect: correctPairsCount === totalPairsCount, isSkipped: false,
+        correctPairsCount, totalPairsCount, userMatches, correctMatches,
+        answerLabels, pointLabels, imageUrl: q.image || "", points: pointsArr, answers: answersArr,
+        pointsEarned, pointsTotal, media,
+      } as ReviewItem;
+    }
+
+    // CROSSWORD
+    if (q.type === "crossword") {
+      const grid: string[][] = ensureArray(q.grid);
+      const words: any[] = ensureArray(q.words);
+      const blocks: any[] = ensureArray(q.blocks);
+      const cellNumbers: Record<string, number> = q.cellNumbers || {};
+      const userGrid = ensureArray(a);
+
+      const stats = getCrosswordStats(q, a);
+
+      const correctWords: Array<{ number: number; direction: string; word: string }> = [];
+      const wrongWords: Array<{ number: number; direction: string; user: string; correct: string }> = [];
+      let totalWords = words.length;
+
+      for (const w of words) {
+        if (!w || typeof w !== "object") continue;
+        const number = Number(w.number ?? 0);
+        const dir = String(w.direction ?? "");
+        const start = w.start as { row: number; col: number } | undefined;
+        const len = Number(w.length ?? 0);
+
+        if (!start || !Number.isFinite(len) || len <= 0) continue;
+
+        let correctWord = "";
+        let userWord = "";
+
+        for (let i = 0; i < len; i++) {
+          const r = dir === "across" ? start.row : start.row + i;
+          const c = dir === "across" ? start.col + i : start.col;
+
+          correctWord += String(ensureArray(grid[r])[c] ?? "");
+          userWord += String(ensureArray(userGrid[r])[c] ?? "").trim();
+        }
+
+        const isCorrect = userWord.toUpperCase() === correctWord.toUpperCase() && userWord !== "";
+
+        if (isCorrect) {
+          correctWords.push({ number, direction: dir, word: correctWord.toUpperCase() });
+        } else {
+          wrongWords.push({ number, direction: dir, user: userWord || "(пусто)", correct: correctWord.toUpperCase() });
+        }
+      }
+
+      const answered = stats.filledCells > 0;
+      let correctPairsCount = correctWords.length;
+      let fraction = safeFraction(correctPairsCount, totalWords);
+      const pointsEarned = Number((fraction * pointsTotal).toFixed(2));
+      
+      statsSum.pointsEarned += pointsEarned; statsSum.pointsTotal += pointsTotal; statsSum.total++;
+
+      if (correctPairsCount === totalWords && totalWords > 0) statsSum.correct++;
+      else if (answered) statsSum.incorrect++;
+      else statsSum.skipped++;
+
+      return {
+        type: "crossword", questionText, isCorrect: correctPairsCount === totalWords && totalWords > 0, isSkipped: !answered,
+        pointsEarned, pointsTotal, note: answered ? `Правильно слов: ${correctPairsCount} из ${totalWords}` : "Кроссворд не заполнен",
+        crosswordStats: { filled: stats.filledCells, total: stats.totalActiveCells, percent: stats.percent },
+        wordReview: { wrong: wrongWords, correct: correctWords },
+        grid, userGrid: (userGrid as string[][]) || [], cellNumbers, blocks, words, media,
+      } as ReviewItem;
+    }
+
+    // OTHER
+    statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
+    
+    return {
+      type: "other", questionText, isCorrect: false, isSkipped: true,
+      note: "Тип вопроса пока не поддержан в стандартном Review.",
+      pointsEarned: 0, pointsTotal, media,
+    } as ReviewItem;
+  }
+
+  qs.forEach((q, i) => {
+    const userAns = safeAnswers[q.id] !== undefined ? safeAnswers[q.id] : safeAnswers[i];
+    review.push(processQ(q, userAns, String(i + 1)));
+  });
+
+  const score = clampScore(safeFraction(statsSum.pointsEarned, statsSum.pointsTotal) * 100);
+
+  return {
+    stats: {
+      score, correct: statsSum.correct, incorrect: statsSum.incorrect, skipped: statsSum.skipped,
+      total: statsSum.total, pointsEarned: Number(statsSum.pointsEarned.toFixed(2)), pointsTotal: statsSum.pointsTotal,
+    },
+    review,
+  };
 }
 </file>
 

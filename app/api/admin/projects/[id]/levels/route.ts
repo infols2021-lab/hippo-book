@@ -17,6 +17,7 @@ type LevelInput = {
   order_index?: number;
   description?: string | null;
   is_active?: boolean;
+  price?: number | null;
 };
 
 function isNonEmptyString(v: unknown): v is string {
@@ -117,6 +118,7 @@ export async function POST(
     order_index: typeof body.order_index === "number" ? body.order_index : 0,
     description: body.description ?? null,
     is_active: typeof body.is_active === "boolean" ? body.is_active : true,
+    price: typeof body.price === "number" ? body.price : null,
   });
 
   if (isNonEmptyString(body.id)) {

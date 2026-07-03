@@ -35,12 +35,10 @@ export type NormalizedRequest = {
 // ----------------------------------------------------------------------------
 
 export function normalizeRequestTargetLevels(value: unknown): string[] {
-  // Теперь все уровни (и Олимпиада, и Gatehouse, и кастомные) нормализуются одинаково
   return normalizeTargetLevels(value);
 }
 
 export function normalizeRequestMaterialKinds(value: unknown): string[] {
-  // Универсальная нормализация для любых типов материалов
   return uniqueStrings(toStringArray(value).map(v => normalizeMaterialKind(v)));
 }
 
@@ -57,7 +55,12 @@ export function normalizeRequestPayload(
   const branch_type = normalizeBranchType(body.branch_type ?? "olympiad");
   const class_level = normalizeNullableString(body.class_level);
   
-  const target_levels = normalizeRequestTargetLevels(body.target_levels ?? body.target_level);
+  // Умный фолбэк если пришел class_level но нет target_levels мы дублируем данные
+  // чтобы универсальная валидация проходила для всех проектов
+  const rawTargetLevels = body.target_levels ?? body.target_level;
+  const target_levels = normalizeRequestTargetLevels(
+    rawTargetLevels !== undefined ? rawTargetLevels : (class_level ? [class_level] : [])
+  );
   
   const textbook_types = normalizeRequestMaterialKinds(body.textbook_types ?? body.material_kinds);
   const material_kinds = normalizeRequestMaterialKinds(body.material_kinds ?? body.textbook_types);
@@ -106,7 +109,7 @@ export function generateRequestNumber(
 }
 
 // ----------------------------------------------------------------------------
-// Форматирование для Google Sheets (A:G) - ЗАМЕНЯЕТ УДАЛЕННЫЙ format.ts
+// Форматирование для Google Sheets (A:G)
 // ----------------------------------------------------------------------------
 
 export function formatDateTimeRU(dateString: string): string {
@@ -183,17 +186,19 @@ export function validateRequest(normalized: NormalizedRequest): {
   error?: string;
 } {
   if (!normalized.textbook_types.length && !normalized.material_kinds.length) {
-    return { valid: false, error: "Выберите тип материала" };
+    return { valid: false, error: "Выберите раздел материалов" };
   }
-  if (normalized.branch_type === "gatehouse" && normalized.target_levels.length === 0) {
-    return { valid: false, error: "Выберите уровень экзамена" };
-  }
-  if (normalized.branch_type !== "gatehouse" && !normalized.class_level && normalized.target_levels.length === 0) {
+  
+  // Универсальная проверка для всех проектов
+  // Если есть хотя бы один из параметров уровня валидация проходит
+  if (!normalized.class_level && normalized.target_levels.length === 0) {
     return { valid: false, error: "Выберите класс или уровень" };
   }
+  
   if (!normalized.email || !normalized.full_name) {
     return { valid: false, error: "Заполните email и ФИО" };
   }
+  
   return { valid: true };
 }
 
