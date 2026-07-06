@@ -20,7 +20,6 @@ function toPublicMaterialDTO(material: MaterialWithProgress) {
     target_levels: material.target_levels,
     class_levels: material.class_levels,
     order_index: material.order_index,
-    price: material.price,
     is_available: material.is_available,
     hasAccess: material.hasAccess,
     progress: material.progress,
