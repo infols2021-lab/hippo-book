@@ -1,3 +1,4 @@
+// app/api/admin/materials/[id]/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -7,7 +8,6 @@ import {
   normalizeNullableString,
   normalizeBool,
   normalizeOrderIndex,
-  normalizePrice,
   normalizeUUID,
   normalizeBranchType,
   normalizeMaterialKind,
@@ -50,10 +50,6 @@ function normalizePatchPayload(body: any) {
     payload.order_index = normalizeOrderIndex(body.order_index ?? body.orderIndex);
   }
 
-  if ("price" in body) {
-    payload.price = normalizePrice(body.price);
-  }
-  
   if ("class_levels" in body || "class_level" in body || "classLevels" in body) {
     payload.class_levels = normalizeClassLevels(body.class_levels ?? body.class_level ?? body.classLevels);
   }
