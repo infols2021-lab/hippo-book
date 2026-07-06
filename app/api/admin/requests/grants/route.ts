@@ -12,8 +12,9 @@ type GrantKind = "textbook" | "crossword" | "mock_test";
 type ReqRow = {
   id: string;
   user_id: string;
-  project_id?: string | null; // НОВОЕ ПОЛЕ: Привязка к проекту
-  branch_type?: string | null; // СТАРОЕ ПОЛЕ: Для обратной совместимости
+  project_id?: string | null; 
+  branch_type?: string | null; 
+  class_level: any;
   target_level: any;
   target_levels?: any;
   textbook_types: any;
@@ -25,9 +26,10 @@ type MaterialRow = {
   id: string;
   title: string;
   project_id?: string;
-  tab_id?: string;
+  project_tab_id?: string | null; // 🔥 ИСПРАВЛЕНИЕ: правильная колонка таба
   material_kind?: string | null;
   target_levels: string[] | null;
+  class_levels?: string[] | null; // 🔥 ИСПРАВЛЕНИЕ: добавлено для полноты
   project_tabs?: {
     name: string;
     icon?: string;
@@ -85,9 +87,14 @@ function uniq<T>(arr: T[]) {
   return Array.from(new Set(arr));
 }
 
+// 🔥 ИСПРАВЛЕНИЕ: Строгая нормализация уровней для админки
+function normalizeLevelCode(lvl: unknown): string {
+  return String(lvl || "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, "_");
+}
+
 function overlaps(a: string[], b: string[]) {
-  const set = new Set(a.map(String));
-  return b.some((x) => set.has(String(x)));
+  const set = new Set(a.map(normalizeLevelCode));
+  return b.map(normalizeLevelCode).some((x) => set.has(x));
 }
 
 // --- 1. ЗАГРУЗКА ИСТОРИИ (Уже выданные доступы) ---
@@ -136,13 +143,13 @@ async function loadProjectsFallback(supabase: any, rows: ReqRow[]) {
   const projectIds = uniq(rows.map((r) => r.project_id).filter(Boolean));
   if (!projectIds.length) return map;
 
-  // Тянем материалы новых проектов с привязанными табами
+  // 🔥 ИСПРАВЛЕНИЕ: Тянем project_tab_id и class_levels
   const { data, error } = await runDbQuery<MaterialRow[]>(
     () =>
       supabase
         .from("materials")
         .select(`
-          id, title, project_id, tab_id, target_levels, is_active,
+          id, title, project_id, project_tab_id, target_levels, class_levels, is_active,
           project_tabs ( name, icon )
         `)
         .in("project_id", projectIds)
@@ -153,15 +160,21 @@ async function loadProjectsFallback(supabase: any, rows: ReqRow[]) {
   if (error || !data) return map;
 
   for (const r of rows) {
-    const reqLevels = r.target_levels?.length ? toArr(r.target_levels) : toArr(r.target_level);
-    const reqTabs = toArr(r.material_kinds); // В новой логике тут лежат ID табов
+    // В заявке может приходить class_level, target_levels или target_level
+    const reqLevels = [
+      ...toArr(r.class_level), 
+      ...toArr(r.target_levels), 
+      ...toArr(r.target_level)
+    ];
+    const reqTabs = toArr(r.material_kinds); 
 
     const matched = data.filter((m) => {
       if (m.project_id !== r.project_id) return false;
 
-      const mLevels = toArr(m.target_levels);
+      const mLevels = [...toArr(m.target_levels), ...toArr(m.class_levels)];
       const levelMatches = reqLevels.length === 0 || overlaps(mLevels, reqLevels);
-      const tabMatches = reqTabs.length === 0 || reqTabs.includes(String(m.tab_id));
+      // 🔥 ИСПРАВЛЕНИЕ: Сравниваем с project_tab_id
+      const tabMatches = reqTabs.length === 0 || reqTabs.includes(String(m.project_tab_id));
 
       return levelMatches && tabMatches;
     });
@@ -179,7 +192,6 @@ async function loadProjectsFallback(supabase: any, rows: ReqRow[]) {
 }
 
 // --- 3. СТАРАЯ ЛОГИКА (ДЛЯ ОБРАТНОЙ СОВМЕСТИМОСТИ ДО МИГРАЦИИ) ---
-// TODO: Удалить после завершения миграции (ЭТАП 7)
 async function loadLegacyGatehouseFallback(supabase: any, rows: ReqRow[]) {
   const map = new Map<string, string[]>();
   if (!rows.length) return map;
@@ -198,12 +210,12 @@ async function loadLegacyGatehouseFallback(supabase: any, rows: ReqRow[]) {
   if (error || !data) return map;
 
   for (const r of rows) {
-    const reqLevels = r.target_levels?.length ? toArr(r.target_levels) : toArr(r.target_level);
+    const reqLevels = [...toArr(r.class_level), ...toArr(r.target_levels), ...toArr(r.target_level)];
     const kinds = toArr(r.material_kinds).concat(toArr(r.textbook_types));
 
     const matched = data.filter((m) => {
       const mLevels = toArr(m.target_levels);
-      const levelMatches = overlaps(mLevels.map(s => s.toLowerCase()), reqLevels.map(s => s.toLowerCase()));
+      const levelMatches = overlaps(mLevels, reqLevels);
       const kindMatches = kinds.length ? kinds.includes(String(m.material_kind)) : true;
       return levelMatches && kindMatches;
     });
@@ -240,7 +252,7 @@ export async function POST(req: NextRequest) {
       () =>
         supabase
           .from("purchase_requests")
-          .select("id, user_id, project_id, branch_type, target_level, target_levels, textbook_types, material_kinds, is_processed")
+          .select("id, user_id, project_id, branch_type, class_level, target_level, target_levels, textbook_types, material_kinds, is_processed")
           .in("id", ids),
       "loadGrantRows",
     );
