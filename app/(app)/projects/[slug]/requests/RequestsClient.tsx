@@ -103,7 +103,9 @@ function normalizeRequestRow(row: any): PurchaseRequest {
 export default function RequestsClient({ project, levels, tabs, userId, userEmail, userFullName, initialRequests }: Props) {
   const router = useRouter();
   const [requests, setRequests] = useState<PurchaseRequest[]>(() => initialRequests.map(normalizeRequestRow));
-  const [notif, setNotif] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  
+  // Добавлен тип "info" для красивых информационных сообщений
+  const [notif, setNotif] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -133,7 +135,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
     return map;
   }, [tabs]);
 
-  // Цена теперь берется не из разделов, а из выбранного уровня
   const totalAmount = useMemo(() => {
     const selectedLevel = levels.find(l => l.code === classLevel);
     return selectedLevel?.price ?? 0;
@@ -156,7 +157,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
     setRequests(initialRequests.map(normalizeRequestRow));
   }, [initialRequests]);
 
-  function showNotification(text: string, type: "success" | "error" = "success") {
+  function showNotification(text: string, type: "success" | "error" | "info" = "success") {
     setNotif({ type, text });
     setTimeout(() => setNotif(null), 4000);
   }
@@ -191,7 +192,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
 
   function openEdit(r: PurchaseRequest) {
     if (r.is_processed) {
-      showNotification("🔒 Обработанную заявку нельзя редактировать", "error");
+      showNotification("Обработанную заявку нельзя редактировать", "error");
       return;
     }
     setEditingId(r.id);
@@ -201,7 +202,6 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
     const localISO = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
     setRequestDateTime(localISO);
     
-    // Обратная совместимость для старых заявок, где мог сохраниться label вместо code
     const rawClassLevel = r.class_level || "";
     const matchedLevel = levels.find(l => l.code === rawClassLevel || l.label === rawClassLevel);
     setClassLevel(matchedLevel ? matchedLevel.code : rawClassLevel);
@@ -219,18 +219,18 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
   async function saveRequest() {
     if (busy) return;
     if (!requestDateTime || !classLevel) {
-      showNotification("❌ Пожалуйста, выберите уровень", "error");
+      showNotification("Пожалуйста, выберите уровень", "error");
       return;
     }
     if (selectedTabs.length === 0) {
-      showNotification("❌ Пожалуйста, выберите хотя бы один раздел", "error");
+      showNotification("Пожалуйста, выберите хотя бы один раздел", "error");
       return;
     }
 
     if (editingId) {
       const cur = requests.find((x) => x.id === editingId);
       if (cur?.is_processed) {
-        showNotification("🔒 Обработанную заявку нельзя редактировать", "error");
+        showNotification("Обработанную заявку нельзя редактировать", "error");
         setRequestModalOpen(false);
         return;
       }
@@ -241,7 +241,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
       created_at: requestDateTime + ":00Z",
       branch_type: project.slug,
       project_id: project.id,
-      class_level: classLevel, // Теперь сюда четко улетает технический code, а не label
+      class_level: classLevel,
       textbook_types: selectedTabs,
       material_kinds: selectedTabs,
       email: currentEmail,
@@ -267,10 +267,10 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
 
       setRequestModalOpen(false);
       openPaymentModal(totalAmount);
-      showNotification(editingId ? "✅ Заявка успешно обновлена" : "✅ Заявка успешно создана");
+      showNotification(editingId ? "Заявка успешно обновлена" : "Заявка успешно создана");
       router.refresh();
     } catch (e: any) {
-      showNotification("❌ Ошибка: " + e.message, "error");
+      showNotification("Ошибка: " + e.message, "error");
     } finally {
       setBusy(false);
     }
@@ -279,7 +279,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
   async function deleteRequest(r: PurchaseRequest) {
     if (busy) return;
     if (r.is_processed) {
-      showNotification("🔒 Обработанную заявку нельзя удалить", "error");
+      showNotification("Обработанную заявку нельзя удалить", "error");
       return;
     }
 
@@ -298,7 +298,7 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
       const { json } = await safeReadJson(res);
       if (!res.ok || !json?.ok) throw new Error(json?.error || `HTTP ${res.status}`);
 
-      showNotification("✅ Заявка успешно удалена");
+      showNotification("Заявка успешно удалена");
       router.refresh();
     } catch (e: any) {
       showNotification("Ошибка: " + e.message, "error");
@@ -316,7 +316,41 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
 
   return (
     <div className="page-requests">
-      {notif ? <div className={`notification ${notif.type === "error" ? "error" : ""}`}>{notif.text}</div> : null}
+      {/* Стили для анимации красивого Toast уведомления */}
+      <style>{`
+        @keyframes toastSlideIn {
+          from { transform: translate3d(100%, 0, 0); opacity: 0; }
+          to { transform: translate3d(0, 0, 0); opacity: 1; }
+        }
+      `}</style>
+      
+      {/* Красивое плавающее уведомление (Toast) */}
+      {notif && (
+        <div style={{
+          position: 'fixed',
+          top: '32px',
+          right: '32px',
+          zIndex: 999999,
+          backgroundColor: notif.type === 'error' ? '#FEF2F2' : notif.type === 'info' ? '#F0F9FF' : '#F0FDF4',
+          color: notif.type === 'error' ? '#991B1B' : notif.type === 'info' ? '#0369A1' : '#166534',
+          border: `1px solid ${notif.type === 'error' ? '#FCA5A5' : notif.type === 'info' ? '#BAE6FD' : '#BBF7D0'}`,
+          borderLeft: `5px solid ${notif.type === 'error' ? '#EF4444' : notif.type === 'info' ? '#0EA5E9' : '#22C55E'}`,
+          padding: '16px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px',
+          fontWeight: 600,
+          fontSize: '15px',
+          animation: 'toastSlideIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards',
+        }}>
+          <span style={{ fontSize: '22px' }}>
+            {notif.type === 'error' ? '❌' : notif.type === 'info' ? 'ℹ️' : '✅'}
+          </span>
+          {notif.text}
+        </div>
+      )}
 
       <Modal open={requestModalOpen} onClose={() => setRequestModalOpen(false)} title={editingId ? "Редактировать заявку" : "Создать заявку"} maxWidth={520}>
         <form onSubmit={(e) => { e.preventDefault(); void saveRequest(); }}>
@@ -481,14 +515,18 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
             <button className="btn" onClick={openCreate} type="button" disabled={busy}>
               ➕ Создать новую заявку
             </button>
-            <button className="btn ghost qr-open" type="button" onClick={() => { 
-              if (!lastPendingRequest) {
-                showNotification("ℹ️ Не найдено необработанных заявок.", "error");
-                return;
-              }
-              openPaymentModal(lastPendingAmount); 
-            }}>
-              📷 Показать qr
+            <button 
+              className="btn ghost qr-open" 
+              type="button" 
+              onClick={() => { 
+                if (!lastPendingRequest) {
+                  showNotification("У вас нет ожидающих оплаты заявок.", "info");
+                  return;
+                }
+                openPaymentModal(lastPendingAmount); 
+              }}
+            >
+              💳 Оплатить заявку (QR)
             </button>
           </div>
 
@@ -501,65 +539,66 @@ export default function RequestsClient({ project, levels, tabs, userId, userEmai
               </button>
             </div>
           ) : (
-            <table className="requests-table">
-              <thead>
-                <tr>
-                  <th>Номер заявки</th>
-                  <th>Дата создания</th>
-                  <th>Уровень (Класс)</th>
-                  <th>Разделы материалов</th>
-                  <th>Цена</th>
-                  <th>Статус</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((r) => {
-                  const locked = r.is_processed;
-                  const rawTabs = r.material_kinds?.length ? r.material_kinds : (r.textbook_types || []);
-                  
-                  const displayTabs = rawTabs.map(id => {
-                    const tab = tabs.find(t => t.id === id);
-                    return tab ? `${tab.icon || ''} ${tab.title}` : id;
-                  }).filter(Boolean);
+            <div style={{ overflowX: "auto" }}>
+              <table className="requests-table">
+                <thead>
+                  <tr>
+                    <th>Номер заявки</th>
+                    <th>Дата создания</th>
+                    <th>Уровень (Класс)</th>
+                    <th>Разделы материалов</th>
+                    <th>Цена</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((r) => {
+                    const locked = r.is_processed;
+                    const rawTabs = r.material_kinds?.length ? r.material_kinds : (r.textbook_types || []);
+                    
+                    const displayTabs = rawTabs.map(id => {
+                      const tab = tabs.find(t => t.id === id);
+                      return tab ? `${tab.icon || ''} ${tab.title}` : id;
+                    }).filter(Boolean);
 
-                  // Обратная совместимость для отображения названия уровня в таблице
-                  const matchedLevel = levels.find(l => l.code === r.class_level || l.label === r.class_level);
-                  const displayLevel = matchedLevel ? matchedLevel.label : (r.class_level || "—");
+                    const matchedLevel = levels.find(l => l.code === r.class_level || l.label === r.class_level);
+                    const displayLevel = matchedLevel ? matchedLevel.label : (r.class_level || "—");
 
-                  return (
-                    <tr key={r.id}>
-                      <td className="font-bold">{r.request_number}</td>
-                      <td>{formatDateTime(r.created_at)}</td>
-                      <td>{displayLevel}</td>
-                      <td>{displayTabs.length > 0 ? displayTabs.join(", ") : "—"}</td>
-                      <td className="font-bold">{r.total_price != null ? formatPrice(r.total_price) : "—"}</td>
-                      <td>
-                        <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
-                          {r.is_processed ? "✅ Выдано" : "⏳ Ожидает"}
-                        </span>
-                      </td>
-                      <td>
-                        {locked ? (
-                          <span className="text-xs text-gray-400 font-medium italic">
-                            🔒 Действия недоступны
+                    return (
+                      <tr key={r.id}>
+                        <td className="font-bold">{r.request_number}</td>
+                        <td>{formatDateTime(r.created_at)}</td>
+                        <td>{displayLevel}</td>
+                        <td>{displayTabs.length > 0 ? displayTabs.join(", ") : "—"}</td>
+                        <td className="font-bold">{r.total_price != null ? formatPrice(r.total_price) : "—"}</td>
+                        <td>
+                          <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
+                            {r.is_processed ? "✅ Выдано" : "⏳ Ожидает"}
                           </span>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                            <button className="btn btn-small" onClick={() => openEdit(r)} type="button" disabled={busy}>
-                              ✏️ Изменить
-                            </button>
-                            <button className="btn btn-small secondary" onClick={() => void deleteRequest(r)} type="button" disabled={busy}>
-                              🗑️ Удалить
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td>
+                          {locked ? (
+                            <span className="text-xs text-gray-400 font-medium italic">
+                              🔒 Действия недоступны
+                            </span>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                              <button className="btn btn-small" onClick={() => openEdit(r)} type="button" disabled={busy}>
+                                ✏️ Изменить
+                              </button>
+                              <button className="btn btn-small secondary" onClick={() => void deleteRequest(r)} type="button" disabled={busy}>
+                                🗑️ Удалить
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>
