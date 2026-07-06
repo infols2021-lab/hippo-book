@@ -31,8 +31,15 @@ export type NormalizedRequest = {
 };
 
 // ----------------------------------------------------------------------------
-// Нормализация массивов
+// Нормализация массивов и строк
 // ----------------------------------------------------------------------------
+
+// 🔥 ИСПРАВЛЕНИЕ: Жесткая нормализация для class_level ("Stage 1" -> "stage_1")
+export function normalizeLevelCode(value: unknown): string | null {
+  const s = normalizeNullableString(value);
+  if (!s) return null;
+  return s.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, "_");
+}
 
 export function normalizeRequestTargetLevels(value: unknown): string[] {
   return normalizeTargetLevels(value);
@@ -53,7 +60,9 @@ export function normalizeRequestPayload(
   profilePhone?: string,
 ): NormalizedRequest {
   const branch_type = normalizeBranchType(body.branch_type ?? "olympiad");
-  const class_level = normalizeNullableString(body.class_level);
+  
+  // 🔥 ИСПРАВЛЕНИЕ: Теперь в базу летит только технический код
+  const class_level = normalizeLevelCode(body.class_level);
   
   // Умный фолбэк если пришел class_level но нет target_levels мы дублируем данные
   // чтобы универсальная валидация проходила для всех проектов
@@ -217,7 +226,8 @@ export type ReqRowLike = {
 
 export function getRequestTargetLevels(r: ReqRowLike): string[] {
   const raw = r.target_levels ?? r.target_level ?? [];
-  return toStringArray(raw);
+  // 🔥 ИСПРАВЛЕНИЕ: Читаем старые заявки корректно, превращая их уровни в коды
+  return normalizeTargetLevels(raw);
 }
 
 export function getRequestMaterialKinds(r: ReqRowLike): string[] {

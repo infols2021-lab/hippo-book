@@ -45,9 +45,14 @@ export type ReqRow = {
   is_processed?: boolean | null;
 };
 
+// 🔥 Улучшенная нормализация уровня для точного совпадения ("Stage 1" -> "stage_1")
+function normalizeLevelCode(lvl: string): string {
+  return String(lvl).toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, "_");
+}
+
 function overlaps(a: string[], b: string[]): boolean {
-  const set = new Set(a.map(String));
-  return b.some((x) => set.has(String(x)));
+  const setA = new Set(a.map(normalizeLevelCode));
+  return b.map(normalizeLevelCode).some((x) => setA.has(x));
 }
 
 export async function grantDynamicProjectAccessForRequest(
@@ -64,7 +69,7 @@ export async function grantDynamicProjectAccessForRequest(
     ...toStringArray(r.class_level),
     ...toStringArray(r.target_levels),
     ...toStringArray(r.target_level)
-  ]).map(x => x.toLowerCase().trim());
+  ]).map(normalizeLevelCode);
     
   // 2. Получаем ID разделов (табов) из заявки
   const requestedTabIds = uniqueStrings([
@@ -85,19 +90,15 @@ export async function grantDynamicProjectAccessForRequest(
 
   // 4. Фильтруем материалы: оставляем только те, которые подходят под запрошенный уровень
   const matchedMaterials = (materials || []).filter((mat) => {
-    // Если в заявке вообще не указан уровень (странно, но вдруг), выдаем всё из таба
     if (requestedLevelCodes.length === 0) return true;
 
-    // Собираем все уровни, привязанные к материалу
     const matLevels = [
       ...toStringArray(mat.target_levels),
       ...toStringArray(mat.class_levels),
-    ].map((x) => String(x).toLowerCase().trim());
+    ].map(normalizeLevelCode);
     
-    // Если материал доступен для всех уровней (массив пустой), выдаем его
     if (matLevels.length === 0) return true;
 
-    // Иначе проверяем, пересекаются ли уровни материала с уровнем из заявки
     return overlaps(matLevels, requestedLevelCodes);
   });
 
@@ -153,7 +154,7 @@ export async function grantGenericBranchAccessForRequest(
     ...toStringArray(r.class_level),
     ...toStringArray(r.target_levels),
     ...toStringArray(r.target_level)
-  ]);
+  ]).map(normalizeLevelCode);
   const kinds = getRequestMaterialKinds(r);
 
   let query = supabase
@@ -169,17 +170,15 @@ export async function grantGenericBranchAccessForRequest(
   const { data: materials, error } = await query;
   if (error) throw new Error(error.message);
 
-  const userLevels = targetLevels.map((x) => String(x).toLowerCase().trim());
-
   const matchedMaterials = (materials ?? []).filter((mat) => {
-    if (userLevels.length === 0) return true;
+    if (targetLevels.length === 0) return true;
     const matLevels = [
       ...toStringArray(mat.target_levels),
       ...toStringArray(mat.class_levels),
-    ].map((x) => String(x).toLowerCase().trim());
+    ].map(normalizeLevelCode);
     
     if (matLevels.length === 0) return true;
-    return overlaps(matLevels, userLevels);
+    return overlaps(matLevels, targetLevels);
   });
 
   for (const mat of matchedMaterials) {
@@ -260,7 +259,7 @@ export async function existsOtherProcessedGenericRequestForMaterial(
   materialKind: string | null | undefined,
   targetLevels: string[] | null | undefined,
 ): Promise<boolean> {
-  const levels = Array.isArray(targetLevels) ? targetLevels.map(String) : [];
+  const levels = Array.isArray(targetLevels) ? targetLevels.map(normalizeLevelCode) : [];
   const kind = String(materialKind ?? "").trim();
 
   if (!levels.length || !kind) return false;
@@ -277,13 +276,10 @@ export async function existsOtherProcessedGenericRequestForMaterial(
 
   for (const row of data ?? []) {
     const req = row as ReqRow;
-    const rowLevels = [...toStringArray(req.class_level), ...toStringArray(req.target_levels)];
-    const rowLevelsNormalized = rowLevels.map(x => String(x).toLowerCase().trim());
-    const levelsNormalized = levels.map(x => String(x).toLowerCase().trim());
-    
+    const rowLevels = [...toStringArray(req.class_level), ...toStringArray(req.target_levels)].map(normalizeLevelCode);
     const rowKinds = getRequestMaterialKinds(req);
 
-    const levelMatches = overlaps(rowLevelsNormalized, levelsNormalized);
+    const levelMatches = overlaps(rowLevels, levels);
     const kindMatches = rowKinds.length ? rowKinds.includes(kind) : true;
 
     if (levelMatches && kindMatches) return true;
