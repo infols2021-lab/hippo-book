@@ -59,75 +59,49 @@ export async function grantDynamicProjectAccessForRequest(
   const grantedLabels: string[] = [];
   const grantsToStore: GrantResult["grantsToStore"] = [];
 
-  const userRawLevels = uniqueStrings([
+  // 1. Получаем единый технический код уровня (class_level) из заявки
+  const requestedLevelCodes = uniqueStrings([
     ...toStringArray(r.class_level),
     ...toStringArray(r.target_levels),
     ...toStringArray(r.target_level)
   ]).map(x => x.toLowerCase().trim());
     
-  const requestedTabs = uniqueStrings([
+  // 2. Получаем ID разделов (табов) из заявки
+  const requestedTabIds = uniqueStrings([
     ...toStringArray(r.material_kinds),
     ...toStringArray(r.textbook_types)
   ]);
 
-  const [levelsRes, tabsRes] = await Promise.all([
-    supabase.from("project_levels").select("code, label").eq("project_id", r.project_id),
-    supabase.from("project_tabs").select("id, title").eq("project_id", r.project_id).eq("is_active", true)
-  ]);
+  if (requestedTabIds.length === 0) return { grantedLabels, grantsToStore };
 
-  if (levelsRes.error) throw new Error(levelsRes.error.message);
-  if (tabsRes.error) throw new Error(tabsRes.error.message);
-
-  const validUserLevelCodes = new Set<string>();
-  (levelsRes.data || []).forEach((lvl: any) => {
-    const code = String(lvl.code).toLowerCase().trim();
-    const label = String(lvl.label).toLowerCase().trim();
-    if (userRawLevels.includes(code) || userRawLevels.includes(label)) {
-      validUserLevelCodes.add(code);
-    }
-  });
-
-  if (validUserLevelCodes.size === 0) {
-    userRawLevels.forEach(x => validUserLevelCodes.add(x));
-  }
-
-  let tabIdsToQuery: string[] = [];
-  if (requestedTabs.length > 0) {
-    for (const reqTab of requestedTabs) {
-      const matched = (tabsRes.data || []).find(
-        (t: any) => t.id === reqTab || String(t.title).toLowerCase().trim() === String(reqTab).toLowerCase().trim(),
-      );
-      if (matched) tabIdsToQuery.push(matched.id);
-    }
-  } else {
-    tabIdsToQuery = (tabsRes.data || []).map((t: any) => t.id);
-  }
-
-  if (tabIdsToQuery.length === 0) return { grantedLabels, grantsToStore };
-
+  // 3. Достаем ВСЕ активные материалы из запрошенных табов
   const { data: materials, error: matError } = await supabase
     .from("materials")
     .select("id, title, material_kind, target_levels, class_levels, project_tab_id")
-    .in("project_tab_id", tabIdsToQuery)
+    .in("project_tab_id", requestedTabIds)
     .eq("is_active", true);
 
   if (matError) throw new Error(matError.message);
 
+  // 4. Фильтруем материалы: оставляем только те, которые подходят под запрошенный уровень
   const matchedMaterials = (materials || []).filter((mat) => {
-    if (validUserLevelCodes.size === 0) return true;
+    // Если в заявке вообще не указан уровень (странно, но вдруг), выдаем всё из таба
+    if (requestedLevelCodes.length === 0) return true;
 
+    // Собираем все уровни, привязанные к материалу
     const matLevels = [
       ...toStringArray(mat.target_levels),
       ...toStringArray(mat.class_levels),
     ].map((x) => String(x).toLowerCase().trim());
     
+    // Если материал доступен для всех уровней (массив пустой), выдаем его
     if (matLevels.length === 0) return true;
 
-    return matLevels.some((ml) => 
-      Array.from(validUserLevelCodes).some((ul) => ml === ul || ml.includes(ul) || ul.includes(ml))
-    );
+    // Иначе проверяем, пересекаются ли уровни материала с уровнем из заявки
+    return overlaps(matLevels, requestedLevelCodes);
   });
 
+  // 5. Выдаем доступы к найденным материалам
   for (const mat of matchedMaterials) {
     const { error: upsertError } = await supabase
       .from("material_access")
@@ -144,7 +118,6 @@ export async function grantDynamicProjectAccessForRequest(
     if (!upsertError) {
       grantedLabels.push(`📘 ${mat.title}`);
       
-      // 🚀 ИСПРАВЛЕНИЕ: Обходим легаси-констрейнт БД. Если не textbook/crossword, пишем mock_test
       const safeKind = (mat.material_kind === "textbook" || mat.material_kind === "crossword") 
         ? mat.material_kind 
         : "mock_test";
@@ -206,7 +179,7 @@ export async function grantGenericBranchAccessForRequest(
     ].map((x) => String(x).toLowerCase().trim());
     
     if (matLevels.length === 0) return true;
-    return matLevels.some((ml) => userLevels.some((ul) => ml === ul || ml.includes(ul) || ul.includes(ml)));
+    return overlaps(matLevels, userLevels);
   });
 
   for (const mat of matchedMaterials) {
