@@ -89,15 +89,6 @@ export function normalizeOrderIndex(value: unknown): number {
   return Math.max(0, Math.trunc(normalizeNumber(value, 0)));
 }
 
-/**
- * Нормализует цену (неотрицательное число).
- * По умолчанию 0, чтобы избежать случайных списаний при ошибке фронтенда.
- */
-export function normalizePrice(value: unknown): number {
-  const n = normalizeNumber(value, 0);
-  return Math.max(0, n); // Цена не может быть отрицательной
-}
-
 // ----------------------------------------------------------------------------
 // Валидация UUID
 // ----------------------------------------------------------------------------
@@ -198,7 +189,6 @@ export type NormalizedMaterial = {
   is_available: boolean;
   is_active: boolean;
   order_index: number;
-  price: number;
   project_tab_id: string | null;
   meta: Record<string, unknown>;
   created_by?: string | null;
@@ -232,9 +222,6 @@ export function normalizeMaterialInput(
     
     order_index: normalizeOrderIndex(safeBody.order_index ?? safeBody.orderIndex),
     
-    // БАГ С ЦЕНОЙ ИСПРАВЛЕН ЗДЕСЬ: строгое извлечение и парсинг
-    price: normalizePrice(safeBody.price),
-    
     // БАГ С ID ВКЛАДКИ ИСПРАВЛЕН ЗДЕСЬ: "none" превратится в null
     project_tab_id: normalizeUUID(
       safeBody.project_tab_id ?? safeBody.tab_id ?? safeBody.projectTabId ?? safeBody.tabId
@@ -260,7 +247,6 @@ export default {
   normalizeBool,
   normalizeNumber,
   normalizeOrderIndex,
-  normalizePrice,
   isValidUUID,
   normalizeUUID,
   normalizeBranchType,

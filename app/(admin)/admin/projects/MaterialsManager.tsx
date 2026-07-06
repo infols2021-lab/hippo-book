@@ -149,12 +149,11 @@ export default function MaterialsManager() {
             description: "", 
             cover_image_url: "", 
             target_levels: [], 
-            price: 0,                   // 👈 Дефолтная цена теперь 0 (безопасно)
             is_active: true, 
             is_available: false, 
             order_index: 0,
             branch_type: "olympiad",
-            material_kind: "material",  // 👈 Перешли на универсальный тип
+            material_kind: "material",
           })}
           className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -167,22 +166,9 @@ export default function MaterialsManager() {
           <h3 className="text-xl font-bold">{editingMaterial.id ? "Редактирование" : "Новый материал"}</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-bold mb-1">Название</label>
               <input required type="text" className="w-full border-2 rounded-xl px-4 py-2" value={editingMaterial.title} onChange={e => setEditingMaterial({...editingMaterial, title: e.target.value})} />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold mb-1">Стоимость (₽)</label>
-              <input 
-                type="number" 
-                min="0" 
-                step="0.01" 
-                required 
-                className="w-full border-2 rounded-xl px-4 py-2" 
-                value={editingMaterial.price ?? 0} 
-                onChange={e => setEditingMaterial({...editingMaterial, price: e.target.value})} 
-              />
             </div>
             
             <div className="md:col-span-2">
@@ -249,7 +235,6 @@ export default function MaterialsManager() {
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="p-4 font-bold text-gray-600">Название</th>
-                <th className="p-4 font-bold text-gray-600 text-center">Стоимость</th>
                 <th className="p-4 font-bold text-gray-600">Уровни</th>
                 <th className="p-4 font-bold text-gray-600 text-center">Статус</th>
                 <th className="p-4"></th>
@@ -258,7 +243,7 @@ export default function MaterialsManager() {
             <tbody className="divide-y">
               {materials.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-10 text-center text-gray-500 font-bold bg-gray-50/50">
+                  <td colSpan={4} className="p-10 text-center text-gray-500 font-bold bg-gray-50/50">
                     В этом разделе пока нет материалов. Создайте первый!
                   </td>
                 </tr>
@@ -275,9 +260,6 @@ export default function MaterialsManager() {
                         {mat.title}
                         {mat.description && <div className="text-xs font-normal text-gray-500 mt-0.5 truncate max-w-xs">{mat.description}</div>}
                       </div>
-                    </td>
-                    <td className="p-4 text-center font-bold">
-                      {mat.price ?? 0} ₽
                     </td>
                     <td className="p-4">
                       <div className="flex flex-wrap gap-1">

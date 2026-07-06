@@ -30,7 +30,6 @@ export type MaterialDbRow = {
   updated_at: string;
   meta: Record<string, unknown>;
   project_tab_id: string | null;
-  price: number;
 };
 
 export type MaterialAccessDbRow = {
@@ -98,7 +97,6 @@ export type MaterialCreateInput = {
   class_levels?: string[];
   target_levels?: string[];
   project_tab_id?: string | null;
-  price?: number;
 };
 
 export type MaterialUpdateInput = Partial<MaterialCreateInput> & {

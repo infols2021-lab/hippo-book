@@ -1,5 +1,5 @@
 // app/api/admin/projects/[id]/route.ts
-// ADMIN: управление одним проектом (GET/PUT/DELETE) + его табами и уровнями.
+// ADMIN: управление одним проектом (GET/PUT/DELETE) + его табами и уровными.
 
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -18,7 +18,7 @@ type UpdateProjectInput = {
   theme?: Record<string, unknown> | null;
   features?: Record<string, unknown> | null;
   ui_texts?: Record<string, unknown> | null;
-  sheet_name?: string | null; // 🚀 НОВОЕ ПОЛЕ: Название листа Google Sheets
+  sheet_name?: string | null; 
 };
 
 type TabInput = {
@@ -131,7 +131,6 @@ export async function PUT(
   if (body.theme !== undefined) patch.theme = body.theme;
   if (body.features !== undefined) patch.features = body.features;
   if (body.ui_texts !== undefined) patch.ui_texts = body.ui_texts;
-  // 🚀 ОБНОВЛЕНИЕ: Сохранение sheet_name в БД проекта
   if (body.sheet_name !== undefined) patch.sheet_name = body.sheet_name ? body.sheet_name.trim() : null;
 
   if (Object.keys(patch).length > 0) {
@@ -288,7 +287,7 @@ export async function PUT(
 }
 
 // ---------------------------------------------------------------------------
-// DELETE: удалить проект (каскадно снесёт табы/уровни по FK ON DELETE CASCADE)
+// DELETE: удалить проект (умное каскадное удаление)
 // ---------------------------------------------------------------------------
 export async function DELETE(
   _req: Request,
@@ -300,20 +299,52 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const { error } = await supabase.from("projects").delete().eq("id", id);
-
-  if (error) {
-    // 23503 — foreign_key_violation (на проект ссылаются материалы/заявки)
-    if (error.code === "23503") {
-      return fail(
-        "Невозможно удалить проект: есть связанные материалы, задания или заявки. Сначала перенесите их или снимите проект с публикации (is_active = false).",
-        409,
-        "HAS_REFERENCES",
-      );
+  try {
+    // 1. Получаем все материалы этого проекта, чтобы удалить связи
+    const { data: projectTabs } = await supabase.from("project_tabs").select("id").eq("project_id", id);
+    const tabIds = projectTabs?.map(t => t.id) || [];
+    
+    let materialIds: string[] = [];
+    if (tabIds.length > 0) {
+      const { data: materials } = await supabase.from("materials").select("id").in("project_tab_id", tabIds);
+      materialIds = materials?.map(m => m.id) || [];
     }
-    return fail(error.message, 500, "DB_ERROR");
-  }
 
-  invalidateProjectsCache();
-  return ok({ deleted: true, id });
+    // 2. Если есть материалы, удаляем их зависимости (доступы, заявки, результаты)
+    if (materialIds.length > 0) {
+      await Promise.all([
+        supabase.from("material_access").delete().in("material_id", materialIds),
+        supabase.from("exam_results").delete().in("material_id", materialIds),
+        supabase.from("purchase_request_grants").delete().in("material_id", materialIds),
+        supabase.from("assignments").delete().in("material_id", materialIds),
+      ]);
+    }
+
+    // 3. Получаем и удаляем заявки проекта
+    const { data: requests } = await supabase.from("purchase_requests").select("id").eq("project_id", id);
+    const requestIds = requests?.map(r => r.id) || [];
+    if (requestIds.length > 0) {
+      await supabase.from("purchase_request_grants").delete().in("request_id", requestIds);
+      await supabase.from("purchase_requests").delete().eq("project_id", id);
+    }
+
+    // 4. Удаляем сами материалы
+    if (materialIds.length > 0) {
+      await supabase.from("materials").delete().in("id", materialIds);
+    }
+
+    // 5. Удаляем проект (табы и уровни удалятся каскадно)
+    const { error: finalError } = await supabase.from("projects").delete().eq("id", id);
+
+    if (finalError) {
+      console.error("🔴 Ошибка при финальном удалении проекта:", finalError);
+      return fail("Ошибка при удалении: " + finalError.message, 500, "DB_ERROR");
+    }
+
+    invalidateProjectsCache();
+    return ok({ deleted: true, id });
+  } catch (error: any) {
+    console.error("🔴 Server error DELETE project:", error);
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
 }

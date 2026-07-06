@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 type ColorSettings = {
   label: string;
@@ -208,6 +209,7 @@ export default function ProjectEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const router = useRouter();
   const initialPrimaryColor = project?.theme?.colors?.primary || project?.theme?.primaryColor || project?.theme_color || "#0ea5e9";
   const initialSecondaryColor = project?.theme?.colors?.secondary || project?.theme?.secondaryColor || "#38bdf8";
   const initialPageBg = project?.theme?.colors?.pageBg || project?.theme?.backgroundColor || "#f8fafc";
@@ -240,11 +242,15 @@ export default function ProjectEditor({
   });
 
   const [levels, setLevels] = useState<any[]>([]);
-  // Добавлено поле цены
-  const [newLevel, setNewLevel] = useState({ code: "", label: "", price: "" });
+  const [editingLevel, setEditingLevel] = useState<any | null>(null);
 
   const [tabs, setTabs] = useState<any[]>([]);
   const [editingTab, setEditingTab] = useState<any | null>(null);
+
+  // Стейты для удаления проекта
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleteConfirmWord, setDeleteConfirmWord] = useState("");
+  const [showDeleteZone, setShowDeleteZone] = useState(false);
 
   useEffect(() => {
     if (project?.id) {
@@ -286,8 +292,9 @@ export default function ProjectEditor({
     }
   };
 
-  const addLevel = async () => {
-    if (!newLevel.code || !newLevel.label || !project?.id) {
+  const saveLevel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLevel?.code || !editingLevel?.label || !project?.id) {
       alert("Заполните код и название уровня.");
       return;
     }
@@ -297,24 +304,46 @@ export default function ProjectEditor({
         method: "POST", 
         headers: { "Content-Type": "application/json" }, 
         cache: "no-store",
-        body: JSON.stringify({ 
-          code: newLevel.code, 
-          label: newLevel.label, 
-          order_index: levels.length * 10, 
-          is_active: true,
-          price: newLevel.price ? Number(newLevel.price) : null // Цена отправляется на бэкенд
+        body: JSON.stringify({
+          id: editingLevel.id, // Если id есть, сработает upsert
+          code: editingLevel.code, 
+          label: editingLevel.label, 
+          order_index: editingLevel.order_index ?? levels.length * 10, 
+          is_active: editingLevel.is_active ?? true,
+          price: editingLevel.price ? Number(editingLevel.price) : null
         }),
       });
       
       if (!res.ok) {
-        throw new Error("Ошибка сохранения");
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Ошибка сохранения");
       }
       
       const refreshRes = await fetch(`/api/admin/projects/${project.id}/levels`, { cache: "no-store" });
       const refreshData = await refreshRes.json();
       
       setLevels(refreshData.levels || refreshData.data || []);
-      setNewLevel({ code: "", label: "", price: "" }); // Сбрасываем цену
+      setEditingLevel(null); 
+    } catch (err: any) { 
+      alert("❌ Ошибка: " + err.message); 
+    }
+  };
+
+  const deleteLevel = async (levelId: string) => {
+    if (!project?.id) return;
+    if (!window.confirm("Удалить этот уровень?")) return;
+    
+    try {
+      const res = await fetch(`/api/admin/projects/${project.id}/levels?id=${levelId}`, { 
+        method: "DELETE", 
+        cache: "no-store" 
+      });
+      
+      if (!res.ok) {
+        throw new Error("Ошибка удаления");
+      }
+      
+      setLevels(levels.filter((l) => l.id !== levelId));
     } catch (err: any) { 
       alert("❌ Ошибка: " + err.message); 
     }
@@ -402,6 +431,29 @@ export default function ProjectEditor({
     }));
   };
 
+  const handleDeleteProject = async () => {
+    if (!project?.id) return;
+    try {
+      const res = await fetch(`/api/admin/projects/${project.id}`, {
+        method: "DELETE",
+        cache: "no-store"
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Ошибка HTTP ${res.status}`);
+      }
+      
+      alert("✅ Проект успешно удален");
+      onClose();
+      router.refresh();
+      // Либо вызвать onSaved() если логика обновления списка висит там
+      onSaved();
+    } catch (err: any) {
+      alert("❌ Ошибка удаления проекта: " + err.message);
+    }
+  };
+
   // 🔥 ГОТОВЫЕ ПРЕСЕТЫ ТЕМ (В 1 КЛИК)
   const applyPreset = (preset: Record<string, string>) => {
     setFormData((prev) => ({ 
@@ -443,6 +495,8 @@ export default function ProjectEditor({
     { label: "Фон карточек", key: "cardBg", value: formData.theme.colors.cardBg },
     { label: "Цвет текста", key: "textColor", value: formData.theme.colors.textColor },
   ];
+
+  const canDeleteProject = deleteConfirmName === project?.name && deleteConfirmWord === "DELETE";
 
   return (
     <div className="bg-white p-6 rounded-[28px] border shadow-xl max-w-[1200px] mx-auto space-y-8">
@@ -664,59 +718,116 @@ export default function ProjectEditor({
       {/* УРОВНИ И ТАБЫ */}
       {project?.id && (
         <div className="space-y-8 border-t pt-8">
-          <div className="bg-gray-50/50 p-8 rounded-[28px] border">
-            <h3 className="text-xl font-black mb-6 text-gray-800">Уровни (Классы)</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-              {levels.map((l) => (
-                <div 
-                  key={l.id} 
-                  className="bg-white border shadow-sm p-4 rounded-2xl flex items-center justify-between hover:border-blue-300 transition-colors"
+          <div className="bg-gray-50/50 p-8 rounded-[28px] border relative">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-gray-800">Уровни (Классы)</h3>
+              {!editingLevel && (
+                <button 
+                  type="button" 
+                  onClick={() => setEditingLevel({ code: "", label: "", price: "", order_index: levels.length * 10, is_active: true })} 
+                  className="bg-white hover:bg-gray-100 border shadow-sm transition-colors text-gray-800 px-5 py-2.5 rounded-xl font-bold text-sm"
                 >
-                  <div className="flex flex-col gap-1">
-                    <span className="font-bold text-gray-800">{l.label}</span>
-                    <span className="text-xs text-gray-500 font-medium">
-                      {l.price != null ? `${l.price} ₽` : "0 ₽ (бесплатно)"}
-                    </span>
-                  </div>
-                  <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded-lg">
-                    {l.code}
-                  </span>
-                </div>
-              ))}
-              {levels.length === 0 && (
-                <div className="text-sm text-gray-500 font-medium col-span-full">
-                  Уровней пока нет
-                </div>
+                  + Создать уровень
+                </button>
               )}
             </div>
-            <div className="flex flex-wrap gap-3 bg-white p-4 rounded-2xl border shadow-sm">
-              <input 
-                className="border-2 rounded-xl px-4 py-2.5 flex-1 min-w-[150px] outline-none focus:border-blue-500 font-medium" 
-                placeholder="Код (hippo-1)" 
-                value={newLevel.code} 
-                onChange={(e) => setNewLevel({ ...newLevel, code: e.target.value })} 
-              />
-              <input 
-                className="border-2 rounded-xl px-4 py-2.5 flex-1 min-w-[150px] outline-none focus:border-blue-500 font-medium" 
-                placeholder="Название (Hippo 1)" 
-                value={newLevel.label} 
-                onChange={(e) => setNewLevel({ ...newLevel, label: e.target.value })} 
-              />
-              <input 
-                type="number" 
-                className="border-2 rounded-xl px-4 py-2.5 w-[120px] outline-none focus:border-blue-500 font-medium" 
-                placeholder="Цена (₽)" 
-                value={newLevel.price} 
-                onChange={(e) => setNewLevel({ ...newLevel, price: e.target.value })} 
-              />
-              <button 
-                onClick={addLevel} 
-                type="button" 
-                className="bg-blue-600 hover:bg-blue-700 transition-colors text-white font-bold px-6 py-2.5 rounded-xl shadow-md"
-              >
-                Добавить
-              </button>
-            </div>
+
+            {editingLevel ? (
+              <form onSubmit={saveLevel} className="bg-white p-6 rounded-2xl border shadow-xl mb-8 relative">
+                <h4 className="font-black text-lg mb-6 text-gray-800">
+                  {editingLevel.id ? "Редактирование уровня" : "Новый уровень"}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Название (Label)</label>
+                    <input 
+                      required 
+                      className="w-full border-2 rounded-xl px-4 py-2.5 font-medium outline-none focus:border-blue-500" 
+                      placeholder="Hippo 1"
+                      value={editingLevel.label} 
+                      onChange={(e) => setEditingLevel({ ...editingLevel, label: e.target.value })} 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Код (Code)</label>
+                    <input 
+                      required 
+                      className="w-full border-2 rounded-xl px-4 py-2.5 font-medium outline-none focus:border-blue-500 font-mono" 
+                      placeholder="hippo-1"
+                      value={editingLevel.code} 
+                      onChange={(e) => setEditingLevel({ ...editingLevel, code: e.target.value })} 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Цена (₽)</label>
+                    <input 
+                      type="number" 
+                      className="w-full border-2 rounded-xl px-4 py-2.5 font-medium outline-none focus:border-blue-500" 
+                      placeholder="1000"
+                      value={editingLevel.price ?? ""} 
+                      onChange={(e) => setEditingLevel({ ...editingLevel, price: e.target.value })} 
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-8">
+                  <button 
+                    type="submit" 
+                    className="bg-blue-600 hover:bg-blue-700 transition-colors text-white px-6 py-3 rounded-xl font-bold shadow-md"
+                  >
+                    Сохранить уровень
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setEditingLevel(null)} 
+                    className="bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors px-6 py-3 rounded-xl font-bold"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {levels.map((l) => (
+                  <div 
+                    key={l.id} 
+                    className="bg-white border shadow-sm p-4 rounded-2xl flex items-center justify-between hover:border-blue-300 transition-colors group"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className="font-bold text-gray-800">{l.label}</span>
+                      <span className="text-xs text-gray-500 font-medium">
+                        {l.price != null ? `${l.price} ₽` : "0 ₽ (бесплатно)"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded-lg">
+                        {l.code}
+                      </span>
+                      <div className="hidden group-hover:flex gap-1 ml-2">
+                        <button 
+                          onClick={() => setEditingLevel(l)} 
+                          className="bg-blue-50 text-blue-600 p-1.5 rounded hover:bg-blue-100 transition-colors"
+                          title="Редактировать"
+                        >
+                          ✏️
+                        </button>
+                        <button 
+                          onClick={() => deleteLevel(l.id)} 
+                          className="bg-red-50 text-red-600 p-1.5 rounded hover:bg-red-100 transition-colors"
+                          title="Удалить"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {levels.length === 0 && (
+                  <div className="text-sm text-gray-500 font-medium col-span-full">
+                    Уровней пока нет
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="bg-gray-50/50 p-8 rounded-[28px] border">
@@ -860,6 +971,82 @@ export default function ProjectEditor({
                 </table>
               </div>
             )}
+          </div>
+          
+          {/* КРАСНАЯ ЗОНА: Удаление проекта */}
+          <div className="border-t-4 border-red-100 pt-10 mt-10">
+            <div className="bg-red-50 p-8 rounded-[28px] border border-red-200">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-2xl font-black text-red-800 mb-2">Удаление проекта</h3>
+                  <p className="text-sm text-red-600 font-medium max-w-2xl">
+                    Внимание! Это действие необратимо. Будут удалены все материалы, доступы, заявки и статистика учеников, связанные с этим проектом.
+                  </p>
+                </div>
+                {!showDeleteZone && (
+                  <button 
+                    type="button" 
+                    onClick={() => setShowDeleteZone(true)}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-sm"
+                  >
+                    Удалить проект...
+                  </button>
+                )}
+              </div>
+
+              {showDeleteZone && (
+                <div className="mt-6 bg-white p-6 rounded-2xl border border-red-100 shadow-sm animate-in fade-in slide-in-from-top-4">
+                  <p className="font-bold text-gray-800 mb-4">
+                    Для подтверждения удаления введите название проекта <span className="bg-gray-100 px-2 py-1 rounded font-mono text-red-600">{project.name}</span> и слово <span className="bg-gray-100 px-2 py-1 rounded font-mono text-red-600">DELETE</span>
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Название проекта</label>
+                      <input 
+                        type="text" 
+                        value={deleteConfirmName}
+                        onChange={(e) => setDeleteConfirmName(e.target.value)}
+                        className="w-full border-2 border-red-100 focus:border-red-500 rounded-xl px-4 py-2.5 font-medium outline-none"
+                        placeholder={project.name}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Слово DELETE</label>
+                      <input 
+                        type="text" 
+                        value={deleteConfirmWord}
+                        onChange={(e) => setDeleteConfirmWord(e.target.value)}
+                        className="w-full border-2 border-red-100 focus:border-red-500 rounded-xl px-4 py-2.5 font-medium outline-none font-mono"
+                        placeholder="DELETE"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button 
+                      type="button" 
+                      onClick={handleDeleteProject}
+                      disabled={!canDeleteProject}
+                      className="bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-xl transition-all"
+                    >
+                      Я понимаю риски, удалить навсегда
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setShowDeleteZone(false);
+                        setDeleteConfirmName("");
+                        setDeleteConfirmWord("");
+                      }}
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-xl transition-colors"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

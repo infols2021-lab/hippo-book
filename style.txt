@@ -13390,6 +13390,181 @@ export default function StreakRoadmapModal({
 }
 </file>
 
+<file path="components/TurnstileWidget.tsx">
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        el: HTMLElement,
+        opts: {
+          sitekey: string;
+          action?: string;
+          callback?: (token: string) => void;
+          "error-callback"?: () => void;
+          "expired-callback"?: () => void;
+          "timeout-callback"?: () => void;
+        }
+      ) => string;
+      reset?: (widgetId?: string) => void;
+      remove?: (widgetId: string) => void;
+    };
+  }
+}
+
+type Status = "idle" | "loading" | "ready" | "error";
+
+export default function TurnstileWidget(props: {
+  siteKey: string;
+  action: string;
+  reloadNonce: number;
+  onToken: (token: string | null) => void;
+  onStatus?: (s: Status) => void;
+}) {
+  const { siteKey, action, reloadNonce, onToken, onStatus } = props;
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const widgetIdRef = useRef<string | null>(null);
+  const scriptAddedRef = useRef(false);
+
+  const [status, setStatus] = useState<Status>("idle");
+
+  function setBoth(s: Status) {
+    setStatus(s);
+    onStatus?.(s);
+  }
+
+  const scriptSrc = useMemo(
+    () => "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit",
+    []
+  );
+
+  useEffect(() => {
+    setBoth("loading");
+
+    // 1) Ensure script
+    if (!scriptAddedRef.current) {
+      scriptAddedRef.current = true;
+
+      // prevent duplicates
+      const existing = document.querySelector(`script[src="${scriptSrc}"]`) as HTMLScriptElement | null;
+      if (!existing) {
+        const s = document.createElement("script");
+        s.src = scriptSrc;
+        s.async = true;
+        s.defer = true;
+
+        s.onload = () => {
+          // render will happen in next effect tick
+        };
+        s.onerror = () => {
+          setBoth("error");
+          onToken(null);
+        };
+
+        document.head.appendChild(s);
+      }
+    }
+
+    return () => {};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function waitAndRender() {
+      onToken(null);
+      setBoth("loading");
+
+      // cleanup previous widget
+      try {
+        if (widgetIdRef.current && window.turnstile?.remove) {
+          window.turnstile.remove(widgetIdRef.current);
+        }
+      } catch {}
+      widgetIdRef.current = null;
+
+      // clear container
+      if (containerRef.current) containerRef.current.innerHTML = "";
+
+      // wait for turnstile global
+      const start = Date.now();
+      while (!cancelled && !window.turnstile && Date.now() - start < 6000) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+
+      if (cancelled) return;
+
+      if (!window.turnstile || !containerRef.current) {
+        setBoth("error");
+        onToken(null);
+        return;
+      }
+
+      try {
+        const id = window.turnstile.render(containerRef.current, {
+          sitekey: siteKey,
+          action,
+          callback: (token) => {
+            if (cancelled) return;
+            onToken(token);
+            setBoth("ready");
+          },
+          "error-callback": () => {
+            if (cancelled) return;
+            onToken(null);
+            setBoth("error");
+          },
+          "expired-callback": () => {
+            if (cancelled) return;
+            onToken(null);
+            setBoth("ready"); // widget still visible, just token expired
+          },
+          "timeout-callback": () => {
+            if (cancelled) return;
+            onToken(null);
+            setBoth("error");
+          },
+        });
+
+        widgetIdRef.current = id;
+        // If user sees widget but no token yet — status should become ready shortly
+        setTimeout(() => {
+          if (!cancelled && status !== "error") setBoth("ready");
+        }, 300);
+      } catch {
+        onToken(null);
+        setBoth("error");
+      }
+    }
+
+    void waitAndRender();
+
+    return () => {
+      cancelled = true;
+      try {
+        if (widgetIdRef.current && window.turnstile?.remove) {
+          window.turnstile.remove(widgetIdRef.current);
+        }
+      } catch {}
+      widgetIdRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteKey, action, reloadNonce]);
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div ref={containerRef} />
+      {/* status is handled by parent, no UI here */}
+    </div>
+  );
+}
+</file>
+
 <file path="components/ui/SafeImg.tsx">
 /**
  * components/ui/SafeImg.tsx
@@ -29004,192 +29179,6 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
 }
 </file>
 
-<file path="app/api/admin/projects/[id]/levels/route.ts">
-// app/api/admin/projects/[id]/levels/route.ts
-// ADMIN: управление уровнями проекта (GET список / POST upsert / DELETE по id).
-
-import { ok, fail } from "@/lib/api/response";
-import { requireAdmin } from "@/lib/api/admin";
-import { invalidateProjectsCache } from "@/lib/projects/loader";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-type LevelInput = {
-  id?: string;
-  code?: string;
-  label?: string;
-  short_label?: string | null;
-  level_group?: string | null;
-  order_index?: number;
-  description?: string | null;
-  is_active?: boolean;
-};
-
-function isNonEmptyString(v: unknown): v is string {
-  return typeof v === "string" && v.trim().length > 0;
-}
-
-function cleanObject<T extends Record<string, unknown>>(obj: T): Partial<T> {
-  const out: Partial<T> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined) (out as Record<string, unknown>)[key] = value;
-  }
-  return out;
-}
-
-/** Проверка, что проект существует. */
-async function projectExists(
-  supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createSupabaseServerClient>>,
-  id: string,
-) {
-  const { data, error } = await supabase.from("projects").select("id").eq("id", id).maybeSingle();
-  if (error) throw new Error(error.message);
-  return Boolean(data);
-}
-
-// GET: список уровней проекта
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const guard = await requireAdmin();
-  if ("response" in guard) return guard.response;
-  const { supabase } = guard;
-
-  const { id } = await params;
-
-  try {
-    if (!(await projectExists(supabase, id))) {
-      return fail("Проект не найден", 404, "NOT_FOUND");
-    }
-  } catch (e: any) {
-    return fail(e?.message || "DB error", 500, "DB_ERROR");
-  }
-
-  const { data, error } = await supabase
-    .from("project_levels")
-    .select("*")
-    .eq("project_id", id)
-    .order("order_index", { ascending: true })
-    .order("code", { ascending: true });
-
-  if (error) return fail(error.message, 500, "DB_ERROR");
-
-  return ok({ levels: data ?? [] });
-}
-
-// POST: создать или обновить уровень (upsert по id, если есть)
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const guard = await requireAdmin();
-  if ("response" in guard) return guard.response;
-  const { supabase } = guard;
-
-  const { id: projectId } = await params;
-
-  let body: LevelInput;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Неверный JSON", 400, "BAD_JSON");
-  }
-
-  try {
-    if (!(await projectExists(supabase, projectId))) {
-      return fail("Проект не найден", 404, "NOT_FOUND");
-    }
-  } catch (e: any) {
-    return fail(e?.message || "DB error", 500, "DB_ERROR");
-  }
-
-  const code = (body.code ?? "").trim();
-  const label = (body.label ?? "").trim();
-
-  if (!isNonEmptyString(code)) {
-    return fail("Поле code обязательно", 400, "MISSING_CODE");
-  }
-  if (!isNonEmptyString(label)) {
-    return fail("Поле label обязательно", 400, "MISSING_LABEL");
-  }
-
-  const payload = cleanObject({
-    project_id: projectId,
-    code,
-    label,
-    short_label: body.short_label ?? null,
-    level_group: body.level_group ?? null,
-    order_index: typeof body.order_index === "number" ? body.order_index : 0,
-    description: body.description ?? null,
-    is_active: typeof body.is_active === "boolean" ? body.is_active : true,
-  });
-
-  if (isNonEmptyString(body.id)) {
-    const { data, error } = await supabase
-      .from("project_levels")
-      .update(payload)
-      .eq("id", body.id)
-      .eq("project_id", projectId)
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === "23505") {
-        return fail(`Уровень с кодом «${code}» уже существует в этом проекте`, 409, "DUPLICATE_CODE");
-      }
-      return fail(error.message, 500, "DB_ERROR");
-    }
-
-    invalidateProjectsCache();
-    return ok({ level: data });
-  }
-
-  const { data, error } = await supabase
-    .from("project_levels")
-    .insert(payload)
-    .select()
-    .single();
-
-  if (error) {
-    if (error.code === "23505") {
-      return fail(`Уровень с кодом «${code}» уже существует в этом проекте`, 409, "DUPLICATE_CODE");
-    }
-    return fail(error.message, 500, "DB_ERROR");
-  }
-
-  invalidateProjectsCache();
-  return ok({ level: data }, { status: 201 });
-}
-
-// DELETE: удалить уровень (по ?id=...)
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin();
-  if ("response" in guard) return guard.response;
-  const { supabase } = guard;
-
-  const { id: projectId } = await params;
-  const url = new URL(req.url);
-  const levelId = url.searchParams.get("id");
-
-  if (!levelId) {
-    return fail("Нужен параметр ?id= (id уровня)", 400, "MISSING_ID");
-  }
-
-  const { error } = await supabase
-    .from("project_levels")
-    .delete()
-    .eq("id", levelId)
-    .eq("project_id", projectId);
-
-  if (error) return fail(error.message, 500, "DB_ERROR");
-
-  invalidateProjectsCache();
-  return ok({ deleted: true, id: levelId });
-}
-</file>
-
 <file path="app/api/admin/requests/grants/route.ts">
 // app/api/admin/requests/grants/route.ts
 import { ok, fail } from "@/lib/api/response";
@@ -30613,181 +30602,6 @@ export async function GET() {
       { status: 500 },
     );
   }
-}
-</file>
-
-<file path="components/TurnstileWidget.tsx">
-"use client";
-
-import { useEffect, useMemo, useRef, useState } from "react";
-
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        el: HTMLElement,
-        opts: {
-          sitekey: string;
-          action?: string;
-          callback?: (token: string) => void;
-          "error-callback"?: () => void;
-          "expired-callback"?: () => void;
-          "timeout-callback"?: () => void;
-        }
-      ) => string;
-      reset?: (widgetId?: string) => void;
-      remove?: (widgetId: string) => void;
-    };
-  }
-}
-
-type Status = "idle" | "loading" | "ready" | "error";
-
-export default function TurnstileWidget(props: {
-  siteKey: string;
-  action: string;
-  reloadNonce: number;
-  onToken: (token: string | null) => void;
-  onStatus?: (s: Status) => void;
-}) {
-  const { siteKey, action, reloadNonce, onToken, onStatus } = props;
-
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const widgetIdRef = useRef<string | null>(null);
-  const scriptAddedRef = useRef(false);
-
-  const [status, setStatus] = useState<Status>("idle");
-
-  function setBoth(s: Status) {
-    setStatus(s);
-    onStatus?.(s);
-  }
-
-  const scriptSrc = useMemo(
-    () => "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit",
-    []
-  );
-
-  useEffect(() => {
-    setBoth("loading");
-
-    // 1) Ensure script
-    if (!scriptAddedRef.current) {
-      scriptAddedRef.current = true;
-
-      // prevent duplicates
-      const existing = document.querySelector(`script[src="${scriptSrc}"]`) as HTMLScriptElement | null;
-      if (!existing) {
-        const s = document.createElement("script");
-        s.src = scriptSrc;
-        s.async = true;
-        s.defer = true;
-
-        s.onload = () => {
-          // render will happen in next effect tick
-        };
-        s.onerror = () => {
-          setBoth("error");
-          onToken(null);
-        };
-
-        document.head.appendChild(s);
-      }
-    }
-
-    return () => {};
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function waitAndRender() {
-      onToken(null);
-      setBoth("loading");
-
-      // cleanup previous widget
-      try {
-        if (widgetIdRef.current && window.turnstile?.remove) {
-          window.turnstile.remove(widgetIdRef.current);
-        }
-      } catch {}
-      widgetIdRef.current = null;
-
-      // clear container
-      if (containerRef.current) containerRef.current.innerHTML = "";
-
-      // wait for turnstile global
-      const start = Date.now();
-      while (!cancelled && !window.turnstile && Date.now() - start < 6000) {
-        await new Promise((r) => setTimeout(r, 100));
-      }
-
-      if (cancelled) return;
-
-      if (!window.turnstile || !containerRef.current) {
-        setBoth("error");
-        onToken(null);
-        return;
-      }
-
-      try {
-        const id = window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
-          action,
-          callback: (token) => {
-            if (cancelled) return;
-            onToken(token);
-            setBoth("ready");
-          },
-          "error-callback": () => {
-            if (cancelled) return;
-            onToken(null);
-            setBoth("error");
-          },
-          "expired-callback": () => {
-            if (cancelled) return;
-            onToken(null);
-            setBoth("ready"); // widget still visible, just token expired
-          },
-          "timeout-callback": () => {
-            if (cancelled) return;
-            onToken(null);
-            setBoth("error");
-          },
-        });
-
-        widgetIdRef.current = id;
-        // If user sees widget but no token yet — status should become ready shortly
-        setTimeout(() => {
-          if (!cancelled && status !== "error") setBoth("ready");
-        }, 300);
-      } catch {
-        onToken(null);
-        setBoth("error");
-      }
-    }
-
-    void waitAndRender();
-
-    return () => {
-      cancelled = true;
-      try {
-        if (widgetIdRef.current && window.turnstile?.remove) {
-          window.turnstile.remove(widgetIdRef.current);
-        }
-      } catch {}
-      widgetIdRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [siteKey, action, reloadNonce]);
-
-  return (
-    <div style={{ marginTop: 10 }}>
-      <div ref={containerRef} />
-      {/* status is handled by parent, no UI here */}
-    </div>
-  );
 }
 </file>
 
@@ -35059,6 +34873,194 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
+<file path="app/api/admin/projects/[id]/levels/route.ts">
+// app/api/admin/projects/[id]/levels/route.ts
+// ADMIN: управление уровнями проекта (GET список / POST upsert / DELETE по id).
+
+import { ok, fail } from "@/lib/api/response";
+import { requireAdmin } from "@/lib/api/admin";
+import { invalidateProjectsCache } from "@/lib/projects/loader";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type LevelInput = {
+  id?: string;
+  code?: string;
+  label?: string;
+  short_label?: string | null;
+  level_group?: string | null;
+  order_index?: number;
+  description?: string | null;
+  is_active?: boolean;
+  price?: number | null;
+};
+
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === "string" && v.trim().length > 0;
+}
+
+function cleanObject<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) (out as Record<string, unknown>)[key] = value;
+  }
+  return out;
+}
+
+/** Проверка, что проект существует. */
+async function projectExists(
+  supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createSupabaseServerClient>>,
+  id: string,
+) {
+  const { data, error } = await supabase.from("projects").select("id").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return Boolean(data);
+}
+
+// GET: список уровней проекта
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+  const { supabase } = guard;
+
+  const { id } = await params;
+
+  try {
+    if (!(await projectExists(supabase, id))) {
+      return fail("Проект не найден", 404, "NOT_FOUND");
+    }
+  } catch (e: any) {
+    return fail(e?.message || "DB error", 500, "DB_ERROR");
+  }
+
+  const { data, error } = await supabase
+    .from("project_levels")
+    .select("*")
+    .eq("project_id", id)
+    .order("order_index", { ascending: true })
+    .order("code", { ascending: true });
+
+  if (error) return fail(error.message, 500, "DB_ERROR");
+
+  return ok({ levels: data ?? [] });
+}
+
+// POST: создать или обновить уровень (upsert по id, если есть)
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+  const { supabase } = guard;
+
+  const { id: projectId } = await params;
+
+  let body: LevelInput;
+  try {
+    body = await req.json();
+  } catch {
+    return fail("Неверный JSON", 400, "BAD_JSON");
+  }
+
+  try {
+    if (!(await projectExists(supabase, projectId))) {
+      return fail("Проект не найден", 404, "NOT_FOUND");
+    }
+  } catch (e: any) {
+    return fail(e?.message || "DB error", 500, "DB_ERROR");
+  }
+
+  const code = (body.code ?? "").trim();
+  const label = (body.label ?? "").trim();
+
+  if (!isNonEmptyString(code)) {
+    return fail("Поле code обязательно", 400, "MISSING_CODE");
+  }
+  if (!isNonEmptyString(label)) {
+    return fail("Поле label обязательно", 400, "MISSING_LABEL");
+  }
+
+  const payload = cleanObject({
+    project_id: projectId,
+    code,
+    label,
+    short_label: body.short_label ?? null,
+    level_group: body.level_group ?? null,
+    order_index: typeof body.order_index === "number" ? body.order_index : 0,
+    description: body.description ?? null,
+    is_active: typeof body.is_active === "boolean" ? body.is_active : true,
+    price: typeof body.price === "number" ? body.price : null,
+  });
+
+  if (isNonEmptyString(body.id)) {
+    const { data, error } = await supabase
+      .from("project_levels")
+      .update(payload)
+      .eq("id", body.id)
+      .eq("project_id", projectId)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        return fail(`Уровень с кодом «${code}» уже существует в этом проекте`, 409, "DUPLICATE_CODE");
+      }
+      return fail(error.message, 500, "DB_ERROR");
+    }
+
+    invalidateProjectsCache();
+    return ok({ level: data });
+  }
+
+  const { data, error } = await supabase
+    .from("project_levels")
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      return fail(`Уровень с кодом «${code}» уже существует в этом проекте`, 409, "DUPLICATE_CODE");
+    }
+    return fail(error.message, 500, "DB_ERROR");
+  }
+
+  invalidateProjectsCache();
+  return ok({ level: data }, { status: 201 });
+}
+
+// DELETE: удалить уровень (по ?id=...)
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+  const { supabase } = guard;
+
+  const { id: projectId } = await params;
+  const url = new URL(req.url);
+  const levelId = url.searchParams.get("id");
+
+  if (!levelId) {
+    return fail("Нужен параметр ?id= (id уровня)", 400, "MISSING_ID");
+  }
+
+  const { error } = await supabase
+    .from("project_levels")
+    .delete()
+    .eq("id", levelId)
+    .eq("project_id", projectId);
+
+  if (error) return fail(error.message, 500, "DB_ERROR");
+
+  invalidateProjectsCache();
+  return ok({ deleted: true, id: levelId });
+}
+</file>
+
 <file path="app/api/admin/projects/[id]/materials/[materialId]/route.ts">
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
@@ -38941,266 +38943,6 @@ export type ProjectConfig = {
 };
 </file>
 
-<file path="lib/requests/normalize.ts">
-// lib/requests/normalize.ts
-// Единая нормализация данных для заявок (purchase_requests).
-// Production-ready: полностью удалены легаси-зависимости gatehouse и format.ts
-
-import {
-  normalizeString,
-  normalizeNullableString,
-  toStringArray,
-  uniqueStrings,
-  normalizeBranchType,
-  normalizeMaterialKind,
-  normalizeTargetLevels,
-} from "@/lib/materials/normalize";
-
-// ----------------------------------------------------------------------------
-// Типы
-// ----------------------------------------------------------------------------
-
-export type RequestBranchType = string;
-
-export type NormalizedRequest = {
-  branch_type: RequestBranchType;
-  class_level: string | null;
-  target_levels: string[];
-  textbook_types: string[];
-  material_kinds: string[];
-  email: string;
-  full_name: string;
-  contact_phone: string | null;
-  is_processed: boolean;
-};
-
-// ----------------------------------------------------------------------------
-// Нормализация массивов
-// ----------------------------------------------------------------------------
-
-export function normalizeRequestTargetLevels(value: unknown): string[] {
-  // Теперь все уровни (и Олимпиада, и Gatehouse, и кастомные) нормализуются одинаково
-  return normalizeTargetLevels(value);
-}
-
-export function normalizeRequestMaterialKinds(value: unknown): string[] {
-  // Универсальная нормализация для любых типов материалов
-  return uniqueStrings(toStringArray(value).map(v => normalizeMaterialKind(v)));
-}
-
-// ----------------------------------------------------------------------------
-// Полная нормализация заявки (из body)
-// ----------------------------------------------------------------------------
-
-export function normalizeRequestPayload(
-  body: Record<string, unknown>,
-  profileEmail?: string,
-  profileFullName?: string,
-  profilePhone?: string,
-): NormalizedRequest {
-  const branch_type = normalizeBranchType(body.branch_type ?? "olympiad");
-  const class_level = normalizeNullableString(body.class_level);
-  
-  const target_levels = normalizeRequestTargetLevels(body.target_levels ?? body.target_level);
-  
-  const textbook_types = normalizeRequestMaterialKinds(body.textbook_types ?? body.material_kinds);
-  const material_kinds = normalizeRequestMaterialKinds(body.material_kinds ?? body.textbook_types);
-  
-  const email = normalizeString(profileEmail ?? body.email);
-  const full_name = normalizeString(profileFullName ?? body.full_name);
-  const contact_phone = normalizeNullableString(profilePhone ?? body.contact_phone);
-
-  return {
-    branch_type,
-    class_level,
-    target_levels,
-    textbook_types,
-    material_kinds,
-    email,
-    full_name,
-    contact_phone,
-    is_processed: false,
-  };
-}
-
-// ----------------------------------------------------------------------------
-// Генерация номера заявки
-// ----------------------------------------------------------------------------
-
-export function generateRequestNumber(
-  branchType: RequestBranchType,
-  customPrefix?: string,
-): string {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-
-  let prefix = "PR";
-  if (customPrefix) {
-    prefix = customPrefix.toUpperCase();
-  } else if (branchType === "gatehouse") {
-    prefix = "GA";
-  } else if (branchType !== "olympiad") {
-    prefix = branchType.substring(0, 2).toUpperCase();
-  }
-
-  return `${prefix}-${yyyy}${mm}${dd}-${random}`;
-}
-
-// ----------------------------------------------------------------------------
-// Форматирование для Google Sheets (A:G) - ЗАМЕНЯЕТ УДАЛЕННЫЙ format.ts
-// ----------------------------------------------------------------------------
-
-export function formatDateTimeRU(dateString: string): string {
-  if (!dateString) return "—";
-  const d = new Date(dateString);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("ru-RU", {
-    timeZone: "Europe/Moscow",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-export function formatRequestStatus(isProcessed: boolean, processedAt?: string | null): string {
-  if (!isProcessed) return "⏳ Ожидает";
-  if (processedAt) return `✅ Обработана · ${formatDateTimeRU(processedAt)}`;
-  return "✅ Обработана";
-}
-
-export function formatTargetForSheet(
-  branchType: RequestBranchType,
-  classLevel: string | null,
-  targetLevels: string[],
-): string {
-  if (targetLevels.length > 0) return targetLevels.join(", ");
-  return classLevel ? classLevel : "—";
-}
-
-export function formatMaterialTypesForSheet(
-  branchType: RequestBranchType,
-  kinds: string[],
-): string {
-  const typeMap: Record<string, string> = {
-    mock_test: "📝 Пробные тесты",
-    textbook: "📚 Учебник",
-    crossword: "🧩 Кроссворд",
-    material: "📁 Материалы"
-  };
-  return kinds.map((t) => typeMap[t.toLowerCase()] || t).join(", ");
-}
-
-export function buildSheetValues(
-  requestNumber: string,
-  createdAt: string,
-  branchType: RequestBranchType,
-  classLevel: string | null,
-  targetLevels: string[],
-  materialKinds: string[],
-  email: string,
-  fullName: string,
-  isProcessed: boolean,
-  processedAt?: string | null,
-): string[] {
-  return [
-    requestNumber,
-    formatDateTimeRU(createdAt),
-    formatTargetForSheet(branchType, classLevel, targetLevels),
-    formatMaterialTypesForSheet(branchType, materialKinds),
-    email,
-    fullName,
-    formatRequestStatus(isProcessed, processedAt),
-  ];
-}
-
-// ----------------------------------------------------------------------------
-// Валидация
-// ----------------------------------------------------------------------------
-
-export function validateRequest(normalized: NormalizedRequest): {
-  valid: boolean;
-  error?: string;
-} {
-  if (!normalized.textbook_types.length && !normalized.material_kinds.length) {
-    return { valid: false, error: "Выберите тип материала" };
-  }
-  if (normalized.branch_type === "gatehouse" && normalized.target_levels.length === 0) {
-    return { valid: false, error: "Выберите уровень экзамена" };
-  }
-  if (normalized.branch_type !== "gatehouse" && !normalized.class_level && normalized.target_levels.length === 0) {
-    return { valid: false, error: "Выберите класс или уровень" };
-  }
-  if (!normalized.email || !normalized.full_name) {
-    return { valid: false, error: "Заполните email и ФИО" };
-  }
-  return { valid: true };
-}
-
-// ----------------------------------------------------------------------------
-// Экспорты для admin/requests/route.ts
-// ----------------------------------------------------------------------------
-
-export type ReqRowLike = {
-  target_levels?: unknown;
-  target_level?: unknown;
-  material_kinds?: unknown;
-  textbook_types?: unknown;
-  class_level?: unknown;
-  branch_type?: unknown;
-};
-
-export function getRequestTargetLevels(r: ReqRowLike): string[] {
-  const raw = r.target_levels ?? r.target_level ?? [];
-  return toStringArray(raw);
-}
-
-export function getRequestMaterialKinds(r: ReqRowLike): string[] {
-  const raw = r.material_kinds ?? r.textbook_types ?? [];
-  return normalizeRequestMaterialKinds(raw);
-}
-
-// ----------------------------------------------------------------------------
-// Реэкспорты из материалов (для маршрутов create/update)
-// ----------------------------------------------------------------------------
-
-export {
-  normalizeBranchType,
-  normalizeString,
-  normalizeNullableString,
-  toStringArray,
-  uniqueStrings,
-  normalizeMaterialKind,
-};
-
-// ----------------------------------------------------------------------------
-// Вспомогательные функции для массивов
-// ----------------------------------------------------------------------------
-
-export function toArr(v: any): string[] {
-  return toStringArray(v);
-}
-
-export function uniq<T>(arr: T[]): T[] {
-  return Array.from(new Set(arr));
-}
-
-export function overlaps(a: string[], b: string[]): boolean {
-  const set = new Set(a.map(String));
-  return b.some((x) => set.has(String(x)));
-}
-
-export function formatBranchLabel(branchType: RequestBranchType): string {
-  if (branchType === "gatehouse") return "🎓 Gatehouse Awards";
-  if (branchType === "olympiad") return "🏆 Олимпиада";
-  return `📁 ${branchType.charAt(0).toUpperCase() + branchType.slice(1)}`;
-}
-</file>
-
 <file path="app/(admin)/admin/projects/ProjectsTab.tsx">
 // app/(admin)/admin/projects/ProjectsTab.tsx
 "use client";
@@ -41922,6 +41664,271 @@ export async function loadProjectMaterialPageData(
  
 export function formatMaterialDate(value: unknown): string {
   return formatDate(value);
+}
+</file>
+
+<file path="lib/requests/normalize.ts">
+// lib/requests/normalize.ts
+// Единая нормализация данных для заявок (purchase_requests).
+// Production-ready: полностью удалены легаси-зависимости gatehouse и format.ts
+
+import {
+  normalizeString,
+  normalizeNullableString,
+  toStringArray,
+  uniqueStrings,
+  normalizeBranchType,
+  normalizeMaterialKind,
+  normalizeTargetLevels,
+} from "@/lib/materials/normalize";
+
+// ----------------------------------------------------------------------------
+// Типы
+// ----------------------------------------------------------------------------
+
+export type RequestBranchType = string;
+
+export type NormalizedRequest = {
+  branch_type: RequestBranchType;
+  class_level: string | null;
+  target_levels: string[];
+  textbook_types: string[];
+  material_kinds: string[];
+  email: string;
+  full_name: string;
+  contact_phone: string | null;
+  is_processed: boolean;
+};
+
+// ----------------------------------------------------------------------------
+// Нормализация массивов
+// ----------------------------------------------------------------------------
+
+export function normalizeRequestTargetLevels(value: unknown): string[] {
+  return normalizeTargetLevels(value);
+}
+
+export function normalizeRequestMaterialKinds(value: unknown): string[] {
+  return uniqueStrings(toStringArray(value).map(v => normalizeMaterialKind(v)));
+}
+
+// ----------------------------------------------------------------------------
+// Полная нормализация заявки (из body)
+// ----------------------------------------------------------------------------
+
+export function normalizeRequestPayload(
+  body: Record<string, unknown>,
+  profileEmail?: string,
+  profileFullName?: string,
+  profilePhone?: string,
+): NormalizedRequest {
+  const branch_type = normalizeBranchType(body.branch_type ?? "olympiad");
+  const class_level = normalizeNullableString(body.class_level);
+  
+  // Умный фолбэк если пришел class_level но нет target_levels мы дублируем данные
+  // чтобы универсальная валидация проходила для всех проектов
+  const rawTargetLevels = body.target_levels ?? body.target_level;
+  const target_levels = normalizeRequestTargetLevels(
+    rawTargetLevels !== undefined ? rawTargetLevels : (class_level ? [class_level] : [])
+  );
+  
+  const textbook_types = normalizeRequestMaterialKinds(body.textbook_types ?? body.material_kinds);
+  const material_kinds = normalizeRequestMaterialKinds(body.material_kinds ?? body.textbook_types);
+  
+  const email = normalizeString(profileEmail ?? body.email);
+  const full_name = normalizeString(profileFullName ?? body.full_name);
+  const contact_phone = normalizeNullableString(profilePhone ?? body.contact_phone);
+
+  return {
+    branch_type,
+    class_level,
+    target_levels,
+    textbook_types,
+    material_kinds,
+    email,
+    full_name,
+    contact_phone,
+    is_processed: false,
+  };
+}
+
+// ----------------------------------------------------------------------------
+// Генерация номера заявки
+// ----------------------------------------------------------------------------
+
+export function generateRequestNumber(
+  branchType: RequestBranchType,
+  customPrefix?: string,
+): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
+
+  let prefix = "PR";
+  if (customPrefix) {
+    prefix = customPrefix.toUpperCase();
+  } else if (branchType === "gatehouse") {
+    prefix = "GA";
+  } else if (branchType !== "olympiad") {
+    prefix = branchType.substring(0, 2).toUpperCase();
+  }
+
+  return `${prefix}-${yyyy}${mm}${dd}-${random}`;
+}
+
+// ----------------------------------------------------------------------------
+// Форматирование для Google Sheets (A:G)
+// ----------------------------------------------------------------------------
+
+export function formatDateTimeRU(dateString: string): string {
+  if (!dateString) return "—";
+  const d = new Date(dateString);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("ru-RU", {
+    timeZone: "Europe/Moscow",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function formatRequestStatus(isProcessed: boolean, processedAt?: string | null): string {
+  if (!isProcessed) return "⏳ Ожидает";
+  if (processedAt) return `✅ Обработана · ${formatDateTimeRU(processedAt)}`;
+  return "✅ Обработана";
+}
+
+export function formatTargetForSheet(
+  branchType: RequestBranchType,
+  classLevel: string | null,
+  targetLevels: string[],
+): string {
+  if (targetLevels.length > 0) return targetLevels.join(", ");
+  return classLevel ? classLevel : "—";
+}
+
+export function formatMaterialTypesForSheet(
+  branchType: RequestBranchType,
+  kinds: string[],
+): string {
+  const typeMap: Record<string, string> = {
+    mock_test: "📝 Пробные тесты",
+    textbook: "📚 Учебник",
+    crossword: "🧩 Кроссворд",
+    material: "📁 Материалы"
+  };
+  return kinds.map((t) => typeMap[t.toLowerCase()] || t).join(", ");
+}
+
+export function buildSheetValues(
+  requestNumber: string,
+  createdAt: string,
+  branchType: RequestBranchType,
+  classLevel: string | null,
+  targetLevels: string[],
+  materialKinds: string[],
+  email: string,
+  fullName: string,
+  isProcessed: boolean,
+  processedAt?: string | null,
+): string[] {
+  return [
+    requestNumber,
+    formatDateTimeRU(createdAt),
+    formatTargetForSheet(branchType, classLevel, targetLevels),
+    formatMaterialTypesForSheet(branchType, materialKinds),
+    email,
+    fullName,
+    formatRequestStatus(isProcessed, processedAt),
+  ];
+}
+
+// ----------------------------------------------------------------------------
+// Валидация
+// ----------------------------------------------------------------------------
+
+export function validateRequest(normalized: NormalizedRequest): {
+  valid: boolean;
+  error?: string;
+} {
+  if (!normalized.textbook_types.length && !normalized.material_kinds.length) {
+    return { valid: false, error: "Выберите раздел материалов" };
+  }
+  
+  // Универсальная проверка для всех проектов
+  // Если есть хотя бы один из параметров уровня валидация проходит
+  if (!normalized.class_level && normalized.target_levels.length === 0) {
+    return { valid: false, error: "Выберите класс или уровень" };
+  }
+  
+  if (!normalized.email || !normalized.full_name) {
+    return { valid: false, error: "Заполните email и ФИО" };
+  }
+  
+  return { valid: true };
+}
+
+// ----------------------------------------------------------------------------
+// Экспорты для admin/requests/route.ts
+// ----------------------------------------------------------------------------
+
+export type ReqRowLike = {
+  target_levels?: unknown;
+  target_level?: unknown;
+  material_kinds?: unknown;
+  textbook_types?: unknown;
+  class_level?: unknown;
+  branch_type?: unknown;
+};
+
+export function getRequestTargetLevels(r: ReqRowLike): string[] {
+  const raw = r.target_levels ?? r.target_level ?? [];
+  return toStringArray(raw);
+}
+
+export function getRequestMaterialKinds(r: ReqRowLike): string[] {
+  const raw = r.material_kinds ?? r.textbook_types ?? [];
+  return normalizeRequestMaterialKinds(raw);
+}
+
+// ----------------------------------------------------------------------------
+// Реэкспорты из материалов (для маршрутов create/update)
+// ----------------------------------------------------------------------------
+
+export {
+  normalizeBranchType,
+  normalizeString,
+  normalizeNullableString,
+  toStringArray,
+  uniqueStrings,
+  normalizeMaterialKind,
+};
+
+// ----------------------------------------------------------------------------
+// Вспомогательные функции для массивов
+// ----------------------------------------------------------------------------
+
+export function toArr(v: any): string[] {
+  return toStringArray(v);
+}
+
+export function uniq<T>(arr: T[]): T[] {
+  return Array.from(new Set(arr));
+}
+
+export function overlaps(a: string[], b: string[]): boolean {
+  const set = new Set(a.map(String));
+  return b.some((x) => set.has(String(x)));
+}
+
+export function formatBranchLabel(branchType: RequestBranchType): string {
+  if (branchType === "gatehouse") return "🎓 Gatehouse Awards";
+  if (branchType === "olympiad") return "🏆 Олимпиада";
+  return `📁 ${branchType.charAt(0).toUpperCase() + branchType.slice(1)}`;
 }
 </file>
 
@@ -47457,572 +47464,6 @@ export default async function ProjectLayout({
 }
 </file>
 
-<file path="app/(app)/projects/[slug]/requests/RequestsClient.tsx">
-// app/(app)/projects/[slug]/requests/RequestsClient.tsx
-"use client";
-
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import Modal from "@/components/Modal";
-import { useRouter } from "next/navigation";
-
-import "./requests.css";
-
-type ProjectLevel = { id: string; code: string; label: string; };
-type ProjectTab = { id: string; slug: string; title: string; icon: string | null; price?: number };
-type Project = { id: string; name: string; slug: string; };
-
-type PurchaseRequest = {
-  id: string;
-  request_number: string;
-  created_at: string;
-  class_level: string | null;
-  textbook_types: string[] | null;
-  material_kinds?: string[] | null;
-  email: string;
-  full_name: string;
-  is_processed: boolean;
-  user_id: string;
-  project_id?: string | null;
-  total_price?: number | null;
-};
-
-type Props = {
-  project: Project;
-  levels: ProjectLevel[];
-  tabs: ProjectTab[];
-  userId: string;
-  userEmail: string;
-  userFullName: string;
-  initialRequests: PurchaseRequest[];
-};
-
-function generateRequestNumber() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `PR-${year}${month}${day}-${random}`;
-}
-
-function normalizeString(value: unknown) {
-  return String(value ?? "").trim();
-}
-
-function toStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map((item) => normalizeString(item)).filter(Boolean);
-  if (typeof value === "string") {
-    const text = value.trim();
-    if (!text) return [];
-    if (text.startsWith("[") && text.endsWith("]")) {
-      try { return toStringArray(JSON.parse(text)); } catch { return []; }
-    }
-    return text.split(",").map((item) => item.trim()).filter(Boolean);
-  }
-  const single = normalizeString(value);
-  return single ? [single] : [];
-}
-
-function formatDateTime(dateString: string | null | undefined) {
-  if (!dateString) return "—";
-  const d = new Date(dateString);
-  if (Number.isNaN(d.getTime())) return String(dateString);
-  return d.toLocaleString("ru-RU", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
-
-function getPaymentQRUrl(seed?: number) {
-  const t = encodeURIComponent(String(seed ?? Date.now()));
-  return `/api/storage/public/help-images/oplata.png?t=${t}`;
-}
-
-async function safeReadJson(res: Response) {
-  const text = await res.text();
-  let json: any = null;
-  try { json = text ? JSON.parse(text) : null; } catch { json = null; }
-  return { text, json };
-}
-
-function normalizeRequestRow(row: any): PurchaseRequest {
-  return {
-    id: String(row?.id ?? ""),
-    user_id: String(row?.user_id ?? ""),
-    request_number: String(row?.request_number ?? ""),
-    created_at: typeof row?.created_at === "string" ? row.created_at : "",
-    class_level: typeof row?.class_level === "string" ? row.class_level : null,
-    textbook_types: toStringArray(row?.textbook_types),
-    material_kinds: toStringArray(row?.material_kinds),
-    email: String(row?.email ?? ""),
-    full_name: String(row?.full_name ?? ""),
-    is_processed: Boolean(row?.is_processed),
-    project_id: row?.project_id ?? null,
-    total_price: row?.total_price ?? null,
-  };
-}
-
-export default function RequestsClient({ project, levels, tabs, userId, userEmail, userFullName, initialRequests }: Props) {
-  const router = useRouter();
-  const [requests, setRequests] = useState<PurchaseRequest[]>(() => initialRequests.map(normalizeRequestRow));
-  const [notif, setNotif] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  const [requestModalOpen, setRequestModalOpen] = useState(false);
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [requestNumber, setRequestNumber] = useState("");
-  const [requestDateTime, setRequestDateTime] = useState("");
-  const [classLevel, setClassLevel] = useState("");
-  const [selectedTabs, setSelectedTabs] = useState<string[]>([]);
-  
-  const [currentEmail, setCurrentEmail] = useState(userEmail);
-  const [currentFullName, setCurrentFullName] = useState(userFullName);
-
-  const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
-  const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
-  const [qrLoading, setQrLoading] = useState(true); 
-  const [qrError, setQrError] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
-
-  const tabTitleToId = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of tabs) {
-      if (t.title) map.set(t.title, t.id);
-    }
-    return map;
-  }, [tabs]);
-
-  const getTabPrice = (tabId: string): number => {
-    const tab = tabs.find(t => t.id === tabId);
-    return tab?.price ?? 0;
-  };
-
-  const totalAmount = selectedTabs.reduce((sum, id) => sum + getTabPrice(id), 0);
-
-  const lastPendingRequest = useMemo(() => {
-    return requests.find((r) => !r.is_processed) ?? null;
-  }, [requests]);
-
-  const lastPendingAmount = useMemo(() => {
-    if (!lastPendingRequest) return 0;
-    if (lastPendingRequest.total_price != null) return lastPendingRequest.total_price;
-
-    const tabNames = lastPendingRequest.material_kinds?.length ? lastPendingRequest.material_kinds : (lastPendingRequest.textbook_types || []);
-    const ids = tabNames.map(name => tabTitleToId.get(name) || name); 
-    return ids.reduce((sum, id) => sum + getTabPrice(id), 0);
-  }, [lastPendingRequest, tabTitleToId, tabs]);
-
-  useEffect(() => {
-    setRequests(initialRequests.map(normalizeRequestRow));
-  }, [initialRequests]);
-
-  function showNotification(text: string, type: "success" | "error" = "success") {
-    setNotif({ type, text });
-    setTimeout(() => setNotif(null), 4000);
-  }
-
-  function openPaymentModal(amount: number) {
-    setPaymentTotalAmount(amount);
-    setQrLoading(true);
-    setQrError(false);
-    setQrSeed(Date.now());
-    setPaymentModalOpen(true);
-  }
-
-  function resetQrStateAndRefresh() {
-    setQrError(false);
-    setQrLoading(true);
-    setQrSeed(Date.now());
-  }
-
-  function openCreate() {
-    setEditingId(null);
-    setRequestNumber(generateRequestNumber());
-    const now = new Date();
-    const tzOffset = now.getTimezoneOffset() * 60000;
-    const localISO = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
-    setRequestDateTime(localISO);
-    setClassLevel("");
-    setSelectedTabs([]);
-    setCurrentEmail(userEmail);
-    setCurrentFullName(userFullName);
-    setRequestModalOpen(true);
-  }
-
-  function openEdit(r: PurchaseRequest) {
-    if (r.is_processed) {
-      showNotification("🔒 Обработанную заявку нельзя редактировать", "error");
-      return;
-    }
-    setEditingId(r.id);
-    setRequestNumber(r.request_number);
-    const d = new Date(r.created_at || new Date().toISOString());
-    const tzOffset = d.getTimezoneOffset() * 60000;
-    const localISO = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
-    setRequestDateTime(localISO);
-    setClassLevel(r.class_level || "");
-
-    const rawTabs = r.material_kinds?.length ? r.material_kinds : (r.textbook_types || []);
-    const tabIds = rawTabs.map(name => tabTitleToId.get(name) || name);
-    setSelectedTabs(tabIds);
-
-    setCurrentEmail(r.email || userEmail);
-    setCurrentFullName(r.full_name || userFullName);
-    
-    setRequestModalOpen(true);
-  }
-
-  async function saveRequest() {
-    if (busy) return;
-    if (!requestDateTime || !classLevel) {
-      showNotification("❌ Пожалуйста, выберите уровень", "error");
-      return;
-    }
-    if (selectedTabs.length === 0) {
-      showNotification("❌ Пожалуйста, выберите хотя бы один раздел", "error");
-      return;
-    }
-
-    if (editingId) {
-      const cur = requests.find((x) => x.id === editingId);
-      if (cur?.is_processed) {
-        showNotification("🔒 Обработанную заявку нельзя редактировать", "error");
-        setRequestModalOpen(false);
-        return;
-      }
-    }
-
-    const payload = {
-      request_number: requestNumber,
-      created_at: requestDateTime + ":00Z",
-      branch_type: project.slug,
-      project_id: project.id,
-      class_level: classLevel,
-      textbook_types: selectedTabs,
-      material_kinds: selectedTabs,
-      email: currentEmail,
-      full_name: currentFullName,
-      user_id: userId,
-      is_processed: false,
-      total_price: totalAmount,
-    };
-
-    setBusy(true);
-
-    try {
-      const url = editingId ? "/api/requests/update" : "/api/requests/create";
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify(editingId ? { id: editingId, ...payload } : payload),
-      });
-
-      const { json } = await safeReadJson(res);
-      if (!res.ok || !json?.ok) throw new Error(json?.error || `HTTP ${res.status}`);
-
-      setRequestModalOpen(false);
-      openPaymentModal(totalAmount);
-      showNotification(editingId ? "✅ Заявка успешно обновлена" : "✅ Заявка успешно создана");
-      router.refresh();
-    } catch (e: any) {
-      showNotification("❌ Ошибка: " + e.message, "error");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function deleteRequest(r: PurchaseRequest) {
-    if (busy) return;
-    if (r.is_processed) {
-      showNotification("🔒 Обработанную заявку нельзя удалить", "error");
-      return;
-    }
-
-    const okConfirm = window.confirm(`Удалить заявку ${r.request_number}?`);
-    if (!okConfirm) return;
-
-    setBusy(true);
-    try {
-      const res = await fetch("/api/requests/delete", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({ id: r.id }),
-      });
-
-      const { json } = await safeReadJson(res);
-      if (!res.ok || !json?.ok) throw new Error(json?.error || `HTTP ${res.status}`);
-
-      showNotification("✅ Заявка успешно удалена");
-      router.refresh();
-    } catch (e: any) {
-      showNotification("Ошибка: " + e.message, "error");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const brandMark = project.name.substring(0, 2).toUpperCase() || "EK";
-
-  const formatPrice = (price: number) => {
-    if (price === 0) return "бесплатно";
-    return `${price} ₽`;
-  };
-
-  return (
-    <div className="page-requests">
-      {notif ? <div className={`notification ${notif.type === "error" ? "error" : ""}`}>{notif.text}</div> : null}
-
-      <Modal open={requestModalOpen} onClose={() => setRequestModalOpen(false)} title={editingId ? "Редактировать заявку" : "Создать заявку"} maxWidth={520}>
-        <form onSubmit={(e) => { e.preventDefault(); void saveRequest(); }}>
-          <div className="form-group">
-            <label>Номер заявки:</label>
-            <input type="text" value={requestNumber} readOnly className="bg-gray-100" />
-          </div>
-
-          <div className="form-group">
-            <label>Класс (Уровень):</label>
-            <select value={classLevel} onChange={(e) => setClassLevel(e.target.value)} required>
-              <option value="">-- Выберите уровень --</option>
-              {levels.map(l => (
-                <option key={l.id} value={l.label}>{l.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Разделы материалов:</label>
-            <div className="checkbox-group">
-              {tabs.map(t => {
-                const isChecked = selectedTabs.includes(t.id);
-                const price = t.price ?? 0;
-                return (
-                  <div
-                    key={t.id}
-                    className={`checkbox-item ${isChecked ? "checked" : ""}`}
-                    onClick={() => setSelectedTabs(prev => isChecked ? prev.filter(id => id !== t.id) : [...prev, t.id])}
-                  >
-                    <input type="checkbox" checked={isChecked} readOnly />
-                    <label>
-                      {t.icon} {t.title}
-                      <span className="price-info">({formatPrice(price)})</span>
-                    </label>
-                  </div>
-                );
-              })}
-              {tabs.length === 0 && <span className="text-gray-500 text-sm">В проекте пока нет разделов</span>}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Email:</label>
-            <input 
-              type="email" 
-              value={currentEmail} 
-              onChange={(e) => setCurrentEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>ФИО ученика:</label>
-            <input 
-              type="text" 
-              value={currentFullName} 
-              onChange={(e) => setCurrentFullName(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="total-amount" style={{ display: totalAmount > 0 ? "block" : "none" }}>
-            <h4>💰 Общая сумма к оплате:</h4>
-            <div className="amount">{totalAmount} руб.</div>
-          </div>
-
-          <div className="modal-actions">
-            <button type="button" className="btn secondary" onClick={() => setRequestModalOpen(false)} disabled={busy}>❌ Отмена</button>
-            <button type="submit" className="btn" disabled={busy}>{busy ? "Сохраняем..." : "💾 Сохранить заявку"}</button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="✅ Оплата заявки" maxWidth={540}>
-        <div style={{ background: "color-mix(in srgb, var(--project-primary) 12%, transparent)", padding: "18px", borderRadius: "14px", border: "1px solid color-mix(in srgb, var(--project-primary) 25%, transparent)", marginBottom: "20px" }}>
-          <h4 style={{ margin: "0 0 14px 0", color: "var(--project-primary)", fontSize: "16px", filter: "brightness(0.7)" }}>📋 Инструкция по оплате</h4>
-          <ul style={{ margin: 0, paddingLeft: "18px", color: "var(--project-text)", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px" }}>
-            <li><strong>Отсканируйте QR-код</strong> в вашем банковском приложении.</li>
-            <li>Сумма к оплате: <strong style={{ fontSize: "16px", color: "var(--project-primary)" }}>{paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "Сумма не определена"}</strong></li>
-            <li>В назначении платежа (сообщении) <strong>ОБЯЗАТЕЛЬНО</strong> укажите: <br/>
-              <span style={{ background: "var(--project-card-bg)", padding: "6px 10px", borderRadius: "8px", display: "inline-block", marginTop: "6px", border: "1px solid var(--glass-border)", fontWeight: 700 }}>
-                ФИО ребенка, оплата за учебные материалы
-              </span>
-            </li>
-          </ul>
-        </div>
-
-        <div className="qr-head">
-          <div className="qr-title">QR-код для перевода</div>
-          <button type="button" className="qr-refresh" onClick={resetQrStateAndRefresh} title="Обновить QR" aria-label="Обновить QR">↻</button>
-        </div>
-
-        <div className="payment-qr payment-qr--smart" style={{ minHeight: "220px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {qrLoading && !qrError ? (
-            <div className="qr-loader" role="status">
-              <span className="qr-spinner" />
-              <div className="qr-loader-text" style={{ marginTop: "12px", fontWeight: 700 }}>Загружаем QR-код...</div>
-            </div>
-          ) : null}
-
-          {qrError ? (
-            <div className="qr-error" role="alert" style={{ textAlign: "center" }}>
-              <div style={{ fontWeight: 800, marginBottom: 6, color: "#d32f2f" }}>Не удалось загрузить QR-код</div>
-              <div style={{ fontSize: "12px", color: "#666", marginBottom: 12 }}>Возможно, файл oplata.png отсутствует на сервере.</div>
-              <button type="button" className="btn secondary" onClick={resetQrStateAndRefresh}>↻ Попробовать снова</button>
-            </div>
-          ) : null}
-
-          <img
-            key={qrUrl}
-            src={qrUrl}
-            alt="QR-код для оплаты"
-            className={`qr-img`}
-            onLoad={() => { setQrLoading(false); setQrError(false); }}
-            onError={() => { setQrLoading(false); setQrError(true); }}
-            style={{ 
-              display: qrLoading || qrError ? "none" : "block", 
-              width: "100%", 
-              maxWidth: "240px", 
-              margin: "0 auto", 
-              borderRadius: "16px", 
-              border: "1px solid rgba(0,0,0,0.1)", 
-              boxShadow: "0 12px 30px rgba(0,0,0,0.08)" 
-            }}
-          />
-        </div>
-
-        <div className="modal-actions" style={{ marginTop: "24px" }}>
-          <button className="btn" style={{ width: "100%" }} type="button" onClick={() => setPaymentModalOpen(false)}>
-            Я всё оплатил(а)
-          </button>
-        </div>
-      </Modal>
-
-      <div className="container">
-        <div className="profile-topbar">
-          <div className="brand">
-            <div className="brand-mark">{brandMark}</div>
-            <div>
-              <div className="brand-title">{project.name}</div>
-              <div className="brand-subtitle">Заявки на доступы</div>
-            </div>
-          </div>
-          <div className="top-actions">
-            <Link className="nav-pill nav-pill--info" href={`/projects/${project.slug}/profile`}>👤 Профиль</Link>
-            <Link className="nav-pill nav-pill--materials" href={`/projects/${project.slug}/materials`}>📚 Материалы</Link>
-            <Link className="nav-pill nav-pill--logout" href="/portal">🏠 Портал</Link>
-          </div>
-        </div>
-
-        <div className="card">
-          <h2 style={{ color: "var(--project-primary)", marginBottom: 20 }}>📝 Мои заявки на доступы</h2>
-
-          <div className="payment-info">
-            <h4>💰 Информация об оплате</h4>
-            <p>
-              Стоимость каждого раздела указывается индивидуально. QR-код для оплаты появляется сразу после создания заявки.
-              После подтверждения оплаты администратором доступ к материалам будет открыт автоматически.
-            </p>
-          </div>
-
-          <div className="requests-actions">
-            <button className="btn" onClick={openCreate} type="button" disabled={busy}>
-              ➕ Создать новую заявку
-            </button>
-            <button className="btn ghost qr-open" type="button" onClick={() => { 
-              if (!lastPendingRequest) {
-                showNotification("ℹ️ Не найдено необработанных заявок.", "error");
-                return;
-              }
-              openPaymentModal(lastPendingAmount); 
-            }}>
-              📷 Показать qr
-            </button>
-          </div>
-
-          {requests.length === 0 ? (
-            <div className="empty-state">
-              <h3>📭 Заявок пока нет</h3>
-              <p>Создайте свою первую заявку на покупку доступа к материалам</p>
-              <button className="btn" onClick={openCreate} type="button" disabled={busy}>
-                ➕ Создать заявку
-              </button>
-            </div>
-          ) : (
-            <table className="requests-table">
-              <thead>
-                <tr>
-                  <th>Номер заявки</th>
-                  <th>Дата создания</th>
-                  <th>Уровень (Класс)</th>
-                  <th>Разделы материалов</th>
-                  <th>Цена</th>
-                  <th>Статус</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((r) => {
-                  const locked = r.is_processed;
-                  const rawTabs = r.material_kinds?.length ? r.material_kinds : (r.textbook_types || []);
-                  
-                  const displayTabs = rawTabs.map(id => {
-                    const tab = tabs.find(t => t.id === id);
-                    return tab ? `${tab.icon || ''} ${tab.title}` : id;
-                  }).filter(Boolean);
-
-                  return (
-                    <tr key={r.id}>
-                      <td className="font-bold">{r.request_number}</td>
-                      <td>{formatDateTime(r.created_at)}</td>
-                      <td>{r.class_level || "—"}</td>
-                      <td>{displayTabs.length > 0 ? displayTabs.join(", ") : "—"}</td>
-                      <td className="font-bold">{r.total_price != null ? formatPrice(r.total_price) : "—"}</td>
-                      <td>
-                        <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
-                          {r.is_processed ? "✅ Выдано" : "⏳ Ожидает"}
-                        </span>
-                      </td>
-                      <td>
-                        {locked ? (
-                          <span className="text-xs text-gray-400 font-medium italic">
-                            🔒 Действия недоступны
-                          </span>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                            <button className="btn btn-small" onClick={() => openEdit(r)} type="button" disabled={busy}>
-                              ✏️ Изменить
-                            </button>
-                            <button className="btn btn-small secondary" onClick={() => void deleteRequest(r)} type="button" disabled={busy}>
-                              🗑️ Удалить
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="app/(app)/projects/[slug]/materials/page.tsx">
 // app/(app)/projects/[slug]/materials/page.tsx
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -48248,6 +47689,577 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
               </div>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="app/(app)/projects/[slug]/requests/RequestsClient.tsx">
+// app/(app)/projects/[slug]/requests/RequestsClient.tsx
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import Modal from "@/components/Modal";
+import { useRouter } from "next/navigation";
+
+import "./requests.css";
+
+type ProjectLevel = { id: string; code: string; label: string; price?: number | null; };
+type ProjectTab = { id: string; slug: string; title: string; icon: string | null; };
+type Project = { id: string; name: string; slug: string; };
+
+type PurchaseRequest = {
+  id: string;
+  request_number: string;
+  created_at: string;
+  class_level: string | null;
+  textbook_types: string[] | null;
+  material_kinds?: string[] | null;
+  email: string;
+  full_name: string;
+  is_processed: boolean;
+  user_id: string;
+  project_id?: string | null;
+  total_price?: number | null;
+};
+
+type Props = {
+  project: Project;
+  levels: ProjectLevel[];
+  tabs: ProjectTab[];
+  userId: string;
+  userEmail: string;
+  userFullName: string;
+  initialRequests: PurchaseRequest[];
+};
+
+function generateRequestNumber() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `PR-${year}${month}${day}-${random}`;
+}
+
+function normalizeString(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => normalizeString(item)).filter(Boolean);
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text) return [];
+    if (text.startsWith("[") && text.endsWith("]")) {
+      try { return toStringArray(JSON.parse(text)); } catch { return []; }
+    }
+    return text.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+  const single = normalizeString(value);
+  return single ? [single] : [];
+}
+
+function formatDateTime(dateString: string | null | undefined) {
+  if (!dateString) return "—";
+  const d = new Date(dateString);
+  if (Number.isNaN(d.getTime())) return String(dateString);
+  return d.toLocaleString("ru-RU", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function getPaymentQRUrl(seed?: number) {
+  const t = encodeURIComponent(String(seed ?? Date.now()));
+  return `/api/storage/public/help-images/oplata.png?t=${t}`;
+}
+
+async function safeReadJson(res: Response) {
+  const text = await res.text();
+  let json: any = null;
+  try { json = text ? JSON.parse(text) : null; } catch { json = null; }
+  return { text, json };
+}
+
+function normalizeRequestRow(row: any): PurchaseRequest {
+  return {
+    id: String(row?.id ?? ""),
+    user_id: String(row?.user_id ?? ""),
+    request_number: String(row?.request_number ?? ""),
+    created_at: typeof row?.created_at === "string" ? row.created_at : "",
+    class_level: typeof row?.class_level === "string" ? row.class_level : null,
+    textbook_types: toStringArray(row?.textbook_types),
+    material_kinds: toStringArray(row?.material_kinds),
+    email: String(row?.email ?? ""),
+    full_name: String(row?.full_name ?? ""),
+    is_processed: Boolean(row?.is_processed),
+    project_id: row?.project_id ?? null,
+    total_price: row?.total_price ?? null,
+  };
+}
+
+export default function RequestsClient({ project, levels, tabs, userId, userEmail, userFullName, initialRequests }: Props) {
+  const router = useRouter();
+  const [requests, setRequests] = useState<PurchaseRequest[]>(() => initialRequests.map(normalizeRequestRow));
+  const [notif, setNotif] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const [requestModalOpen, setRequestModalOpen] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [requestNumber, setRequestNumber] = useState("");
+  const [requestDateTime, setRequestDateTime] = useState("");
+  const [classLevel, setClassLevel] = useState("");
+  const [selectedTabs, setSelectedTabs] = useState<string[]>([]);
+  
+  const [currentEmail, setCurrentEmail] = useState(userEmail);
+  const [currentFullName, setCurrentFullName] = useState(userFullName);
+
+  const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
+  const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
+  const [qrLoading, setQrLoading] = useState(true); 
+  const [qrError, setQrError] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
+
+  const tabTitleToId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of tabs) {
+      if (t.title) map.set(t.title, t.id);
+    }
+    return map;
+  }, [tabs]);
+
+  // Цена теперь берется не из разделов, а из выбранного уровня
+  const totalAmount = useMemo(() => {
+    const selectedLevel = levels.find(l => l.code === classLevel);
+    return selectedLevel?.price ?? 0;
+  }, [classLevel, levels]);
+
+  const lastPendingRequest = useMemo(() => {
+    return requests.find((r) => !r.is_processed) ?? null;
+  }, [requests]);
+
+  const lastPendingAmount = useMemo(() => {
+    if (!lastPendingRequest) return 0;
+    if (lastPendingRequest.total_price != null) return lastPendingRequest.total_price;
+
+    const lvlCode = lastPendingRequest.class_level || "";
+    const matchedLevel = levels.find(l => l.code === lvlCode || l.label === lvlCode);
+    return matchedLevel?.price ?? 0;
+  }, [lastPendingRequest, levels]);
+
+  useEffect(() => {
+    setRequests(initialRequests.map(normalizeRequestRow));
+  }, [initialRequests]);
+
+  function showNotification(text: string, type: "success" | "error" = "success") {
+    setNotif({ type, text });
+    setTimeout(() => setNotif(null), 4000);
+  }
+
+  function openPaymentModal(amount: number) {
+    setPaymentTotalAmount(amount);
+    setQrLoading(true);
+    setQrError(false);
+    setQrSeed(Date.now());
+    setPaymentModalOpen(true);
+  }
+
+  function resetQrStateAndRefresh() {
+    setQrError(false);
+    setQrLoading(true);
+    setQrSeed(Date.now());
+  }
+
+  function openCreate() {
+    setEditingId(null);
+    setRequestNumber(generateRequestNumber());
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localISO = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+    setRequestDateTime(localISO);
+    setClassLevel("");
+    setSelectedTabs([]);
+    setCurrentEmail(userEmail);
+    setCurrentFullName(userFullName);
+    setRequestModalOpen(true);
+  }
+
+  function openEdit(r: PurchaseRequest) {
+    if (r.is_processed) {
+      showNotification("🔒 Обработанную заявку нельзя редактировать", "error");
+      return;
+    }
+    setEditingId(r.id);
+    setRequestNumber(r.request_number);
+    const d = new Date(r.created_at || new Date().toISOString());
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    const localISO = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+    setRequestDateTime(localISO);
+    
+    // Обратная совместимость для старых заявок, где мог сохраниться label вместо code
+    const rawClassLevel = r.class_level || "";
+    const matchedLevel = levels.find(l => l.code === rawClassLevel || l.label === rawClassLevel);
+    setClassLevel(matchedLevel ? matchedLevel.code : rawClassLevel);
+
+    const rawTabs = r.material_kinds?.length ? r.material_kinds : (r.textbook_types || []);
+    const tabIds = rawTabs.map(name => tabTitleToId.get(name) || name);
+    setSelectedTabs(tabIds);
+
+    setCurrentEmail(r.email || userEmail);
+    setCurrentFullName(r.full_name || userFullName);
+    
+    setRequestModalOpen(true);
+  }
+
+  async function saveRequest() {
+    if (busy) return;
+    if (!requestDateTime || !classLevel) {
+      showNotification("❌ Пожалуйста, выберите уровень", "error");
+      return;
+    }
+    if (selectedTabs.length === 0) {
+      showNotification("❌ Пожалуйста, выберите хотя бы один раздел", "error");
+      return;
+    }
+
+    if (editingId) {
+      const cur = requests.find((x) => x.id === editingId);
+      if (cur?.is_processed) {
+        showNotification("🔒 Обработанную заявку нельзя редактировать", "error");
+        setRequestModalOpen(false);
+        return;
+      }
+    }
+
+    const payload = {
+      request_number: requestNumber,
+      created_at: requestDateTime + ":00Z",
+      branch_type: project.slug,
+      project_id: project.id,
+      class_level: classLevel, // Теперь сюда четко улетает технический code, а не label
+      textbook_types: selectedTabs,
+      material_kinds: selectedTabs,
+      email: currentEmail,
+      full_name: currentFullName,
+      user_id: userId,
+      is_processed: false,
+      total_price: totalAmount,
+    };
+
+    setBusy(true);
+
+    try {
+      const url = editingId ? "/api/requests/update" : "/api/requests/create";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify(editingId ? { id: editingId, ...payload } : payload),
+      });
+
+      const { json } = await safeReadJson(res);
+      if (!res.ok || !json?.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+
+      setRequestModalOpen(false);
+      openPaymentModal(totalAmount);
+      showNotification(editingId ? "✅ Заявка успешно обновлена" : "✅ Заявка успешно создана");
+      router.refresh();
+    } catch (e: any) {
+      showNotification("❌ Ошибка: " + e.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteRequest(r: PurchaseRequest) {
+    if (busy) return;
+    if (r.is_processed) {
+      showNotification("🔒 Обработанную заявку нельзя удалить", "error");
+      return;
+    }
+
+    const okConfirm = window.confirm(`Удалить заявку ${r.request_number}?`);
+    if (!okConfirm) return;
+
+    setBusy(true);
+    try {
+      const res = await fetch("/api/requests/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ id: r.id }),
+      });
+
+      const { json } = await safeReadJson(res);
+      if (!res.ok || !json?.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+
+      showNotification("✅ Заявка успешно удалена");
+      router.refresh();
+    } catch (e: any) {
+      showNotification("Ошибка: " + e.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const brandMark = project.name.substring(0, 2).toUpperCase() || "EK";
+
+  const formatPrice = (price: number) => {
+    if (price === 0) return "бесплатно";
+    return `${price} ₽`;
+  };
+
+  return (
+    <div className="page-requests">
+      {notif ? <div className={`notification ${notif.type === "error" ? "error" : ""}`}>{notif.text}</div> : null}
+
+      <Modal open={requestModalOpen} onClose={() => setRequestModalOpen(false)} title={editingId ? "Редактировать заявку" : "Создать заявку"} maxWidth={520}>
+        <form onSubmit={(e) => { e.preventDefault(); void saveRequest(); }}>
+          <div className="form-group">
+            <label>Номер заявки:</label>
+            <input type="text" value={requestNumber} readOnly className="bg-gray-100" />
+          </div>
+
+          <div className="form-group">
+            <label>Уровень:</label>
+            <select value={classLevel} onChange={(e) => setClassLevel(e.target.value)} required>
+              <option value="">-- Выберите уровень --</option>
+              {levels.map(l => (
+                <option key={l.id} value={l.code}>{l.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Разделы материалов:</label>
+            <div className="checkbox-group">
+              {tabs.map(t => {
+                const isChecked = selectedTabs.includes(t.id);
+                return (
+                  <div
+                    key={t.id}
+                    className={`checkbox-item ${isChecked ? "checked" : ""}`}
+                    onClick={() => setSelectedTabs(prev => isChecked ? prev.filter(id => id !== t.id) : [...prev, t.id])}
+                  >
+                    <input type="checkbox" checked={isChecked} readOnly />
+                    <label>
+                      {t.icon} {t.title}
+                    </label>
+                  </div>
+                );
+              })}
+              {tabs.length === 0 && <span className="text-gray-500 text-sm">В проекте пока нет разделов</span>}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Email:</label>
+            <input 
+              type="email" 
+              value={currentEmail} 
+              onChange={(e) => setCurrentEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>ФИО ученика:</label>
+            <input 
+              type="text" 
+              value={currentFullName} 
+              onChange={(e) => setCurrentFullName(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="total-amount" style={{ display: totalAmount > 0 ? "block" : "none" }}>
+            <h4>💰 Стоимость уровня:</h4>
+            <div className="amount">{totalAmount} руб.</div>
+          </div>
+
+          <div className="modal-actions">
+            <button type="button" className="btn secondary" onClick={() => setRequestModalOpen(false)} disabled={busy}>❌ Отмена</button>
+            <button type="submit" className="btn" disabled={busy}>{busy ? "Сохраняем..." : "💾 Сохранить заявку"}</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="✅ Оплата заявки" maxWidth={540}>
+        <div style={{ background: "color-mix(in srgb, var(--project-primary) 12%, transparent)", padding: "18px", borderRadius: "14px", border: "1px solid color-mix(in srgb, var(--project-primary) 25%, transparent)", marginBottom: "20px" }}>
+          <h4 style={{ margin: "0 0 14px 0", color: "var(--project-primary)", fontSize: "16px", filter: "brightness(0.7)" }}>📋 Инструкция по оплате</h4>
+          <ul style={{ margin: 0, paddingLeft: "18px", color: "var(--project-text)", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px" }}>
+            <li><strong>Отсканируйте QR-код</strong> в вашем банковском приложении.</li>
+            <li>Сумма к оплате: <strong style={{ fontSize: "16px", color: "var(--project-primary)" }}>{paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "Сумма не определена"}</strong></li>
+            <li>В назначении платежа (сообщении) <strong>ОБЯЗАТЕЛЬНО</strong> укажите: <br/>
+              <span style={{ background: "var(--project-card-bg)", padding: "6px 10px", borderRadius: "8px", display: "inline-block", marginTop: "6px", border: "1px solid var(--glass-border)", fontWeight: 700 }}>
+                ФИО ребенка, оплата за учебные материалы
+              </span>
+            </li>
+          </ul>
+        </div>
+
+        <div className="qr-head">
+          <div className="qr-title">QR-код для перевода</div>
+          <button type="button" className="qr-refresh" onClick={resetQrStateAndRefresh} title="Обновить QR" aria-label="Обновить QR">↻</button>
+        </div>
+
+        <div className="payment-qr payment-qr--smart" style={{ minHeight: "220px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {qrLoading && !qrError ? (
+            <div className="qr-loader" role="status">
+              <span className="qr-spinner" />
+              <div className="qr-loader-text" style={{ marginTop: "12px", fontWeight: 700 }}>Загружаем QR-код...</div>
+            </div>
+          ) : null}
+
+          {qrError ? (
+            <div className="qr-error" role="alert" style={{ textAlign: "center" }}>
+              <div style={{ fontWeight: 800, marginBottom: 6, color: "#d32f2f" }}>Не удалось загрузить QR-код</div>
+              <div style={{ fontSize: "12px", color: "#666", marginBottom: 12 }}>Возможно, файл oplata.png отсутствует на сервере.</div>
+              <button type="button" className="btn secondary" onClick={resetQrStateAndRefresh}>↻ Попробовать снова</button>
+            </div>
+          ) : null}
+
+          <img
+            key={qrUrl}
+            src={qrUrl}
+            alt="QR-код для оплаты"
+            className={`qr-img`}
+            onLoad={() => { setQrLoading(false); setQrError(false); }}
+            onError={() => { setQrLoading(false); setQrError(true); }}
+            style={{ 
+              display: qrLoading || qrError ? "none" : "block", 
+              width: "100%", 
+              maxWidth: "240px", 
+              margin: "0 auto", 
+              borderRadius: "16px", 
+              border: "1px solid rgba(0,0,0,0.1)", 
+              boxShadow: "0 12px 30px rgba(0,0,0,0.08)" 
+            }}
+          />
+        </div>
+
+        <div className="modal-actions" style={{ marginTop: "24px" }}>
+          <button className="btn" style={{ width: "100%" }} type="button" onClick={() => setPaymentModalOpen(false)}>
+            Я всё оплатил(а)
+          </button>
+        </div>
+      </Modal>
+
+      <div className="container">
+        <div className="profile-topbar">
+          <div className="brand">
+            <div className="brand-mark">{brandMark}</div>
+            <div>
+              <div className="brand-title">{project.name}</div>
+              <div className="brand-subtitle">Заявки на доступы</div>
+            </div>
+          </div>
+          <div className="top-actions">
+            <Link className="nav-pill nav-pill--info" href={`/projects/${project.slug}/profile`}>👤 Профиль</Link>
+            <Link className="nav-pill nav-pill--materials" href={`/projects/${project.slug}/materials`}>📚 Материалы</Link>
+            <Link className="nav-pill nav-pill--logout" href="/portal">🏠 Портал</Link>
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 style={{ color: "var(--project-primary)", marginBottom: 20 }}>📝 Мои заявки на доступы</h2>
+
+          <div className="payment-info">
+            <h4>💰 Информация об оплате</h4>
+            <p>
+              Стоимость зависит от выбранного уровня. QR-код для оплаты появляется сразу после создания заявки.
+              После подтверждения оплаты администратором доступ к материалам будет открыт автоматически.
+            </p>
+          </div>
+
+          <div className="requests-actions">
+            <button className="btn" onClick={openCreate} type="button" disabled={busy}>
+              ➕ Создать новую заявку
+            </button>
+            <button className="btn ghost qr-open" type="button" onClick={() => { 
+              if (!lastPendingRequest) {
+                showNotification("ℹ️ Не найдено необработанных заявок.", "error");
+                return;
+              }
+              openPaymentModal(lastPendingAmount); 
+            }}>
+              📷 Показать qr
+            </button>
+          </div>
+
+          {requests.length === 0 ? (
+            <div className="empty-state">
+              <h3>📭 Заявок пока нет</h3>
+              <p>Создайте свою первую заявку на покупку доступа к материалам</p>
+              <button className="btn" onClick={openCreate} type="button" disabled={busy}>
+                ➕ Создать заявку
+              </button>
+            </div>
+          ) : (
+            <table className="requests-table">
+              <thead>
+                <tr>
+                  <th>Номер заявки</th>
+                  <th>Дата создания</th>
+                  <th>Уровень (Класс)</th>
+                  <th>Разделы материалов</th>
+                  <th>Цена</th>
+                  <th>Статус</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((r) => {
+                  const locked = r.is_processed;
+                  const rawTabs = r.material_kinds?.length ? r.material_kinds : (r.textbook_types || []);
+                  
+                  const displayTabs = rawTabs.map(id => {
+                    const tab = tabs.find(t => t.id === id);
+                    return tab ? `${tab.icon || ''} ${tab.title}` : id;
+                  }).filter(Boolean);
+
+                  // Обратная совместимость для отображения названия уровня в таблице
+                  const matchedLevel = levels.find(l => l.code === r.class_level || l.label === r.class_level);
+                  const displayLevel = matchedLevel ? matchedLevel.label : (r.class_level || "—");
+
+                  return (
+                    <tr key={r.id}>
+                      <td className="font-bold">{r.request_number}</td>
+                      <td>{formatDateTime(r.created_at)}</td>
+                      <td>{displayLevel}</td>
+                      <td>{displayTabs.length > 0 ? displayTabs.join(", ") : "—"}</td>
+                      <td className="font-bold">{r.total_price != null ? formatPrice(r.total_price) : "—"}</td>
+                      <td>
+                        <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
+                          {r.is_processed ? "✅ Выдано" : "⏳ Ожидает"}
+                        </span>
+                      </td>
+                      <td>
+                        {locked ? (
+                          <span className="text-xs text-gray-400 font-medium italic">
+                            🔒 Действия недоступны
+                          </span>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            <button className="btn btn-small" onClick={() => openEdit(r)} type="button" disabled={busy}>
+                              ✏️ Изменить
+                            </button>
+                            <button className="btn btn-small secondary" onClick={() => void deleteRequest(r)} type="button" disabled={busy}>
+                              🗑️ Удалить
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
@@ -48857,7 +48869,8 @@ export default function ProjectEditor({
   });
 
   const [levels, setLevels] = useState<any[]>([]);
-  const [newLevel, setNewLevel] = useState({ code: "", label: "" });
+  // Добавлено поле цены
+  const [newLevel, setNewLevel] = useState({ code: "", label: "", price: "" });
 
   const [tabs, setTabs] = useState<any[]>([]);
   const [editingTab, setEditingTab] = useState<any | null>(null);
@@ -48917,7 +48930,8 @@ export default function ProjectEditor({
           code: newLevel.code, 
           label: newLevel.label, 
           order_index: levels.length * 10, 
-          is_active: true 
+          is_active: true,
+          price: newLevel.price ? Number(newLevel.price) : null // Цена отправляется на бэкенд
         }),
       });
       
@@ -48929,7 +48943,7 @@ export default function ProjectEditor({
       const refreshData = await refreshRes.json();
       
       setLevels(refreshData.levels || refreshData.data || []);
-      setNewLevel({ code: "", label: "" });
+      setNewLevel({ code: "", label: "", price: "" }); // Сбрасываем цену
     } catch (err: any) { 
       alert("❌ Ошибка: " + err.message); 
     }
@@ -49287,7 +49301,12 @@ export default function ProjectEditor({
                   key={l.id} 
                   className="bg-white border shadow-sm p-4 rounded-2xl flex items-center justify-between hover:border-blue-300 transition-colors"
                 >
-                  <span className="font-bold text-gray-800">{l.label}</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-bold text-gray-800">{l.label}</span>
+                    <span className="text-xs text-gray-500 font-medium">
+                      {l.price != null ? `${l.price} ₽` : "0 ₽ (бесплатно)"}
+                    </span>
+                  </div>
                   <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded-lg">
                     {l.code}
                   </span>
@@ -49311,6 +49330,13 @@ export default function ProjectEditor({
                 placeholder="Название (Hippo 1)" 
                 value={newLevel.label} 
                 onChange={(e) => setNewLevel({ ...newLevel, label: e.target.value })} 
+              />
+              <input 
+                type="number" 
+                className="border-2 rounded-xl px-4 py-2.5 w-[120px] outline-none focus:border-blue-500 font-medium" 
+                placeholder="Цена (₽)" 
+                value={newLevel.price} 
+                onChange={(e) => setNewLevel({ ...newLevel, price: e.target.value })} 
               />
               <button 
                 onClick={addLevel} 

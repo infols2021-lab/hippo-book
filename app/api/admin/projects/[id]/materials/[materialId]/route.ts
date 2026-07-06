@@ -1,3 +1,4 @@
+// app/api/admin/projects/[id]/materials/[materialId]/route.ts
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -8,7 +9,6 @@ import {
   normalizeNullableString,
   normalizeBool,
   normalizeOrderIndex,
-  normalizePrice,
   normalizeUUID,
   normalizeBranchType,
   normalizeMaterialKind,
@@ -51,11 +51,6 @@ function normalizePatchPayload(body: any) {
   if ("order_index" in body || "orderIndex" in body) {
     payload.order_index = normalizeOrderIndex(body.order_index ?? body.orderIndex);
   }
-
-  // ❗️ ИСПРАВЛЕНА ПРОБЛЕМА: Цена теперь сохраняется
-  if ("price" in body) {
-    payload.price = normalizePrice(body.price);
-  }
   
   if ("class_levels" in body || "class_level" in body || "classLevels" in body) {
     payload.class_levels = normalizeClassLevels(body.class_levels ?? body.class_level ?? body.classLevels);
@@ -69,7 +64,7 @@ function normalizePatchPayload(body: any) {
     payload.meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
   }
   
-  // ❗️ ИСПРАВЛЕНА ПРОБЛЕМА: Ультра-фикс для табов теперь под капотом в normalizeUUID
+  // Ультра-фикс для табов теперь под капотом в normalizeUUID
   const hasTabId = "project_tab_id" in body || "tab_id" in body || "projectTabId" in body || "tabId" in body;
   if (hasTabId) {
     const rawTabId = body.project_tab_id ?? body.tab_id ?? body.projectTabId ?? body.tabId;
