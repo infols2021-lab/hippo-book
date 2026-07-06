@@ -119,7 +119,7 @@ function normalizeProjectMaterial(row: any): MaterialDbRow {
     updated_at: typeof row?.updated_at === "string" ? row.updated_at : new Date().toISOString(),
     meta: row?.meta && typeof row.meta === "object" ? row.meta : {},
     project_tab_id: row?.project_tab_id ?? null,
-    price: typeof row?.price === "number" ? row.price : 1000,
+  
   };
 }
  
