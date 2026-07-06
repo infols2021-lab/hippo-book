@@ -70,7 +70,6 @@ export async function POST(req: NextRequest) {
     return fail("Bad JSON", 400, "BAD_JSON", noStoreInit());
   }
 
-  // Единая нормализация всех полей заявки (без дублирования логики в роуте)
   const normalized = normalizeRequestPayload(
     body,
     profile?.email || user?.email,
@@ -90,17 +89,16 @@ export async function POST(req: NextRequest) {
     let projectId = null;
     let sheetName = null;
 
-    if (normalized.branch_type !== "gatehouse" && normalized.branch_type !== "olympiad") {
-      const { data: projectInfo } = await supabase
-        .from("projects")
-        .select("id, sheet_name")
-        .eq("slug", normalized.branch_type)
-        .maybeSingle();
+    // 🔥 ИСПРАВЛЕНИЕ: Ищем проект ВСЕГДА, чтобы новые ветки (и Gatehouse) получали project_id
+    const { data: projectInfo } = await supabase
+      .from("projects")
+      .select("id, sheet_name")
+      .eq("slug", normalized.branch_type)
+      .maybeSingle();
 
-      if (projectInfo) {
-        projectId = projectInfo.id;
-        sheetName = projectInfo.sheet_name;
-      }
+    if (projectInfo) {
+      projectId = projectInfo.id;
+      sheetName = projectInfo.sheet_name;
     }
 
     const payload: Record<string, any> = {

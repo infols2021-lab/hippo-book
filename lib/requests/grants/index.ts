@@ -157,21 +157,25 @@ export async function grantGenericBranchAccessForRequest(
   ]).map(normalizeLevelCode);
   const kinds = getRequestMaterialKinds(r);
 
-  let query = supabase
+  // 🔥 ИСПРАВЛЕНИЕ: Тянем project_tab_id, чтобы понимать и старые слова, и новые UUID табов
+  const { data: materials, error } = await supabase
     .from("materials")
-    .select("id, title, material_kind, target_levels, class_levels")
+    .select("id, title, material_kind, target_levels, class_levels, project_tab_id")
     .eq("branch_type", branchType)
     .eq("is_active", true);
 
-  if (kinds.length) {
-    query = query.in("material_kind", kinds);
-  }
-
-  const { data: materials, error } = await query;
   if (error) throw new Error(error.message);
 
   const matchedMaterials = (materials ?? []).filter((mat) => {
+    // Умная проверка: заявка может прислать слово "mock_test" или UUID таба
+    if (kinds.length > 0) {
+      const matchesLegacyKind = kinds.includes(String(mat.material_kind));
+      const matchesTabId = kinds.includes(String(mat.project_tab_id));
+      if (!matchesLegacyKind && !matchesTabId) return false;
+    }
+
     if (targetLevels.length === 0) return true;
+    
     const matLevels = [
       ...toStringArray(mat.target_levels),
       ...toStringArray(mat.class_levels),

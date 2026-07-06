@@ -75,10 +75,8 @@ export async function POST(req: NextRequest) {
       return fail("Processed request can't be updated", 403, "LOCKED", noStoreInit());
     }
 
-    // Мержим существующие данные и новые из body перед нормализацией
     const mergedBody = { ...existing, ...body };
 
-    // Единая нормализация всех полей
     const normalized = normalizeRequestPayload(
       mergedBody,
       profile?.email || user?.email || existing.email,
@@ -92,8 +90,34 @@ export async function POST(req: NextRequest) {
       return fail(validation.error || "Неверные данные заявки", 400, "VALIDATION", noStoreInit());
     }
 
+    // 🔥 ИСПРАВЛЕНИЕ: Пытаемся найти project_id, если его нет
+    let projectId = existing.project_id;
+    let sheetName = null;
+
+    if (!projectId || normalized.branch_type !== existing.branch_type) {
+      const { data: projectInfo } = await supabase
+        .from("projects")
+        .select("id, sheet_name")
+        .eq("slug", normalized.branch_type)
+        .maybeSingle();
+
+      if (projectInfo) {
+        projectId = projectInfo.id;
+        sheetName = projectInfo.sheet_name;
+      }
+    } else {
+      // Если проект уже был, просто достаем его sheet_name
+      const { data: projectInfo } = await supabase
+        .from("projects")
+        .select("sheet_name")
+        .eq("id", projectId)
+        .maybeSingle();
+      if (projectInfo) sheetName = projectInfo.sheet_name;
+    }
+
     const payload: Record<string, any> = {
       branch_type: normalized.branch_type,
+      project_id: projectId, // Обновляем проект
       class_level: normalized.class_level || null,
       target_level: normalized.target_levels.length > 0 ? normalized.target_levels : null,
       target_levels: normalized.target_levels.length > 0 ? normalized.target_levels : null,
@@ -118,19 +142,6 @@ export async function POST(req: NextRequest) {
     if (updateError) return fail(updateError.message, 500, "DB_ERROR", noStoreInit());
 
     const row = updatedRow as any;
-
-    let sheetName = null;
-    if (existing.project_id) {
-      const { data: projectInfo } = await supabase
-        .from("projects")
-        .select("sheet_name")
-        .eq("id", existing.project_id)
-        .maybeSingle();
-
-      if (projectInfo?.sheet_name) {
-        sheetName = projectInfo.sheet_name;
-      }
-    }
 
     const sheetValues = buildSheetValues(
       row.request_number || "",
