@@ -138,7 +138,7 @@ export default function MatchingEditor({ value, onChange, disabled }: Props) {
             <button
               type="button"
               onClick={() => handleRemovePair(index)}
-              disabled={disabled || pairs.length <= 2}
+              disabled={disabled || pairs.length <= 1}
               style={{
                 position: "absolute",
                 top: "12px",
@@ -146,9 +146,9 @@ export default function MatchingEditor({ value, onChange, disabled }: Props) {
                 background: "transparent",
                 border: "none",
                 color: "#ff4d4f",
-                cursor: disabled || pairs.length <= 2 ? "not-allowed" : "pointer",
+                cursor: disabled || pairs.length <= 1 ? "not-allowed" : "pointer",
                 fontSize: "16px",
-                opacity: disabled || pairs.length <= 2 ? 0.3 : 1
+                opacity: disabled || pairs.length <= 1 ? 0.3 : 1
               }}
               title="Удалить пару"
             >

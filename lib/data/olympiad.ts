@@ -1,3 +1,4 @@
+// lib/data/olympiad.ts
 import "server-only";
 
 import type { DataAuthContext } from "@/lib/data/auth";
@@ -88,9 +89,32 @@ export type OlympiadSourcePageData = {
   userProgress: OlympiadProgressRow[];
 };
 
+// Безопасный парсинг строковых массивов (поддерживает массивы, JSON-строки и CSV)
 function toStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const str = value.trim();
+    if (!str) return [];
+
+    if (str.startsWith("[") && str.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(str);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => String(item ?? "").trim()).filter(Boolean);
+        }
+      } catch {}
+    }
+
+    return str
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
 }
 
 function normalizeTextbook(row: any): OlympiadTextbookRow {
@@ -104,7 +128,7 @@ function normalizeTextbook(row: any): OlympiadTextbookRow {
     order_index: typeof row?.order_index === "number" ? row.order_index : 0,
     created_at: typeof row?.created_at === "string" ? row.created_at : null,
     created_by: typeof row?.created_by === "string" ? row.created_by : null,
-    class_level: toStringArray(row?.class_level),
+    class_level: toStringArray(row?.class_level ?? row?.class_levels),
     branch_type: typeof row?.branch_type === "string" ? row.branch_type : "olympiad",
     target_levels: toStringArray(row?.target_levels),
   };
@@ -121,7 +145,7 @@ function normalizeCrossword(row: any): OlympiadCrosswordRow {
     order_index: typeof row?.order_index === "number" ? row.order_index : 0,
     created_at: typeof row?.created_at === "string" ? row.created_at : null,
     created_by: typeof row?.created_by === "string" ? row.created_by : null,
-    class_level: toStringArray(row?.class_level),
+    class_level: toStringArray(row?.class_level ?? row?.class_levels),
     branch_type: typeof row?.branch_type === "string" ? row.branch_type : "olympiad",
     target_levels: toStringArray(row?.target_levels),
   };

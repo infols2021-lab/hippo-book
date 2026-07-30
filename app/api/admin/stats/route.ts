@@ -20,14 +20,20 @@ export async function GET() {
         .select("*", { count: "exact", head: true })
         .or("branch_type.eq.olympiad,branch_type.is.null"),
 
-      supabase.from("materials").select("*", { count: "exact", head: true }),
+      supabase
+        .from("materials")
+        .select("*", { count: "exact", head: true })
+        .or("branch_type.eq.olympiad,branch_type.is.null"),
 
       supabase
         .from("materials")
         .select("*", { count: "exact", head: true })
         .eq("branch_type", "gatehouse"),
 
-      supabase.from("assignments").select("*", { count: "exact", head: true }),
+      supabase
+        .from("assignments")
+        .select("*", { count: "exact", head: true })
+        .or("branch_type.eq.olympiad,branch_type.is.null"),
 
       supabase
         .from("assignments")

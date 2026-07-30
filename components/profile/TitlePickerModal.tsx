@@ -159,7 +159,7 @@ function pickTitlesSource(titleCatalog?: TitleCatalogItem[] | null): NormalizedT
     if (fromDb.length) return dedupeAndSort(fromDb);
   }
 
-  // 2) fallback: roadmap exports (если где-то ещё используется)
+  // 2) fallback: roadmap exports
   const r: any = Roadmap as any;
   const rawTitles =
     r.STREAK_TITLE_MILESTONES ??
@@ -202,7 +202,7 @@ export default function TitlePickerModal({
   // ✅ рекорд — по нему решаем unlocked/locked
   const safeLongest = Math.max(0, Math.floor(num(longestStreak, 0)));
 
-  // ✅ текущая серия — по ней считаем "осталось"
+  // ✅ текущая серия — по ней отображаем информацию
   const safeCurrent = Math.max(0, Math.floor(num(currentStreak, 0)));
 
   const titles = useMemo(() => pickTitlesSource(titleCatalog), [titleCatalog]);
@@ -232,8 +232,10 @@ export default function TitlePickerModal({
 
   const nextLockedTitle = lockedTitles[0] ?? null;
 
-  // ✅ осталось до следующего титула считаем по текущей серии, НЕ по рекорду
-  const nextLeftByCurrent = nextLockedTitle ? Math.max(0, nextLockedTitle.day - safeCurrent) : 0;
+  // ✅ Корректный расчёт оставшихся дней с учётом рекорда пользователя
+  const nextLeftByCurrent = nextLockedTitle
+    ? Math.max(0, nextLockedTitle.day - Math.max(safeCurrent, safeLongest))
+    : 0;
 
   return (
     <Modal open={open} onClose={onClose} title="🏷️ Выбор титула" maxWidth={860}>
@@ -246,8 +248,6 @@ export default function TitlePickerModal({
             </div>
             <div className="tpm-hero-sub">
               Открытие титулов идёт по <b>рекорду серии</b>, поэтому они не сгорают при сбросе текущей серии.
-              <br />
-              А вот <b>«осталось до следующего»</b> — считается от <b>текущей серии</b>.
             </div>
 
             <div className="tpm-hero-stats">
@@ -389,8 +389,7 @@ export default function TitlePickerModal({
           ) : (
             <div className="tpm-list">
               {lockedTitles.map((t) => {
-                // ✅ “осталось” теперь от текущей серии
-                const left = Math.max(0, t.day - safeCurrent);
+                const left = Math.max(0, t.day - Math.max(safeCurrent, safeLongest));
 
                 return (
                   <button
@@ -422,7 +421,6 @@ export default function TitlePickerModal({
         </section>
       </div>
 
-      {/* Стили оставляю как у тебя (без изменений), чтобы визуал не поплыл */}
       <style jsx>{`
         .title-picker-modal {
           display: flex;

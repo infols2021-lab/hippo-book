@@ -1,7 +1,6 @@
 // lib/data/materials.ts
 // Универсальный слой запроса материалов по табу проекта (project_tab_id).
-// Не зависит от хардкода olympiad/gatehouse. Используется новыми роутами
-// /projects/[slug]/materials.
+// Поддерживает как единую таблицу materials, так и легаси-таблицы textbooks/crosswords.
 
 import "server-only";
 
@@ -19,7 +18,7 @@ import type {
 import { getProjectBySlug } from "@/lib/projects/loader";
 
 // ---------------------------------------------------------------------------
-// Публичные типы (для новых роутов/страниц)
+// Публичные типы
 // ---------------------------------------------------------------------------
 
 export type ProjectAssignmentLink = {
@@ -113,13 +112,61 @@ function normalizeProjectMaterial(row: any): MaterialDbRow {
     is_available: typeof row?.is_available === "boolean" ? row.is_available : false,
     order_index: typeof row?.order_index === "number" ? row.order_index : 0,
     price: normalizePrice(row?.price),
-    class_levels: normalizeArray(row?.class_levels),
+    class_levels: normalizeArray(row?.class_levels ?? row?.class_level),
     target_levels: normalizeArray(row?.target_levels),
     legacy_source_table:
       row?.legacy_source_table === "textbooks" || row?.legacy_source_table === "crosswords"
         ? row.legacy_source_table
         : null,
     legacy_source_id: typeof row?.legacy_source_id === "string" ? row.legacy_source_id : null,
+    created_by: typeof row?.created_by === "string" ? row.created_by : null,
+    created_at: typeof row?.created_at === "string" ? row.created_at : new Date().toISOString(),
+    updated_at: typeof row?.updated_at === "string" ? row.updated_at : new Date().toISOString(),
+    meta: row?.meta && typeof row.meta === "object" ? row.meta : {},
+    project_tab_id: row?.project_tab_id ?? null,
+  };
+}
+
+function normalizeTextbookToMaterial(row: any): MaterialDbRow {
+  return {
+    id: String(row?.id ?? ""),
+    branch_type: (row?.branch_type as BranchType) || "olympiad",
+    material_kind: "textbook",
+    title: String(row?.title ?? "Учебник"),
+    description: typeof row?.description === "string" ? row.description : null,
+    cover_image_url: typeof row?.cover_image_url === "string" ? row.cover_image_url : null,
+    is_active: typeof row?.is_active === "boolean" ? row.is_active : true,
+    is_available: typeof row?.is_available === "boolean" ? row.is_available : false,
+    order_index: typeof row?.order_index === "number" ? row.order_index : 0,
+    price: normalizePrice(row?.price),
+    class_levels: normalizeArray(row?.class_level ?? row?.class_levels),
+    target_levels: normalizeArray(row?.target_levels),
+    legacy_source_table: "textbooks",
+    legacy_source_id: String(row?.id ?? ""),
+    created_by: typeof row?.created_by === "string" ? row.created_by : null,
+    created_at: typeof row?.created_at === "string" ? row.created_at : new Date().toISOString(),
+    updated_at: typeof row?.updated_at === "string" ? row.updated_at : new Date().toISOString(),
+    meta: row?.meta && typeof row.meta === "object" ? row.meta : {},
+    project_tab_id: row?.project_tab_id ?? null,
+  };
+}
+
+function normalizeCrosswordToMaterial(row: any): MaterialDbRow {
+  return {
+    id: String(row?.id ?? ""),
+    branch_type: (row?.branch_type as BranchType) || "olympiad",
+    material_kind: "crossword",
+    title: String(row?.title ?? "Кроссворд"),
+    description: typeof row?.description === "string" ? row.description : null,
+    cover_image_url: typeof row?.cover_image_url === "string" ? row.cover_image_url : null,
+    is_active: typeof row?.is_active === "boolean" ? row.is_active : true,
+    is_available: typeof row?.is_available === "boolean" ? row.is_available : false,
+    order_index: typeof row?.order_index === "number" ? row.order_index : 0,
+    price: normalizePrice(row?.price),
+    class_levels: normalizeArray(row?.class_level ?? row?.class_levels),
+    target_levels: normalizeArray(row?.target_levels),
+    legacy_source_table: "crosswords",
+    legacy_source_id: String(row?.id ?? ""),
     created_by: typeof row?.created_by === "string" ? row.created_by : null,
     created_at: typeof row?.created_at === "string" ? row.created_at : new Date().toISOString(),
     updated_at: typeof row?.updated_at === "string" ? row.updated_at : new Date().toISOString(),
@@ -208,20 +255,68 @@ export async function loadProjectMaterialsData(
       .eq("material_kind", tab.materialKind);
   }
 
+  // Легаси-запросы для Олимпиады
+  const isOlympiad = projectSlug === "olympiad" || !projectSlug;
+  const shouldFetchTextbooks = isOlympiad && (!tab.materialKind || tab.materialKind === "textbook");
+  const shouldFetchCrosswords = isOlympiad && (!tab.materialKind || tab.materialKind === "crossword");
+
   const [
     { data: materialRows, error: materialsError },
+    { data: textbookRows, error: textbooksError },
+    { data: crosswordRows, error: crosswordsError },
     { data: progressRows, error: progressError },
     { data: accessRows, error: accessError },
+    { data: tbAccessRows, error: tbAccessError },
+    { data: cwAccessRows, error: cwAccessError },
   ] = await Promise.all([
     materialsQuery,
+    shouldFetchTextbooks
+      ? supabase.from("textbooks").select("*").eq("is_active", true).order("order_index", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    shouldFetchCrosswords
+      ? supabase.from("crosswords").select("*").eq("is_active", true).order("order_index", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
     supabase
       .from("user_progress")
       .select("assignment_id, is_completed, score, completed_at")
       .eq("user_id", user.id),
     supabase.from("material_access").select("material_id").eq("user_id", user.id),
+    shouldFetchTextbooks
+      ? supabase.from("textbook_access").select("textbook_id").eq("user_id", user.id)
+      : Promise.resolve({ data: [], error: null }),
+    shouldFetchCrosswords
+      ? supabase.from("crossword_access").select("crossword_id").eq("user_id", user.id)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const materials = Array.isArray(materialRows) ? materialRows.map(normalizeProjectMaterial) : [];
+  const materialsMap = new Map<string, MaterialDbRow>();
+
+  if (Array.isArray(materialRows)) {
+    for (const r of materialRows) {
+      const item = normalizeProjectMaterial(r);
+      materialsMap.set(item.id, item);
+    }
+  }
+
+  if (Array.isArray(textbookRows)) {
+    for (const r of textbookRows) {
+      const item = normalizeTextbookToMaterial(r);
+      if (!materialsMap.has(item.id)) {
+        materialsMap.set(item.id, item);
+      }
+    }
+  }
+
+  if (Array.isArray(crosswordRows)) {
+    for (const r of crosswordRows) {
+      const item = normalizeCrosswordToMaterial(r);
+      if (!materialsMap.has(item.id)) {
+        materialsMap.set(item.id, item);
+      }
+    }
+  }
+
+  const materials = Array.from(materialsMap.values());
   const materialIds = materials.map((m) => m.id);
 
   let assignmentRows: any[] = [];
@@ -230,8 +325,10 @@ export async function loadProjectMaterialsData(
   if (materialIds.length > 0) {
     const { data, error } = await supabase
       .from("assignments")
-      .select("id, material_id, title, order_index")
-      .in("material_id", materialIds)
+      .select("id, material_id, textbook_id, crossword_id, title, order_index")
+      .or(
+        `material_id.in.(${materialIds.join(",")}),textbook_id.in.(${materialIds.join(",")}),crossword_id.in.(${materialIds.join(",")})`
+      )
       .order("order_index", { ascending: true, nullsFirst: false });
 
     assignmentRows = data || [];
@@ -240,15 +337,26 @@ export async function loadProjectMaterialsData(
 
   const error =
     materialsError?.message ||
+    textbooksError?.message ||
+    crosswordsError?.message ||
     assignmentsError?.message ||
     progressError?.message ||
     accessError?.message ||
+    tbAccessError?.message ||
+    cwAccessError?.message ||
     null;
 
   const assignments: ProjectAssignmentLink[] = Array.isArray(assignmentRows)
     ? assignmentRows.map((row: any) => ({
         id: String(row?.id ?? ""),
-        material_id: typeof row?.material_id === "string" ? row.material_id : null,
+        material_id:
+          typeof row?.material_id === "string" && row.material_id
+            ? row.material_id
+            : typeof row?.textbook_id === "string" && row.textbook_id
+            ? row.textbook_id
+            : typeof row?.crossword_id === "string" && row.crossword_id
+            ? row.crossword_id
+            : null,
         title: String(row?.title ?? "Задание"),
         order_index: Number(row?.order_index ?? 0),
       }))
@@ -264,11 +372,22 @@ export async function loadProjectMaterialsData(
       }))
     : [];
 
-  const accessIds = new Set(
-    Array.isArray(accessRows)
-      ? accessRows.map((row: any) => String(row?.material_id ?? "")).filter(Boolean)
-      : [],
-  );
+  const accessIds = new Set<string>();
+  if (Array.isArray(accessRows)) {
+    for (const r of accessRows) {
+      if (r?.material_id) accessIds.add(String(r.material_id));
+    }
+  }
+  if (Array.isArray(tbAccessRows)) {
+    for (const r of tbAccessRows) {
+      if (r?.textbook_id) accessIds.add(String(r.textbook_id));
+    }
+  }
+  if (Array.isArray(cwAccessRows)) {
+    for (const r of cwAccessRows) {
+      if (r?.crossword_id) accessIds.add(String(r.crossword_id));
+    }
+  }
 
   return {
     tab,
@@ -299,6 +418,9 @@ export async function loadProjectMaterialPageData(
   const tab = project.tabs.find((t) => t.slug === tabSlug) ?? null;
   if (!tab) return { data: null, error: `Таб «${tabSlug}» не найден.` };
 
+  let materialRow: any = null;
+  let materialSource: "materials" | "textbooks" | "crosswords" = "materials";
+
   const materialQuery = supabase.from("materials").select("*").eq("id", id).eq("is_active", true);
   if (tab.id) {
     materialQuery.eq("project_tab_id", tab.id);
@@ -306,39 +428,57 @@ export async function loadProjectMaterialPageData(
     materialQuery.eq("branch_type", projectSlug).eq("material_kind", tab.materialKind);
   }
 
-  const { data: materialRow, error: materialError } = await materialQuery.maybeSingle();
-  if (materialError || !materialRow) {
-    return { data: null, error: materialError?.message || "Материал не найден" };
+  const { data: mData } = await materialQuery.maybeSingle();
+  if (mData) {
+    materialRow = mData;
+  } else if (projectSlug === "olympiad" || !projectSlug) {
+    const { data: tbData } = await supabase.from("textbooks").select("*").eq("id", id).eq("is_active", true).maybeSingle();
+    if (tbData) {
+      materialRow = tbData;
+      materialSource = "textbooks";
+    } else {
+      const { data: cwData } = await supabase.from("crosswords").select("*").eq("id", id).eq("is_active", true).maybeSingle();
+      if (cwData) {
+        materialRow = cwData;
+        materialSource = "crosswords";
+      }
+    }
   }
 
-  const material = normalizeProjectMaterial(materialRow);
+  if (!materialRow) {
+    return { data: null, error: "Материал не найден" };
+  }
+
+  const material =
+    materialSource === "textbooks"
+      ? normalizeTextbookToMaterial(materialRow)
+      : materialSource === "crosswords"
+      ? normalizeCrosswordToMaterial(materialRow)
+      : normalizeProjectMaterial(materialRow);
 
   const [
-    { data: accessRow, error: accessError },
+    { data: accessRow },
+    { data: tbAccessRow },
+    { data: cwAccessRow },
     { data: assignmentRows, error: assignmentsError },
     { data: progressRows, error: progressError },
   ] = await Promise.all([
-    supabase
-      .from("material_access")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("material_id", id)
-      .maybeSingle(),
-
+    supabase.from("material_access").select("id").eq("user_id", user.id).eq("material_id", id).maybeSingle(),
+    supabase.from("textbook_access").select("id").eq("user_id", user.id).eq("textbook_id", id).maybeSingle(),
+    supabase.from("crossword_access").select("id").eq("user_id", user.id).eq("crossword_id", id).maybeSingle(),
     supabase
       .from("assignments")
       .select("id, title, order_index, content, created_at")
-      .eq("material_id", id)
+      .or(`material_id.eq.${id},textbook_id.eq.${id},crossword_id.eq.${id}`)
       .order("order_index", { ascending: true })
       .order("created_at", { ascending: true }),
-
     supabase
       .from("user_progress")
       .select("assignment_id, is_completed, score, completed_at")
       .eq("user_id", user.id),
   ]);
 
-  const error = accessError?.message || assignmentsError?.message || progressError?.message || null;
+  const error = assignmentsError?.message || progressError?.message || null;
 
   const progressByAssignment = new Map<string, ProjectProgressRow>();
   for (const row of Array.isArray(progressRows) ? progressRows : []) {
@@ -353,7 +493,7 @@ export async function loadProjectMaterialPageData(
     });
   }
 
-  const hasAccess = Boolean(material.is_available || accessRow);
+  const hasAccess = Boolean(material.is_available || accessRow || tbAccessRow || cwAccessRow);
 
   const assignments: ProjectAssignmentPreview[] = Array.isArray(assignmentRows)
     ? assignmentRows.map((assignment: any) => {

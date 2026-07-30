@@ -2,10 +2,11 @@
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
+import { normalizeOlympiadRequest, normalizeGatehouseRequest } from "@/lib/data/requests";
 
 /**
  * GET: получить список заявок текущего пользователя по конкретному проекту.
- * Используется для отображения истории заявок на странице /projects/[slug]/requests.
+ * Поддерживает как новые проекты с project_id, так и легаси-заявки по branch_type.
  */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const auth = await requireUser();
@@ -15,36 +16,56 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
   const { slug } = await ctx.params;
 
   try {
-    // 1. Получаем ID проекта по slug
-    const { data: project, error: projectError } = await supabase
+    // 1. Попытка получить ID проекта из таблицы projects
+    const { data: project } = await supabase
       .from("projects")
       .select("id")
       .eq("slug", slug)
-      .single();
+      .maybeSingle();
 
-    if (projectError || !project) {
-      return fail("Проект не найден", 404, "NOT_FOUND");
-    }
-
-    // 2. Загружаем заявки пользователя для этого проекта
-    const { data, error } = await supabase
+    // 2. Формируем гибкий фильтр под проект и легаси-ветки
+    let query = supabase
       .from("purchase_requests")
       .select("*")
       .eq("user_id", user.id)
-      .eq("project_id", project.id)
       .order("created_at", { ascending: false });
+
+    const isOlympiad = slug === "olympiad" || !slug;
+
+    if (project?.id) {
+      if (isOlympiad) {
+        query = query.or(`project_id.eq.${project.id},branch_type.eq.olympiad,branch_type.is.null`);
+      } else {
+        query = query.or(`project_id.eq.${project.id},branch_type.eq.${slug}`);
+      }
+    } else {
+      if (isOlympiad) {
+        query = query.or("branch_type.eq.olympiad,branch_type.is.null");
+      } else {
+        query = query.eq("branch_type", slug);
+      }
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Ошибка загрузки заявок:", error.message);
       return fail(error.message, 500, "DB_ERROR");
     }
 
-    return ok({ requests: data ?? [] });
+    // 3. Нормализуем полученные заявки
+    const requests = (data ?? []).map((row) => {
+      if (slug === "gatehouse" || row.branch_type === "gatehouse") {
+        return normalizeGatehouseRequest(row);
+      }
+      return normalizeOlympiadRequest(row);
+    });
+
+    const res = ok({ requests });
+    res.headers.set("Cache-Control", "no-store, max-age=0");
+    return res;
   } catch (e: any) {
     console.error("Ошибка в GET /api/projects/[slug]/requests:", e);
     return fail(e?.message || "Внутренняя ошибка сервера", 500, "SERVER_ERROR");
   }
 }
-
-// POST удалён — создание заявок происходит через единый эндпоинт /api/requests/create
-// с передачей project_id и других параметров.

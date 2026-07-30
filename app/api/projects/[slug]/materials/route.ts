@@ -20,6 +20,7 @@ function toPublicMaterialDTO(material: MaterialWithProgress) {
     target_levels: material.target_levels,
     class_levels: material.class_levels,
     order_index: material.order_index,
+    price: material.price,
     is_available: material.is_available,
     hasAccess: material.hasAccess,
     progress: material.progress,
@@ -30,7 +31,7 @@ function toPublicMaterialDTO(material: MaterialWithProgress) {
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
-  // 1. Авторизация (получаем полный контекст)
+  // 1. Авторизация
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
 
@@ -49,12 +50,16 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
 
   // 3. Если таб не указан или не существует — возвращаем пустой список
   if (!tabSlug) {
-    return ok({ materials: [] });
+    const res = ok({ materials: [] });
+    res.headers.set("Cache-Control", "no-store, max-age=0");
+    return res;
   }
 
   const tabExists = project.tabs.some((t) => t.slug === tabSlug && t.isActive);
   if (!tabExists) {
-    return ok({ materials: [] });
+    const res = ok({ materials: [] });
+    res.headers.set("Cache-Control", "no-store, max-age=0");
+    return res;
   }
 
   // 4. Загрузка материалов через унифицированный слой
@@ -71,7 +76,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
 
   let materials = result.materials;
 
-  // 5. Дополнительная фильтрация по уровню
+  // 5. Фильтрация по уровню / классу
   if (levelCode) {
     materials = materials.filter((m) =>
       (m.target_levels ?? []).includes(levelCode) ||
@@ -82,5 +87,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
   // 6. Преобразование в публичный DTO
   const dto = materials.map(toPublicMaterialDTO);
 
-  return ok({ materials: dto });
+  const res = ok({ materials: dto });
+  res.headers.set("Cache-Control", "no-store, max-age=0");
+  return res;
 }

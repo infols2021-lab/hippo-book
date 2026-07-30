@@ -61,7 +61,7 @@ export default function UsersTab() {
 
   /* ================= DATA ================= */
 
-  async function loadPendingUsers() {
+  async function fetchPendingUserIds(): Promise<Set<string>> {
     try {
       const res = await fetch("/api/admin/requests?status=pending", { cache: "no-store" });
       const json = (await safeJson(res)) as
@@ -69,15 +69,15 @@ export default function UsersTab() {
         | ApiErr
         | null;
 
-      if (!res.ok || !json || !("ok" in json) || !json.ok) return;
+      if (!res.ok || !json || !("ok" in json) || !json.ok) return new Set();
 
       const ids = new Set<string>();
       for (const r of json.requests ?? []) {
         if (r?.user_id) ids.add(String(r.user_id));
       }
-      setPendingUserIds(ids);
+      return ids;
     } catch {
-      // подсветка не критична
+      return new Set();
     }
   }
 
@@ -91,21 +91,25 @@ export default function UsersTab() {
       if (region) qs.set("region", region);
       if (materialsFilter) qs.set("materials", materialsFilter);
 
-      const res = await fetch(`/api/admin/users?${qs.toString()}`, { cache: "no-store" });
-      const json = (await safeJson(res)) as UsersApiOk | ApiErr | null;
+      // Параллельная загрузка пользователей и активных заявок без фликера
+      const [usersRes, pendingIds] = await Promise.all([
+        fetch(`/api/admin/users?${qs.toString()}`, { cache: "no-store" }),
+        fetchPendingUserIds(),
+      ]);
 
-      if (!res.ok || !json) throw new Error(`HTTP ${res.status}`);
-      if (!json.ok) throw new Error((json as ApiErr).error || `HTTP ${res.status}`);
+      const json = (await safeJson(usersRes)) as UsersApiOk | ApiErr | null;
+
+      if (!usersRes.ok || !json) throw new Error(`HTTP ${usersRes.status}`);
+      if (!json.ok) throw new Error((json as ApiErr).error || `HTTP ${usersRes.status}`);
 
       setUsers(json.users ?? []);
       setStats(json.stats ?? { total: 0, withMaterials: 0 });
-
-      // параллельно — pending requests
-      void loadPendingUsers();
+      setPendingUserIds(pendingIds);
     } catch (e: any) {
       setErr(e?.message || String(e));
       setUsers([]);
       setStats({ total: 0, withMaterials: 0 });
+      setPendingUserIds(new Set());
     } finally {
       setLoading(false);
     }
@@ -272,7 +276,7 @@ export default function UsersTab() {
         </div>
       ) : null}
 
-      {/* ===== MODAL (важно: тут user=modalUser, как требует текущий компонент) ===== */}
+      {/* ===== MODAL ===== */}
       <UserAccessModal
         open={modalOpen}
         user={modalUser}

@@ -153,7 +153,7 @@ export default function RequestsClient({
   // Данные витрины
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [materialsLoading, setMaterialsLoading] = useState(false);
-  const [activeTabId, setActiveTabId] = useState<string>(tabs[0]?.id || "all");
+  const [activeTabId, setActiveTabId] = useState<string>("all");
 
   // Состояние формы
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -170,16 +170,52 @@ export default function RequestsClient({
 
   const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
 
-  // Загрузка всех материалов проекта для витрины
+  // Загрузка всех материалов проекта по всем табам для витрины
   useEffect(() => {
     let alive = true;
     async function loadMaterials() {
       setMaterialsLoading(true);
       try {
-        const res = await fetch(`/api/projects/${project.slug}/materials`, { cache: "no-store" });
-        const { json } = await safeReadJson(res);
-        if (alive && res.ok && json?.ok && Array.isArray(json.materials)) {
-          const list: MaterialItem[] = json.materials.map((m: any) => ({
+        if (!tabs || tabs.length === 0) {
+          const res = await fetch(`/api/projects/${project.slug}/materials`, { cache: "no-store" });
+          const { json } = await safeReadJson(res);
+          if (alive && res.ok && json?.ok && Array.isArray(json.materials)) {
+            const list: MaterialItem[] = json.materials.map((m: any) => ({
+              id: String(m.id),
+              title: String(m.title || "Материал"),
+              description: m.description ? String(m.description) : null,
+              cover_image_url: m.cover_image_url ? String(m.cover_image_url) : null,
+              price: typeof m.price === "number" && m.price >= 0 ? m.price : 1000,
+              project_tab_id: m.project_tab_id ? String(m.project_tab_id) : null,
+              material_kind: String(m.material_kind || ""),
+            }));
+            setMaterials(list);
+          }
+          return;
+        }
+
+        const tabPromises = tabs.map(async (tab) => {
+          const res = await fetch(`/api/projects/${project.slug}/materials?tab=${tab.slug}`, {
+            cache: "no-store",
+          });
+          const { json } = await safeReadJson(res);
+          if (res.ok && json?.ok && Array.isArray(json.materials)) {
+            return json.materials.map((m: any) => ({
+              ...m,
+              project_tab_id: m.project_tab_id || tab.id,
+            }));
+          }
+          return [];
+        });
+
+        const results = await Promise.all(tabPromises);
+        if (!alive) return;
+
+        const allFetched = results.flat();
+        const map = new Map<string, MaterialItem>();
+
+        for (const m of allFetched) {
+          const item: MaterialItem = {
             id: String(m.id),
             title: String(m.title || "Материал"),
             description: m.description ? String(m.description) : null,
@@ -187,9 +223,13 @@ export default function RequestsClient({
             price: typeof m.price === "number" && m.price >= 0 ? m.price : 1000,
             project_tab_id: m.project_tab_id ? String(m.project_tab_id) : null,
             material_kind: String(m.material_kind || ""),
-          }));
-          setMaterials(list);
+          };
+          if (!map.has(item.id)) {
+            map.set(item.id, item);
+          }
         }
+
+        setMaterials(Array.from(map.values()));
       } catch (e) {
         console.error("Ошибка загрузки материалов витрины:", e);
       } finally {
@@ -201,7 +241,7 @@ export default function RequestsClient({
     return () => {
       alive = false;
     };
-  }, [project.slug]);
+  }, [project.slug, tabs]);
 
   useEffect(() => {
     setRequests(initialRequests.map(normalizeRequestRow));
@@ -210,7 +250,9 @@ export default function RequestsClient({
   // Фильтрация материалов по выбранному табу
   const filteredMaterials = useMemo(() => {
     if (activeTabId === "all") return materials;
-    return materials.filter((m) => m.project_tab_id === activeTabId);
+    return materials.filter(
+      (m) => m.project_tab_id === activeTabId || m.material_kind === activeTabId
+    );
   }, [materials, activeTabId]);
 
   // Выбранные объекты материалов
@@ -262,7 +304,7 @@ export default function RequestsClient({
     const localISO = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
     setRequestDateTime(localISO);
     setSelectedMaterialIds([]);
-    if (tabs.length > 0) setActiveTabId(tabs[0].id);
+    setActiveTabId("all");
     setRequestModalOpen(true);
   }
 
@@ -280,7 +322,7 @@ export default function RequestsClient({
     setRequestDateTime(localISO);
 
     setSelectedMaterialIds(r.material_ids || []);
-    if (tabs.length > 0) setActiveTabId(tabs[0].id);
+    setActiveTabId("all");
 
     setRequestModalOpen(true);
   }
@@ -782,7 +824,7 @@ export default function RequestsClient({
                 </div>
               </div>
 
-              {/* Данные покупателя (ЗАБЛОКИРОВАНЫ - берутся строго из профиля) */}
+              {/* Данные покупателя */}
               <div className="form-group">
                 <label>Email (🔒 Из профиля):</label>
                 <input type="email" value={userEmail} disabled className="user-locked-field" />

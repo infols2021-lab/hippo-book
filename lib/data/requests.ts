@@ -1,3 +1,4 @@
+// lib/data/requests.ts
 import "server-only";
 
 import type { DataAuthContext } from "@/lib/data/auth";
@@ -56,18 +57,43 @@ export type GatehouseRequestsPageData = {
   error: string | null;
 };
 
+// Универсальная нормализация массивов (поддерживает массивы, JSON-строки и CSV)
 function normalizeArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const str = value.trim();
+    if (!str) return [];
+
+    if (str.startsWith("[") && str.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(str);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => String(item ?? "").trim()).filter(Boolean);
+        }
+      } catch {}
+    }
+
+    return str
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
 }
 
 export function normalizeOlympiadRequest(row: any): OlympiadPurchaseRequest {
+  const parsedTypes = normalizeArray(row?.textbook_types);
+
   return {
     id: String(row?.id ?? ""),
     request_number: String(row?.request_number ?? ""),
     created_at: typeof row?.created_at === "string" ? row.created_at : "",
     class_level: typeof row?.class_level === "string" ? row.class_level : "",
-    textbook_types: Array.isArray(row?.textbook_types) ? normalizeArray(row.textbook_types) : null,
+    textbook_types: parsedTypes.length > 0 ? parsedTypes : null,
     email: String(row?.email ?? ""),
     full_name: String(row?.full_name ?? ""),
     is_processed: Boolean(row?.is_processed),

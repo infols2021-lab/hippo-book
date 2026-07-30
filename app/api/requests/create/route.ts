@@ -102,26 +102,71 @@ export async function POST(req: NextRequest) {
       sheetName = projectInfo.sheet_name;
     }
 
-    // 2. Получение выбранных материалов из БД для точного расчёта цены и названий
+    // 2. Поиск выбранных материалов по всем источникам (materials, textbooks, crosswords)
     let selectedMaterials: SelectedMaterialItem[] = [];
     let calculatedTotalPrice = 0;
 
     if (normalized.material_ids.length > 0) {
-      const { data: fetchedMaterials } = await supabase
-        .from("materials")
-        .select("id, title, price, material_kind")
-        .in("id", normalized.material_ids);
+      const [
+        { data: fetchedMaterials },
+        { data: fetchedTextbooks },
+        { data: fetchedCrosswords },
+      ] = await Promise.all([
+        supabase
+          .from("materials")
+          .select("id, title, price, material_kind")
+          .in("id", normalized.material_ids),
+        supabase
+          .from("textbooks")
+          .select("id, title, price")
+          .in("id", normalized.material_ids),
+        supabase
+          .from("crosswords")
+          .select("id, title, price")
+          .in("id", normalized.material_ids),
+      ]);
 
-      if (Array.isArray(fetchedMaterials) && fetchedMaterials.length > 0) {
-        selectedMaterials = fetchedMaterials.map((m: any) => ({
-          id: String(m.id),
-          title: String(m.title || "Материал"),
-          price: Number(m.price || 1000),
-          material_kind: m.material_kind ? String(m.material_kind) : undefined,
-        }));
+      const itemsMap = new Map<string, SelectedMaterialItem>();
 
-        calculatedTotalPrice = selectedMaterials.reduce((acc, m) => acc + m.price, 0);
+      if (Array.isArray(fetchedMaterials)) {
+        for (const m of fetchedMaterials) {
+          itemsMap.set(String(m.id), {
+            id: String(m.id),
+            title: String(m.title || "Материал"),
+            price: Number(m.price || 1000),
+            material_kind: m.material_kind ? String(m.material_kind) : undefined,
+          });
+        }
       }
+
+      if (Array.isArray(fetchedTextbooks)) {
+        for (const m of fetchedTextbooks) {
+          if (!itemsMap.has(String(m.id))) {
+            itemsMap.set(String(m.id), {
+              id: String(m.id),
+              title: String(m.title || "Учебник"),
+              price: Number(m.price || 1000),
+              material_kind: "textbook",
+            });
+          }
+        }
+      }
+
+      if (Array.isArray(fetchedCrosswords)) {
+        for (const m of fetchedCrosswords) {
+          if (!itemsMap.has(String(m.id))) {
+            itemsMap.set(String(m.id), {
+              id: String(m.id),
+              title: String(m.title || "Кроссворд"),
+              price: Number(m.price || 1000),
+              material_kind: "crossword",
+            });
+          }
+        }
+      }
+
+      selectedMaterials = Array.from(itemsMap.values());
+      calculatedTotalPrice = selectedMaterials.reduce((acc, m) => acc + m.price, 0);
     }
 
     const totalPrice = calculatedTotalPrice > 0 ? calculatedTotalPrice : (normalized.total_price || 0);
@@ -168,7 +213,7 @@ export async function POST(req: NextRequest) {
 
     const row = insertedRow as any;
 
-    // 4. Подготовка значений для Google Таблицы (с понятными названиями)
+    // 4. Подготовка значений для Google Таблицы
     const sheetValues = buildSheetValues(
       row.request_number || "",
       row.created_at || "",
