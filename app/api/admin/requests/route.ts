@@ -40,14 +40,15 @@ type ReqRow = {
   target_levels?: any;
   textbook_types: any;
   material_kinds?: any;
+  material_ids?: any;
+  total_price?: number | null;
   project_id?: string | null;
   projects?: any;
   sheet_name?: string | null;
 };
 
-// ❗️ ИСПРАВЛЕНИЕ: Убрали total_price, так как его нет в БД
 const REQUEST_SELECT =
-  "id,user_id,request_number,created_at,processed_at,is_processed,full_name,email,contact_phone,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,project_id,projects(name, sheet_name)";
+  "id,user_id,request_number,created_at,processed_at,is_processed,full_name,email,contact_phone,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,material_ids,total_price,project_id,projects(name, sheet_name)";
 
 const DB_RETRY_COUNT = 1;
 const DB_RETRY_DELAY_MS = 350;
@@ -236,7 +237,10 @@ export async function PATCH(req: NextRequest) {
       sheet_name: r.projects?.sheet_name || null,
     })) as ReqRow[];
 
-    const results: Record<string, { ok: boolean; granted?: string[]; error?: string; sheet?: any; grants_history?: any }> = {};
+    const results: Record<
+      string,
+      { ok: boolean; granted?: string[]; error?: string; sheet?: any; grants_history?: any }
+    > = {};
 
     for (const r of rows) {
       try {
@@ -244,9 +248,16 @@ export async function PATCH(req: NextRequest) {
         const grantsHistory: any = { ok: true };
 
         if (is_processed) {
-          const { grantedLabels, grantsToStore } = await grantAccessForRequest(supabase, user.id, r);
+          const { grantedLabels, grantsToStore } = await grantAccessForRequest(
+            supabase,
+            user.id,
+            r,
+          );
 
-          const delHistory = await supabase.from("purchase_request_grants").delete().eq("request_id", r.id);
+          const delHistory = await supabase
+            .from("purchase_request_grants")
+            .delete()
+            .eq("request_id", r.id);
           if (delHistory.error) throw new Error(delHistory.error.message);
 
           if (grantsToStore.length) {
@@ -262,11 +273,20 @@ export async function PATCH(req: NextRequest) {
             const t = await enrichMockTestTargetIfNeeded(supabase, rawTarget);
 
             const keepByGrant = await existsOtherProcessedGrant(
-              supabase, r.id, r.user_id, t.kind, t.item_id
+              supabase,
+              r.id,
+              r.user_id,
+              t.kind,
+              t.item_id,
             );
 
             const keepByRequest = await existsOtherProcessedGenericRequestForMaterial(
-              supabase, r.id, r.user_id, r.branch_type || "olympiad", t.material_kind, t.target_levels
+              supabase,
+              r.id,
+              r.user_id,
+              r.branch_type || "olympiad",
+              t.material_kind,
+              t.target_levels,
             );
 
             if (keepByGrant || keepByRequest) continue;
@@ -280,7 +300,10 @@ export async function PATCH(req: NextRequest) {
             if (del.error) throw new Error(del.error.message);
           }
 
-          const delHistory = await supabase.from("purchase_request_grants").delete().eq("request_id", r.id);
+          const delHistory = await supabase
+            .from("purchase_request_grants")
+            .delete()
+            .eq("request_id", r.id);
           if (delHistory.error) throw new Error(delHistory.error.message);
         }
 
@@ -298,13 +321,17 @@ export async function PATCH(req: NextRequest) {
         const updatedRow = upd.data as any;
         const sheetName = r.sheet_name;
 
+        const rawKinds = getRequestMaterialKinds(updatedRow);
+        const totalPrice = Number(updatedRow.total_price) || 0;
+
         const sheetValues = buildSheetValues(
           updatedRow.request_number || "",
           updatedRow.created_at || "",
           normalizeBranchType(updatedRow.branch_type),
           updatedRow.class_level,
           getRequestTargetLevels(updatedRow),
-          getRequestMaterialKinds(updatedRow),
+          rawKinds,
+          totalPrice,
           updatedRow.email || "",
           updatedRow.full_name || "",
           Boolean(updatedRow.is_processed),

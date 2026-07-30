@@ -8,6 +8,7 @@ import {
   buildSheetValues,
   validateRequest,
   normalizeRequestPayload,
+  type SelectedMaterialItem,
 } from "@/lib/requests/normalize";
 
 export const runtime = "nodejs";
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     const { data: existing, error: existingError } = await supabase
       .from("purchase_requests")
       .select(
-        "id,user_id,project_id,request_number,created_at,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,email,full_name,contact_phone,is_processed,processed_at"
+        "id,user_id,project_id,request_number,created_at,branch_type,class_level,target_level,target_levels,textbook_types,material_kinds,material_ids,total_price,email,full_name,contact_phone,is_processed,processed_at"
       )
       .eq("id", id)
       .eq("user_id", user.id)
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
       return fail(validation.error || "Неверные данные заявки", 400, "VALIDATION", noStoreInit());
     }
 
-    // 🔥 ИСПРАВЛЕНИЕ: Пытаемся найти project_id, если его нет
+    // 1. Поиск проекта и имени листа Google Sheets
     let projectId = existing.project_id;
     let sheetName = null;
 
@@ -106,7 +107,6 @@ export async function POST(req: NextRequest) {
         sheetName = projectInfo.sheet_name;
       }
     } else {
-      // Если проект уже был, просто достаем его sheet_name
       const { data: projectInfo } = await supabase
         .from("projects")
         .select("sheet_name")
@@ -115,14 +115,47 @@ export async function POST(req: NextRequest) {
       if (projectInfo) sheetName = projectInfo.sheet_name;
     }
 
+    // 2. Выборка выбранных материалов из БД для перерасчета цены и названий
+    let selectedMaterials: SelectedMaterialItem[] = [];
+    let calculatedTotalPrice = 0;
+
+    if (normalized.material_ids.length > 0) {
+      const { data: fetchedMaterials } = await supabase
+        .from("materials")
+        .select("id, title, price, material_kind")
+        .in("id", normalized.material_ids);
+
+      if (Array.isArray(fetchedMaterials) && fetchedMaterials.length > 0) {
+        selectedMaterials = fetchedMaterials.map((m: any) => ({
+          id: String(m.id),
+          title: String(m.title || "Материал"),
+          price: Number(m.price || 1000),
+          material_kind: m.material_kind ? String(m.material_kind) : undefined,
+        }));
+
+        calculatedTotalPrice = selectedMaterials.reduce((acc, m) => acc + m.price, 0);
+      }
+    }
+
+    const totalPrice = calculatedTotalPrice > 0 ? calculatedTotalPrice : (normalized.total_price || 0);
+
+    const extractedKinds = Array.from(
+      new Set(selectedMaterials.map((m) => m.material_kind).filter(Boolean))
+    ) as string[];
+
+    const materialKinds =
+      normalized.material_kinds.length > 0 ? normalized.material_kinds : extractedKinds;
+
     const payload: Record<string, any> = {
       branch_type: normalized.branch_type,
-      project_id: projectId, // Обновляем проект
+      project_id: projectId,
       class_level: normalized.class_level || null,
       target_level: normalized.target_levels.length > 0 ? normalized.target_levels : null,
       target_levels: normalized.target_levels.length > 0 ? normalized.target_levels : null,
-      textbook_types: normalized.textbook_types,
-      material_kinds: normalized.material_kinds,
+      textbook_types: normalized.textbook_types.length > 0 ? normalized.textbook_types : materialKinds,
+      material_kinds: materialKinds,
+      material_ids: normalized.material_ids,
+      total_price: totalPrice,
       email: normalized.email,
       full_name: normalized.full_name,
       contact_phone: normalized.contact_phone || null,
@@ -149,7 +182,8 @@ export async function POST(req: NextRequest) {
       normalized.branch_type,
       normalized.class_level,
       normalized.target_levels,
-      normalized.material_kinds.length > 0 ? normalized.material_kinds : normalized.textbook_types,
+      selectedMaterials.length > 0 ? selectedMaterials : (normalized.material_kinds.length > 0 ? normalized.material_kinds : normalized.textbook_types),
+      totalPrice,
       normalized.email,
       normalized.full_name,
       Boolean(row.is_processed),

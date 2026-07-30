@@ -112,6 +112,7 @@ export function normalizeGatehouseMaterial(row: any): MaterialDbRow {
     is_active: typeof row?.is_active === "boolean" ? row.is_active : true,
     is_available: typeof row?.is_available === "boolean" ? row.is_available : false,
     order_index: typeof row?.order_index === "number" ? row.order_index : 0,
+    price: typeof row?.price === "number" && row.price >= 0 ? row.price : 1000,
     class_levels: normalizeArray(row?.class_levels),
     target_levels: normalizeArray(row?.target_levels),
     legacy_source_table:
@@ -123,8 +124,7 @@ export function normalizeGatehouseMaterial(row: any): MaterialDbRow {
     created_at: typeof row?.created_at === "string" ? row.created_at : new Date().toISOString(),
     updated_at: typeof row?.updated_at === "string" ? row.updated_at : new Date().toISOString(),
     meta: row?.meta && typeof row.meta === "object" ? row.meta : {},
-    project_tab_id: null, // для gatehouse материалов пока нет привязки к табу
- 
+    project_tab_id: null,
   };
 }
 

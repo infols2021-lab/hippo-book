@@ -1,6 +1,6 @@
 // lib/requests/normalize.ts
 // Единая нормализация данных для заявок (purchase_requests).
-// Обновлено: полная поддержка корзины товаров (material_ids), гибких цен (total_price) и форматирования для Google Sheets.
+// Обновлено: полная поддержка корзины товаров (material_ids), гибких цен (total_price) и полиморфных аргументов для Google Sheets.
 
 import {
   normalizeString,
@@ -173,14 +173,14 @@ export function formatTargetForSheet(
 }
 
 /**
- * Превращает список выбранных материалов из UUID в понятные человеку названия.
- * Решает баг, когда в Google Sheets улетали сырые UUID вроде "4c7b9eb7-1444..."
+ * Превращает список выбранных материалов (как объектов, так и строк) в понятные человеку названия.
  */
-export function formatMaterialTitlesForSheet(items: SelectedMaterialItem[]): string {
+export function formatMaterialTitlesForSheet(items: (SelectedMaterialItem | string)[]): string {
   if (!Array.isArray(items) || items.length === 0) return "—";
 
   return items
     .map((item) => {
+      if (typeof item === "string") return item;
       const title = item.title || "Материал";
       const priceStr = item.price ? ` (${item.price} ₽)` : "";
       return `${title}${priceStr}`;
@@ -194,7 +194,7 @@ export function buildSheetValues(
   branchType: RequestBranchType,
   classLevel: string | null,
   targetLevels: string[],
-  selectedMaterials: SelectedMaterialItem[],
+  selectedMaterials: (SelectedMaterialItem | string)[],
   totalPrice: number,
   email: string,
   fullName: string,
@@ -221,7 +221,11 @@ export function validateRequest(normalized: NormalizedRequest): {
   valid: boolean;
   error?: string;
 } {
-  if (normalized.material_ids.length === 0) {
+  if (
+    normalized.material_ids.length === 0 &&
+    normalized.textbook_types.length === 0 &&
+    normalized.material_kinds.length === 0
+  ) {
     return { valid: false, error: "Выберите хотя бы один материал для заказа" };
   }
 
