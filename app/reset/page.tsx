@@ -4,74 +4,10 @@ import "./reset.css";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import TurnstileWidget from "@/components/TurnstileWidget";
+import { isValidEmailFormat, validateEmailDomain } from "@/lib/security/domains";
 
 type BannerType = "error" | "success" | "warning" | null;
 type ModalKind = "error" | "success" | "warning";
-
-function isValidEmail(email: string) {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(email);
-}
-
-const ALLOWED_DOMAINS = [
-  "gmail.com",
-  "yandex.ru",
-  "mail.ru",
-  "ya.ru",
-  "yandex.com",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "yahoo.com",
-  "icloud.com",
-  "me.com",
-  "mac.com",
-  "rambler.ru",
-  "bk.ru",
-  "list.ru",
-  "inbox.ru",
-  "yandex.ua",
-  "mail.ua",
-  "ukr.net",
-  "i.ua",
-  "meta.ua",
-  "email.ua",
-];
-
-const BLOCKED_DOMAINS = [
-  "tempmail.com",
-  "10minutemail.com",
-  "guerrillamail.com",
-  "mailinator.com",
-  "yopmail.com",
-  "throwawaymail.com",
-  "fakeinbox.com",
-  "temp-mail.org",
-  "trashmail.com",
-  "getnada.com",
-  "tmpmail.org",
-  "maildrop.cc",
-  "disposablemail.com",
-  "fake-mail.com",
-  "tempinbox.com",
-  "jetable.org",
-  "mailnesia.com",
-  "sharklasers.com",
-  "guerrillamail.biz",
-  "grr.la",
-  "guerrillamail.info",
-  "spam4.me",
-  "tmpmail.net",
-];
-
-function validateDomain(email: string) {
-  const domain = email.split("@")[1]?.toLowerCase();
-  if (!domain) return { ok: false, message: "Неверный формат email" };
-  if (BLOCKED_DOMAINS.includes(domain)) return { ok: false, message: "Временные email адреса запрещены" };
-  if (!ALLOWED_DOMAINS.includes(domain))
-    return { ok: false, message: "Разрешены только email от популярных сервисов (Gmail, Yandex, Mail.ru, Outlook и др.)" };
-  return { ok: true, message: "" };
-}
 
 export default function ResetPage() {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
@@ -95,6 +31,7 @@ export default function ResetPage() {
     setBannerType(type);
     setBannerText(text);
   }
+
   function clearBanner() {
     setBannerType(null);
     setBannerText("");
@@ -120,14 +57,19 @@ export default function ResetPage() {
 
   const canSubmit = useMemo(() => {
     const e = email.trim().toLowerCase();
-    return !!siteKey && !busy && !sent && isValidEmail(e) && !!captchaToken;
+    return !!siteKey && !busy && !sent && isValidEmailFormat(e) && !!captchaToken;
   }, [siteKey, busy, sent, email, captchaToken]);
 
   function friendlyErrorFromApi(payload: any, status: number) {
     const code = String(payload?.code || "").toUpperCase();
     const err = String(payload?.error || payload?.message || "").trim();
 
-    if (code.includes("CAPTCHA") || code.includes("TURNSTILE") || err.toLowerCase().includes("captcha") || err.toLowerCase().includes("капч")) {
+    if (
+      code.includes("CAPTCHA") ||
+      code.includes("TURNSTILE") ||
+      err.toLowerCase().includes("captcha") ||
+      err.toLowerCase().includes("капч")
+    ) {
       return (
         (err || "Капча не пройдена или не загрузилась.") +
         "\n\nПопробуйте:\n" +
@@ -151,12 +93,12 @@ export default function ResetPage() {
       openModal("error", "Ошибка", "Введите email.");
       return;
     }
-    if (!isValidEmail(e)) {
+    if (!isValidEmailFormat(e)) {
       openModal("error", "Ошибка", "Неверный формат email.");
       return;
     }
 
-    const d = validateDomain(e);
+    const d = validateEmailDomain(e);
     if (!d.ok) {
       openModal("error", "Ошибка", d.message);
       return;
@@ -189,19 +131,8 @@ export default function ResetPage() {
         json = null;
       }
 
-      if (!res.ok) {
+      if (!res.ok || !json?.ok) {
         const msg = friendlyErrorFromApi(json, res.status);
-
-        setBusy(false);
-        clearBanner();
-        resetCaptchaHard();
-
-        openModal("error", "Ошибка", msg);
-        return;
-      }
-
-      if (!json?.ok) {
-        const msg = friendlyErrorFromApi(json, 400);
 
         setBusy(false);
         clearBanner();
@@ -264,7 +195,7 @@ export default function ResetPage() {
             <div className="reset-modal-body">{modalBody}</div>
 
             <div className="reset-modal-actions">
-              {(modalKind === "error" || modalKind === "warning") ? (
+              {modalKind === "error" || modalKind === "warning" ? (
                 <button
                   type="button"
                   className="btn btn-captcha-reload"

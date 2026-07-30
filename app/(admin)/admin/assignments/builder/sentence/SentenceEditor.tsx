@@ -26,7 +26,9 @@ function normalizeAnswers(raw: unknown, blanks: number): string[][] {
 
 function answersToRawLines(ans: string[][]): string[] {
   return ans.map((g) => {
-    const cleaned = Array.isArray(g) ? g.map((x) => String(x ?? "")).filter((x) => x !== "") : [];
+    const cleaned = Array.isArray(g)
+      ? g.map((x) => String(x ?? "")).filter((x) => x !== "")
+      : [];
     return cleaned.join("; ");
   });
 }
@@ -43,18 +45,21 @@ export default function SentenceEditor({ value, onChange, disabled }: Props) {
   const sentence = typeof value.sentence === "string" ? value.sentence : "";
   const blanks = useMemo(() => countBlanks(sentence), [sentence]);
 
-  const normalized = useMemo(() => normalizeAnswers(value.answers, blanks), [value.answers, blanks]);
+  const [rawLines, setRawLines] = useState<string[]>(() => {
+    const normalized = normalizeAnswers(value.answers, blanks);
+    return answersToRawLines(normalized);
+  });
 
-  const [rawLines, setRawLines] = useState<string[]>(() => answersToRawLines(normalized));
-
-  // когда сменился вопрос — обновляем rawLines
+  // При смене выбранного вопроса — инициализируем строки ответов заново
   useEffect(() => {
-    setRawLines(answersToRawLines(normalizeAnswers(value.answers, blanks)));
+    const normalized = normalizeAnswers(value.answers, blanks);
+    setRawLines(answersToRawLines(normalized));
   }, [value.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // когда blanks поменялись — подстраиваем rawLines по количеству пропусков
+  // При изменении количества пропусков (добавление/удаление ___ в предложении)
   useEffect(() => {
     setRawLines((prev) => {
+      if (prev.length === blanks) return prev;
       const next = prev.slice(0, blanks);
       while (next.length < blanks) next.push("");
       return next;
@@ -71,17 +76,34 @@ export default function SentenceEditor({ value, onChange, disabled }: Props) {
     patch({ answers: parsed });
   }
 
+  function handleSentenceChange(newSentence: string) {
+    const newBlanks = countBlanks(newSentence);
+    const updatedRawLines = rawLines.slice(0, newBlanks);
+    while (updatedRawLines.length < newBlanks) {
+      updatedRawLines.push("");
+    }
+
+    setRawLines(updatedRawLines);
+    onChange({
+      ...value,
+      sentence: newSentence,
+      answers: updatedRawLines.map(parseRawLine),
+    });
+  }
+
   return (
     <div>
       <div className="form-group">
-        <label>Предложение (используй ___ для пропусков):</label>
+        <label style={{ fontWeight: 600, display: "block", marginBottom: 8 }}>
+          Предложение (используй ___ для пропусков):
+        </label>
         <textarea
           className="input"
           rows={4}
           disabled={disabled}
           placeholder="I ___ to school every ___ ."
           value={sentence}
-          onChange={(e) => patch({ sentence: e.target.value })}
+          onChange={(e) => handleSentenceChange(e.target.value)}
         />
 
         <div className="small-muted" style={{ marginTop: 6 }}>
@@ -89,9 +111,11 @@ export default function SentenceEditor({ value, onChange, disabled }: Props) {
         </div>
       </div>
 
-      {/* Предпросмотр с [1][2] как раньше */}
+      {/* Предпросмотр */}
       <div className="form-group">
-        <label>Предпросмотр:</label>
+        <label style={{ fontWeight: 600, display: "block", marginBottom: 8 }}>
+          Предпросмотр:
+        </label>
         <div className="sentence-preview">
           {sentence.split("___").map((part, idx) => (
             <span key={idx}>
@@ -117,12 +141,14 @@ export default function SentenceEditor({ value, onChange, disabled }: Props) {
       </div>
 
       <div className="form-group">
-        <label>Ответы для пропусков:</label>
+        <label style={{ fontWeight: 600, display: "block", marginBottom: 8 }}>
+          Ответы для пропусков:
+        </label>
 
         {blanks === 0 ? (
           <div className="small-muted">Добавь хотя бы один ___ в предложение</div>
         ) : (
-          <div className="sentence-answers">
+          <div className="sentence-answers" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {rawLines.map((line, idx) => (
               <div key={idx} className="fill-input-item">
                 <div className="fill-input-number">{idx + 1}</div>
@@ -145,7 +171,7 @@ export default function SentenceEditor({ value, onChange, disabled }: Props) {
         )}
 
         <div className="small-muted" style={{ marginTop: 6 }}>
-          Несколько вариантов разделяй через <b>;</b>. Пробелы можно — всё ок.
+          Несколько вариантов разделяй через <b>;</b>. Пробелы можно — всё сохранится корректно.
         </div>
       </div>
     </div>

@@ -3,6 +3,9 @@ import { ok, fail } from "@/lib/api/response";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 function getRemoteIp(req: Request): string | null {
   const xff = req.headers.get("x-forwarded-for");
   if (xff) return xff.split(",")[0]?.trim() || null;
@@ -39,14 +42,23 @@ export async function POST(req: Request) {
 
     const { data: u, error: uErr } = await supabase.auth.getUser();
     if (uErr || !u?.user) {
-      return fail("Сессия восстановления не найдена или устарела. Запросите восстановление заново.", 401, "NO_SESSION");
+      return fail(
+        "Сессия восстановления не найдена или устарела. Запросите восстановление заново.",
+        401,
+        "NO_SESSION"
+      );
     }
 
     const { error } = await supabase.auth.updateUser({ password });
-    if (error) return fail("Не удалось обновить пароль: " + error.message, 400, "UPDATE_FAILED");
+    if (error) {
+      return fail("Не удалось обновить пароль: " + error.message, 400, "UPDATE_FAILED");
+    }
 
     return ok({ message: "✅ Пароль успешно изменён! Теперь войдите в систему." });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: e?.message || String(e), code: "SERVER_ERROR" },
+      { status: 500 }
+    );
   }
 }

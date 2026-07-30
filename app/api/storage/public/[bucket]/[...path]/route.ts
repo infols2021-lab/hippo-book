@@ -6,11 +6,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// Разрешаем Next.js принимать тела запросов до 50 МБ для этого прокси-роута
-
-// Vercel: увеличиваем таймаут — крупные файлы (аудио, PDF) могут грузиться дольше 10 сек
-export const maxDuration = 30;
-
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
@@ -36,7 +31,6 @@ function normalizePath(parts: unknown) {
 
 /**
  * Дефолтный список публичных бакетов.
- * ВАЖНО: синхронизировать с DEFAULT_PUBLIC_BUCKETS в lib/storage/server.ts
  */
 const DEFAULT_PROXY_PUBLIC_BUCKETS = [
   "covers",
@@ -49,12 +43,6 @@ const DEFAULT_PROXY_PUBLIC_BUCKETS = [
   "profile-backgrounds",
 ];
 
-/**
- * Возвращает список разрешённых бакетов.
- * Если STORAGE_PUBLIC_BUCKETS задан — берём его.
- * Если нет — используем DEFAULT_PROXY_PUBLIC_BUCKETS.
- * Yandex-бакет добавляется всегда.
- */
 function getAllowedPublicBuckets(): string[] {
   const fromEnv = (process.env.STORAGE_PUBLIC_BUCKETS || "")
     .split(",")
@@ -112,10 +100,6 @@ function buildYandexPublicUrl(bucket: string, objectPath: string) {
   return `https://storage.yandexcloud.net/${encodeURIComponent(bucket)}/${encodeStoragePath(objectPath)}`;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-
 function jsonError(message: string, status = 500, code = "STORAGE_PROXY_ERROR") {
   return NextResponse.json(
     { ok: false, error: message, code },
@@ -152,80 +136,17 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     return jsonError(e?.message || "URL build error", 500, "URL_BUILD_ERROR");
   }
 
-  try {
-    // Формируем upstream-заголовки
-    const upstreamHeaders: Record<string, string> = {
-      // Представляемся браузером — некоторые CDN блокируют bot-like UA
-      "User-Agent":
-        "Mozilla/5.0 (compatible; HippoProxy/1.0; +https://hippo-book.ru)",
-    };
-
-    // ↓ Пробрасываем Range для поддержки audio seek через прокси.
-    //   Без этого браузер не может перематывать аудиофайлы.
-    const rangeHeader = req.headers.get("Range");
-    if (rangeHeader) {
-      upstreamHeaders["Range"] = rangeHeader;
-    }
-
-    // Запрашиваем файл server-to-server.
-    // Пользователю не нужен прямой доступ к Яндексу/Supabase —
-    // наш сервер сам забирает контент и стримит его пользователю.
-    const upstream = await fetch(targetUrl, {
-      headers: upstreamHeaders,
-      // Отключаем Next.js-кеш fetch — нам важен свежий ответ от upstream,
-      // а кешировать будем на уровне браузера через Cache-Control
-      cache: "no-store",
-    });
-
-    // 206 Partial Content — легитимный ответ на Range-запрос
-    if (!upstream.ok && upstream.status !== 206) {
-      if (upstream.status === 404) {
-        return jsonError("File not found", 404, "NOT_FOUND");
-      }
-      return jsonError(`Upstream error: ${upstream.status}`, 502, "UPSTREAM_ERROR");
-    }
-
-    // ─── Формируем заголовки ответа ───────────────────────────────────────
-    const resHeaders: Record<string, string> = {
-      // Тип контента — берём от upstream (image/jpeg, audio/mp4, и т.д.)
-      "Content-Type":
-        upstream.headers.get("Content-Type") || "application/octet-stream",
-
-      // Долгое кеширование в браузере — файлы в хранилище immutable
-      "Cache-Control": "public, max-age=31536000, immutable",
-
-      // Безопасность
-      "X-Content-Type-Options": "nosniff",
-    };
-
-    // Пробрасываем заголовки для range requests и кеш-валидации
-    const headersToForward = [
-      "Content-Length",
-      "Content-Range",
-      "Accept-Ranges",
-      "ETag",
-      "Last-Modified",
-    ] as const;
-
-    for (const header of headersToForward) {
-      const val = upstream.headers.get(header);
-      if (val) resHeaders[header] = val;
-    }
-
-    // ─── Стримим тело напрямую — без буферизации в памяти ────────────────
-    // upstream.body — это ReadableStream, NextResponse умеет его стримить.
-    return new NextResponse(upstream.body, {
-      status: upstream.status, // 200 или 206 (для range requests)
-      headers: resHeaders,
-    });
-  } catch (e: any) {
-    // fetch упал (network error, timeout и т.д.)
-    return jsonError(e?.message || "Storage fetch error", 502, "FETCH_ERROR");
-  }
+  // Возвращаем 307 HTTP-редирект на целевой CDN-URL.
+  // Браузер напрямую загрузит файл из S3/Supabase CDN,
+  // что сэкономит трафик серверлесс-функций Vercel и снимет ограничение по таймауту.
+  return NextResponse.redirect(targetUrl, {
+    status: 307,
+    headers: {
+      "Cache-Control": "public, max-age=86400, s-maxage=86400",
+    },
+  });
 }
 
-// HEAD используется браузером для preflight проверок и audio duration
 export async function HEAD(req: NextRequest, ctx: RouteContext) {
-  // Переиспользуем GET — NextResponse автоматически уберёт body для HEAD
   return GET(req, ctx);
 }

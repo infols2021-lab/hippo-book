@@ -3,48 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { ok, fail } from "@/lib/api/response";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
-
-const BLOCKED_DOMAINS = [
-  "tempmail.com",
-  "10minutemail.com",
-  "guerrillamail.com",
-  "mailinator.com",
-  "yopmail.com",
-  "throwawaymail.com",
-  "fakeinbox.com",
-  "temp-mail.org",
-  "trashmail.com",
-  "getnada.com",
-  "tmpmail.org",
-  "maildrop.cc",
-  "disposablemail.com",
-  "fake-mail.com",
-  "tempinbox.com",
-  "jetable.org",
-  "mailnesia.com",
-  "sharklasers.com",
-  "guerrillamail.biz",
-  "grr.la",
-  "guerrillamail.info",
-  "spam4.me",
-  "tmpmail.net",
-];
-
-function isValidEmail(email: string) {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(email);
-}
-
-function validateDomain(email: string) {
-  const domain = email.split("@")[1]?.toLowerCase().trim();
-  if (!domain) return { ok: false as const, message: "Неверный формат email" };
-
-  if (BLOCKED_DOMAINS.includes(domain)) {
-    return { ok: false as const, message: "Временные email адреса запрещены" };
-  }
-
-  return { ok: true as const };
-}
+import { isValidEmailFormat, validateEmailDomain } from "@/lib/security/domains";
 
 function getRemoteIp(req: Request): string | null {
   const xff = req.headers.get("x-forwarded-for");
@@ -85,6 +44,7 @@ export async function POST(req: Request) {
 
     const remoteIp = getRemoteIp(req) ?? undefined;
 
+    // 1. Проверка капчи
     const captcha = await verifyTurnstileToken({
       token: captchaToken,
       expectedAction: "register",
@@ -95,20 +55,23 @@ export async function POST(req: Request) {
       return fail("Капча не пройдена. Перезагрузите и попробуйте снова.", 400, captcha.code);
     }
 
+    // 2. Валидация полей через модуль domains.ts
     if (!fullName || fullName.length < 3) return fail("Введите ФИО", 400, "VALIDATION");
     if (!phone) return fail("Введите телефон", 400, "VALIDATION");
     if (!region) return fail("Выберите область", 400, "VALIDATION");
-    if (!email || !isValidEmail(email)) return fail("Неверный формат email", 400, "VALIDATION");
+    if (!email || !isValidEmailFormat(email)) return fail("Неверный формат email", 400, "VALIDATION");
 
-    const d = validateDomain(email);
+    const d = validateEmailDomain(email);
     if (!d.ok) return fail(d.message, 400, "VALIDATION");
 
     if (!password || password.length < 6) {
       return fail("Пароль должен быть не менее 6 символов", 400, "VALIDATION");
     }
 
+    // 3. Предварительная проверка существования профиля
+    let admin = null;
     try {
-      const admin = getSupabaseAdminClient();
+      admin = getSupabaseAdminClient();
       const { data: existing } = await admin
         .from("profiles")
         .select("id")
@@ -122,8 +85,8 @@ export async function POST(req: Request) {
           "USER_EXISTS",
         );
       }
-    } catch {
-      // если admin недоступен — не валим, просто идём дальше
+    } catch (e) {
+      console.warn("[register] Admin profile check warn:", e);
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -137,6 +100,7 @@ export async function POST(req: Request) {
     const origin = getPublicOrigin(req);
     const redirectTo = origin ? `${origin}/login?message=confirmed` : undefined;
 
+    // 4. Регистрация в Supabase Auth
     const { data, error } = await supabaseAnon.auth.signUp({
       email,
       password,
@@ -170,23 +134,51 @@ export async function POST(req: Request) {
       return fail("Ошибка регистрации: " + error.message, 400, "SIGNUP_FAILED");
     }
 
-    if (!data.user?.id) return fail("Не удалось создать пользователя", 500, "NO_USER");
+    const userId = data.user?.id;
+    if (!userId) return fail("Не удалось создать пользователя", 500, "NO_USER");
 
+    // 5. Запись профиля в таблицу `profiles` с откатом (Rollback) при ошибке
     try {
-      const admin = getSupabaseAdminClient();
+      if (!admin) admin = getSupabaseAdminClient();
+
       const { error: pErr } = await admin.from("profiles").upsert(
         {
-          id: data.user.id,
+          id: userId,
+          email: email,
           full_name: fullName,
           contact_phone: phone,
-          region,
+          region: region,
         } as any,
         { onConflict: "id" },
       );
 
-      if (pErr) console.error("[register] profile upsert error", pErr);
+      if (pErr) {
+        console.error("[register] Profile creation failed, rolling back user:", pErr);
+
+        await admin.auth.admin.deleteUser(userId).catch((delErr) => {
+          console.error("[register] Rollback user deletion failed:", delErr);
+        });
+
+        return fail(
+          "Не удалось создать профиль пользователя. Попробуйте еще раз.",
+          500,
+          "PROFILE_CREATE_FAILED",
+        );
+      }
     } catch (e) {
-      console.error("[register] profile upsert exception", e);
+      console.error("[register] Profile upsert exception, rolling back user:", e);
+
+      if (admin && userId) {
+        await admin.auth.admin.deleteUser(userId).catch((delErr) => {
+          console.error("[register] Rollback user deletion failed:", delErr);
+        });
+      }
+
+      return fail(
+        "Ошибка при сохранении данных профиля. Попробуйте заново.",
+        500,
+        "PROFILE_CREATE_EXCEPTION",
+      );
     }
 
     return ok({

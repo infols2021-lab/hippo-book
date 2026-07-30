@@ -17,7 +17,9 @@ function normalizeAnswers(raw: unknown): string[][] {
 
 function answersToRawLines(ans: string[][]): string[] {
   return (ans.length ? ans : [[""]]).map((g) => {
-    const cleaned = Array.isArray(g) ? g.map((x) => String(x ?? "")).filter((x) => x !== "") : [];
+    const cleaned = Array.isArray(g)
+      ? g.map((x) => String(x ?? "")).filter((x) => x !== "")
+      : [];
     return cleaned.join("; ");
   });
 }
@@ -33,16 +35,16 @@ function parseRawLine(line: string): string[] {
 export default function FillEditor({ value, onChange, disabled }: Props) {
   const answers = normalizeAnswers(value.answers);
 
-  // raw-строки для инпутов (не ломают пробелы/курсор)
+  // raw-строки для инпутов (сохраняют пробелы и курсор при вводе)
   const [rawLines, setRawLines] = useState<string[]>(() => answersToRawLines(answers));
 
+  // Синхронизация при смене выбранного вопроса
   useEffect(() => {
     setRawLines(answersToRawLines(normalizeAnswers(value.answers)));
-  }, [value.id]); // при смене вопроса
+  }, [value.id]);
 
   function patchAnswers(nextRawLines: string[]) {
     setRawLines(nextRawLines);
-
     const parsed = nextRawLines.map(parseRawLine);
     onChange({ ...value, answers: parsed });
   }
@@ -50,7 +52,9 @@ export default function FillEditor({ value, onChange, disabled }: Props) {
   return (
     <div>
       <div className="form-group">
-        <label>Правильные ответы:</label>
+        <label style={{ fontWeight: 600, display: "block", marginBottom: 8 }}>
+          Правильные ответы:
+        </label>
 
         <div className="fill-inputs-container">
           {rawLines.map((line, idx) => (
@@ -65,7 +69,7 @@ export default function FillEditor({ value, onChange, disabled }: Props) {
                 placeholder="Варианты ответа через ; (например: ежик;кошка)"
                 onChange={(e) => {
                   const next = rawLines.slice();
-                  next[idx] = e.target.value; // как есть
+                  next[idx] = e.target.value;
                   patchAnswers(next);
                 }}
               />
@@ -97,7 +101,7 @@ export default function FillEditor({ value, onChange, disabled }: Props) {
           ➕ Добавить ответ
         </button>
 
-        <div className="input-count" style={{ marginTop: 6 }}>
+        <div className="input-count" style={{ marginTop: 6, fontSize: 13, color: "#666" }}>
           Количество ответов: {rawLines.length}
         </div>
 

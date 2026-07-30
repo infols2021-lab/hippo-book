@@ -1,40 +1,35 @@
 export const runtime = 'nodejs';
+export const revalidate = 3600; // Кешируем роут на 1 час на уровне Next.js / CDN
 
 const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
 
-let cachedScript: string | null = null;
-let cacheTime = 0;
-const CACHE_TTL = 60 * 60 * 1000; // 1 час
-
 export async function GET() {
   try {
-    if (cachedScript && Date.now() - cacheTime < CACHE_TTL) {
-      return new Response(cachedScript, {
-        headers: {
-          'Content-Type': 'application/javascript',
-          'Cache-Control': 'public, max-age=3600',
-        },
-      });
+    const response = await fetch(TURNSTILE_SCRIPT_URL, {
+      next: { revalidate: 3600 },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch Cloudflare Turnstile script: ${response.status}`);
     }
 
-    const response = await fetch(TURNSTILE_SCRIPT_URL);
-    if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
-
     const script = await response.text();
-    cachedScript = script;
-    cacheTime = Date.now();
 
     return new Response(script, {
+      status: 200,
       headers: {
-        'Content-Type': 'application/javascript',
-        'Cache-Control': 'public, max-age=3600',
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400',
       },
     });
   } catch (error) {
     console.error('Turnstile proxy error:', error);
     return new Response('// Turnstile script unavailable', {
       status: 502,
-      headers: { 'Content-Type': 'application/javascript' },
+      headers: {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'no-store, max-age=0',
+      },
     });
   }
 }

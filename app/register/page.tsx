@@ -2,90 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import TurnstileWidget from "@/components/TurnstileWidget";
+import { isValidEmailFormat, validateEmailDomain } from "@/lib/security/domains";
 import "./register.css";
 
 type BannerType = "error" | "success" | "warning" | null;
 type ModalKind = "error" | "success" | "warning";
-
-const BLOCKED_DOMAINS = [
-  "tempmail.com",
-  "10minutemail.com",
-  "guerrillamail.com",
-  "mailinator.com",
-  "yopmail.com",
-  "throwawaymail.com",
-  "fakeinbox.com",
-  "temp-mail.org",
-  "trashmail.com",
-  "getnada.com",
-  "tmpmail.org",
-  "maildrop.cc",
-  "disposablemail.com",
-  "fake-mail.com",
-  "tempinbox.com",
-  "jetable.org",
-  "mailnesia.com",
-  "sharklasers.com",
-  "guerrillamail.biz",
-  "grr.la",
-  "guerrillamail.info",
-  "spam4.me",
-  "tmpmail.net",
-];
-
-const REGISTRATION_LIMIT = {
-  maxAttempts: 3,
-  timeWindow: 60 * 60 * 1000,
-  key: "edu-keys-registration-limits",
-};
-
-function isValidEmail(email: string) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-function validateDomain(email: string) {
-  const domain = email.split("@")[1]?.toLowerCase().trim();
-  if (!domain) return { valid: false, message: "Неверный формат email" };
-
-  if (BLOCKED_DOMAINS.includes(domain)) {
-    return { valid: false, message: "Временные email адреса запрещены" };
-  }
-
-  return { valid: true, message: "" };
-}
-
-function checkRateLimit() {
-  try {
-    const now = Date.now();
-    const limits = JSON.parse(
-      localStorage.getItem(REGISTRATION_LIMIT.key) || '{"attempts":[]}',
-    ) as { attempts: number[] };
-
-    const recentAttempts = (limits.attempts || []).filter(
-      (t) => now - t < REGISTRATION_LIMIT.timeWindow,
-    );
-
-    if (recentAttempts.length >= REGISTRATION_LIMIT.maxAttempts) {
-      const nextAttempt = Math.min(...recentAttempts) + REGISTRATION_LIMIT.timeWindow;
-      const minutesLeft = Math.ceil((nextAttempt - now) / (60 * 1000));
-      return {
-        allowed: false,
-        message: `Превышен лимит регистраций. Попробуйте через ${minutesLeft} минут.`,
-      };
-    }
-
-    recentAttempts.push(now);
-    localStorage.setItem(
-      REGISTRATION_LIMIT.key,
-      JSON.stringify({ attempts: recentAttempts }),
-    );
-
-    return { allowed: true, message: "" };
-  } catch {
-    return { allowed: true, message: "" };
-  }
-}
 
 export default function RegisterPage() {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
@@ -134,7 +55,7 @@ export default function RegisterPage() {
     clearBanner();
   }
 
-  const formatValid = useMemo(() => isValidEmail(email.trim()), [email]);
+  const formatValid = useMemo(() => isValidEmailFormat(email.trim()), [email]);
 
   const matchValid = useMemo(() => {
     const e = email.trim().toLowerCase();
@@ -146,7 +67,7 @@ export default function RegisterPage() {
 
   const domainValid = useMemo(() => {
     const e = email.trim().toLowerCase();
-    return e ? validateDomain(e).valid : false;
+    return e ? validateEmailDomain(e).ok : false;
   }, [email]);
 
   const phoneValid = useMemo(() => phone.trim().length > 0, [phone]);
@@ -246,13 +167,13 @@ export default function RegisterPage() {
       openModal("error", "Ошибка", "Email адреса не совпадают.");
       return;
     }
-    if (!isValidEmail(em)) {
+    if (!isValidEmailFormat(em)) {
       openModal("error", "Ошибка", "Неверный формат email.");
       return;
     }
 
-    const dc = validateDomain(em);
-    if (!dc.valid) {
+    const dc = validateEmailDomain(em);
+    if (!dc.ok) {
       openModal("error", "Ошибка", dc.message);
       return;
     }
@@ -263,12 +184,6 @@ export default function RegisterPage() {
         "Нужна капча",
         "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
       );
-      return;
-    }
-
-    const rl = checkRateLimit();
-    if (!rl.allowed) {
-      openModal("error", "Лимит", rl.message);
       return;
     }
 
@@ -297,19 +212,8 @@ export default function RegisterPage() {
         json = null;
       }
 
-      if (!res.ok) {
+      if (!res.ok || !json?.ok) {
         const msg = friendlyErrorFromApi(json, res.status);
-
-        setBusy(false);
-        clearBanner();
-        resetCaptchaHard();
-
-        openModal("error", "Ошибка регистрации", msg);
-        return;
-      }
-
-      if (!json?.ok) {
-        const msg = friendlyErrorFromApi(json, 400);
 
         setBusy(false);
         clearBanner();
@@ -483,10 +387,6 @@ export default function RegisterPage() {
           <div className="info-box">
             ✅ <strong>Подтверждение email обязательно!</strong> Без подтверждения вход в систему
             невозможен.
-          </div>
-
-          <div className="rate-limit">
-            ⚠️ <strong>Защита от спама:</strong> Максимум 3 регистрации в час с одного устройства
           </div>
 
           {!siteKey ? (
