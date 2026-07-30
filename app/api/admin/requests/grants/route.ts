@@ -7,18 +7,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // --- ТИПЫ ДАННЫХ ---
-type GrantKind = "textbook" | "crossword" | "mock_test";
-
 type ReqRow = {
   id: string;
   user_id: string;
-  project_id?: string | null; 
-  branch_type?: string | null; 
+  project_id?: string | null;
+  branch_type?: string | null;
   class_level: any;
   target_level: any;
   target_levels?: any;
   textbook_types: any;
   material_kinds?: any;
+  material_ids?: string[] | null;
   is_processed: boolean | null;
 };
 
@@ -26,14 +25,15 @@ type MaterialRow = {
   id: string;
   title: string;
   project_id?: string;
-  project_tab_id?: string | null; // 🔥 ИСПРАВЛЕНИЕ: правильная колонка таба
+  project_tab_id?: string | null;
   material_kind?: string | null;
   target_levels: string[] | null;
-  class_levels?: string[] | null; // 🔥 ИСПРАВЛЕНИЕ: добавлено для полноты
+  class_levels?: string[] | null;
   project_tabs?: {
-    name: string;
+    name?: string;
+    title?: string;
     icon?: string;
-  };
+  } | null;
 };
 
 // --- УТИЛИТЫ СТАБИЛЬНОСТИ БД ---
@@ -87,7 +87,6 @@ function uniq<T>(arr: T[]) {
   return Array.from(new Set(arr));
 }
 
-// 🔥 ИСПРАВЛЕНИЕ: Строгая нормализация уровней для админки
 function normalizeLevelCode(lvl: unknown): string {
   return String(lvl || "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, "_");
 }
@@ -97,7 +96,7 @@ function overlaps(a: string[], b: string[]) {
   return b.map(normalizeLevelCode).some((x) => set.has(x));
 }
 
-// --- 1. ЗАГРУЗКА ИСТОРИИ (Уже выданные доступы) ---
+// --- 1. ЗАГРУЗКА ИСТОРИИ ВЫДАННЫХ ГРАНТОВ ---
 async function loadGrantHistory(supabase: any, ids: string[]) {
   const map = new Map<string, string[]>();
   ids.forEach((id) => map.set(id, []));
@@ -121,8 +120,7 @@ async function loadGrantHistory(supabase: any, ids: string[]) {
     const title = String(row.title || "");
 
     if (!requestId || !title) continue;
-    
-    // Форматирование бейджей
+
     let label = `🎓 ${title}`;
     if (kind === "textbook") label = `📚 ${title}`;
     if (kind === "crossword") label = `🧩 ${title}`;
@@ -135,7 +133,51 @@ async function loadGrantHistory(supabase: any, ids: string[]) {
   return map;
 }
 
-// --- 2. НОВАЯ ЛОГИКА (АВТОВЫДАЧА ЧЕРЕЗ PROJECTS & TABS) ---
+// --- 2. ПРЯМАЯ ЗАГРУЗКА МАТЕРИАЛОВ ПО material_ids ---
+async function loadMaterialsByDirectIds(supabase: any, rows: ReqRow[]) {
+  const map = new Map<string, string[]>();
+  const allMaterialIds = uniq(rows.flatMap((r) => toArr(r.material_ids)));
+
+  if (!allMaterialIds.length) return map;
+
+  const { data, error } = await runDbQuery<MaterialRow[]>(
+    () =>
+      supabase
+        .from("materials")
+        .select(`
+          id, title, project_id, project_tab_id, material_kind,
+          project_tabs ( title, icon )
+        `)
+        .in("id", allMaterialIds),
+    "loadMaterialsByDirectIds",
+  );
+
+  if (error || !data) return map;
+
+  const materialMap = new Map<string, MaterialRow>();
+  data.forEach((m) => materialMap.set(m.id, m));
+
+  for (const r of rows) {
+    const ids = toArr(r.material_ids);
+    const labels: string[] = [];
+
+    for (const id of ids) {
+      const m = materialMap.get(id);
+      if (m) {
+        const icon = m.project_tabs?.icon || "📖";
+        labels.push(`${icon} ${m.title}`);
+      }
+    }
+
+    if (labels.length > 0) {
+      map.set(r.id, uniq(labels));
+    }
+  }
+
+  return map;
+}
+
+// --- 3. ЛОГИКА ДЛЯ ПРОЕКТОВ И ТАБОВ (FALLBACK) ---
 async function loadProjectsFallback(supabase: any, rows: ReqRow[]) {
   const map = new Map<string, string[]>();
   if (!rows.length) return map;
@@ -143,14 +185,13 @@ async function loadProjectsFallback(supabase: any, rows: ReqRow[]) {
   const projectIds = uniq(rows.map((r) => r.project_id).filter(Boolean));
   if (!projectIds.length) return map;
 
-  // 🔥 ИСПРАВЛЕНИЕ: Тянем project_tab_id и class_levels
   const { data, error } = await runDbQuery<MaterialRow[]>(
     () =>
       supabase
         .from("materials")
         .select(`
           id, title, project_id, project_tab_id, target_levels, class_levels, is_active,
-          project_tabs ( name, icon )
+          project_tabs ( title, icon )
         `)
         .in("project_id", projectIds)
         .eq("is_active", true),
@@ -160,27 +201,25 @@ async function loadProjectsFallback(supabase: any, rows: ReqRow[]) {
   if (error || !data) return map;
 
   for (const r of rows) {
-    // В заявке может приходить class_level, target_levels или target_level
     const reqLevels = [
-      ...toArr(r.class_level), 
-      ...toArr(r.target_levels), 
-      ...toArr(r.target_level)
+      ...toArr(r.class_level),
+      ...toArr(r.target_levels),
+      ...toArr(r.target_level),
     ];
-    const reqTabs = toArr(r.material_kinds); 
+    const reqTabs = toArr(r.material_kinds);
 
     const matched = data.filter((m) => {
       if (m.project_id !== r.project_id) return false;
 
       const mLevels = [...toArr(m.target_levels), ...toArr(m.class_levels)];
       const levelMatches = reqLevels.length === 0 || overlaps(mLevels, reqLevels);
-      // 🔥 ИСПРАВЛЕНИЕ: Сравниваем с project_tab_id
       const tabMatches = reqTabs.length === 0 || reqTabs.includes(String(m.project_tab_id));
 
       return levelMatches && tabMatches;
     });
 
     const labels = matched.map((m) => {
-      const tabName = m.project_tabs?.name || "Материал";
+      const tabName = m.project_tabs?.title || "Материал";
       const icon = m.project_tabs?.icon || "📄";
       return `${icon} [${tabName}] ${m.title}`;
     });
@@ -191,7 +230,7 @@ async function loadProjectsFallback(supabase: any, rows: ReqRow[]) {
   return map;
 }
 
-// --- 3. СТАРАЯ ЛОГИКА (ДЛЯ ОБРАТНОЙ СОВМЕСТИМОСТИ ДО МИГРАЦИИ) ---
+// --- 4. СТАРАЯ ЛОГИКА GATEHOUSE (FALLBACK) ---
 async function loadLegacyGatehouseFallback(supabase: any, rows: ReqRow[]) {
   const map = new Map<string, string[]>();
   if (!rows.length) return map;
@@ -228,7 +267,11 @@ async function loadLegacyGatehouseFallback(supabase: any, rows: ReqRow[]) {
 
 // --- ОСНОВНОЙ РОУТ ---
 async function safeJson(req: NextRequest) {
-  try { return await req.json(); } catch { return null; }
+  try {
+    return await req.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -252,7 +295,9 @@ export async function POST(req: NextRequest) {
       () =>
         supabase
           .from("purchase_requests")
-          .select("id, user_id, project_id, branch_type, class_level, target_level, target_levels, textbook_types, material_kinds, is_processed")
+          .select(
+            "id, user_id, project_id, branch_type, class_level, target_level, target_levels, textbook_types, material_kinds, material_ids, is_processed"
+          )
           .in("id", ids),
       "loadGrantRows",
     );
@@ -260,27 +305,33 @@ export async function POST(req: NextRequest) {
     if (rowsError) return fail(rowsError.message, 500, "DB_ERROR");
     const rows = (rowsData ?? []) as ReqRow[];
 
-    // 1. Получаем то, что уже реально выдано в БД
+    // 1. Получаем то, что уже выдано в истории БД
     const historyMap = await loadGrantHistory(supabase, ids);
 
-    // 2. Ищем обработанные заявки, у которых нет истории (нужен fallback)
+    // 2. Для заявок с материалами из новой витрины загружаем их напрямую по material_ids
+    const directMap = await loadMaterialsByDirectIds(supabase, rows);
+    for (const [reqId, items] of directMap.entries()) {
+      const current = historyMap.get(reqId) ?? [];
+      if (current.length === 0 && items.length > 0) {
+        historyMap.set(reqId, items);
+      }
+    }
+
+    // 3. Для оставшихся обработанных заявок вызываем фоллбэки
     const needFallback = rows.filter((r) => {
       const current = historyMap.get(r.id) ?? [];
       return current.length === 0 && Boolean(r.is_processed);
     });
 
     if (needFallback.length) {
-      // Разделяем на заявки новой архитектуры и старой
       const newArchRows = needFallback.filter((r) => !!r.project_id);
       const legacyRows = needFallback.filter((r) => !r.project_id && r.branch_type === "gatehouse");
 
-      // Подтягиваем фоллбэки параллельно
       const [newMap, legacyMap] = await Promise.all([
         loadProjectsFallback(supabase, newArchRows),
-        loadLegacyGatehouseFallback(supabase, legacyRows)
+        loadLegacyGatehouseFallback(supabase, legacyRows),
       ]);
 
-      // Заполняем историю
       for (const r of newArchRows) {
         const items = newMap.get(r.id) ?? [];
         if (items.length) historyMap.set(r.id, items);

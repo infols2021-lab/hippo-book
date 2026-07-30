@@ -11,11 +11,9 @@ import {
 import {
   normalizeBranchType,
   toArr,
-  formatDateTimeRU,
-  formatTargetForSheet,
-  formatMaterialTypesForSheet,
-  formatRequestStatus,
+  uniq,
   buildSheetValues,
+  type SelectedMaterialItem,
 } from "@/lib/requests/normalize";
 
 export const runtime = "nodejs";
@@ -35,7 +33,7 @@ function norm(v: any) {
 }
 
 function equalRow(a: (string | number)[], b: string[]) {
-  const max = Math.max(a.length, b.length, 7);
+  const max = Math.max(a.length, b.length, 8);
   for (let i = 0; i < max; i += 1) {
     const av = norm(a[i]);
     const bv = norm(b[i]);
@@ -52,7 +50,7 @@ function groupRequestsBySheet(rows: any[]): Map<string, { requests: any[]; dbSet
   const groups = new Map<string, { requests: any[]; dbSet: Set<string> }>();
 
   for (const r of rows) {
-    const sheetName = r.sheet_name || null; // null => дефолтный лист
+    const sheetName = r.sheet_name || null;
     const key = sheetName ?? "default";
 
     if (!groups.has(key)) {
@@ -78,7 +76,6 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    // Если тело не JSON, пробуем читать query-параметры (для обратной совместимости)
     body = {};
   }
 
@@ -101,6 +98,8 @@ export async function POST(req: NextRequest) {
         target_levels,
         textbook_types,
         material_kinds,
+        material_ids,
+        total_price,
         email,
         full_name,
         contact_phone,
@@ -117,12 +116,36 @@ export async function POST(req: NextRequest) {
 
     if (error) return fail(error.message, 500, "DB_ERROR", noStoreInit());
 
-    const rows = (data ?? []).map((r: any) => ({
+    const rawRows = data ?? [];
+
+    // 2. Предзагружаем все материалы пакетом по всем material_ids из датасета
+    const allMaterialIds = uniq(rawRows.flatMap((r: any) => toArr(r.material_ids)));
+    const materialsMap = new Map<string, SelectedMaterialItem>();
+
+    if (allMaterialIds.length > 0) {
+      const { data: fetchedMaterials } = await supabase
+        .from("materials")
+        .select("id, title, price, material_kind")
+        .in("id", allMaterialIds);
+
+      if (Array.isArray(fetchedMaterials)) {
+        fetchedMaterials.forEach((m: any) => {
+          materialsMap.set(String(m.id), {
+            id: String(m.id),
+            title: String(m.title || "Материал"),
+            price: Number(m.price || 1000),
+            material_kind: m.material_kind ? String(m.material_kind) : undefined,
+          });
+        });
+      }
+    }
+
+    const rows = rawRows.map((r: any) => ({
       ...r,
-      sheet_name: r.projects?.sheet_name || null, // извлекаем sheet_name из joined projects
+      sheet_name: r.projects?.sheet_name || null,
     }));
 
-    // 2. Группируем по sheet_name
+    // 3. Группируем по sheet_name
     const groups = groupRequestsBySheet(rows);
 
     let inserted = 0;
@@ -133,17 +156,14 @@ export async function POST(req: NextRequest) {
     let failed = 0;
     let ops = 0;
 
-    // Для dry-run собираем отчёт
     const dryRunReport: any = {
       groups: [],
-      total: { inserted: 0, updated: 0, deleted: 0, unchanged: 0, skipped: 0, failed: 0 },
+      total: { inserted, updated, deleted, unchanged, skipped, failed },
     };
 
-    // 3. Для каждой группы загружаем sheetMap и обрабатываем заявки
     for (const [sheetKey, group] of groups.entries()) {
-      const sheetName = sheetKey === "default" ? null : sheetKey; // null => дефолтный лист
+      const sheetName = sheetKey === "default" ? null : sheetKey;
 
-      // Если dryRun, мы всё равно получаем текущий state листа, но не применяем изменения
       const sheetMap = dryRun
         ? await getSheetRequestRowMap(sheetName).catch(() => new Map())
         : await getSheetRequestRowMap(sheetName);
@@ -172,17 +192,46 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
+        // Вычисляем список выбранных материалов
+        const mIds = toArr(r.material_ids);
+        let selectedMaterials: SelectedMaterialItem[] = [];
+
+        if (mIds.length > 0) {
+          selectedMaterials = mIds
+            .map((id) => materialsMap.get(id))
+            .filter((m): m is SelectedMaterialItem => Boolean(m));
+        }
+
+        // Фоллбэк для старых заявок без material_ids
+        if (selectedMaterials.length === 0) {
+          const fallbackKinds = toArr(r.material_kinds).length
+            ? toArr(r.material_kinds)
+            : toArr(r.textbook_types);
+
+          selectedMaterials = fallbackKinds.map((k) => ({
+            id: k,
+            title: k,
+            price: 0,
+          }));
+        }
+
+        const totalPrice =
+          typeof r.total_price === "number" && r.total_price >= 0
+            ? r.total_price
+            : selectedMaterials.reduce((acc, m) => acc + m.price, 0);
+
         const sheetValues = buildSheetValues(
           r.request_number || "",
           r.created_at || "",
           normalizeBranchType(r.branch_type),
           r.class_level,
           toArr(r.target_levels).length ? toArr(r.target_levels) : toArr(r.target_level),
-          toArr(r.material_kinds).length ? toArr(r.material_kinds) : toArr(r.textbook_types),
+          selectedMaterials,
+          totalPrice,
           r.email || "",
           r.full_name || "",
           Boolean(r.is_processed),
-          r.processed_at ?? null,
+          r.processed_at ?? null
         );
 
         const existing = sheetMap.get(rn);
@@ -226,10 +275,16 @@ export async function POST(req: NextRequest) {
             updated += 1;
             ops += 1;
             groupReport.updated += 1;
-            groupReport.operations.push(`UPDATE ${rn} (row ${existing.rowNumber}) -> ${sheetName || "default"}`);
+            groupReport.operations.push(
+              `UPDATE ${rn} (row ${existing.rowNumber}) -> ${sheetName || "default"}`
+            );
           } else {
-            // Строка совпадает, но если в БД не проставлены метаданные – обновляем
-            if (!dryRun && (!r.sheet_synced_at || r.sheet_row !== existing.rowNumber || r.sheet_sync_error)) {
+            if (
+              !dryRun &&
+              (!r.sheet_synced_at ||
+                r.sheet_row !== existing.rowNumber ||
+                r.sheet_sync_error)
+            ) {
               await supabase
                 .from("purchase_requests")
                 .update({
@@ -250,7 +305,10 @@ export async function POST(req: NextRequest) {
               .from("purchase_requests")
               .update({
                 sheet_synced_at: null,
-                sheet_sync_error: String(e?.message || e || "Sheets sync error").slice(0, 500),
+                sheet_sync_error: String(e?.message || e || "Sheets sync error").slice(
+                  0,
+                  500
+                ),
               })
               .eq("id", r.id);
           }
@@ -258,7 +316,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // 4. Удаляем лишние строки из этого листа (которых нет в БД)
+      // 4. Удаляем лишние строки из листа (которых нет в БД)
       if (ops < limit) {
         const toDelete: number[] = [];
         for (const [rn, info] of sheetMap.entries()) {
@@ -279,14 +337,15 @@ export async function POST(req: NextRequest) {
             ops += slice.length;
           }
           groupReport.deleted += slice.length;
-          groupReport.operations.push(`DELETE ${slice.length} rows from ${sheetName || "default"}`);
+          groupReport.operations.push(
+            `DELETE ${slice.length} rows from ${sheetName || "default"}`
+          );
         }
       }
 
       dryRunReport.groups.push(groupReport);
     }
 
-    // Общая статистика для dryRun
     dryRunReport.total = { inserted, updated, deleted, unchanged, skipped, failed };
 
     if (dryRun) {
@@ -296,7 +355,7 @@ export async function POST(req: NextRequest) {
           report: dryRunReport,
           summary: { inserted, updated, deleted, unchanged, skipped, failed, limit, ops },
         },
-        noStoreInit(),
+        noStoreInit()
       );
     }
 
@@ -311,7 +370,7 @@ export async function POST(req: NextRequest) {
         limit,
         ops,
       },
-      noStoreInit(),
+      noStoreInit()
     );
   } catch (e: any) {
     return fail(e?.message || "Server error", 500, "SERVER_ERROR", noStoreInit());

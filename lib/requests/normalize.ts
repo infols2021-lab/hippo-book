@@ -1,6 +1,6 @@
 // lib/requests/normalize.ts
 // Единая нормализация данных для заявок (purchase_requests).
-// Production-ready: полностью удалены легаси-зависимости gatehouse и format.ts
+// Обновлено: полная поддержка корзины товаров (material_ids), гибких цен (total_price) и форматирования для Google Sheets.
 
 import {
   normalizeString,
@@ -18,15 +18,25 @@ import {
 
 export type RequestBranchType = string;
 
+export type SelectedMaterialItem = {
+  id: string;
+  title: string;
+  price: number;
+  material_kind?: string;
+};
+
 export type NormalizedRequest = {
   branch_type: RequestBranchType;
   class_level: string | null;
   target_levels: string[];
   textbook_types: string[];
   material_kinds: string[];
+  material_ids: string[];
+  total_price: number;
   email: string;
   full_name: string;
   contact_phone: string | null;
+  project_id?: string | null;
   is_processed: boolean;
 };
 
@@ -34,7 +44,6 @@ export type NormalizedRequest = {
 // Нормализация массивов и строк
 // ----------------------------------------------------------------------------
 
-// 🔥 ИСПРАВЛЕНИЕ: Жесткая нормализация для class_level ("Stage 1" -> "stage_1")
 export function normalizeLevelCode(value: unknown): string | null {
   const s = normalizeNullableString(value);
   if (!s) return null;
@@ -46,7 +55,16 @@ export function normalizeRequestTargetLevels(value: unknown): string[] {
 }
 
 export function normalizeRequestMaterialKinds(value: unknown): string[] {
-  return uniqueStrings(toStringArray(value).map(v => normalizeMaterialKind(v)));
+  return uniqueStrings(toStringArray(value).map((v) => normalizeMaterialKind(v)));
+}
+
+export function normalizeMaterialIds(value: unknown): string[] {
+  return uniqueStrings(toStringArray(value));
+}
+
+export function normalizeTotalPrice(value: unknown): number {
+  const price = Number(value);
+  return Number.isFinite(price) && price >= 0 ? Math.round(price) : 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -60,23 +78,24 @@ export function normalizeRequestPayload(
   profilePhone?: string,
 ): NormalizedRequest {
   const branch_type = normalizeBranchType(body.branch_type ?? "olympiad");
-  
-  // 🔥 ИСПРАВЛЕНИЕ: Теперь в базу летит только технический код
+
   const class_level = normalizeLevelCode(body.class_level);
-  
-  // Умный фолбэк если пришел class_level но нет target_levels мы дублируем данные
-  // чтобы универсальная валидация проходила для всех проектов
+
   const rawTargetLevels = body.target_levels ?? body.target_level;
   const target_levels = normalizeRequestTargetLevels(
-    rawTargetLevels !== undefined ? rawTargetLevels : (class_level ? [class_level] : [])
+    rawTargetLevels !== undefined ? rawTargetLevels : class_level ? [class_level] : [],
   );
-  
+
   const textbook_types = normalizeRequestMaterialKinds(body.textbook_types ?? body.material_kinds);
   const material_kinds = normalizeRequestMaterialKinds(body.material_kinds ?? body.textbook_types);
-  
+
+  const material_ids = normalizeMaterialIds(body.material_ids);
+  const total_price = normalizeTotalPrice(body.total_price);
+
   const email = normalizeString(profileEmail ?? body.email);
   const full_name = normalizeString(profileFullName ?? body.full_name);
   const contact_phone = normalizeNullableString(profilePhone ?? body.contact_phone);
+  const project_id = normalizeNullableString(body.project_id);
 
   return {
     branch_type,
@@ -84,9 +103,12 @@ export function normalizeRequestPayload(
     target_levels,
     textbook_types,
     material_kinds,
+    material_ids,
+    total_price,
     email,
     full_name,
     contact_phone,
+    project_id,
     is_processed: false,
   };
 }
@@ -118,7 +140,7 @@ export function generateRequestNumber(
 }
 
 // ----------------------------------------------------------------------------
-// Форматирование для Google Sheets (A:G)
+// Форматирование для Google Sheets
 // ----------------------------------------------------------------------------
 
 export function formatDateTimeRU(dateString: string): string {
@@ -150,17 +172,20 @@ export function formatTargetForSheet(
   return classLevel ? classLevel : "—";
 }
 
-export function formatMaterialTypesForSheet(
-  branchType: RequestBranchType,
-  kinds: string[],
-): string {
-  const typeMap: Record<string, string> = {
-    mock_test: "📝 Пробные тесты",
-    textbook: "📚 Учебник",
-    crossword: "🧩 Кроссворд",
-    material: "📁 Материалы"
-  };
-  return kinds.map((t) => typeMap[t.toLowerCase()] || t).join(", ");
+/**
+ * Превращает список выбранных материалов из UUID в понятные человеку названия.
+ * Решает баг, когда в Google Sheets улетали сырые UUID вроде "4c7b9eb7-1444..."
+ */
+export function formatMaterialTitlesForSheet(items: SelectedMaterialItem[]): string {
+  if (!Array.isArray(items) || items.length === 0) return "—";
+
+  return items
+    .map((item) => {
+      const title = item.title || "Материал";
+      const priceStr = item.price ? ` (${item.price} ₽)` : "";
+      return `${title}${priceStr}`;
+    })
+    .join(", ");
 }
 
 export function buildSheetValues(
@@ -169,7 +194,8 @@ export function buildSheetValues(
   branchType: RequestBranchType,
   classLevel: string | null,
   targetLevels: string[],
-  materialKinds: string[],
+  selectedMaterials: SelectedMaterialItem[],
+  totalPrice: number,
   email: string,
   fullName: string,
   isProcessed: boolean,
@@ -179,7 +205,8 @@ export function buildSheetValues(
     requestNumber,
     formatDateTimeRU(createdAt),
     formatTargetForSheet(branchType, classLevel, targetLevels),
-    formatMaterialTypesForSheet(branchType, materialKinds),
+    formatMaterialTitlesForSheet(selectedMaterials),
+    `${totalPrice} ₽`,
     email,
     fullName,
     formatRequestStatus(isProcessed, processedAt),
@@ -194,25 +221,19 @@ export function validateRequest(normalized: NormalizedRequest): {
   valid: boolean;
   error?: string;
 } {
-  if (!normalized.textbook_types.length && !normalized.material_kinds.length) {
-    return { valid: false, error: "Выберите раздел материалов" };
+  if (normalized.material_ids.length === 0) {
+    return { valid: false, error: "Выберите хотя бы один материал для заказа" };
   }
-  
-  // Универсальная проверка для всех проектов
-  // Если есть хотя бы один из параметров уровня валидация проходит
-  if (!normalized.class_level && normalized.target_levels.length === 0) {
-    return { valid: false, error: "Выберите класс или уровень" };
-  }
-  
+
   if (!normalized.email || !normalized.full_name) {
     return { valid: false, error: "Заполните email и ФИО" };
   }
-  
+
   return { valid: true };
 }
 
 // ----------------------------------------------------------------------------
-// Экспорты для admin/requests/route.ts
+// Экспорты для admin/requests
 // ----------------------------------------------------------------------------
 
 export type ReqRowLike = {
@@ -220,13 +241,14 @@ export type ReqRowLike = {
   target_level?: unknown;
   material_kinds?: unknown;
   textbook_types?: unknown;
+  material_ids?: unknown;
+  total_price?: unknown;
   class_level?: unknown;
   branch_type?: unknown;
 };
 
 export function getRequestTargetLevels(r: ReqRowLike): string[] {
   const raw = r.target_levels ?? r.target_level ?? [];
-  // 🔥 ИСПРАВЛЕНИЕ: Читаем старые заявки корректно, превращая их уровни в коды
   return normalizeTargetLevels(raw);
 }
 
@@ -234,10 +256,6 @@ export function getRequestMaterialKinds(r: ReqRowLike): string[] {
   const raw = r.material_kinds ?? r.textbook_types ?? [];
   return normalizeRequestMaterialKinds(raw);
 }
-
-// ----------------------------------------------------------------------------
-// Реэкспорты из материалов (для маршрутов create/update)
-// ----------------------------------------------------------------------------
 
 export {
   normalizeBranchType,
@@ -247,10 +265,6 @@ export {
   uniqueStrings,
   normalizeMaterialKind,
 };
-
-// ----------------------------------------------------------------------------
-// Вспомогательные функции для массивов
-// ----------------------------------------------------------------------------
 
 export function toArr(v: any): string[] {
   return toStringArray(v);

@@ -21,6 +21,7 @@ export type MaterialDbRow = {
   is_active: boolean;
   is_available: boolean;
   order_index: number;
+  price: number;
   class_levels: string[];
   target_levels: string[];
   legacy_source_table: MaterialLegacySourceTable;
@@ -94,6 +95,7 @@ export type MaterialCreateInput = {
   cover_image_url?: string | null;
   is_available?: boolean;
   order_index?: number;
+  price?: number;
   class_levels?: string[];
   target_levels?: string[];
   project_tab_id?: string | null;
@@ -105,7 +107,6 @@ export type MaterialUpdateInput = Partial<MaterialCreateInput> & {
 
 export type PurchaseRequestMaterialKind = MaterialKind;
 
-// ✅ Исправлено: branch_type теперь string, чтобы поддерживать динамические ветки
 export type PurchaseRequestTarget = {
   branch_type: string;
   material_kinds: PurchaseRequestMaterialKind[];

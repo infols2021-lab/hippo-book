@@ -22,6 +22,8 @@ type RequestRow = {
   target_levels?: any;
   textbook_types: any;
   material_kinds?: any;
+  material_ids?: any;
+  total_price?: number | null;
   project_id?: string | null;
   projects?: { name: string } | null;
 };
@@ -46,8 +48,11 @@ const PAGE_SIZE = 10;
 async function safeJson(res: Response) {
   const t = await res.text();
   if (!t) return null;
-  try { return JSON.parse(t); } 
-  catch { return null; }
+  try {
+    return JSON.parse(t);
+  } catch {
+    return null;
+  }
 }
 
 function arrOf(v: any): string[] {
@@ -60,8 +65,11 @@ function fmtDate(v: string | null) {
   if (!v) return "—";
   try {
     return new Date(v).toLocaleString("ru-RU", {
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   } catch {
     return v;
@@ -74,17 +82,35 @@ function isValidUUID(str: string) {
 
 function renderProjectName(row: RequestRow) {
   if (row.projects?.name) {
-    return <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">{row.projects.name}</span>;
+    return (
+      <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">
+        {row.projects.name}
+      </span>
+    );
   }
-  
+
   const branch = String(row.branch_type || "olympiad").toLowerCase();
-  
-  if (branch === "gatehouse" || branch === "ga_exam" || branch === "ga" || branch === "exam" || branch === "gatehouse_awards") {
-    return <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">🎓 Экзамены (Gatehouse)</span>;
+
+  if (
+    branch === "gatehouse" ||
+    branch === "ga_exam" ||
+    branch === "ga" ||
+    branch === "exam" ||
+    branch === "gatehouse_awards"
+  ) {
+    return (
+      <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">
+        🎓 Экзамены (Gatehouse)
+      </span>
+    );
   }
-  
+
   if (branch === "olympiad") {
-    return <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">🏆 Олимпиада (Легаси)</span>;
+    return (
+      <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">
+        🏆 Олимпиада (Легаси)
+      </span>
+    );
   }
 
   const capitalizedBranch = branch.charAt(0).toUpperCase() + branch.slice(1);
@@ -99,14 +125,17 @@ function renderClassLevels(row: RequestRow) {
   const tLevels = arrOf(row.target_levels);
   const tLevel = arrOf(row.target_level);
   const cLevel = arrOf(row.class_level);
-  
+
   const arr = tLevels.length ? tLevels : tLevel.length ? tLevel : cLevel;
   if (!arr.length) return <span className="text-gray-400 font-medium">—</span>;
 
   return (
     <div className="flex flex-wrap gap-1">
       {arr.map((c, i) => (
-        <span key={i} className="bg-gray-100 border text-gray-700 px-2 py-0.5 rounded text-[11px] uppercase font-bold whitespace-nowrap">
+        <span
+          key={i}
+          className="bg-gray-100 border text-gray-700 px-2 py-0.5 rounded text-[11px] uppercase font-bold whitespace-nowrap"
+        >
           {c}
         </span>
       ))}
@@ -117,9 +146,12 @@ function renderClassLevels(row: RequestRow) {
 function renderTypes(row: RequestRow) {
   const mk = arrOf(row.material_kinds);
   const tt = arrOf(row.textbook_types);
-  
-  const arrSet = new Set([...mk, ...tt]);
-  const arr = Array.from(arrSet);
+
+  const allRaw = Array.from(new Set([...mk, ...tt]));
+
+  // Если есть понятные типы материалов, убираем сырые UUID, чтобы не засорять табличку
+  const nonUuid = allRaw.filter((x) => !isValidUUID(x));
+  const arr = nonUuid.length > 0 ? nonUuid : allRaw;
 
   if (!arr.length) return <span className="text-gray-400 font-medium">—</span>;
 
@@ -131,23 +163,26 @@ function renderTypes(row: RequestRow) {
         let color = "bg-gray-50 text-gray-700 border-gray-200";
 
         if (isValidUUID(str)) {
-          label = "📁 Раздел проекта"; 
+          label = "📁 Материал заказа";
           color = "bg-indigo-50 text-indigo-700 border-indigo-200";
-        }
-        else if (str.includes("mock") || str.includes("пробн") || str.includes("мок")) {
-          label = "📝 Пробный тест"; color = "bg-purple-50 text-purple-700 border-purple-200";
-        }
-        else if (str.includes("учебник") || str.includes("textbook")) {
-          label = "📚 Учебник"; color = "bg-blue-50 text-blue-700 border-blue-200";
-        }
-        else if (str.includes("кроссворд") || str.includes("crossword")) {
-          label = "🧩 Кроссворд"; color = "bg-green-50 text-green-700 border-green-200";
+        } else if (str.includes("mock") || str.includes("пробн") || str.includes("мок")) {
+          label = "📝 Пробный тест";
+          color = "bg-purple-50 text-purple-700 border-purple-200";
+        } else if (str.includes("учебник") || str.includes("textbook")) {
+          label = "📚 Учебник";
+          color = "bg-blue-50 text-blue-700 border-blue-200";
+        } else if (str.includes("кроссворд") || str.includes("crossword")) {
+          label = "🧩 Кроссворд";
+          color = "bg-green-50 text-green-700 border-green-200";
         } else {
           label = `📁 ${str.charAt(0).toUpperCase() + str.slice(1)}`;
         }
 
         return (
-          <span key={i} className={`px-2 py-0.5 border rounded text-[11px] font-bold whitespace-nowrap ${color}`}>
+          <span
+            key={i}
+            className={`px-2 py-0.5 border rounded text-[11px] font-bold whitespace-nowrap ${color}`}
+          >
             {label}
           </span>
         );
@@ -175,10 +210,14 @@ function isAbortError(e: any) {
   return e?.name === "AbortError";
 }
 
-export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (pending: number) => void }) {
+export default function RequestsTab({
+  onPendingChanged,
+}: {
+  onPendingChanged?: (pending: number) => void;
+}) {
   const [tab, setTab] = useState<"all" | "pending" | "processed">("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
-  const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
   const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, processed: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
@@ -213,8 +252,8 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
   useEffect(() => {
     fetch("/api/admin/projects")
-      .then(r => r.json())
-      .then(d => setProjects(d.projects || d.data || d || []))
+      .then((r) => r.json())
+      .then((d) => setProjects(d.projects || d.data || d || []))
       .catch(() => {});
   }, []);
 
@@ -244,7 +283,8 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       if (seq !== statsSeqRef.current) return;
 
       if (!res.ok || !json) throw new Error(`HTTP ${res.status}`);
-      if (!json.ok) throw new Error((json as ApiErr).error || "Не удалось загрузить статистику заявок");
+      if (!json.ok)
+        throw new Error((json as ApiErr).error || "Не удалось загрузить статистику заявок");
 
       setStats(json.stats);
       onPendingChanged?.(json.stats.pending);
@@ -282,7 +322,8 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       const json = (await safeJson(res)) as ApiOkGrants | ApiErr | null;
 
       if (!res.ok || !json) throw new Error(`HTTP ${res.status}`);
-      if (!json.ok) throw new Error((json as ApiErr).error || "Не удалось загрузить выданные материалы");
+      if (!json.ok)
+        throw new Error((json as ApiErr).error || "Не удалось загрузить выданные материалы");
 
       setMaterialsByRequest((prev) => ({
         ...(reset ? {} : prev),
@@ -290,7 +331,9 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       }));
 
       if ((json as ApiOkGrants).materialsError) {
-        setMaterialsWarning(`Выданные материалы временно недоступны: ${(json as ApiOkGrants).materialsError}`);
+        setMaterialsWarning(
+          `Выданные материалы временно недоступны: ${(json as ApiOkGrants).materialsError}`
+        );
       }
     } catch (e: any) {
       if (isAbortError(e)) return;
@@ -327,11 +370,11 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       qs.set("limit", String(PAGE_SIZE));
 
       if (!reset && nextCursor?.created_at) qs.set("cursor_created_at", nextCursor.created_at);
-      
+
       if (projectFilter === "legacy_olympiad") qs.set("branch_type", "olympiad");
       else if (projectFilter === "legacy_gatehouse") qs.set("branch_type", "gatehouse");
       else if (projectFilter !== "all") qs.set("project_id", projectFilter);
-      
+
       if (name.trim()) qs.set("name", name.trim());
       if (email.trim()) qs.set("email", email.trim());
 
@@ -345,10 +388,15 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       if (seq !== listSeqRef.current) return;
 
       if (!res.ok || !json) throw new Error(`HTTP ${res.status}`);
-      if (!json.ok) throw new Error((json as ApiErr).error || "Не удалось загрузить заявок");
+      if (!json.ok) throw new Error((json as ApiErr).error || "Не удалось загрузить заявки");
 
       const rawRows = (json as ApiOkList).requests ?? [];
-      const safeRows = tab === "processed" ? rawRows.filter(r => Boolean(r.is_processed)) : tab === "pending" ? rawRows.filter(r => !Boolean(r.is_processed)) : rawRows;
+      const safeRows =
+        tab === "processed"
+          ? rawRows.filter((r) => Boolean(r.is_processed))
+          : tab === "pending"
+          ? rawRows.filter((r) => !Boolean(r.is_processed))
+          : rawRows;
 
       if (reset) {
         setRows(safeRows);
@@ -414,14 +462,19 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
         body: JSON.stringify({ ids, is_processed }),
       });
 
-      const json = (await safeJson(res)) as { ok: boolean; error?: string; results?: Record<string, { ok: boolean, error?: string }> } | null;
+      const json = (await safeJson(res)) as {
+        ok: boolean;
+        error?: string;
+        results?: Record<string, { ok: boolean; error?: string }>;
+      } | null;
 
       if (!res.ok || !json) throw new Error(`HTTP ${res.status}`);
       if (!json.ok) throw new Error(json.error || "Не удалось обновить заявки");
 
-      // 🚀 ИСПРАВЛЕНИЕ: Распаковываем скрытые ошибки базы данных и показываем их админу
       if (json.results) {
-        const rowErrors = Object.values(json.results).filter(r => !r.ok).map(r => r.error);
+        const rowErrors = Object.values(json.results)
+          .filter((r) => !r.ok)
+          .map((r) => r.error);
         if (rowErrors.length > 0) {
           throw new Error(`Ошибка БД: ${rowErrors.join("; ")}`);
         }
@@ -429,21 +482,26 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
       await Promise.all([loadStats(), loadList(true)]);
     } catch (e: any) {
-      setErr(e?.message || String(e)); // Теперь ошибка будет показана красным блоком на странице!
+      setErr(e?.message || String(e));
     } finally {
       setLoading(false);
       setProcessingOpen(false);
     }
   }
 
-  async function oneUpdate(id: string, is_processed: boolean) { await patchRequests([id], is_processed, false); }
-  async function bulkProcess() { await patchRequests(Array.from(selectionRef.current), true, true); }
-  async function bulkUnprocess() { await patchRequests(Array.from(selectionRef.current), false, true); }
+  async function oneUpdate(id: string, is_processed: boolean) {
+    await patchRequests([id], is_processed, false);
+  }
+  async function bulkProcess() {
+    await patchRequests(Array.from(selectionRef.current), true, true);
+  }
+  async function bulkUnprocess() {
+    await patchRequests(Array.from(selectionRef.current), false, true);
+  }
 
   useEffect(() => {
     void loadStats();
     return () => statsAbortRef.current?.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectFilter]);
 
   useEffect(() => {
@@ -452,7 +510,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       listAbortRef.current?.abort();
       grantsAbortRef.current?.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, projectFilter]);
 
   useEffect(() => {
@@ -462,7 +519,6 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
     }
     const t = window.setTimeout(() => void loadList(true), 350);
     return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, email]);
 
   function toggleAll(checked: boolean) {
@@ -473,7 +529,8 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
   function toggleOne(id: string, checked: boolean) {
     setSelected((prev) => {
       const n = new Set(prev);
-      if (checked) n.add(id); else n.delete(id);
+      if (checked) n.add(id);
+      else n.delete(id);
       return n;
     });
   }
@@ -486,9 +543,15 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       <div className="admin-section-head mb-4 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">📋 Управление заявками</h2>
-          <p className="text-gray-500 text-sm">Центр выдачи доступов ученикам по всем веткам и проектам.</p>
+          <p className="text-gray-500 text-sm">
+            Центр выдачи доступов ученикам по всем веткам и проектам.
+          </p>
         </div>
-        <button className="bg-gray-100 text-gray-800 px-4 py-2 rounded-xl font-bold hover:bg-gray-200 transition-colors" type="button" onClick={() => void Promise.all([loadStats(), loadList(true)])}>
+        <button
+          className="bg-gray-100 text-gray-800 px-4 py-2 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+          type="button"
+          onClick={() => void Promise.all([loadStats(), loadList(true)])}
+        >
           🔄 Обновить
         </button>
       </div>
@@ -497,31 +560,43 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
         <div className="flex gap-4 flex-wrap">
           <div className="bg-white border rounded-xl p-4 flex-1 shadow-sm">
             <div className="text-2xl font-black">{stats.total}</div>
-            <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">Всего заявок</div>
+            <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">
+              Всего заявок
+            </div>
           </div>
           <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 flex-1 shadow-sm">
             <div className="text-2xl font-black text-orange-600">{stats.pending}</div>
-            <div className="text-xs text-orange-500 font-bold uppercase tracking-wider">Ожидают</div>
+            <div className="text-xs text-orange-500 font-bold uppercase tracking-wider">
+              Ожидают
+            </div>
           </div>
           <div className="bg-green-50 border border-green-100 rounded-xl p-4 flex-1 shadow-sm">
             <div className="text-2xl font-black text-green-600">{stats.processed}</div>
-            <div className="text-xs text-green-500 font-bold uppercase tracking-wider">Обработано</div>
+            <div className="text-xs text-green-500 font-bold uppercase tracking-wider">
+              Обработано
+            </div>
           </div>
         </div>
       )}
 
       <div className="flex gap-4 p-5 bg-gray-50 rounded-2xl border flex-wrap items-end mb-6">
         <div className="flex-1 min-w-[200px]">
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Проект (Ветка)</label>
-          <select 
-            value={projectFilter} 
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+            Проект (Ветка)
+          </label>
+          <select
+            value={projectFilter}
             onChange={(e) => setProjectFilter(e.target.value)}
             className="w-full border-2 rounded-xl px-4 py-2 font-bold bg-white outline-none"
           >
             <option value="all">Все проекты</option>
             {projects.length > 0 && (
               <optgroup label="Новые динамические проекты">
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
               </optgroup>
             )}
             <optgroup label="Легаси (старая структура)">
@@ -531,10 +606,12 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
           </select>
         </div>
         <div className="flex-1 min-w-[180px]">
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Статус</label>
-          <select 
-            value={tab} 
-            onChange={e => setTab(e.target.value as any)} 
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+            Статус
+          </label>
+          <select
+            value={tab}
+            onChange={(e) => setTab(e.target.value as any)}
             className="w-full border-2 rounded-xl px-4 py-2 font-bold bg-white outline-none"
           >
             <option value="all">📋 Все заявки</option>
@@ -543,17 +620,36 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
           </select>
         </div>
         <div className="flex-1 min-w-[180px]">
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Поиск по ФИО</label>
-          <input className="w-full border-2 rounded-xl px-4 py-2 bg-white outline-none" value={name} onChange={(e) => setName(e.target.value)} placeholder="ФИО..." />
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+            Поиск по ФИО
+          </label>
+          <input
+            className="w-full border-2 rounded-xl px-4 py-2 bg-white outline-none"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="ФИО..."
+          />
         </div>
         <div className="flex-1 min-w-[180px]">
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Поиск по Email</label>
-          <input className="w-full border-2 rounded-xl px-4 py-2 bg-white outline-none" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email..." />
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+            Поиск по Email
+          </label>
+          <input
+            className="w-full border-2 rounded-xl px-4 py-2 bg-white outline-none"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email..."
+          />
         </div>
         <button
           className="bg-gray-200 text-gray-800 px-6 py-2 rounded-xl font-bold hover:bg-gray-300 transition-colors whitespace-nowrap"
           type="button"
-          onClick={() => { setName(""); setEmail(""); setProjectFilter("all"); setTab("all"); }}
+          onClick={() => {
+            setName("");
+            setEmail("");
+            setProjectFilter("all");
+            setTab("all");
+          }}
         >
           🗑️ Сбросить
         </button>
@@ -565,16 +661,31 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
             Выбрано: <span className="text-blue-600">{selected.size}</span>
           </div>
           {tab !== "processed" && (
-            <button className="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-bold text-sm shadow-sm hover:bg-blue-700 transition-colors" type="button" onClick={() => void bulkProcess()} disabled={actionBusy}>
+            <button
+              className="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-bold text-sm shadow-sm hover:bg-blue-700 transition-colors"
+              type="button"
+              onClick={() => void bulkProcess()}
+              disabled={actionBusy}
+            >
               ✅ Обработать выбранные
             </button>
           )}
           {tab !== "pending" && (
-            <button className="bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded-lg font-bold text-sm shadow-sm hover:bg-gray-50 transition-colors" type="button" onClick={() => void bulkUnprocess()} disabled={actionBusy}>
+            <button
+              className="bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded-lg font-bold text-sm shadow-sm hover:bg-gray-50 transition-colors"
+              type="button"
+              onClick={() => void bulkUnprocess()}
+              disabled={actionBusy}
+            >
               ↩️ Вернуть в необработанные
             </button>
           )}
-          <button className="text-gray-500 hover:text-gray-800 font-bold text-sm ml-auto" type="button" onClick={() => setSelected(new Set())} disabled={actionBusy}>
+          <button
+            className="text-gray-500 hover:text-gray-800 font-bold text-sm ml-auto"
+            type="button"
+            onClick={() => setSelected(new Set())}
+            disabled={actionBusy}
+          >
             Отменить выделение
           </button>
         </div>
@@ -586,66 +697,123 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
 
       {!loading && !err && (
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden overflow-x-auto">
-          <table className="w-full text-left text-sm min-w-[1000px]">
+          <table className="w-full text-left text-sm min-w-[1050px]">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="p-4 w-12 text-center">
-                  <input type="checkbox" checked={allChecked} onChange={(e) => toggleAll(e.target.checked)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    onChange={(e) => toggleAll(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
                 </th>
                 <th className="p-4 font-bold text-gray-500 w-12">№</th>
                 <th className="p-4 font-bold min-w-[120px]">Номер</th>
-                <th className="p-4 font-bold min-w-[150px]">Проект (Раздел)</th>
+                <th className="p-4 font-bold min-w-[150px]">Проект</th>
                 <th className="p-4 font-bold">Создана</th>
                 {tab === "processed" && <th className="p-4 font-bold">Обработана</th>}
                 <th className="p-4 font-bold">Уровни</th>
                 <th className="p-4 font-bold">Типы</th>
+                <th className="p-4 font-bold">Сумма</th>
                 <th className="p-4 font-bold">Пользователь</th>
-                {tab === "processed" ? <th className="p-4 font-bold">Выдано</th> : tab === "all" ? <th className="p-4 font-bold text-center">Статус</th> : null}
+                {tab === "processed" ? (
+                  <th className="p-4 font-bold">Выдано</th>
+                ) : tab === "all" ? (
+                  <th className="p-4 font-bold text-center">Статус</th>
+                ) : null}
                 <th className="p-4 font-bold text-right">Действия</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="p-8 text-center text-gray-500 font-bold">Заявок не найдено</td>
+                  <td colSpan={13} className="p-8 text-center text-gray-500 font-bold">
+                    Заявок не найдено
+                  </td>
                 </tr>
               ) : (
                 rows.map((r, idx) => {
                   const checked = selected.has(r.id);
                   const status = Boolean(r.is_processed);
                   return (
-                    <tr key={r.id} className={`hover:bg-gray-50 transition-colors ${checked ? "bg-blue-50/50" : ""}`}>
+                    <tr
+                      key={r.id}
+                      className={`hover:bg-gray-50 transition-colors ${
+                        checked ? "bg-blue-50/50" : ""
+                      }`}
+                    >
                       <td className="p-4 text-center">
-                        <input type="checkbox" checked={checked} onChange={(e) => toggleOne(r.id, e.target.checked)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => toggleOne(r.id, e.target.checked)}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
                       </td>
                       <td className="p-4 font-bold text-gray-400">{idx + 1}</td>
-                      <td className="p-4 font-bold font-mono text-xs">{r.request_number || "—"}</td>
+                      <td className="p-4 font-bold font-mono text-xs">
+                        {r.request_number || "—"}
+                      </td>
                       <td className="p-4">{renderProjectName(r)}</td>
-                      <td className="p-4 text-xs font-mono text-gray-500 whitespace-nowrap">{fmtDate(r.created_at)}</td>
-                      {tab === "processed" && <td className="p-4 text-xs font-mono text-gray-500 whitespace-nowrap">{fmtDate(r.processed_at)}</td>}
+                      <td className="p-4 text-xs font-mono text-gray-500 whitespace-nowrap">
+                        {fmtDate(r.created_at)}
+                      </td>
+                      {tab === "processed" && (
+                        <td className="p-4 text-xs font-mono text-gray-500 whitespace-nowrap">
+                          {fmtDate(r.processed_at)}
+                        </td>
+                      )}
                       <td className="p-4">{renderClassLevels(r)}</td>
                       <td className="p-4">{renderTypes(r)}</td>
+                      <td className="p-4 font-bold font-mono text-xs text-emerald-700 whitespace-nowrap">
+                        {r.total_price != null ? `${r.total_price} ₽` : "—"}
+                      </td>
                       <td className="p-4">
-                        <div className="font-bold whitespace-nowrap">{r.full_name || "—"}</div>
-                        <div className="text-xs text-gray-500 truncate max-w-[150px]" title={r.email || ""}>{r.email || "—"}</div>
+                        <div className="font-bold whitespace-nowrap">
+                          {r.full_name || "—"}
+                        </div>
+                        <div
+                          className="text-xs text-gray-500 truncate max-w-[150px]"
+                          title={r.email || ""}
+                        >
+                          {r.email || "—"}
+                        </div>
                       </td>
                       {tab === "processed" ? (
-                        <td className="p-4">{renderGrantedMaterials(materialsByRequest?.[r.id])}</td>
+                        <td className="p-4">
+                          {renderGrantedMaterials(materialsByRequest?.[r.id])}
+                        </td>
                       ) : tab === "all" ? (
                         <td className="p-4 text-center">
-                          {status 
-                            ? <span className="text-green-600 font-bold text-xs bg-green-50 px-2 py-1 rounded-md whitespace-nowrap">✅ Готово</span>
-                            : <span className="text-orange-500 font-bold text-xs bg-orange-50 px-2 py-1 rounded-md whitespace-nowrap">⏳ Ожидает</span>
-                          }
+                          {status ? (
+                            <span className="text-green-600 font-bold text-xs bg-green-50 px-2 py-1 rounded-md whitespace-nowrap">
+                              ✅ Готово
+                            </span>
+                          ) : (
+                            <span className="text-orange-500 font-bold text-xs bg-orange-50 px-2 py-1 rounded-md whitespace-nowrap">
+                              ⏳ Ожидает
+                            </span>
+                          )}
                         </td>
                       ) : null}
                       <td className="p-4 text-right">
                         {!status ? (
-                          <button className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm hover:bg-blue-700 transition-colors whitespace-nowrap" type="button" onClick={() => void oneUpdate(r.id, true)} disabled={actionBusy}>
+                          <button
+                            className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm hover:bg-blue-700 transition-colors whitespace-nowrap"
+                            type="button"
+                            onClick={() => void oneUpdate(r.id, true)}
+                            disabled={actionBusy}
+                          >
                             ✅ Обработать
                           </button>
                         ) : (
-                          <button className="bg-white border text-gray-700 px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap" type="button" onClick={() => void oneUpdate(r.id, false)} disabled={actionBusy}>
+                          <button
+                            className="bg-white border text-gray-700 px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap"
+                            type="button"
+                            onClick={() => void oneUpdate(r.id, false)}
+                            disabled={actionBusy}
+                          >
                             ↩️ Вернуть
                           </button>
                         )}
@@ -662,7 +830,12 @@ export default function RequestsTab({ onPendingChanged }: { onPendingChanged?: (
       {rows.length > 0 && (
         <div className="flex justify-center mt-6">
           {hasMore ? (
-            <button className="bg-gray-100 text-gray-700 font-bold px-6 py-2.5 rounded-xl hover:bg-gray-200 transition-colors" type="button" onClick={() => void loadList(false)} disabled={loadingMore}>
+            <button
+              className="bg-gray-100 text-gray-700 font-bold px-6 py-2.5 rounded-xl hover:bg-gray-200 transition-colors"
+              type="button"
+              onClick={() => void loadList(false)}
+              disabled={loadingMore}
+            >
               {loadingMore ? "Загружаем..." : `Показать ещё ${PAGE_SIZE}`}
             </button>
           ) : (

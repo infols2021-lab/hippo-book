@@ -9,6 +9,7 @@ import {
   generateRequestNumber,
   validateRequest,
   normalizeRequestPayload,
+  type SelectedMaterialItem,
 } from "@/lib/requests/normalize";
 
 export const runtime = "nodejs";
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
     let projectId = null;
     let sheetName = null;
 
-    // 🔥 ИСПРАВЛЕНИЕ: Ищем проект ВСЕГДА, чтобы новые ветки (и Gatehouse) получали project_id
+    // 1. Поиск проекта
     const { data: projectInfo } = await supabase
       .from("projects")
       .select("id, sheet_name")
@@ -101,6 +102,38 @@ export async function POST(req: NextRequest) {
       sheetName = projectInfo.sheet_name;
     }
 
+    // 2. Получение выбранных материалов из БД для точного расчёта цены и названий
+    let selectedMaterials: SelectedMaterialItem[] = [];
+    let calculatedTotalPrice = 0;
+
+    if (normalized.material_ids.length > 0) {
+      const { data: fetchedMaterials } = await supabase
+        .from("materials")
+        .select("id, title, price, material_kind")
+        .in("id", normalized.material_ids);
+
+      if (Array.isArray(fetchedMaterials) && fetchedMaterials.length > 0) {
+        selectedMaterials = fetchedMaterials.map((m: any) => ({
+          id: String(m.id),
+          title: String(m.title || "Материал"),
+          price: Number(m.price || 1000),
+          material_kind: m.material_kind ? String(m.material_kind) : undefined,
+        }));
+
+        calculatedTotalPrice = selectedMaterials.reduce((acc, m) => acc + m.price, 0);
+      }
+    }
+
+    const totalPrice = calculatedTotalPrice > 0 ? calculatedTotalPrice : (normalized.total_price || 0);
+
+    const extractedKinds = Array.from(
+      new Set(selectedMaterials.map((m) => m.material_kind).filter(Boolean))
+    ) as string[];
+
+    const materialKinds =
+      normalized.material_kinds.length > 0 ? normalized.material_kinds : extractedKinds;
+
+    // 3. Формирование записи для базы данных
     const payload: Record<string, any> = {
       user_id: user.id,
       request_number,
@@ -109,8 +142,10 @@ export async function POST(req: NextRequest) {
       class_level: normalized.class_level || null,
       target_level: normalized.target_levels.length > 0 ? normalized.target_levels : null,
       target_levels: normalized.target_levels.length > 0 ? normalized.target_levels : null,
-      textbook_types: normalized.textbook_types,
-      material_kinds: normalized.material_kinds,
+      textbook_types: normalized.textbook_types.length > 0 ? normalized.textbook_types : materialKinds,
+      material_kinds: materialKinds,
+      material_ids: normalized.material_ids,
+      total_price: totalPrice,
       email: normalized.email,
       full_name: normalized.full_name,
       contact_phone: normalized.contact_phone || null,
@@ -132,13 +167,16 @@ export async function POST(req: NextRequest) {
     }
 
     const row = insertedRow as any;
+
+    // 4. Подготовка значений для Google Таблицы (с понятными названиями)
     const sheetValues = buildSheetValues(
       row.request_number || "",
       row.created_at || "",
       normalized.branch_type,
       normalized.class_level,
       normalized.target_levels,
-      normalized.material_kinds.length > 0 ? normalized.material_kinds : normalized.textbook_types,
+      selectedMaterials,
+      totalPrice,
       normalized.email,
       normalized.full_name,
       false,
