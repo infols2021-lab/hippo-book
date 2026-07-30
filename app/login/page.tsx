@@ -3,7 +3,6 @@
 import "./login.css";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import TurnstileWidget from "@/components/TurnstileWidget";
 
 type BannerType = "error" | "success" | "warning" | null;
 
@@ -58,14 +57,9 @@ function unwrapApiData(json: ApiPayload | null) {
 }
 
 export default function LoginPage() {
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [reloadNonce, setReloadNonce] = useState(0);
 
   const [bannerType, setBannerType] = useState<BannerType>(null);
   const [bannerText, setBannerText] = useState("");
@@ -86,11 +80,6 @@ export default function LoginPage() {
   function showBanner(type: BannerType, text: string) {
     setBannerType(type);
     setBannerText(text);
-  }
-
-  function resetCaptcha() {
-    setCaptchaToken(null);
-    setReloadNonce((n) => n + 1);
   }
 
   function showNetworkBanner(extra?: string) {
@@ -200,11 +189,6 @@ export default function LoginPage() {
       return;
     }
 
-    if (siteKey && !captchaToken) {
-      showBanner("warning", "🧩 Пожалуйста, пройдите проверку капчи");
-      return;
-    }
-
     setNetworkIssue(false);
 
     try {
@@ -221,7 +205,6 @@ export default function LoginPage() {
           password,
           isAdmin,
           mode: isAdmin ? "admin" : "student",
-          captchaToken,
         }),
       });
 
@@ -231,8 +214,6 @@ export default function LoginPage() {
       if (!res.ok || !json?.ok) {
         const msg = String(payload?.error || payload?.message || json?.error || "Ошибка входа");
         const code = String(payload?.code || json?.code || "").toUpperCase();
-
-        resetCaptcha();
 
         if (looksLikeNetworkError(msg)) {
           showNetworkBanner(msg);
@@ -264,7 +245,6 @@ export default function LoginPage() {
       const redirectTo = String(payload?.redirectTo || (isAdmin ? "/admin" : "/portal"));
       window.location.href = redirectTo;
     } catch (err: any) {
-      resetCaptcha();
       if (looksLikeNetworkError(err)) showNetworkBanner(String(err?.message || err));
       else showBanner("error", "❌ Неожиданная ошибка: " + (err?.message || String(err)));
       setBusy(false);
@@ -413,7 +393,7 @@ export default function LoginPage() {
                   <div className="step-body">
                     <h5>Проверьте все папки</h5>
                     <p>
-                      Откройте ваш почтовый ящик. Если во «Входящих» пусто, не пугайтесь — обязательно загляните в папки <strong>«Спам»</strong> и <strong>«Промоакции»</strong>. Фильтры почты иногда путают автоматические письма.
+                      Откройте ваш почтовый ящик. Если во «Входящих» пусто, не пугайтесь — обязательно загляните в папки <strong>«Спам»</strong> and <strong>«Промоакции»</strong>. Фильтры почты иногда путают автоматические письма.
                     </p>
                   </div>
                 </div>
@@ -600,15 +580,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {siteKey ? (
-            <TurnstileWidget
-              siteKey={siteKey}
-              action="login"
-              reloadNonce={reloadNonce}
-              onToken={(t) => setCaptchaToken(t)}
-            />
-          ) : null}
-
           <button className="btn student" onClick={() => void doLogin(false)} disabled={busy}>
             Войти как ученик
           </button>
@@ -631,6 +602,7 @@ export default function LoginPage() {
               </button>
             </div>
 
+            {/* Кнопка техподдержки, расположенная под всеми кнопками */}
             <button
               className="btn support"
               onClick={openSupport}

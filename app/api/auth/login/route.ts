@@ -1,4 +1,3 @@
-// app/api/auth/login/route.ts
 import { NextResponse } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -12,7 +11,6 @@ type LoginBody = {
   isAdmin?: boolean;
   admin?: boolean;
   mode?: "student" | "admin";
-  captchaToken?: string | null;
 };
 
 type SafeUser = {
@@ -39,28 +37,6 @@ function toSafeUser(user: any): SafeUser {
     email: user?.email ?? null,
     email_confirmed_at: user?.email_confirmed_at ?? null,
   };
-}
-
-async function verifyTurnstileToken(token: string, remoteIp?: string): Promise<boolean> {
-  const secretKey = process.env.TURNSTILE_SECRET_KEY;
-  if (!secretKey) return true; // Если секрет не задан, пропускаем (например, в локальной разработке)
-
-  try {
-    const formData = new URLSearchParams();
-    formData.append("secret", secretKey);
-    formData.append("response", token);
-    if (remoteIp) formData.append("remoteip", remoteIp);
-
-    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      body: formData,
-    });
-
-    const json = await res.json();
-    return Boolean(json?.success);
-  } catch {
-    return false;
-  }
 }
 
 function mapLoginError(error: any) {
@@ -115,7 +91,6 @@ export async function POST(req: Request) {
     const email = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "");
     const wantsAdmin = Boolean(body.isAdmin || body.admin || body.mode === "admin");
-    const captchaToken = String(body.captchaToken ?? "").trim();
 
     if (!email || !password) {
       return fail("Введите email и пароль", 400, "VALIDATION", noStoreInit());
@@ -123,13 +98,6 @@ export async function POST(req: Request) {
 
     if (!isValidEmail(email)) {
       return fail("Неверный формат email", 400, "VALIDATION", noStoreInit());
-    }
-
-    // Проверка капчи Turnstile
-    const clientIp = req.headers.get("x-forwarded-for") || undefined;
-    const isCaptchaValid = await verifyTurnstileToken(captchaToken, clientIp);
-    if (!isCaptchaValid) {
-      return fail("❌ Ошибка проверки капчи. Попробуйте обновить страницу.", 400, "CAPTCHA_FAILED", noStoreInit());
     }
 
     const supabase = await createSupabaseServerClient();
