@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
 
-// Импортируем всё из нашей новой единой точки истины (Single Source of Truth)
+// Импортируем утилиты нормализации
 import {
   normalizeString,
   normalizeNullableString,
@@ -16,6 +16,11 @@ import {
   normalizeTargetLevels
 } from "@/lib/materials/normalize";
 
+function normalizePrice(value: any): number {
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? Math.round(num) : 1000;
+}
+
 // Создаем чистый payload, поддерживающий частичное обновление (PATCH/PUT)
 function normalizePatchPayload(body: any) {
   const payload: Record<string, any> = {};
@@ -23,48 +28,51 @@ function normalizePatchPayload(body: any) {
   if ("branch_type" in body || "branchType" in body) {
     payload.branch_type = normalizeBranchType(body.branch_type ?? body.branchType);
   }
-  
+
   if ("material_kind" in body || "materialKind" in body) {
     payload.material_kind = normalizeMaterialKind(body.material_kind ?? body.materialKind);
   }
-  
+
   if ("title" in body) {
     payload.title = normalizeString(body.title);
   }
-  
+
   if ("description" in body) {
     payload.description = normalizeNullableString(body.description);
   }
-  
+
   if ("cover_image_url" in body || "coverImageUrl" in body) {
     payload.cover_image_url = normalizeNullableString(body.cover_image_url ?? body.coverImageUrl);
   }
-  
+
+  if ("price" in body) {
+    payload.price = normalizePrice(body.price);
+  }
+
   if ("is_available" in body || "isAvailable" in body) {
     payload.is_available = normalizeBool(body.is_available ?? body.isAvailable);
   }
-  
+
   if ("is_active" in body || "isActive" in body) {
     payload.is_active = normalizeBool(body.is_active ?? body.isActive);
   }
-  
+
   if ("order_index" in body || "orderIndex" in body) {
     payload.order_index = normalizeOrderIndex(body.order_index ?? body.orderIndex);
   }
-  
+
   if ("class_levels" in body || "class_level" in body || "classLevels" in body) {
     payload.class_levels = normalizeClassLevels(body.class_levels ?? body.class_level ?? body.classLevels);
   }
-  
+
   if ("target_levels" in body || "target_level" in body || "targetLevels" in body) {
     payload.target_levels = normalizeTargetLevels(body.target_levels ?? body.target_level ?? body.targetLevels);
   }
-  
+
   if ("meta" in body) {
     payload.meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
   }
-  
-  // Ультра-фикс для табов теперь под капотом в normalizeUUID
+
   const hasTabId = "project_tab_id" in body || "tab_id" in body || "projectTabId" in body || "tabId" in body;
   if (hasTabId) {
     const rawTabId = body.project_tab_id ?? body.tab_id ?? body.projectTabId ?? body.tabId;
@@ -77,25 +85,25 @@ function normalizePatchPayload(body: any) {
 function validatePatchPayload(payload: Record<string, any>) {
   if ("title" in payload && !payload.title) return "title required";
   if ("material_kind" in payload && !payload.material_kind) return "material_kind required";
-  
+
   if (
-    "branch_type" in payload && 
-    payload.branch_type === "gatehouse" && 
-    "target_levels" in payload && 
+    "branch_type" in payload &&
+    payload.branch_type === "gatehouse" &&
+    "target_levels" in payload &&
     (!payload.target_levels || payload.target_levels.length === 0)
   ) {
     return "target_levels required";
   }
-  
+
   if (
-    "branch_type" in payload && 
-    payload.branch_type === "olympiad" && 
-    "class_levels" in payload && 
+    "branch_type" in payload &&
+    payload.branch_type === "olympiad" &&
+    "class_levels" in payload &&
     (!payload.class_levels || payload.class_levels.length === 0)
   ) {
     return "class_levels required";
   }
-  
+
   return null;
 }
 
@@ -174,6 +182,26 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string;
       let errorMsg = error.message;
       if (errorMsg.includes("foreign key")) errorMsg = "Ошибка привязки таба (несуществующий ID)";
       return fail(errorMsg, 500, "DB_ERROR");
+    }
+
+    // Безопасная синхронизация с легаси-таблицами
+    if (data?.legacy_source_table && data?.legacy_source_id) {
+      const legacyPayload: Record<string, any> = {};
+      if ("price" in payload) legacyPayload.price = payload.price;
+      if ("title" in payload) legacyPayload.title = payload.title;
+      if ("description" in payload) legacyPayload.description = payload.description;
+      if ("cover_image_url" in payload) legacyPayload.cover_image_url = payload.cover_image_url;
+
+      if (Object.keys(legacyPayload).length > 0) {
+        try {
+          await supabase
+            .from(data.legacy_source_table)
+            .update(legacyPayload)
+            .eq("id", data.legacy_source_id);
+        } catch {
+          // Игнорируем внешние ошибки фоновой синхронизации
+        }
+      }
     }
 
     return ok({ material: data });

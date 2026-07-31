@@ -1,6 +1,6 @@
 // lib/requests/normalize.ts
 // Единая нормализация данных для заявок (purchase_requests).
-// Обновлено: поддержка корзины товаров (material_ids), гибких цен (total_price) и сгруппированного форматирования для Google Sheets.
+// Обновлено: поддержка корзины товаров (material_ids), гибких цен (total_price), названий табов и сгруппированного форматирования для Google Sheets.
 
 import {
   normalizeString,
@@ -23,6 +23,7 @@ export type SelectedMaterialItem = {
   title: string;
   price: number;
   material_kind?: string;
+  tab_title?: string;
   count?: number;
 };
 
@@ -174,12 +175,12 @@ export function formatTargetForSheet(
 }
 
 /**
- * Превращает список выбранных материалов в понятную строку с группировкой повторяющихся товаров.
+ * Превращает список выбранных материалов в понятную строку с группировкой повторяющихся товаров и указанием таба.
  */
 export function formatMaterialTitlesForSheet(items: (SelectedMaterialItem | string)[]): string {
   if (!Array.isArray(items) || items.length === 0) return "—";
 
-  const grouped = new Map<string, { title: string; count: number; unitPrice: number }>();
+  const grouped = new Map<string, { title: string; count: number; unitPrice: number; tabTitle?: string }>();
 
   for (const item of items) {
     if (typeof item === "string") {
@@ -194,6 +195,7 @@ export function formatMaterialTitlesForSheet(items: (SelectedMaterialItem | stri
         title: item.title || "Материал",
         count: 0,
         unitPrice: item.price || 0,
+        tabTitle: item.tab_title,
       };
       current.count += item.count || 1;
       grouped.set(key, current);
@@ -202,9 +204,10 @@ export function formatMaterialTitlesForSheet(items: (SelectedMaterialItem | stri
 
   return Array.from(grouped.values())
     .map((g) => {
+      const tabStr = g.tabTitle ? ` (${g.tabTitle})` : "";
       const countStr = g.count > 1 ? ` (x${g.count})` : "";
       const priceStr = g.unitPrice > 0 ? ` (${g.unitPrice * g.count} ₽)` : "";
-      return `${g.title}${countStr}${priceStr}`;
+      return `${g.title}${tabStr}${countStr}${priceStr}`;
     })
     .join(", ");
 }

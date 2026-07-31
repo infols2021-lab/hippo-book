@@ -33,6 +33,7 @@ type MaterialItemMeta = {
   title: string;
   price?: number;
   material_kind?: string;
+  tab_title?: string;
 };
 
 type Stats = { total: number; pending: number; processed: number };
@@ -128,28 +129,6 @@ function renderProjectName(row: RequestRow) {
   );
 }
 
-function renderClassLevels(row: RequestRow) {
-  const tLevels = arrOf(row.target_levels);
-  const tLevel = arrOf(row.target_level);
-  const cLevel = arrOf(row.class_level);
-
-  const arr = tLevels.length ? tLevels : tLevel.length ? tLevel : cLevel;
-  if (!arr.length) return <span className="text-gray-400 font-medium">—</span>;
-
-  return (
-    <div className="flex flex-wrap gap-1">
-      {arr.map((c, i) => (
-        <span
-          key={i}
-          className="bg-gray-100 border text-gray-700 px-2 py-0.5 rounded text-[11px] uppercase font-bold whitespace-nowrap"
-        >
-          {c}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function renderTypesFallback(row: RequestRow) {
   const mk = arrOf(row.material_kinds);
   const tt = arrOf(row.textbook_types);
@@ -202,7 +181,7 @@ function renderRequestedMaterials(row: RequestRow, items?: (MaterialItemMeta | s
     return renderTypesFallback(row);
   }
 
-  const countsMap = new Map<string, { title: string; count: number }>();
+  const countsMap = new Map<string, { title: string; tabTitle?: string; count: number }>();
 
   for (const item of items) {
     if (typeof item === "string") {
@@ -213,8 +192,9 @@ function renderRequestedMaterials(row: RequestRow, items?: (MaterialItemMeta | s
       countsMap.set(title, cur);
     } else if (item && typeof item === "object") {
       const title = String(item.title || "Материал").trim();
+      const tabTitle = item.tab_title ? String(item.tab_title).trim() : undefined;
       const key = item.id || title;
-      const cur = countsMap.get(key) ?? { title, count: 0 };
+      const cur = countsMap.get(key) ?? { title, tabTitle, count: 0 };
       cur.count += 1;
       countsMap.set(key, cur);
     }
@@ -226,8 +206,10 @@ function renderRequestedMaterials(row: RequestRow, items?: (MaterialItemMeta | s
   return (
     <div className="flex flex-col gap-1">
       {list.map((g, i) => (
-        <div key={i} className="text-xs font-bold text-gray-800 truncate max-w-[220px]" title={g.title}>
-          📖 {g.title} {g.count > 1 ? <span className="text-indigo-600 font-extrabold">(x{g.count})</span> : null}
+        <div key={i} className="text-xs font-bold text-gray-800 truncate max-w-[260px]" title={g.title}>
+          📖 {g.title}{" "}
+          {g.tabTitle ? <span className="text-gray-500 font-normal">({g.tabTitle})</span> : null}{" "}
+          {g.count > 1 ? <span className="text-indigo-600 font-extrabold">(x{g.count})</span> : null}
         </div>
       ))}
     </div>
@@ -747,7 +729,7 @@ export default function RequestsTab({
 
       {!loading && !err && (
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden overflow-x-auto">
-          <table className="w-full text-left text-sm min-w-[1050px]">
+          <table className="w-full text-left text-sm min-w-[980px]">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="p-4 w-12 text-center">
@@ -763,8 +745,7 @@ export default function RequestsTab({
                 <th className="p-4 font-bold min-w-[150px]">Проект</th>
                 <th className="p-4 font-bold">Создана</th>
                 {tab === "processed" && <th className="p-4 font-bold">Обработана</th>}
-                <th className="p-4 font-bold">Уровни</th>
-                <th className="p-4 font-bold">Состав заказа</th>
+                <th className="p-4 font-bold min-w-[200px]">Состав заказа</th>
                 <th className="p-4 font-bold">Сумма</th>
                 <th className="p-4 font-bold">Пользователь</th>
                 {tab === "processed" ? (
@@ -778,7 +759,7 @@ export default function RequestsTab({
             <tbody className="divide-y">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="p-8 text-center text-gray-500 font-bold">
+                  <td colSpan={12} className="p-8 text-center text-gray-500 font-bold">
                     Заявок не найдено
                   </td>
                 </tr>
@@ -814,7 +795,6 @@ export default function RequestsTab({
                           {fmtDate(r.processed_at)}
                         </td>
                       )}
-                      <td className="p-4">{renderClassLevels(r)}</td>
                       <td className="p-4">{renderRequestedMaterials(r, materialsByRequest?.[r.id])}</td>
                       <td className="p-4 font-bold font-mono text-xs text-emerald-700 whitespace-nowrap">
                         {r.total_price != null ? `${r.total_price} ₽` : "—"}

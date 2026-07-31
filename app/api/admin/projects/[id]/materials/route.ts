@@ -1,7 +1,13 @@
+// app/api/admin/projects/[id]/materials/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
 import { normalizeMaterialInput } from "@/lib/materials/normalize";
+
+function normalizePrice(value: any): number {
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? Math.round(num) : 1000;
+}
 
 // ----------------------------------------------------------------------------
 // GET: список материалов для проекта/таба
@@ -66,8 +72,12 @@ export async function POST(
     return fail("Неверный формат JSON", 400, "BAD_JSON");
   }
 
-  // 1. Единая точка нормализации всех данных
-  const payload = normalizeMaterialInput(body, user.id);
+  // 1. Единая точка нормализации всех данных + фиксация кастомной цены
+  const basePayload = normalizeMaterialInput(body, user.id);
+  const payload = {
+    ...basePayload,
+    price: normalizePrice(body.price),
+  };
 
   // 2. Валидация обязательных полей
   if (!payload.title) {

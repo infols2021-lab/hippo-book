@@ -119,6 +119,7 @@ function applyCursor(q: any, cursorCreatedAt: string) {
 
 /**
  * Подтягивает подробную информацию о материалах из всех таблиц (materials, textbooks, crosswords)
+ * с учётом названия таба проекта.
  */
 async function fetchMaterialsByIds(supabase: any, materialIds: string[]) {
   if (!materialIds || materialIds.length === 0) return new Map();
@@ -130,7 +131,7 @@ async function fetchMaterialsByIds(supabase: any, materialIds: string[]) {
   ] = await Promise.all([
     supabase
       .from("materials")
-      .select("id, title, price, material_kind")
+      .select("id, title, price, material_kind, project_tabs(title)")
       .in("id", materialIds),
     supabase
       .from("textbooks")
@@ -142,15 +143,17 @@ async function fetchMaterialsByIds(supabase: any, materialIds: string[]) {
       .in("id", materialIds),
   ]);
 
-  const map = new Map<string, { id: string; title: string; price: number; material_kind?: string }>();
+  const map = new Map<string, { id: string; title: string; price: number; material_kind?: string; tab_title?: string }>();
 
   if (Array.isArray(fetchedMaterials)) {
     for (const m of fetchedMaterials) {
+      const rawTabTitle = (m as any).project_tabs?.title || null;
       map.set(String(m.id), {
         id: String(m.id),
         title: String(m.title || "Материал"),
         price: Number(m.price || 1000),
         material_kind: m.material_kind ? String(m.material_kind) : undefined,
+        tab_title: rawTabTitle ? String(rawTabTitle) : undefined,
       });
     }
   }
@@ -163,6 +166,7 @@ async function fetchMaterialsByIds(supabase: any, materialIds: string[]) {
           title: String(m.title || "Учебник"),
           price: Number(m.price || 1000),
           material_kind: "textbook",
+          tab_title: "Учебники",
         });
       }
     }
@@ -176,6 +180,7 @@ async function fetchMaterialsByIds(supabase: any, materialIds: string[]) {
           title: String(m.title || "Кроссворд"),
           price: Number(m.price || 1000),
           material_kind: "crossword",
+          tab_title: "Кроссворды",
         });
       }
     }

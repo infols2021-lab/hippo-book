@@ -252,6 +252,33 @@ export default function RequestsClient({
     setRequests(initialRequests.map(normalizeRequestRow));
   }, [initialRequests]);
 
+  // Множество ID уже выданных ученику материалов (из обработанных заявок)
+  const ownedMaterialIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const req of requests) {
+      if (req.is_processed) {
+        const ids = toStringArray(req.material_ids);
+        for (const id of ids) set.add(id);
+      }
+    }
+    return set;
+  }, [requests]);
+
+  // Расчёт реальной цены заявки (с динамическим фоллбэком, если total_price равен null или 0)
+  const getRequestPrice = (r: PurchaseRequest) => {
+    if (typeof r.total_price === "number" && r.total_price > 0) {
+      return r.total_price;
+    }
+    const ids = toStringArray(r.material_ids);
+    if (ids.length === 0) return 0;
+    let calculated = 0;
+    for (const id of ids) {
+      const mat = materials.find((m) => m.id === id);
+      calculated += mat?.price ?? 1000;
+    }
+    return calculated;
+  };
+
   // Фильтрация материалов по выбранному табу и уровню проекта
   const filteredMaterials = useMemo(() => {
     return materials.filter((m) => {
@@ -288,24 +315,28 @@ export default function RequestsClient({
     return requests.filter((r) => !r.is_processed);
   }, [requests]);
 
-  // Сводка всех заказываемых материалов по ВСЕМ необработанным заявкам (с группировкой дубликатов)
+  // Сводка всех заказываемых материалов по ВСЕМ необработанным заявкам
   const aggregatedPendingSummary = useMemo(() => {
     let sum = 0;
     const itemsMap = new Map<string, { title: string; count: number; unitPrice: number }>();
 
     for (const req of pendingRequests) {
-      sum += Number(req.total_price) || 0;
       const ids = toStringArray(req.material_ids);
+      const reqPrice = typeof req.total_price === "number" && req.total_price > 0 ? req.total_price : 0;
+      let calcPrice = 0;
 
       for (const id of ids) {
         const mat = materials.find((m) => m.id === id);
         const title = mat?.title || "Учебный материал";
         const unitPrice = mat?.price || 1000;
+        calcPrice += unitPrice;
 
         const current = itemsMap.get(id) ?? { title, count: 0, unitPrice };
         current.count += 1;
-        itemsMap.get(id) ? null : itemsMap.set(id, current);
+        itemsMap.set(id, current);
       }
+
+      sum += reqPrice > 0 ? reqPrice : calcPrice;
     }
 
     return {
@@ -321,7 +352,8 @@ export default function RequestsClient({
   }
 
   function openPaymentModal(amount: number) {
-    setPaymentTotalAmount(amount);
+    const finalAmount = amount > 0 ? amount : aggregatedPendingSummary.totalPrice;
+    setPaymentTotalAmount(finalAmount);
     setQrLoading(true);
     setQrError(false);
     setQrSeed(Date.now());
@@ -369,6 +401,7 @@ export default function RequestsClient({
   }
 
   function toggleMaterialSelection(id: string) {
+    if (ownedMaterialIds.has(id)) return;
     setSelectedMaterialIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
@@ -530,7 +563,7 @@ export default function RequestsClient({
             ? "🛒 Шаг 1: Выбор материалов"
             : "📝 Шаг 2: Оформление заказа"
         }
-        maxWidth={modalStep === 1 ? 720 : 520}
+        maxWidth={modalStep === 1 ? 760 : 520}
       >
         <form
           onSubmit={(e) => {
@@ -607,7 +640,7 @@ export default function RequestsClient({
                 ))}
               </div>
 
-              {/* Сетка материалов */}
+              {/* Сетка материалов (3 в ряд) */}
               {materialsLoading ? (
                 <div style={{ textAlign: "center", padding: "30px", fontWeight: 700 }}>
                   ⏳ Загружаем доступные материалы...
@@ -626,11 +659,13 @@ export default function RequestsClient({
               ) : (
                 <div className="materials-grid">
                   {filteredMaterials.map((item) => {
+                    const isOwned = ownedMaterialIds.has(item.id);
                     const isSelected = selectedMaterialIds.includes(item.id);
+
                     return (
                       <div
                         key={item.id}
-                        className={`material-card ${isSelected ? "selected" : ""}`}
+                        className={`material-card ${isSelected ? "selected" : ""} ${isOwned ? "owned" : ""}`}
                         onClick={() => toggleMaterialSelection(item.id)}
                       >
                         <div className="material-cover-wrapper">
@@ -648,7 +683,7 @@ export default function RequestsClient({
                                 alignItems: "center",
                                 justifyContent: "center",
                                 height: "100%",
-                                fontSize: "32px",
+                                fontSize: "28px",
                               }}
                             >
                               📖
@@ -660,9 +695,13 @@ export default function RequestsClient({
                           <div className="material-card-title">{item.title}</div>
                           <div className="material-card-footer">
                             <span className="material-card-price">{formatPrice(item.price)}</span>
-                            <span className={`vitrine-card-btn ${isSelected ? "remove" : "add"}`}>
-                              {isSelected ? "✅ Выбрано" : "➕ Выбрать"}
-                            </span>
+                            {isOwned ? (
+                              <span className="owned-badge">✅ Выдан</span>
+                            ) : (
+                              <span className={`vitrine-card-btn ${isSelected ? "remove" : "add"}`}>
+                                {isSelected ? "✅ Выбрано" : "➕ Выбрать"}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -712,7 +751,7 @@ export default function RequestsClient({
                   style={{
                     fontWeight: 800,
                     marginBottom: "10px",
-                    color: "#0f172a",
+                    color: "var(--project-text)",
                     fontSize: "14px",
                   }}
                 >
@@ -825,7 +864,7 @@ export default function RequestsClient({
             <li>
               Сумма к оплате (все неоплаченные заявки):{" "}
               <strong style={{ fontSize: "17px", color: "var(--project-primary)" }}>
-                {paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "Сумма не определена"}
+                {paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "0 руб."}
               </strong>
             </li>
             <li>
@@ -1033,13 +1072,15 @@ export default function RequestsClient({
                         ? r.textbook_types.join(", ")
                         : "—";
 
+                    const price = getRequestPrice(r);
+
                     return (
                       <tr key={r.id}>
                         <td className="font-bold">{r.request_number}</td>
                         <td>{formatDateTime(r.created_at)}</td>
                         <td>{displayMaterials}</td>
                         <td className="font-bold">
-                          {r.total_price != null ? formatPrice(r.total_price) : "—"}
+                          {formatPrice(price)}
                         </td>
                         <td>
                           <span
