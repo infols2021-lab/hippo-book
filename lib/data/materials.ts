@@ -255,10 +255,10 @@ export async function loadProjectMaterialsData(
       .eq("material_kind", tab.materialKind);
   }
 
-  // Легаси-запросы для Олимпиады
+  // Легаси-запросы запрашиваем ТОЛЬКО если у таба нет собственного project_tab_id
   const isOlympiad = projectSlug === "olympiad" || !projectSlug;
-  const shouldFetchTextbooks = isOlympiad && (!tab.materialKind || tab.materialKind === "textbook");
-  const shouldFetchCrosswords = isOlympiad && (!tab.materialKind || tab.materialKind === "crossword");
+  const shouldFetchTextbooks = !tab.id && isOlympiad && (!tab.materialKind || tab.materialKind === "textbook");
+  const shouldFetchCrosswords = !tab.id && isOlympiad && (!tab.materialKind || tab.materialKind === "crossword");
 
   const [
     { data: materialRows, error: materialsError },
@@ -300,6 +300,7 @@ export async function loadProjectMaterialsData(
 
   if (Array.isArray(textbookRows)) {
     for (const r of textbookRows) {
+      if (r?.project_tab_id && tab.id && r.project_tab_id !== tab.id) continue;
       const item = normalizeTextbookToMaterial(r);
       if (!materialsMap.has(item.id)) {
         materialsMap.set(item.id, item);
@@ -309,6 +310,7 @@ export async function loadProjectMaterialsData(
 
   if (Array.isArray(crosswordRows)) {
     for (const r of crosswordRows) {
+      if (r?.project_tab_id && tab.id && r.project_tab_id !== tab.id) continue;
       const item = normalizeCrosswordToMaterial(r);
       if (!materialsMap.has(item.id)) {
         materialsMap.set(item.id, item);
@@ -431,7 +433,7 @@ export async function loadProjectMaterialPageData(
   const { data: mData } = await materialQuery.maybeSingle();
   if (mData) {
     materialRow = mData;
-  } else if (projectSlug === "olympiad" || !projectSlug) {
+  } else if (!tab.id && (projectSlug === "olympiad" || !projectSlug)) {
     const { data: tbData } = await supabase.from("textbooks").select("*").eq("id", id).eq("is_active", true).maybeSingle();
     if (tbData) {
       materialRow = tbData;
