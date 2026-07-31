@@ -48,43 +48,73 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
     return fail("Проект не найден или неактивен", 404, "NOT_FOUND");
   }
 
-  // 3. Если таб не указан или не существует — возвращаем пустой список
-  if (!tabSlug) {
-    const res = ok({ materials: [] });
-    res.headers.set("Cache-Control", "no-store, max-age=0");
-    return res;
+  const activeTabs = (project.tabs || []).filter((t) => t.isActive);
+  const activeTabSlugs = activeTabs.map((t) => t.slug);
+  const activeTabIds = new Set(activeTabs.map((t) => t.id));
+
+  // 3. Определение списка табов для загрузки
+  let targetSlugs: string[] = [];
+
+  if (tabSlug) {
+    if (!activeTabSlugs.includes(tabSlug)) {
+      const res = ok({ materials: [] });
+      res.headers.set("Cache-Control", "no-store, max-age=0");
+      return res;
+    }
+    targetSlugs = [tabSlug];
+  } else {
+    targetSlugs = activeTabSlugs;
   }
 
-  const tabExists = project.tabs.some((t) => t.slug === tabSlug && t.isActive);
-  if (!tabExists) {
-    const res = ok({ materials: [] });
-    res.headers.set("Cache-Control", "no-store, max-age=0");
-    return res;
-  }
-
-  // 4. Загрузка материалов через унифицированный слой
-  const result = await loadProjectMaterialsData(
-    { supabase, user, profile },
-    slug,
-    tabSlug,
+  // 4. Загрузка материалов по целевым табам
+  const results = await Promise.all(
+    targetSlugs.map((s) =>
+      loadProjectMaterialsData({ supabase, user, profile }, slug, s)
+    )
   );
 
-  if (result.error) {
-    console.error("Ошибка загрузки материалов:", result.error);
-    return fail(result.error, 500, "DB_ERROR");
+  const rawMaterials: MaterialWithProgress[] = [];
+  const seenIds = new Set<string>();
+
+  for (const res of results) {
+    if (res.materials) {
+      for (const m of res.materials) {
+        if (!seenIds.has(m.id)) {
+          seenIds.add(m.id);
+          rawMaterials.push(m);
+        }
+      }
+    }
   }
 
-  let materials = result.materials;
+  // 5. Защита от фантомных легаси-материалов без привязки («демо», «чебупеля» и т.д.)
+  let materials = rawMaterials.filter((m) => {
+    const hasValidTab = m.project_tab_id ? activeTabIds.has(m.project_tab_id) : false;
+    const isProjectDirect = (m as any).project_id === project.id;
 
-  // 5. Фильтрация по уровню / классу
+    // Если материал не привязан ни к активным табам, ни напрямую к проекту — отбрасываем
+    if (!hasValidTab && !isProjectDirect) {
+      return false;
+    }
+
+    const titleLower = String(m.title || "").toLowerCase();
+    if (titleLower.includes("чебупеля") || titleLower.includes("демо")) {
+      // Исключаем мусорные названия, если они случайно попали из старых таблиц
+      if (!hasValidTab) return false;
+    }
+
+    return true;
+  });
+
+  // 6. Фильтрация по уровню / классу
   if (levelCode) {
     materials = materials.filter((m) =>
       (m.target_levels ?? []).includes(levelCode) ||
-      (m.class_levels ?? []).includes(levelCode),
+      (m.class_levels ?? []).includes(levelCode)
     );
   }
 
-  // 6. Преобразование в публичный DTO
+  // 7. Преобразование в публичный DTO
   const dto = materials.map(toPublicMaterialDTO);
 
   const res = ok({ materials: dto });

@@ -1,6 +1,6 @@
 // lib/requests/normalize.ts
 // Единая нормализация данных для заявок (purchase_requests).
-// Обновлено: поддержка корзины товаров (material_ids), гибких цен (total_price), названий табов и сгруппированного форматирования для Google Sheets.
+// Поддержка корзины товаров (material_ids), гибких цен (total_price), названий табов и форматирования для Google Sheets.
 
 import {
   normalizeString,
@@ -212,27 +212,40 @@ export function formatMaterialTitlesForSheet(items: (SelectedMaterialItem | stri
     .join(", ");
 }
 
+/**
+ * Формирует массив значений под структуру Google Таблицы из 7 столбцов:
+ * 1. Номер заявки
+ * 2. Дата и время создания
+ * 3. Проект
+ * 4. Состав заказа
+ * 5. Сумма
+ * 6. Пользователь
+ * 7. Статус заявки
+ */
 export function buildSheetValues(
   requestNumber: string,
   createdAt: string,
   branchType: RequestBranchType,
-  classLevel: string | null,
-  targetLevels: string[],
+  _classLevel: string | null,
+  _targetLevels: string[],
   selectedMaterials: (SelectedMaterialItem | string)[],
   totalPrice: number,
   email: string,
   fullName: string,
   isProcessed: boolean,
   processedAt?: string | null,
+  projectName?: string | null,
 ): string[] {
+  const projectLabel = projectName || formatBranchLabel(branchType);
+  const userLabel = fullName && email ? `${fullName} (${email})` : fullName || email || "—";
+
   return [
     requestNumber,
     formatDateTimeRU(createdAt),
-    formatTargetForSheet(branchType, classLevel, targetLevels),
+    projectLabel,
     formatMaterialTitlesForSheet(selectedMaterials),
     `${totalPrice} ₽`,
-    email,
-    fullName,
+    userLabel,
     formatRequestStatus(isProcessed, processedAt),
   ];
 }

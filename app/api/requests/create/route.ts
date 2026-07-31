@@ -89,17 +89,19 @@ export async function POST(req: NextRequest) {
 
     let projectId = null;
     let sheetName = null;
+    let projectName = null;
 
-    // 1. Поиск проекта
+    // 1. Поиск проекта (включая имя для Google Sheets)
     const { data: projectInfo } = await supabase
       .from("projects")
-      .select("id, sheet_name")
+      .select("id, sheet_name, name")
       .eq("slug", normalized.branch_type)
       .maybeSingle();
 
     if (projectInfo) {
       projectId = projectInfo.id;
       sheetName = projectInfo.sheet_name;
+      projectName = projectInfo.name;
     }
 
     // 2. Поиск выбранных материалов по всем источникам (materials, textbooks, crosswords)
@@ -114,7 +116,7 @@ export async function POST(req: NextRequest) {
       ] = await Promise.all([
         supabase
           .from("materials")
-          .select("id, title, price, material_kind")
+          .select("id, title, price, material_kind, project_tabs(title)")
           .in("id", normalized.material_ids),
         supabase
           .from("textbooks")
@@ -130,11 +132,13 @@ export async function POST(req: NextRequest) {
 
       if (Array.isArray(fetchedMaterials)) {
         for (const m of fetchedMaterials) {
+          const rawTabTitle = (m as any).project_tabs?.title || null;
           itemsMap.set(String(m.id), {
             id: String(m.id),
             title: String(m.title || "Материал"),
             price: Number(m.price || 1000),
             material_kind: m.material_kind ? String(m.material_kind) : undefined,
+            tab_title: rawTabTitle ? String(rawTabTitle) : undefined,
           });
         }
       }
@@ -147,6 +151,7 @@ export async function POST(req: NextRequest) {
               title: String(m.title || "Учебник"),
               price: Number(m.price || 1000),
               material_kind: "textbook",
+              tab_title: "Учебники",
             });
           }
         }
@@ -160,6 +165,7 @@ export async function POST(req: NextRequest) {
               title: String(m.title || "Кроссворд"),
               price: Number(m.price || 1000),
               material_kind: "crossword",
+              tab_title: "Кроссворды",
             });
           }
         }
@@ -213,7 +219,7 @@ export async function POST(req: NextRequest) {
 
     const row = insertedRow as any;
 
-    // 4. Подготовка значений для Google Таблицы
+    // 4. Подготовка ровно 7 столбцов для Google Таблицы
     const sheetValues = buildSheetValues(
       row.request_number || "",
       row.created_at || "",
@@ -225,7 +231,8 @@ export async function POST(req: NextRequest) {
       normalized.email,
       normalized.full_name,
       false,
-      null
+      null,
+      projectName
     );
 
     let sheetOk = true;

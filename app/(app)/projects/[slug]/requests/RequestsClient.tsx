@@ -47,6 +47,7 @@ type Props = {
   userEmail: string;
   userFullName: string;
   initialRequests: PurchaseRequest[];
+  ownedMaterialIds?: string[];
 };
 
 function generateRequestNumber() {
@@ -135,6 +136,7 @@ export default function RequestsClient({
   userEmail,
   userFullName,
   initialRequests,
+  ownedMaterialIds = [],
 }: Props) {
   const router = useRouter();
   const [requests, setRequests] = useState<PurchaseRequest[]>(() =>
@@ -252,9 +254,9 @@ export default function RequestsClient({
     setRequests(initialRequests.map(normalizeRequestRow));
   }, [initialRequests]);
 
-  // Множество ID уже выданных ученику материалов (из обработанных заявок)
-  const ownedMaterialIds = useMemo(() => {
-    const set = new Set<string>();
+  // Объединенное множество всех выданных доступов (из БД и из обработанных заявок)
+  const ownedMaterialSet = useMemo(() => {
+    const set = new Set<string>(ownedMaterialIds);
     for (const req of requests) {
       if (req.is_processed) {
         const ids = toStringArray(req.material_ids);
@@ -262,9 +264,9 @@ export default function RequestsClient({
       }
     }
     return set;
-  }, [requests]);
+  }, [ownedMaterialIds, requests]);
 
-  // Расчёт реальной цены заявки (с динамическим фоллбэком, если total_price равен null или 0)
+  // Расчёт цены заявки с фиксированным приоритетом за сохраненной total_price
   const getRequestPrice = (r: PurchaseRequest) => {
     if (typeof r.total_price === "number" && r.total_price > 0) {
       return r.total_price;
@@ -321,22 +323,19 @@ export default function RequestsClient({
     const itemsMap = new Map<string, { title: string; count: number; unitPrice: number }>();
 
     for (const req of pendingRequests) {
-      const ids = toStringArray(req.material_ids);
-      const reqPrice = typeof req.total_price === "number" && req.total_price > 0 ? req.total_price : 0;
-      let calcPrice = 0;
+      const reqPrice = getRequestPrice(req);
+      sum += reqPrice;
 
+      const ids = toStringArray(req.material_ids);
       for (const id of ids) {
         const mat = materials.find((m) => m.id === id);
         const title = mat?.title || "Учебный материал";
         const unitPrice = mat?.price || 1000;
-        calcPrice += unitPrice;
 
         const current = itemsMap.get(id) ?? { title, count: 0, unitPrice };
         current.count += 1;
         itemsMap.set(id, current);
       }
-
-      sum += reqPrice > 0 ? reqPrice : calcPrice;
     }
 
     return {
@@ -401,7 +400,7 @@ export default function RequestsClient({
   }
 
   function toggleMaterialSelection(id: string) {
-    if (ownedMaterialIds.has(id)) return;
+    if (ownedMaterialSet.has(id)) return;
     setSelectedMaterialIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
@@ -619,8 +618,8 @@ export default function RequestsClient({
                 </div>
               )}
 
-              {/* Табы фильтрации витрины */}
-              <div className="vitrine-tabs" style={{ marginTop: "12px" }}>
+              {/* Табы фильтрации витрины (красивые чипсы) */}
+              <div className="vitrine-tabs">
                 <button
                   type="button"
                   className={`vitrine-tab-btn ${activeTabId === "all" ? "active" : ""}`}
@@ -659,7 +658,7 @@ export default function RequestsClient({
               ) : (
                 <div className="materials-grid">
                   {filteredMaterials.map((item) => {
-                    const isOwned = ownedMaterialIds.has(item.id);
+                    const isOwned = ownedMaterialSet.has(item.id);
                     const isSelected = selectedMaterialIds.includes(item.id);
 
                     return (

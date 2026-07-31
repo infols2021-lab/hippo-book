@@ -20,20 +20,25 @@ export default function MaterialsManager() {
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/projects").then(r => r.json()).then(d => {
-      setProjects(d.projects || d || []);
-      setIsLoading(false);
-    });
+    fetch("/api/admin/projects")
+      .then((r) => r.json())
+      .then((d) => {
+        setProjects(d.projects || d || []);
+        setIsLoading(false);
+      });
   }, []);
 
   useEffect(() => {
     if (!selectedProjectId) {
-      setTabs([]); setLevels([]); setMaterials([]); setSelectedTabId("");
+      setTabs([]);
+      setLevels([]);
+      setMaterials([]);
+      setSelectedTabId("");
       return;
     }
     Promise.all([
-      fetch(`/api/admin/projects/${selectedProjectId}/tabs`).then(r => r.json()),
-      fetch(`/api/admin/projects/${selectedProjectId}/levels`).then(r => r.json()),
+      fetch(`/api/admin/projects/${selectedProjectId}/tabs`).then((r) => r.json()),
+      fetch(`/api/admin/projects/${selectedProjectId}/levels`).then((r) => r.json()),
     ]).then(([tabsData, levelsData]) => {
       setTabs(tabsData.tabs || []);
       setLevels(levelsData.levels || levelsData.data || []);
@@ -47,13 +52,15 @@ export default function MaterialsManager() {
       return;
     }
     fetch(`/api/admin/projects/${selectedProjectId}/materials?tab_id=${selectedTabId}`)
-      .then(r => r.json())
-      .then(d => setMaterials(d.materials || []));
+      .then((r) => r.json())
+      .then((d) => setMaterials(d.materials || []));
   }, [selectedProjectId, selectedTabId]);
 
   const toggleLevel = (code: string) => {
     const current = editingMaterial.target_levels || [];
-    const updated = current.includes(code) ? current.filter((c: string) => c !== code) : [...current, code];
+    const updated = current.includes(code)
+      ? current.filter((c: string) => c !== code)
+      : [...current, code];
     setEditingMaterial({ ...editingMaterial, target_levels: updated });
   };
 
@@ -89,6 +96,28 @@ export default function MaterialsManager() {
       setMaterials(mData.materials || []);
     } catch (err: any) {
       alert("❌ Ошибка: " + err.message);
+    }
+  };
+
+  const handleDelete = async (materialId: string, materialTitle: string) => {
+    const okConfirm = window.confirm(`Удалить материал "${materialTitle}" безвозвратно?`);
+    if (!okConfirm) return;
+
+    try {
+      const res = await fetch(`/api/admin/projects/${selectedProjectId}/materials/${materialId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Ошибка HTTP ${res.status}`);
+      }
+
+      const mRes = await fetch(`/api/admin/projects/${selectedProjectId}/materials?tab_id=${selectedTabId}`);
+      const mData = await mRes.json();
+      setMaterials(mData.materials || []);
+    } catch (err: any) {
+      alert("❌ Ошибка удаления: " + err.message);
     }
   };
 
@@ -248,7 +277,7 @@ export default function MaterialsManager() {
                 <th className="p-4 font-bold text-gray-600">Уровни</th>
                 <th className="p-4 font-bold text-gray-600 text-center">Цена</th>
                 <th className="p-4 font-bold text-gray-600 text-center">Статус</th>
-                <th className="p-4"></th>
+                <th className="p-4 text-right">Действия</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -288,9 +317,14 @@ export default function MaterialsManager() {
                       {mat.is_available ? <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg">Всем</span> : <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-lg">По заявке</span>}
                     </td>
                     <td className="p-4 text-right">
-                      <button onClick={() => setEditingMaterial(mat)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg font-bold transition-colors">
-                        Изменить
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => setEditingMaterial(mat)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-bold transition-colors">
+                          Изменить
+                        </button>
+                        <button onClick={() => void handleDelete(mat.id, mat.title)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg font-bold transition-colors" title="Удалить">
+                          🗑️
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

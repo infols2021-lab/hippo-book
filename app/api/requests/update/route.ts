@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     if (!existing) return fail("Not found", 404, "NOT_FOUND", noStoreInit());
 
     if (existing.is_processed) {
-      return fail("Processed request can't be updated", 403, "LOCKED", noStoreInit());
+      return fail("Обработанную заявку нельзя редактировать", 403, "LOCKED", noStoreInit());
     }
 
     const mergedBody = { ...existing, ...body };
@@ -91,50 +91,105 @@ export async function POST(req: NextRequest) {
       return fail(validation.error || "Неверные данные заявки", 400, "VALIDATION", noStoreInit());
     }
 
-    // 1. Поиск проекта и имени листа Google Sheets
+    // 1. Поиск проекта (включая название и имя листа для Google Sheets)
     let projectId = existing.project_id;
     let sheetName = null;
+    let projectName = null;
 
     if (!projectId || normalized.branch_type !== existing.branch_type) {
       const { data: projectInfo } = await supabase
         .from("projects")
-        .select("id, sheet_name")
+        .select("id, sheet_name, name")
         .eq("slug", normalized.branch_type)
         .maybeSingle();
 
       if (projectInfo) {
         projectId = projectInfo.id;
         sheetName = projectInfo.sheet_name;
+        projectName = projectInfo.name;
       }
     } else {
       const { data: projectInfo } = await supabase
         .from("projects")
-        .select("sheet_name")
+        .select("sheet_name, name")
         .eq("id", projectId)
         .maybeSingle();
-      if (projectInfo) sheetName = projectInfo.sheet_name;
+
+      if (projectInfo) {
+        sheetName = projectInfo.sheet_name;
+        projectName = projectInfo.name;
+      }
     }
 
-    // 2. Выборка выбранных материалов из БД для перерасчета цены и названий
+    // 2. Выборка материалов из всех таблиц (materials, textbooks, crosswords) с подгрузкой табов
     let selectedMaterials: SelectedMaterialItem[] = [];
     let calculatedTotalPrice = 0;
 
     if (normalized.material_ids.length > 0) {
-      const { data: fetchedMaterials } = await supabase
-        .from("materials")
-        .select("id, title, price, material_kind")
-        .in("id", normalized.material_ids);
+      const [
+        { data: fetchedMaterials },
+        { data: fetchedTextbooks },
+        { data: fetchedCrosswords },
+      ] = await Promise.all([
+        supabase
+          .from("materials")
+          .select("id, title, price, material_kind, project_tabs(title)")
+          .in("id", normalized.material_ids),
+        supabase
+          .from("textbooks")
+          .select("id, title, price")
+          .in("id", normalized.material_ids),
+        supabase
+          .from("crosswords")
+          .select("id, title, price")
+          .in("id", normalized.material_ids),
+      ]);
 
-      if (Array.isArray(fetchedMaterials) && fetchedMaterials.length > 0) {
-        selectedMaterials = fetchedMaterials.map((m: any) => ({
-          id: String(m.id),
-          title: String(m.title || "Материал"),
-          price: Number(m.price || 1000),
-          material_kind: m.material_kind ? String(m.material_kind) : undefined,
-        }));
+      const itemsMap = new Map<string, SelectedMaterialItem>();
 
-        calculatedTotalPrice = selectedMaterials.reduce((acc, m) => acc + m.price, 0);
+      if (Array.isArray(fetchedMaterials)) {
+        for (const m of fetchedMaterials) {
+          const rawTabTitle = (m as any).project_tabs?.title || null;
+          itemsMap.set(String(m.id), {
+            id: String(m.id),
+            title: String(m.title || "Материал"),
+            price: Number(m.price || 1000),
+            material_kind: m.material_kind ? String(m.material_kind) : undefined,
+            tab_title: rawTabTitle ? String(rawTabTitle) : undefined,
+          });
+        }
       }
+
+      if (Array.isArray(fetchedTextbooks)) {
+        for (const m of fetchedTextbooks) {
+          if (!itemsMap.has(String(m.id))) {
+            itemsMap.set(String(m.id), {
+              id: String(m.id),
+              title: String(m.title || "Учебник"),
+              price: Number(m.price || 1000),
+              material_kind: "textbook",
+              tab_title: "Учебники",
+            });
+          }
+        }
+      }
+
+      if (Array.isArray(fetchedCrosswords)) {
+        for (const m of fetchedCrosswords) {
+          if (!itemsMap.has(String(m.id))) {
+            itemsMap.set(String(m.id), {
+              id: String(m.id),
+              title: String(m.title || "Кроссворд"),
+              price: Number(m.price || 1000),
+              material_kind: "crossword",
+              tab_title: "Кроссворды",
+            });
+          }
+        }
+      }
+
+      selectedMaterials = Array.from(itemsMap.values());
+      calculatedTotalPrice = selectedMaterials.reduce((acc, m) => acc + m.price, 0);
     }
 
     const totalPrice = calculatedTotalPrice > 0 ? calculatedTotalPrice : (normalized.total_price || 0);
@@ -146,6 +201,7 @@ export async function POST(req: NextRequest) {
     const materialKinds =
       normalized.material_kinds.length > 0 ? normalized.material_kinds : extractedKinds;
 
+    // 3. Сохранение изменений в БД
     const payload: Record<string, any> = {
       branch_type: normalized.branch_type,
       project_id: projectId,
@@ -176,18 +232,24 @@ export async function POST(req: NextRequest) {
 
     const row = updatedRow as any;
 
+    // 4. Формирование ровно 7 столбцов для выгрузки в Google Таблицу
     const sheetValues = buildSheetValues(
       row.request_number || "",
       row.created_at || "",
       normalized.branch_type,
       normalized.class_level,
       normalized.target_levels,
-      selectedMaterials.length > 0 ? selectedMaterials : (normalized.material_kinds.length > 0 ? normalized.material_kinds : normalized.textbook_types),
+      selectedMaterials.length > 0
+        ? selectedMaterials
+        : normalized.material_kinds.length > 0
+        ? normalized.material_kinds
+        : normalized.textbook_types,
       totalPrice,
       normalized.email,
       normalized.full_name,
       Boolean(row.is_processed),
-      row.processed_at ?? null
+      row.processed_at ?? null,
+      projectName
     );
 
     let sheetOk = true;

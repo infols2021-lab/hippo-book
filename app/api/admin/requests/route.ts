@@ -315,16 +315,20 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const { data: reqs, error: rErr } = await runDbQuery<ReqRow[]>(
-      () => supabase.from("purchase_requests").select("*, projects(sheet_name)").in("id", ids),
+      () => supabase.from("purchase_requests").select("*, projects(name, sheet_name)").in("id", ids),
       "patchLoadRequests",
     );
 
     if (rErr) return fail(rErr.message, 500, "DB_ERROR", noStoreInit());
 
-    const rows = (reqs ?? []).map((r: any) => ({
-      ...r,
-      sheet_name: r.projects?.sheet_name || null,
-    })) as ReqRow[];
+    const rows = (reqs ?? []).map((r: any) => {
+      const proj = Array.isArray(r.projects) ? r.projects[0] : r.projects;
+      return {
+        ...r,
+        projects: proj,
+        sheet_name: proj?.sheet_name || null,
+      };
+    }) as ReqRow[];
 
     const results: Record<
       string,
@@ -430,6 +434,7 @@ export async function PATCH(req: NextRequest) {
           updatedRow.full_name || "",
           Boolean(updatedRow.is_processed),
           updatedRow.processed_at ?? null,
+          r.projects?.name || null,
         );
 
         try {

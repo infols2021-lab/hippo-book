@@ -3,9 +3,9 @@ import "server-only";
 
 import { google } from "googleapis";
 
-const ACCOUNTING_COLUMNS = "A:H";
-const ACCOUNTING_LAST_COLUMN = "H";
-const ACCOUNTING_COLUMNS_COUNT = 8;
+const ACCOUNTING_COLUMNS = "A:G";
+const ACCOUNTING_LAST_COLUMN = "G";
+const ACCOUNTING_COLUMNS_COUNT = 7;
 const GOOGLE_API_TIMEOUT_MS = 15_000;
 
 export type AccountingRowValue = string | number | null | undefined;
@@ -110,7 +110,7 @@ async function getSheetIdByTitle(spreadsheetId: string, tab: string) {
 }
 
 /**
- * Append строки заявки в конец A:H.
+ * Append строки заявки в конец A:G (7 столбцов).
  * @param customTabName Имя листа из настроек проекта (опционально)
  */
 export async function appendAccountingRow(values: AccountingRowValue[], customTabName?: string | null) {
@@ -174,8 +174,8 @@ export async function getExistingRequestNumbersSet(customTabName?: string | null
 }
 
 /**
- * Мапа request_number -> { rowNumber, values[0..7] }.
- * Читает A:H и учитывает только строки, где колонка A похожа на номер заявки.
+ * Мапа request_number -> { rowNumber, values[0..6] }.
+ * Читает A:G и учитывает только строки, где колонка A похожа на номер заявки.
  */
 export async function getSheetRequestRowMap(customTabName?: string | null) {
   const sheets = getSheetsClient();
@@ -213,7 +213,7 @@ export async function getSheetRequestRowMap(customTabName?: string | null) {
 }
 
 /**
- * Обновить конкретную строку A:H по номеру строки.
+ * Обновить конкретную строку A:G по номеру строки.
  */
 export async function updateAccountingRow(rowNumber: number, values: AccountingRowValue[], customTabName?: string | null) {
   if (!Number.isFinite(rowNumber) || rowNumber <= 0) {
@@ -297,10 +297,10 @@ export async function findRowNumberByRequestNumber(requestNumber: string, custom
 }
 
 /**
- * UPSERT строки A:H по request_number из колонки A.
+ * UPSERT строки A:G по request_number из колонки A.
  */
-export async function upsertRequestRowByNumber(valuesAtoH: AccountingRowValue[], customTabName?: string | null) {
-  const requestNumber = norm(valuesAtoH?.[0]);
+export async function upsertRequestRowByNumber(valuesAtoG: AccountingRowValue[], customTabName?: string | null) {
+  const requestNumber = norm(valuesAtoG?.[0]);
 
   if (!requestNumber) {
     throw new Error("Missing request_number in values[0]");
@@ -310,7 +310,7 @@ export async function upsertRequestRowByNumber(valuesAtoH: AccountingRowValue[],
   const found = map.get(requestNumber);
 
   if (found) {
-    await updateAccountingRow(found.rowNumber, valuesAtoH, customTabName);
+    await updateAccountingRow(found.rowNumber, valuesAtoG, customTabName);
 
     return {
       action: "updated" as const,
@@ -318,7 +318,7 @@ export async function upsertRequestRowByNumber(valuesAtoH: AccountingRowValue[],
     };
   }
 
-  const appended = await appendAccountingRow(valuesAtoH, customTabName);
+  const appended = await appendAccountingRow(valuesAtoG, customTabName);
 
   return {
     action: "inserted" as const,

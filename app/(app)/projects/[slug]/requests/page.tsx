@@ -17,7 +17,7 @@ export default async function ProjectRequestsPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // 🚀 ИСПРАВЛЕНИЕ: Данные профиля лежат в таблице profiles, а не users
+  // Данные профиля
   const { data: userProfile } = await supabase
     .from("profiles")
     .select("full_name, email")
@@ -33,60 +33,76 @@ export default async function ProjectRequestsPage({
 
   if (!project || !project.is_active) notFound();
 
-  // 3. Собираем реальные табы, уровни и историю заявок этого юзера
-  const [tabsRes, levelsRes, requestsRes] = await Promise.all([
+  // 3. Собираем табы, уровни, историю заявок и реальные выданные доступы
+  const [tabsRes, levelsRes, requestsRes, accessRes, grantsRes] = await Promise.all([
     supabase.from("project_tabs").select("*").eq("project_id", project.id).eq("is_active", true).order("order_index"),
     supabase.from("project_levels").select("*").eq("project_id", project.id).eq("is_active", true).order("order_index"),
-    supabase.from("purchase_requests").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
+    supabase.from("purchase_requests").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("material_access").select("material_id").eq("user_id", user.id),
+    supabase.from("purchase_request_grants").select("material_id, item_id").eq("user_id", user.id),
   ]);
 
   const tabs = tabsRes.data || [];
-  const tabIds = tabs.map(t => t.id);
+  const tabIds = tabs.map((t) => t.id);
 
-  // 4. 🚀 ДИНАМИЧЕСКИЙ ПОДСЧЕТ ЦЕН: Грузим материалы этих табов
+  // Собираем все ID выданных материалов
+  const ownedSet = new Set<string>();
+
+  (accessRes.data || []).forEach((a) => {
+    if (a.material_id) ownedSet.add(a.material_id);
+  });
+
+  (grantsRes.data || []).forEach((g) => {
+    if (g.material_id) ownedSet.add(g.material_id);
+    if (g.item_id) ownedSet.add(g.item_id);
+  });
+
+  // 4. ДИНАМИЧЕСКИЙ ПОДСЧЕТ ЦЕН ТАБОВ (для справочной информации)
   const { data: materials } = await supabase
     .from("materials")
     .select("project_tab_id, price")
     .in("project_tab_id", tabIds)
     .eq("is_active", true);
 
-  // Считаем общую стоимость каждого таба (сумма цен его материалов)
   const tabPrices: Record<string, number> = {};
-  tabs.forEach(t => { tabPrices[t.id] = 0; });
-  
-  (materials || []).forEach(m => {
+  tabs.forEach((t) => {
+    tabPrices[t.id] = 0;
+  });
+
+  (materials || []).forEach((m) => {
     if (m.project_tab_id) {
-      tabPrices[m.project_tab_id] += (m.price || 0);
+      tabPrices[m.project_tab_id] += m.price || 0;
     }
   });
 
-  // Обогащаем табы вычисленной ценой
-  const enrichedTabs = tabs.map(t => ({
+  const enrichedTabs = tabs.map((t) => ({
     ...t,
-    price: tabPrices[t.id] || 0
+    price: tabPrices[t.id] || 0,
   }));
 
-  // Маппинг для легаси заявок (если там хранились названия, а не ID)
   const tabTitleToId = new Map<string, string>();
-  enrichedTabs.forEach(t => tabTitleToId.set(t.title, t.id));
+  enrichedTabs.forEach((t) => tabTitleToId.set(t.title, t.id));
 
-  // 5. Фильтруем заявки и обогащаем их вычисленной total_price
+  // 5. Фильтруем и сохраняем оригинальную историческую стоимость заявок
   const allRequests = requestsRes.data || [];
   const projectRequests = allRequests
-    .filter(r => r.project_id === project.id || !r.project_id)
-    .map(r => {
-      // Собираем все запрошенные табы из заявки
-      const rawTabs = r.material_kinds?.length ? r.material_kinds : (r.textbook_types || []);
-      
-      // Считаем общую цену для этой конкретной заявки
-      const total_price = rawTabs.reduce((sum: number, tabIdentifier: string) => {
+    .filter((r) => r.project_id === project.id || !r.project_id)
+    .map((r) => {
+      // Если заявка уже имеет зафиксированную цену в БД (> 0) — используем её без перерасчёта!
+      if (typeof r.total_price === "number" && r.total_price > 0) {
+        return r;
+      }
+
+      // Иначе (для легаси заявок) рассчитываем динамически
+      const rawTabs = r.material_kinds?.length ? r.material_kinds : r.textbook_types || [];
+      const calculatedPrice = rawTabs.reduce((sum: number, tabIdentifier: string) => {
         const tabId = tabTitleToId.get(tabIdentifier) || tabIdentifier;
         return sum + (tabPrices[tabId] || 0);
       }, 0);
 
       return {
         ...r,
-        total_price
+        total_price: calculatedPrice > 0 ? calculatedPrice : 1000,
       };
     });
 
@@ -99,6 +115,7 @@ export default async function ProjectRequestsPage({
       userEmail={userProfile?.email || user.email || ""}
       userFullName={userProfile?.full_name || "Ученик"}
       initialRequests={projectRequests}
+      ownedMaterialIds={Array.from(ownedSet)}
     />
   );
 }
