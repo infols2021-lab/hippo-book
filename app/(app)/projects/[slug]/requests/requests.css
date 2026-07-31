@@ -29,8 +29,8 @@
   overflow: hidden;
   border: 1px solid var(--glass-border);
   box-shadow: inset 0 1px 1px var(--glass-highlight), var(--glass-shadow);
-  table-layout: auto;           /* чтобы колонки подстраивались под контент */
-  word-break: break-word;       /* длинные названия не ломают таблицу */
+  table-layout: auto;
+  word-break: break-word;
 }
 
 .requests-table th,
@@ -60,8 +60,6 @@
   border-bottom: none;
 }
 
-/* ⚡ Ячейка действий – больше НЕ используем td:last-child flex,
-   вместо этого добавляем класс .actions-cell в разметке */
 .actions-cell {
   display: flex;
   flex-direction: column;
@@ -70,7 +68,6 @@
   min-width: 130px;
 }
 
-/* Текст «Действия недоступны» — красиво и ненавязчиво */
 .actions-locked {
   font-size: 13px;
   font-weight: 500;
@@ -101,6 +98,164 @@
 .status-processed {
   background: color-mix(in srgb, #10b981 15%, transparent);
   color: #059669;
+}
+
+/* =========================================================
+   ✅ ФИЛЬТР УРОВНЕЙ И СЕТКА МАТЕРИАЛОВ (С ускорением FPS)
+   ========================================================= */
+
+.level-filter-container {
+  margin-bottom: 18px;
+}
+
+.level-filter-title {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: color-mix(in srgb, var(--project-text) 60%, transparent);
+  margin-bottom: 8px;
+}
+
+.level-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.level-chip {
+  padding: 8px 16px;
+  border-radius: 99px;
+  border: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--project-text) 4%, transparent);
+  color: var(--project-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.level-chip:hover {
+  background: color-mix(in srgb, var(--project-text) 8%, transparent);
+}
+
+.level-chip.active {
+  background: var(--project-primary);
+  color: #ffffff;
+  border-color: var(--project-primary);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--project-primary) 35%, transparent);
+}
+
+/* Оптимизированная карточка материала */
+.materials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding: 4px;
+  margin-bottom: 20px;
+  contain: content;
+  will-change: scroll-position;
+  -webkit-overflow-scrolling: touch;
+}
+
+.material-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--project-text) 3%, transparent);
+  border: 2px solid var(--glass-border);
+  border-radius: 18px;
+  padding: 12px;
+  cursor: pointer;
+  user-select: none;
+  contain: layout style;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease,
+              box-shadow 0.2s ease,
+              background-color 0.2s ease;
+  transform: translateZ(0);
+}
+
+.material-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--project-primary) 50%, transparent);
+}
+
+.material-card.selected {
+  border-color: var(--project-primary);
+  background: color-mix(in srgb, var(--project-primary) 10%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--project-primary) 22%, transparent);
+}
+
+/* Обложка с фиксированным aspect-ratio против скачков высоты */
+.material-cover-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--project-text) 6%, transparent);
+  margin-bottom: 10px;
+}
+
+.material-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.material-card:hover .material-cover-img {
+  transform: scale(1.05);
+}
+
+.material-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.material-card-title {
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--project-text);
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.material-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+.material-card-price {
+  font-weight: 900;
+  font-size: 15px;
+  color: var(--project-primary);
+}
+
+.material-check-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--project-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 /* =========================================================
@@ -147,60 +302,8 @@
   cursor: not-allowed;
 }
 
-/* Checkbox group */
-.checkbox-group {
-  margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.checkbox-item {
-  display: flex;
-  align-items: center;
-  padding: 14px 16px;
-  background: color-mix(in srgb, var(--project-text) 3%, transparent);
-  border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.checkbox-item:hover {
-  background: color-mix(in srgb, var(--project-text) 6%, transparent);
-}
-
-.checkbox-item.checked {
-  border-color: var(--project-primary);
-  background: color-mix(in srgb, var(--project-primary) 8%, transparent);
-  box-shadow: inset 0 0 0 1px var(--project-primary);
-}
-
-.checkbox-item input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
-  margin-right: 14px;
-  cursor: pointer;
-  accent-color: var(--project-primary);
-}
-
-.checkbox-item label {
-  margin: 0;
-  font-weight: 700;
-  color: var(--project-text);
-  cursor: pointer;
-  flex: 1;
-}
-
-.price-info {
-  color: color-mix(in srgb, var(--project-text) 60%, transparent);
-  font-size: 13px;
-  margin-left: 6px;
-  font-weight: 500;
-}
-
 /* =========================================================
-   ✅ ИНФО-ПЛАШКИ
+   ✅ ИНФО-ПЛАШКИ И СВОДКА ЗАКАЗА
    ========================================================= */
 
 .payment-info {
@@ -208,36 +311,71 @@
   border-left: 4px solid var(--project-primary);
   padding: 16px 20px;
   border-radius: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   color: var(--project-text);
 }
 
 .payment-info h4 {
   color: var(--project-primary);
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
   font-weight: 800;
+}
+
+.summary-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 14px 0;
+  padding-right: 4px;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--project-text) 4%, transparent);
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  font-size: 14px;
+}
+
+.summary-item-title {
+  font-weight: 700;
+  color: var(--project-text);
+}
+
+.summary-item-badge {
+  font-weight: 800;
+  color: var(--project-primary);
+  background: color-mix(in srgb, var(--project-primary) 14%, transparent);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
 }
 
 .total-amount {
   background: color-mix(in srgb, var(--project-primary) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--project-primary) 30%, transparent);
   border-radius: 16px;
-  padding: 20px;
-  margin: 20px 0;
+  padding: 18px;
+  margin: 16px 0;
   text-align: center;
 }
 
 .total-amount h4 {
   color: color-mix(in srgb, var(--project-text) 80%, transparent);
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .total-amount .amount {
-  font-size: 2rem;
+  font-size: 2.1rem;
   font-weight: 900;
   color: var(--project-primary);
 }
@@ -277,7 +415,7 @@
 
 .payment-qr--smart {
   position: relative;
-  min-height: 260px;
+  min-height: 240px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -302,6 +440,10 @@
   animation: spin 1s linear infinite;
   display: block;
   margin: 0 auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .qr-img {
@@ -362,17 +504,9 @@
     white-space: normal;
     text-align: center;
   }
-}
 
-@media (max-width: 480px) {
-  .requests-table th,
-  .requests-table td {
-    padding: 14px 12px;
-    font-size: 14px;
-  }
-
-  .checkbox-item {
-    flex-direction: column;
-    align-items: flex-start;
+  .materials-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
   }
 }

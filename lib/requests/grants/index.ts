@@ -2,8 +2,7 @@
 // Единая точка бизнес-логики выдачи и отзыва доступов по заявкам.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { toStringArray, uniqueStrings, normalizeBranchType } from "@/lib/materials/normalize";
-import { getRequestMaterialKinds } from "@/lib/requests/normalize";
+import { toStringArray, uniqueStrings } from "@/lib/materials/normalize";
 
 export type GrantKind = "textbook" | "crossword" | "mock_test" | "material";
 
@@ -37,25 +36,19 @@ export type ReqRow = {
   user_id: string;
   project_id?: string | null;
   branch_type?: string | null;
-  class_level: any;
-  target_level: any;
+  class_level?: any;
+  target_level?: any;
   target_levels?: any;
-  textbook_types: any;
+  textbook_types?: any;
   material_kinds?: any;
+  material_ids?: any;
   is_processed?: boolean | null;
 };
 
-// 🔥 Улучшенная нормализация уровня для точного совпадения ("Stage 1" -> "stage_1")
-function normalizeLevelCode(lvl: string): string {
-  return String(lvl).toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, "_");
-}
-
-function overlaps(a: string[], b: string[]): boolean {
-  const setA = new Set(a.map(normalizeLevelCode));
-  return b.map(normalizeLevelCode).some((x) => setA.has(x));
-}
-
-export async function grantDynamicProjectAccessForRequest(
+/**
+ * Единая функция выдачи доступов строго по material_ids из заявки.
+ */
+export async function grantAccessForRequest(
   supabase: SupabaseClient,
   adminId: string,
   r: ReqRow,
@@ -64,129 +57,52 @@ export async function grantDynamicProjectAccessForRequest(
   const grantedLabels: string[] = [];
   const grantsToStore: GrantResult["grantsToStore"] = [];
 
-  // 1. Получаем единый технический код уровня (class_level) из заявки
-  const requestedLevelCodes = uniqueStrings([
-    ...toStringArray(r.class_level),
-    ...toStringArray(r.target_levels),
-    ...toStringArray(r.target_level)
-  ]).map(normalizeLevelCode);
-    
-  // 2. Получаем ID разделов (табов) из заявки
-  const requestedTabIds = uniqueStrings([
-    ...toStringArray(r.material_kinds),
-    ...toStringArray(r.textbook_types)
+  // Извлекаем все запрошенные ID из заявки (material_ids, а также резервные поля)
+  const requestedIds = uniqueStrings([
+    ...toStringArray(r.material_ids),
+    ...toStringArray(r.material_kinds).filter((x) => x.includes("-") || x.length > 20),
+    ...toStringArray(r.textbook_types).filter((x) => x.includes("-") || x.length > 20),
   ]);
 
-  if (requestedTabIds.length === 0) return { grantedLabels, grantsToStore };
-
-  // 3. Достаем ВСЕ активные материалы из запрошенных табов
-  const { data: materials, error: matError } = await supabase
-    .from("materials")
-    .select("id, title, material_kind, target_levels, class_levels, project_tab_id")
-    .in("project_tab_id", requestedTabIds)
-    .eq("is_active", true);
-
-  if (matError) throw new Error(matError.message);
-
-  // 4. Фильтруем материалы: оставляем только те, которые подходят под запрошенный уровень
-  const matchedMaterials = (materials || []).filter((mat) => {
-    if (requestedLevelCodes.length === 0) return true;
-
-    const matLevels = [
-      ...toStringArray(mat.target_levels),
-      ...toStringArray(mat.class_levels),
-    ].map(normalizeLevelCode);
-    
-    if (matLevels.length === 0) return true;
-
-    return overlaps(matLevels, requestedLevelCodes);
-  });
-
-  // 5. Выдаем доступы к найденным материалам
-  for (const mat of matchedMaterials) {
-    const { error: upsertError } = await supabase
-      .from("material_access")
-      .upsert(
-        {
-          user_id: r.user_id,
-          material_id: mat.id,
-          granted_by: adminId,
-          granted_at: nowISO,
-        },
-        { onConflict: "user_id,material_id" },
-      );
-
-    if (!upsertError) {
-      grantedLabels.push(`📘 ${mat.title}`);
-      
-      const safeKind = (mat.material_kind === "textbook" || mat.material_kind === "crossword") 
-        ? mat.material_kind 
-        : "mock_test";
-
-      grantsToStore.push({
-        request_id: r.id,
-        user_id: r.user_id,
-        kind: safeKind as GrantKind, 
-        item_id: mat.id,
-        title: mat.title,
-        granted_by: adminId,
-        granted_at: nowISO,
-        material_id: mat.id,
-        material_kind: mat.material_kind || "material",
-      });
-    }
+  if (requestedIds.length === 0) {
+    return { grantedLabels, grantsToStore };
   }
 
-  return { grantedLabels, grantsToStore };
-}
-
-export async function grantGenericBranchAccessForRequest(
-  supabase: SupabaseClient,
-  adminId: string,
-  r: ReqRow,
-): Promise<GrantResult> {
-  const nowISO = new Date().toISOString();
-  const grantedLabels: string[] = [];
-  const grantsToStore: GrantResult["grantsToStore"] = [];
-
-  const branchType = normalizeBranchType(r.branch_type);
-  const targetLevels = uniqueStrings([
-    ...toStringArray(r.class_level),
-    ...toStringArray(r.target_levels),
-    ...toStringArray(r.target_level)
-  ]).map(normalizeLevelCode);
-  const kinds = getRequestMaterialKinds(r);
-
-  // 🔥 ИСПРАВЛЕНИЕ: Тянем project_tab_id, чтобы понимать и старые слова, и новые UUID табов
-  const { data: materials, error } = await supabase
+  // 1. Ищем запрошенные материалы в единой таблице materials
+  const { data: materials } = await supabase
     .from("materials")
-    .select("id, title, material_kind, target_levels, class_levels, project_tab_id")
-    .eq("branch_type", branchType)
-    .eq("is_active", true);
+    .select("id, title, material_kind, legacy_source_table, legacy_source_id")
+    .in("id", requestedIds);
 
-  if (error) throw new Error(error.message);
+  const foundMaterialIds = new Set((materials || []).map((m) => m.id));
+  const missingIds = requestedIds.filter((id) => !foundMaterialIds.has(id));
 
-  const matchedMaterials = (materials ?? []).filter((mat) => {
-    // Умная проверка: заявка может прислать слово "mock_test" или UUID таба
-    if (kinds.length > 0) {
-      const matchesLegacyKind = kinds.includes(String(mat.material_kind));
-      const matchesTabId = kinds.includes(String(mat.project_tab_id));
-      if (!matchesLegacyKind && !matchesTabId) return false;
-    }
+  // 2. Ищем оставшиеся ID в легаси-таблице textbooks
+  let textbooks: any[] = [];
+  if (missingIds.length > 0) {
+    const { data: tbData } = await supabase
+      .from("textbooks")
+      .select("id, title")
+      .in("id", missingIds);
+    if (tbData) textbooks = tbData;
+  }
 
-    if (targetLevels.length === 0) return true;
-    
-    const matLevels = [
-      ...toStringArray(mat.target_levels),
-      ...toStringArray(mat.class_levels),
-    ].map(normalizeLevelCode);
-    
-    if (matLevels.length === 0) return true;
-    return overlaps(matLevels, targetLevels);
-  });
+  // 3. Ищем оставшиеся ID в легаси-таблице crosswords
+  const foundTbIds = new Set(textbooks.map((t) => t.id));
+  const missingAfterTb = missingIds.filter((id) => !foundTbIds.has(id));
 
-  for (const mat of matchedMaterials) {
-    const { error: upsertError } = await supabase
+  let crosswords: any[] = [];
+  if (missingAfterTb.length > 0) {
+    const { data: cwData } = await supabase
+      .from("crosswords")
+      .select("id, title")
+      .in("id", missingAfterTb);
+    if (cwData) crosswords = cwData;
+  }
+
+  // ---- Выдача для материалов из таблицы materials ----
+  for (const mat of materials || []) {
+    const { error: upsertErr } = await supabase
       .from("material_access")
       .upsert(
         {
@@ -198,12 +114,30 @@ export async function grantGenericBranchAccessForRequest(
         { onConflict: "user_id,material_id" },
       );
 
-    if (!upsertError) {
-      grantedLabels.push(`📁 ${mat.title}`);
-      
-      const safeKind = (mat.material_kind === "textbook" || mat.material_kind === "crossword") 
-        ? mat.material_kind 
-        : "mock_test";
+    // Связка с легаси-таблицами доступов при наличии
+    if (mat.legacy_source_table === "textbooks" && mat.legacy_source_id) {
+      await supabase
+        .from("textbook_access")
+        .upsert(
+          { user_id: r.user_id, textbook_id: mat.legacy_source_id },
+          { onConflict: "user_id,textbook_id" },
+        );
+    } else if (mat.legacy_source_table === "crosswords" && mat.legacy_source_id) {
+      await supabase
+        .from("crossword_access")
+        .upsert(
+          { user_id: r.user_id, crossword_id: mat.legacy_source_id },
+          { onConflict: "user_id,crossword_id" },
+        );
+    }
+
+    if (!upsertErr) {
+      grantedLabels.push(`📘 ${mat.title}`);
+
+      const safeKind =
+        mat.material_kind === "textbook" || mat.material_kind === "crossword"
+          ? mat.material_kind
+          : "material";
 
       grantsToStore.push({
         request_id: r.id,
@@ -213,9 +147,61 @@ export async function grantGenericBranchAccessForRequest(
         title: mat.title,
         granted_by: adminId,
         granted_at: nowISO,
+        branch_type: r.branch_type || "olympiad",
         material_id: mat.id,
-        branch_type: branchType,
         material_kind: mat.material_kind || "material",
+      });
+    }
+  }
+
+  // ---- Выдача для материалов из легаси-таблицы textbooks ----
+  for (const tb of textbooks) {
+    const { error: upsertErr } = await supabase
+      .from("textbook_access")
+      .upsert(
+        { user_id: r.user_id, textbook_id: tb.id },
+        { onConflict: "user_id,textbook_id" },
+      );
+
+    if (!upsertErr) {
+      grantedLabels.push(`📚 ${tb.title}`);
+      grantsToStore.push({
+        request_id: r.id,
+        user_id: r.user_id,
+        kind: "textbook",
+        item_id: tb.id,
+        title: tb.title,
+        granted_by: adminId,
+        granted_at: nowISO,
+        branch_type: r.branch_type || "olympiad",
+        material_id: tb.id,
+        material_kind: "textbook",
+      });
+    }
+  }
+
+  // ---- Выдача для материалов из легаси-таблицы crosswords ----
+  for (const cw of crosswords) {
+    const { error: upsertErr } = await supabase
+      .from("crossword_access")
+      .upsert(
+        { user_id: r.user_id, crossword_id: cw.id },
+        { onConflict: "user_id,crossword_id" },
+      );
+
+    if (!upsertErr) {
+      grantedLabels.push(`🧩 ${cw.title}`);
+      grantsToStore.push({
+        request_id: r.id,
+        user_id: r.user_id,
+        kind: "crossword",
+        item_id: cw.id,
+        title: cw.title,
+        granted_by: adminId,
+        granted_at: nowISO,
+        branch_type: r.branch_type || "olympiad",
+        material_id: cw.id,
+        material_kind: "crossword",
       });
     }
   }
@@ -223,15 +209,21 @@ export async function grantGenericBranchAccessForRequest(
   return { grantedLabels: uniqueStrings(grantedLabels), grantsToStore };
 }
 
-export async function grantAccessForRequest(
+// Алиасы для поддержания совместимости
+export async function grantDynamicProjectAccessForRequest(
   supabase: SupabaseClient,
   adminId: string,
   r: ReqRow,
 ): Promise<GrantResult> {
-  if (r.project_id) {
-    return grantDynamicProjectAccessForRequest(supabase, adminId, r);
-  }
-  return grantGenericBranchAccessForRequest(supabase, adminId, r);
+  return grantAccessForRequest(supabase, adminId, r);
+}
+
+export async function grantGenericBranchAccessForRequest(
+  supabase: SupabaseClient,
+  adminId: string,
+  r: ReqRow,
+): Promise<GrantResult> {
+  return grantAccessForRequest(supabase, adminId, r);
 }
 
 export async function existsOtherProcessedGrant(
@@ -256,39 +248,13 @@ export async function existsOtherProcessedGrant(
 }
 
 export async function existsOtherProcessedGenericRequestForMaterial(
-  supabase: SupabaseClient,
-  requestId: string,
-  userId: string,
-  branchType: string,
-  materialKind: string | null | undefined,
-  targetLevels: string[] | null | undefined,
+  _supabase: SupabaseClient,
+  _requestId: string,
+  _userId: string,
+  _branchType: string,
+  _materialKind: string | null | undefined,
+  _targetLevels: string[] | null | undefined,
 ): Promise<boolean> {
-  const levels = Array.isArray(targetLevels) ? targetLevels.map(normalizeLevelCode) : [];
-  const kind = String(materialKind ?? "").trim();
-
-  if (!levels.length || !kind) return false;
-
-  const { data, error } = await supabase
-    .from("purchase_requests")
-    .select("id,target_level,target_levels,textbook_types,material_kinds,class_level,is_processed,branch_type")
-    .eq("user_id", userId)
-    .eq("is_processed", true)
-    .eq("branch_type", branchType)
-    .neq("id", requestId);
-
-  if (error) return false;
-
-  for (const row of data ?? []) {
-    const req = row as ReqRow;
-    const rowLevels = [...toStringArray(req.class_level), ...toStringArray(req.target_levels)].map(normalizeLevelCode);
-    const rowKinds = getRequestMaterialKinds(req);
-
-    const levelMatches = overlaps(rowLevels, levels);
-    const kindMatches = rowKinds.length ? rowKinds.includes(kind) : true;
-
-    if (levelMatches && kindMatches) return true;
-  }
-
   return false;
 }
 
@@ -340,6 +306,9 @@ export async function enrichMockTestTargetIfNeeded(
   };
 }
 
+/**
+ * Отзыв доступов при отмене обработки заявки.
+ */
 export async function revokeAccessForRequest(
   supabase: SupabaseClient,
   r: ReqRow,
@@ -357,24 +326,31 @@ export async function revokeAccessForRequest(
       t.item_id,
     );
 
-    const keepByRequest = await existsOtherProcessedGenericRequestForMaterial(
-      supabase,
-      r.id,
-      r.user_id,
-      r.branch_type || "olympiad",
-      t.material_kind,
-      t.target_levels,
-    );
+    if (keepByGrant) continue;
 
-    if (keepByGrant || keepByRequest) continue;
-
-    const { error: delError } = await supabase
+    // Удаление из единой таблицы доступов
+    await supabase
       .from("material_access")
       .delete()
       .eq("user_id", r.user_id)
       .eq("material_id", t.item_id);
 
-    if (delError) throw new Error(delError.message);
+    // Удаление из легаси-таблиц при наличии
+    if (t.kind === "textbook") {
+      await supabase
+        .from("textbook_access")
+        .delete()
+        .eq("user_id", r.user_id)
+        .eq("textbook_id", t.item_id);
+    }
+
+    if (t.kind === "crossword") {
+      await supabase
+        .from("crossword_access")
+        .delete()
+        .eq("user_id", r.user_id)
+        .eq("crossword_id", t.item_id);
+    }
   }
 
   const { error: delHistory } = await supabase

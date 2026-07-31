@@ -268,7 +268,6 @@ export default function ProjectEditor({
     }
   }, [project]);
 
-  // ✅ ИСПРАВЛЕННЫЙ МЕТОД СОХРАНЕНИЯ (PUT)
   const saveProject = async (e: React.FormEvent) => {
     e.preventDefault();
     const url = project?.id ? `/api/admin/projects/${project.id}` : "/api/admin/projects";
@@ -305,12 +304,11 @@ export default function ProjectEditor({
         headers: { "Content-Type": "application/json" }, 
         cache: "no-store",
         body: JSON.stringify({
-          id: editingLevel.id, // Если id есть, сработает upsert
+          id: editingLevel.id,
           code: editingLevel.code, 
           label: editingLevel.label, 
           order_index: editingLevel.order_index ?? levels.length * 10, 
           is_active: editingLevel.is_active ?? true,
-          price: editingLevel.price ? Number(editingLevel.price) : null
         }),
       });
       
@@ -447,14 +445,12 @@ export default function ProjectEditor({
       alert("✅ Проект успешно удален");
       onClose();
       router.refresh();
-      // Либо вызвать onSaved() если логика обновления списка висит там
       onSaved();
     } catch (err: any) {
       alert("❌ Ошибка удаления проекта: " + err.message);
     }
   };
 
-  // 🔥 ГОТОВЫЕ ПРЕСЕТЫ ТЕМ (В 1 КЛИК)
   const applyPreset = (preset: Record<string, string>) => {
     setFormData((prev) => ({ 
       ...prev, 
@@ -724,7 +720,7 @@ export default function ProjectEditor({
               {!editingLevel && (
                 <button 
                   type="button" 
-                  onClick={() => setEditingLevel({ code: "", label: "", price: "", order_index: levels.length * 10, is_active: true })} 
+                  onClick={() => setEditingLevel({ code: "", label: "", order_index: levels.length * 10, is_active: true })} 
                   className="bg-white hover:bg-gray-100 border shadow-sm transition-colors text-gray-800 px-5 py-2.5 rounded-xl font-bold text-sm"
                 >
                   + Создать уровень
@@ -737,7 +733,7 @@ export default function ProjectEditor({
                 <h4 className="font-black text-lg mb-6 text-gray-800">
                   {editingLevel.id ? "Редактирование уровня" : "Новый уровень"}
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Название (Label)</label>
                     <input 
@@ -756,16 +752,6 @@ export default function ProjectEditor({
                       placeholder="hippo-1"
                       value={editingLevel.code} 
                       onChange={(e) => setEditingLevel({ ...editingLevel, code: e.target.value })} 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Цена (₽)</label>
-                    <input 
-                      type="number" 
-                      className="w-full border-2 rounded-xl px-4 py-2.5 font-medium outline-none focus:border-blue-500" 
-                      placeholder="1000"
-                      value={editingLevel.price ?? ""} 
-                      onChange={(e) => setEditingLevel({ ...editingLevel, price: e.target.value })} 
                     />
                   </div>
                 </div>
@@ -794,9 +780,6 @@ export default function ProjectEditor({
                   >
                     <div className="flex flex-col gap-1">
                       <span className="font-bold text-gray-800">{l.label}</span>
-                      <span className="text-xs text-gray-500 font-medium">
-                        {l.price != null ? `${l.price} ₽` : "0 ₽ (бесплатно)"}
-                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded-lg">

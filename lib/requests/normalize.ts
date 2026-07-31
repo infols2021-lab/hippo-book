@@ -1,6 +1,6 @@
 // lib/requests/normalize.ts
 // Единая нормализация данных для заявок (purchase_requests).
-// Обновлено: полная поддержка корзины товаров (material_ids), гибких цен (total_price) и полиморфных аргументов для Google Sheets.
+// Обновлено: поддержка корзины товаров (material_ids), гибких цен (total_price) и сгруппированного форматирования для Google Sheets.
 
 import {
   normalizeString,
@@ -23,6 +23,7 @@ export type SelectedMaterialItem = {
   title: string;
   price: number;
   material_kind?: string;
+  count?: number;
 };
 
 export type NormalizedRequest = {
@@ -59,7 +60,7 @@ export function normalizeRequestMaterialKinds(value: unknown): string[] {
 }
 
 export function normalizeMaterialIds(value: unknown): string[] {
-  return uniqueStrings(toStringArray(value));
+  return toStringArray(value);
 }
 
 export function normalizeTotalPrice(value: unknown): number {
@@ -173,17 +174,37 @@ export function formatTargetForSheet(
 }
 
 /**
- * Превращает список выбранных материалов (как объектов, так и строк) в понятные человеку названия.
+ * Превращает список выбранных материалов в понятную строку с группировкой повторяющихся товаров.
  */
 export function formatMaterialTitlesForSheet(items: (SelectedMaterialItem | string)[]): string {
   if (!Array.isArray(items) || items.length === 0) return "—";
 
-  return items
-    .map((item) => {
-      if (typeof item === "string") return item;
-      const title = item.title || "Материал";
-      const priceStr = item.price ? ` (${item.price} ₽)` : "";
-      return `${title}${priceStr}`;
+  const grouped = new Map<string, { title: string; count: number; unitPrice: number }>();
+
+  for (const item of items) {
+    if (typeof item === "string") {
+      const key = item.trim();
+      if (!key) continue;
+      const current = grouped.get(key) ?? { title: key, count: 0, unitPrice: 0 };
+      current.count += 1;
+      grouped.set(key, current);
+    } else {
+      const key = item.id || item.title;
+      const current = grouped.get(key) ?? {
+        title: item.title || "Материал",
+        count: 0,
+        unitPrice: item.price || 0,
+      };
+      current.count += item.count || 1;
+      grouped.set(key, current);
+    }
+  }
+
+  return Array.from(grouped.values())
+    .map((g) => {
+      const countStr = g.count > 1 ? ` (x${g.count})` : "";
+      const priceStr = g.unitPrice > 0 ? ` (${g.unitPrice * g.count} ₽)` : "";
+      return `${g.title}${countStr}${priceStr}`;
     })
     .join(", ");
 }

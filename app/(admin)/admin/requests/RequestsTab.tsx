@@ -28,13 +28,20 @@ type RequestRow = {
   projects?: { name: string } | null;
 };
 
+type MaterialItemMeta = {
+  id: string;
+  title: string;
+  price?: number;
+  material_kind?: string;
+};
+
 type Stats = { total: number; pending: number; processed: number };
 type PageCursor = { created_at: string } | null;
 
 type ApiOkList = {
   ok: true;
   requests: RequestRow[];
-  materialsByRequest?: Record<string, string[]>;
+  materialsByRequest?: Record<string, (MaterialItemMeta | string)[]>;
   materialsError?: string | null;
   page?: { limit: number; returned: number; hasMore: boolean; nextCursor?: PageCursor };
 };
@@ -143,13 +150,12 @@ function renderClassLevels(row: RequestRow) {
   );
 }
 
-function renderTypes(row: RequestRow) {
+function renderTypesFallback(row: RequestRow) {
   const mk = arrOf(row.material_kinds);
   const tt = arrOf(row.textbook_types);
 
   const allRaw = Array.from(new Set([...mk, ...tt]));
 
-  // Если есть понятные типы материалов, убираем сырые UUID, чтобы не засорять табличку
   const nonUuid = allRaw.filter((x) => !isValidUUID(x));
   const arr = nonUuid.length > 0 ? nonUuid : allRaw;
 
@@ -191,6 +197,43 @@ function renderTypes(row: RequestRow) {
   );
 }
 
+function renderRequestedMaterials(row: RequestRow, items?: (MaterialItemMeta | string)[]) {
+  if (!items || items.length === 0) {
+    return renderTypesFallback(row);
+  }
+
+  const countsMap = new Map<string, { title: string; count: number }>();
+
+  for (const item of items) {
+    if (typeof item === "string") {
+      const title = item.trim();
+      if (!title) continue;
+      const cur = countsMap.get(title) ?? { title, count: 0 };
+      cur.count += 1;
+      countsMap.set(title, cur);
+    } else if (item && typeof item === "object") {
+      const title = String(item.title || "Материал").trim();
+      const key = item.id || title;
+      const cur = countsMap.get(key) ?? { title, count: 0 };
+      cur.count += 1;
+      countsMap.set(key, cur);
+    }
+  }
+
+  const list = Array.from(countsMap.values());
+  if (list.length === 0) return renderTypesFallback(row);
+
+  return (
+    <div className="flex flex-col gap-1">
+      {list.map((g, i) => (
+        <div key={i} className="text-xs font-bold text-gray-800 truncate max-w-[220px]" title={g.title}>
+          📖 {g.title} {g.count > 1 ? <span className="text-indigo-600 font-extrabold">(x{g.count})</span> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function renderGrantedMaterials(items: string[] | undefined) {
   const arr = Array.isArray(items) ? items : [];
   if (!arr.length) return <span className="text-gray-400 font-medium">—</span>;
@@ -198,7 +241,7 @@ function renderGrantedMaterials(items: string[] | undefined) {
   return (
     <div className="flex flex-col gap-1">
       {arr.map((m, i) => (
-        <div key={i} className="text-xs font-medium text-gray-700 truncate max-w-[200px]" title={m}>
+        <div key={i} className="text-xs font-semibold text-emerald-800 truncate max-w-[200px]" title={m}>
           ✓ {m}
         </div>
       ))}
@@ -229,7 +272,7 @@ export default function RequestsTab({
   const [materialsWarning, setMaterialsWarning] = useState<string | null>(null);
 
   const [rows, setRows] = useState<RequestRow[]>([]);
-  const [materialsByRequest, setMaterialsByRequest] = useState<Record<string, string[]>>({});
+  const [materialsByRequest, setMaterialsByRequest] = useState<Record<string, (MaterialItemMeta | string)[]>>({});
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<PageCursor>(null);
 
@@ -406,6 +449,13 @@ export default function RequestsTab({
           const nextRows = safeRows.filter((r) => !seen.has(r.id));
           return [...prev, ...nextRows];
         });
+      }
+
+      if ((json as ApiOkList).materialsByRequest) {
+        setMaterialsByRequest((prev) => ({
+          ...(reset ? {} : prev),
+          ...((json as ApiOkList).materialsByRequest ?? {}),
+        }));
       }
 
       setHasMore(Boolean((json as ApiOkList).page?.hasMore));
@@ -714,7 +764,7 @@ export default function RequestsTab({
                 <th className="p-4 font-bold">Создана</th>
                 {tab === "processed" && <th className="p-4 font-bold">Обработана</th>}
                 <th className="p-4 font-bold">Уровни</th>
-                <th className="p-4 font-bold">Типы</th>
+                <th className="p-4 font-bold">Состав заказа</th>
                 <th className="p-4 font-bold">Сумма</th>
                 <th className="p-4 font-bold">Пользователь</th>
                 {tab === "processed" ? (
@@ -765,7 +815,7 @@ export default function RequestsTab({
                         </td>
                       )}
                       <td className="p-4">{renderClassLevels(r)}</td>
-                      <td className="p-4">{renderTypes(r)}</td>
+                      <td className="p-4">{renderRequestedMaterials(r, materialsByRequest?.[r.id])}</td>
                       <td className="p-4 font-bold font-mono text-xs text-emerald-700 whitespace-nowrap">
                         {r.total_price != null ? `${r.total_price} ₽` : "—"}
                       </td>
@@ -782,7 +832,7 @@ export default function RequestsTab({
                       </td>
                       {tab === "processed" ? (
                         <td className="p-4">
-                          {renderGrantedMaterials(materialsByRequest?.[r.id])}
+                          {renderGrantedMaterials(materialsByRequest?.[r.id] as string[])}
                         </td>
                       ) : tab === "all" ? (
                         <td className="p-4 text-center">

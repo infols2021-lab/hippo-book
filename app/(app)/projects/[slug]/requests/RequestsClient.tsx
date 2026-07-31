@@ -20,6 +20,7 @@ type MaterialItem = {
   price: number;
   project_tab_id: string | null;
   material_kind: string;
+  target_levels?: string[] | null;
 };
 
 type PurchaseRequest = {
@@ -154,6 +155,7 @@ export default function RequestsClient({
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [materialsLoading, setMaterialsLoading] = useState(false);
   const [activeTabId, setActiveTabId] = useState<string>("all");
+  const [selectedLevelCode, setSelectedLevelCode] = useState<string>("all");
 
   // Состояние формы
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -188,6 +190,7 @@ export default function RequestsClient({
               price: typeof m.price === "number" && m.price >= 0 ? m.price : 1000,
               project_tab_id: m.project_tab_id ? String(m.project_tab_id) : null,
               material_kind: String(m.material_kind || ""),
+              target_levels: toStringArray(m.target_levels || m.class_levels),
             }));
             setMaterials(list);
           }
@@ -203,6 +206,7 @@ export default function RequestsClient({
             return json.materials.map((m: any) => ({
               ...m,
               project_tab_id: m.project_tab_id || tab.id,
+              target_levels: toStringArray(m.target_levels || m.class_levels),
             }));
           }
           return [];
@@ -223,6 +227,7 @@ export default function RequestsClient({
             price: typeof m.price === "number" && m.price >= 0 ? m.price : 1000,
             project_tab_id: m.project_tab_id ? String(m.project_tab_id) : null,
             material_kind: String(m.material_kind || ""),
+            target_levels: toStringArray(m.target_levels || m.class_levels),
           };
           if (!map.has(item.id)) {
             map.set(item.id, item);
@@ -247,13 +252,25 @@ export default function RequestsClient({
     setRequests(initialRequests.map(normalizeRequestRow));
   }, [initialRequests]);
 
-  // Фильтрация материалов по выбранному табу
+  // Фильтрация материалов по выбранному табу и уровню проекта
   const filteredMaterials = useMemo(() => {
-    if (activeTabId === "all") return materials;
-    return materials.filter(
-      (m) => m.project_tab_id === activeTabId || m.material_kind === activeTabId
-    );
-  }, [materials, activeTabId]);
+    return materials.filter((m) => {
+      const matchTab =
+        activeTabId === "all" ||
+        m.project_tab_id === activeTabId ||
+        m.material_kind === activeTabId;
+
+      const matchLevel =
+        selectedLevelCode === "all" ||
+        !m.target_levels ||
+        m.target_levels.length === 0 ||
+        m.target_levels.some(
+          (lvl) => lvl.toLowerCase() === selectedLevelCode.toLowerCase()
+        );
+
+      return matchTab && matchLevel;
+    });
+  }, [materials, activeTabId, selectedLevelCode]);
 
   // Выбранные объекты материалов
   const selectedMaterialsList = useMemo(() => {
@@ -266,15 +283,37 @@ export default function RequestsClient({
     return selectedMaterialsList.reduce((sum, item) => sum + item.price, 0);
   }, [selectedMaterialsList]);
 
-  const lastPendingRequest = useMemo(() => {
-    return requests.find((r) => !r.is_processed) ?? null;
+  // Список ВСЕХ необработанных (pending) заявок пользователя
+  const pendingRequests = useMemo(() => {
+    return requests.filter((r) => !r.is_processed);
   }, [requests]);
 
-  const lastPendingAmount = useMemo(() => {
-    if (!lastPendingRequest) return 0;
-    if (lastPendingRequest.total_price != null) return lastPendingRequest.total_price;
-    return 1000;
-  }, [lastPendingRequest]);
+  // Сводка всех заказываемых материалов по ВСЕМ необработанным заявкам (с группировкой дубликатов)
+  const aggregatedPendingSummary = useMemo(() => {
+    let sum = 0;
+    const itemsMap = new Map<string, { title: string; count: number; unitPrice: number }>();
+
+    for (const req of pendingRequests) {
+      sum += Number(req.total_price) || 0;
+      const ids = toStringArray(req.material_ids);
+
+      for (const id of ids) {
+        const mat = materials.find((m) => m.id === id);
+        const title = mat?.title || "Учебный материал";
+        const unitPrice = mat?.price || 1000;
+
+        const current = itemsMap.get(id) ?? { title, count: 0, unitPrice };
+        current.count += 1;
+        itemsMap.get(id) ? null : itemsMap.set(id, current);
+      }
+    }
+
+    return {
+      totalPrice: sum,
+      items: Array.from(itemsMap.values()),
+      count: pendingRequests.length,
+    };
+  }, [pendingRequests, materials]);
 
   function showNotification(text: string, type: "success" | "error" | "info" = "success") {
     setNotif({ type, text });
@@ -305,6 +344,7 @@ export default function RequestsClient({
     setRequestDateTime(localISO);
     setSelectedMaterialIds([]);
     setActiveTabId("all");
+    setSelectedLevelCode("all");
     setRequestModalOpen(true);
   }
 
@@ -323,6 +363,7 @@ export default function RequestsClient({
 
     setSelectedMaterialIds(r.material_ids || []);
     setActiveTabId("all");
+    setSelectedLevelCode("all");
 
     setRequestModalOpen(true);
   }
@@ -423,166 +464,9 @@ export default function RequestsClient({
           from { transform: translate3d(100%, 0, 0); opacity: 0; }
           to { transform: translate3d(0, 0, 0); opacity: 1; }
         }
-
-        /* Стиль витрины */
-        .vitrine-tabs {
-          display: flex;
-          gap: 8px;
-          overflow-x: auto;
-          padding-bottom: 8px;
-          margin-bottom: 16px;
-        }
-
-        .vitrine-tab-btn {
-          padding: 8px 14px;
-          border-radius: 12px;
-          border: 1px solid rgba(0,0,0,0.08);
-          background: rgba(255,255,255,0.7);
-          font-weight: 700;
-          font-size: 13px;
-          cursor: pointer;
-          white-space: nowrap;
-          transition: all 0.15s ease;
-        }
-
-        .vitrine-tab-btn.active {
-          background: var(--project-primary, #6366f1);
-          color: #ffffff;
-          border-color: var(--project-primary, #6366f1);
-          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
-        }
-
-        .vitrine-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 12px;
-          max-height: 340px;
-          overflow-y: auto;
-          padding-right: 4px;
-        }
-
-        .vitrine-card {
-          border-radius: 14px;
-          border: 2px solid rgba(0,0,0,0.08);
-          background: #ffffff;
-          padding: 12px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          position: relative;
-        }
-
-        .vitrine-card:hover {
-          border-color: color-mix(in srgb, var(--project-primary, #6366f1) 50%, transparent);
-          transform: translateY(-2px);
-        }
-
-        .vitrine-card.selected {
-          border-color: var(--project-primary, #6366f1);
-          background: color-mix(in srgb, var(--project-primary, #6366f1) 6%, #ffffff);
-          box-shadow: 0 6px 16px rgba(99, 102, 241, 0.15);
-        }
-
-        .vitrine-card-cover {
-          width: 100%;
-          height: 90px;
-          border-radius: 10px;
-          object-fit: cover;
-          background: #f1f5f9;
-          margin-bottom: 8px;
-        }
-
-        .vitrine-card-title {
-          font-weight: 800;
-          font-size: 14px;
-          color: #1e293b;
-          line-height: 1.25;
-          margin-bottom: 6px;
-        }
-
-        .vitrine-card-price {
-          font-weight: 900;
-          font-size: 15px;
-          color: var(--project-primary, #6366f1);
-        }
-
-        .vitrine-card-btn {
-          margin-top: 8px;
-          padding: 6px 10px;
-          border-radius: 8px;
-          border: none;
-          font-size: 12px;
-          font-weight: 800;
-          cursor: pointer;
-          width: 100%;
-          text-align: center;
-          transition: all 0.15s ease;
-        }
-
-        .vitrine-card-btn.add {
-          background: rgba(0,0,0,0.05);
-          color: #475569;
-        }
-
-        .vitrine-card-btn.remove {
-          background: var(--project-primary, #6366f1);
-          color: #ffffff;
-        }
-
-        .cart-summary-bar {
-          margin-top: 16px;
-          padding: 14px;
-          border-radius: 14px;
-          background: color-mix(in srgb, var(--project-primary, #6366f1) 10%, #ffffff);
-          border: 1px solid color-mix(in srgb, var(--project-primary, #6366f1) 25%, transparent);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        /* Чек-смета на шаге 2 */
-        .receipt-box {
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
-          border-radius: 14px;
-          padding: 16px;
-          margin-bottom: 16px;
-        }
-
-        .receipt-item {
-          display: flex;
-          justify-content: space-between;
-          padding: 6px 0;
-          border-bottom: 1px dashed #cbd5e1;
-          font-size: 14px;
-          font-weight: 600;
-        }
-
-        .receipt-item:last-child {
-          border-bottom: none;
-        }
-
-        .receipt-total {
-          display: flex;
-          justify-content: space-between;
-          padding-top: 12px;
-          margin-top: 6px;
-          border-top: 2px solid #0f172a;
-          font-weight: 900;
-          font-size: 16px;
-        }
-
-        .user-locked-field {
-          background: #f1f5f9;
-          border: 1px solid #cbd5e1;
-          color: #64748b;
-          cursor: not-allowed;
-        }
       `}</style>
 
-      {/* Красивое плавающее уведомление (Toast) */}
+      {/* Плавающее уведомление (Toast) */}
       {notif && (
         <div
           style={{
@@ -646,7 +530,7 @@ export default function RequestsClient({
             ? "🛒 Шаг 1: Выбор материалов"
             : "📝 Шаг 2: Оформление заказа"
         }
-        maxWidth={modalStep === 1 ? 680 : 520}
+        maxWidth={modalStep === 1 ? 720 : 520}
       >
         <form
           onSubmit={(e) => {
@@ -676,8 +560,34 @@ export default function RequestsClient({
                 />
               </div>
 
+              {/* Фильтр по уровням проекта */}
+              {levels && levels.length > 0 && (
+                <div className="level-filter-container">
+                  <div className="level-filter-title">🎯 Уровень / Класс:</div>
+                  <div className="level-filter-chips">
+                    <button
+                      type="button"
+                      className={`level-chip ${selectedLevelCode === "all" ? "active" : ""}`}
+                      onClick={() => setSelectedLevelCode("all")}
+                    >
+                      Все уровни
+                    </button>
+                    {levels.map((lvl) => (
+                      <button
+                        key={lvl.id}
+                        type="button"
+                        className={`level-chip ${selectedLevelCode === lvl.code ? "active" : ""}`}
+                        onClick={() => setSelectedLevelCode(lvl.code)}
+                      >
+                        {lvl.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Табы фильтрации витрины */}
-              <div className="vitrine-tabs">
+              <div className="vitrine-tabs" style={{ marginTop: "12px" }}>
                 <button
                   type="button"
                   className={`vitrine-tab-btn ${activeTabId === "all" ? "active" : ""}`}
@@ -714,46 +624,46 @@ export default function RequestsClient({
                   В этом разделе пока нет материалов
                 </div>
               ) : (
-                <div className="vitrine-grid">
+                <div className="materials-grid">
                   {filteredMaterials.map((item) => {
                     const isSelected = selectedMaterialIds.includes(item.id);
                     return (
                       <div
                         key={item.id}
-                        className={`vitrine-card ${isSelected ? "selected" : ""}`}
+                        className={`material-card ${isSelected ? "selected" : ""}`}
                         onClick={() => toggleMaterialSelection(item.id)}
                       >
-                        <div>
+                        <div className="material-cover-wrapper">
                           {item.cover_image_url ? (
                             <img
                               src={item.cover_image_url}
                               alt={item.title}
-                              className="vitrine-card-cover"
+                              loading="lazy"
+                              className="material-cover-img"
                             />
                           ) : (
                             <div
-                              className="vitrine-card-cover"
                               style={{
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                fontSize: "28px",
+                                height: "100%",
+                                fontSize: "32px",
                               }}
                             >
                               📖
                             </div>
                           )}
-                          <div className="vitrine-card-title">{item.title}</div>
                         </div>
 
-                        <div>
-                          <div className="vitrine-card-price">{formatPrice(item.price)}</div>
-                          <button
-                            type="button"
-                            className={`vitrine-card-btn ${isSelected ? "remove" : "add"}`}
-                          >
-                            {isSelected ? "✅ Выбрано" : "➕ Выбрать"}
-                          </button>
+                        <div className="material-card-body">
+                          <div className="material-card-title">{item.title}</div>
+                          <div className="material-card-footer">
+                            <span className="material-card-price">{formatPrice(item.price)}</span>
+                            <span className={`vitrine-card-btn ${isSelected ? "remove" : "add"}`}>
+                              {isSelected ? "✅ Выбрано" : "➕ Выбрать"}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     );
@@ -853,7 +763,7 @@ export default function RequestsClient({
         </form>
       </Modal>
 
-      {/* МОДАЛКА ОПЛАТЫ (QR-КОД) */}
+      {/* МОДАЛКА ОПЛАТЫ (QR-КОД) С АГРЕГАЦИЕЙ ВСЕХ ЗАЯВОК */}
       <Modal
         open={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
@@ -871,7 +781,7 @@ export default function RequestsClient({
         >
           <h4
             style={{
-              margin: "0 0 14px 0",
+              margin: "0 0 10px 0",
               color: "var(--project-primary)",
               fontSize: "16px",
               filter: "brightness(0.7)",
@@ -879,6 +789,25 @@ export default function RequestsClient({
           >
             📋 Инструкция по оплате
           </h4>
+
+          {/* Список всех сгруппированных товаров во всех неоплаченных заявках */}
+          {aggregatedPendingSummary.items.length > 0 && (
+            <div className="summary-items-list">
+              <div style={{ fontSize: "12px", fontWeight: 700, opacity: 0.8 }}>
+                Заказываемые материалы ({aggregatedPendingSummary.count} заявка/заявок):
+              </div>
+              {aggregatedPendingSummary.items.map((item, idx) => (
+                <div key={idx} className="summary-item">
+                  <span className="summary-item-title">{item.title}</span>
+                  <span className="summary-item-badge">
+                    {item.count > 1 ? `x${item.count} • ` : ""}
+                    {item.unitPrice * item.count} ₽
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <ul
             style={{
               margin: 0,
@@ -886,7 +815,7 @@ export default function RequestsClient({
               color: "var(--project-text)",
               display: "flex",
               flexDirection: "column",
-              gap: "10px",
+              gap: "8px",
               fontSize: "14px",
             }}
           >
@@ -894,8 +823,8 @@ export default function RequestsClient({
               <strong>Отсканируйте QR-код</strong> в вашем банковском приложении.
             </li>
             <li>
-              Сумма к оплате:{" "}
-              <strong style={{ fontSize: "16px", color: "var(--project-primary)" }}>
+              Сумма к оплате (все неоплаченные заявки):{" "}
+              <strong style={{ fontSize: "17px", color: "var(--project-primary)" }}>
                 {paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "Сумма не определена"}
               </strong>
             </li>
@@ -1055,11 +984,11 @@ export default function RequestsClient({
               className="btn ghost qr-open"
               type="button"
               onClick={() => {
-                if (!lastPendingRequest) {
+                if (aggregatedPendingSummary.count === 0) {
                   showNotification("У вас нет ожидающих оплаты заявок.", "info");
                   return;
                 }
-                openPaymentModal(lastPendingAmount);
+                openPaymentModal(aggregatedPendingSummary.totalPrice);
               }}
             >
               💳 Оплатить заявку (QR)
@@ -1091,7 +1020,6 @@ export default function RequestsClient({
                   {requests.map((r) => {
                     const locked = r.is_processed;
 
-                    // Поиск названий выбранных материалов
                     const matchedMaterials = materials.filter(
                       (m) => r.material_ids && r.material_ids.includes(m.id)
                     );

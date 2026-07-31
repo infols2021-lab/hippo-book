@@ -64,13 +64,10 @@ export default function MaterialsManager() {
       ? `/api/admin/projects/${selectedProjectId}/materials/${editingMaterial.id}` 
       : `/api/admin/projects/${selectedProjectId}/materials`;
     
-    // 🔥 Фронтенд больше не занимается сложным парсингом и приведением типов.
-    // Бэкенд (через normalize.ts) сам приведет всё к идеалу. 
-    // Мы только страхуем project_tab_id от значений "none" или пустых строк.
     const payload = {
       ...editingMaterial,
+      price: Number(editingMaterial.price) || 1000,
       project_tab_id: selectedTabId === "none" || !selectedTabId ? null : selectedTabId,
-      // Дублируем для обратной совместимости, если бэкенду вдруг понадобятся оба массива
       class_levels: editingMaterial.target_levels || [],
     };
 
@@ -148,6 +145,7 @@ export default function MaterialsManager() {
             title: "", 
             description: "", 
             cover_image_url: "", 
+            price: 1000,
             target_levels: [], 
             is_active: true, 
             is_available: false, 
@@ -168,9 +166,21 @@ export default function MaterialsManager() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <label className="block text-sm font-bold mb-1">Название</label>
-              <input required type="text" className="w-full border-2 rounded-xl px-4 py-2" value={editingMaterial.title} onChange={e => setEditingMaterial({...editingMaterial, title: e.target.value})} />
+              <input required type="text" className="w-full border-2 rounded-xl px-4 py-2 font-medium outline-none focus:border-blue-500" value={editingMaterial.title} onChange={e => setEditingMaterial({...editingMaterial, title: e.target.value})} />
             </div>
-            
+
+            <div>
+              <label className="block text-sm font-bold mb-1">Цена (₽)</label>
+              <input 
+                required 
+                type="number" 
+                min="0"
+                className="w-full border-2 rounded-xl px-4 py-2 font-medium outline-none focus:border-blue-500" 
+                value={editingMaterial.price ?? 1000} 
+                onChange={e => setEditingMaterial({...editingMaterial, price: Number(e.target.value)})} 
+              />
+            </div>
+
             <div className="md:col-span-2">
               <label className="block text-sm font-bold mb-1">Обложка (Cover Image)</label>
               <div className="flex flex-col gap-2">
@@ -236,6 +246,7 @@ export default function MaterialsManager() {
               <tr>
                 <th className="p-4 font-bold text-gray-600">Название</th>
                 <th className="p-4 font-bold text-gray-600">Уровни</th>
+                <th className="p-4 font-bold text-gray-600 text-center">Цена</th>
                 <th className="p-4 font-bold text-gray-600 text-center">Статус</th>
                 <th className="p-4"></th>
               </tr>
@@ -243,7 +254,7 @@ export default function MaterialsManager() {
             <tbody className="divide-y">
               {materials.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-10 text-center text-gray-500 font-bold bg-gray-50/50">
+                  <td colSpan={5} className="p-10 text-center text-gray-500 font-bold bg-gray-50/50">
                     В этом разделе пока нет материалов. Создайте первый!
                   </td>
                 </tr>
@@ -269,6 +280,9 @@ export default function MaterialsManager() {
                           </span>
                         ))}
                       </div>
+                    </td>
+                    <td className="p-4 text-center text-sm font-bold text-gray-800">
+                      {mat.price ?? 1000} ₽
                     </td>
                     <td className="p-4 text-center text-sm font-bold">
                       {mat.is_available ? <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg">Всем</span> : <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-lg">По заявке</span>}

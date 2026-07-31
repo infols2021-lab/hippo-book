@@ -15,14 +15,13 @@ import {
   getRequestMaterialKinds,
   normalizeBranchType,
   buildSheetValues,
+  toStringArray,
 } from "@/lib/requests/normalize";
 import { sanitizeLikeQuery } from "@/lib/api/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-type GrantKind = "textbook" | "crossword" | "mock_test" | "material";
 
 type ReqRow = {
   id: string;
@@ -118,6 +117,73 @@ function applyCursor(q: any, cursorCreatedAt: string) {
   return q.lt("created_at", d.toISOString());
 }
 
+/**
+ * Подтягивает подробную информацию о материалах из всех таблиц (materials, textbooks, crosswords)
+ */
+async function fetchMaterialsByIds(supabase: any, materialIds: string[]) {
+  if (!materialIds || materialIds.length === 0) return new Map();
+
+  const [
+    { data: fetchedMaterials },
+    { data: fetchedTextbooks },
+    { data: fetchedCrosswords },
+  ] = await Promise.all([
+    supabase
+      .from("materials")
+      .select("id, title, price, material_kind")
+      .in("id", materialIds),
+    supabase
+      .from("textbooks")
+      .select("id, title, price")
+      .in("id", materialIds),
+    supabase
+      .from("crosswords")
+      .select("id, title, price")
+      .in("id", materialIds),
+  ]);
+
+  const map = new Map<string, { id: string; title: string; price: number; material_kind?: string }>();
+
+  if (Array.isArray(fetchedMaterials)) {
+    for (const m of fetchedMaterials) {
+      map.set(String(m.id), {
+        id: String(m.id),
+        title: String(m.title || "Материал"),
+        price: Number(m.price || 1000),
+        material_kind: m.material_kind ? String(m.material_kind) : undefined,
+      });
+    }
+  }
+
+  if (Array.isArray(fetchedTextbooks)) {
+    for (const m of fetchedTextbooks) {
+      if (!map.has(String(m.id))) {
+        map.set(String(m.id), {
+          id: String(m.id),
+          title: String(m.title || "Учебник"),
+          price: Number(m.price || 1000),
+          material_kind: "textbook",
+        });
+      }
+    }
+  }
+
+  if (Array.isArray(fetchedCrosswords)) {
+    for (const m of fetchedCrosswords) {
+      if (!map.has(String(m.id))) {
+        map.set(String(m.id), {
+          id: String(m.id),
+          title: String(m.title || "Кроссворд"),
+          price: Number(m.price || 1000),
+          material_kind: "crossword",
+        });
+      }
+    }
+  }
+
+  return map;
+}
+
 // ----------------------------------------------------------------------------
 // GET: список заявок
 // ----------------------------------------------------------------------------
@@ -181,6 +247,24 @@ export async function GET(req: NextRequest) {
       sheet_name: r.projects?.sheet_name || null,
     }));
 
+    // Подтягивание информации о материалах по material_ids для всей страницы заявок
+    const allMaterialIds: string[] = [];
+    for (const r of rows) {
+      const ids = toStringArray(r.material_ids);
+      allMaterialIds.push(...ids);
+    }
+    const uniqueMatIds = Array.from(new Set(allMaterialIds));
+
+    const materialsMap = await fetchMaterialsByIds(supabase, uniqueMatIds);
+
+    const materialsByRequest: Record<string, any[]> = {};
+    for (const r of rows) {
+      const ids = toStringArray(r.material_ids);
+      materialsByRequest[r.id] = ids
+        .map((id) => materialsMap.get(id))
+        .filter(Boolean);
+    }
+
     const last = rows[rows.length - 1] ?? null;
     const nextCursor =
       rows.length === limit && last?.created_at ? { created_at: last.created_at } : null;
@@ -188,7 +272,7 @@ export async function GET(req: NextRequest) {
     return ok(
       {
         requests: rows,
-        materialsByRequest: {},
+        materialsByRequest,
         materialsError: null,
         page: { limit, returned: rows.length, hasMore: Boolean(nextCursor), nextCursor },
       },
@@ -321,7 +405,12 @@ export async function PATCH(req: NextRequest) {
         const updatedRow = upd.data as any;
         const sheetName = r.sheet_name;
 
-        const rawKinds = getRequestMaterialKinds(updatedRow);
+        const rawIds = toStringArray(updatedRow.material_ids);
+        const matMap = await fetchMaterialsByIds(supabase, rawIds);
+        const selectedMaterials = rawIds.map((id) => matMap.get(id)).filter(Boolean);
+        const rawKinds = selectedMaterials.length > 0
+          ? selectedMaterials
+          : getRequestMaterialKinds(updatedRow);
         const totalPrice = Number(updatedRow.total_price) || 0;
 
         const sheetValues = buildSheetValues(

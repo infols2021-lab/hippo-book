@@ -27,7 +27,7 @@ type MaterialRow = {
   project_id?: string;
   project_tab_id?: string | null;
   material_kind?: string | null;
-  target_levels: string[] | null;
+  target_levels?: string[] | null;
   class_levels?: string[] | null;
   project_tabs?: {
     name?: string;
@@ -133,39 +133,76 @@ async function loadGrantHistory(supabase: any, ids: string[]) {
   return map;
 }
 
-// --- 2. ПРЯМАЯ ЗАГРУЗКА МАТЕРИАЛОВ ПО material_ids ---
+// --- 2. ПРЯМАЯ ЗАГРУЗКА МАТЕРИАЛОВ ПО material_ids (materials, textbooks, crosswords) ---
 async function loadMaterialsByDirectIds(supabase: any, rows: ReqRow[]) {
   const map = new Map<string, string[]>();
   const allMaterialIds = uniq(rows.flatMap((r) => toArr(r.material_ids)));
 
   if (!allMaterialIds.length) return map;
 
-  const { data, error } = await runDbQuery<MaterialRow[]>(
-    () =>
-      supabase
-        .from("materials")
-        .select(`
-          id, title, project_id, project_tab_id, material_kind,
-          project_tabs ( title, icon )
-        `)
-        .in("id", allMaterialIds),
-    "loadMaterialsByDirectIds",
-  );
+  const [materialsRes, textbooksRes, crosswordsRes] = await Promise.all([
+    runDbQuery<MaterialRow[]>(
+      () =>
+        supabase
+          .from("materials")
+          .select(`
+            id, title, project_id, project_tab_id, material_kind,
+            project_tabs ( title, icon )
+          `)
+          .in("id", allMaterialIds),
+      "loadMaterialsFromMaterials",
+    ).catch(() => ({ data: null, error: true })),
+    runDbQuery<{ id: string; title: string }[]>(
+      () =>
+        supabase
+          .from("textbooks")
+          .select("id, title")
+          .in("id", allMaterialIds),
+      "loadMaterialsFromTextbooks",
+    ).catch(() => ({ data: null, error: true })),
+    runDbQuery<{ id: string; title: string }[]>(
+      () =>
+        supabase
+          .from("crosswords")
+          .select("id, title")
+          .in("id", allMaterialIds),
+      "loadMaterialsFromCrosswords",
+    ).catch(() => ({ data: null, error: true })),
+  ]);
 
-  if (error || !data) return map;
+  const labelMap = new Map<string, string>();
 
-  const materialMap = new Map<string, MaterialRow>();
-  data.forEach((m) => materialMap.set(m.id, m));
+  if (Array.isArray(materialsRes.data)) {
+    for (const m of materialsRes.data) {
+      const icon = (m as any).project_tabs?.icon || "📘";
+      labelMap.set(m.id, `${icon} ${m.title}`);
+    }
+  }
+
+  if (Array.isArray(textbooksRes.data)) {
+    for (const m of textbooksRes.data) {
+      if (!labelMap.has(m.id)) {
+        labelMap.set(m.id, `📚 ${m.title}`);
+      }
+    }
+  }
+
+  if (Array.isArray(crosswordsRes.data)) {
+    for (const m of crosswordsRes.data) {
+      if (!labelMap.has(m.id)) {
+        labelMap.set(m.id, `🧩 ${m.title}`);
+      }
+    }
+  }
 
   for (const r of rows) {
     const ids = toArr(r.material_ids);
     const labels: string[] = [];
 
     for (const id of ids) {
-      const m = materialMap.get(id);
-      if (m) {
-        const icon = m.project_tabs?.icon || "📖";
-        labels.push(`${icon} ${m.title}`);
+      const label = labelMap.get(id);
+      if (label) {
+        labels.push(label);
       }
     }
 

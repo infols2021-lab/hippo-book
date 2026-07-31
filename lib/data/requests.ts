@@ -9,6 +9,9 @@ export type OlympiadPurchaseRequest = {
   created_at: string;
   class_level: string;
   textbook_types: string[] | null;
+  material_kinds?: string[] | null;
+  material_ids?: string[] | null;
+  total_price?: number | null;
   email: string;
   full_name: string;
   is_processed: boolean;
@@ -29,6 +32,8 @@ export type GatehousePurchaseRequest = {
   target_levels: string[];
   textbook_types: string[];
   material_kinds: string[];
+  material_ids?: string[] | null;
+  total_price?: number | null;
   email: string;
   full_name: string;
   contact_phone: string | null;
@@ -55,6 +60,13 @@ export type GatehouseRequestsPageData = {
   profile: GatehouseRequestProfile;
   requests: GatehousePurchaseRequest[];
   error: string | null;
+};
+
+export type AggregatedPendingSummary = {
+  totalPrice: number;
+  materialIds: string[];
+  materialCounts: Record<string, number>;
+  pendingCount: number;
 };
 
 // Универсальная нормализация массивов (поддерживает массивы, JSON-строки и CSV)
@@ -85,8 +97,16 @@ function normalizeArray(value: unknown): string[] {
   return [];
 }
 
+function normalizeNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
 export function normalizeOlympiadRequest(row: any): OlympiadPurchaseRequest {
   const parsedTypes = normalizeArray(row?.textbook_types);
+  const parsedKinds = normalizeArray(row?.material_kinds);
+  const parsedIds = normalizeArray(row?.material_ids);
 
   return {
     id: String(row?.id ?? ""),
@@ -94,6 +114,9 @@ export function normalizeOlympiadRequest(row: any): OlympiadPurchaseRequest {
     created_at: typeof row?.created_at === "string" ? row.created_at : "",
     class_level: typeof row?.class_level === "string" ? row.class_level : "",
     textbook_types: parsedTypes.length > 0 ? parsedTypes : null,
+    material_kinds: parsedKinds.length > 0 ? parsedKinds : null,
+    material_ids: parsedIds.length > 0 ? parsedIds : null,
+    total_price: normalizeNumberOrNull(row?.total_price),
     email: String(row?.email ?? ""),
     full_name: String(row?.full_name ?? ""),
     is_processed: Boolean(row?.is_processed),
@@ -116,12 +139,51 @@ export function normalizeGatehouseRequest(row: any): GatehousePurchaseRequest {
     target_levels: normalizeArray(row?.target_levels),
     textbook_types: normalizeArray(row?.textbook_types),
     material_kinds: normalizeArray(row?.material_kinds),
+    material_ids: normalizeArray(row?.material_ids),
+    total_price: normalizeNumberOrNull(row?.total_price),
     email: String(row?.email ?? ""),
     full_name: String(row?.full_name ?? ""),
     contact_phone: typeof row?.contact_phone === "string" ? row.contact_phone : null,
     is_processed: Boolean(row?.is_processed),
     processed_at: typeof row?.processed_at === "string" ? row.processed_at : null,
   };
+}
+
+/**
+ * Агрегирует все необработанные (pending) заявки пользователя:
+ * суммирует их общую стоимость и подсчитывает количество повторов каждого материала.
+ */
+export function aggregatePendingRequests(
+  requests: Array<{ is_processed?: boolean | null; total_price?: number | null; material_ids?: string[] | null }>
+): AggregatedPendingSummary {
+  const pending = requests.filter((r) => !r.is_processed);
+  let totalPrice = 0;
+  const allMaterialIds: string[] = [];
+  const materialCounts: Record<string, number> = {};
+
+  for (const req of pending) {
+    totalPrice += Number(req.total_price) || 0;
+    const ids = normalizeArray(req.material_ids);
+    for (const id of ids) {
+      allMaterialIds.push(id);
+      materialCounts[id] = (materialCounts[id] || 0) + 1;
+    }
+  }
+
+  return {
+    totalPrice,
+    materialIds: allMaterialIds,
+    materialCounts,
+    pendingCount: pending.length,
+  };
+}
+
+/**
+ * Форматирует название материала с добавлением плашки количества (например, "Hippo 1 (x2)").
+ */
+export function formatMaterialWithCount(title: string, count: number): string {
+  if (count <= 1) return title;
+  return `${title} (x${count})`;
 }
 
 export async function loadOlympiadRequestsPageData(ctx: DataAuthContext): Promise<OlympiadRequestsPageData> {
