@@ -9,12 +9,6 @@ type ColorSettings = {
   value: string;
 };
 
-type FeatureKey =
-  | "leaderboard"
-  | "avatars"
-  | "profileProgress"
-  | "requestMode";
-
 // ============================================================
 // 🖼️ Живое превью – точная копия движка Glassmorphism
 // ============================================================
@@ -322,12 +316,7 @@ export default function ProjectEditor({
         textColor: initialTextColor,
       },
     },
-    features: {
-      leaderboard: project?.features?.leaderboard || project?.features?.hasLeaderboard || false,
-      avatars: project?.features?.avatars || project?.features?.hasAvatars || false,
-      profileProgress: project?.features?.profileProgress || false,
-      requestMode: project?.features?.requestMode || "target_levels",
-    },
+    features: project?.features || {},
   });
 
   const [levels, setLevels] = useState<any[]>([]);
@@ -480,26 +469,6 @@ export default function ProjectEditor({
     } catch (err: any) {
       alert("❌ Ошибка: " + err.message);
     }
-  };
-
-  const toggleFeature = (key: FeatureKey) => {
-    setFormData((prev) => ({
-      ...prev,
-      features: {
-        ...prev.features,
-        [key]: !prev.features[key],
-      },
-    }));
-  };
-
-  const handleRequestModeChange = (mode: "class_level" | "target_levels") => {
-    setFormData((prev) => ({
-      ...prev,
-      features: {
-        ...prev.features,
-        requestMode: mode,
-      },
-    }));
   };
 
   const handleThemeChange = (
@@ -719,67 +688,6 @@ export default function ProjectEditor({
             <h3 className="text-xl font-black mb-1 text-gray-800">👀 Живое превью</h3>
             <p className="text-sm text-gray-500 mb-4 font-medium">Так интерфейс выглядит для ученика в реальном времени.</p>
             <LivePreview colors={formData.theme.colors} />
-          </div>
-        </div>
-
-        {/* ФИЧИ */}
-        <div className="bg-blue-50/50 p-6 rounded-[24px] border border-blue-100 border-t pt-8">
-          <h3 className="font-black text-blue-900 mb-2 text-xl">🎮 Модули платформы</h3>
-          <p className="text-sm text-blue-800/70 mb-6 font-medium">Включите геймификацию и выберите режим заявок.</p>
-
-          <div className="flex flex-wrap gap-4 mb-8">
-            <label className="flex items-center gap-3 cursor-pointer bg-white p-4 rounded-2xl border shadow-sm hover:border-blue-300 transition-all">
-              <input
-                type="checkbox"
-                className="w-5 h-5 text-blue-600 rounded"
-                checked={formData.features.leaderboard}
-                onChange={() => toggleFeature("leaderboard")}
-              />
-              <span className="font-bold text-gray-800">🏆 Лидерборд</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer bg-white p-4 rounded-2xl border shadow-sm hover:border-blue-300 transition-all">
-              <input
-                type="checkbox"
-                className="w-5 h-5 text-blue-600 rounded"
-                checked={formData.features.avatars}
-                onChange={() => toggleFeature("avatars")}
-              />
-              <span className="font-bold text-gray-800">🖼️ Аватарки</span>
-            </label>
-          </div>
-
-          <div className="pt-6 border-t border-blue-200/50">
-            <div className="text-sm font-bold text-gray-800 mb-4">Режим выбора уровня в заявках:</div>
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-3 cursor-pointer bg-white p-4 rounded-2xl border shadow-sm hover:border-blue-300 transition-all">
-                <input
-                  type="radio"
-                  name="requestMode"
-                  value="class_level"
-                  checked={formData.features.requestMode === "class_level"}
-                  onChange={() => handleRequestModeChange("class_level")}
-                  className="w-5 h-5 text-blue-600"
-                />
-                <div>
-                  <div className="font-bold text-gray-800">📚 Класс (одиночный)</div>
-                  <div className="text-xs text-gray-500 font-medium">Пользователь выбирает только 1 класс</div>
-                </div>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer bg-white p-4 rounded-2xl border shadow-sm hover:border-blue-300 transition-all">
-                <input
-                  type="radio"
-                  name="requestMode"
-                  value="target_levels"
-                  checked={formData.features.requestMode === "target_levels"}
-                  onChange={() => handleRequestModeChange("target_levels")}
-                  className="w-5 h-5 text-blue-600"
-                />
-                <div>
-                  <div className="font-bold text-gray-800">🎯 Уровни (множественный)</div>
-                  <div className="text-xs text-gray-500 font-medium">Массив уровней (как в Gatehouse)</div>
-                </div>
-              </label>
-            </div>
           </div>
         </div>
 
