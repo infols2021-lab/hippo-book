@@ -38,7 +38,7 @@ export default async function ProjectProfilePage({
   // 3. Получаем данные профиля пользователя
   const { data: userProfile } = await supabase
     .from("profiles")
-    .select("full_name, contact_phone, region, is_admin, current_streak, max_streak")
+    .select("full_name, contact_phone, region, is_admin")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -47,11 +47,9 @@ export default async function ProjectProfilePage({
     contact_phone: userProfile?.contact_phone || "",
     region: userProfile?.region || "",
     is_admin: Boolean(userProfile?.is_admin),
-    current_streak: Number(userProfile?.current_streak || 0),
-    max_streak: Number(userProfile?.max_streak || 0),
   };
 
-  // 4. Флаги геймификации (стрики и лидерборд теперь всегда активны глобально)
+  // 4. Флаги геймификации
   const rawFeatures = project.features || {};
   const features = {
     streaks: true,

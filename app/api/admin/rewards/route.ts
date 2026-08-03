@@ -21,11 +21,11 @@ async function verifyAdmin() {
 
   const { data: profile } = await adminSupabase
     .from("profiles")
-    .select("role, is_admin")
+    .select("is_admin")
     .eq("id", user.id)
     .maybeSingle();
 
-  const isAdmin = profile?.is_admin === true || profile?.role === "admin";
+  const isAdmin = profile?.is_admin === true;
   if (!isAdmin) {
     return { user: null, error: "Доступ запрещен. Требуются права администратора", adminSupabase: null };
   }
