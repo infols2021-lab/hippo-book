@@ -7,6 +7,8 @@ import type {
   RewardItem,
   RewardType,
   StreakConfigItem,
+  StreakLeaderboardEntry,
+  StreakStats,
   UserInventoryItem,
   PromocodeRedeemResult,
   PromocodeRewardsBundle,
@@ -124,16 +126,23 @@ export async function getUserInventory(
 }
 
 // ---------------------------------------------------------------------------
-// 3. ДОРОЖКА СЕРИИ (СТРИКИ)
+// 3. ДОРОЖКА СЕРИИ (СТРИКИ) И ЛИДЕРБОРД
 // ---------------------------------------------------------------------------
 
 export async function getStreakPath(
   supabase: SupabaseClient,
   userId: string
-): Promise<{ currentStreak: number; path: StreakConfigItem[] }> {
+): Promise<{
+  stats: StreakStats;
+  path: StreakConfigItem[];
+}> {
   const [{ data: profile }, { data: streakConfig }, { data: inventory }] =
     await Promise.all([
-      supabase.from("profiles").select("current_streak").eq("id", userId).maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("current_streak, max_streak, last_completed_at")
+        .eq("id", userId)
+        .maybeSingle(),
       supabase
         .from("streak_config")
         .select("day_number, reward_id, created_at, reward:rewards(*)")
@@ -146,6 +155,17 @@ export async function getStreakPath(
     ]);
 
   const currentStreak = Number(profile?.current_streak || 0);
+  const maxStreak = Number(profile?.max_streak || currentStreak);
+  const lastCompletedAt = profile?.last_completed_at ? String(profile.last_completed_at) : null;
+
+  // Проверка выполнения хотя бы одного задания сегодня
+  let completedToday = false;
+  if (lastCompletedAt) {
+    const lastDate = new Date(lastCompletedAt).toISOString().split("T")[0];
+    const todayDate = new Date().toISOString().split("T")[0];
+    completedToday = lastDate === todayDate;
+  }
+
   const claimedRewardIds = new Set(
     Array.isArray(inventory) ? inventory.map((item) => item.reward_id) : []
   );
@@ -162,7 +182,37 @@ export async function getStreakPath(
       })
     : [];
 
-  return { currentStreak, path };
+  return {
+    stats: {
+      currentStreak,
+      maxStreak,
+      completedToday,
+      lastCompletedAt,
+    },
+    path,
+  };
+}
+
+export async function getStreakLeaderboard(
+  supabase: SupabaseClient,
+  currentUserId?: string
+): Promise<StreakLeaderboardEntry[]> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, current_streak, max_streak")
+    .order("max_streak", { ascending: false })
+    .order("current_streak", { ascending: false })
+    .limit(20);
+
+  if (error || !Array.isArray(data)) return [];
+
+  return data.map((row: any, index: number) => ({
+    rank: index + 1,
+    user_id: row.id,
+    current_streak: Number(row.current_streak || 0),
+    max_streak: Number(row.max_streak || row.current_streak || 0),
+    is_current_user: row.id === currentUserId,
+  }));
 }
 
 export async function claimStreakReward(

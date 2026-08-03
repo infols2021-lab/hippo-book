@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import MascotViewer from "../mascot/MascotViewer";
+import StreakTimeline from "./StreakTimeline";
 import MaterialChoiceModal from "./MaterialChoiceModal";
 import PhysicalPrizeModal from "./PhysicalPrizeModal";
 import type {
   MascotSettings,
-  RewardItem,
   RewardType,
   StreakConfigItem,
+  StreakStats,
   UserInventoryItem,
   CustomPhysicalPrize,
 } from "@/lib/rewards/types";
@@ -30,12 +31,16 @@ export default function RewardsModal({
   // Данные
   const [mascot, setMascot] = useState<MascotSettings | null>(null);
   const [inventory, setInventory] = useState<UserInventoryItem[]>([]);
+  const [streakStats, setStreakStats] = useState<StreakStats>({
+    currentStreak: 0,
+    maxStreak: 0,
+    completedToday: false,
+    lastCompletedAt: null,
+  });
   const [streakPath, setStreakPath] = useState<StreakConfigItem[]>([]);
-  const [currentStreak, setCurrentStreak] = useState(0);
 
   // Категория гардероба
   const [wardrobeCategory, setWardrobeCategory] = useState<RewardType>("hat");
-  const [equipping, setEquipping] = useState(false);
 
   // Промокоды
   const [promoCodeInput, setPromoCodeInput] = useState("");
@@ -77,7 +82,14 @@ export default function RewardsModal({
         setInventory(mascotData.inventory || []);
       }
       if (streaksRes.ok) {
-        setCurrentStreak(streaksData.currentStreak || 0);
+        if (streaksData.stats) {
+          setStreakStats(streaksData.stats);
+        } else {
+          setStreakStats((prev) => ({
+            ...prev,
+            currentStreak: streaksData.currentStreak || 0,
+          }));
+        }
         setStreakPath(streaksData.path || []);
       }
     } catch (e) {
@@ -89,7 +101,6 @@ export default function RewardsModal({
 
   // Экипировка / Снятие предмета
   const handleEquip = async (category: RewardType, rewardId: string | null) => {
-    setEquipping(true);
     try {
       const res = await fetch("/api/mascot", {
         method: "POST",
@@ -103,8 +114,6 @@ export default function RewardsModal({
       }
     } catch (e) {
       console.error("Failed to equip item:", e);
-    } finally {
-      setEquipping(false);
     }
   };
 
@@ -118,13 +127,13 @@ export default function RewardsModal({
       });
 
       if (res.ok) {
-        loadData(); // Перезагружаем стрик и инвентарь
+        await loadData();
       } else {
         const err = await res.json();
         alert(err.error || "Ошибка получения награды");
       }
     } catch (e) {
-      alert(" Ошибка сети");
+      alert("Ошибка сети");
     }
   };
 
@@ -149,7 +158,6 @@ export default function RewardsModal({
       if (!res.ok) {
         setPromoError(data.error || "Неверный промокод");
       } else {
-        // Успех! Проверяем, нужны ли дополнительные шаги
         if (data.requiresMaterialChoice) {
           setMaterialChoiceState({
             isOpen: true,
@@ -195,43 +203,51 @@ export default function RewardsModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full h-[85vh] flex flex-col shadow-2xl overflow-hidden relative animate-in fade-in zoom-in-95">
+      <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+        <div
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-4xl w-full h-[88vh] flex flex-col shadow-2xl overflow-hidden relative animate-in fade-in zoom-in-95"
+          style={{
+            backgroundColor: "var(--glass-bg, rgba(15, 23, 42, 0.95))",
+            color: "var(--project-text, #ffffff)",
+          }}
+        >
           {/* Шапка модалки */}
-          <div className="flex items-center justify-between p-6 border-b border-slate-800">
+          <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800/80">
             <div className="flex items-center gap-3">
               <span className="text-2xl">🎭</span>
-              <h2 className="text-xl font-black text-white">Центр Наград</h2>
+              <h2 className="text-xl font-black text-slate-900 dark:text-white">
+                Центр Наград
+              </h2>
             </div>
 
-            {/* Табы */}
-            <div className="flex gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            {/* Переключатель табов */}
+            <div className="flex gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-2xl border border-slate-200 dark:border-slate-800">
               <button
                 onClick={() => setActiveTab("wardrobe")}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeTab === "wardrobe"
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                    : "text-slate-400 hover:text-white"
+                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                 }`}
               >
                 👕 Гардероб
               </button>
               <button
                 onClick={() => setActiveTab("streaks")}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeTab === "streaks"
                     ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
-                    : "text-slate-400 hover:text-white"
+                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                 }`}
               >
-                🔥 Серия ({currentStreak}d)
+                🔥 Серия ({streakStats.currentStreak}d)
               </button>
               <button
                 onClick={() => setActiveTab("promocode")}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeTab === "promocode"
                     ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
-                    : "text-slate-400 hover:text-white"
+                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                 }`}
               >
                 🎁 Промокод
@@ -240,16 +256,16 @@ export default function RewardsModal({
 
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
             >
               ✕
             </button>
           </div>
 
           {/* ТЕЛО МОДАЛКИ */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6">
             {loading ? (
-              <div className="h-full flex items-center justify-center text-slate-500 font-semibold">
+              <div className="h-full flex items-center justify-center text-slate-400 font-semibold text-sm">
                 Загрузка Центра Наград...
               </div>
             ) : (
@@ -258,17 +274,17 @@ export default function RewardsModal({
                 {activeTab === "wardrobe" && (
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
                     {/* Слева: Предпросмотр Маскота */}
-                    <div className="md:col-span-5 bg-slate-950 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center relative">
-                      <MascotViewer mascotSettings={mascot} size={240} />
-                      <div className="text-xs text-slate-500 font-medium mt-4">
-                        Кликайте по предметам справа для примерки
+                    <div className="md:col-span-5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-inner">
+                      <MascotViewer mascotSettings={mascot} size={230} />
+                      <div className="text-xs text-slate-400 font-medium mt-4 text-center">
+                        Примеряйте найденные предметы
                       </div>
                     </div>
 
                     {/* Справа: Категории и Сетка Инвентаря */}
                     <div className="md:col-span-7 flex flex-col space-y-4">
                       {/* Селектор категорий */}
-                      <div className="flex gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
+                      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 overflow-x-auto">
                         {[
                           { type: "hat", label: "👑 Шляпы" },
                           { type: "aura", label: "✨ Ауры" },
@@ -283,8 +299,8 @@ export default function RewardsModal({
                             }
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
                               wardrobeCategory === cat.type
-                                ? "bg-slate-800 text-indigo-400 border border-indigo-500/30"
-                                : "text-slate-400 hover:bg-slate-800/50"
+                                ? "bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30"
+                                : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/50"
                             }`}
                           >
                             {cat.label}
@@ -292,13 +308,13 @@ export default function RewardsModal({
                         ))}
                       </div>
 
-                      {/* Сетка разблокированных предметов */}
+                      {/* Сетка инвентаря */}
                       <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3 pr-1">
                         {filteredInventory.length === 0 ? (
-                          <div className="col-span-full py-12 text-center text-slate-500 text-xs">
+                          <div className="col-span-full py-12 text-center text-slate-400 text-xs">
                             У вас пока нет предметов в этой категории.
                             <br />
-                            Заходите каждый день или активируйте промокоды!
+                            Держите серию или вводите промокоды!
                           </div>
                         ) : (
                           filteredInventory.map((item) => {
@@ -314,10 +330,10 @@ export default function RewardsModal({
                                     equipped ? null : item.reward!.id
                                   )
                                 }
-                                className={`bg-slate-950 border rounded-2xl p-3 flex flex-col items-center justify-between cursor-pointer transition-all relative group ${
+                                className={`bg-slate-50 dark:bg-slate-950 border rounded-2xl p-3 flex flex-col items-center justify-between cursor-pointer transition-all relative group ${
                                   equipped
-                                    ? "border-indigo-500 bg-indigo-950/20 shadow-lg shadow-indigo-500/10"
-                                    : "border-slate-800 hover:border-slate-700"
+                                    ? "border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/10"
+                                    : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                                 }`}
                               >
                                 {equipped && (
@@ -331,8 +347,10 @@ export default function RewardsModal({
                                     <span
                                       className="font-bold text-xs px-2 py-1 rounded-full border truncate max-w-full"
                                       style={{
-                                        borderColor: item.reward.meta?.color || "#8b5cf6",
-                                        color: item.reward.meta?.color || "#8b5cf6",
+                                        borderColor:
+                                          item.reward.meta?.color || "#8b5cf6",
+                                        color:
+                                          item.reward.meta?.color || "#8b5cf6",
                                       }}
                                     >
                                       «{item.reward.title}»
@@ -349,7 +367,7 @@ export default function RewardsModal({
                                 </div>
 
                                 <div className="text-center w-full">
-                                  <div className="font-bold text-xs text-white truncate">
+                                  <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
                                     {item.reward.title}
                                   </div>
                                 </div>
@@ -362,74 +380,21 @@ export default function RewardsModal({
                   </div>
                 )}
 
-                {/* TAB 2: ДОРОЖКА СЕРИИ (СТРИКИ) */}
+                {/* TAB 2: ДОРОЖКА СЕРИИ (ВЕРНУТЫЙ СТАРОЙ КРАСИВЫЙ ВИД) */}
                 {activeTab === "streaks" && (
-                  <div className="space-y-6 max-w-2xl mx-auto py-4">
-                    <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl text-center space-y-2">
-                      <div className="text-4xl font-black text-amber-500 flex items-center justify-center gap-2">
-                        <span>🔥</span> {currentStreak} D
-                      </div>
-                      <p className="text-xs text-slate-400">
-                        Ваша текущая серия входа. Не пропускайте дни, чтобы забирать эксклюзивные награды!
-                      </p>
-                    </div>
-
-                    <div className="space-y-3">
-                      {streakPath.map((item) => (
-                        <div
-                          key={item.day_number}
-                          className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${
-                            item.is_claimed
-                              ? "bg-slate-950/50 border-slate-800/60 opacity-60"
-                              : item.is_available
-                              ? "bg-amber-950/20 border-amber-500/50 shadow-lg shadow-amber-500/10"
-                              : "bg-slate-950 border-slate-800"
-                          }`}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center font-black text-amber-500 text-lg">
-                              {item.day_number}d
-                            </div>
-                            <div>
-                              <div className="font-bold text-sm text-white">
-                                {item.reward?.title || `День ${item.day_number}`}
-                              </div>
-                              <div className="text-xs text-slate-500 capitalize">
-                                {item.reward?.type || "Награда"}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div>
-                            {item.is_claimed ? (
-                              <span className="text-xs font-bold text-slate-500 px-3 py-1.5 bg-slate-900 rounded-xl border border-slate-800">
-                                Забрано ✓
-                              </span>
-                            ) : item.is_available ? (
-                              <button
-                                onClick={() => handleClaimStreak(item.day_number)}
-                                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-amber-600/30"
-                              >
-                                Забрать награду!
-                              </button>
-                            ) : (
-                              <span className="text-xs font-semibold text-slate-600 px-3 py-1.5 bg-slate-900/50 rounded-xl">
-                                Закрыто 🔒
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <StreakTimeline
+                    stats={streakStats}
+                    path={streakPath}
+                    onClaimReward={handleClaimStreak}
+                  />
                 )}
 
                 {/* TAB 3: ПРОМОКОД */}
                 {activeTab === "promocode" && (
                   <div className="max-w-md mx-auto py-12 space-y-6">
                     <div className="text-center space-y-2">
-                      <div className="text-4xl">🎁</div>
-                      <h3 className="text-lg font-black text-white">
+                      <div className="text-5xl">🎁</div>
+                      <h3 className="text-lg font-black text-slate-900 dark:text-white">
                         Активация Промокода
                       </h3>
                       <p className="text-xs text-slate-400">
@@ -446,18 +411,18 @@ export default function RewardsModal({
                           onChange={(e) =>
                             setPromoCodeInput(e.target.value.toUpperCase())
                           }
-                          className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-center text-lg font-mono font-bold text-emerald-400 uppercase tracking-widest focus:outline-none focus:border-emerald-500 transition-colors"
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-center text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest focus:outline-none focus:border-emerald-500 transition-colors shadow-inner"
                         />
                       </div>
 
                       {promoError && (
-                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 text-center font-semibold">
+                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-500 dark:text-red-400 text-center font-semibold">
                           {promoError}
                         </div>
                       )}
 
                       {promoSuccessMsg && (
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400 text-center font-semibold">
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-600 dark:text-emerald-400 text-center font-semibold">
                           {promoSuccessMsg}
                         </div>
                       )}

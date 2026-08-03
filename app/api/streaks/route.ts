@@ -18,10 +18,11 @@ export async function GET() {
       );
     }
 
-    const { currentStreak, path } = await getStreakPath(supabase, user.id);
+    const { stats, path } = await getStreakPath(supabase, user.id);
 
     return NextResponse.json({
-      currentStreak,
+      stats,
+      currentStreak: stats.currentStreak,
       path,
     });
   } catch (error: any) {

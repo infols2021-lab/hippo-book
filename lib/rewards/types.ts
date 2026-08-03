@@ -60,6 +60,21 @@ export type StreakConfigItem = {
   is_available?: boolean;
 };
 
+export type StreakStats = {
+  currentStreak: number;
+  maxStreak: number;
+  completedToday: boolean;
+  lastCompletedAt: string | null;
+};
+
+export type StreakLeaderboardEntry = {
+  rank: number;
+  user_id: string;
+  current_streak: number;
+  max_streak: number;
+  is_current_user: boolean;
+};
+
 export type CustomPhysicalPrize = {
   title: string;
   text: string;
