@@ -36,7 +36,8 @@
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 1px var(--glass-highlight), var(--glass-shadow);
+  /* ФИКС: Убран inset 0 1px 1px, дававший паразитическую белую полосу сверху */
+  box-shadow: var(--glass-shadow);
   padding: 24px;
 }
 
@@ -133,9 +134,7 @@
   text-align: center; 
 }
 
-/* ====================================================
-   🔥 ФИКС ОГРОМНОГО БЕГЕМОТА И СТИЛИЗАЦИЯ АВАТАРА 🔥
-   ==================================================== */
+/* ===== СТИЛИЗАЦИЯ АВАТАРА ===== */
 .profile-avatar-wrapper {
   width: 220px;
   height: 220px;
@@ -155,7 +154,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  overflow: hidden; /* Обрезает бегемота по форме круга */
+  overflow: hidden;
   position: relative;
   z-index: 2;
 }
@@ -163,7 +162,7 @@
 .streak-visual__img--avatar {
   width: 100%;
   height: 100%;
-  object-fit: cover; /* Идеальное заполнение */
+  object-fit: cover;
   border-radius: 50%;
 }
 
@@ -330,7 +329,7 @@
 .profile-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px; /* Вот он, спасительный отступ! */
+  gap: 12px;
   width: 100%;
 }
 .profile-actions .btn {

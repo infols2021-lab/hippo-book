@@ -464,12 +464,6 @@ export default function ProfileClient({
               🎭 Награды
             </button>
 
-            {features?.leaderboard && (
-              <button type="button" className="nav-pill" onClick={() => setLeaderboardOpen(true)}>
-                🏆 Топ серий
-              </button>
-            )}
-
             <Link className="nav-pill" href={`/projects/${projectSlug}/materials`}>
               📚 Материалы
             </Link>
