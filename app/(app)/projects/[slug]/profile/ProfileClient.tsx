@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import Modal from "@/components/Modal";
-import StreakRoadmapModal from "@/components/streak/StreakRoadmapModal";
-import StreakLeaderboardModal, { type StreakLeaderboardRow } from "@/components/profile/StreakLeaderboardModal";
-import TitlePickerModal, { type TitlePickerChoice, type TitleCatalogItem } from "@/components/profile/TitlePickerModal";
+import RewardsModal from "@/components/rewards/RewardsModal";
+import StreakLeaderboardModal, {
+  type StreakLeaderboardRow,
+} from "@/components/profile/StreakLeaderboardModal";
 import { getTierCodeByStreak } from "@/lib/streaks/roadmap";
 
 import "./profile.css";
@@ -40,7 +41,7 @@ export type MaterialProgressItem = {
   total: number;
   progressPercent: number;
   href: string;
-  tabTitle?: string; // 🚀 Добавили поле для названия таба
+  tabTitle?: string;
 };
 
 export type StreakSnapshot = {
@@ -51,7 +52,15 @@ export type StreakSnapshot = {
   last_completed_date: string | null;
   done_today: boolean;
   can_save_today: boolean;
-  tier_code: "none" | "bronze" | "silver" | "gold" | "platinum" | "diamond" | "legendary" | string;
+  tier_code:
+    | "none"
+    | "bronze"
+    | "silver"
+    | "gold"
+    | "platinum"
+    | "diamond"
+    | "legendary"
+    | string;
 };
 
 type IconVisualPayloadFromApi = {
@@ -83,7 +92,6 @@ type ProfileStreakApiResponse = {
     unlockAt?: number | null;
     description?: string | null;
   } | null;
-  titleCatalog?: TitleCatalogItem[] | null;
   unlockedIconCodes?: string[] | null;
   selectedIconCode?: string | null;
   effectiveIconCode?: string | null;
@@ -91,30 +99,6 @@ type ProfileStreakApiResponse = {
   appliedIcon?: IconVisualPayloadFromApi | null;
   selectedIcon?: IconVisualPayloadFromApi | null;
   effectiveIcon?: IconVisualPayloadFromApi | null;
-};
-
-type SaveStreakIconApiResponse = {
-  ok?: boolean;
-  error?: string;
-  selectedIconCode?: string | null;
-  selectedIconDbCode?: string | null;
-  effectiveIconCode?: string | null;
-  unlockedIconCodes?: string[] | null;
-};
-
-type SaveStreakTitleApiResponse = {
-  ok?: boolean;
-  error?: string;
-  cleared?: boolean;
-  selectedTitleCode?: string | null;
-  selectedTitleDbCode?: string | null;
-  longestForUnlocks?: number | null;
-  selectedTitle?: {
-    code?: string | null;
-    label?: string | null;
-    unlockAt?: number | null;
-    description?: string | null;
-  } | null;
 };
 
 type LeaderboardApiResponse = {
@@ -141,18 +125,12 @@ type ProfileUpdateApiResponse = {
   } | null;
 };
 
-type CustomUpdateRetryAction =
-  | { type: "icon"; iconCode: string }
-  | { type: "title-select"; choice: TitlePickerChoice }
-  | { type: "title-clear" };
-
 type CustomUpdateDialogState = {
   open: boolean;
   mode: "loading" | "error";
   scope: "icon" | "title";
   title: string;
   message: string;
-  retryAction: CustomUpdateRetryAction | null;
 };
 
 type Props = {
@@ -204,7 +182,6 @@ type StreakClientCache = {
   appliedIconTierCode?: string | null;
   titleCode: string | null;
   titleLabel: string | null;
-  titleCatalog: TitleCatalogItem[] | null;
 };
 
 type ProgressClientCache = {
@@ -233,12 +210,18 @@ function uniqStrings(values: (string | null | undefined)[]) {
 }
 
 function getClosedCustomUpdateDialog(): CustomUpdateDialogState {
-  return { open: false, mode: "loading", scope: "icon", title: "", message: "", retryAction: null };
+  return { open: false, mode: "loading", scope: "icon", title: "", message: "" };
 }
 
-function regionLabel(region: string) { return region?.trim() ? region : "Не указана"; }
-function phoneLabel(phone: string) { return phone?.trim() ? phone : "Не указан"; }
-function nameLabel(name: string) { return name?.trim() ? name : "Ученик"; }
+function regionLabel(region: string) {
+  return region?.trim() ? region : "Не указана";
+}
+function phoneLabel(phone: string) {
+  return phone?.trim() ? phone : "Не указан";
+}
+function nameLabel(name: string) {
+  return name?.trim() ? name : "Ученик";
+}
 
 function asInt(value: unknown, fallback = 0) {
   const n = Number(value);
@@ -271,13 +254,18 @@ function pick(obj: Record<string, any>, keys: string[]) {
 
 function safeJsonParse<T>(raw: string | null): T | null {
   if (!raw) return null;
-  try { return JSON.parse(raw) as T; } 
-  catch { return null; }
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
 }
 
 function readStreakCache(): StreakClientCache | null {
   if (typeof window === "undefined") return null;
-  const cached = safeJsonParse<StreakClientCache>(sessionStorage.getItem(STREAK_CACHE_KEY));
+  const cached = safeJsonParse<StreakClientCache>(
+    sessionStorage.getItem(STREAK_CACHE_KEY)
+  );
   if (!cached?.ts) return null;
   if (Date.now() - cached.ts > STREAK_CACHE_TTL_MS) return null;
   return cached;
@@ -285,13 +273,16 @@ function readStreakCache(): StreakClientCache | null {
 
 function writeStreakCache(payload: StreakClientCache) {
   if (typeof window === "undefined") return;
-  try { sessionStorage.setItem(STREAK_CACHE_KEY, JSON.stringify(payload)); } 
-  catch {}
+  try {
+    sessionStorage.setItem(STREAK_CACHE_KEY, JSON.stringify(payload));
+  } catch {}
 }
 
 function readProgressCache(): ProgressClientCache | null {
   if (typeof window === "undefined") return null;
-  const cached = safeJsonParse<ProgressClientCache>(sessionStorage.getItem(PROGRESS_CACHE_KEY));
+  const cached = safeJsonParse<ProgressClientCache>(
+    sessionStorage.getItem(PROGRESS_CACHE_KEY)
+  );
   if (!cached?.ts) return null;
   if (Date.now() - cached.ts > PROGRESS_CACHE_TTL_MS) return null;
   return cached;
@@ -299,27 +290,41 @@ function readProgressCache(): ProgressClientCache | null {
 
 function writeProgressCache(payload: ProgressClientCache) {
   if (typeof window === "undefined") return;
-  try { sessionStorage.setItem(PROGRESS_CACHE_KEY, JSON.stringify(payload)); } 
-  catch {}
+  try {
+    sessionStorage.setItem(PROGRESS_CACHE_KEY, JSON.stringify(payload));
+  } catch {}
 }
 
 function runWhenIdle(fn: () => void, timeout = 900) {
   if (typeof window === "undefined") return;
   const w = window as any;
-  if (typeof w.requestIdleCallback === "function") w.requestIdleCallback(fn, { timeout });
+  if (typeof w.requestIdleCallback === "function")
+    w.requestIdleCallback(fn, { timeout });
   else setTimeout(fn, 50);
 }
 
 function normalizeUiErrorMessage(error: unknown, fallback = "Произошла ошибка") {
-  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : error == null ? "" : String(error);
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+      ? error
+      : error == null
+      ? ""
+      : String(error);
   const msg = raw.trim();
   if (!msg) return fallback;
   const lower = msg.toLowerCase();
   if (
-    lower.includes("failed to fetch") || lower.includes("networkerror") ||
-    lower.includes("network request failed") || lower.includes("load failed") ||
-    lower.includes("terminated") || lower.includes("econnreset") ||
-    lower.includes("etimedout") || lower.includes("socket") || lower.includes("network")
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network request failed") ||
+    lower.includes("load failed") ||
+    lower.includes("terminated") ||
+    lower.includes("econnreset") ||
+    lower.includes("etimedout") ||
+    lower.includes("socket") ||
+    lower.includes("network")
   ) {
     return "Ошибка соединения с сервером";
   }
@@ -361,28 +366,129 @@ function toStorageProxyUrl(raw: unknown): string {
 function normalizeStreakSnapshotFromApi(rawInput: unknown): StreakSnapshot | null {
   if (!rawInput || typeof rawInput !== "object") return null;
   const raw = rawInput as Record<string, any>;
-  const rawCurrent = asInt(pick(raw, ["raw_current_streak", "rawCurrentStreak", "current_streak", "currentStreak", "current", "streak"]), 0);
-  const displayCurrent = asInt(pick(raw, ["display_current_streak", "displayCurrentStreak", "current_streak", "currentStreak"]), rawCurrent);
-  const longest = asInt(pick(raw, ["longest_streak", "longestStreak", "display_longest_streak", "displayLongestStreak"]), displayCurrent);
-  const doneToday = asBool(pick(raw, ["done_today", "today_completed", "todayCompleted", "is_today_completed", "isTodayCompleted"]), false);
-  const canSaveToday = asBool(pick(raw, ["can_save_today", "canSaveToday"]), !doneToday);
-  const tierCode = asStringOrNull(pick(raw, ["tier_code", "tierCode"])) ?? getTierCodeByStreak(displayCurrent);
-  const today = asStringOrNull(pick(raw, ["today", "today_date", "todayDate"])) ?? new Date().toISOString().slice(0, 10);
-  const lastCompletedDate = asStringOrNull(pick(raw, ["last_completed_date", "lastCompletedDate", "activity_date", "lastActivityDate"])) ?? null;
+  const rawCurrent = asInt(
+    pick(raw, [
+      "raw_current_streak",
+      "rawCurrentStreak",
+      "current_streak",
+      "currentStreak",
+      "current",
+      "streak",
+    ]),
+    0
+  );
+  const displayCurrent = asInt(
+    pick(raw, [
+      "display_current_streak",
+      "displayCurrentStreak",
+      "current_streak",
+      "currentStreak",
+    ]),
+    rawCurrent
+  );
+  const longest = asInt(
+    pick(raw, [
+      "longest_streak",
+      "longestStreak",
+      "display_longest_streak",
+      "displayLongestStreak",
+    ]),
+    displayCurrent
+  );
+  const doneToday = asBool(
+    pick(raw, [
+      "done_today",
+      "today_completed",
+      "todayCompleted",
+      "is_today_completed",
+      "isTodayCompleted",
+    ]),
+    false
+  );
+  const canSaveToday = asBool(
+    pick(raw, ["can_save_today", "canSaveToday"]),
+    !doneToday
+  );
+  const tierCode =
+    asStringOrNull(pick(raw, ["tier_code", "tierCode"])) ??
+    getTierCodeByStreak(displayCurrent);
+  const today =
+    asStringOrNull(pick(raw, ["today", "today_date", "todayDate"])) ??
+    new Date().toISOString().slice(0, 10);
+  const lastCompletedDate =
+    asStringOrNull(
+      pick(raw, [
+        "last_completed_date",
+        "lastCompletedDate",
+        "activity_date",
+        "lastActivityDate",
+      ])
+    ) ?? null;
 
-  return { today, raw_current_streak: rawCurrent, display_current_streak: displayCurrent, longest_streak: longest, last_completed_date: lastCompletedDate, done_today: doneToday, can_save_today: canSaveToday, tier_code: tierCode };
+  return {
+    today,
+    raw_current_streak: rawCurrent,
+    display_current_streak: displayCurrent,
+    longest_streak: longest,
+    last_completed_date: lastCompletedDate,
+    done_today: doneToday,
+    can_save_today: canSaveToday,
+    tier_code: tierCode,
+  };
 }
 
 function getStreakTierUi(tierCode?: string, streakValue?: number) {
   const v = Math.max(0, Number(streakValue || 0));
   switch (tierCode) {
-    case "legendary": return { icon: "Л", label: "Легендарный", className: "streak-chip--legendary", ringClassName: "streak-mini-badge--legendary" };
-    case "diamond": return { icon: "А", label: "Алмазный", className: "streak-chip--diamond", ringClassName: "streak-mini-badge--diamond" };
-    case "platinum": return { icon: "П", label: "Платиновый", className: "streak-chip--platinum", ringClassName: "streak-mini-badge--platinum" };
-    case "gold": return { icon: "З", label: "Золотой", className: "streak-chip--gold", ringClassName: "streak-mini-badge--gold" };
-    case "silver": return { icon: "С", label: "Серебряный", className: "streak-chip--silver", ringClassName: "streak-mini-badge--silver" };
-    case "bronze": return { icon: "Б", label: "Бронзовый", className: "streak-chip--bronze", ringClassName: "streak-mini-badge--bronze" };
-    default: return { icon: v > 0 ? "С" : "", label: v > 0 ? "Серия" : "Нет серии", className: "streak-chip--none", ringClassName: "streak-mini-badge--none" };
+    case "legendary":
+      return {
+        icon: "Л",
+        label: "Легендарный",
+        className: "streak-chip--legendary",
+        ringClassName: "streak-mini-badge--legendary",
+      };
+    case "diamond":
+      return {
+        icon: "А",
+        label: "Алмазный",
+        className: "streak-chip--diamond",
+        ringClassName: "streak-mini-badge--diamond",
+      };
+    case "platinum":
+      return {
+        icon: "П",
+        label: "Платиновый",
+        className: "streak-chip--platinum",
+        ringClassName: "streak-mini-badge--platinum",
+      };
+    case "gold":
+      return {
+        icon: "З",
+        label: "Золотой",
+        className: "streak-chip--gold",
+        ringClassName: "streak-mini-badge--gold",
+      };
+    case "silver":
+      return {
+        icon: "С",
+        label: "Серебряный",
+        className: "streak-chip--silver",
+        ringClassName: "streak-mini-badge--silver",
+      };
+    case "bronze":
+      return {
+        icon: "Б",
+        label: "Бронзовый",
+        className: "streak-chip--bronze",
+        ringClassName: "streak-mini-badge--bronze",
+      };
+    default:
+      return {
+        icon: v > 0 ? "С" : "",
+        label: v > 0 ? "Серия" : "Нет серии",
+        className: "streak-chip--none",
+        ringClassName: "streak-mini-badge--none",
+      };
   }
 }
 
@@ -402,7 +508,12 @@ function normalizeLeaderboardRows(input: unknown): StreakLeaderboardRow[] {
     if (place <= 0) continue;
     if (seen.has(place)) continue;
 
-    out.push({ place, current: asInt(r.current, 0), longest: asInt(r.longest, 0), isMe: asBool(r.isMe, false) });
+    out.push({
+      place,
+      current: asInt(r.current, 0),
+      longest: asInt(r.longest, 0),
+      isMe: asBool(r.isMe, false),
+    });
     seen.add(place);
   }
   out.sort((a, b) => a.place - b.place);
@@ -416,17 +527,34 @@ function asIntOrNull(v: unknown): number | null {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ICON URL RESOLUTION
+// ICON URL RESOLUTION & VISUAL COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-function makeIconCacheKey(bucket: string, iconCode: string, cacheTag?: string | null) {
+function makeIconCacheKey(
+  bucket: string,
+  iconCode: string,
+  cacheTag?: string | null
+) {
   return `${bucket}::${iconCode}::${(cacheTag || "v0").trim() || "v0"}`;
 }
 
-function buildCandidateUrls(params: { preferredUrls?: string[] | null; iconCode: string | null; variant?: unknown; }): string[] {
-  const preferred = Array.isArray(params.preferredUrls) ? params.preferredUrls : [];
+function buildCandidateUrls(params: {
+  preferredUrls?: string[] | null;
+  iconCode: string | null;
+  variant?: unknown;
+}): string[] {
+  const preferred = Array.isArray(params.preferredUrls)
+    ? params.preferredUrls
+    : [];
   const code = params.iconCode?.trim() || null;
-  const fromCode = code ? [`${code}.webp`, `${code}.png`, `v1/defaults/${code}.webp`, `v1/defaults/${code}.png`] : [];
+  const fromCode = code
+    ? [
+        `${code}.webp`,
+        `${code}.png`,
+        `v1/defaults/${code}.webp`,
+        `v1/defaults/${code}.png`,
+      ]
+    : [];
   const variantPaths: string[] = [];
 
   if (params.variant && typeof params.variant === "object") {
@@ -442,25 +570,44 @@ function buildCandidateUrls(params: { preferredUrls?: string[] | null; iconCode:
   const toUrl = (p: string) => {
     const raw = p.trim();
     if (!raw) return null;
-    if (/^https?:\/\//i.test(raw) || raw.startsWith("data:") || raw.startsWith("/api/storage/public/")) {
+    if (
+      /^https?:\/\//i.test(raw) ||
+      raw.startsWith("data:") ||
+      raw.startsWith("/api/storage/public/")
+    ) {
       return toStorageProxyUrl(raw);
     }
     return getStoragePublicUrl(STREAK_ICON_BUCKET, raw.replace(/^\/+/, ""));
   };
 
   return uniqStrings([
-    ...preferred.map((x) => (typeof x === "string" ? toStorageProxyUrl(x) : "")).filter(Boolean),
+    ...preferred
+      .map((x) => (typeof x === "string" ? toStorageProxyUrl(x) : ""))
+      .filter(Boolean),
     ...(variantPaths.map(toUrl).filter(Boolean) as string[]),
     ...(fromCode.map(toUrl).filter(Boolean) as string[]),
   ]);
 }
 
-function preloadIconByUrls(params: { iconCode: string | null; cacheTag?: string | null; preferredUrls?: string[] | null; variant?: unknown; }) {
+function preloadIconByUrls(params: {
+  iconCode: string | null;
+  cacheTag?: string | null;
+  preferredUrls?: string[] | null;
+  variant?: unknown;
+}) {
   if (!isNonEmptyString(params.iconCode)) return;
-  const cacheKey = makeIconCacheKey(STREAK_ICON_BUCKET, params.iconCode, params.cacheTag);
+  const cacheKey = makeIconCacheKey(
+    STREAK_ICON_BUCKET,
+    params.iconCode,
+    params.cacheTag
+  );
   if (ICON_URL_RESOLVED_CACHE.has(cacheKey)) return;
 
-  const candidates = buildCandidateUrls({ preferredUrls: params.preferredUrls, iconCode: params.iconCode, variant: params.variant });
+  const candidates = buildCandidateUrls({
+    preferredUrls: params.preferredUrls,
+    iconCode: params.iconCode,
+    variant: params.variant,
+  });
   if (!candidates.length) return;
 
   let idx = 0;
@@ -478,10 +625,6 @@ function preloadIconByUrls(params: { iconCode: string | null; cacheTag?: string 
   tryNext();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STREAK ICON VISUAL
-// ─────────────────────────────────────────────────────────────────────────────
-
 type StreakIconVisualProps = {
   iconCode: string | null;
   cacheTag?: string | null;
@@ -495,12 +638,33 @@ type StreakIconVisualProps = {
   priority?: boolean;
 };
 
-function StreakIconVisual({ iconCode, cacheTag = null, preferredUrls = null, variant, emojiFallback, alt, wrapperClassName, imgClassName, emojiClassName, priority = false }: StreakIconVisualProps) {
-  const cacheKey = iconCode ? makeIconCacheKey(STREAK_ICON_BUCKET, iconCode, cacheTag) : null;
-  const preferredKey = Array.isArray(preferredUrls) ? preferredUrls.join("|") : "";
+function StreakIconVisual({
+  iconCode,
+  cacheTag = null,
+  preferredUrls = null,
+  variant,
+  emojiFallback,
+  alt,
+  wrapperClassName,
+  imgClassName,
+  emojiClassName,
+  priority = false,
+}: StreakIconVisualProps) {
+  const cacheKey = iconCode
+    ? makeIconCacheKey(STREAK_ICON_BUCKET, iconCode, cacheTag)
+    : null;
+  const preferredKey = Array.isArray(preferredUrls)
+    ? preferredUrls.join("|")
+    : "";
 
-  const candidateUrls = useMemo(() => buildCandidateUrls({ preferredUrls, iconCode, variant }), [iconCode, cacheTag, preferredKey, variant]);
-  const candidatesKey = useMemo(() => candidateUrls.join("|"), [candidateUrls]);
+  const candidateUrls = useMemo(
+    () => buildCandidateUrls({ preferredUrls, iconCode, variant }),
+    [iconCode, cacheTag, preferredKey, variant]
+  );
+  const candidatesKey = useMemo(
+    () => candidateUrls.join("|"),
+    [candidateUrls]
+  );
 
   const [shownSrc, setShownSrc] = useState<string | null>(() => {
     if (!cacheKey) return null;
@@ -526,18 +690,26 @@ function StreakIconVisual({ iconCode, cacheTag = null, preferredUrls = null, var
   }, [cacheKey, candidatesKey]);
 
   useEffect(() => {
-    if (!iconCode) { setShownSrc(null); return; }
+    if (!iconCode) {
+      setShownSrc(null);
+      return;
+    }
     if (!candidateUrls.length) {
       if (cacheKey) ICON_URL_RESOLVED_CACHE.set(cacheKey, "");
-      setShownSrc(null); return;
+      setShownSrc(null);
+      return;
     }
     if (pendingIndex >= candidateUrls.length) {
       if (cacheKey) ICON_URL_RESOLVED_CACHE.set(cacheKey, "");
-      setShownSrc(null); return;
+      setShownSrc(null);
+      return;
     }
 
     const src = candidateUrls[pendingIndex] ?? null;
-    if (!src) { setPendingIndex((i) => i + 1); return; }
+    if (!src) {
+      setPendingIndex((i) => i + 1);
+      return;
+    }
     if (shownSrc === src) return;
 
     let alive = true;
@@ -559,16 +731,31 @@ function StreakIconVisual({ iconCode, cacheTag = null, preferredUrls = null, var
     img.src = src;
     if (img.complete && img.naturalWidth > 0) markReady();
 
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [iconCode, cacheKey, candidateUrls, pendingIndex, shownSrc]);
 
   const hasImage = Boolean(shownSrc);
 
   return (
-    <span className={joinClasses("streak-visual", wrapperClassName)} aria-hidden="true" style={{ position: "relative" }} title={alt}>
+    <span
+      className={joinClasses("streak-visual", wrapperClassName)}
+      aria-hidden="true"
+      style={{ position: "relative" }}
+      title={alt}
+    >
       <span
         className={joinClasses("streak-visual__emoji", emojiClassName)}
-        style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", opacity: hasImage ? 0 : 1, transition: "opacity 140ms ease", pointerEvents: "none" }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "grid",
+          placeItems: "center",
+          opacity: hasImage ? 0 : 1,
+          transition: "opacity 140ms ease",
+          pointerEvents: "none",
+        }}
       >
         {emojiFallback}
       </span>
@@ -609,155 +796,258 @@ export default function ProfileClient({
   const cachedStreak = typeof window !== "undefined" ? readStreakCache() : null;
   const cachedProgress = typeof window !== "undefined" ? readProgressCache() : null;
 
-  const cachedSelectedIconServer = normalizeDbIconCode(cachedStreak?.selectedIconServer ?? null);
-  const cachedAppliedIconCode = normalizeDbIconCode(cachedStreak?.appliedIconCode ?? null);
+  const cachedSelectedIconServer = normalizeDbIconCode(
+    cachedStreak?.selectedIconServer ?? null
+  );
+  const cachedAppliedIconCode = normalizeDbIconCode(
+    cachedStreak?.appliedIconCode ?? null
+  );
 
-  const backgroundProxyUrl = useMemo(() => toStorageProxyUrl(backgroundUrl), [backgroundUrl]);
+  const backgroundProxyUrl = useMemo(
+    () => toStorageProxyUrl(backgroundUrl),
+    [backgroundUrl]
+  );
 
   const [profile, setProfile] = useState<ProfileData>(initialProfile);
 
-  const [bgLoading, setBgLoading] = useState<boolean>(Boolean(backgroundProxyUrl));
+  const [bgLoading, setBgLoading] = useState<boolean>(
+    Boolean(backgroundProxyUrl)
+  );
   const [bgReady, setBgReady] = useState<boolean>(false);
 
-  const [notif, setNotif] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [notif, setNotif] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
+  // Стейты редактирования личных данных
   const [editOpen, setEditOpen] = useState(false);
   const [editFullName, setEditFullName] = useState(profile.full_name ?? "");
   const [editPhone, setEditPhone] = useState(profile.contact_phone ?? "");
   const [editRegion, setEditRegion] = useState(profile.region ?? "");
   const [saving, setSaving] = useState(false);
 
-  const [streakModalOpen, setStreakModalOpen] = useState(false);
-  const [titleModalOpen, setTitleModalOpen] = useState(false);
+  // Центр Наград (Единая модалка)
+  const [rewardsModalOpen, setRewardsModalOpen] = useState(false);
+  const [rewardsTab, setRewardsTab] = useState<
+    "wardrobe" | "streaks" | "promocode"
+  >("streaks");
 
+  // Лидерборд
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
-  const [leaderboardTop, setLeaderboardTop] = useState<StreakLeaderboardRow[] | null>(null);
-  const [leaderboardAround, setLeaderboardAround] = useState<StreakLeaderboardRow[] | null>(null);
-  const [leaderboardMyPlace, setLeaderboardMyPlace] = useState<number | null>(null);
-  const [leaderboardMyCurrent, setLeaderboardMyCurrent] = useState<number | null>(null);
-  const [leaderboardMyLongest, setLeaderboardMyLongest] = useState<number | null>(null);
+  const [leaderboardTop, setLeaderboardTop] = useState<
+    StreakLeaderboardRow[] | null
+  >(null);
+  const [leaderboardAround, setLeaderboardAround] = useState<
+    StreakLeaderboardRow[] | null
+  >(null);
+  const [leaderboardMyPlace, setLeaderboardMyPlace] = useState<number | null>(
+    null
+  );
+  const [leaderboardMyCurrent, setLeaderboardMyCurrent] = useState<
+    number | null
+  >(null);
+  const [leaderboardMyLongest, setLeaderboardMyLongest] = useState<
+    number | null
+  >(null);
 
   const lastLeaderboardFetchAtRef = useRef<number>(0);
   const leaderboardAbortRef = useRef<AbortController | null>(null);
 
-  const [customUpdateDialog, setCustomUpdateDialog] = useState<CustomUpdateDialogState>(getClosedCustomUpdateDialog());
+  const [customUpdateDialog, setCustomUpdateDialog] =
+    useState<CustomUpdateDialogState>(getClosedCustomUpdateDialog());
 
-  const [stats, setStats] = useState<Stats | null>(statsProp ?? cachedProgress?.stats ?? null);
-  const [materialsProgress, setMaterialsProgress] = useState<MaterialProgressItem[] | null>(
-    progressProp ?? cachedProgress?.materialsProgress ?? null,
+  // Статистика и Прогресс
+  const [stats, setStats] = useState<Stats | null>(
+    statsProp ?? cachedProgress?.stats ?? null
   );
+  const [materialsProgress, setMaterialsProgress] = useState<
+    MaterialProgressItem[] | null
+  >(progressProp ?? cachedProgress?.materialsProgress ?? null);
 
   const [progressLoading, setProgressLoading] = useState<boolean>(
-    Boolean(!statsProp && !progressProp && !(cachedProgress?.stats && cachedProgress?.materialsProgress)),
+    Boolean(
+      !statsProp &&
+        !progressProp &&
+        !(cachedProgress?.stats && cachedProgress?.materialsProgress)
+    )
   );
   const [progressError, setProgressError] = useState<string | null>(null);
 
-  const [streak, setStreak] = useState<StreakSnapshot | null>(streakProp ?? cachedStreak?.streak ?? null);
-  const [streakLoading, setStreakLoading] = useState<boolean>(Boolean(!streakProp && !cachedStreak?.streak));
+  // Стрики
+  const [streak, setStreak] = useState<StreakSnapshot | null>(
+    streakProp ?? cachedStreak?.streak ?? null
+  );
+  const [streakLoading, setStreakLoading] = useState<boolean>(
+    Boolean(!streakProp && !cachedStreak?.streak)
+  );
   const [streakError, setStreakError] = useState<string | null>(null);
 
-  const [equippedTitleLabelState, setEquippedTitleLabelState] = useState<string | null>(cachedStreak?.titleLabel ?? equippedTitleLabel ?? null);
-  const [equippedTitleCodeState, setEquippedTitleCodeState] = useState<string | null>(cachedStreak?.titleCode ?? null);
-  const [titleCatalogState, setTitleCatalogState] = useState<TitleCatalogItem[] | null>(cachedStreak?.titleCatalog ?? null);
-  const [savingTitle, setSavingTitle] = useState(false);
+  const [equippedTitleLabelState, setEquippedTitleLabelState] = useState<
+    string | null
+  >(cachedStreak?.titleLabel ?? equippedTitleLabel ?? null);
+  const [equippedTitleCodeState, setEquippedTitleCodeState] = useState<
+    string | null
+  >(cachedStreak?.titleCode ?? null);
 
-  const [unlockedIconCodesState, setUnlockedIconCodesState] = useState<string[] | null>(
-    Array.isArray(cachedStreak?.unlockedIconCodes) ? cachedStreak!.unlockedIconCodes ?? null : null,
+  const [unlockedIconCodesState, setUnlockedIconCodesState] = useState<
+    string[] | null
+  >(
+    Array.isArray(cachedStreak?.unlockedIconCodes)
+      ? cachedStreak!.unlockedIconCodes ?? null
+      : null
   );
-  const [appliedIconCodeState, setAppliedIconCodeState] = useState<string | null>(cachedAppliedIconCode ?? null);
+  const [appliedIconCodeState, setAppliedIconCodeState] = useState<
+    string | null
+  >(cachedAppliedIconCode ?? null);
   const [appliedIconUrlsState, setAppliedIconUrlsState] = useState<string[]>(
-    Array.isArray(cachedStreak?.appliedIconUrls) ? cachedStreak.appliedIconUrls.map(toStorageProxyUrl).filter(Boolean) : [],
+    Array.isArray(cachedStreak?.appliedIconUrls)
+      ? cachedStreak.appliedIconUrls.map(toStorageProxyUrl).filter(Boolean)
+      : []
   );
-  const [appliedIconCacheTagState, setAppliedIconCacheTagState] = useState<string | null>(cachedStreak?.appliedIconCacheTag ?? null);
-  const [appliedIconEmojiFallbackState, setAppliedIconEmojiFallbackState] = useState<string | null>(cachedStreak?.appliedIconEmojiFallback ?? null);
-  const [appliedIconTierCodeState, setAppliedIconTierCodeState] = useState<string | null>(cachedStreak?.appliedIconTierCode ?? null);
+  const [appliedIconCacheTagState, setAppliedIconCacheTagState] = useState<
+    string | null
+  >(cachedStreak?.appliedIconCacheTag ?? null);
+  const [appliedIconEmojiFallbackState, setAppliedIconEmojiFallbackState] =
+    useState<string | null>(cachedStreak?.appliedIconEmojiFallback ?? null);
+  const [appliedIconTierCodeState, setAppliedIconTierCodeState] = useState<
+    string | null
+  >(cachedStreak?.appliedIconTierCode ?? null);
 
-  const [selectedStreakIconCodeLocal, setSelectedStreakIconCodeLocal] = useState<string | null>(null);
-  const [selectedStreakIconCodeServer, setSelectedStreakIconCodeServer] = useState<string | null>(cachedSelectedIconServer ?? null);
-  const [savingStreakIcon, setSavingStreakIcon] = useState(false);
+  const [selectedStreakIconCodeLocal, setSelectedStreakIconCodeLocal] = useState<
+    string | null
+  >(null);
+  const [selectedStreakIconCodeServer, setSelectedStreakIconCodeServer] =
+    useState<string | null>(cachedSelectedIconServer ?? null);
 
   const lastStreakFetchAtRef = useRef<number>(0);
   const streakAbortRef = useRef<AbortController | null>(null);
   const progressAbortRef = useRef<AbortController | null>(null);
 
-  const isCustomizationUpdateLocked = customUpdateDialog.open || savingTitle || savingStreakIcon;
-
-  const streakDisplay = Math.max(0, Number(streak?.display_current_streak ?? 0));
-  const longestStreakDisplay = Math.max(0, Number(streak?.longest_streak ?? 0));
+  const streakDisplay = Math.max(
+    0,
+    Number(streak?.display_current_streak ?? 0)
+  );
+  const longestStreakDisplay = Math.max(
+    0,
+    Number(streak?.longest_streak ?? 0)
+  );
 
   const unlockedIconCodesForUi: string[] = useMemo(() => {
     if (Array.isArray(unlockedIconCodesState) && unlockedIconCodesState.length) {
-      return unlockedIconCodesState.map((c) => normalizeDbIconCode(c)).filter(Boolean) as string[];
+      return unlockedIconCodesState
+        .map((c) => normalizeDbIconCode(c))
+        .filter(Boolean) as string[];
     }
     return [];
   }, [unlockedIconCodesState]);
 
   const effectiveSelectedStreakIconCode = useMemo(() => {
-    const candidate = normalizeDbIconCode(selectedStreakIconCodeLocal ?? selectedStreakIconCodeServer);
+    const candidate = normalizeDbIconCode(
+      selectedStreakIconCodeLocal ?? selectedStreakIconCodeServer
+    );
     if (candidate && unlockedIconCodesForUi.includes(candidate)) return candidate;
-    if (unlockedIconCodesForUi.length) return unlockedIconCodesForUi[unlockedIconCodesForUi.length - 1];
+    if (unlockedIconCodesForUi.length)
+      return unlockedIconCodesForUi[unlockedIconCodesForUi.length - 1];
     return candidate ?? null;
   }, [selectedStreakIconCodeLocal, selectedStreakIconCodeServer, unlockedIconCodesForUi]);
 
   const uiTierCodeForColors = useMemo(() => {
-    const fromIcon = effectiveSelectedStreakIconCode && appliedIconCodeState === effectiveSelectedStreakIconCode && typeof appliedIconTierCodeState === "string"
+    const fromIcon =
+      effectiveSelectedStreakIconCode &&
+      appliedIconCodeState === effectiveSelectedStreakIconCode &&
+      typeof appliedIconTierCodeState === "string"
         ? appliedIconTierCodeState.trim().toLowerCase()
         : "";
     if (fromIcon) return fromIcon;
-    const fromStreak = typeof streak?.tier_code === "string" ? streak.tier_code.trim().toLowerCase() : "";
+    const fromStreak =
+      typeof streak?.tier_code === "string"
+        ? streak.tier_code.trim().toLowerCase()
+        : "";
     return fromStreak || getTierCodeByStreak(streakDisplay);
-  }, [effectiveSelectedStreakIconCode, appliedIconCodeState, appliedIconTierCodeState, streak?.tier_code, streakDisplay]);
+  }, [
+    effectiveSelectedStreakIconCode,
+    appliedIconCodeState,
+    appliedIconTierCodeState,
+    streak?.tier_code,
+    streakDisplay,
+  ]);
 
   const streakUiBase = getStreakTierUi(uiTierCodeForColors, streakDisplay);
 
   const emojiFallbackForCurrentIcon = useMemo(() => {
-    if (effectiveSelectedStreakIconCode && appliedIconCodeState === effectiveSelectedStreakIconCode) {
-      const e = typeof appliedIconEmojiFallbackState === "string" ? appliedIconEmojiFallbackState.trim() : "";
+    if (
+      effectiveSelectedStreakIconCode &&
+      appliedIconCodeState === effectiveSelectedStreakIconCode
+    ) {
+      const e =
+        typeof appliedIconEmojiFallbackState === "string"
+          ? appliedIconEmojiFallbackState.trim()
+          : "";
       if (e) return e;
     }
     return streakUiBase.icon || "С";
-  }, [effectiveSelectedStreakIconCode, appliedIconCodeState, appliedIconEmojiFallbackState, streakUiBase.icon]);
+  }, [
+    effectiveSelectedStreakIconCode,
+    appliedIconCodeState,
+    appliedIconEmojiFallbackState,
+    streakUiBase.icon,
+  ]);
 
   const avatarEmojiFallback = emojiFallbackForCurrentIcon;
   const chipEmojiFallback = emojiFallbackForCurrentIcon;
 
   const preferredUrlsForCurrentIcon = useMemo(() => {
-    if (!effectiveSelectedStreakIconCode || !appliedIconCodeState || appliedIconCodeState !== effectiveSelectedStreakIconCode) return [];
+    if (
+      !effectiveSelectedStreakIconCode ||
+      !appliedIconCodeState ||
+      appliedIconCodeState !== effectiveSelectedStreakIconCode
+    )
+      return [];
     return (appliedIconUrlsState ?? []).map(toStorageProxyUrl).filter(Boolean);
   }, [effectiveSelectedStreakIconCode, appliedIconCodeState, appliedIconUrlsState]);
 
   const cacheTagForCurrentIcon = useMemo(() => {
-    if (!effectiveSelectedStreakIconCode || !appliedIconCodeState || appliedIconCodeState !== effectiveSelectedStreakIconCode) return null;
+    if (
+      !effectiveSelectedStreakIconCode ||
+      !appliedIconCodeState ||
+      appliedIconCodeState !== effectiveSelectedStreakIconCode
+    )
+      return null;
     return appliedIconCacheTagState ?? null;
-  }, [effectiveSelectedStreakIconCode, appliedIconCodeState, appliedIconCacheTagState]);
+  }, [
+    effectiveSelectedStreakIconCode,
+    appliedIconCodeState,
+    appliedIconCacheTagState,
+  ]);
+
+  // Функция открытия центра наград
+  const openRewards = (
+    tab: "wardrobe" | "streaks" | "promocode" = "streaks"
+  ) => {
+    setRewardsTab(tab);
+    setRewardsModalOpen(true);
+  };
 
   useEffect(() => {
     if (!effectiveSelectedStreakIconCode) return;
-    preloadIconByUrls({ iconCode: effectiveSelectedStreakIconCode, cacheTag: cacheTagForCurrentIcon, preferredUrls: preferredUrlsForCurrentIcon, variant: null });
-  }, [effectiveSelectedStreakIconCode, cacheTagForCurrentIcon, preferredUrlsForCurrentIcon]);
-
-  useEffect(() => {
-    if (!unlockedIconCodesForUi.length) return;
-    runWhenIdle(() => {
-      for (const code of unlockedIconCodesForUi) {
-        preloadIconByUrls({ iconCode: code, cacheTag: null, preferredUrls: null, variant: null });
-      }
-    }, 2000);
-  }, [unlockedIconCodesForUi]);
+    preloadIconByUrls({
+      iconCode: effectiveSelectedStreakIconCode,
+      cacheTag: cacheTagForCurrentIcon,
+      preferredUrls: preferredUrlsForCurrentIcon,
+      variant: null,
+    });
+  }, [
+    effectiveSelectedStreakIconCode,
+    cacheTagForCurrentIcon,
+    preferredUrlsForCurrentIcon,
+  ]);
 
   function showNotification(text: string, type: "success" | "error" = "success") {
     setNotif({ type, text });
     setTimeout(() => setNotif(null), 3500);
-  }
-
-  function openUpdateLoading(scope: "icon" | "title") {
-    setCustomUpdateDialog({ open: true, mode: "loading", scope, title: scope === "icon" ? "Обновляем иконку" : "Обновляем титул", message: scope === "icon" ? "Сохраняем выбранную иконку серии..." : "Сохраняем выбранный титул...", retryAction: null });
-  }
-
-  function showUpdateError(scope: "icon" | "title", error: unknown, retryAction: CustomUpdateRetryAction) {
-    setCustomUpdateDialog({ open: true, mode: "error", scope, title: scope === "icon" ? "Ошибка обновления иконки" : "Ошибка обновления титула", message: normalizeUiErrorMessage(error, "Ошибка соединения с сервером"), retryAction });
   }
 
   function closeCustomUpdateDialog() {
@@ -767,30 +1057,37 @@ export default function ProfileClient({
     });
   }
 
-  function openStreakModal() {
-    if (features?.streaks && !customUpdateDialog.open) setStreakModalOpen(true);
-  }
-
   function openLeaderboardModal() {
-    if (features?.leaderboard && !customUpdateDialog.open) setLeaderboardOpen(true);
-  }
-
-  async function retryCustomUpdateDialogAction() {
-    const action = customUpdateDialog.retryAction;
-    if (!action) return;
-    if (action.type === "icon") { await handleSelectStreakIcon(action.iconCode, { force: true }); return; }
-    if (action.type === "title-select") { await handleSelectTitle(action.choice, { force: true }); return; }
-    if (action.type === "title-clear") { await handleClearSelectedTitle({ force: true }); }
+    if (features?.leaderboard && !customUpdateDialog.open)
+      setLeaderboardOpen(true);
   }
 
   function extractAppliedIconInfo(json: ProfileStreakApiResponse) {
-    const appliedIcon = (json.appliedIcon ?? json.selectedIcon ?? json.effectiveIcon ?? null) as IconVisualPayloadFromApi | null;
-    const appliedIconCodeRaw = (typeof json.appliedIconCode === "string" && json.appliedIconCode) || (typeof appliedIcon?.code === "string" && appliedIcon.code) || null;
+    const appliedIcon = (json.appliedIcon ??
+      json.selectedIcon ??
+      json.effectiveIcon ??
+      null) as IconVisualPayloadFromApi | null;
+    const appliedIconCodeRaw =
+      (typeof json.appliedIconCode === "string" && json.appliedIconCode) ||
+      (typeof appliedIcon?.code === "string" && appliedIcon.code) ||
+      null;
     const appliedIconCode = normalizeDbIconCode(appliedIconCodeRaw);
-    const urls = uniqStrings([...(Array.isArray(appliedIcon?.candidatePublicUrls) ? appliedIcon!.candidatePublicUrls! : []), appliedIcon?.publicUrl ?? null]).map(toStorageProxyUrl).filter(Boolean);
-    const cacheTag = typeof appliedIcon?.cacheTag === "string" ? appliedIcon.cacheTag : null;
-    const emojiFallback = typeof appliedIcon?.emojiFallback === "string" ? appliedIcon.emojiFallback : null;
-    const tierCode = typeof appliedIcon?.tierCode === "string" ? appliedIcon.tierCode : null;
+    const urls = uniqStrings([
+      ...(Array.isArray(appliedIcon?.candidatePublicUrls)
+        ? appliedIcon!.candidatePublicUrls!
+        : []),
+      appliedIcon?.publicUrl ?? null,
+    ])
+      .map(toStorageProxyUrl)
+      .filter(Boolean);
+    const cacheTag =
+      typeof appliedIcon?.cacheTag === "string" ? appliedIcon.cacheTag : null;
+    const emojiFallback =
+      typeof appliedIcon?.emojiFallback === "string"
+        ? appliedIcon.emojiFallback
+        : null;
+    const tierCode =
+      typeof appliedIcon?.tierCode === "string" ? appliedIcon.tierCode : null;
     return { appliedIconCode, urls, cacheTag, emojiFallback, tierCode };
   }
 
@@ -798,15 +1095,28 @@ export default function ProfileClient({
     const normalizedStreak = normalizeStreakSnapshotFromApi(json.streak ?? null);
     if (normalizedStreak) setStreak(normalizedStreak);
 
-    const rawTitleObj = (json.selectedTitle ?? json.equippedTitle ?? null) as Record<string, any> | null;
-    const apiTitleLabel = rawTitleObj && typeof rawTitleObj.label === "string" ? rawTitleObj.label : null;
-    const apiTitleCode = (rawTitleObj && typeof rawTitleObj.titleCode === "string" && rawTitleObj.titleCode) || (rawTitleObj && typeof rawTitleObj.code === "string" && rawTitleObj.code) || null;
+    const rawTitleObj = (json.selectedTitle ??
+      json.equippedTitle ??
+      null) as Record<string, any> | null;
+    const apiTitleLabel =
+      rawTitleObj && typeof rawTitleObj.label === "string"
+        ? rawTitleObj.label
+        : null;
+    const apiTitleCode =
+      (rawTitleObj &&
+        typeof rawTitleObj.titleCode === "string" &&
+        rawTitleObj.titleCode) ||
+      (rawTitleObj &&
+        typeof rawTitleObj.code === "string" &&
+        rawTitleObj.code) ||
+      null;
     setEquippedTitleLabelState(apiTitleLabel ?? null);
     setEquippedTitleCodeState(apiTitleCode ?? null);
 
-    if (Array.isArray(json.titleCatalog)) setTitleCatalogState(json.titleCatalog as TitleCatalogItem[]);
     if (Array.isArray(json.unlockedIconCodes)) {
-      const norm = json.unlockedIconCodes.map((c) => normalizeDbIconCode(c)).filter(Boolean) as string[];
+      const norm = json.unlockedIconCodes
+        .map((c) => normalizeDbIconCode(c))
+        .filter(Boolean) as string[];
       setUnlockedIconCodesState(norm);
     }
 
@@ -823,7 +1133,12 @@ export default function ProfileClient({
     setAppliedIconTierCodeState(applied.tierCode);
 
     if (applied.appliedIconCode) {
-      preloadIconByUrls({ iconCode: applied.appliedIconCode, cacheTag: applied.cacheTag, preferredUrls: applied.urls, variant: null });
+      preloadIconByUrls({
+        iconCode: applied.appliedIconCode,
+        cacheTag: applied.cacheTag,
+        preferredUrls: applied.urls,
+        variant: null,
+      });
     }
 
     setSelectedStreakIconCodeLocal((prev) => {
@@ -834,17 +1149,29 @@ export default function ProfileClient({
     });
 
     writeStreakCache({
-      ts: Date.now(), streak: normalizedStreak, selectedIconServer: resolvedIcon,
-      unlockedIconCodes: Array.isArray(json.unlockedIconCodes) ? (json.unlockedIconCodes as string[]) : unlockedIconCodesState ?? null,
-      appliedIconCode: applied.appliedIconCode, appliedIconUrls: applied.urls, appliedIconCacheTag: applied.cacheTag,
-      appliedIconEmojiFallback: applied.emojiFallback, appliedIconTierCode: applied.tierCode,
-      titleCode: apiTitleCode ?? null, titleLabel: apiTitleLabel ?? null,
-      titleCatalog: Array.isArray(json.titleCatalog) ? (json.titleCatalog as TitleCatalogItem[]) : titleCatalogState ?? null,
+      ts: Date.now(),
+      streak: normalizedStreak,
+      selectedIconServer: resolvedIcon,
+      unlockedIconCodes: Array.isArray(json.unlockedIconCodes)
+        ? (json.unlockedIconCodes as string[])
+        : unlockedIconCodesState ?? null,
+      appliedIconCode: applied.appliedIconCode,
+      appliedIconUrls: applied.urls,
+      appliedIconCacheTag: applied.cacheTag,
+      appliedIconEmojiFallback: applied.emojiFallback,
+      appliedIconTierCode: applied.tierCode,
+      titleCode: apiTitleCode ?? null,
+      titleLabel: apiTitleLabel ?? null,
     });
-    try { sessionStorage.removeItem("profile-streak-dirty"); } catch {}
+    try {
+      sessionStorage.removeItem("profile-streak-dirty");
+    } catch {}
   }
 
-  async function refreshStreakFromApi(options?: { silent?: boolean; force?: boolean }) {
+  async function refreshStreakFromApi(options?: {
+    silent?: boolean;
+    force?: boolean;
+  }) {
     const silent = Boolean(options?.silent);
     const now = Date.now();
     if (!options?.force && now - lastStreakFetchAtRef.current < 12_000) return;
@@ -857,10 +1184,19 @@ export default function ProfileClient({
     try {
       if (!silent) setStreakLoading(true);
       setStreakError(null);
-      const res = await fetch("/api/profile-streak", { method: "GET", cache: "no-store", signal: controller.signal });
+      const res = await fetch("/api/profile-streak", {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal,
+      });
       let json: ProfileStreakApiResponse | null = null;
-      try { json = (await res.json()) as ProfileStreakApiResponse; } catch { json = null; }
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить стрик");
+      try {
+        json = (await res.json()) as ProfileStreakApiResponse;
+      } catch {
+        json = null;
+      }
+      if (!res.ok || !json?.ok)
+        throw new Error(json?.error || "Не удалось загрузить стрик");
       applyStreakResponseToState(json);
       if (!silent) setStreakLoading(false);
     } catch (e: any) {
@@ -872,7 +1208,11 @@ export default function ProfileClient({
 
   async function refreshLeaderboardFromApi(options?: { force?: boolean }) {
     const now = Date.now();
-    if (!options?.force && now - lastLeaderboardFetchAtRef.current < LEADERBOARD_MIN_REFRESH_MS) return;
+    if (
+      !options?.force &&
+      now - lastLeaderboardFetchAtRef.current < LEADERBOARD_MIN_REFRESH_MS
+    )
+      return;
 
     lastLeaderboardFetchAtRef.current = now;
     leaderboardAbortRef.current?.abort();
@@ -882,10 +1222,19 @@ export default function ProfileClient({
     try {
       setLeaderboardLoading(true);
       setLeaderboardError(null);
-      const res = await fetch("/api/profile-streak-leaderboard", { method: "GET", cache: "no-store", signal: controller.signal });
+      const res = await fetch("/api/profile-streak-leaderboard", {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal,
+      });
       let json: LeaderboardApiResponse | null = null;
-      try { json = (await res.json()) as LeaderboardApiResponse; } catch { json = null; }
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить рейтинг");
+      try {
+        json = (await res.json()) as LeaderboardApiResponse;
+      } catch {
+        json = null;
+      }
+      if (!res.ok || !json?.ok)
+        throw new Error(json?.error || "Не удалось загрузить рейтинг");
       setLeaderboardTop(normalizeLeaderboardRows(json?.top));
       setLeaderboardAround(normalizeLeaderboardRows(json?.around));
       setLeaderboardMyPlace(asIntOrNull(json?.myPlace));
@@ -895,16 +1244,28 @@ export default function ProfileClient({
     } catch (e: any) {
       if (e?.name === "AbortError") return;
       setLeaderboardLoading(false);
-      setLeaderboardError(normalizeUiErrorMessage(e, "Не удалось загрузить рейтинг"));
+      setLeaderboardError(
+        normalizeUiErrorMessage(e, "Не удалось загрузить рейтинг")
+      );
     }
   }
 
   useEffect(() => {
-    if (!backgroundProxyUrl) { setBgLoading(false); setBgReady(false); return; }
+    if (!backgroundProxyUrl) {
+      setBgLoading(false);
+      setBgReady(false);
+      return;
+    }
     setBgLoading(true);
     const img = new Image();
-    img.onload = () => { setBgLoading(false); setBgReady(true); };
-    img.onerror = () => { setBgLoading(false); setBgReady(false); };
+    img.onload = () => {
+      setBgLoading(false);
+      setBgReady(true);
+    };
+    img.onerror = () => {
+      setBgLoading(false);
+      setBgReady(false);
+    };
     img.src = backgroundProxyUrl;
     const t = setTimeout(() => setBgLoading(false), 6000);
     return () => clearTimeout(t);
@@ -913,7 +1274,10 @@ export default function ProfileClient({
   useEffect(() => {
     let cancelled = false;
     async function loadProgress() {
-      if (statsProp && progressProp) { setProgressLoading(false); return; }
+      if (statsProp && progressProp) {
+        setProgressLoading(false);
+        return;
+      }
       progressAbortRef.current?.abort();
       const controller = new AbortController();
       progressAbortRef.current = controller;
@@ -927,60 +1291,89 @@ export default function ProfileClient({
           signal: controller.signal,
         });
         const json = await res.json().catch(() => null);
-        if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить прогресс");
+        if (!res.ok || !json?.ok)
+          throw new Error(json?.error || "Не удалось загрузить прогресс");
         if (cancelled) return;
         setStats(json.stats as Stats);
         setMaterialsProgress(json.materialsProgress as MaterialProgressItem[]);
         setProgressLoading(false);
-        writeProgressCache({ ts: Date.now(), stats: json.stats as Stats, materialsProgress: json.materialsProgress as MaterialProgressItem[] });
+        writeProgressCache({
+          ts: Date.now(),
+          stats: json.stats as Stats,
+          materialsProgress: json.materialsProgress as MaterialProgressItem[],
+        });
       } catch (e: any) {
         if (e?.name === "AbortError" || cancelled) return;
         setProgressLoading(false);
-        setProgressError(normalizeUiErrorMessage(e, "Не удалось загрузить прогресс"));
+        setProgressError(
+          normalizeUiErrorMessage(e, "Не удалось загрузить прогресс")
+        );
       }
     }
     runWhenIdle(() => void loadProgress(), 1200);
-    return () => { cancelled = true; progressAbortRef.current?.abort(); };
+    return () => {
+      cancelled = true;
+      progressAbortRef.current?.abort();
+    };
   }, [statsProp, progressProp, projectSlug]);
 
   useEffect(() => {
     let cancelled = false;
-    const dirty = typeof window !== "undefined" ? sessionStorage.getItem("profile-streak-dirty") === "1" : false;
-    const hasFreshCache = Boolean(cachedStreak?.streak && Date.now() - (cachedStreak?.ts ?? 0) < STREAK_CACHE_TTL_MS);
+    const dirty =
+      typeof window !== "undefined"
+        ? sessionStorage.getItem("profile-streak-dirty") === "1"
+        : false;
+    const hasFreshCache = Boolean(
+      cachedStreak?.streak &&
+        Date.now() - (cachedStreak?.ts ?? 0) < STREAK_CACHE_TTL_MS
+    );
 
     if (streakProp || cachedStreak?.streak) setStreakLoading(false);
 
-    const doFetch = async () => { if (!cancelled) { await refreshStreakFromApi({ silent: true, force: dirty || !hasFreshCache }); } };
-    if (dirty || !hasFreshCache) void doFetch(); else runWhenIdle(() => void doFetch(), 900);
+    const doFetch = async () => {
+      if (!cancelled) {
+        await refreshStreakFromApi({
+          silent: true,
+          force: dirty || !hasFreshCache,
+        });
+      }
+    };
+    if (dirty || !hasFreshCache) void doFetch();
+    else runWhenIdle(() => void doFetch(), 900);
 
     const onFocus = () => void refreshStreakFromApi({ silent: true });
-    const onVisibility = () => { if (document.visibilityState === "visible") void refreshStreakFromApi({ silent: true }); };
-    const onCustomRefresh = () => void refreshStreakFromApi({ silent: false, force: true });
+    const onVisibility = () => {
+      if (document.visibilityState === "visible")
+        void refreshStreakFromApi({ silent: true });
+    };
+    const onCustomRefresh = () =>
+      void refreshStreakFromApi({ silent: false, force: true });
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("profile-streak-refresh", onCustomRefresh as EventListener);
+    window.addEventListener(
+      "profile-streak-refresh",
+      onCustomRefresh as EventListener
+    );
 
     return () => {
       cancelled = true;
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("profile-streak-refresh", onCustomRefresh as EventListener);
+      window.removeEventListener(
+        "profile-streak-refresh",
+        onCustomRefresh as EventListener
+      );
       streakAbortRef.current?.abort();
     };
   }, [streakProp]);
 
   useEffect(() => {
-    try {
-      localStorage.removeItem("profile-selected-streak-icon");
-      localStorage.removeItem("profile-selected-title-v1");
-    } catch {}
-  }, []);
-
-  useEffect(() => {
     if (!leaderboardOpen) return;
     void refreshLeaderboardFromApi({ force: false });
-    return () => { leaderboardAbortRef.current?.abort(); };
+    return () => {
+      leaderboardAbortRef.current?.abort();
+    };
   }, [leaderboardOpen]);
 
   function openEdit() {
@@ -990,132 +1383,101 @@ export default function ProfileClient({
     setEditOpen(true);
   }
 
-  function closeEdit() { setEditOpen(false); }
+  function closeEdit() {
+    setEditOpen(false);
+  }
 
   async function saveProfile() {
     const fullName = editFullName.trim();
     const phone = editPhone.trim();
     const region = editRegion.trim();
-    if (!fullName || !phone || !region) { showNotification("Заполните все поля", "error"); return; }
+    if (!fullName || !phone || !region) {
+      showNotification("Заполните все поля", "error");
+      return;
+    }
 
     try {
       setSaving(true);
-      const res = await fetch("/api/profile/update", { method: "PATCH", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ full_name: fullName, contact_phone: phone, region }) });
+      const res = await fetch("/api/profile/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          full_name: fullName,
+          contact_phone: phone,
+          region,
+        }),
+      });
       let json: ProfileUpdateApiResponse | null = null;
-      try { json = (await res.json()) as ProfileUpdateApiResponse; } catch { json = null; }
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось обновить профиль");
+      try {
+        json = (await res.json()) as ProfileUpdateApiResponse;
+      } catch {
+        json = null;
+      }
+      if (!res.ok || !json?.ok)
+        throw new Error(json?.error || "Не удалось обновить профиль");
       const updated = json.profile;
-      setProfile((p) => ({ ...p, full_name: updated?.full_name ?? fullName, contact_phone: updated?.contact_phone ?? phone, region: updated?.region ?? region, is_admin: typeof updated?.is_admin === "boolean" ? updated.is_admin : p.is_admin }));
+      setProfile((p) => ({
+        ...p,
+        full_name: updated?.full_name ?? fullName,
+        contact_phone: updated?.contact_phone ?? phone,
+        region: updated?.region ?? region,
+        is_admin:
+          typeof updated?.is_admin === "boolean" ? updated.is_admin : p.is_admin,
+      }));
       showNotification("Профиль успешно обновлён!");
       closeEdit();
     } catch (e: any) {
-      showNotification("Ошибка обновления профиля: " + normalizeUiErrorMessage(e), "error");
-    } finally { setSaving(false); }
+      showNotification(
+        "Ошибка обновления профиля: " + normalizeUiErrorMessage(e),
+        "error"
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function logout() {
-    try { await fetch("/api/auth/logout", { method: "POST", cache: "no-store" }); } 
-    finally { window.location.href = "/login"; }
-  }
-
-  async function handleSelectStreakIcon(iconCodeRaw: string, options?: { force?: boolean }) {
-    const normalized = normalizeDbIconCode(iconCodeRaw);
-    if (!normalized) { showNotification("Некорректный код иконки", "error"); return; }
-    if (!options?.force && (savingStreakIcon || savingTitle || customUpdateDialog.open)) return;
-    if (unlockedIconCodesForUi.length && !unlockedIconCodesForUi.includes(normalized)) { showNotification("Иконка ещё не разблокирована", "error"); return; }
-
-    const prevLocal = selectedStreakIconCodeLocal;
-    const prevServer = selectedStreakIconCodeServer;
     try {
-      openUpdateLoading("icon");
-      setSelectedStreakIconCodeLocal(normalized);
-      setSavingStreakIcon(true);
-      preloadIconByUrls({ iconCode: normalized, cacheTag: null, preferredUrls: null, variant: null });
-      const res = await fetch("/api/profile-streak-icon", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ iconCode: normalized }) });
-      let json: SaveStreakIconApiResponse | null = null;
-      try { json = (await res.json()) as SaveStreakIconApiResponse; } catch { json = null; }
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось сохранить иконку серии");
-      const resolvedSelected = normalizeDbIconCode(json.selectedIconCode ?? json.selectedIconDbCode ?? normalized);
-      const resolvedEffective = normalizeDbIconCode(json.effectiveIconCode ?? null);
-      setSelectedStreakIconCodeServer(resolvedSelected ?? resolvedEffective ?? normalized);
-      setSelectedStreakIconCodeLocal(null);
-      setCustomUpdateDialog(getClosedCustomUpdateDialog());
-      showNotification("Иконка серии успешно обновлена");
-      void refreshStreakFromApi({ silent: true, force: true });
-    } catch (e: any) {
-      setSelectedStreakIconCodeLocal(prevLocal);
-      setSelectedStreakIconCodeServer(prevServer);
-      showUpdateError("icon", e, { type: "icon", iconCode: normalized });
-    } finally { setSavingStreakIcon(false); }
+      await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
+    } finally {
+      window.location.href = "/login";
+    }
   }
 
-  async function handleSelectTitle(choice: TitlePickerChoice, options?: { force?: boolean }) {
-    if (!options?.force && (savingTitle || savingStreakIcon || customUpdateDialog.open)) return;
-    const prevCode = equippedTitleCodeState;
-    const prevLabel = equippedTitleLabelState;
-    try {
-      openUpdateLoading("title");
-      setSavingTitle(true);
-      setEquippedTitleCodeState(choice.code);
-      setEquippedTitleLabelState(choice.label);
-      const res = await fetch("/api/profile-streak-title", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ titleCode: choice.code }) });
-      let json: SaveStreakTitleApiResponse | null = null;
-      try { json = (await res.json()) as SaveStreakTitleApiResponse; } catch { json = null; }
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось сохранить титул");
-      const savedCode = (typeof json.selectedTitle?.code === "string" && json.selectedTitle.code) || (typeof json.selectedTitleCode === "string" && json.selectedTitleCode) || (typeof json.selectedTitleDbCode === "string" && json.selectedTitleDbCode) || choice.code;
-      const savedLabel = (typeof json.selectedTitle?.label === "string" && json.selectedTitle.label) || choice.label;
-      setEquippedTitleCodeState(savedCode);
-      setEquippedTitleLabelState(savedLabel);
-      setCustomUpdateDialog(getClosedCustomUpdateDialog());
-      showNotification("Титул успешно обновлён");
-      setTitleModalOpen(false);
-      void refreshStreakFromApi({ silent: true, force: true });
-    } catch (e: any) {
-      setEquippedTitleCodeState(prevCode);
-      setEquippedTitleLabelState(prevLabel);
-      showUpdateError("title", e, { type: "title-select", choice });
-    } finally { setSavingTitle(false); }
-  }
+  const overlayCss =
+    backgroundProxyUrl && (bgReady || !bgLoading)
+      ? `url('${backgroundProxyUrl}')`
+      : "none";
 
-  async function handleClearSelectedTitle(options?: { force?: boolean }) {
-    if (!options?.force && (savingTitle || savingStreakIcon || customUpdateDialog.open)) return;
-    const prevCode = equippedTitleCodeState;
-    const prevLabel = equippedTitleLabelState;
-    try {
-      openUpdateLoading("title");
-      setSavingTitle(true);
-      setEquippedTitleCodeState(null);
-      setEquippedTitleLabelState(null);
-      const res = await fetch("/api/profile-streak-title", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ reset: true }) });
-      let json: SaveStreakTitleApiResponse | null = null;
-      try { json = (await res.json()) as SaveStreakTitleApiResponse; } catch { json = null; }
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось сбросить титул");
-      setEquippedTitleCodeState(null);
-      setEquippedTitleLabelState(null);
-      setCustomUpdateDialog(getClosedCustomUpdateDialog());
-      showNotification("Титул успешно сброшен");
-      setTitleModalOpen(false);
-      void refreshStreakFromApi({ silent: true, force: true });
-    } catch (e: any) {
-      setEquippedTitleCodeState(prevCode);
-      setEquippedTitleLabelState(prevLabel);
-      showUpdateError("title", e, { type: "title-clear" });
-    } finally { setSavingTitle(false); }
-  }
-
-  const overlayCss = backgroundProxyUrl && (bgReady || !bgLoading) ? `url('${backgroundProxyUrl}')` : "none";
   const effectiveTitleLabelForUi = equippedTitleLabelState ?? null;
-  const effectiveTitleCodeForUi = equippedTitleCodeState ?? null;
-  const titleText = effectiveTitleLabelForUi?.trim() || (streakDisplay >= 1 ? "Без титула (пока не выбран)" : "Без титула");
+  const titleText =
+    effectiveTitleLabelForUi?.trim() ||
+    (streakDisplay >= 1 ? "Легенда центра" : "Без титула");
 
-  const streakChipTitle = streakLoading ? "Загружаем стрик..." : streakError ? `Стрик временно недоступен: ${streakError}` : streak ? `Серия: ${streakDisplay} дн. • Рекорд: ${streak.longest_streak} дн.` : "Серия пока не началась";
-  const streakChipSub = streakLoading ? "серия" : streak?.done_today ? "сделано сегодня" : streakDisplay > 0 ? "сохранить сегодня" : "начни серию";
-  const titleSavingNow = customUpdateDialog.open && customUpdateDialog.scope === "title" && customUpdateDialog.mode === "loading";
+  const streakChipTitle = streakLoading
+    ? "Загружаем стрик..."
+    : streakError
+    ? `Стрик временно недоступен: ${streakError}`
+    : streak
+    ? `Серия: ${streakDisplay} дн. • Рекорд: ${streak.longest_streak} дн.`
+    : "Серия пока не началась";
+  const streakChipSub = streakLoading
+    ? "серия"
+    : streak?.done_today
+    ? "сделано сегодня"
+    : streakDisplay > 0
+    ? "сохранить сегодня"
+    : "начни серию";
 
   const brandMark = projectName.substring(0, 2).toUpperCase() || "EK";
 
   return (
-    <div id="profileBody" className="profile-page" style={{ ["--profile-overlay" as any]: overlayCss }}>
+    <div
+      id="profileBody"
+      className="profile-page"
+      style={{ ["--profile-overlay" as any]: overlayCss }}
+    >
       {bgLoading && (
         <div className="background-loading" style={{ display: "block" }}>
           <span className="spinner" /> Загружаем фон...
@@ -1123,24 +1485,66 @@ export default function ProfileClient({
       )}
 
       {notif && (
-        <div style={{ position: "fixed", top: 20, right: 20, background: notif.type === "success" ? "#4caf50" : "#f44336", color: "white", padding: "14px 18px", borderRadius: 12, boxShadow: "0 14px 35px rgba(0,0,0,0.18)", zIndex: 10001, maxWidth: 360, fontWeight: 800 }}>
+        <div
+          style={{
+            position: "fixed",
+            top: 20,
+            right: 20,
+            background: notif.type === "success" ? "#4caf50" : "#f44336",
+            color: "white",
+            padding: "14px 18px",
+            borderRadius: 12,
+            boxShadow: "0 14px 35px rgba(0,0,0,0.18)",
+            zIndex: 10001,
+            maxWidth: 360,
+            fontWeight: 800,
+          }}
+        >
           {notif.text}
         </div>
       )}
 
-      <Modal open={editOpen} onClose={closeEdit} title="Редактирование профиля" maxWidth={520}>
-        <form onSubmit={(e) => { e.preventDefault(); void saveProfile(); }}>
+      {/* Модалка редактирования личных данных */}
+      <Modal
+        open={editOpen}
+        onClose={closeEdit}
+        title="Редактирование профиля"
+        maxWidth={520}
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveProfile();
+          }}
+        >
           <div className="form-group">
             <label htmlFor="editFullName">ФИО:</label>
-            <input id="editFullName" type="text" required value={editFullName} onChange={(e) => setEditFullName(e.target.value)} />
+            <input
+              id="editFullName"
+              type="text"
+              required
+              value={editFullName}
+              onChange={(e) => setEditFullName(e.target.value)}
+            />
           </div>
           <div className="form-group">
             <label htmlFor="editPhone">Контактный телефон:</label>
-            <input id="editPhone" type="tel" required value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+            <input
+              id="editPhone"
+              type="tel"
+              required
+              value={editPhone}
+              onChange={(e) => setEditPhone(e.target.value)}
+            />
           </div>
           <div className="form-group">
             <label htmlFor="editRegion">Область проживания:</label>
-            <select id="editRegion" required value={editRegion} onChange={(e) => setEditRegion(e.target.value)}>
+            <select
+              id="editRegion"
+              required
+              value={editRegion}
+              onChange={(e) => setEditRegion(e.target.value)}
+            >
               <option value="">-- Выберите область --</option>
               <option value="Белгородская">Белгородская область</option>
               <option value="Курская">Курская область</option>
@@ -1153,43 +1557,146 @@ export default function ProfileClient({
           <div className="form-group">
             <label>Email:</label>
             <input type="email" value={userEmail} disabled />
-            <div className="small-muted" style={{ marginTop: 5 }}>Email нельзя изменить</div>
+            <div className="small-muted" style={{ marginTop: 5 }}>
+              Email нельзя изменить
+            </div>
           </div>
           <div className="modal-actions">
-            <button type="button" className="btn ghost" onClick={closeEdit}>Отмена</button>
-            <button type="submit" className="btn" disabled={saving}>{saving ? "Сохранение..." : "Сохранить изменения"}</button>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={closeEdit}
+            >
+              Отмена
+            </button>
+            <button type="submit" className="btn" disabled={saving}>
+              {saving ? "Сохранение..." : "Сохранить изменения"}
+            </button>
           </div>
         </form>
       </Modal>
 
-      <TitlePickerModal open={titleModalOpen} onClose={() => setTitleModalOpen(false)} longestStreak={longestStreakDisplay} currentStreak={streakDisplay} currentTitleCode={effectiveTitleCodeForUi} currentTitleLabel={effectiveTitleLabelForUi} titleCatalog={titleCatalogState} onSelectTitle={(choice) => { if (isCustomizationUpdateLocked) return; void handleSelectTitle(choice); }} onClearLocalTitle={() => { if (isCustomizationUpdateLocked) return; void handleClearSelectedTitle(); }} loading={streakLoading || titleSavingNow} />
-      <StreakRoadmapModal open={streakModalOpen} onClose={() => setStreakModalOpen(false)} streak={streak} loading={streakLoading} error={streakError} equippedTitleLabel={effectiveTitleLabelForUi} unlockedIconCodes={unlockedIconCodesForUi} selectedIconCode={effectiveSelectedStreakIconCode} onSelectIconCode={isCustomizationUpdateLocked ? undefined : handleSelectStreakIcon} />
-      <StreakLeaderboardModal open={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} loading={leaderboardLoading} error={leaderboardError} top={leaderboardTop} around={leaderboardAround} myPlace={leaderboardMyPlace} myCurrent={leaderboardMyCurrent} myLongest={leaderboardMyLongest} onRetry={() => void refreshLeaderboardFromApi({ force: true })} />
+      {/* ЕДИНАЯ МОДАЛКА НАГРАД (Стрики, Гардероб, Промокоды) */}
+      <RewardsModal
+        isOpen={rewardsModalOpen}
+        defaultTab={rewardsTab}
+        onClose={() => setRewardsModalOpen(false)}
+      />
 
-      <Modal open={customUpdateDialog.open} onClose={closeCustomUpdateDialog} title={customUpdateDialog.title || "Обновление"} maxWidth={460}>
+      {/* МОДАЛКА ЛИДЕРБОРДА */}
+      <StreakLeaderboardModal
+        open={leaderboardOpen}
+        onClose={() => setLeaderboardOpen(false)}
+        loading={leaderboardLoading}
+        error={leaderboardError}
+        top={leaderboardTop}
+        around={leaderboardAround}
+        myPlace={leaderboardMyPlace}
+        myCurrent={leaderboardMyCurrent}
+        myLongest={leaderboardMyLongest}
+        onRetry={() => void refreshLeaderboardFromApi({ force: true })}
+      />
+
+      {/* ИНФОРМАЦИОННЫЙ ДИАЛОГ ОБНОВЛЕНИЯ */}
+      <Modal
+        open={customUpdateDialog.open}
+        onClose={closeCustomUpdateDialog}
+        title={customUpdateDialog.title || "Обновление"}
+        maxWidth={460}
+      >
         <div style={{ display: "grid", gap: 14 }}>
           {customUpdateDialog.mode === "loading" ? (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 2px", fontWeight: 800, color: "var(--project-text)" }}>
-                <span className="spinner" style={{ borderColor: "var(--glass-border)", borderTopColor: "var(--project-primary)" }} /><span>{customUpdateDialog.message || "Обновляем..."}</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "6px 2px",
+                  fontWeight: 800,
+                  color: "var(--project-text)",
+                }}
+              >
+                <span
+                  className="spinner"
+                  style={{
+                    borderColor: "var(--glass-border)",
+                    borderTopColor: "var(--project-primary)",
+                  }}
+                />
+                <span>{customUpdateDialog.message || "Обновляем..."}</span>
               </div>
-              <div style={{ fontSize: 14, lineHeight: 1.4, color: "var(--project-muted)", background: "color-mix(in srgb, var(--project-text) 5%, transparent)", borderRadius: 12, padding: "12px" }}>
-                Пожалуйста, дождитесь завершения. Пока окно открыто, выбор новой иконки/титула временно заблокирован.
+              <div
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.4,
+                  color: "var(--project-muted)",
+                  background:
+                    "color-mix(in srgb, var(--project-text) 5%, transparent)",
+                  borderRadius: 12,
+                  padding: "12px",
+                }}
+              >
+                Пожалуйста, дождитесь завершения.
               </div>
-              <div className="modal-actions" style={{ justifyContent: "flex-end" }}><button type="button" className="btn secondary" disabled>Обновление...</button></div>
+              <div
+                className="modal-actions"
+                style={{ justifyContent: "flex-end" }}
+              >
+                <button type="button" className="btn secondary" disabled>
+                  Обновление...
+                </button>
+              </div>
             </>
           ) : (
             <>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "color-mix(in srgb, #ef4444 8%, transparent)", border: "1px solid color-mix(in srgb, #ef4444 20%, transparent)", borderRadius: 14, padding: "12px 14px" }}>
-                <span style={{ fontSize: 20, lineHeight: 1, fontWeight: 900, color: "#ef4444" }}>!</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  background:
+                    "color-mix(in srgb, #ef4444 8%, transparent)",
+                  border:
+                    "1px solid color-mix(in srgb, #ef4444 20%, transparent)",
+                  borderRadius: 14,
+                  padding: "12px 14px",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 20,
+                    lineHeight: 1,
+                    fontWeight: 900,
+                    color: "#ef4444",
+                  }}
+                >
+                  !
+                </span>
                 <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ fontWeight: 900, color: "#ef4444" }}>Не удалось обновить</div>
-                  <div style={{ color: "#ef4444", fontWeight: 700, lineHeight: 1.35, opacity: 0.9 }}>{customUpdateDialog.message || "Ошибка соединения с сервером"}</div>
+                  <div style={{ fontWeight: 900, color: "#ef4444" }}>
+                    Не удалось обновить
+                  </div>
+                  <div
+                    style={{
+                      color: "#ef4444",
+                      fontWeight: 700,
+                      lineHeight: 1.35,
+                      opacity: 0.9,
+                    }}
+                  >
+                    {customUpdateDialog.message || "Ошибка соединения с сервером"}
+                  </div>
                 </div>
               </div>
               <div className="modal-actions">
-                <button type="button" className="btn ghost" onClick={closeCustomUpdateDialog}>Закрыть</button>
-                <button type="button" className="btn" onClick={() => void retryCustomUpdateDialogAction()}>Повторить</button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={closeCustomUpdateDialog}
+                >
+                  Закрыть
+                </button>
               </div>
             </>
           )}
@@ -1197,6 +1704,7 @@ export default function ProfileClient({
       </Modal>
 
       <div className="profile-container">
+        {/* ВЕРХНИЙ БАР */}
         <div className="profile-topbar">
           <div className="brand">
             <div className="brand-mark">{brandMark}</div>
@@ -1207,175 +1715,385 @@ export default function ProfileClient({
           </div>
 
           <div className="top-actions">
+            {/* Кнопка серии / стрика */}
             {features?.streaks && (
-              <button type="button" className={`streak-chip ${streakUiBase.className} ${streakLoading ? "streak-chip--loading" : ""}`} title={streakChipTitle} aria-label="Открыть информацию о серии" onClick={openStreakModal}>
+              <button
+                type="button"
+                className={`streak-chip ${streakUiBase.className} ${
+                  streakLoading ? "streak-chip--loading" : ""
+                }`}
+                title={streakChipTitle}
+                aria-label="Открыть информацию о серии"
+                onClick={() => openRewards("streaks")}
+              >
                 <span className="streak-chip-icon" aria-hidden="true">
-                  <StreakIconVisual iconCode={effectiveSelectedStreakIconCode ?? null} cacheTag={cacheTagForCurrentIcon} preferredUrls={preferredUrlsForCurrentIcon} variant={null} emojiFallback={chipEmojiFallback} alt="Иконка серии" wrapperClassName="streak-visual--chip" imgClassName="streak-visual__img--chip" emojiClassName="streak-visual__emoji--chip" />
+                  <StreakIconVisual
+                    iconCode={effectiveSelectedStreakIconCode ?? null}
+                    cacheTag={cacheTagForCurrentIcon}
+                    preferredUrls={preferredUrlsForCurrentIcon}
+                    variant={null}
+                    emojiFallback={chipEmojiFallback}
+                    alt="Иконка серии"
+                    wrapperClassName="streak-visual--chip"
+                    imgClassName="streak-visual__img--chip"
+                    emojiClassName="streak-visual__emoji--chip"
+                  />
                 </span>
                 <span className="streak-chip-main">
-                  <span className="streak-chip-value">{streakLoading ? "…" : streakDisplay}</span>
+                  <span className="streak-chip-value">
+                    {streakLoading ? "…" : streakDisplay}
+                  </span>
                   <span className="streak-chip-unit">дн.</span>
                 </span>
                 <span className="streak-chip-sub">{streakChipSub}</span>
               </button>
             )}
 
+            {/* Топ серий */}
             {features?.leaderboard && (
-              <button type="button" className="nav-pill" onClick={openLeaderboardModal} title="Открыть топ по сериям" aria-label="Открыть топ по сериям">
+              <button
+                type="button"
+                className="nav-pill"
+                onClick={openLeaderboardModal}
+                title="Открыть топ по сериям"
+                aria-label="Открыть топ по сериям"
+              >
                 🏆 Топ серий
               </button>
             )}
 
-            <Link className="nav-pill" href={`/projects/${projectSlug}/materials`}>📚 Материалы</Link>
-            <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}>🚪 Выйти</button>
+            {/* Кнопка Центр Наград */}
+            <button
+              type="button"
+              className="nav-pill"
+              onClick={() => openRewards("wardrobe")}
+              title="Открыть Центр Наград и Маскота"
+            >
+              🎭 Награды
+            </button>
+
+            <Link
+              className="nav-pill"
+              href={`/projects/${projectSlug}/materials`}
+            >
+              📚 Материалы
+            </Link>
+            <button
+              className="nav-pill nav-pill--logout"
+              type="button"
+              onClick={() => void logout()}
+            >
+              🚪 Выйти
+            </button>
           </div>
         </div>
 
         <div className="profile-grid">
-          
           {/* ЛЕВАЯ КОЛОНКА */}
           <aside className="profile-panel profile-sidebar">
             <div
-              className={`profile-avatar-wrapper ${features?.streaks ? `avatar-circle--${(() => {
-                const allowed = new Set(["none", "bronze", "silver", "gold", "platinum", "diamond", "legendary"]);
-                return allowed.has(String(uiTierCodeForColors)) ? String(uiTierCodeForColors) : "none";
-              })()}` : "avatar-circle--none"}`}
-              role={features?.streaks ? "button" : "presentation"}
-              tabIndex={features?.streaks ? 0 : -1}
-              onClick={features?.streaks ? openStreakModal : undefined}
-              style={{ cursor: features?.streaks ? "pointer" : "default" }}
-              aria-label={features?.streaks ? "Иконка награды профиля" : "Аватар профиля"}
-              title={features?.streaks ? "Открыть серию активности" : ""}
+              className={`profile-avatar-wrapper ${
+                features?.streaks
+                  ? `avatar-circle--${(() => {
+                      const allowed = new Set([
+                        "none",
+                        "bronze",
+                        "silver",
+                        "gold",
+                        "platinum",
+                        "diamond",
+                        "legendary",
+                      ]);
+                      return allowed.has(String(uiTierCodeForColors))
+                        ? String(uiTierCodeForColors)
+                        : "none";
+                    })()}`
+                  : "avatar-circle--none"
+              }`}
+              role="button"
+              tabIndex={0}
+              onClick={() => openRewards("wardrobe")}
+              style={{ cursor: "pointer" }}
+              aria-label="Аватар и Центр Наград"
+              title="Нажмите, чтобы открыть Центр Наград"
             >
-              {features?.streaks ? (
-                <>
-                  <div className="avatar-icon-bg" />
-                  <StreakIconVisual iconCode={effectiveSelectedStreakIconCode ?? null} cacheTag={cacheTagForCurrentIcon} preferredUrls={preferredUrlsForCurrentIcon} variant={null} emojiFallback={avatarEmojiFallback} alt="Иконка награды" priority wrapperClassName="streak-visual--avatar" imgClassName="streak-visual__img--avatar" emojiClassName="streak-visual__emoji--avatar" />
-                  <button type="button" className={`streak-mini-badge ${streakUiBase.ringClassName}`} title={`Стрик: ${streakLoading ? "…" : streakDisplay} дн.`} onClick={openStreakModal}>
-                    {streakLoading ? "…" : streakDisplay}
-                  </button>
-                </>
-              ) : (
-                <span>👤</span>
-              )}
+              <div className="avatar-icon-bg" />
+              <StreakIconVisual
+                iconCode={effectiveSelectedStreakIconCode ?? null}
+                cacheTag={cacheTagForCurrentIcon}
+                preferredUrls={preferredUrlsForCurrentIcon}
+                variant={null}
+                emojiFallback={avatarEmojiFallback}
+                alt="Иконка награды"
+                priority
+                wrapperClassName="streak-visual--avatar"
+                imgClassName="streak-visual__img--avatar"
+                emojiClassName="streak-visual__emoji--avatar"
+              />
+              <button
+                type="button"
+                className={`streak-mini-badge ${streakUiBase.ringClassName}`}
+                title={`Стрик: ${streakLoading ? "…" : streakDisplay} дн.`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openRewards("streaks");
+                }}
+              >
+                {streakLoading ? "…" : streakDisplay}
+              </button>
             </div>
 
             <div className="profile-name">{nameLabel(profile.full_name)}</div>
             <div className="profile-email">{userEmail || "—"}</div>
 
-            {features?.titles && (
-              <button
-                type="button"
-                className="profile-title-slot"
-                onClick={() => setTitleModalOpen(true)}
-                title="Выбрать титул"
-                style={{ cursor: customUpdateDialog.open ? "not-allowed" : "pointer", opacity: customUpdateDialog.open ? 0.7 : 1, border: "none", marginBottom: "24px" }}
-              >
-                <span className="profile-title-slot-icon">Т</span>
-                <span className="profile-title-slot-text">{titleText}</span>
-              </button>
-            )}
+            {/* Слот выбора титула */}
+            <button
+              type="button"
+              className="profile-title-slot"
+              onClick={() => openRewards("wardrobe")}
+              title="Выбрать титул в Центре Наград"
+              style={{
+                cursor: "pointer",
+                border: "none",
+                marginBottom: "24px",
+              }}
+            >
+              <span className="profile-title-slot-icon">🏷️</span>
+              <span className="profile-title-slot-text">{titleText}</span>
+            </button>
 
-            <div className="details-list" style={{ width: "100%", marginBottom: "16px" }}>
+            <div
+              className="details-list"
+              style={{ width: "100%", marginBottom: "16px" }}
+            >
               <div className="detail-item">
                 <span className="detail-label">Телефон</span>
-                <span className="detail-value">{phoneLabel(profile.contact_phone)}</span>
+                <span className="detail-value">
+                  {phoneLabel(profile.contact_phone)}
+                </span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Регион</span>
-                <span className="detail-value">{regionLabel(profile.region)}</span>
+                <span className="detail-value">
+                  {regionLabel(profile.region)}
+                </span>
               </div>
             </div>
 
             {features?.streaks && (
-              <div className="details-list" style={{ width: "100%", marginBottom: "24px" }}>
-                <div className="detail-item" style={{ cursor: "pointer" }} onClick={openStreakModal}>
+              <div
+                className="details-list"
+                style={{ width: "100%", marginBottom: "24px" }}
+              >
+                <div
+                  className="detail-item"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => openRewards("streaks")}
+                >
                   <span className="detail-label">Текущая серия</span>
-                  <span className="detail-value" style={{ color: "var(--project-primary)" }}>{streakLoading ? "…" : `${streakDisplay} дн.`}</span>
+                  <span
+                    className="detail-value"
+                    style={{ color: "var(--project-primary)" }}
+                  >
+                    {streakLoading ? "…" : `${streakDisplay} дн.`}
+                  </span>
                 </div>
-                <div className="detail-item" style={{ cursor: "pointer" }} onClick={openStreakModal}>
+                <div
+                  className="detail-item"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => openRewards("streaks")}
+                >
                   <span className="detail-label">Рекорд</span>
-                  <span className="detail-value">{streakLoading ? "…" : `${longestStreakDisplay} дн.`}</span>
+                  <span className="detail-value">
+                    {streakLoading ? "…" : `${longestStreakDisplay} дн.`}
+                  </span>
                 </div>
               </div>
             )}
 
             <div className="profile-actions">
-              <button className="btn ghost" onClick={openEdit} type="button">Редактировать профиль</button>
-              <button className="btn secondary" onClick={() => router.push(`/projects/${projectSlug}/requests`)} type="button">Заявки на покупку</button>
-              {profile.is_admin && <Link className="btn info" href="/admin">Панель управления</Link>}
+              <button className="btn ghost" onClick={openEdit} type="button">
+                Редактировать профиль
+              </button>
+              <button
+                className="btn secondary"
+                onClick={() =>
+                  router.push(`/projects/${projectSlug}/requests`)
+                }
+                type="button"
+              >
+                Заявки на покупку
+              </button>
+              {profile.is_admin && (
+                <Link className="btn info" href="/admin">
+                  Панель управления
+                </Link>
+              )}
             </div>
           </aside>
 
           {/* ПРАВАЯ КОЛОНКА */}
           <main className="profile-panel">
-            
-            <div className="section-title">Статистика <b>материалов</b></div>
+            <div className="section-title">
+              Статистика <b>материалов</b>
+            </div>
             <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-value">{stats?.totalMaterials ?? "—"}</div>
                 <div className="stat-label">Доступно материалов</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">{stats?.completedMaterials ?? "—"}</div>
+                <div className="stat-value">
+                  {stats?.completedMaterials ?? "—"}
+                </div>
                 <div className="stat-label">Пройдено полностью</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">{stats ? `${stats.successRate}%` : "—"}</div>
+                <div className="stat-value">
+                  {stats ? `${stats.successRate}%` : "—"}
+                </div>
                 <div className="stat-label">Общий прогресс</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">{stats?.totalAvailableAssignments ?? "—"}</div>
+                <div className="stat-value">
+                  {stats?.totalAvailableAssignments ?? "—"}
+                </div>
                 <div className="stat-label">Доступно заданий</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">{stats?.completedAvailableAssignments ?? "—"}</div>
+                <div className="stat-value">
+                  {stats?.completedAvailableAssignments ?? "—"}
+                </div>
                 <div className="stat-label">Решено заданий</div>
               </div>
             </div>
-            {progressLoading && <div style={{ marginBottom: 24, fontWeight: 700, color: "var(--project-muted)" }}>Подгружаем прогресс...</div>}
-            {progressError && <div style={{ marginBottom: 24, fontWeight: 800, color: "#ef4444" }}>Прогресс не загрузился: {progressError}</div>}
+            {progressLoading && (
+              <div
+                style={{
+                  marginBottom: 24,
+                  fontWeight: 700,
+                  color: "var(--project-muted)",
+                }}
+              >
+                Подгружаем прогресс...
+              </div>
+            )}
+            {progressError && (
+              <div
+                style={{
+                  marginBottom: 24,
+                  fontWeight: 800,
+                  color: "#ef4444",
+                }}
+              >
+                Прогресс не загрузился: {progressError}
+              </div>
+            )}
 
-            <div className="section-title">Прогресс <b>обучения</b></div>
+            <div className="section-title">
+              Прогресс <b>обучения</b>
+            </div>
             {!materialsProgress ? (
-              <div style={{ fontWeight: 700, color: "var(--project-muted)" }}>Загрузка материалов...</div>
+              <div style={{ fontWeight: 700, color: "var(--project-muted)" }}>
+                Загрузка материалов...
+              </div>
             ) : materialsProgress.length === 0 ? (
-              <div style={{ fontWeight: 700, color: "var(--project-muted)", textAlign: "center", padding: "40px", background: "color-mix(in srgb, var(--project-text) 2%, transparent)", borderRadius: "20px" }}>
+              <div
+                style={{
+                  fontWeight: 700,
+                  color: "var(--project-muted)",
+                  textAlign: "center",
+                  padding: "40px",
+                  background:
+                    "color-mix(in srgb, var(--project-text) 2%, transparent)",
+                  borderRadius: "20px",
+                }}
+              >
                 Материалы пока не доступны
-                <div style={{ marginTop: 8, fontSize: "14px" }}>Обратитесь к администратору для получения доступа</div>
+                <div style={{ marginTop: 8, fontSize: "14px" }}>
+                  Обратитесь к администратору для получения доступа
+                </div>
               </div>
             ) : (
               <div className="progress-list">
                 {materialsProgress.map((m) => (
-                  <Link key={`${m.kind}-${m.id}`} href={m.href} className="progress-row" style={{ textDecoration: "none" }}>
+                  <Link
+                    key={`${m.kind}-${m.id}`}
+                    href={m.href}
+                    className="progress-row"
+                    style={{ textDecoration: "none" }}
+                  >
                     <div className="progress-left">
-                      {/* 🚀 ИСПРАВЛЕНИЕ: Выводим tabTitle, если есть, иначе fallback */}
                       <div className="progress-type">
-                        {m.tabTitle ? m.tabTitle.toUpperCase() : (m.kind === "textbook" ? "УЧЕБНИК" : "КРОССВОРД")}
+                        {m.tabTitle
+                          ? m.tabTitle.toUpperCase()
+                          : m.kind === "textbook"
+                          ? "УЧЕБНИК"
+                          : "КРОССВОРД"}
                       </div>
                       <div className="progress-title">{m.title}</div>
                       <div className="progress-sub">
-                        {m.kind === "textbook" ? `${m.completed} из ${m.total} заданий выполнено` : `${m.completed} из ${m.total} слов отгадано`}
+                        {m.kind === "textbook"
+                          ? `${m.completed} из ${m.total} заданий выполнено`
+                          : `${m.completed} из ${m.total} слов отгадано`}
                         {m.total === 0 ? " (нет заданий)" : ""}
                       </div>
                     </div>
                     <div className="progress-right">
-                      <div className="progress-bar"><div className="progress-fill" style={{ width: `${m.progressPercent}%` }} /></div>
-                      <div className="progress-percent">{m.progressPercent}%</div>
+                      <div className="progress-bar">
+                        <div
+                          className="progress-fill"
+                          style={{ width: `${m.progressPercent}%` }}
+                        />
+                      </div>
+                      <div className="progress-percent">
+                        {m.progressPercent}%
+                      </div>
                     </div>
                   </Link>
                 ))}
               </div>
             )}
 
-            <div className="section-title" style={{ marginTop: "32px" }}>Служба <b>поддержки</b></div>
+            <div className="section-title" style={{ marginTop: "32px" }}>
+              Служба <b>поддержки</b>
+            </div>
             <ul className="info-list">
               <li className="info-li">
                 <span className="info-bullet" />
-                <span>Возникли вопросы по материалам или платформе? Свяжитесь с нами: <b><a href="https://t.me/skebobingg" target="_blank" rel="noopener noreferrer" style={{ color: "var(--project-primary)", textDecoration: "none" }}>Telegram</a></b> или <b><a href="https://vk.com/bluntokyr" target="_blank" rel="noopener noreferrer" style={{ color: "var(--project-primary)", textDecoration: "none" }}>ВКонтакте</a></b>.</span>
+                <span>
+                  Возникли вопросы по материалам или платформе? Свяжитесь с нами:{" "}
+                  <b>
+                    <a
+                      href="https://t.me/skebobingg"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: "var(--project-primary)",
+                        textDecoration: "none",
+                      }}
+                    >
+                      Telegram
+                    </a>
+                  </b>{" "}
+                  или{" "}
+                  <b>
+                    <a
+                      href="https://vk.com/bluntokyr"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: "var(--project-primary)",
+                        textDecoration: "none",
+                      }}
+                    >
+                      ВКонтакте
+                    </a>
+                  </b>
+                  .
+                </span>
               </li>
             </ul>
-
           </main>
         </div>
       </div>

@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import ProfileClient from "./ProfileClient";
 
-// Отключаем кэш, чтобы настройки фичей и профиль всегда были свежими
+// Отключаем кэш, чтобы настройки профиля и темы всегда были свежими
 export const revalidate = 0;
 
 export default async function ProjectProfilePage({
@@ -15,7 +15,10 @@ export default async function ProjectProfilePage({
   const { slug } = await params;
 
   // 1. Проверяем авторизацию
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
   if (authError || !user) {
     redirect("/login");
   }
@@ -25,18 +28,17 @@ export default async function ProjectProfilePage({
     .from("projects")
     .select("id, name, slug, features, is_active, theme, theme_color")
     .eq("slug", slug)
-    .single();
+    .maybeSingle();
 
   // Защита от несуществующих или скрытых веток
   if (!project || project.is_active === false) {
     notFound();
   }
 
-  // 3. Получаем данные профиля пользователя (имя, телефон, регион, роль)
-  // Используем таблицу profiles (не users)
+  // 3. Получаем данные профиля пользователя
   const { data: userProfile } = await supabase
     .from("profiles")
-    .select("full_name, contact_phone, region, is_admin")
+    .select("full_name, contact_phone, region, is_admin, current_streak, max_streak")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -45,20 +47,23 @@ export default async function ProjectProfilePage({
     contact_phone: userProfile?.contact_phone || "",
     region: userProfile?.region || "",
     is_admin: Boolean(userProfile?.is_admin),
+    current_streak: Number(userProfile?.current_streak || 0),
+    max_streak: Number(userProfile?.max_streak || 0),
   };
 
-  // 4. Формируем флаги геймификации (с поддержкой обратной совместимости легаси-ключей)
+  // 4. Флаги геймификации (стрики и лидерборд теперь всегда активны глобально)
   const rawFeatures = project.features || {};
   const features = {
-    streaks: Boolean(rawFeatures.streaks || rawFeatures.hasStreaks),
-    titles: Boolean(rawFeatures.titles || rawFeatures.hasTitles),
-    leaderboard: Boolean(rawFeatures.leaderboard || rawFeatures.hasLeaderboard),
+    streaks: true,
+    titles: true,
+    leaderboard: Boolean(rawFeatures.leaderboard ?? true),
   };
 
-  // Достаем картинку фона из темы (если она была задана в админке)
-  const backgroundUrl = project.theme?.backgroundUrl || project.theme?.bgImage || null;
+  // Картинка фона из темы проекта
+  const backgroundUrl =
+    project.theme?.backgroundUrl || project.theme?.bgImage || null;
 
-  // 5. Передаём всё в умный клиентский компонент
+  // 5. Передаём всё в клиентский компонент профиля
   return (
     <ProfileClient
       projectName={project.name}
