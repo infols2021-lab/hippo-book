@@ -17,7 +17,7 @@ type CreateProjectInput = {
   theme?: Record<string, unknown> | null;
   features?: Record<string, unknown> | null;
   ui_texts?: Record<string, unknown> | null;
-  sheet_name?: string | null; 
+  sheet_name?: string | null;
 };
 
 type UpdateProjectInput = CreateProjectInput & { id: string };
@@ -28,6 +28,23 @@ function isNonEmptyString(v: unknown): v is string {
 
 function isValidSlug(slug: string): boolean {
   return /^[a-z0-9][a-z0-9-_]*$/i.test(slug);
+}
+
+/**
+ * Очищает объект features от устаревших локальных флагов стриков и титулов.
+ */
+function sanitizeFeatures(rawFeatures?: Record<string, unknown> | null): Record<string, unknown> {
+  if (!rawFeatures || typeof rawFeatures !== "object") return {};
+  
+  const {
+    streaks,
+    titles,
+    hasRewards,
+    hasOlympiadStreaks,
+    ...cleanFeatures
+  } = rawFeatures;
+
+  return cleanFeatures;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +98,7 @@ export async function POST(req: Request) {
     is_active: typeof body.is_active === "boolean" ? body.is_active : true,
     order_index: typeof body.order_index === "number" ? body.order_index : 0,
     theme: body.theme ?? {}, 
-    features: body.features ?? {},
+    features: sanitizeFeatures(body.features),
     ui_texts: body.ui_texts ?? {},
     sheet_name,
   };
@@ -102,7 +119,7 @@ export async function POST(req: Request) {
 }
 
 // ---------------------------------------------------------------------------
-// PATCH: обновить существующий проект (вкл. ЦВЕТА И ТЕМУ)
+// PATCH: обновить существующий проект
 // ---------------------------------------------------------------------------
 export async function PATCH(req: Request) {
   const guard = await requireAdmin();
@@ -138,7 +155,7 @@ export async function PATCH(req: Request) {
   if (updates.is_active !== undefined) updateData.is_active = updates.is_active;
   if (updates.order_index !== undefined) updateData.order_index = updates.order_index;
   if (updates.theme !== undefined) updateData.theme = updates.theme;
-  if (updates.features !== undefined) updateData.features = updates.features;
+  if (updates.features !== undefined) updateData.features = sanitizeFeatures(updates.features);
   if (updates.ui_texts !== undefined) updateData.ui_texts = updates.ui_texts;
   if (updates.sheet_name !== undefined) updateData.sheet_name = (updates.sheet_name || "").trim() || null;
 

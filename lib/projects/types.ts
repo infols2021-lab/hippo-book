@@ -30,7 +30,7 @@ export type ProjectRow = {
   ui_texts: ProjectUiTextsJson | null;
   created_at: string | null;
   updated_at: string | null;
-  sheet_name: string | null; // 🚀 НОВОЕ ПОЛЕ: Название листа в Google Таблице (например "Заявки Hippo")
+  sheet_name: string | null; // Название листа в Google Таблице (например "Заявки Hippo")
 };
 
 export type ProjectTabRow = {
@@ -73,8 +73,6 @@ export type ProjectThemeJson = {
 };
 
 export type ProjectFeaturesJson = {
-  streaks?: boolean;
-  titles?: boolean;
   avatars?: boolean;
   leaderboard?: boolean;
   profileProgress?: boolean;
@@ -166,8 +164,7 @@ export type ProjectPortalCardConfig = {
 
 /**
  * Полный конфиг проекта — аналог BranchConfig из lib/branches,
- * но собирается из БД. Поля выровнены по именам со старым типом,
- * чтобы упростить миграцию потребителей.
+ * но собирается из БД.
  */
 export type ProjectConfig = {
   // Идентификация
@@ -188,7 +185,7 @@ export type ProjectConfig = {
   orderIndex: number;
   fallbackIcon: string;
   themeColor: string;
-  sheetName: string | null; // 🚀 НОВОЕ ПОЛЕ: для конфигурации Google Таблиц
+  sheetName: string | null;
 
   // Подконфиги
   theme: ProjectThemeConfig;
@@ -198,7 +195,4 @@ export type ProjectConfig = {
   portalCard: ProjectPortalCardConfig;
   tabs: ProjectTabConfig[];
   levels: ProjectLevelConfig[];
-
-  // Флаги для совместимости со старым BranchConfig
-  hasOlympiadStreaks: boolean;
 };

@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       projectName = projectInfo.name;
     }
 
-    // 2. Поиск выбранных материалов по всем источникам (materials, textbooks, crosswords)
+    // 2. Поиск выбранных материалов по всем источникам (исключая секретные is_secret = true)
     let selectedMaterials: SelectedMaterialItem[] = [];
     let calculatedTotalPrice = 0;
 
@@ -116,15 +116,15 @@ export async function POST(req: NextRequest) {
       ] = await Promise.all([
         supabase
           .from("materials")
-          .select("id, title, price, material_kind, project_tabs(title)")
+          .select("id, title, price, material_kind, is_secret, project_tabs(title)")
           .in("id", normalized.material_ids),
         supabase
           .from("textbooks")
-          .select("id, title, price")
+          .select("id, title, price, is_secret")
           .in("id", normalized.material_ids),
         supabase
           .from("crosswords")
-          .select("id, title, price")
+          .select("id, title, price, is_secret")
           .in("id", normalized.material_ids),
       ]);
 
@@ -132,6 +132,9 @@ export async function POST(req: NextRequest) {
 
       if (Array.isArray(fetchedMaterials)) {
         for (const m of fetchedMaterials) {
+          // Игнорируем секретные материалы (их нельзя купить)
+          if (m.is_secret) continue;
+
           const rawTabTitle = (m as any).project_tabs?.title || null;
           itemsMap.set(String(m.id), {
             id: String(m.id),
@@ -145,6 +148,8 @@ export async function POST(req: NextRequest) {
 
       if (Array.isArray(fetchedTextbooks)) {
         for (const m of fetchedTextbooks) {
+          if (m.is_secret) continue;
+
           if (!itemsMap.has(String(m.id))) {
             itemsMap.set(String(m.id), {
               id: String(m.id),
@@ -159,6 +164,8 @@ export async function POST(req: NextRequest) {
 
       if (Array.isArray(fetchedCrosswords)) {
         for (const m of fetchedCrosswords) {
+          if (m.is_secret) continue;
+
           if (!itemsMap.has(String(m.id))) {
             itemsMap.set(String(m.id), {
               id: String(m.id),
@@ -176,6 +183,7 @@ export async function POST(req: NextRequest) {
     }
 
     const totalPrice = calculatedTotalPrice > 0 ? calculatedTotalPrice : (normalized.total_price || 0);
+    const validMaterialIds = selectedMaterials.map((m) => m.id);
 
     const extractedKinds = Array.from(
       new Set(selectedMaterials.map((m) => m.material_kind).filter(Boolean))
@@ -195,7 +203,7 @@ export async function POST(req: NextRequest) {
       target_levels: normalized.target_levels.length > 0 ? normalized.target_levels : null,
       textbook_types: normalized.textbook_types.length > 0 ? normalized.textbook_types : materialKinds,
       material_kinds: materialKinds,
-      material_ids: normalized.material_ids,
+      material_ids: validMaterialIds,
       total_price: totalPrice,
       email: normalized.email,
       full_name: normalized.full_name,
@@ -219,7 +227,7 @@ export async function POST(req: NextRequest) {
 
     const row = insertedRow as any;
 
-    // 4. Подготовка ровно 7 столбцов для Google Таблицы
+    // 4. Подготовка столбцов для Google Таблицы
     const sheetValues = buildSheetValues(
       row.request_number || "",
       row.created_at || "",

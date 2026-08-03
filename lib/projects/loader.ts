@@ -80,8 +80,6 @@ const DEFAULT_THEME: ProjectThemeConfig = {
 };
 
 const DEFAULT_FEATURES: ProjectFeaturesJson = {
-  streaks: false,
-  titles: false,
   avatars: false,
   leaderboard: false,
   profileProgress: true,
@@ -253,10 +251,7 @@ function buildConfig(row: ProjectRow, tabs: ProjectTabRow[], levels: ProjectLeve
       .filter((l) => l.project_id === row.id)
       .sort((a, b) => a.order_index - b.order_index)
       .map(mapLevel),
-    // ✅ Фаза 2: добавлено поле sheetName
     sheetName: row.sheet_name ?? null,
-    // ✅ Фаза 2: флаг стриков (уже был)
-    hasOlympiadStreaks: asBoolean(features.streaks, false),
   };
 }
 

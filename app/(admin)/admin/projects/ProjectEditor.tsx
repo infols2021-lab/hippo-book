@@ -11,8 +11,6 @@ type ColorSettings = {
 };
 
 type FeatureKey =
-  | "streaks"
-  | "titles"
   | "leaderboard"
   | "avatars"
   | "profileProgress"
@@ -232,8 +230,6 @@ export default function ProjectEditor({
       },
     },
     features: {
-      streaks: project?.features?.streaks || project?.features?.hasStreaks || false,
-      titles: project?.features?.titles || project?.features?.hasTitles || false,
       leaderboard: project?.features?.leaderboard || project?.features?.hasLeaderboard || false,
       avatars: project?.features?.avatars || project?.features?.hasAvatars || false,
       profileProgress: project?.features?.profileProgress || false,
@@ -460,7 +456,7 @@ export default function ProjectEditor({
           ...prev.theme.colors, 
           ...preset 
         } 
-      }
+      } 
     }));
   };
 
@@ -633,7 +629,7 @@ export default function ProjectEditor({
           </div>
         </div>
 
-        {/* ФИЧИ */}
+        {/* ФИЧИ (Старые локальные стрики и титулы убраны, оставлены лидерборд, аватарки и режим заявок) */}
         <div className="bg-blue-50/50 p-6 rounded-[24px] border border-blue-100 border-t pt-8">
           <h3 className="font-black text-blue-900 mb-2 text-xl">🎮 Модули платформы</h3>
           <p className="text-sm text-blue-800/70 mb-6 font-medium">Включите геймификацию и выберите режим заявок.</p>
@@ -643,28 +639,19 @@ export default function ProjectEditor({
               <input 
                 type="checkbox" 
                 className="w-5 h-5 text-blue-600 rounded" 
-                checked={formData.features.streaks} 
-                onChange={() => toggleFeature("streaks")} 
-              />
-              <span className="font-bold text-gray-800">🔥 Огненные серии (Стрики)</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer bg-white p-4 rounded-2xl border shadow-sm hover:border-blue-300 transition-all">
-              <input 
-                type="checkbox" 
-                className="w-5 h-5 text-blue-600 rounded" 
-                checked={formData.features.titles} 
-                onChange={() => toggleFeature("titles")} 
-              />
-              <span className="font-bold text-gray-800">👑 Титулы</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer bg-white p-4 rounded-2xl border shadow-sm hover:border-blue-300 transition-all">
-              <input 
-                type="checkbox" 
-                className="w-5 h-5 text-blue-600 rounded" 
                 checked={formData.features.leaderboard} 
                 onChange={() => toggleFeature("leaderboard")} 
               />
               <span className="font-bold text-gray-800">🏆 Лидерборд</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer bg-white p-4 rounded-2xl border shadow-sm hover:border-blue-300 transition-all">
+              <input 
+                type="checkbox" 
+                className="w-5 h-5 text-blue-600 rounded" 
+                checked={formData.features.avatars} 
+                onChange={() => toggleFeature("avatars")} 
+              />
+              <span className="font-bold text-gray-800">🖼️ Аватарки</span>
             </label>
           </div>
 

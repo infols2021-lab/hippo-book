@@ -1,6 +1,7 @@
 // lib/data/materials.ts
 // Универсальный слой запроса материалов по табу проекта (project_tab_id).
 // Поддерживает как единую таблицу materials, так и легаси-таблицы textbooks/crosswords.
+// Включает фильтрацию секретных материалов (is_secret).
 
 import "server-only";
 
@@ -60,6 +61,10 @@ export type ProjectMaterialPageData = {
   totalAssignments: number;
 };
 
+export type ExtendedMaterialDbRow = MaterialDbRow & {
+  is_secret?: boolean;
+};
+
 // ---------------------------------------------------------------------------
 // Утилиты нормализации
 // ---------------------------------------------------------------------------
@@ -99,7 +104,7 @@ function formatDate(value: unknown): string {
   }
 }
 
-function normalizeProjectMaterial(row: any): MaterialDbRow {
+function normalizeProjectMaterial(row: any): ExtendedMaterialDbRow {
   const branchType = String(row?.branch_type ?? "olympiad") as BranchType;
   return {
     id: String(row?.id ?? ""),
@@ -110,6 +115,7 @@ function normalizeProjectMaterial(row: any): MaterialDbRow {
     cover_image_url: typeof row?.cover_image_url === "string" ? row.cover_image_url : null,
     is_active: typeof row?.is_active === "boolean" ? row.is_active : true,
     is_available: typeof row?.is_available === "boolean" ? row.is_available : false,
+    is_secret: Boolean(row?.is_secret),
     order_index: typeof row?.order_index === "number" ? row.order_index : 0,
     price: normalizePrice(row?.price),
     class_levels: normalizeArray(row?.class_levels ?? row?.class_level),
@@ -127,7 +133,7 @@ function normalizeProjectMaterial(row: any): MaterialDbRow {
   };
 }
 
-function normalizeTextbookToMaterial(row: any): MaterialDbRow {
+function normalizeTextbookToMaterial(row: any): ExtendedMaterialDbRow {
   return {
     id: String(row?.id ?? ""),
     branch_type: (row?.branch_type as BranchType) || "olympiad",
@@ -137,6 +143,7 @@ function normalizeTextbookToMaterial(row: any): MaterialDbRow {
     cover_image_url: typeof row?.cover_image_url === "string" ? row.cover_image_url : null,
     is_active: typeof row?.is_active === "boolean" ? row.is_active : true,
     is_available: typeof row?.is_available === "boolean" ? row.is_available : false,
+    is_secret: Boolean(row?.is_secret),
     order_index: typeof row?.order_index === "number" ? row.order_index : 0,
     price: normalizePrice(row?.price),
     class_levels: normalizeArray(row?.class_level ?? row?.class_levels),
@@ -151,7 +158,7 @@ function normalizeTextbookToMaterial(row: any): MaterialDbRow {
   };
 }
 
-function normalizeCrosswordToMaterial(row: any): MaterialDbRow {
+function normalizeCrosswordToMaterial(row: any): ExtendedMaterialDbRow {
   return {
     id: String(row?.id ?? ""),
     branch_type: (row?.branch_type as BranchType) || "olympiad",
@@ -161,6 +168,7 @@ function normalizeCrosswordToMaterial(row: any): MaterialDbRow {
     cover_image_url: typeof row?.cover_image_url === "string" ? row.cover_image_url : null,
     is_active: typeof row?.is_active === "boolean" ? row.is_active : true,
     is_available: typeof row?.is_available === "boolean" ? row.is_available : false,
+    is_secret: Boolean(row?.is_secret),
     order_index: typeof row?.order_index === "number" ? row.order_index : 0,
     price: normalizePrice(row?.price),
     class_levels: normalizeArray(row?.class_level ?? row?.class_levels),
@@ -176,7 +184,7 @@ function normalizeCrosswordToMaterial(row: any): MaterialDbRow {
 }
 
 function buildMaterialsWithProgress(params: {
-  materials: MaterialDbRow[];
+  materials: ExtendedMaterialDbRow[];
   assignments: ProjectAssignmentLink[];
   userProgress: ProjectProgressRow[];
   accessIds: Set<string>;
@@ -197,7 +205,17 @@ function buildMaterialsWithProgress(params: {
     assignmentsByMaterial.set(materialId, current);
   }
 
-  return params.materials.map((material) => {
+  const result: MaterialWithProgress[] = [];
+
+  for (const material of params.materials) {
+    const hasAccess = Boolean(material.is_available || params.accessIds.has(material.id));
+
+    // КЛЮЧЕВАЯ ЛОГИКА СЕКРЕТНЫХ МАТЕРИАЛОВ:
+    // Если материал секретный и у ученика НЕТ доступа к нему, скрываем его полностью
+    if (material.is_secret && !hasAccess) {
+      continue;
+    }
+
     const materialAssignments = assignmentsByMaterial.get(material.id) ?? [];
     const totalAssignments = materialAssignments.length;
 
@@ -209,14 +227,16 @@ function buildMaterialsWithProgress(params: {
     const progress =
       totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
 
-    return {
+    result.push({
       ...material,
       totalAssignments,
       completedAssignments,
       progress,
-      hasAccess: Boolean(material.is_available || params.accessIds.has(material.id)),
-    };
-  });
+      hasAccess,
+    });
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -289,7 +309,7 @@ export async function loadProjectMaterialsData(
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const materialsMap = new Map<string, MaterialDbRow>();
+  const materialsMap = new Map<string, ExtendedMaterialDbRow>();
 
   if (Array.isArray(materialRows)) {
     for (const r of materialRows) {
@@ -480,6 +500,13 @@ export async function loadProjectMaterialPageData(
       .eq("user_id", user.id),
   ]);
 
+  const hasAccess = Boolean(material.is_available || accessRow || tbAccessRow || cwAccessRow);
+
+  // Если материал секретный и у пользователя НЕТ доступа — отклоняем запрос
+  if (material.is_secret && !hasAccess) {
+    return { data: null, error: "Материал не найден" };
+  }
+
   const error = assignmentsError?.message || progressError?.message || null;
 
   const progressByAssignment = new Map<string, ProjectProgressRow>();
@@ -494,8 +521,6 @@ export async function loadProjectMaterialPageData(
         typeof (row as any)?.completed_at === "string" ? (row as any).completed_at : null,
     });
   }
-
-  const hasAccess = Boolean(material.is_available || accessRow || tbAccessRow || cwAccessRow);
 
   const assignments: ProjectAssignmentPreview[] = Array.isArray(assignmentRows)
     ? assignmentRows.map((assignment: any) => {
