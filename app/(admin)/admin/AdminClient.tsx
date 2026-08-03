@@ -106,7 +106,7 @@ export default function AdminClient() {
   const [optimizerQuality, setOptimizerQuality] = useState(80);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // НОВОЕ НАВИГАЦИОННОЕ МЕНЮ
+  // НАВИГАЦИОННОЕ МЕНЮ
   const tabs = useMemo(
     () => [
       { key: "projects" as const, label: "📁 Ветки (Проекты)" },
@@ -192,7 +192,6 @@ export default function AdminClient() {
 
   useEffect(() => {
     void loadStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const totalLegacyMaterials = Number(stats.textbooks || 0) + Number(stats.crosswords || 0);
@@ -207,6 +206,10 @@ export default function AdminClient() {
           </div>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <button className="btn small" type="button" onClick={() => router.push("/admin/rewards")}>
+              🎭 Награды
+            </button>
+
             <button className="btn small" type="button" onClick={() => router.push("/portal")}>
               🏠 Портал
             </button>
@@ -325,7 +328,7 @@ export default function AdminClient() {
         })}
       </div>
 
-      {/* НОВЫЙ РОУТИНГ ТАБОВ АДМИНКИ */}
+      {/* РОУТИНГ ТАБОВ АДМИНКИ */}
       {tab === "projects" ? <ProjectsTab /> : null}
       {tab === "materials" ? <MaterialsManager /> : null}
       {tab === "assignments" ? <AssignmentsTab /> : null}

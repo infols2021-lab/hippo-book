@@ -140,7 +140,7 @@ export async function getStreakPath(
     await Promise.all([
       supabase
         .from("profiles")
-        .select("current_streak, max_streak, last_completed_at")
+        .select("current_streak, max_streak, longest_streak, last_completed_at")
         .eq("id", userId)
         .maybeSingle(),
       supabase
@@ -155,10 +155,14 @@ export async function getStreakPath(
     ]);
 
   const currentStreak = Number(profile?.current_streak || 0);
-  const maxStreak = Number(profile?.max_streak || currentStreak);
-  const lastCompletedAt = profile?.last_completed_at ? String(profile.last_completed_at) : null;
+  const maxStreak = Number(
+    profile?.max_streak ?? profile?.longest_streak ?? currentStreak
+  );
+  const lastCompletedAt = profile?.last_completed_at
+    ? String(profile.last_completed_at)
+    : null;
 
-  // Проверка выполнения хотя бы одного задания сегодня
+  // Проверка выполнения хотя бы одного задания сегодня (в UTC)
   let completedToday = false;
   if (lastCompletedAt) {
     const lastDate = new Date(lastCompletedAt).toISOString().split("T")[0];
@@ -199,20 +203,25 @@ export async function getStreakLeaderboard(
 ): Promise<StreakLeaderboardEntry[]> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, current_streak, max_streak")
+    .select("id, current_streak, max_streak, longest_streak")
     .order("max_streak", { ascending: false })
     .order("current_streak", { ascending: false })
     .limit(20);
 
   if (error || !Array.isArray(data)) return [];
 
-  return data.map((row: any, index: number) => ({
-    rank: index + 1,
-    user_id: row.id,
-    current_streak: Number(row.current_streak || 0),
-    max_streak: Number(row.max_streak || row.current_streak || 0),
-    is_current_user: row.id === currentUserId,
-  }));
+  return data.map((row: any, index: number) => {
+    const current = Number(row.current_streak || 0);
+    const max = Number(row.max_streak ?? row.longest_streak ?? current);
+
+    return {
+      rank: index + 1,
+      user_id: row.id,
+      current_streak: current,
+      max_streak: max,
+      is_current_user: row.id === currentUserId,
+    };
+  });
 }
 
 export async function claimStreakReward(

@@ -1,4 +1,3 @@
-// app/(app)/projects/[slug]/materials/page.tsx
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";

@@ -14,18 +14,37 @@ import type {
   CustomPhysicalPrize,
 } from "@/lib/rewards/types";
 
-interface RewardsModalProps {
-  isOpen: boolean;
+export type RewardsTabType = "wardrobe" | "streaks" | "promocode" | "timeline";
+
+export interface RewardsModalProps {
+  isOpen?: boolean;
+  open?: boolean;
   onClose: () => void;
-  defaultTab?: "wardrobe" | "streaks" | "promocode";
+  defaultTab?: RewardsTabType;
+  initialTab?: RewardsTabType;
 }
 
 export default function RewardsModal({
   isOpen,
+  open,
   onClose,
   defaultTab = "wardrobe",
+  initialTab,
 }: RewardsModalProps) {
-  const [activeTab, setActiveTab] = useState(defaultTab);
+  // Флаг открытия (поддержка и isOpen, и open)
+  const showModal = Boolean(isOpen ?? open);
+
+  // Нормализация выбранной вкладки ("timeline" -> "streaks")
+  const normalizeTab = (tab?: RewardsTabType): "wardrobe" | "streaks" | "promocode" => {
+    const raw = tab || initialTab || defaultTab;
+    if (raw === "timeline") return "streaks";
+    return raw === "promocode" || raw === "streaks" ? raw : "wardrobe";
+  };
+
+  const [activeTab, setActiveTab] = useState<"wardrobe" | "streaks" | "promocode">(() =>
+    normalizeTab(initialTab || defaultTab)
+  );
+
   const [loading, setLoading] = useState(true);
 
   // Данные
@@ -61,10 +80,11 @@ export default function RewardsModal({
   }>({ isOpen: false, prize: null });
 
   useEffect(() => {
-    if (isOpen) {
-      loadData();
+    if (showModal) {
+      setActiveTab(normalizeTab(initialTab || defaultTab));
+      void loadData();
     }
-  }, [isOpen]);
+  }, [showModal, initialTab, defaultTab]);
 
   const loadData = async () => {
     setLoading(true);
@@ -172,7 +192,7 @@ export default function RewardsModal({
         } else {
           setPromoSuccessMsg("🎉 Промокод успешно активирован!");
           setPromoCodeInput("");
-          loadData();
+          void loadData();
         }
       }
     } catch (e) {
@@ -182,7 +202,7 @@ export default function RewardsModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!showModal) return null;
 
   // Фильтрация инвентаря по выбранной категории гардероба
   const filteredInventory = inventory.filter(
@@ -223,6 +243,7 @@ export default function RewardsModal({
             {/* Переключатель табов */}
             <div className="flex gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-2xl border border-slate-200 dark:border-slate-800">
               <button
+                type="button"
                 onClick={() => setActiveTab("wardrobe")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeTab === "wardrobe"
@@ -233,6 +254,7 @@ export default function RewardsModal({
                 👕 Гардероб
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab("streaks")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeTab === "streaks"
@@ -243,6 +265,7 @@ export default function RewardsModal({
                 🔥 Серия ({streakStats.currentStreak}d)
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab("promocode")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeTab === "promocode"
@@ -255,6 +278,7 @@ export default function RewardsModal({
             </div>
 
             <button
+              type="button"
               onClick={onClose}
               className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
             >
@@ -294,6 +318,7 @@ export default function RewardsModal({
                         ].map((cat) => (
                           <button
                             key={cat.type}
+                            type="button"
                             onClick={() =>
                               setWardrobeCategory(cat.type as RewardType)
                             }
@@ -380,7 +405,7 @@ export default function RewardsModal({
                   </div>
                 )}
 
-                {/* TAB 2: ДОРОЖКА СЕРИИ (ВЕРНУТЫЙ СТАРОЙ КРАСИВЫЙ ВИД) */}
+                {/* TAB 2: ДОРОЖКА СЕРИИ */}
                 {activeTab === "streaks" && (
                   <StreakTimeline
                     stats={streakStats}
@@ -451,7 +476,7 @@ export default function RewardsModal({
           requiredChoiceCount={materialChoiceState.remainingCount}
           onClose={() => {
             setMaterialChoiceState({ ...materialChoiceState, isOpen: false });
-            loadData();
+            void loadData();
           }}
         />
       )}
@@ -463,7 +488,7 @@ export default function RewardsModal({
           prize={physicalPrizeState.prize}
           onClose={() => {
             setPhysicalPrizeState({ ...physicalPrizeState, isOpen: false });
-            loadData();
+            void loadData();
           }}
         />
       )}
