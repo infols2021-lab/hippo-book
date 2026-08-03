@@ -174,10 +174,10 @@ export default function ProfileClient({
   const [editRegion, setEditRegion] = useState(profile.region ?? "");
   const [saving, setSaving] = useState(false);
 
-  // Модалка Центра Наград (Гардероб, Стрики, Промокод)
+  // Модалка Центра Наград
   const [rewardsModalOpen, setRewardsModalOpen] = useState(false);
 
-  // Модалка Анонимного Лидерборда
+  // Модалка Лидерборда
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
   // Прогресс и статистика
@@ -198,13 +198,12 @@ export default function ProfileClient({
   );
   const [streakLoading, setStreakLoading] = useState<boolean>(!streakProp);
 
-  // Уведомление
   function showNotification(text: string, type: "success" | "error" = "success") {
     setNotif({ type, text });
     setTimeout(() => setNotif(null), 3500);
   }
 
-  // Загрузка свежих данных по стрику и экипировке
+  // Загрузка актуального состояния стрика
   const fetchStreakData = async () => {
     try {
       setStreakLoading(true);
@@ -233,7 +232,7 @@ export default function ProfileClient({
     }
   }, [streakProp]);
 
-  // Загрузка фонового изображения
+  // Фоновое изображение
   useEffect(() => {
     if (!backgroundProxyUrl) {
       setBgLoading(false);
@@ -255,7 +254,7 @@ export default function ProfileClient({
     return () => clearTimeout(t);
   }, [backgroundProxyUrl]);
 
-  // Подгрузка прогресса по материалам
+  // Подгрузка прогресса по учебникам
   useEffect(() => {
     if (statsProp && progressProp) return;
 
@@ -279,12 +278,10 @@ export default function ProfileClient({
     void loadProgress();
   }, [statsProp, progressProp, projectSlug]);
 
-  // Открытие Центра Наград
   function openRewards() {
     setRewardsModalOpen(true);
   }
 
-  // Редактирование профиля
   function openEdit() {
     setEditFullName(profile.full_name || "");
     setEditPhone(profile.contact_phone || "");
@@ -370,7 +367,7 @@ export default function ProfileClient({
         </div>
       )}
 
-      {/* Модалка редактирования личной информации */}
+      {/* Модалка редактирования личных данных */}
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Редактирование профиля" maxWidth={520}>
         <form
           onSubmit={(e) => {
@@ -416,13 +413,13 @@ export default function ProfileClient({
         </form>
       </Modal>
 
-      {/* 🎭 ЕДИНЫЙ ЦЕНТР НАГРАД (Гардероб, Дорожка, Промокод) */}
+      {/* 🎭 ЕДИНЫЙ ЦЕНТР НАГРАД (Гардероб, Дорожка, Промокоды) */}
       {rewardsModalOpen && (
         <RewardsModal
           isOpen={rewardsModalOpen}
           onClose={() => {
             setRewardsModalOpen(false);
-            void fetchStreakData(); // Обновляем профиль при закрытии модалки
+            void fetchStreakData();
           }}
         />
       )}
@@ -436,6 +433,7 @@ export default function ProfileClient({
       )}
 
       <div className="profile-container">
+        {/* Верхняя панель сайта */}
         <div className="profile-topbar">
           <div className="brand">
             <div className="brand-mark">{brandMark}</div>
@@ -463,7 +461,7 @@ export default function ProfileClient({
             )}
 
             <button type="button" className="nav-pill" onClick={openRewards}>
-              🎁 Промокод
+              🎭 Награды
             </button>
 
             {features?.leaderboard && (
@@ -482,7 +480,7 @@ export default function ProfileClient({
         </div>
 
         <div className="profile-grid">
-          {/* ЛЕВАЯ КОЛОНКА (Профиль пользователя и Экипировка) */}
+          {/* ЛЕВАЯ КОЛОНКА (Сайдбар) */}
           <aside className="profile-panel profile-sidebar">
             <div
               className="profile-avatar-wrapper"
@@ -542,9 +540,6 @@ export default function ProfileClient({
             <div className="profile-actions">
               <button className="btn ghost" onClick={openEdit} type="button">
                 Редактировать профиль
-              </button>
-              <button className="btn secondary" onClick={openRewards} type="button">
-                🎭 Центр наград
               </button>
               <button
                 className="btn secondary"

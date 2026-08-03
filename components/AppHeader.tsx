@@ -35,12 +35,12 @@ export default function AppHeader({
       <header
         className="sticky top-0 z-40 transition-colors duration-500"
         style={{
-          backgroundColor: "var(--glass-bg)",
-          backdropFilter: "var(--glass-blur)",
-          WebkitBackdropFilter: "var(--glass-blur)",
-          borderBottom: "1px solid var(--glass-border)",
+          backgroundColor: "var(--glass-bg, transparent)",
+          backdropFilter: "var(--glass-blur, blur(16px))",
+          WebkitBackdropFilter: "var(--glass-blur, blur(16px))",
+          borderBottom: "1px solid color-mix(in srgb, var(--project-text, #ffffff) 10%, transparent)",
           boxShadow:
-            "0 4px 20px -2px color-mix(in srgb, var(--project-text) 5%, transparent)",
+            "0 4px 20px -2px color-mix(in srgb, var(--project-text, #ffffff) 5%, transparent)",
           marginBottom: "24px",
         }}
       >
@@ -100,6 +100,7 @@ export default function AppHeader({
                 return (
                   <button
                     key={`rewards-${idx}`}
+                    type="button"
                     onClick={() => setIsRewardsOpen(true)}
                     className={`whitespace-nowrap flex-shrink-0 ${
                       item.className || "btn ghost"
@@ -125,11 +126,13 @@ export default function AppHeader({
         </div>
       </header>
 
-      {/* Единая модалка "Центр Наград" */}
-      <RewardsModal
-        isOpen={isRewardsOpen}
-        onClose={() => setIsRewardsOpen(false)}
-      />
+      {/* Единый Центр Наград */}
+      {isRewardsOpen && (
+        <RewardsModal
+          isOpen={isRewardsOpen}
+          onClose={() => setIsRewardsOpen(false)}
+        />
+      )}
     </>
   );
 }

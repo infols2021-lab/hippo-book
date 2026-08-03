@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, DragEvent, ChangeEvent } from "react";
 import type { RewardItem, RewardType } from "@/lib/rewards/types";
 
 const REWARD_TYPES: { type: RewardType; label: string; icon: string }[] = [
@@ -17,6 +17,12 @@ export default function RewardsCatalogManager() {
   const [filterType, setFilterType] = useState<string>("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Состояния для Drag-and-Drop загрузки
+  const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Форма предмета
   const [formData, setFormData] = useState<{
@@ -41,7 +47,7 @@ export default function RewardsCatalogManager() {
   });
 
   useEffect(() => {
-    fetchRewards();
+    void fetchRewards();
   }, []);
 
   const fetchRewards = async () => {
@@ -60,6 +66,7 @@ export default function RewardsCatalogManager() {
   };
 
   const handleOpenModal = (item?: RewardItem) => {
+    setUploadError(null);
     if (item) {
       setFormData({
         id: item.id,
@@ -85,6 +92,68 @@ export default function RewardsCatalogManager() {
       });
     }
     setIsModalOpen(true);
+  };
+
+  // Загрузка файла в Яндекс / Supabase Storage
+  const handleFileUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Пожалуйста, загружайте только изображения (PNG, WEBP, SVG, JPG)");
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setUploadError(null);
+
+      const bodyData = new FormData();
+      bodyData.append("file", file);
+      bodyData.append("bucket", "question-images"); // Дефолтный бакет загрузки
+
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: bodyData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Ошибка при загрузке файла");
+      }
+
+      const uploadedUrl = data.publicUrl || data.url || "";
+      setFormData((prev) => ({ ...prev, asset_url: uploadedUrl }));
+    } catch (err: any) {
+      setUploadError(err.message || "Не удалось загрузить изображение");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Drag-and-Drop события
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (uploading) return;
+
+    const file = e.dataTransfer.files[0];
+    if (file) void handleFileUpload(file);
+  };
+
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && !uploading) {
+      void handleFileUpload(file);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -114,7 +183,7 @@ export default function RewardsCatalogManager() {
 
       if (res.ok) {
         setIsModalOpen(false);
-        fetchRewards();
+        void fetchRewards();
       } else {
         const err = await res.json();
         alert(err.error || "Ошибка сохранения");
@@ -132,28 +201,28 @@ export default function RewardsCatalogManager() {
     try {
       const res = await fetch(`/api/admin/rewards?id=${id}`, { method: "DELETE" });
       if (res.ok) {
-        fetchRewards();
+        void fetchRewards();
       }
     } catch (e) {
       alert("Ошибка при удалении");
     }
   };
 
-  const filteredRewards = filterType === "all"
-    ? rewards
-    : rewards.filter((r) => r.type === filterType);
+  const filteredRewards =
+    filterType === "all" ? rewards : rewards.filter((r) => r.type === filterType);
 
   return (
     <div className="space-y-6">
-      {/* Панель фильтров и действий */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+      {/* Панель фильтров и создания */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 border border-gray-200 p-4 rounded-2xl">
         <div className="flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={() => setFilterType("all")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
               filterType === "all"
-                ? "bg-slate-700 text-white"
-                : "text-slate-400 hover:bg-slate-800"
+                ? "bg-gray-900 text-white shadow-sm"
+                : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
             }`}
           >
             Все ({rewards.length})
@@ -161,11 +230,12 @@ export default function RewardsCatalogManager() {
           {REWARD_TYPES.map((t) => (
             <button
               key={t.type}
+              type="button"
               onClick={() => setFilterType(t.type)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
                 filterType === t.type
-                  ? "bg-indigo-600 text-white"
-                  : "text-slate-400 hover:bg-slate-800"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
               }`}
             >
               <span>{t.icon}</span>
@@ -175,18 +245,19 @@ export default function RewardsCatalogManager() {
         </div>
 
         <button
+          type="button"
           onClick={() => handleOpenModal()}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+          className="px-4 py-2.5 bg-gray-900 hover:bg-black text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2"
         >
-          <span>+</span> Создать награду
+          <span className="text-base leading-none">+</span> Создать награду
         </button>
       </div>
 
       {/* Сетка предметов */}
       {loading ? (
-        <div className="text-center py-12 text-slate-500">Загрузка каталога...</div>
+        <div className="text-center py-12 text-gray-500 font-bold text-sm">Загрузка каталога...</div>
       ) : filteredRewards.length === 0 ? (
-        <div className="text-center py-12 bg-slate-900/50 border border-slate-800 rounded-2xl text-slate-400">
+        <div className="text-center py-12 bg-gray-50 border border-gray-200 rounded-2xl text-gray-500 font-bold text-sm">
           Предметы не найдены
         </div>
       ) : (
@@ -194,24 +265,26 @@ export default function RewardsCatalogManager() {
           {filteredRewards.map((item) => (
             <div
               key={item.id}
-              className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 flex flex-col justify-between transition-all"
+              className="bg-white border border-gray-200 hover:border-gray-300 rounded-2xl p-4 flex flex-col justify-between transition-all shadow-sm hover:shadow-md"
             >
               <div>
                 <div className="flex justify-between items-start gap-2 mb-3">
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-slate-300">
+                  <span className="text-[11px] font-extrabold px-2.5 py-1 bg-gray-100 border border-gray-200 rounded-lg text-gray-700">
                     {REWARD_TYPES.find((t) => t.type === item.type)?.icon} {item.type}
                   </span>
                   <div className="flex gap-1">
                     <button
+                      type="button"
                       onClick={() => handleOpenModal(item)}
-                      className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg text-xs"
+                      className="p-1.5 hover:bg-gray-100 text-gray-500 hover:text-gray-900 rounded-lg text-xs transition-colors"
                       title="Редактировать"
                     >
                       ✏️
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDelete(item.id)}
-                      className="p-1.5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg text-xs"
+                      className="p-1.5 hover:bg-red-50 text-gray-500 hover:text-red-600 rounded-lg text-xs transition-colors"
                       title="Удалить"
                     >
                       🗑️
@@ -220,10 +293,10 @@ export default function RewardsCatalogManager() {
                 </div>
 
                 {/* Превью ассета или титула */}
-                <div className="w-full h-32 bg-slate-950 border border-slate-800/80 rounded-xl flex items-center justify-center mb-3 overflow-hidden relative">
+                <div className="w-full h-32 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center mb-3 overflow-hidden relative">
                   {item.type === "title" ? (
                     <span
-                      className="font-bold text-sm px-3 py-1 rounded-full border shadow-sm"
+                      className="font-black text-xs px-3 py-1.5 rounded-full border shadow-sm"
                       style={{
                         borderColor: item.meta?.color || "#8b5cf6",
                         color: item.meta?.color || "#8b5cf6",
@@ -243,18 +316,18 @@ export default function RewardsCatalogManager() {
                   )}
                 </div>
 
-                <h3 className="font-bold text-white text-base leading-tight mb-1">
+                <h3 className="font-extrabold text-gray-900 text-base leading-tight mb-1">
                   {item.title}
                 </h3>
                 {item.description && (
-                  <p className="text-xs text-slate-400 line-clamp-2 mb-2">
+                  <p className="text-xs text-gray-500 font-medium line-clamp-2 mb-2">
                     {item.description}
                   </p>
                 )}
               </div>
 
               {item.type !== "title" && (
-                <div className="text-[10px] text-slate-500 font-mono mt-2 pt-2 border-t border-slate-800/60 flex justify-between">
+                <div className="text-[10px] text-gray-400 font-mono font-bold mt-2 pt-2 border-t border-gray-100 flex justify-between">
                   <span>
                     Off: {item.meta?.offset_x || 0}, {item.meta?.offset_y || 0}
                   </span>
@@ -268,15 +341,24 @@ export default function RewardsCatalogManager() {
 
       {/* Модалка создания / редактирования */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
-            <h2 className="text-xl font-bold text-white">
-              {formData.id ? "Редактировать награду" : "Создать награду"}
-            </h2>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-gray-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h2 className="text-lg font-black text-gray-900">
+                {formData.id ? "Редактировать награду" : "Создать награду"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-700 font-bold p-1 rounded-lg text-sm"
+              >
+                ✕
+              </button>
+            </div>
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                <label className="block text-xs font-bold text-gray-700 mb-1">
                   Тип предмета
                 </label>
                 <select
@@ -284,7 +366,7 @@ export default function RewardsCatalogManager() {
                   onChange={(e) =>
                     setFormData({ ...formData, type: e.target.value as RewardType })
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-blue-500 transition-colors"
                 >
                   {REWARD_TYPES.map((t) => (
                     <option key={t.type} value={t.type}>
@@ -295,7 +377,7 @@ export default function RewardsCatalogManager() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                <label className="block text-xs font-bold text-gray-700 mb-1">
                   Название
                 </label>
                 <input
@@ -306,12 +388,12 @@ export default function RewardsCatalogManager() {
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-blue-500 transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                <label className="block text-xs font-bold text-gray-700 mb-1">
                   Описание
                 </label>
                 <textarea
@@ -321,13 +403,13 @@ export default function RewardsCatalogManager() {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-blue-500 transition-colors"
                 />
               </div>
 
               {formData.type === "title" ? (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
                     Цвет титула (HEX)
                   </label>
                   <div className="flex gap-2">
@@ -337,7 +419,7 @@ export default function RewardsCatalogManager() {
                       onChange={(e) =>
                         setFormData({ ...formData, color: e.target.value })
                       }
-                      className="h-10 w-12 bg-slate-950 border border-slate-800 rounded-xl p-1 cursor-pointer"
+                      className="h-10 w-12 bg-gray-50 border-2 border-gray-200 rounded-xl p-1 cursor-pointer"
                     />
                     <input
                       type="text"
@@ -345,30 +427,100 @@ export default function RewardsCatalogManager() {
                       onChange={(e) =>
                         setFormData({ ...formData, color: e.target.value })
                       }
-                      className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white font-mono"
+                      className="flex-1 bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs font-mono font-bold text-gray-800"
                     />
                   </div>
                 </div>
               ) : (
                 <>
+                  {/* Drag and Drop зона для изображений */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">
-                      Ссылка на изображение (PNG / SVG)
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Изображение предмета (PNG / SVG / WEBP)
                     </label>
-                    <input
-                      type="text"
-                      placeholder="/mascot/hats/crown.png"
-                      value={formData.asset_url}
-                      onChange={(e) =>
-                        setFormData({ ...formData, asset_url: e.target.value })
-                      }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white font-mono focus:outline-none focus:border-indigo-500"
-                    />
+
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={() => !uploading && fileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all ${
+                        isDragging
+                          ? "border-blue-500 bg-blue-50/50 scale-[1.01]"
+                          : "border-gray-200 bg-gray-50 hover:bg-gray-100/60"
+                      }`}
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        disabled={uploading}
+                      />
+
+                      {formData.asset_url ? (
+                        <div className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-gray-200">
+                          <img
+                            src={formData.asset_url}
+                            alt="Превью"
+                            className="w-12 h-12 object-contain rounded-lg border bg-gray-50"
+                          />
+                          <div className="flex-1 text-left min-w-0">
+                            <div className="text-[11px] font-extrabold text-green-700 truncate">
+                              ✅ Изображение прикреплено
+                            </div>
+                            <div className="text-[10px] text-gray-400 font-mono truncate">
+                              {formData.asset_url}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFormData({ ...formData, asset_url: "" });
+                            }}
+                            className="text-xs font-bold text-red-500 hover:text-red-700 p-1"
+                          >
+                            ✖
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="py-2">
+                          <div className="text-2xl mb-1">{uploading ? "⚡" : "📦"}</div>
+                          <div className="text-xs font-bold text-gray-800">
+                            {uploading ? "Загружаем картинку в Storage..." : "Перетащите сюда изображение"}
+                          </div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">
+                            или кликните для выбора файла
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {uploadError && (
+                      <div className="text-[11px] font-bold text-red-600 mt-1">
+                        ⚠️ {uploadError}
+                      </div>
+                    )}
+
+                    {/* Поле прямого ввода ссылки на всякий случай */}
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        placeholder="Или вставьте прямую ссылку..."
+                        value={formData.asset_url}
+                        onChange={(e) =>
+                          setFormData({ ...formData, asset_url: e.target.value })
+                        }
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-[11px] font-mono text-gray-700 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1">
                         Offset X (px)
                       </label>
                       <input
@@ -380,11 +532,11 @@ export default function RewardsCatalogManager() {
                             offset_x: Number(e.target.value),
                           })
                         }
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white"
+                        className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2 text-xs font-bold text-gray-800"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1">
                         Offset Y (px)
                       </label>
                       <input
@@ -396,11 +548,11 @@ export default function RewardsCatalogManager() {
                             offset_y: Number(e.target.value),
                           })
                         }
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white"
+                        className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2 text-xs font-bold text-gray-800"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1">
                         Scale
                       </label>
                       <input
@@ -413,25 +565,25 @@ export default function RewardsCatalogManager() {
                             scale: Number(e.target.value),
                           })
                         }
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white"
+                        className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2 text-xs font-bold text-gray-800"
                       />
                     </div>
                   </div>
                 </>
               )}
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <div className="flex justify-end gap-2 pt-3 border-t">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl"
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl disabled:opacity-50"
+                  disabled={saving || uploading}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl disabled:opacity-50 transition-colors shadow-sm"
                 >
                   {saving ? "Сохранение..." : "Сохранить"}
                 </button>

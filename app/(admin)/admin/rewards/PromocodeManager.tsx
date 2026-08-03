@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, DragEvent, ChangeEvent } from "react";
 import type { PromocodeItem, PromocodeRedemption, RewardItem } from "@/lib/rewards/types";
 
 export default function PromocodeManager() {
@@ -12,6 +12,12 @@ export default function PromocodeManager() {
 
   const [activeSubTab, setActiveSubTab] = useState<"constructor" | "logs">("constructor");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Drag and Drop загрузка изображений физического подарка
+  const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Поля формы промокода
   const [formId, setFormId] = useState<string | undefined>(undefined);
@@ -36,7 +42,7 @@ export default function PromocodeManager() {
   const [physicalImageUrl, setPhysicalImageUrl] = useState("");
 
   useEffect(() => {
-    loadAllData();
+    void loadAllData();
   }, []);
 
   const loadAllData = async () => {
@@ -65,6 +71,7 @@ export default function PromocodeManager() {
   };
 
   const handleOpenModal = (item?: PromocodeItem) => {
+    setUploadError(null);
     if (item) {
       setFormId(item.id);
       setCode(item.code);
@@ -120,6 +127,67 @@ export default function PromocodeManager() {
     );
   };
 
+  // Загрузка изображений подарка в Storage
+  const handleFileUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Пожалуйста, загружайте только изображения (PNG, WEBP, SVG, JPG)");
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setUploadError(null);
+
+      const bodyData = new FormData();
+      bodyData.append("file", file);
+      bodyData.append("bucket", "question-images");
+
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: bodyData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Ошибка при загрузке файла");
+      }
+
+      const uploadedUrl = data.publicUrl || data.url || "";
+      setPhysicalImageUrl(uploadedUrl);
+    } catch (err: any) {
+      setUploadError(err.message || "Не удалось загрузить изображение");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (uploading) return;
+
+    const file = e.dataTransfer.files[0];
+    if (file) void handleFileUpload(file);
+  };
+
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && !uploading) {
+      void handleFileUpload(file);
+    }
+  };
+
   const handleSavePromocode = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -158,7 +226,7 @@ export default function PromocodeManager() {
 
       if (res.ok) {
         setIsModalOpen(false);
-        loadAllData();
+        void loadAllData();
       } else {
         const err = await res.json();
         alert(err.error || "Ошибка сохранения промокода");
@@ -176,7 +244,7 @@ export default function PromocodeManager() {
     try {
       const res = await fetch(`/api/admin/promocodes?id=${id}`, { method: "DELETE" });
       if (res.ok) {
-        loadAllData();
+        void loadAllData();
       }
     } catch (e) {
       alert("Ошибка при удалении промокода");
@@ -185,25 +253,27 @@ export default function PromocodeManager() {
 
   return (
     <div className="space-y-6">
-      {/* Подтабы: Список & Логи */}
-      <div className="flex justify-between items-center bg-slate-900 p-4 border border-slate-800 rounded-2xl">
+      {/* Переключатель Подтабов */}
+      <div className="flex justify-between items-center bg-gray-50 p-4 border border-gray-200 rounded-2xl">
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={() => setActiveSubTab("constructor")}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeSubTab === "constructor"
-                ? "bg-slate-800 text-white"
-                : "text-slate-400 hover:text-white"
+                ? "bg-gray-900 text-white shadow-sm"
+                : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
             }`}
           >
             📋 Список Промокодов ({promocodes.length})
           </button>
           <button
+            type="button"
             onClick={() => setActiveSubTab("logs")}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeSubTab === "logs"
-                ? "bg-slate-800 text-white"
-                : "text-slate-400 hover:text-white"
+                ? "bg-gray-900 text-white shadow-sm"
+                : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
             }`}
           >
             📊 История Активаций ({redemptions.length})
@@ -212,10 +282,11 @@ export default function PromocodeManager() {
 
         {activeSubTab === "constructor" && (
           <button
+            type="button"
             onClick={() => handleOpenModal()}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2"
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-2"
           >
-            <span>+</span> Создать Промокод
+            <span className="text-base leading-none">+</span> Создать Промокод
           </button>
         )}
       </div>
@@ -224,9 +295,9 @@ export default function PromocodeManager() {
       {activeSubTab === "constructor" && (
         <>
           {loading ? (
-            <div className="text-center py-12 text-slate-500">Загрузка промокодов...</div>
+            <div className="text-center py-12 text-gray-500 font-bold text-sm">Загрузка промокодов...</div>
           ) : promocodes.length === 0 ? (
-            <div className="text-center py-12 bg-slate-900/50 border border-slate-800 rounded-2xl text-slate-400">
+            <div className="text-center py-12 bg-gray-50 border border-gray-200 rounded-2xl text-gray-500 font-bold text-sm">
               Промокоды еще не созданы
             </div>
           ) : (
@@ -242,28 +313,30 @@ export default function PromocodeManager() {
                 return (
                   <div
                     key={promo.id}
-                    className={`bg-slate-900 border rounded-2xl p-5 flex flex-col justify-between transition-all ${
+                    className={`bg-white border rounded-2xl p-5 flex flex-col justify-between transition-all shadow-sm hover:shadow-md ${
                       !promo.is_active || isExpired || isLimitReached
-                        ? "border-slate-800 opacity-60"
-                        : "border-slate-800 hover:border-emerald-500/50"
+                        ? "border-gray-200 opacity-60"
+                        : "border-gray-200 hover:border-emerald-500/50"
                     }`}
                   >
                     <div>
                       <div className="flex justify-between items-start gap-2 mb-3">
-                        <span className="font-mono font-black text-lg text-emerald-400 tracking-wider px-3 py-1 bg-emerald-950/60 border border-emerald-800/60 rounded-xl">
+                        <span className="font-mono font-black text-lg text-emerald-700 tracking-wider px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-xl">
                           {promo.code}
                         </span>
                         <div className="flex gap-1">
                           <button
+                            type="button"
                             onClick={() => handleOpenModal(promo)}
-                            className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg text-xs"
+                            className="p-1.5 hover:bg-gray-100 text-gray-500 hover:text-gray-900 rounded-lg text-xs transition-colors"
                             title="Редактировать"
                           >
                             ✏️
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleDeletePromocode(promo.id)}
-                            className="p-1.5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg text-xs"
+                            className="p-1.5 hover:bg-red-50 text-gray-500 hover:text-red-600 rounded-lg text-xs transition-colors"
                             title="Удалить"
                           >
                             🗑️
@@ -274,26 +347,26 @@ export default function PromocodeManager() {
                       {/* Статусы и ограничения */}
                       <div className="flex flex-wrap gap-1.5 mb-4">
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                          className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
                             promo.is_active
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : "bg-red-500/10 text-red-400 border border-red-500/20"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-red-50 text-red-700 border border-red-200"
                           }`}
                         >
                           {promo.is_active ? "Активен" : "Выключен"}
                         </span>
 
-                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-800 text-slate-300 rounded-md">
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 bg-gray-100 text-gray-700 border border-gray-200 rounded-md">
                           Использовано: {promo.current_uses}{" "}
                           {promo.max_uses !== null ? `/ ${promo.max_uses}` : "(безлимит)"}
                         </span>
 
                         {promo.expires_at && (
                           <span
-                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
                               isExpired
-                                ? "bg-red-500/10 text-red-400"
-                                : "bg-slate-800 text-slate-300"
+                                ? "bg-red-50 text-red-700 border border-red-200"
+                                : "bg-gray-100 text-gray-700 border border-gray-200"
                             }`}
                           >
                             До: {new Date(promo.expires_at).toLocaleDateString("ru-RU")}
@@ -302,7 +375,7 @@ export default function PromocodeManager() {
                       </div>
 
                       {/* Начинка промокода */}
-                      <div className="space-y-1.5 text-xs text-slate-300 bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                      <div className="space-y-1.5 text-xs text-gray-700 bg-gray-50 p-3 rounded-xl border border-gray-200">
                         {bundle.reward_ids && bundle.reward_ids.length > 0 && (
                           <div className="flex items-center gap-1.5">
                             <span>🎽</span>
@@ -334,7 +407,7 @@ export default function PromocodeManager() {
                         ) : null}
 
                         {bundle.custom_physical && (
-                          <div className="flex items-center gap-1.5 text-amber-400">
+                          <div className="flex items-center gap-1.5 text-amber-700 font-bold">
                             <span>🧸</span>
                             <span className="truncate">
                               Приз: <b>{bundle.custom_physical.title}</b>
@@ -344,7 +417,7 @@ export default function PromocodeManager() {
                       </div>
                     </div>
 
-                    <div className="text-[10px] text-slate-500 pt-3 mt-3 border-t border-slate-800/60">
+                    <div className="text-[10px] text-gray-400 font-bold pt-3 mt-3 border-t border-gray-100">
                       Создан: {new Date(promo.created_at).toLocaleDateString("ru-RU")}
                     </div>
                   </div>
@@ -357,19 +430,19 @@ export default function PromocodeManager() {
 
       {/* Вкладка 2: Таблица Логов Активаций */}
       {activeSubTab === "logs" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 overflow-hidden">
-          <h2 className="text-lg font-bold text-white mb-4">История ввода промокодов</h2>
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden">
+          <h2 className="text-base font-black text-gray-900 mb-4">История ввода промокодов</h2>
 
           {loading ? (
-            <div className="text-center py-8 text-slate-500">Загрузка истории...</div>
+            <div className="text-center py-8 text-gray-500 font-bold text-sm">Загрузка истории...</div>
           ) : redemptions.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
+            <div className="text-center py-8 text-gray-500 font-bold text-sm">
               Пока ни один ученик не активировал промокод
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] border-b border-slate-800">
+              <table className="w-full text-left text-xs text-gray-800">
+                <thead className="bg-gray-50 text-gray-500 uppercase font-black text-[10px] border-b border-gray-200">
                   <tr>
                     <th className="p-3">Дата / Время</th>
                     <th className="p-3">Ученик</th>
@@ -377,28 +450,28 @@ export default function PromocodeManager() {
                     <th className="p-3">Выбранные материалы</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-gray-100">
                   {redemptions.map((log: PromocodeRedemption) => (
-                    <tr key={log.id} className="hover:bg-slate-800/30">
-                      <td className="p-3 font-mono text-slate-400">
+                    <tr key={log.id} className="hover:bg-gray-50/80 transition-colors">
+                      <td className="p-3 font-mono font-bold text-gray-500">
                         {new Date(log.redeemed_at).toLocaleString("ru-RU")}
                       </td>
                       <td className="p-3">
-                        <div className="font-bold text-white">{log.user_full_name}</div>
-                        <div className="text-[10px] text-slate-500">{log.user_email}</div>
+                        <div className="font-extrabold text-gray-900">{log.user_full_name}</div>
+                        <div className="text-[10px] text-gray-400 font-medium">{log.user_email}</div>
                       </td>
                       <td className="p-3">
-                        <span className="font-mono font-bold text-emerald-400 px-2 py-0.5 bg-emerald-950/60 border border-emerald-800/60 rounded-lg">
+                        <span className="font-mono font-black text-emerald-700 px-2 py-0.5 bg-emerald-50 border border-emerald-200 rounded-lg">
                           {log.promocode_code}
                         </span>
                       </td>
-                      <td className="p-3 font-mono text-[10px] text-slate-400">
+                      <td className="p-3 font-mono text-[10px] text-gray-500">
                         {log.chosen_material_ids && log.chosen_material_ids.length > 0 ? (
-                          <span className="text-indigo-400">
+                          <span className="text-blue-600 font-bold">
                             IDs: {log.chosen_material_ids.join(", ")}
                           </span>
                         ) : (
-                          <span className="text-slate-600">—</span>
+                          <span className="text-gray-400">—</span>
                         )}
                       </td>
                     </tr>
@@ -412,36 +485,45 @@ export default function PromocodeManager() {
 
       {/* Модалка Конструктора Промокода */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-6 my-8 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold text-white">
-              {formId ? "Редактировать промокод" : "Конструктор промокода"}
-            </h2>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl max-w-2xl w-full p-6 space-y-6 my-8 max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h2 className="text-lg font-black text-gray-900">
+                {formId ? "Редактировать промокод" : "Конструктор промокода"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-700 font-bold p-1 rounded-lg text-sm"
+              >
+                ✕
+              </button>
+            </div>
 
             <form onSubmit={handleSavePromocode} className="space-y-6">
               {/* Основные настройки */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
                     Промокод (слово)
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Например: ОХАЕШЕЧКИ"
+                    placeholder="Например: HIPPO2026"
                     value={code}
                     onChange={(e) => setCode(e.target.value.toUpperCase())}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500 uppercase"
+                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs font-mono font-black text-emerald-700 focus:outline-none focus:border-emerald-500 uppercase transition-colors"
                   />
                 </div>
 
                 <div className="flex items-center pt-6">
-                  <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-300">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
                     <input
                       type="checkbox"
                       checked={isActive}
                       onChange={(e) => setIsActive(e.target.checked)}
-                      className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-emerald-600 focus:ring-0"
+                      className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                     />
                     <span>Промокод активен</span>
                   </label>
@@ -449,20 +531,20 @@ export default function PromocodeManager() {
               </div>
 
               {/* Ограничения */}
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-4">
+                <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
                   Ограничения (необязательно)
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Лимит использования */}
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-300">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
                       <input
                         type="checkbox"
                         checked={hasMaxUses}
                         onChange={(e) => setHasMaxUses(e.target.checked)}
-                        className="w-4 h-4 rounded bg-slate-900 border-slate-800 text-emerald-600"
+                        className="w-4 h-4 rounded border-gray-300 text-emerald-600"
                       />
                       <span>Лимит кол-ва активаций</span>
                     </label>
@@ -473,7 +555,7 @@ export default function PromocodeManager() {
                         min={1}
                         value={maxUses}
                         onChange={(e) => setMaxUses(Number(e.target.value))}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white"
+                        className="w-full bg-white border-2 border-gray-200 rounded-xl p-2 text-xs font-bold text-gray-800"
                         placeholder="Количество (например: 50)"
                       />
                     )}
@@ -481,12 +563,12 @@ export default function PromocodeManager() {
 
                   {/* Ограничение по дате */}
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-300">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
                       <input
                         type="checkbox"
                         checked={hasExpiresAt}
                         onChange={(e) => setHasExpiresAt(e.target.checked)}
-                        className="w-4 h-4 rounded bg-slate-900 border-slate-800 text-emerald-600"
+                        className="w-4 h-4 rounded border-gray-300 text-emerald-600"
                       />
                       <span>Ограничение по времени</span>
                     </label>
@@ -496,7 +578,7 @@ export default function PromocodeManager() {
                         type="datetime-local"
                         value={expiresAt}
                         onChange={(e) => setExpiresAt(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white"
+                        className="w-full bg-white border-2 border-gray-200 rounded-xl p-2 text-xs font-bold text-gray-800"
                       />
                     )}
                   </div>
@@ -505,29 +587,29 @@ export default function PromocodeManager() {
 
               {/* Бандл Наград */}
               <div className="space-y-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
                   Начинка промокода (выберите призы)
                 </h3>
 
                 {/* 1. Предметы из каталога */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-2">
+                  <label className="block text-xs font-bold text-gray-700 mb-2">
                     🎽 Награды из каталога (шмотки, базы, титулы)
                   </label>
-                  <div className="max-h-36 overflow-y-auto bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                  <div className="max-h-36 overflow-y-auto bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-1.5">
                     {rewardsCatalog.length === 0 ? (
-                      <div className="text-xs text-slate-600">Каталог пуст</div>
+                      <div className="text-xs text-gray-400 font-bold">Каталог пуст</div>
                     ) : (
                       rewardsCatalog.map((r: RewardItem) => (
                         <label
                           key={r.id}
-                          className="flex items-center gap-2 cursor-pointer hover:bg-slate-900 p-1.5 rounded-lg text-xs text-slate-200"
+                          className="flex items-center gap-2 cursor-pointer hover:bg-white p-1.5 rounded-lg text-xs text-gray-800 transition-colors"
                         >
                           <input
                             type="checkbox"
                             checked={selectedRewardIds.includes(r.id)}
                             onChange={() => handleToggleReward(r.id)}
-                            className="w-3.5 h-3.5 rounded bg-slate-900 border-slate-800 text-emerald-600"
+                            className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600"
                           />
                           <span>
                             [{r.type}] <b>{r.title}</b>
@@ -540,7 +622,7 @@ export default function PromocodeManager() {
 
                 {/* 2. Конкретные и секретные материалы */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
                     📚 Конкретные / Секретные материалы (UUID через запятую)
                   </label>
                   <input
@@ -548,13 +630,13 @@ export default function PromocodeManager() {
                     placeholder="uuid-1, uuid-2"
                     value={specificMaterialIdsText}
                     onChange={(e) => setSpecificMaterialIdsText(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs text-gray-800 font-mono font-bold focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
                 {/* 3. Материал на выбор ученика */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
                     🎓 Сколько материалов ученик выбирает САМ
                   </label>
                   <input
@@ -562,18 +644,18 @@ export default function PromocodeManager() {
                     min={0}
                     value={materialChoiceCount}
                     onChange={(e) => setMaterialChoiceCount(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
-                {/* 4. Физический подарок */}
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-3">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-amber-400">
+                {/* 4. Физический подарок с Drag & Drop загрузкой изображения */}
+                <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80 space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-amber-900">
                     <input
                       type="checkbox"
                       checked={hasPhysicalPrize}
                       onChange={(e) => setHasPhysicalPrize(e.target.checked)}
-                      className="w-4 h-4 rounded bg-slate-900 border-slate-800 text-amber-600"
+                      className="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
                     />
                     <span>🧸 Добавить физический подарок / Поздравление</span>
                   </label>
@@ -586,43 +668,114 @@ export default function PromocodeManager() {
                         placeholder="Заголовок (например: 🎉 Ты выиграл плюшевую тучку!)"
                         value={physicalTitle}
                         onChange={(e) => setPhysicalTitle(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white"
+                        className="w-full bg-white border-2 border-amber-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
                       />
 
                       <textarea
                         rows={2}
                         required={hasPhysicalPrize}
-                        placeholder="Инструкция для ученика (например: Покажи этот экран администратору в центре...)"
+                        placeholder="Инструкция для ученика (например: Покажи этот экран администратору...)"
                         value={physicalText}
                         onChange={(e) => setPhysicalText(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white"
+                        className="w-full bg-white border-2 border-amber-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
                       />
 
-                      <input
-                        type="text"
-                        placeholder="Ссылка на картинку подарка (опционально)"
-                        value={physicalImageUrl}
-                        onChange={(e) => setPhysicalImageUrl(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white font-mono"
-                      />
+                      {/* Drag and Drop зона для картинки подарка */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-amber-900 mb-1">
+                          Изображение подарка (PNG / JPG / WEBP)
+                        </label>
+                        <div
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          onDrop={handleDrop}
+                          onClick={() => !uploading && fileInputRef.current?.click()}
+                          className={`border-2 border-dashed rounded-2xl p-3 text-center cursor-pointer transition-all ${
+                            isDragging
+                              ? "border-amber-500 bg-amber-100/50 scale-[1.01]"
+                              : "border-amber-200 bg-white hover:bg-amber-50/50"
+                          }`}
+                        >
+                          <input
+                            type="file"
+                            accept="image/*"
+                            ref={fileInputRef}
+                            onChange={handleFileSelect}
+                            className="hidden"
+                            disabled={uploading}
+                          />
+
+                          {physicalImageUrl ? (
+                            <div className="flex items-center justify-between gap-3 bg-amber-50 p-2 rounded-xl border border-amber-200">
+                              <img
+                                src={physicalImageUrl}
+                                alt="Превью"
+                                className="w-10 h-10 object-contain rounded-lg border bg-white"
+                              />
+                              <div className="flex-1 text-left min-w-0">
+                                <div className="text-[10px] font-extrabold text-amber-900 truncate">
+                                  ✅ Картинка подарка загружена
+                                </div>
+                                <div className="text-[9px] text-amber-700/70 font-mono truncate">
+                                  {physicalImageUrl}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPhysicalImageUrl("");
+                                }}
+                                className="text-xs font-bold text-red-500 hover:text-red-700 p-1"
+                              >
+                                ✖
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="py-1">
+                              <div className="text-xl mb-0.5">{uploading ? "⚡" : "🎁"}</div>
+                              <div className="text-xs font-bold text-amber-900">
+                                {uploading ? "Загрузка изображения..." : "Перетащите сюда картинку приза"}
+                              </div>
+                              <div className="text-[10px] text-amber-700/70">
+                                или кликните для выбора
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {uploadError && (
+                          <div className="text-[10px] font-bold text-red-600 mt-1">
+                            ⚠️ {uploadError}
+                          </div>
+                        )}
+
+                        <input
+                          type="text"
+                          placeholder="Или вставьте прямую ссылку..."
+                          value={physicalImageUrl}
+                          onChange={(e) => setPhysicalImageUrl(e.target.value)}
+                          className="w-full bg-white border border-amber-200 rounded-xl p-2 text-[10px] font-mono text-gray-700 mt-2 focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Кнопки */}
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-800">
+              <div className="flex justify-end gap-2 pt-4 border-t">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl"
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm rounded-xl disabled:opacity-50"
+                  disabled={saving || uploading}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl disabled:opacity-50 transition-colors shadow-sm"
                 >
                   {saving ? "Сохранение..." : "Сохранить промокод"}
                 </button>

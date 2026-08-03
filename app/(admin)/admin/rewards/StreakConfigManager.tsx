@@ -13,7 +13,7 @@ export default function StreakConfigManager() {
   const [selectedRewardId, setSelectedRewardId] = useState<string>("");
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   const loadData = async () => {
@@ -52,7 +52,7 @@ export default function StreakConfigManager() {
       });
 
       if (res.ok) {
-        loadData();
+        void loadData();
         setSelectedRewardId("");
       } else {
         const err = await res.json();
@@ -72,7 +72,7 @@ export default function StreakConfigManager() {
       const res = await fetch(`/api/admin/streaks?dayNumber=${targetDay}`, {
         method: "DELETE",
       });
-      if (res.ok) loadData();
+      if (res.ok) void loadData();
     } catch (e) {
       alert("Ошибка при удалении");
     }
@@ -81,14 +81,14 @@ export default function StreakConfigManager() {
   return (
     <div className="space-y-6">
       {/* Форма добавления/редактирования дня */}
-      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+      <div className="bg-gray-50 border border-gray-200 p-6 rounded-2xl space-y-4">
+        <h2 className="text-base font-black text-gray-900 flex items-center gap-2">
           <span>🔥</span> Назначить награду за день серии
         </h2>
 
         <form onSubmit={handleSaveDay} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1">
+            <label className="block text-xs font-bold text-gray-700 mb-1">
               Номер дня серии (1, 2, 3, 7, 14, 30...)
             </label>
             <input
@@ -97,19 +97,19 @@ export default function StreakConfigManager() {
               required
               value={dayNumber}
               onChange={(e) => setDayNumber(Number(e.target.value))}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white font-bold focus:outline-none focus:border-amber-500"
+              className="w-full bg-white border-2 border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-blue-500 transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1">
+            <label className="block text-xs font-bold text-gray-700 mb-1">
               Выбрать награду из каталога
             </label>
             <select
               required
               value={selectedRewardId}
               onChange={(e) => setSelectedRewardId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+              className="w-full bg-white border-2 border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-blue-500 transition-colors"
             >
               <option value="">-- Выберите награду --</option>
               {rewardsCatalog.map((r) => (
@@ -123,7 +123,7 @@ export default function StreakConfigManager() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-amber-600/20 disabled:opacity-50"
+            className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50"
           >
             {saving ? "Сохранение..." : "Привязать день"}
           </button>
@@ -131,15 +131,15 @@ export default function StreakConfigManager() {
       </div>
 
       {/* Список настроенных дней серии */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-        <h3 className="text-base font-bold text-white mb-4">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 space-y-4">
+        <h3 className="text-base font-black text-gray-900">
           Текущая дорожка наград ({streakConfig.length} шагов)
         </h3>
 
         {loading ? (
-          <div className="text-center py-8 text-slate-500">Загрузка дорожки...</div>
+          <div className="text-center py-8 text-gray-500 font-bold text-sm">Загрузка дорожки...</div>
         ) : streakConfig.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
+          <div className="text-center py-8 text-gray-500 font-bold text-sm">
             Ни один день серии пока не настроен
           </div>
         ) : (
@@ -147,31 +147,32 @@ export default function StreakConfigManager() {
             {streakConfig.map((item) => (
               <div
                 key={item.day_number}
-                className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col justify-between relative group hover:border-amber-500/50 transition-all"
+                className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-between relative group hover:border-amber-400 transition-all shadow-sm hover:shadow-md"
               >
                 <button
+                  type="button"
                   onClick={() => handleDeleteDay(item.day_number)}
-                  className="absolute top-3 right-3 p-1 text-slate-500 hover:text-red-400 rounded-lg text-xs transition-colors"
+                  className="absolute top-3 right-3 p-1 text-gray-400 hover:text-red-500 rounded-lg text-xs transition-colors"
                   title="Удалить день"
                 >
                   ✕
                 </button>
 
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center font-black text-amber-500 text-base">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center font-black text-amber-600 text-sm">
                     {item.day_number}d
                   </div>
                   <div>
-                    <div className="text-[10px] text-slate-500 uppercase font-semibold">
+                    <div className="text-[10px] text-gray-400 uppercase font-extrabold">
                       День серии
                     </div>
-                    <div className="text-sm font-bold text-white">
+                    <div className="text-sm font-black text-gray-900">
                       День {item.day_number}
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-slate-900 border border-slate-800/80 rounded-lg p-2.5 flex items-center gap-2">
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 flex items-center gap-2.5">
                   {item.reward?.asset_url ? (
                     <img
                       src={item.reward.asset_url}
@@ -181,11 +182,11 @@ export default function StreakConfigManager() {
                   ) : (
                     <span className="text-base">🎁</span>
                   )}
-                  <div className="overflow-hidden">
-                    <div className="text-xs font-bold text-slate-200 truncate">
+                  <div className="overflow-hidden min-w-0">
+                    <div className="text-xs font-extrabold text-gray-900 truncate">
                       {item.reward?.title || "Неизвестная награда"}
                     </div>
-                    <div className="text-[10px] text-slate-400 capitalize">
+                    <div className="text-[10px] font-bold text-gray-400 capitalize">
                       {item.reward?.type || "предмет"}
                     </div>
                   </div>

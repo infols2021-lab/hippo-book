@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import RewardsCatalogManager from "./RewardsCatalogManager";
 import StreakConfigManager from "./StreakConfigManager";
 import PromocodeManager from "./PromocodeManager";
@@ -8,65 +9,77 @@ import PromocodeManager from "./PromocodeManager";
 type TabType = "catalog" | "streaks" | "promocodes";
 
 export default function AdminRewardsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>("catalog");
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Шапка */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800 pb-6">
+    <div className="admin-container">
+      {/* Верхняя шапка в стиле главной админки */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
+            <h1 style={{ margin: 0, fontSize: "24px", fontWeight: 900, display: "flex", alignItems: "center", gap: "10px" }}>
               <span>🎭</span> Центр Наград и Маскота
             </h1>
-            <p className="text-sm text-slate-400 mt-1">
+            <div className="small-muted" style={{ marginTop: 4 }}>
               Управление предметами гардероба, титулами, настройка серии входа и промокодов.
-            </p>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              className="btn small secondary"
+              type="button"
+              onClick={() => router.push("/admin")}
+            >
+              ← Назад в админку
+            </button>
+            <button
+              className="btn small"
+              type="button"
+              onClick={() => router.push("/portal")}
+            >
+              🏠 Портал
+            </button>
           </div>
         </div>
 
         {/* Переключатель табов */}
-        <div className="flex gap-2 p-1.5 bg-slate-900/80 border border-slate-800 rounded-2xl w-fit">
+        <div style={{ display: "flex", gap: 8, marginTop: 18, flexWrap: "wrap" }}>
           <button
+            type="button"
             onClick={() => setActiveTab("catalog")}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              activeTab === "catalog"
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
+            className={`btn ${activeTab === "catalog" ? "" : "ghost"}`}
+            style={{ borderRadius: 14, fontWeight: 900 }}
           >
-            <span>🎨</span> Каталог Наград
+            🎨 Каталог Наград
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab("streaks")}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              activeTab === "streaks"
-                ? "bg-amber-600 text-white shadow-lg shadow-amber-600/30"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
+            className={`btn ${activeTab === "streaks" ? "" : "ghost"}`}
+            style={{ borderRadius: 14, fontWeight: 900 }}
           >
-            <span>🔥</span> Дорожка Стриков
+            🔥 Дорожка Стриков
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab("promocodes")}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              activeTab === "promocodes"
-                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
+            className={`btn ${activeTab === "promocodes" ? "" : "ghost"}`}
+            style={{ borderRadius: 14, fontWeight: 900 }}
           >
-            <span>🎁</span> Промокоды & Логи
+            🎁 Промокоды & Логи
           </button>
         </div>
+      </div>
 
-        {/* Контент активного таба */}
-        <div className="transition-all duration-200">
-          {activeTab === "catalog" && <RewardsCatalogManager />}
-          {activeTab === "streaks" && <StreakConfigManager />}
-          {activeTab === "promocodes" && <PromocodeManager />}
-        </div>
+      {/* Контент активного таба */}
+      <div className="card">
+        {activeTab === "catalog" && <RewardsCatalogManager />}
+        {activeTab === "streaks" && <StreakConfigManager />}
+        {activeTab === "promocodes" && <PromocodeManager />}
       </div>
     </div>
   );

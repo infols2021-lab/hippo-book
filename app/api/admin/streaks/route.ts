@@ -1,18 +1,22 @@
 // app/api/admin/streaks/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
-async function verifyAdmin(supabase: any) {
+async function verifyAdmin() {
+  const userClient = await createSupabaseServerClient();
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
+  } = await userClient.auth.getUser();
 
   if (authError || !user) {
-    return { user: null, error: "Необходима авторизация" };
+    return { user: null, error: "Необходима авторизация", adminSupabase: null };
   }
 
-  const { data: profile } = await supabase
+  const adminSupabase = getSupabaseAdminClient();
+
+  const { data: profile } = await adminSupabase
     .from("profiles")
     .select("role, is_admin")
     .eq("id", user.id)
@@ -20,21 +24,20 @@ async function verifyAdmin(supabase: any) {
 
   const isAdmin = profile?.is_admin === true || profile?.role === "admin";
   if (!isAdmin) {
-    return { user: null, error: "Доступ запрещен. Требуются права администратора" };
+    return { user: null, error: "Доступ запрещен. Требуются права администратора", adminSupabase: null };
   }
 
-  return { user, error: null };
+  return { user, error: null, adminSupabase };
 }
 
 export async function GET() {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { error: adminErr } = await verifyAdmin(supabase);
-    if (adminErr) {
+    const { error: adminErr, adminSupabase } = await verifyAdmin();
+    if (adminErr || !adminSupabase) {
       return NextResponse.json({ error: adminErr }, { status: 403 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await adminSupabase
       .from("streak_config")
       .select("*, reward:rewards(*)")
       .order("day_number", { ascending: true });
@@ -55,9 +58,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { error: adminErr } = await verifyAdmin(supabase);
-    if (adminErr) {
+    const { error: adminErr, adminSupabase } = await verifyAdmin();
+    if (adminErr || !adminSupabase) {
       return NextResponse.json({ error: adminErr }, { status: 403 });
     }
 
@@ -83,7 +85,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await adminSupabase
       .from("streak_config")
       .upsert(
         { day_number: dayNumber, reward_id: rewardId },
@@ -108,9 +110,8 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { error: adminErr } = await verifyAdmin(supabase);
-    if (adminErr) {
+    const { error: adminErr, adminSupabase } = await verifyAdmin();
+    if (adminErr || !adminSupabase) {
       return NextResponse.json({ error: adminErr }, { status: 403 });
     }
 
@@ -124,7 +125,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const { error } = await supabase
+    const { error } = await adminSupabase
       .from("streak_config")
       .delete()
       .eq("day_number", dayNumber);
