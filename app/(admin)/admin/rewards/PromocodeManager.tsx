@@ -12,8 +12,7 @@ interface ProjectItem {
 interface MaterialCatalogItem {
   id: string;
   title: string;
-  project_id?: string;
-  project_tab_id?: string;
+  is_secret?: boolean;
 }
 
 export default function PromocodeManager() {
@@ -86,7 +85,6 @@ export default function PromocodeManager() {
         const pList = projectsData.projects || [];
         setProjectsList(pList);
         
-        // Загружаем материалы всех проектов для визуал-селектора
         const matPromises = pList.map((p: ProjectItem) =>
           fetch(`/api/projects/${p.slug}/materials`).then((r) => r.json())
         );
@@ -519,7 +517,7 @@ export default function PromocodeManager() {
                         </span>
                       </td>
                       <td className="p-3 space-y-1">
-                        {log.bundle_reward_ids && log.bundle_reward_titles.length > 0 && (
+                        {log.bundle_reward_titles && log.bundle_reward_titles.length > 0 && (
                           <div className="text-[11px] text-purple-700 font-bold">
                             🎽 {log.bundle_reward_titles.join(", ")}
                           </div>
@@ -702,7 +700,9 @@ export default function PromocodeManager() {
                           key={m.id}
                           className="flex items-center justify-between p-1.5 bg-white border border-gray-200 rounded-xl cursor-pointer text-xs"
                         >
-                          <span className="font-bold text-gray-800">{m.title}</span>
+                          <span className="font-bold text-gray-800">
+                            {m.title} {m.is_secret && "🔒 (Секретный)"}
+                          </span>
                           <input
                             type="checkbox"
                             checked={selectedSpecificMaterialIds.includes(m.id)}

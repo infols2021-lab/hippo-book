@@ -74,6 +74,7 @@ export default function MaterialsManager() {
     const payload = {
       ...editingMaterial,
       price: Number(editingMaterial.price) || 1000,
+      is_secret: Boolean(editingMaterial.is_secret),
       project_tab_id: selectedTabId === "none" || !selectedTabId ? null : selectedTabId,
       class_levels: editingMaterial.target_levels || [],
     };
@@ -178,6 +179,7 @@ export default function MaterialsManager() {
             target_levels: [], 
             is_active: true, 
             is_available: false, 
+            is_secret: false,
             order_index: 0,
             branch_type: "olympiad",
             material_kind: "material",
@@ -250,7 +252,7 @@ export default function MaterialsManager() {
             </div>
           </div>
 
-          <div className="flex gap-6 p-4 bg-gray-50 rounded-xl border">
+          <div className="flex flex-wrap gap-6 p-4 bg-gray-50 rounded-xl border">
             <label className="flex items-center gap-2 cursor-pointer font-bold">
               <input type="checkbox" className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" checked={editingMaterial.is_active} onChange={e => setEditingMaterial({...editingMaterial, is_active: e.target.checked})} />
               Отображать на сайте (is_active)
@@ -258,6 +260,10 @@ export default function MaterialsManager() {
             <label className="flex items-center gap-2 cursor-pointer font-bold">
               <input type="checkbox" className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" checked={editingMaterial.is_available} onChange={e => setEditingMaterial({...editingMaterial, is_available: e.target.checked})} />
               Доступен всем без заявок (is_available)
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-bold text-purple-700">
+              <input type="checkbox" className="w-5 h-5 rounded text-purple-600 focus:ring-purple-500" checked={Boolean(editingMaterial.is_secret)} onChange={e => setEditingMaterial({...editingMaterial, is_secret: e.target.checked})} />
+              🔒 Секретный материал (is_secret)
             </label>
           </div>
 
@@ -297,7 +303,14 @@ export default function MaterialsManager() {
                         <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl shadow-sm border">📄</div>
                       )}
                       <div>
-                        {mat.title}
+                        <div className="flex items-center gap-2">
+                          <span>{mat.title}</span>
+                          {mat.is_secret && (
+                            <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                              ★ Секретный
+                            </span>
+                          )}
+                        </div>
                         {mat.description && <div className="text-xs font-normal text-gray-500 mt-0.5 truncate max-w-xs">{mat.description}</div>}
                       </div>
                     </td>

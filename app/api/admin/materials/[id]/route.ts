@@ -55,6 +55,10 @@ function normalizePatchPayload(body: any) {
     payload.is_active = normalizeBool(body.is_active ?? body.isActive);
   }
 
+  if ("is_secret" in body || "isSecret" in body) {
+    payload.is_secret = normalizeBool(body.is_secret ?? body.isSecret);
+  }
+
   if ("order_index" in body || "orderIndex" in body) {
     payload.order_index = normalizeOrderIndex(body.order_index ?? body.orderIndex);
   }
@@ -192,7 +196,6 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       return fail(errorMsg, 500, "DB_ERROR");
     }
 
-    // Синхронизация с легаси-таблицами при обновлении цен и названий
     if (data?.legacy_source_table && data?.legacy_source_id) {
       const legacyPayload: Record<string, any> = {};
       if ("price" in payload) legacyPayload.price = payload.price;
@@ -207,7 +210,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             .update(legacyPayload)
             .eq("id", data.legacy_source_id);
         } catch {
-          // Игнорируем возможные фоновые ошибки синхронизации
+          // Игнорируем ошибки синхронизации легаси-таблиц
         }
       }
     }

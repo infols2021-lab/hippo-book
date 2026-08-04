@@ -22,6 +22,7 @@ function toPublicMaterialDTO(material: MaterialWithProgress) {
     order_index: material.order_index,
     price: material.price,
     is_available: material.is_available,
+    is_secret: Boolean((material as any).is_secret),
     hasAccess: material.hasAccess,
     progress: material.progress,
     totalAssignments: material.totalAssignments,
@@ -87,20 +88,23 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
     }
   }
 
-  // 5. Защита от фантомных легаси-материалов без привязки («демо», «чебупеля» и т.д.)
+  // 5. Защита от фантомных легаси-материалов и ФИЛЬТРАЦИЯ СЕКРЕТНЫХ
   let materials = rawMaterials.filter((m) => {
     const hasValidTab = m.project_tab_id ? activeTabIds.has(m.project_tab_id) : false;
     const isProjectDirect = (m as any).project_id === project.id;
 
-    // Если материал не привязан ни к активным табам, ни напрямую к проекту — отбрасываем
     if (!hasValidTab && !isProjectDirect) {
       return false;
     }
 
     const titleLower = String(m.title || "").toLowerCase();
     if (titleLower.includes("чебупеля") || titleLower.includes("демо")) {
-      // Исключаем мусорные названия, если они случайно попали из старых таблиц
       if (!hasValidTab) return false;
+    }
+
+    // Секретные материалы видны ученику ТОЛЬКО после получения доступа (hasAccess === true)
+    if ((m as any).is_secret && !m.hasAccess) {
+      return false;
     }
 
     return true;

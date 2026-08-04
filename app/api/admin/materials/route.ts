@@ -1,3 +1,4 @@
+// app/api/admin/materials/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -43,7 +44,6 @@ export async function GET(req: NextRequest) {
       return ok({ materials });
     }
 
-    // Подсчет заданий в памяти для обхода лимитов PostgREST
     const { data: assignments, error: countError } = await supabase
       .from("assignments")
       .select("id, material_id, textbook_id, crossword_id");
@@ -86,10 +86,11 @@ export async function POST(req: NextRequest) {
     return fail("Bad JSON", 400, "BAD_JSON");
   }
 
-  // Делегируем всю нормализацию единому файлу-источнику истины
-  const payload = normalizeMaterialInput(body, user.id);
+  const payload = {
+    ...normalizeMaterialInput(body, user.id),
+    is_secret: typeof body.is_secret === "boolean" ? body.is_secret : Boolean(body.isSecret),
+  };
 
-  // Локальная валидация критических для бизнес-логики полей
   if (!payload.title) {
     return fail("title required", 400, "VALIDATION");
   }
