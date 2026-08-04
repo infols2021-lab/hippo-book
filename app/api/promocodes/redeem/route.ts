@@ -42,7 +42,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ok: true,
+      ...result,
+    });
   } catch (error: any) {
     console.error("Ошибка при активации промокода:", error);
     return NextResponse.json(

@@ -85,6 +85,16 @@ export async function POST(request: Request) {
       );
     }
 
+    // 1. Узнаем, какая награда была привязана ранее
+    const { data: oldConfig } = await adminSupabase
+      .from("streak_config")
+      .select("reward_id")
+      .eq("day_number", dayNumber)
+      .maybeSingle();
+
+    const oldRewardId = oldConfig?.reward_id;
+
+    // 2. Обновляем привязку дня
     const { data, error } = await adminSupabase
       .from("streak_config")
       .upsert(
@@ -96,6 +106,15 @@ export async function POST(request: Request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    // 3. Если привязка изменилась, изымаем старую награду из стриков
+    if (oldRewardId && oldRewardId !== rewardId) {
+      await adminSupabase
+        .from("user_inventory")
+        .delete()
+        .eq("reward_id", oldRewardId)
+        .eq("source", "streak");
     }
 
     return NextResponse.json({ success: true, item: data });
@@ -125,6 +144,16 @@ export async function DELETE(request: Request) {
       );
     }
 
+    // 1. Получаем удаляемую награду
+    const { data: oldConfig } = await adminSupabase
+      .from("streak_config")
+      .select("reward_id")
+      .eq("day_number", dayNumber)
+      .maybeSingle();
+
+    const rewardIdToDelete = oldConfig?.reward_id;
+
+    // 2. Удаляем конфигурацию дня
     const { error } = await adminSupabase
       .from("streak_config")
       .delete()
@@ -132,6 +161,24 @@ export async function DELETE(request: Request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    // 3. Автоматически чистим инвентарь от удалённой награды стрика
+    if (rewardIdToDelete) {
+      await adminSupabase
+        .from("user_inventory")
+        .delete()
+        .eq("reward_id", rewardIdToDelete)
+        .eq("source", "streak");
+
+      // Скидываем надевание этой награды, если она на ком-то надета
+      await Promise.all([
+        adminSupabase.from("mascot_settings").update({ equipped_hat_id: null }).eq("equipped_hat_id", rewardIdToDelete),
+        adminSupabase.from("mascot_settings").update({ equipped_aura_id: null }).eq("equipped_aura_id", rewardIdToDelete),
+        adminSupabase.from("mascot_settings").update({ equipped_emotion_id: null }).eq("equipped_emotion_id", rewardIdToDelete),
+        adminSupabase.from("mascot_settings").update({ equipped_base_id: null }).eq("equipped_base_id", rewardIdToDelete),
+        adminSupabase.from("mascot_settings").update({ equipped_title_id: null }).eq("equipped_title_id", rewardIdToDelete),
+      ]);
     }
 
     return NextResponse.json({ success: true });

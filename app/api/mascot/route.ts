@@ -1,6 +1,7 @@
 // app/api/mascot/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   equipMascotItem,
   getMascotSettings,
@@ -31,12 +32,18 @@ export async function GET() {
       );
     }
 
+    const adminSupabase = getSupabaseAdminClient();
+
     const [mascot, inventory] = await Promise.all([
-      getMascotSettings(supabase, user.id),
-      getUserInventory(supabase, user.id),
+      getMascotSettings(adminSupabase, user.id),
+      getUserInventory(adminSupabase, user.id),
     ]);
 
-    return NextResponse.json({ mascot, inventory });
+    return NextResponse.json({
+      ok: true,
+      mascot,
+      inventory: Array.isArray(inventory) ? inventory : [],
+    });
   } catch (error: any) {
     console.error("Ошибка при получении данных маскота:", error);
     return NextResponse.json(
@@ -78,8 +85,27 @@ export async function POST(request: Request) {
       );
     }
 
+    const adminSupabase = getSupabaseAdminClient();
+
+    // Защита: проверяем, присутствует ли предмет в реальном инвентаре пользователя
+    if (rewardId) {
+      const { data: invItem } = await adminSupabase
+        .from("user_inventory")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("reward_id", rewardId)
+        .maybeSingle();
+
+      if (!invItem) {
+        return NextResponse.json(
+          { error: "Данный предмет отсутствует в вашем инвентаре" },
+          { status: 400 }
+        );
+      }
+    }
+
     const result = await equipMascotItem(
-      supabase,
+      adminSupabase,
       user.id,
       category as RewardType,
       rewardId ? String(rewardId) : null
@@ -89,9 +115,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    const updatedMascot = await getMascotSettings(supabase, user.id);
+    const updatedMascot = await getMascotSettings(adminSupabase, user.id);
 
     return NextResponse.json({
+      ok: true,
       success: true,
       mascot: updatedMascot,
     });

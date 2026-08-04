@@ -27,7 +27,6 @@ export default function StreakTimeline({
     }
   };
 
-  // Поиск следующей доступной или закрытой награды
   const nextUpcomingReward = path.find((item) => !item.is_claimed);
 
   return (
@@ -35,141 +34,133 @@ export default function StreakTimeline({
       {/* 1. ВЕРХНИЕ КАРТОЧКИ СТАТИСТИКИ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Карточка 1: Текущая серия */}
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center text-2xl">
-            🔥
-          </div>
+        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
           <div>
-            <div className="text-xl font-black text-slate-900 dark:text-white">
+            <div className="text-[10px] font-black uppercase tracking-wider text-amber-500 mb-1">
+              Серия
+            </div>
+            <div className="text-2xl font-black text-white">
               {stats.currentStreak} дн.
             </div>
-            <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            <div className="text-xs font-medium text-slate-400 mt-0.5">
               Текущая серия
             </div>
+          </div>
+          <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold rounded-lg uppercase tracking-wider">
+            Активна
           </div>
         </div>
 
         {/* Карточка 2: Рекорд */}
         <div
           onClick={() => setIsLeaderboardOpen(true)}
-          className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-blue-500/15 transition-all group"
+          className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:border-blue-500/50 transition-all group"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-2xl">
-              🏆
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-wider text-blue-400 mb-1">
+              Рекорд
             </div>
-            <div>
-              <div className="text-xl font-black text-slate-900 dark:text-white">
-                {stats.maxStreak} дн.
-              </div>
-              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Рекорд серии
-              </div>
+            <div className="text-2xl font-black text-white">
+              {stats.maxStreak} дн.
+            </div>
+            <div className="text-xs font-medium text-slate-400 mt-0.5">
+              Максимум за всё время
             </div>
           </div>
-          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-0.5 transition-transform">
-            Топ-20 ➔
+          <span className="text-xs font-extrabold text-blue-400 uppercase tracking-wider bg-slate-900 border border-slate-800 px-3 py-2 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all">
+            Топ-20
           </span>
         </div>
 
         {/* Карточка 3: Статус за сегодня */}
-        <div
-          className={`border rounded-2xl p-4 flex items-center gap-3 ${
-            stats.completedToday
-              ? "bg-emerald-500/10 border-emerald-500/20"
-              : "bg-rose-500/10 border-rose-500/20"
-          }`}
-        >
-          <div
-            className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${
-              stats.completedToday ? "bg-emerald-500/20" : "bg-rose-500/20"
-            }`}
-          >
-            {stats.completedToday ? "✅" : "📅"}
-          </div>
+        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
           <div>
+            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+              Статус дня
+            </div>
             <div
-              className={`text-base font-black ${
-                stats.completedToday
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-rose-600 dark:text-rose-400"
+              className={`text-lg font-black uppercase tracking-wider ${
+                stats.completedToday ? "text-emerald-400" : "text-rose-400"
               }`}
             >
-              {stats.completedToday ? "Засчитано!" : "Не засчитано"}
+              {stats.completedToday ? "Засчитано" : "Не засчитано"}
             </div>
-            <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            <div className="text-xs font-medium text-slate-400 mt-0.5">
               {stats.completedToday
-                ? "Задание на сегодня выполнено"
-                : "Сделай задание сегодня"}
+                ? "Задание выполнено"
+                : "Сделайте задание сегодня"}
             </div>
           </div>
+          <div
+            className={`w-3 h-3 rounded-full ${
+              stats.completedToday ? "bg-emerald-500 shadow-md shadow-emerald-500/50" : "bg-rose-500"
+            }`}
+          />
         </div>
       </div>
 
       {/* 2. БАННЕР СЛЕДУЮЩЕЙ НАГРАДЫ */}
-      <div className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
-        <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+      <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5">
+        <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-3">
           Следующая награда
         </h4>
         {nextUpcomingReward ? (
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-lg">
-                🚀
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="text-base font-black text-white uppercase tracking-wider">
+                {nextUpcomingReward.reward?.title || "Награда"} — День{" "}
+                {nextUpcomingReward.day_number}
               </div>
-              <div>
-                <div className="text-sm font-bold text-slate-900 dark:text-white">
-                  {nextUpcomingReward.reward?.title || "Награда"} — День{" "}
-                  {nextUpcomingReward.day_number}
-                </div>
-                <div className="text-xs text-slate-500">
-                  Осталось дней:{" "}
+              <div className="text-xs font-medium text-slate-400 mt-1">
+                Осталось дней серии:{" "}
+                <span className="font-bold text-white">
                   {Math.max(
                     0,
                     nextUpcomingReward.day_number - stats.currentStreak
                   )}
-                </div>
+                </span>
               </div>
             </div>
 
             {nextUpcomingReward.is_available && (
               <button
+                type="button"
                 onClick={() => handleClaim(nextUpcomingReward.day_number)}
                 disabled={claimingDay === nextUpcomingReward.day_number}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/20 disabled:opacity-50 transition-all"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-600/20 disabled:opacity-50 transition-all flex-shrink-0"
               >
                 {claimingDay === nextUpcomingReward.day_number
                   ? "Получение..."
-                  : "Забрать сейчас!"}
+                  : "Забрать награду"}
               </button>
             )}
           </div>
         ) : (
-          <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-            <span>🎉</span> Все награды в текущей дорожке уже открыты!
+          <div className="text-xs font-black text-emerald-400 uppercase tracking-wider">
+            Все награды в текущей дорожке уже разблокированы
           </div>
         )}
       </div>
 
-      {/* 3. ТАЙМЛАЙН / ДОРОЖКА НАГРАД (Центральная ось с разветвлением) */}
-      <div className="bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 relative">
+      {/* 3. ТАЙМЛАЙН / ДОРОЖКА НАГРАД */}
+      <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 relative">
         <div className="text-center mb-8">
-          <h3 className="text-lg font-black text-slate-900 dark:text-white">
+          <h3 className="text-lg font-black text-white uppercase tracking-wider">
             Дорожка наград
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-medium text-slate-400 mt-1">
             Титулы слева • Предметы и иконки справа
           </p>
         </div>
 
         {path.length === 0 ? (
-          <div className="text-center py-12 text-slate-500 text-xs">
-            Дорожка наград пока не настроена администратором
+          <div className="text-center py-12 text-slate-500 text-xs font-bold uppercase tracking-wider">
+            Дорожка наград пока не настроена
           </div>
         ) : (
           <div className="relative py-4">
-            {/* Центральная вертикальная линия таймлайна */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-slate-300 dark:bg-slate-800 -translate-x-1/2 rounded-full z-0" />
+            {/* Центральная линия */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-slate-800 -translate-x-1/2 z-0" />
 
             <div className="space-y-8 relative z-10">
               {path.map((item) => {
@@ -185,12 +176,12 @@ export default function StreakTimeline({
                     {/* ЦЕНТРАЛЬНАЯ МЕТКА ДНЯ */}
                     <div className="absolute left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
                       <div
-                        className={`w-9 h-9 rounded-full border-2 font-black text-xs flex items-center justify-center shadow-md transition-all ${
+                        className={`w-10 h-10 rounded-full border-2 font-black text-xs flex items-center justify-center uppercase tracking-wider transition-all ${
                           isClaimed
-                            ? "bg-emerald-500 border-emerald-400 text-white"
+                            ? "bg-emerald-600 border-emerald-400 text-white"
                             : isAvailable
-                            ? "bg-amber-500 border-amber-300 text-white animate-bounce"
-                            : "bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+                            ? "bg-amber-500 border-amber-300 text-white shadow-lg shadow-amber-500/20"
+                            : "bg-slate-900 border-slate-800 text-slate-500"
                         }`}
                       >
                         {item.day_number}d
@@ -203,47 +194,48 @@ export default function StreakTimeline({
                         <div
                           className={`p-4 rounded-2xl border transition-all ${
                             isClaimed
-                              ? "bg-slate-200/50 dark:bg-slate-950/40 border-slate-300 dark:border-slate-800 opacity-70"
+                              ? "bg-slate-900/50 border-slate-800/80 opacity-70"
                               : isAvailable
-                              ? "bg-white dark:bg-slate-900 border-amber-500 shadow-lg shadow-amber-500/10"
-                              : "bg-white/80 dark:bg-slate-900/80 border-slate-200 dark:border-slate-800"
+                              ? "bg-slate-900 border-blue-500 shadow-md shadow-blue-500/10"
+                              : "bg-slate-900 border-slate-800"
                           }`}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                              🏷️ Титул
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-purple-950 border border-purple-800 text-purple-400 tracking-wider">
+                              Титул
                             </span>
                             <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                              className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
                                 isClaimed
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
                                   : isAvailable
-                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                                  : "text-slate-400"
+                                  ? "bg-amber-950 text-amber-400 border border-amber-800"
+                                  : "text-slate-500"
                               }`}
                             >
                               {isClaimed
-                                ? "Открыт ✓"
+                                ? "Открыт"
                                 : isAvailable
-                                ? "Доступен!"
-                                : "Закрыт 🔒"}
+                                ? "Доступен"
+                                : "Закрыт"}
                             </span>
                           </div>
 
-                          <div className="font-bold text-sm text-slate-900 dark:text-white mb-1">
+                          <div className="font-bold text-sm text-white mb-1">
                             «{item.reward?.title}»
                           </div>
                           {item.reward?.description && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                            <p className="text-xs text-slate-400 font-medium line-clamp-2">
                               {item.reward.description}
                             </p>
                           )}
 
                           {isAvailable && (
                             <button
+                              type="button"
                               onClick={() => handleClaim(item.day_number)}
                               disabled={claimingDay === item.day_number}
-                              className="mt-3 w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-amber-500/20 disabled:opacity-50"
+                              className="mt-3 w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md shadow-amber-600/20 disabled:opacity-50"
                             >
                               {claimingDay === item.day_number
                                 ? "Забор..."
@@ -260,30 +252,30 @@ export default function StreakTimeline({
                         <div
                           className={`p-4 rounded-2xl border transition-all ${
                             isClaimed
-                              ? "bg-slate-200/50 dark:bg-slate-950/40 border-slate-300 dark:border-slate-800 opacity-70"
+                              ? "bg-slate-900/50 border-slate-800/80 opacity-70"
                               : isAvailable
-                              ? "bg-white dark:bg-slate-900 border-amber-500 shadow-lg shadow-amber-500/10"
-                              : "bg-white/80 dark:bg-slate-900/80 border-slate-200 dark:border-slate-800"
+                              ? "bg-slate-900 border-blue-500 shadow-md shadow-blue-500/10"
+                              : "bg-slate-900 border-slate-800"
                           }`}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                              👑 Предмет
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-950 border border-blue-800 text-blue-400 tracking-wider">
+                              Предмет
                             </span>
                             <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                              className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
                                 isClaimed
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
                                   : isAvailable
-                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                                  : "text-slate-400"
+                                  ? "bg-amber-950 text-amber-400 border border-amber-800"
+                                  : "text-slate-500"
                               }`}
                             >
                               {isClaimed
-                                ? "Открыт ✓"
+                                ? "Открыт"
                                 : isAvailable
-                                ? "Доступен!"
-                                : "Закрыт 🔒"}
+                                ? "Доступен"
+                                : "Закрыт"}
                             </span>
                           </div>
 
@@ -295,13 +287,15 @@ export default function StreakTimeline({
                                 className="w-10 h-10 object-contain"
                               />
                             ) : (
-                              <span className="text-2xl">🎁</span>
+                              <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400">
+                                N/A
+                              </div>
                             )}
                             <div>
-                              <div className="font-bold text-sm text-slate-900 dark:text-white">
+                              <div className="font-bold text-sm text-white">
                                 {item.reward?.title || "Награда"}
                               </div>
-                              <div className="text-[10px] text-slate-500 uppercase font-semibold">
+                              <div className="text-[10px] text-slate-400 uppercase font-black tracking-wider">
                                 {item.reward?.type || "предмет"}
                               </div>
                             </div>
@@ -309,9 +303,10 @@ export default function StreakTimeline({
 
                           {isAvailable && (
                             <button
+                              type="button"
                               onClick={() => handleClaim(item.day_number)}
                               disabled={claimingDay === item.day_number}
-                              className="mt-2 w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-amber-500/20 disabled:opacity-50"
+                              className="mt-2 w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md shadow-amber-600/20 disabled:opacity-50"
                             >
                               {claimingDay === item.day_number
                                 ? "Забор..."

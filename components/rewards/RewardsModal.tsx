@@ -31,10 +31,8 @@ export default function RewardsModal({
   defaultTab = "wardrobe",
   initialTab,
 }: RewardsModalProps) {
-  // Флаг открытия (поддержка и isOpen, и open)
   const showModal = Boolean(isOpen ?? open);
 
-  // Нормализация выбранной вкладки ("timeline" -> "streaks")
   const normalizeTab = (tab?: RewardsTabType): "wardrobe" | "streaks" | "promocode" => {
     const raw = tab || initialTab || defaultTab;
     if (raw === "timeline") return "streaks";
@@ -47,7 +45,6 @@ export default function RewardsModal({
 
   const [loading, setLoading] = useState(true);
 
-  // Данные
   const [mascot, setMascot] = useState<MascotSettings | null>(null);
   const [inventory, setInventory] = useState<UserInventoryItem[]>([]);
   const [streakStats, setStreakStats] = useState<StreakStats>({
@@ -58,16 +55,13 @@ export default function RewardsModal({
   });
   const [streakPath, setStreakPath] = useState<StreakConfigItem[]>([]);
 
-  // Категория гардероба
   const [wardrobeCategory, setWardrobeCategory] = useState<RewardType>("hat");
 
-  // Промокоды
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoSuccessMsg, setPromoSuccessMsg] = useState<string | null>(null);
   const [redeeming, setRedeeming] = useState(false);
 
-  // Вложенные модалки выбора материала / физ приза
   const [materialChoiceState, setMaterialChoiceState] = useState<{
     isOpen: boolean;
     code: string;
@@ -135,7 +129,6 @@ export default function RewardsModal({
     }
   };
 
-  // Экипировка / Снятие предмета
   const handleEquip = async (category: RewardType, rewardId: string | null) => {
     try {
       const res = await fetch("/api/mascot", {
@@ -153,7 +146,6 @@ export default function RewardsModal({
     }
   };
 
-  // Забор награды за стрик
   const handleClaimStreak = async (dayNumber: number) => {
     try {
       const res = await fetch("/api/streaks", {
@@ -173,7 +165,6 @@ export default function RewardsModal({
     }
   };
 
-  // Активация промокода
   const handleRedeemPromo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!promoCodeInput.trim()) return;
@@ -206,7 +197,7 @@ export default function RewardsModal({
             prize: data.physicalPrize,
           });
         } else {
-          setPromoSuccessMsg("🎉 Промокод успешно активирован!");
+          setPromoSuccessMsg("Промокод успешно активирован!");
           setPromoCodeInput("");
           void loadData();
         }
@@ -220,12 +211,10 @@ export default function RewardsModal({
 
   if (!showModal) return null;
 
-  // Фильтрация инвентаря по выбранной категории гардероба
   const filteredInventory = inventory.filter(
     (item) => item.reward?.type === wardrobeCategory
   );
 
-  // Проверка, экипирован ли конкретный предмет
   const isItemEquipped = (rewardId: string) => {
     if (!mascot) return false;
     return (
@@ -239,98 +228,98 @@ export default function RewardsModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
         <div
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-4xl w-full h-[88vh] flex flex-col shadow-2xl overflow-hidden relative animate-in fade-in zoom-in-95"
+          className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full h-[88vh] flex flex-col shadow-2xl overflow-hidden relative"
           style={{
-            backgroundColor: "var(--glass-bg, rgba(15, 23, 42, 0.95))",
+            backgroundColor: "var(--project-card-bg, #0f172a)",
             color: "var(--project-text, #ffffff)",
           }}
         >
           {/* Шапка модалки */}
-          <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800/80">
+          <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-800 bg-slate-900/90">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">🎭</span>
-              <h2 className="text-xl font-black text-slate-900 dark:text-white">
-                Центр Наград
+              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <h2 className="text-xl font-black text-white tracking-wide uppercase">
+                Центр наград
               </h2>
             </div>
 
-            {/* Переключатель табов */}
-            <div className="flex gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-2xl border border-slate-200 dark:border-slate-800">
+            {/* Сегментированные табы */}
+            <div className="flex gap-1 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
               <button
                 type="button"
                 onClick={() => setActiveTab("wardrobe")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all ${
                   activeTab === "wardrobe"
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
-                👕 Гардероб
+                Гардероб
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("streaks")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all ${
                   activeTab === "streaks"
                     ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
-                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
-                🔥 Серия ({streakStats.currentStreak}d)
+                Серия ({streakStats.currentStreak} дн.)
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("promocode")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all ${
                   activeTab === "promocode"
                     ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
-                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
-                🎁 Промокод
+                Промокод
               </button>
             </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              className="px-3 py-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold transition-colors"
             >
-              ✕
+              Закрыть
             </button>
           </div>
 
-          {/* ТЕЛО МОДАЛКИ */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-6">
+          {/* Контент модалки */}
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6 bg-slate-900">
             {loading ? (
-              <div className="h-full flex items-center justify-center text-slate-400 font-semibold text-sm">
-                Загрузка Центра Наград...
+              <div className="h-full flex items-center justify-center text-slate-400 font-bold text-sm uppercase tracking-wider">
+                Загрузка данных...
               </div>
             ) : (
               <>
-                {/* TAB 1: ГАРДЕРОБ */}
+                {/* Вкладка 1: ГАРДЕРОБ */}
                 {activeTab === "wardrobe" && (
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
-                    {/* Слева: Предпросмотр Маскота */}
-                    <div className="md:col-span-5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-inner">
+                    {/* Левая панель: Примерка */}
+                    <div className="md:col-span-5 bg-slate-950 border border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-inner">
                       <MascotViewer mascotSettings={mascot} size={230} />
-                      <div className="text-xs text-slate-400 font-medium mt-4 text-center">
-                        Примеряйте найденные предметы
+                      <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-4 text-center">
+                        Предпросмотр комбинации
                       </div>
                     </div>
 
-                    {/* Справа: Категории и Сетка Инвентаря */}
+                    {/* Правая панель: Инвентарь */}
                     <div className="md:col-span-7 flex flex-col space-y-4">
                       {/* Селектор категорий */}
-                      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 overflow-x-auto">
+                      <div className="flex gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
                         {[
-                          { type: "hat", label: "👑 Шляпы" },
-                          { type: "aura", label: "✨ Ауры" },
-                          { type: "emotion", label: "😄 Эмоции" },
-                          { type: "base", label: "☁️ Базы" },
-                          { type: "title", label: "🏷️ Титулы" },
+                          { type: "hat", label: "Шляпы" },
+                          { type: "aura", label: "Ауры" },
+                          { type: "emotion", label: "Эмоции" },
+                          { type: "base", label: "Базы" },
+                          { type: "title", label: "Титулы" },
                         ].map((cat) => (
                           <button
                             key={cat.type}
@@ -338,10 +327,10 @@ export default function RewardsModal({
                             onClick={() =>
                               setWardrobeCategory(cat.type as RewardType)
                             }
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
+                            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
                               wardrobeCategory === cat.type
-                                ? "bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30"
-                                : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/50"
+                                ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
+                                : "bg-slate-800/60 text-slate-400 hover:bg-slate-800 hover:text-white"
                             }`}
                           >
                             {cat.label}
@@ -349,7 +338,7 @@ export default function RewardsModal({
                         ))}
                       </div>
 
-                      {/* Инвентарь предметов */}
+                      {/* Сетка предметов */}
                       <div
                         className={`flex-1 overflow-y-auto pr-1 ${
                           wardrobeCategory === "title"
@@ -358,17 +347,19 @@ export default function RewardsModal({
                         }`}
                       >
                         {filteredInventory.length === 0 ? (
-                          <div className="col-span-full py-12 text-center text-slate-400 text-xs">
-                            У вас пока нет предметов в этой категории.
-                            <br />
-                            Держите серию или вводите промокоды!
+                          <div className="col-span-full py-16 text-center bg-slate-950 border border-slate-800 rounded-2xl p-6">
+                            <div className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-1">
+                              Предметы отсутствуют
+                            </div>
+                            <div className="text-xs text-slate-500 font-medium">
+                              Продлевайте ежедневную серию или активируйте промокоды для получения наград.
+                            </div>
                           </div>
                         ) : (
                           filteredInventory.map((item) => {
                             if (!item.reward) return null;
                             const equipped = isItemEquipped(item.reward.id);
 
-                            // Оформление для ТИТУЛОВ (полноширинная плашка)
                             if (wardrobeCategory === "title") {
                               return (
                                 <div
@@ -379,46 +370,41 @@ export default function RewardsModal({
                                       equipped ? null : item.reward!.id
                                     )
                                   }
-                                  className={`w-full border rounded-2xl p-3.5 flex items-center justify-between cursor-pointer transition-all relative group ${
+                                  className={`w-full border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all ${
                                     equipped
-                                      ? "border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/10"
-                                      : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-950"
+                                      ? "border-blue-500 bg-blue-950/40 shadow-md shadow-blue-500/10"
+                                      : "border-slate-800 bg-slate-950 hover:border-slate-700"
                                   }`}
                                 >
-                                  <div className="flex items-center gap-3 min-w-0 pr-2">
-                                    <span className="text-xl flex-shrink-0">🏷️</span>
-                                    <div className="min-w-0">
-                                      <span
-                                        className="font-bold text-xs sm:text-sm px-3 py-1 rounded-full border inline-block truncate max-w-full"
-                                        style={{
-                                          borderColor:
-                                            item.reward.meta?.color || "#8b5cf6",
-                                          color:
-                                            item.reward.meta?.color || "#8b5cf6",
-                                          backgroundColor: `color-mix(in srgb, ${
-                                            item.reward.meta?.color || "#8b5cf6"
-                                          } 10%, transparent)`,
-                                        }}
-                                      >
-                                        «{item.reward.title}»
-                                      </span>
-                                    </div>
+                                  <div className="min-w-0 pr-3">
+                                    <span
+                                      className="font-black text-xs sm:text-sm px-3 py-1 rounded-lg border inline-block truncate max-w-full uppercase tracking-wider"
+                                      style={{
+                                        borderColor:
+                                          item.reward.meta?.color || "#3b82f6",
+                                        color:
+                                          item.reward.meta?.color || "#3b82f6",
+                                        backgroundColor: "rgba(15, 23, 42, 0.8)",
+                                      }}
+                                    >
+                                      «{item.reward.title}»
+                                    </span>
                                   </div>
 
-                                  <span
-                                    className={`text-xs font-bold px-3 py-1.5 rounded-xl flex-shrink-0 transition-colors ${
+                                  <button
+                                    type="button"
+                                    className={`text-xs font-black uppercase tracking-wider px-4 py-2 rounded-xl flex-shrink-0 transition-colors ${
                                       equipped
-                                        ? "bg-indigo-600 text-white"
-                                        : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 group-hover:bg-indigo-600 group-hover:text-white"
+                                        ? "bg-blue-600 text-white"
+                                        : "bg-slate-800 text-slate-300 group-hover:bg-blue-600 group-hover:text-white"
                                     }`}
                                   >
                                     {equipped ? "Надето" : "Надеть"}
-                                  </span>
+                                  </button>
                                 </div>
                               );
                             }
 
-                            // Оформление для ВСЕХ ОСТАЛЬНЫХ ПРЕДМЕТОВ (сетка)
                             return (
                               <div
                                 key={item.id}
@@ -428,19 +414,19 @@ export default function RewardsModal({
                                     equipped ? null : item.reward!.id
                                   )
                                 }
-                                className={`bg-slate-50 dark:bg-slate-950 border rounded-2xl p-3 flex flex-col items-center justify-between cursor-pointer transition-all relative group ${
+                                className={`border rounded-2xl p-4 flex flex-col items-center justify-between cursor-pointer transition-all bg-slate-950 ${
                                   equipped
-                                    ? "border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/10"
-                                    : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                                    ? "border-blue-500 bg-blue-950/30 shadow-md shadow-blue-500/10"
+                                    : "border-slate-800 hover:border-slate-700"
                                 }`}
                               >
                                 {equipped && (
-                                  <span className="absolute top-2 right-2 text-[10px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded-md">
+                                  <span className="self-end text-[10px] bg-blue-600 text-white font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
                                     Надето
                                   </span>
                                 )}
 
-                                <div className="w-16 h-16 flex items-center justify-center my-2">
+                                <div className="w-16 h-16 flex items-center justify-center my-3">
                                   {item.reward.asset_url ? (
                                     <img
                                       src={item.reward.asset_url}
@@ -448,12 +434,14 @@ export default function RewardsModal({
                                       className="max-h-14 max-w-14 object-contain"
                                     />
                                   ) : (
-                                    <span className="text-2xl">🎁</span>
+                                    <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400">
+                                      N/A
+                                    </div>
                                   )}
                                 </div>
 
                                 <div className="text-center w-full">
-                                  <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                                  <div className="font-bold text-xs text-white truncate">
                                     {item.reward.title}
                                   </div>
                                 </div>
@@ -466,7 +454,7 @@ export default function RewardsModal({
                   </div>
                 )}
 
-                {/* TAB 2: ДОРОЖКА СЕРИИ */}
+                {/* Вкладка 2: ДОРОЖКА СЕРИИ */}
                 {activeTab === "streaks" && (
                   <StreakTimeline
                     stats={streakStats}
@@ -475,16 +463,15 @@ export default function RewardsModal({
                   />
                 )}
 
-                {/* TAB 3: ПРОМОКОД */}
+                {/* Вкладка 3: ПРОМОКОД */}
                 {activeTab === "promocode" && (
                   <div className="max-w-md mx-auto py-12 space-y-6">
                     <div className="text-center space-y-2">
-                      <div className="text-5xl">🎁</div>
-                      <h3 className="text-lg font-black text-slate-900 dark:text-white">
-                        Активация Промокода
+                      <h3 className="text-lg font-black text-white uppercase tracking-wider">
+                        Активация промокода
                       </h3>
-                      <p className="text-xs text-slate-400">
-                        Введите секретный код, полученный за участие в ивентах или от преподавателей.
+                      <p className="text-xs text-slate-400 font-medium">
+                        Введите персональный код для получения наград или доступа к материалам.
                       </p>
                     </div>
 
@@ -492,23 +479,23 @@ export default function RewardsModal({
                       <div>
                         <input
                           type="text"
-                          placeholder="ВВЕДИТЕ ПРОМОКОД"
+                          placeholder="ВВЕДИТЕ КОД"
                           value={promoCodeInput}
                           onChange={(e) =>
                             setPromoCodeInput(e.target.value.toUpperCase())
                           }
-                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-center text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest focus:outline-none focus:border-emerald-500 transition-colors shadow-inner"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-center text-lg font-mono font-black text-emerald-400 uppercase tracking-widest focus:outline-none focus:border-emerald-500 transition-colors shadow-inner"
                         />
                       </div>
 
                       {promoError && (
-                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-500 dark:text-red-400 text-center font-semibold">
+                        <div className="p-3 bg-red-950/60 border border-red-800 rounded-xl text-xs text-red-400 text-center font-bold">
                           {promoError}
                         </div>
                       )}
 
                       {promoSuccessMsg && (
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-600 dark:text-emerald-400 text-center font-semibold">
+                        <div className="p-3 bg-emerald-950/60 border border-emerald-800 rounded-xl text-xs text-emerald-400 text-center font-bold">
                           {promoSuccessMsg}
                         </div>
                       )}
@@ -516,9 +503,9 @@ export default function RewardsModal({
                       <button
                         type="submit"
                         disabled={redeeming || !promoCodeInput.trim()}
-                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-2xl transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50"
                       >
-                        {redeeming ? "Проверка..." : "Активировать"}
+                        {redeeming ? "Активация..." : "Активировать"}
                       </button>
                     </form>
                   </div>
@@ -529,7 +516,7 @@ export default function RewardsModal({
         </div>
       </div>
 
-      {/* Модалка выбора материала по промику */}
+      {/* Выбор материала по промокоду */}
       {materialChoiceState.isOpen && (
         <MaterialChoiceModal
           isOpen={materialChoiceState.isOpen}
@@ -542,7 +529,7 @@ export default function RewardsModal({
         />
       )}
 
-      {/* Модалка физического подарка */}
+      {/* Физический приз */}
       {physicalPrizeState.isOpen && physicalPrizeState.prize && (
         <PhysicalPrizeModal
           isOpen={physicalPrizeState.isOpen}
