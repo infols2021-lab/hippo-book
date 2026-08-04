@@ -9,10 +9,8 @@ import Dropzone from "@/components/Admin/ImageOptimizer/Dropzone";
 import SettingsPanel from "@/components/Admin/ImageOptimizer/SettingsPanel";
 import { processImages } from "@/lib/imageOptimizer";
 
-// НОВЫЕ КОМПОНЕНТЫ УПРАВЛЕНИЯ ЯДРОМ
 import ProjectsTab from "./projects/ProjectsTab";
 import MaterialsManager from "./projects/MaterialsManager";
-
 import AssignmentsTab from "./assignments/AssignmentsTab";
 import UsersTab from "./users/UsersTab";
 import RequestsTab from "./requests/RequestsTab";
@@ -30,7 +28,6 @@ type ReqStats = {
   processed: number;
 };
 
-// ОБНОВЛЕННЫЕ ТАБЫ
 type AdminTab = "projects" | "materials" | "assignments" | "users" | "requests";
 
 type ApiOkStats = {
@@ -86,7 +83,6 @@ export default function AdminClient() {
   const router = useRouter();
 
   const [loggingOut, setLoggingOut] = useState(false);
-  // Начинаем с управления проектами (ветками)
   const [tab, setTab] = useState<AdminTab>("projects");
 
   const [stats, setStats] = useState<Stats>({
@@ -100,13 +96,11 @@ export default function AdminClient() {
   const [statsErr, setStatsErr] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState(0);
 
-  // Состояния для инструмента сжатия
   const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
   const [optimizerFiles, setOptimizerFiles] = useState<File[]>([]);
   const [optimizerQuality, setOptimizerQuality] = useState(80);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // НАВИГАЦИОННОЕ МЕНЮ
   const tabs = useMemo(
     () => [
       { key: "projects" as const, label: "📁 Ветки (Проекты)" },
@@ -180,7 +174,6 @@ export default function AdminClient() {
     }
   }
 
-  // Обработчик сжатия
   const handleOptimize = async () => {
     if (optimizerFiles.length === 0) return;
     setIsProcessing(true);
@@ -285,7 +278,7 @@ export default function AdminClient() {
               onClick={() => setTab(t.key)}
               style={{
                 borderRadius: 14,
-                padding: "10px 14px",
+                padding: "10px 16px",
                 fontWeight: 900,
                 display: "inline-flex",
                 alignItems: "center",
@@ -293,8 +286,8 @@ export default function AdminClient() {
                 position: "relative",
                 ...(isRequests && pendingRequests > 0
                   ? {
-                      border: "2px solid var(--accent)",
-                      boxShadow: "0 0 0 4px rgba(255,107,107,0.12)",
+                      border: "2px solid #ef4444",
+                      boxShadow: "0 0 0 4px rgba(239, 68, 68, 0.15)",
                     }
                   : {}),
               }}
@@ -310,14 +303,14 @@ export default function AdminClient() {
                     width: 22,
                     height: 22,
                     borderRadius: 999,
-                    background: "var(--accent)",
-                    color: "#fff",
+                    background: "#ef4444",
+                    color: "#ffffff",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: 12,
                     fontWeight: 900,
-                    boxShadow: "0 6px 12px rgba(255,107,107,0.22)",
+                    boxShadow: "0 4px 10px rgba(239, 68, 68, 0.3)",
                   }}
                 >
                   {pendingRequests > 99 ? "99" : pendingRequests}
@@ -328,14 +321,12 @@ export default function AdminClient() {
         })}
       </div>
 
-      {/* РОУТИНГ ТАБОВ АДМИНКИ */}
       {tab === "projects" ? <ProjectsTab /> : null}
       {tab === "materials" ? <MaterialsManager /> : null}
       {tab === "assignments" ? <AssignmentsTab /> : null}
       {tab === "users" ? <UsersTab /> : null}
       {tab === "requests" ? <RequestsTab onPendingChanged={(p) => setPendingRequests(p)} /> : null}
 
-      {/* Модальное окно инструмента сжатия */}
       <Modal
         open={isOptimizerOpen}
         onClose={() => {
@@ -357,7 +348,7 @@ export default function AdminClient() {
               style={{
                 width: "100%",
                 marginTop: "1rem",
-                background: isProcessing ? "#475569" : "linear-gradient(135deg, var(--accent2), #6dd3c0)",
+                background: isProcessing ? "#475569" : "linear-gradient(135deg, #0ea5e9, #0284c7)",
               }}
             >
               {isProcessing ? "⚡ Обработка и сжатие..." : "Скачать готовый ZIP архив"}
