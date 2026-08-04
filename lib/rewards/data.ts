@@ -1,5 +1,12 @@
 // lib/rewards/data.ts
 // Серверный слой работы с базой данных Supabase: Маскот, Стрики и Промокоды.
+//
+// ВАЖНО: единственный источник правды по сериям (стрикам) во всей системе —
+// таблица `profiles` (колонки current_streak / max_streak / longest_streak /
+// last_completed_at). Её обновляет RPC record_streak_completion при
+// выполнении задания. Все функции этого файла и все API-роуты, которые
+// показывают/начисляют/ранжируют стрики, должны читать именно её —
+// не заводите параллельных таблиц вроде user_streaks, иначе данные разъедутся.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
@@ -204,6 +211,8 @@ export async function getStreakLeaderboard(
   const { data, error } = await supabase
     .from("profiles")
     .select("id, current_streak, max_streak, longest_streak")
+    // Не засоряем топ пользователями без единого дня серии
+    .or("current_streak.gt.0,max_streak.gt.0,longest_streak.gt.0")
     .order("max_streak", { ascending: false })
     .order("current_streak", { ascending: false })
     .limit(20);

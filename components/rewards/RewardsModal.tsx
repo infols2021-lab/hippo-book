@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from "react";
 import MascotViewer from "../mascot/MascotViewer";
 import StreakTimeline from "./StreakTimeline";
-import MaterialChoiceModal from "./MaterialChoiceModal";
+import MaterialChoiceModal, {
+  MaterialChoiceSuccessResult,
+} from "./MaterialChoiceModal";
 import PhysicalPrizeModal from "./PhysicalPrizeModal";
 import RewardUnboxModal, { UnboxedRewardItem } from "./RewardUnboxModal";
 
@@ -67,6 +69,8 @@ export default function RewardsModal({
   // Стейты для пошагового анбоксинга
   const [unboxModalOpen, setUnboxModalOpen] = useState(false);
   const [unboxedItems, setUnboxedItems] = useState<UnboxedRewardItem[]>([]);
+  // Награды, которые нужно показать ПОСЛЕ того как закроется окно физ. приза
+  const [pendingUnboxItems, setPendingUnboxItems] = useState<UnboxedRewardItem[]>([]);
 
   const [materialChoiceState, setMaterialChoiceState] = useState<{
     isOpen: boolean;
@@ -102,28 +106,17 @@ export default function RewardsModal({
         setInventory(mascotData.inventory || []);
       }
       if (streaksRes.ok) {
-        const curr =
-          streaksData.streak?.currentStreak ??
-          streaksData.stats?.currentStreak ??
-          streaksData.currentStreak ??
-          0;
-        const max =
-          streaksData.streak?.longestStreak ??
-          streaksData.stats?.longestStreak ??
-          streaksData.stats?.maxStreak ??
-          streaksData.longestStreak ??
-          0;
-        const done =
-          streaksData.streak?.doneToday ??
-          streaksData.stats?.doneToday ??
-          streaksData.stats?.completedToday ??
-          false;
+        // Единственный источник правды — streaksData.stats (он всегда
+        // построен из profiles на бэкенде). streaksData.streak дублирует
+        // те же значения для обратной совместимости, поэтому больше не
+        // отдаём ему приоритет через `??`.
+        const stats = streaksData.stats || {};
 
         setStreakStats({
-          currentStreak: Number(curr),
-          maxStreak: Number(max),
-          completedToday: Boolean(done),
-          lastCompletedAt: null,
+          currentStreak: Number(stats.currentStreak ?? 0),
+          maxStreak: Number(stats.maxStreak ?? 0),
+          completedToday: Boolean(stats.completedToday ?? false),
+          lastCompletedAt: stats.lastCompletedAt ?? null,
         });
 
         setStreakPath(streaksData.path || []);
@@ -185,6 +178,55 @@ export default function RewardsModal({
     }
   };
 
+  // Общий обработчик результата активации промокода — используется и для
+  // прямого ввода кода, и для завершения выбора материалов. Гарантирует,
+  // что физ. приз и обычные награды не "съедают" друг друга: если есть и
+  // то и другое — сначала показываем приз, а после его закрытия открываем
+  // пошаговый анбоксинг остальных наград.
+  const processRedeemResult = (data: {
+    physicalPrize?: CustomPhysicalPrize | null;
+    grantedRewards?: any[];
+  }) => {
+    const rewardItems: UnboxedRewardItem[] = Array.isArray(data.grantedRewards)
+      ? data.grantedRewards.map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          type: r.type,
+          description: r.description,
+          asset_url: r.asset_url,
+          meta: r.meta,
+        }))
+      : [];
+
+    if (data.physicalPrize) {
+      setPhysicalPrizeState({ isOpen: true, prize: data.physicalPrize });
+      setPendingUnboxItems(rewardItems);
+    } else if (rewardItems.length > 0) {
+      setUnboxedItems(rewardItems);
+      setUnboxModalOpen(true);
+    } else {
+      setPromoSuccessMsg("Промокод успешно активирован!");
+    }
+
+    void loadData();
+  };
+
+  const handleMaterialChoiceSuccess = (result: MaterialChoiceSuccessResult) => {
+    setMaterialChoiceState((prev) => ({ ...prev, isOpen: false }));
+
+    if (result.physicalPrize) {
+      setPhysicalPrizeState({ isOpen: true, prize: result.physicalPrize });
+      setPendingUnboxItems(result.unboxItems as UnboxedRewardItem[]);
+    } else if (result.unboxItems.length > 0) {
+      setUnboxedItems(result.unboxItems as UnboxedRewardItem[]);
+      setUnboxModalOpen(true);
+    } else {
+      setPromoSuccessMsg("Материалы успешно разблокированы!");
+    }
+
+    void loadData();
+  };
+
   const handleRedeemPromo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!promoCodeInput.trim()) return;
@@ -204,43 +246,35 @@ export default function RewardsModal({
 
       if (!res.ok) {
         setPromoError(data.error || "Неверный промокод");
+      } else if (data.requiresMaterialChoice) {
+        setMaterialChoiceState({
+          isOpen: true,
+          code: promoCodeInput.trim().toUpperCase(),
+          remainingCount: data.remainingMaterialChoices || 1,
+        });
+        setPromoCodeInput("");
       } else {
-        if (data.requiresMaterialChoice) {
-          setMaterialChoiceState({
-            isOpen: true,
-            code: promoCodeInput.trim().toUpperCase(),
-            remainingCount: data.remainingMaterialChoices || 1,
-          });
-        } else if (data.physicalPrize) {
-          setPhysicalPrizeState({
-            isOpen: true,
-            prize: data.physicalPrize,
-          });
-        } else if (data.grantedRewards && data.grantedRewards.length > 0) {
-          const itemsToUnbox: UnboxedRewardItem[] = data.grantedRewards.map((r: any) => ({
-            id: r.id,
-            title: r.title,
-            type: r.type,
-            description: r.description,
-            asset_url: r.asset_url,
-            meta: r.meta,
-          }));
-
-          setUnboxedItems(itemsToUnbox);
-          setUnboxModalOpen(true);
-          setPromoCodeInput("");
-          void loadData();
-        } else {
-          setPromoSuccessMsg("Промокод успешно активирован!");
-          setPromoCodeInput("");
-          void loadData();
-        }
+        processRedeemResult(data);
+        setPromoCodeInput("");
       }
     } catch (e) {
       setPromoError("Ошибка сети при активации");
     } finally {
       setRedeeming(false);
     }
+  };
+
+  const closePhysicalPrizeModal = () => {
+    setPhysicalPrizeState({ isOpen: false, prize: null });
+
+    // Если пока показывали приз, "в очереди" ждали ещё награды — открываем их
+    if (pendingUnboxItems.length > 0) {
+      setUnboxedItems(pendingUnboxItems);
+      setPendingUnboxItems([]);
+      setUnboxModalOpen(true);
+    }
+
+    void loadData();
   };
 
   if (!showModal) return null;
@@ -287,9 +321,7 @@ export default function RewardsModal({
                 className="w-3.5 h-3.5 rounded-full"
                 style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
               />
-              <h2 className="text-xl font-black tracking-wide uppercase">
-                Центр наград
-              </h2>
+              <h2 className="text-xl font-black tracking-wide uppercase">Центр наград</h2>
             </div>
 
             {/* Табы */}
@@ -306,9 +338,7 @@ export default function RewardsModal({
                 className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
                 style={{
                   backgroundColor:
-                    activeTab === "wardrobe"
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "transparent",
+                    activeTab === "wardrobe" ? "var(--project-primary, #0ea5e9)" : "transparent",
                   color: activeTab === "wardrobe" ? "#ffffff" : "var(--project-text, #0f172a)",
                 }}
               >
@@ -320,9 +350,7 @@ export default function RewardsModal({
                 className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
                 style={{
                   backgroundColor:
-                    activeTab === "streaks"
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "transparent",
+                    activeTab === "streaks" ? "var(--project-primary, #0ea5e9)" : "transparent",
                   color: activeTab === "streaks" ? "#ffffff" : "var(--project-text, #0f172a)",
                 }}
               >
@@ -334,9 +362,7 @@ export default function RewardsModal({
                 className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
                 style={{
                   backgroundColor:
-                    activeTab === "promocode"
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "transparent",
+                    activeTab === "promocode" ? "var(--project-primary, #0ea5e9)" : "transparent",
                   color: activeTab === "promocode" ? "#ffffff" : "var(--project-text, #0f172a)",
                 }}
               >
@@ -369,7 +395,6 @@ export default function RewardsModal({
                 {/* Вкладка 1: ГАРДЕРОБ */}
                 {activeTab === "wardrobe" && (
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
-                    {/* Левая панель: Примерка */}
                     <div
                       className="md:col-span-5 border rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-sm"
                       style={{
@@ -383,10 +408,11 @@ export default function RewardsModal({
                       </div>
                     </div>
 
-                    {/* Правая панель: Инвентарь */}
                     <div className="md:col-span-7 flex flex-col space-y-4">
-                      {/* Селектор категорий */}
-                      <div className="flex gap-2 border-b pb-3 overflow-x-auto" style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}>
+                      <div
+                        className="flex gap-2 border-b pb-3 overflow-x-auto"
+                        style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
+                      >
                         {[
                           { type: "hat", label: "Шляпы" },
                           { type: "aura", label: "Ауры" },
@@ -397,9 +423,7 @@ export default function RewardsModal({
                           <button
                             key={cat.type}
                             type="button"
-                            onClick={() =>
-                              setWardrobeCategory(cat.type as RewardType)
-                            }
+                            onClick={() => setWardrobeCategory(cat.type as RewardType)}
                             className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all border"
                             style={{
                               backgroundColor:
@@ -421,7 +445,6 @@ export default function RewardsModal({
                         ))}
                       </div>
 
-                      {/* Сетка предметов */}
                       <div
                         className={`flex-1 overflow-y-auto pr-1 ${
                           wardrobeCategory === "title"
@@ -454,10 +477,7 @@ export default function RewardsModal({
                                 <div
                                   key={item.id}
                                   onClick={() =>
-                                    handleEquip(
-                                      wardrobeCategory,
-                                      equipped ? null : item.reward!.id
-                                    )
+                                    handleEquip(wardrobeCategory, equipped ? null : item.reward!.id)
                                   }
                                   className="w-full border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all"
                                   style={{
@@ -506,10 +526,7 @@ export default function RewardsModal({
                               <div
                                 key={item.id}
                                 onClick={() =>
-                                  handleEquip(
-                                    wardrobeCategory,
-                                    equipped ? null : item.reward!.id
-                                  )
+                                  handleEquip(wardrobeCategory, equipped ? null : item.reward!.id)
                                 }
                                 className="border rounded-2xl p-4 flex flex-col items-center justify-between cursor-pointer transition-all"
                                 style={{
@@ -548,9 +565,7 @@ export default function RewardsModal({
                                 </div>
 
                                 <div className="text-center w-full">
-                                  <div className="font-bold text-xs truncate">
-                                    {item.reward.title}
-                                  </div>
+                                  <div className="font-bold text-xs truncate">{item.reward.title}</div>
                                 </div>
                               </div>
                             );
@@ -588,9 +603,7 @@ export default function RewardsModal({
                           type="text"
                           placeholder="ВВЕДИТЕ КОД"
                           value={promoCodeInput}
-                          onChange={(e) =>
-                            setPromoCodeInput(e.target.value.toUpperCase())
-                          }
+                          onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
                           className="w-full border-2 rounded-2xl p-4 text-center text-lg font-mono font-black uppercase tracking-widest focus:outline-none transition-colors"
                           style={{
                             backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
@@ -652,8 +665,8 @@ export default function RewardsModal({
           requiredChoiceCount={materialChoiceState.remainingCount}
           onClose={() => {
             setMaterialChoiceState({ ...materialChoiceState, isOpen: false });
-            void loadData();
           }}
+          onSuccess={handleMaterialChoiceSuccess}
         />
       )}
 
@@ -662,10 +675,7 @@ export default function RewardsModal({
         <PhysicalPrizeModal
           isOpen={physicalPrizeState.isOpen}
           prize={physicalPrizeState.prize}
-          onClose={() => {
-            setPhysicalPrizeState({ ...physicalPrizeState, isOpen: false });
-            void loadData();
-          }}
+          onClose={closePhysicalPrizeModal}
         />
       )}
     </>

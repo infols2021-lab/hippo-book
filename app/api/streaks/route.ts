@@ -31,24 +31,39 @@ export async function GET() {
 
     const adminSupabase = getSupabaseAdminClient();
 
-    // 1. Получаем точные данные стриков пользователя
-    const { data: userStreak } = await adminSupabase
-      .from("user_streaks")
-      .select("current_streak, longest_streak, last_completed_date")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    // ЕДИНСТВЕННЫЙ источник правды по сериям — таблица `profiles`
+    // (current_streak / max_streak / longest_streak / last_completed_at).
+    // Именно её обновляет RPC record_streak_completion при выполнении
+    // задания, и именно её читают getStreakPath/claimStreakReward.
+    // Раньше здесь отдельно читалась таблица user_streaks — она не
+    // синхронизирована с profiles, из-за чего "Серия" в шапке показывала
+    // неверные значения, а награды/титулы за стрик выглядели заблокированными.
+    let path: any[] = [];
+    let stats: {
+      currentStreak: number;
+      maxStreak: number;
+      completedToday: boolean;
+      lastCompletedAt: string | null;
+    } = {
+      currentStreak: 0,
+      maxStreak: 0,
+      completedToday: false,
+      lastCompletedAt: null,
+    };
 
-    const currentStreak = Number(userStreak?.current_streak || 0);
-    const longestStreak = Number(userStreak?.longest_streak || 0);
+    try {
+      const streakPathRes = await getStreakPath(supabase, user.id);
+      path = streakPathRes.path || [];
+      stats = streakPathRes.stats;
+    } catch (e) {
+      console.warn("Фоновое предупреждение при получении дорожки наград:", e);
+    }
 
-    // Вычисляем, сделано ли задание сегодня
-    const todayStr = new Date().toISOString().split("T")[0];
-    const lastCompletedStr = userStreak?.last_completed_date
-      ? String(userStreak.last_completed_date)
-      : "";
-    const doneToday = lastCompletedStr === todayStr;
+    const currentStreak = stats.currentStreak;
+    const longestStreak = stats.maxStreak;
+    const doneToday = stats.completedToday;
 
-    // 2. Определяем надетый титул пользователя
+    // Определяем надетый титул пользователя
     let equippedTitleLabel: string | null = null;
     let equippedAvatarUrl: string | null = null;
 
@@ -103,17 +118,6 @@ export async function GET() {
       }
     }
 
-    // 3. Получаем данные дорожки для модалки Центр Наград
-    let path: any[] = [];
-    let streakPathStats: any = null;
-    try {
-      const streakPathRes = await getStreakPath(supabase, user.id);
-      path = streakPathRes.path || [];
-      streakPathStats = streakPathRes.stats || null;
-    } catch (e) {
-      console.warn("Фоновое предупреждение при получении дорожки наград:", e);
-    }
-
     return NextResponse.json({
       ok: true,
       success: true,
@@ -125,11 +129,7 @@ export async function GET() {
       },
       equippedTitle: equippedTitleLabel ? { label: equippedTitleLabel } : null,
       equippedAvatarUrl,
-      stats: streakPathStats || {
-        currentStreak,
-        longestStreak,
-        doneToday,
-      },
+      stats,
       currentStreak,
       longestStreak,
       path,
