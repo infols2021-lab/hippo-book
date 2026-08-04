@@ -23,6 +23,14 @@ import type {
 // Специфичный тип только для админки (режим редактора)
 export type EditorMode = "visual" | "json";
 
+// ТИП ДЛЯ КАСТОМНОГО ЭКРАНА ЗАВЕРШЕНИЯ (ФИДБЕК ПО ПРОЦЕНТАМ)
+export type FeedbackRange = {
+  id: string;
+  minPercent: number;
+  maxPercent: number;
+  text: string;
+};
+
 // ==========================================
 // ФУНКЦИИ-ХЕЛПЕРЫ (FACTORY)
 // ==========================================
@@ -92,7 +100,7 @@ export function newQuestion(type: QuestionType): Question {
         { id: crypto.randomUUID(), text: "", media: [] },
       ],
       correct: [0],
-    } satisfies QuestionTest; // Используем satisfies для строгой проверки соответствия интерфейсу
+    } satisfies QuestionTest;
   }
 
   if (type === "fill") {
@@ -157,7 +165,6 @@ export function newQuestion(type: QuestionType): Question {
     } satisfies QuestionReading;
   }
 
-  // Fallback -> Crossword
   return {
     id,
     type: "crossword",
