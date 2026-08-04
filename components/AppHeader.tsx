@@ -33,14 +33,13 @@ export default function AppHeader({
   return (
     <>
       <header
-        className="sticky top-0 z-40 transition-colors duration-500"
+        className="sticky top-0 z-40 w-full transition-colors duration-500"
         style={{
           backgroundColor: "var(--glass-bg, transparent)",
           backdropFilter: "var(--glass-blur, blur(16px))",
           WebkitBackdropFilter: "var(--glass-blur, blur(16px))",
           borderBottom: "1px solid color-mix(in srgb, var(--project-text, #ffffff) 10%, transparent)",
-          boxShadow:
-            "0 4px 20px -2px color-mix(in srgb, var(--project-text, #ffffff) 5%, transparent)",
+          boxShadow: "0 4px 20px -2px color-mix(in srgb, var(--project-text, #ffffff) 5%, transparent)",
           marginBottom: "24px",
         }}
       >
@@ -51,8 +50,7 @@ export default function AppHeader({
               style={{
                 background: "var(--project-primary)",
                 color: "#ffffff",
-                boxShadow:
-                  "inset 0 1px 1px rgba(255,255,255,0.3), 0 8px 16px -4px color-mix(in srgb, var(--project-primary) 50%, transparent)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3), 0 8px 16px -4px color-mix(in srgb, var(--project-primary) 50%, transparent)",
               }}
             >
               {markText}
@@ -68,8 +66,7 @@ export default function AppHeader({
               <div
                 className="text-[12px] sm:text-[13px] font-medium truncate mt-0.5 transition-colors duration-500"
                 style={{
-                  color:
-                    "color-mix(in srgb, var(--project-text) 60%, transparent)",
+                  color: "color-mix(in srgb, var(--project-text) 60%, transparent)",
                 }}
               >
                 {subtitle}
@@ -87,9 +84,7 @@ export default function AppHeader({
                   <Link
                     key={`${item.href}-${idx}`}
                     href={item.href}
-                    className={`whitespace-nowrap flex-shrink-0 ${
-                      item.className || "btn ghost"
-                    }`}
+                    className={`whitespace-nowrap flex-shrink-0 ${item.className || "btn ghost"}`}
                   >
                     {item.label}
                   </Link>
@@ -102,9 +97,7 @@ export default function AppHeader({
                     key={`rewards-${idx}`}
                     type="button"
                     onClick={() => setIsRewardsOpen(true)}
-                    className={`whitespace-nowrap flex-shrink-0 ${
-                      item.className || "btn ghost"
-                    }`}
+                    className={`whitespace-nowrap flex-shrink-0 ${item.className || "btn ghost"}`}
                   >
                     {item.label || "🎭 Награды"}
                   </button>
@@ -114,9 +107,7 @@ export default function AppHeader({
               return (
                 <LogoutButton
                   key={`logout-${idx}`}
-                  className={`whitespace-nowrap flex-shrink-0 ${
-                    item.className || "btn secondary"
-                  }`}
+                  className={`whitespace-nowrap flex-shrink-0 ${item.className || "btn secondary"}`}
                 >
                   {item.label || "🚪 Выйти"}
                 </LogoutButton>

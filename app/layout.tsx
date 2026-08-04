@@ -22,7 +22,14 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="/styles/base.css" />
       </head>
-      <body>{children}</body>
+      {/* 
+        Добавлены flex-классы. 
+        Это глобальный фикс выпадающих отступов (margin collapse), 
+        убивающий белую полосу над хедером при любых динамических темах.
+      */}
+      <body className="flex flex-col min-h-screen m-0 p-0 overflow-x-hidden text-base antialiased">
+        {children}
+      </body>
     </html>
   );
 }
