@@ -8,11 +8,13 @@ import { redirect } from "next/navigation";
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const auth = await requireAdmin();
 
-  // requireAdmin у тебя возвращает либо { response }, либо { supabase, user }
   if ("response" in auth) {
     redirect("/login");
   }
 
-  // В nested layout НЕ рендерим <html>/<body>, иначе можно сломать общий RootLayout.
-  return <div className="admin-container">{children}</div>;
+  return (
+    <div className="admin-root">
+      <div className="admin-container">{children}</div>
+    </div>
+  );
 }

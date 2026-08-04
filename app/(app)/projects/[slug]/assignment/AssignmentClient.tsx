@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-// === ЛОКАЛЬНЫЕ КОМПОНЕНТЫ (Правильные пути ./) ===
 import QuestionCrossword from "./components/QuestionCrossword";
 import QuestionTest from "./components/QuestionTest";
 import QuestionFill from "./components/QuestionFill";
@@ -18,7 +17,6 @@ import ReviewPanel from "./components/ReviewPanel";
 import ImageModal from "./components/ImageModal";
 import BlockRenderer from "./components/BlockRenderer";
 
-// === ГЛОБАЛЬНАЯ ЛОГИКА И ТИПЫ (Идеальные пути) ===
 import { getImageUrl } from "@/lib/assignments/image";
 import type { FinalStats, ReviewItem, QuestionAny, AssignmentData } from "@/lib/assignments/types";
 import type { InfoBlock } from "@/app/(admin)/admin/assignments/builder/types";
@@ -32,7 +30,6 @@ import {
 
 import "./assignment.css";
 
-// ===================== TYPES =====================
 type ApiOk = {
   ok: true;
   assignment: AssignmentData & { assignment_type?: string }; 
@@ -54,7 +51,6 @@ type Props = {
   projectSlug: string;
 };
 
-// ===================== HELPERS =====================
 function normalizeQuestions(qs: unknown): QuestionAny[] {
   if (!Array.isArray(qs)) return [];
   return qs.map((q) => {
@@ -79,11 +75,24 @@ function getAssignmentMaterialLevels(assignment: AssignmentData | null): string[
   return normalizeStringArray(material?.target_levels);
 }
 
-// ===================== COMPONENT =====================
+// Вспомогательный хелпер поиска кастомного сообщения из админки
+function getFeedbackMessage(score: number, ranges?: any[]): string {
+  if (Array.isArray(ranges) && ranges.length > 0) {
+    const match = ranges.find(
+      (r) => score >= (r.minPercent ?? 0) && score <= (r.maxPercent ?? 100) && r.text?.trim()
+    );
+    if (match) return match.text.trim();
+  }
+
+  if (score >= 90) return "Отличный результат! Вы прекрасно справились с заданием!";
+  if (score >= 70) return "Хороший результат! Вы хорошо усвоили материал.";
+  if (score >= 50) return "Неплохой результат! Есть над чем поработать.";
+  return "Попробуйте пройти задание ещё раз для лучшего результата.";
+}
+
 export default function AssignmentClient({ assignmentId, source, sourceId, projectSlug }: Props) {
   const router = useRouter();
 
-  // --- STATE ---
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [assignment, setAssignment] = useState<AssignmentData | null>(null);
@@ -106,7 +115,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
   const [isSaving, setIsSaving] = useState(false);
   const saveBusyRef = useRef(false);
 
-  // --- PRELOAD ---
   useEffect(() => {
     if (assignmentMode !== "interactive") return;
     const nextIndex = currentIndex + 1;
@@ -123,32 +131,12 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     if ((nextQ as any).image) {
       urls.push({ type: "image", url: getImageUrl((nextQ as any).image) });
     }
-    if (nextQ.type === "test" && Array.isArray((nextQ as any).options)) {
-      for (const opt of (nextQ as any).options) {
-        if (Array.isArray(opt?.media)) {
-          for (const m of opt.media) {
-            if (m?.url) urls.push({ type: m.type || "unknown", url: m.url });
-          }
-        }
-      }
-    }
 
     const preloads = urls.map(({ type, url }) => {
       if (type.startsWith("image") || url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i)) {
         const img = new window.Image();
         img.src = url;
         return { cleanup: () => {} };
-      }
-      if (type.startsWith("audio") || url.match(/\.(mp3|wav|ogg)$/i)) {
-        const audio = new window.Audio();
-        audio.preload = "auto";
-        audio.src = url;
-        return { cleanup: () => {} };
-      }
-      if (type.startsWith("pdf") || url.match(/\.pdf$/i)) {
-        const controller = new AbortController();
-        fetch(url, { method: "HEAD", signal: controller.signal }).catch(() => {});
-        return { cleanup: () => controller.abort() };
       }
       return { cleanup: () => {} };
     });
@@ -158,7 +146,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     };
   }, [currentIndex, questions, assignmentMode]);
 
-  // --- THEME LOGIC ---
   const isGatehouse = useMemo(() => {
     const s = String(source ?? "").trim().toLowerCase();
     return s.includes("gatehouse") || assignment?.branch_type === "gatehouse";
@@ -201,7 +188,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     return { href: basePath, headerLabel: "← К материалам", actionLabel: "К материалам" };
   }, [source, sourceId, projectSlug]);
 
-  // --- ACTIONS ---
   async function load() {
     try {
       setLoading(true);
@@ -263,14 +249,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     setImageModalOpen(false);
     setModalSrc("");
   }
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && imageModalOpen) closeImage();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [imageModalOpen]);
 
   function setAnswerForQuestion(qIndex: number, value: any) {
     const qId = questions[qIndex]?.id || qIndex;
@@ -444,7 +422,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
           />
         );
       default:
-  return <div className="error-message">Тип "{(q as any).type}" не поддерживается</div>;
+        return <div className="error-message">Тип "{(q as any).type}" не поддерживается</div>;
     }
   }
 
@@ -475,7 +453,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
         background: theme.bg,
         minHeight: "100vh",
         color: theme.text,
-        fontFamily: "var(--font-geist-sans), 'Inter', sans-serif",
       }}
     >
       <header className="premium-header">
@@ -528,6 +505,21 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
               </span>
               <span className="score-label">Ваш балл</span>
             </div>
+
+            {/* Вывод кастомного текста из админки в зависимости от набранного % */}
+            <p 
+              className="card-subtitle" 
+              style={{ 
+                fontSize: "16px", 
+                fontWeight: 600, 
+                marginTop: "16px", 
+                marginBottom: "20px", 
+                textAlign: "center",
+                color: theme.text 
+              }}
+            >
+              {getFeedbackMessage(finalStats.score, assignment?.content?.feedbackRanges)}
+            </p>
 
             {gatehouseRecommendation && (
               <div className="recommendation-box">
