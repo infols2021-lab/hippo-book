@@ -5,7 +5,7 @@ import type { MascotSettings, RewardItem } from "@/lib/rewards/types";
 
 interface MascotViewerProps {
   mascotSettings?: MascotSettings | null;
-  size?: number; // Разбор в пикселях (по умолчанию 300)
+  size?: number; // Размер в пикселях (по умолчанию 300)
   className?: string;
   showTitle?: boolean;
 }
@@ -42,10 +42,10 @@ export default function MascotViewer({
           <span
             className="font-black text-xs px-3.5 py-1 rounded-full border shadow-md tracking-wide"
             style={{
-              borderColor: title.meta?.color || "#8b5cf6",
-              color: title.meta?.color || "#8b5cf6",
-              backgroundColor: `${title.meta?.color || "#8b5cf6"}18`,
-              boxShadow: `0 4px 14px ${title.meta?.color || "#8b5cf6"}25`,
+              borderColor: title.meta?.color || "var(--project-primary, #0ea5e9)",
+              color: title.meta?.color || "var(--project-primary, #0ea5e9)",
+              backgroundColor: `${title.meta?.color || "var(--project-primary, #0ea5e9)"}18`,
+              boxShadow: `0 4px 14px ${title.meta?.color || "var(--project-primary, #0ea5e9)"}25`,
             }}
           >
             «{title.title}»
@@ -68,7 +68,10 @@ export default function MascotViewer({
           />
         ) : (
           /* Дефолтное свечение, если аура не надета */
-          <div className="absolute inset-4 rounded-full bg-indigo-500/10 blur-2xl z-0" />
+          <div
+            className="absolute inset-4 rounded-full blur-2xl z-0 opacity-20"
+            style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
+          />
         )}
 
         {/* 2. СЛОЙ 2: База Маскота */}
@@ -81,9 +84,14 @@ export default function MascotViewer({
           />
         ) : (
           /* Фолбэк базового облачка, если база не надета */
-          <div className="z-10 w-2/3 h-2/3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl shadow-indigo-500/30 border-4 border-indigo-400/30">
+          <div
+            className="z-10 w-2/3 h-2/3 rounded-full flex items-center justify-center shadow-2xl border-4"
+            style={{
+              background: "linear-gradient(135deg, var(--project-primary, #0ea5e9), var(--project-secondary, #38bdf8))",
+              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
+            }}
+          >
             <div className="w-full h-full relative flex items-center justify-center">
-              {/* Глазки фолбэка */}
               {!emotion && (
                 <div className="flex gap-4">
                   <div className="w-3 h-5 bg-white rounded-full animate-pulse" />
@@ -115,7 +123,6 @@ export default function MascotViewer({
         )}
       </div>
 
-      {/* Встроенная CSS-анимация покачивания */}
       <style jsx global>{`
         @keyframes mascotFloat {
           0%, 100% {

@@ -41,8 +41,8 @@ export default function RewardsModal({
     return raw === "promocode" || raw === "streaks" ? raw : "wardrobe";
   };
 
-  const [activeTab, setActiveTab] = useState<"wardrobe" | "streaks" | "promocode">(() =>
-    normalizeTab(initialTab || defaultTab)
+  const [activeTab, setActiveTab] = useState<"wardrobe" | "streaks" | "promocode">(
+    () => normalizeTab(initialTab || defaultTab)
   );
 
   const [loading, setLoading] = useState(true);
@@ -262,7 +262,10 @@ export default function RewardsModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto" style={{ backgroundColor: "rgba(0,0,0,0.75)" }}>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+        style={{ backgroundColor: "rgba(0,0,0,0.8)" }}
+      >
         <div
           className="rounded-[32px] max-w-4xl w-full h-[88vh] flex flex-col shadow-2xl overflow-hidden relative border transition-all"
           style={{

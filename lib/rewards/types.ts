@@ -1,5 +1,4 @@
 // lib/rewards/types.ts
-// Полная библиотека типов для Системы Наград, Маскота, Стриков и Промокодов.
 
 export type RewardType = "hat" | "aura" | "emotion" | "base" | "title";
 
@@ -43,7 +42,6 @@ export type MascotSettings = {
   equipped_title_id: string | null;
   updated_at: string;
 
-  // Раскрытые объекты наград для рендера в MascotViewer
   equipped_base?: RewardItem | null;
   equipped_hat?: RewardItem | null;
   equipped_aura?: RewardItem | null;

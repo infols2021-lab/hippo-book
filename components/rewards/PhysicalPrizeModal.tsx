@@ -18,38 +18,48 @@ export default function PhysicalPrizeModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
     >
       <div
-        className="rounded-[32px] max-w-md w-full p-6 text-center space-y-6 relative overflow-hidden shadow-2xl border transition-all"
+        className="rounded-[32px] max-w-md w-full p-6 text-center space-y-6 shadow-2xl relative overflow-hidden border transition-all"
         style={{
           backgroundColor: "var(--project-card-bg, #ffffff)",
           color: "var(--project-text, #0f172a)",
-          borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
+          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
         }}
       >
-        <div className="text-6xl animate-bounce my-2">🎉</div>
+        {/* Декоративное свечение */}
+        <div
+          className="absolute -top-12 -left-12 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-25"
+          style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
+        />
+        <div
+          className="absolute -bottom-12 -right-12 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-25"
+          style={{ backgroundColor: "var(--project-secondary, #38bdf8)" }}
+        />
+
+        <div className="text-5xl animate-bounce">🎉</div>
 
         <div className="space-y-2">
           <h2
-            className="text-xl font-black uppercase tracking-wider"
+            className="text-xl font-black"
             style={{ color: "var(--project-primary, #0ea5e9)" }}
           >
-            {prize.title || "Поздравляем со специальным призом!"}
+            {prize.title || "Вы выиграли подарок!"}
           </h2>
-          <p className="text-xs font-medium leading-relaxed opacity-75 max-w-xs mx-auto">
+          <p className="text-xs font-medium opacity-80 leading-relaxed">
             {prize.text}
           </p>
         </div>
 
-        {/* Картинка приза (если есть) */}
+        {/* Картинка приза */}
         {prize.image_url && (
           <div
             className="w-full h-44 rounded-2xl overflow-hidden flex items-center justify-center p-2 border"
             style={{
               backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-              borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
+              borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
             }}
           >
             <img
@@ -63,10 +73,9 @@ export default function PhysicalPrizeModal({
         <button
           type="button"
           onClick={onClose}
-          className="w-full py-3.5 font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg active:scale-95"
+          className="w-full py-3.5 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105"
           style={{
             backgroundColor: "var(--project-primary, #0ea5e9)",
-            color: "#ffffff",
           }}
         >
           Замечательно!

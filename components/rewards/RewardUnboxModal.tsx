@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
+import type { RewardType, RewardMeta } from "@/lib/rewards/types";
 
-export type UnboxedRewardItem = {
+export interface UnboxedRewardItem {
   id: string;
   title: string;
-  type?: string; // "hat" | "aura" | "emotion" | "base" | "title" | "material" | "physical" | string;
+  type: RewardType | string;
   description?: string | null;
   asset_url?: string | null;
-  meta?: any;
-};
+  meta?: RewardMeta;
+}
 
 interface RewardUnboxModalProps {
   isOpen: boolean;
@@ -22,23 +23,23 @@ export default function RewardUnboxModal({
   items,
   onClose,
 }: RewardUnboxModalProps) {
-  const [step, setStep] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   if (!isOpen || !items || items.length === 0) return null;
 
-  const currentItem = items[step] || items[0];
-  const isLast = step >= items.length - 1;
+  const currentItem = items[currentIndex] || items[0];
+  const isLast = currentIndex >= items.length - 1;
 
   const handleNext = () => {
     if (isLast) {
-      setStep(0);
+      setCurrentIndex(0);
       onClose();
     } else {
-      setStep((prev) => prev + 1);
+      setCurrentIndex((prev) => prev + 1);
     }
   };
 
-  const getTypeLabel = (type?: string) => {
+  const getTypeLabel = (type: string) => {
     switch (type) {
       case "hat":
         return "👑 Головной убор";
@@ -50,10 +51,6 @@ export default function RewardUnboxModal({
         return "☁️ База маскота";
       case "title":
         return "🏷️ Титул профиля";
-      case "material":
-        return "📚 Учебный материал";
-      case "physical":
-        return "🎁 Физический подарок";
       default:
         return "🎁 Награда";
     }
@@ -61,125 +58,107 @@ export default function RewardUnboxModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{
-        backgroundColor: "rgba(0, 0, 0, 0.75)",
-      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.82)" }}
     >
       <div
-        className="w-full max-w-md rounded-[32px] p-6 text-center space-y-6 relative overflow-hidden transition-all shadow-2xl"
+        className="rounded-[32px] max-w-md w-full p-8 text-center space-y-6 shadow-2xl relative overflow-hidden border transition-all"
         style={{
           backgroundColor: "var(--project-card-bg, #ffffff)",
           color: "var(--project-text, #0f172a)",
-          border: "1px solid var(--glass-border, rgba(15,23,42,0.12))",
-          boxShadow: "var(--glass-shadow, 0 20px 50px rgba(0,0,0,0.25))",
+          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
+          boxShadow: "var(--glass-shadow, 0 20px 50px rgba(0,0,0,0.3))",
         }}
       >
-        {/* Шаг / Индикатор прогресса */}
-        {items.length > 1 && (
-          <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-70">
-            <span>Награда {step + 1} из {items.length}</span>
-            <div className="flex gap-1.5">
-              {items.map((_, idx) => (
-                <div
-                  key={idx}
-                  className="h-1.5 rounded-full transition-all duration-300"
-                  style={{
-                    width: idx === step ? "20px" : "6px",
-                    backgroundColor:
-                      idx === step
-                        ? "var(--project-primary, #0ea5e9)"
-                        : "color-mix(in srgb, var(--project-text, #0f172a) 20%, transparent)",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Фоновый размытый блик темы */}
+        <div
+          className="absolute -top-16 -left-16 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-25"
+          style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
+        />
+        <div
+          className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-25"
+          style={{ backgroundColor: "var(--project-secondary, #38bdf8)" }}
+        />
 
-        {/* Анимация праздника */}
-        <div className="text-6xl animate-bounce my-2">🎉</div>
+        {/* Шапка шагов */}
+        <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-60">
+          <span>Новая награда!</span>
+          {items.length > 1 && (
+            <span>
+              {currentIndex + 1} из {items.length}
+            </span>
+          )}
+        </div>
 
-        {/* Категория награды */}
-        <div className="inline-block">
+        {/* Анимационный эффект */}
+        <div className="text-5xl animate-bounce">🎁</div>
+
+        {/* Карточка самой награды */}
+        <div
+          className="p-6 rounded-2xl border flex flex-col items-center justify-center space-y-4"
+          style={{
+            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
+            borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
+          }}
+        >
           <span
-            className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border"
+            className="text-xs font-black px-3 py-1 rounded-full border uppercase tracking-wider"
             style={{
-              backgroundColor:
-                "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
-              borderColor:
-                "color-mix(in srgb, var(--project-primary, #0ea5e9) 30%, transparent)",
+              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
               color: "var(--project-primary, #0ea5e9)",
+              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
             }}
           >
             {getTypeLabel(currentItem.type)}
           </span>
-        </div>
 
-        {/* Заголовок предмета */}
-        <div className="space-y-2">
-          <h2
-            className="text-2xl font-black tracking-tight"
-            style={{ color: "var(--project-text, #0f172a)" }}
-          >
-            {currentItem.type === "title" ? `«${currentItem.title}»` : currentItem.title}
-          </h2>
-          {currentItem.description && (
-            <p
-              className="text-xs font-medium leading-relaxed opacity-75 max-w-xs mx-auto"
-              style={{ color: "var(--project-text, #0f172a)" }}
-            >
-              {currentItem.description}
-            </p>
-          )}
-        </div>
-
-        {/* Визуализация предмета */}
-        <div
-          className="w-full h-48 rounded-2xl flex items-center justify-center p-4 border relative overflow-hidden"
-          style={{
-            backgroundColor:
-              "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-            borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
-          }}
-        >
+          {/* Титул или Изображение */}
           {currentItem.type === "title" ? (
-            <span
-              className="font-black text-lg px-6 py-2.5 rounded-full border shadow-md uppercase tracking-wider"
-              style={{
-                borderColor: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
-                color: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
-                backgroundColor: `${
-                  currentItem.meta?.color || "var(--project-primary, #0ea5e9)"
-                }18`,
-              }}
-            >
-              «{currentItem.title}»
-            </span>
+            <div className="py-4">
+              <span
+                className="font-black text-lg px-5 py-2 rounded-2xl border inline-block shadow-sm uppercase tracking-wider"
+                style={{
+                  borderColor: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
+                  color: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
+                  backgroundColor: `${currentItem.meta?.color || "var(--project-primary, #0ea5e9)"}18`,
+                }}
+              >
+                «{currentItem.title}»
+              </span>
+            </div>
           ) : currentItem.asset_url ? (
-            <img
-              src={currentItem.asset_url}
-              alt={currentItem.title}
-              className="max-h-full max-w-full object-contain"
-            />
+            <div className="w-32 h-32 flex items-center justify-center py-2">
+              <img
+                src={currentItem.asset_url}
+                alt={currentItem.title}
+                className="max-h-full max-w-full object-contain filter drop-shadow-md"
+              />
+            </div>
           ) : (
-            <span className="text-6xl">🎁</span>
+            <div className="text-4xl py-4">✨</div>
           )}
+
+          <div className="space-y-1">
+            <h3 className="text-xl font-black">{currentItem.title}</h3>
+            {currentItem.description && (
+              <p className="text-xs font-medium opacity-70 leading-relaxed">
+                {currentItem.description}
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* Кнопка "Далее" / "Завершить" */}
+        {/* Кнопка действия */}
         <button
           type="button"
           onClick={handleNext}
-          className="w-full py-3.5 font-black text-sm uppercase tracking-wider rounded-2xl transition-all shadow-lg active:scale-95 hover:opacity-90"
+          className="w-full py-4 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105 active:scale-[0.99]"
           style={{
             backgroundColor: "var(--project-primary, #0ea5e9)",
-            color: "#ffffff",
-            boxShadow:
-              "0 10px 25px color-mix(in srgb, var(--project-primary, #0ea5e9) 35%, transparent)",
+            boxShadow: "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
           }}
         >
-          {isLast ? "Завершить 🎉" : "Далее →"}
+          {isLast ? "Отлично, забрать!" : "Далее →"}
         </button>
       </div>
     </div>

@@ -40,11 +40,11 @@ export default function StreakLeaderboardModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
-      style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
     >
       <div
-        className="rounded-[32px] max-w-lg w-full p-6 space-y-5 shadow-2xl relative border transition-all"
+        className="rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative border transition-all"
         style={{
           backgroundColor: "var(--project-card-bg, #ffffff)",
           color: "var(--project-text, #0f172a)",
@@ -71,16 +71,16 @@ export default function StreakLeaderboardModal({
           </button>
         </div>
 
-        {/* Информационный баннер (Анонимность) */}
+        {/* Анонимность */}
         <div
-          className="rounded-2xl p-3.5 text-xs font-bold border"
+          className="p-3.5 rounded-2xl text-xs font-medium border"
           style={{
             backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)",
             borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
             color: "var(--project-primary, #0ea5e9)",
           }}
         >
-          Здесь нет имён — только место в рейтинге, текущая и максимальная серия.
+          Здесь нет имён — только место в рейтинге, текущая серия и максимальный рекорд.
         </div>
 
         {/* Заголовок списка */}
@@ -91,11 +91,11 @@ export default function StreakLeaderboardModal({
         {/* Список участников */}
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
           {loading ? (
-            <div className="text-center py-8 opacity-60 text-xs font-bold uppercase tracking-wider">
+            <div className="text-center py-8 text-xs font-bold uppercase tracking-wider opacity-60">
               Загрузка рейтинга...
             </div>
           ) : leaderboard.length === 0 ? (
-            <div className="text-center py-8 opacity-60 text-xs font-bold uppercase tracking-wider">
+            <div className="text-center py-8 text-xs font-bold uppercase tracking-wider opacity-60">
               Рейтинг пока пуст
             </div>
           ) : (
@@ -105,8 +105,8 @@ export default function StreakLeaderboardModal({
                 className="p-3.5 rounded-2xl border flex items-center justify-between transition-all"
                 style={{
                   backgroundColor: item.is_current_user
-                    ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)"
-                    : "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                    ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 15%, transparent)"
+                    : "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
                   borderColor: item.is_current_user
                     ? "var(--project-primary, #0ea5e9)"
                     : "var(--glass-border, rgba(15,23,42,0.08))",
@@ -114,19 +114,17 @@ export default function StreakLeaderboardModal({
               >
                 <div className="flex items-center gap-3">
                   <span
-                    className="font-black text-sm min-w-[36px]"
-                    style={{
-                      color:
-                        item.rank === 1
-                          ? "#f59e0b"
-                          : item.rank === 2
-                          ? "#94a3b8"
-                          : item.rank === 3
-                          ? "#d97706"
-                          : "var(--project-text, #0f172a)",
-                    }}
+                    className={`font-black text-sm min-w-[32px] ${
+                      item.rank === 1
+                        ? "text-amber-500"
+                        : item.rank === 2
+                        ? "text-slate-400"
+                        : item.rank === 3
+                        ? "text-amber-700"
+                        : "opacity-60"
+                    }`}
                   >
-                    {item.is_current_user ? "Вы " : ""}#{item.rank}
+                    {item.is_current_user ? "Вы" : ""} #{item.rank}
                   </span>
                 </div>
 
@@ -137,13 +135,16 @@ export default function StreakLeaderboardModal({
                       className="font-bold"
                       style={{ color: "var(--project-primary, #0ea5e9)" }}
                     >
-                      {item.current_streak} дн.
+                      {item.current_streak}
                     </span>
                   </div>
                   <div>
                     Максимум:{" "}
-                    <span className="font-bold">
-                      {item.max_streak} дн.
+                    <span
+                      className="font-bold"
+                      style={{ color: "var(--project-primary, #0ea5e9)" }}
+                    >
+                      {item.max_streak}
                     </span>
                   </div>
                 </div>
