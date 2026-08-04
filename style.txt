@@ -32760,133 +32760,6 @@ export async function GET(req: NextRequest) {
 }
 </file>
 
-<file path="app/api/streaks/leaderboard/route.ts">
-import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-
-export async function GET() {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Необходима авторизация" },
-        { status: 401 }
-      );
-    }
-
-    const adminSupabase = getSupabaseAdminClient();
-
-    // 1. Пробуем вызвать RPC функцию лидерборда если есть в БД
-    const { data: rpcData, error: rpcError } = await adminSupabase.rpc(
-      "get_streak_leaderboard",
-      { _top: 20, _above: 5 }
-    );
-
-    if (!rpcError && rpcData) {
-      const list = rpcData.leaderboard || rpcData.top || rpcData || [];
-      if (Array.isArray(list) && list.length > 0) {
-        const formatted = list.map((item: any, idx: number) => ({
-          rank: item.rank || idx + 1,
-          user_id: item.user_id || item.id,
-          full_name: item.full_name || item.name || `Ученик #${idx + 1}`,
-          current_streak: Number(item.current_streak || item.streak || 0),
-          max_streak: Number(item.max_streak || item.longest_streak || item.maxStreak || 0),
-          is_current_user: (item.user_id || item.id) === user.id,
-        }));
-        return NextResponse.json({
-          ok: true,
-          success: true,
-          leaderboard: formatted,
-        });
-      }
-    }
-
-    // 2. Прямой запрос к таблице user_streaks с подгрузкой профилей
-    const { data: streaks, error: streaksError } = await adminSupabase
-      .from("user_streaks")
-      .select(`
-        user_id,
-        current_streak,
-        longest_streak,
-        last_completed_date,
-        profiles:user_id (
-          full_name,
-          email
-        )
-      `)
-      .or("longest_streak.gt.0,current_streak.gt.0")
-      .order("longest_streak", { ascending: false })
-      .order("current_streak", { ascending: false })
-      .limit(20);
-
-    if (streaksError) {
-      // Фолбэк на таблицу profiles если user_streaks еще пуста
-      const { data: profilesData } = await adminSupabase
-        .from("profiles")
-        .select("id, full_name, email, current_streak, max_streak, longest_streak")
-        .or("current_streak.gt.0,max_streak.gt.0,longest_streak.gt.0")
-        .order("max_streak", { ascending: false })
-        .order("current_streak", { ascending: false })
-        .limit(20);
-
-      const formattedFromProfiles = (profilesData || []).map((item: any, idx: number) => {
-        const curr = Number(item.current_streak || 0);
-        const max = Number(item.max_streak || item.longest_streak || curr);
-        const name = item.full_name?.trim() || item.email?.split("@")[0] || `Ученик #${idx + 1}`;
-        return {
-          rank: idx + 1,
-          user_id: item.id,
-          full_name: name,
-          current_streak: curr,
-          max_streak: max,
-          is_current_user: item.id === user.id,
-        };
-      });
-
-      return NextResponse.json({
-        ok: true,
-        success: true,
-        leaderboard: formattedFromProfiles,
-      });
-    }
-
-    const formattedList = (streaks || []).map((item: any, idx: number) => {
-      const prof = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles;
-      const name = prof?.full_name?.trim() || prof?.email?.split("@")[0] || `Ученик #${idx + 1}`;
-      const curr = Number(item.current_streak || 0);
-      const max = Number(item.longest_streak || curr);
-
-      return {
-        rank: idx + 1,
-        user_id: item.user_id,
-        full_name: name,
-        current_streak: curr,
-        max_streak: max,
-        is_current_user: item.user_id === user.id,
-      };
-    });
-
-    return NextResponse.json({
-      ok: true,
-      success: true,
-      leaderboard: formattedList,
-    });
-  } catch (error: any) {
-    console.error("Ошибка при получении лидерборда:", error);
-    return NextResponse.json(
-      { error: error?.message || "Внутренняя ошибка сервера" },
-      { status: 500 }
-    );
-  }
-}
-</file>
-
 <file path="app/login/page.tsx">
 "use client";
 
@@ -36732,22 +36605,12 @@ export async function GET(req: NextRequest) {
 }
 </file>
 
-<file path="app/api/streaks/route.ts">
-// app/api/streaks/route.ts
+<file path="app/api/streaks/leaderboard/route.ts">
+// app/api/streaks/leaderboard/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { claimStreakReward, getStreakPath } from "@/lib/rewards/data";
-
-function calculateTierCode(streak: number): string {
-  if (streak >= 100) return "legendary";
-  if (streak >= 50) return "diamond";
-  if (streak >= 30) return "platinum";
-  if (streak >= 14) return "gold";
-  if (streak >= 7) return "silver";
-  if (streak >= 3) return "bronze";
-  return "none";
-}
+import { getStreakLeaderboard } from "@/lib/rewards/data";
 
 export async function GET() {
   try {
@@ -36766,163 +36629,20 @@ export async function GET() {
 
     const adminSupabase = getSupabaseAdminClient();
 
-    // 1. Получаем точные данные стриков пользователя
-    const { data: userStreak } = await adminSupabase
-      .from("user_streaks")
-      .select("current_streak, longest_streak, last_completed_date")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    const currentStreak = Number(userStreak?.current_streak || 0);
-    const longestStreak = Number(userStreak?.longest_streak || 0);
-
-    // Вычисляем, сделано ли задание сегодня
-    const todayStr = new Date().toISOString().split("T")[0];
-    const lastCompletedStr = userStreak?.last_completed_date
-      ? String(userStreak.last_completed_date)
-      : "";
-    const doneToday = lastCompletedStr === todayStr;
-
-    // 2. Определяем надетый титул пользователя
-    let equippedTitleLabel: string | null = null;
-    let equippedAvatarUrl: string | null = null;
-
-    const { data: mascot } = await adminSupabase
-      .from("mascot_settings")
-      .select("equipped_title_id, equipped_base_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (mascot?.equipped_title_id) {
-      const { data: rewardTitle } = await adminSupabase
-        .from("rewards")
-        .select("title")
-        .eq("id", mascot.equipped_title_id)
-        .maybeSingle();
-
-      if (rewardTitle?.title) {
-        equippedTitleLabel = rewardTitle.title;
-      }
-    }
-
-    // Резервный поиск титула в каталоге, если в mascot_settings пусто
-    if (!equippedTitleLabel) {
-      const { data: profile } = await adminSupabase
-        .from("profiles")
-        .select("selected_streak_title_code")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (profile?.selected_streak_title_code) {
-        const { data: titleCatalog } = await adminSupabase
-          .from("streak_title_catalog")
-          .select("label")
-          .eq("code", profile.selected_streak_title_code)
-          .maybeSingle();
-
-        if (titleCatalog?.label) {
-          equippedTitleLabel = titleCatalog.label;
-        }
-      }
-    }
-
-    if (mascot?.equipped_base_id) {
-      const { data: rewardBase } = await adminSupabase
-        .from("rewards")
-        .select("asset_url")
-        .eq("id", mascot.equipped_base_id)
-        .maybeSingle();
-
-      if (rewardBase?.asset_url) {
-        equippedAvatarUrl = rewardBase.asset_url;
-      }
-    }
-
-    // 3. Получаем данные дорожки для модалки Центр Наград
-    let path: any[] = [];
-    let streakPathStats: any = null;
-    try {
-      const streakPathRes = await getStreakPath(supabase, user.id);
-      path = streakPathRes.path || [];
-      streakPathStats = streakPathRes.stats || null;
-    } catch (e) {
-      console.warn("Фоновое предупреждение при получении дорожки наград:", e);
-    }
+    // Раньше здесь был отдельный (и неверный) запрос к таблице user_streaks,
+    // которая не синхронизирована с profiles — из-за этого лидерборд всегда
+    // был пустым. Теперь используем ту же функцию, что и остальная система
+    // наград (`lib/rewards/data.ts`), которая читает из `profiles` —
+    // единственного источника правды по сериям.
+    const leaderboard = await getStreakLeaderboard(adminSupabase, user.id);
 
     return NextResponse.json({
       ok: true,
       success: true,
-      streak: {
-        currentStreak,
-        longestStreak,
-        doneToday,
-        tierCode: calculateTierCode(currentStreak),
-      },
-      equippedTitle: equippedTitleLabel ? { label: equippedTitleLabel } : null,
-      equippedAvatarUrl,
-      stats: streakPathStats || {
-        currentStreak,
-        longestStreak,
-        doneToday,
-      },
-      currentStreak,
-      longestStreak,
-      path,
+      leaderboard,
     });
   } catch (error: any) {
-    console.error("Ошибка при получении данных серии:", error);
-    return NextResponse.json(
-      { error: error?.message || "Внутренняя ошибка сервера" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Необходима авторизация" },
-        { status: 401 }
-      );
-    }
-
-    const body = await request.json().catch(() => null);
-    if (!body) {
-      return NextResponse.json(
-        { error: "Невалидный JSON в теле запроса" },
-        { status: 400 }
-      );
-    }
-
-    const dayNumber = Number(body.dayNumber);
-
-    if (!Number.isInteger(dayNumber) || dayNumber <= 0) {
-      return NextResponse.json(
-        { error: "Некорректный номер дня серии" },
-        { status: 400 }
-      );
-    }
-
-    const result = await claimStreakReward(supabase, user.id, dayNumber);
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      success: true,
-      reward: result.reward,
-    });
-  } catch (error: any) {
-    console.error("Ошибка при получении награды за серию:", error);
+    console.error("Ошибка при получении лидерборда:", error);
     return NextResponse.json(
       { error: error?.message || "Внутренняя ошибка сервера" },
       { status: 500 }
@@ -38436,404 +38156,6 @@ export type ProjectConfig = {
   tabs: ProjectTabConfig[];
   levels: ProjectLevelConfig[];
 };
-</file>
-
-<file path="lib/rewards/data.ts">
-// lib/rewards/data.ts
-// Серверный слой работы с базой данных Supabase: Маскот, Стрики и Промокоды.
-
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type {
-  MascotSettings,
-  RewardItem,
-  RewardType,
-  StreakConfigItem,
-  StreakLeaderboardEntry,
-  StreakStats,
-  UserInventoryItem,
-  PromocodeRedeemResult,
-  PromocodeRewardsBundle,
-} from "./types";
-
-// ---------------------------------------------------------------------------
-// 1. МАСКОТ И НАСТРОЙКИ ЭКИПИРОВКИ
-// ---------------------------------------------------------------------------
-
-export async function getMascotSettings(
-  supabase: SupabaseClient,
-  userId: string
-): Promise<MascotSettings> {
-  const { data: rawSettings } = await supabase
-    .from("mascot_settings")
-    .select(
-      `
-      user_id,
-      equipped_base_id,
-      equipped_hat_id,
-      equipped_aura_id,
-      equipped_emotion_id,
-      equipped_title_id,
-      updated_at,
-      equipped_base:rewards!mascot_settings_equipped_base_id_fkey(*),
-      equipped_hat:rewards!mascot_settings_equipped_hat_id_fkey(*),
-      equipped_aura:rewards!mascot_settings_equipped_aura_id_fkey(*),
-      equipped_emotion:rewards!mascot_settings_equipped_emotion_id_fkey(*),
-      equipped_title:rewards!mascot_settings_equipped_title_id_fkey(*)
-    `
-    )
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (!rawSettings) {
-    return {
-      user_id: userId,
-      equipped_base_id: null,
-      equipped_hat_id: null,
-      equipped_aura_id: null,
-      equipped_emotion_id: null,
-      equipped_title_id: null,
-      updated_at: new Date().toISOString(),
-    };
-  }
-
-  return rawSettings as unknown as MascotSettings;
-}
-
-export async function equipMascotItem(
-  supabase: SupabaseClient,
-  userId: string,
-  category: RewardType,
-  rewardId: string | null
-): Promise<{ success: boolean; error?: string }> {
-  if (rewardId) {
-    const { data: hasItem } = await supabase
-      .from("user_inventory")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("reward_id", rewardId)
-      .maybeSingle();
-
-    if (!hasItem) {
-      return { success: false, error: "У вас нет этой награды в инвентаре." };
-    }
-  }
-
-  const columnMap: Record<RewardType, string> = {
-    base: "equipped_base_id",
-    hat: "equipped_hat_id",
-    aura: "equipped_aura_id",
-    emotion: "equipped_emotion_id",
-    title: "equipped_title_id",
-  };
-
-  const targetColumn = columnMap[category];
-  if (!targetColumn) {
-    return { success: false, error: "Неверная категория элемента." };
-  }
-
-  const payload = {
-    user_id: userId,
-    [targetColumn]: rewardId,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { error } = await supabase
-    .from("mascot_settings")
-    .upsert(payload, { onConflict: "user_id" });
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
-
-  return { success: true };
-}
-
-// ---------------------------------------------------------------------------
-// 2. ИНВЕНТАРЬ ПОЛЬЗОВАТЕЛЯ
-// ---------------------------------------------------------------------------
-
-export async function getUserInventory(
-  supabase: SupabaseClient,
-  userId: string
-): Promise<UserInventoryItem[]> {
-  const { data, error } = await supabase
-    .from("user_inventory")
-    .select("*, reward:rewards(*)")
-    .eq("user_id", userId)
-    .order("unlocked_at", { ascending: false });
-
-  if (error || !Array.isArray(data)) return [];
-  return data as unknown as UserInventoryItem[];
-}
-
-// ---------------------------------------------------------------------------
-// 3. ДОРОЖКА СЕРИИ (СТРИКИ) И ЛИДЕРБОРД
-// ---------------------------------------------------------------------------
-
-export async function getStreakPath(
-  supabase: SupabaseClient,
-  userId: string
-): Promise<{
-  stats: StreakStats;
-  path: StreakConfigItem[];
-}> {
-  const [{ data: profile }, { data: streakConfig }, { data: inventory }] =
-    await Promise.all([
-      supabase
-        .from("profiles")
-        .select("current_streak, max_streak, longest_streak, last_completed_at")
-        .eq("id", userId)
-        .maybeSingle(),
-      supabase
-        .from("streak_config")
-        .select("day_number, reward_id, created_at, reward:rewards(*)")
-        .order("day_number", { ascending: true }),
-      supabase
-        .from("user_inventory")
-        .select("reward_id")
-        .eq("user_id", userId)
-        .eq("source", "streak"),
-    ]);
-
-  const currentStreak = Number(profile?.current_streak || 0);
-  const maxStreak = Number(
-    profile?.max_streak ?? profile?.longest_streak ?? currentStreak
-  );
-  const lastCompletedAt = profile?.last_completed_at
-    ? String(profile.last_completed_at)
-    : null;
-
-  // Проверка выполнения хотя бы одного задания сегодня (в UTC)
-  let completedToday = false;
-  if (lastCompletedAt) {
-    const lastDate = new Date(lastCompletedAt).toISOString().split("T")[0];
-    const todayDate = new Date().toISOString().split("T")[0];
-    completedToday = lastDate === todayDate;
-  }
-
-  const claimedRewardIds = new Set(
-    Array.isArray(inventory) ? inventory.map((item) => item.reward_id) : []
-  );
-
-  const path: StreakConfigItem[] = Array.isArray(streakConfig)
-    ? streakConfig.map((item: any) => {
-        const isClaimed = claimedRewardIds.has(item.reward_id);
-        const isAvailable = currentStreak >= item.day_number && !isClaimed;
-        return {
-          ...item,
-          is_claimed: isClaimed,
-          is_available: isAvailable,
-        };
-      })
-    : [];
-
-  return {
-    stats: {
-      currentStreak,
-      maxStreak,
-      completedToday,
-      lastCompletedAt,
-    },
-    path,
-  };
-}
-
-export async function getStreakLeaderboard(
-  supabase: SupabaseClient,
-  currentUserId?: string
-): Promise<StreakLeaderboardEntry[]> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, current_streak, max_streak, longest_streak")
-    .order("max_streak", { ascending: false })
-    .order("current_streak", { ascending: false })
-    .limit(20);
-
-  if (error || !Array.isArray(data)) return [];
-
-  return data.map((row: any, index: number) => {
-    const current = Number(row.current_streak || 0);
-    const max = Number(row.max_streak ?? row.longest_streak ?? current);
-
-    return {
-      rank: index + 1,
-      user_id: row.id,
-      current_streak: current,
-      max_streak: max,
-      is_current_user: row.id === currentUserId,
-    };
-  });
-}
-
-export async function claimStreakReward(
-  supabase: SupabaseClient,
-  userId: string,
-  dayNumber: number
-): Promise<{ success: boolean; reward?: RewardItem; error?: string }> {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("current_streak")
-    .eq("id", userId)
-    .maybeSingle();
-
-  const currentStreak = Number(profile?.current_streak || 0);
-  if (currentStreak < dayNumber) {
-    return { success: false, error: "Вы ещё не достигли этого дня серии." };
-  }
-
-  const { data: streakConfig } = await supabase
-    .from("streak_config")
-    .select("reward_id, reward:rewards(*)")
-    .eq("day_number", dayNumber)
-    .maybeSingle();
-
-  if (!streakConfig || !streakConfig.reward_id) {
-    return { success: false, error: "Награда для этого дня не настроена." };
-  }
-
-  const rewardId = streakConfig.reward_id;
-
-  const { error: insertError } = await supabase.from("user_inventory").insert({
-    user_id: userId,
-    reward_id: rewardId,
-    source: "streak",
-  });
-
-  if (insertError) {
-    if (insertError.code === "23505") {
-      return { success: false, error: "Награда за этот день уже получена." };
-    }
-    return { success: false, error: insertError.message };
-  }
-
-  return {
-    success: true,
-    reward: streakConfig.reward as unknown as RewardItem,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// 4. ПРОМОКОДЫ И АКТИВАЦИЯ
-// ---------------------------------------------------------------------------
-
-export async function redeemPromocode(
-  supabase: SupabaseClient,
-  userId: string,
-  rawCode: string,
-  chosenMaterialIds: string[] = []
-): Promise<PromocodeRedeemResult> {
-  const code = String(rawCode || "").trim().toUpperCase();
-  if (!code) return { success: false, error: "Введите промокод." };
-
-  const { data: promo, error: promoError } = await supabase
-    .from("promocodes")
-    .select("*")
-    .eq("code", code)
-    .maybeSingle();
-
-  if (promoError || !promo) {
-    return { success: false, error: "Промокод не найден." };
-  }
-
-  if (!promo.is_active) {
-    return { success: false, error: "Промокод деактивирован." };
-  }
-
-  if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
-    return { success: false, error: "Срок действия промокода истёк." };
-  }
-
-  if (promo.max_uses !== null && promo.current_uses >= promo.max_uses) {
-    return { success: false, error: "Лимит активаций промокода исчерпан." };
-  }
-
-  const { data: existingRedemption } = await supabase
-    .from("promocode_redemptions")
-    .select("id")
-    .eq("promocode_id", promo.id)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (existingRedemption) {
-    return { success: false, error: "Вы уже активировали этот промокод." };
-  }
-
-  const bundle: PromocodeRewardsBundle = promo.rewards_bundle || {};
-  const requiredChoiceCount = Number(bundle.material_choice_count || 0);
-
-  if (requiredChoiceCount > 0 && chosenMaterialIds.length < requiredChoiceCount) {
-    return {
-      success: true,
-      requiresMaterialChoice: true,
-      remainingMaterialChoices: requiredChoiceCount - chosenMaterialIds.length,
-      physicalPrize: bundle.custom_physical || null,
-    };
-  }
-
-  const grantedRewards: RewardItem[] = [];
-
-  if (Array.isArray(bundle.reward_ids) && bundle.reward_ids.length > 0) {
-    const inventoryRows = bundle.reward_ids.map((rewardId) => ({
-      user_id: userId,
-      reward_id: rewardId,
-      source: "promocode" as const,
-    }));
-
-    await supabase
-      .from("user_inventory")
-      .upsert(inventoryRows, { onConflict: "user_id,reward_id" });
-
-    const { data: rewardsData } = await supabase
-      .from("rewards")
-      .select("*")
-      .in("id", bundle.reward_ids);
-
-    if (Array.isArray(rewardsData)) {
-      grantedRewards.push(...(rewardsData as unknown as RewardItem[]));
-    }
-  }
-
-  const allMaterialIdsToGrant = [
-    ...(bundle.specific_material_ids || []),
-    ...chosenMaterialIds,
-  ].filter(Boolean);
-
-  if (allMaterialIdsToGrant.length > 0) {
-    const accessRows = allMaterialIdsToGrant.map((mId) => ({
-      user_id: userId,
-      material_id: mId,
-    }));
-
-    await supabase
-      .from("material_access")
-      .upsert(accessRows, { onConflict: "user_id,material_id" });
-  }
-
-  const { error: rpcError } = await supabase.rpc("increment_promocode_uses", {
-    promo_id: promo.id,
-  });
-
-  if (rpcError) {
-    await supabase
-      .from("promocodes")
-      .update({ current_uses: (promo.current_uses || 0) + 1 })
-      .eq("id", promo.id);
-  }
-
-  await supabase.from("promocode_redemptions").insert({
-    promocode_id: promo.id,
-    user_id: userId,
-    chosen_material_ids: chosenMaterialIds,
-  });
-
-  return {
-    success: true,
-    requiresMaterialChoice: false,
-    grantedRewards,
-    physicalPrize: bundle.custom_physical || null,
-    grantedMaterialIds: allMaterialIdsToGrant,
-  };
-}
 </file>
 
 <file path="lib/rewards/types.ts">
@@ -41044,443 +40366,202 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
 }
 </file>
 
-<file path="components/rewards/MaterialChoiceModal.tsx">
-"use client";
+<file path="app/api/streaks/route.ts">
+// app/api/streaks/route.ts
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { claimStreakReward, getStreakPath } from "@/lib/rewards/data";
 
-import React, { useState, useEffect } from "react";
-
-interface MaterialItem {
-  id: string;
-  title: string;
-  is_secret?: boolean;
-  kind?: "textbook" | "crossword" | string;
-  has_access?: boolean;
-  is_unlocked?: boolean;
-  unlocked?: boolean;
-  already_unlocked?: boolean;
-  cover_image_url?: string | null;
-  target_levels?: string[] | null;
-  class_levels?: string[] | null;
+function calculateTierCode(streak: number): string {
+  if (streak >= 100) return "legendary";
+  if (streak >= 50) return "diamond";
+  if (streak >= 30) return "platinum";
+  if (streak >= 14) return "gold";
+  if (streak >= 7) return "silver";
+  if (streak >= 3) return "bronze";
+  return "none";
 }
 
-interface ProjectItem {
-  id: string;
-  name: string;
-  slug: string;
-}
+export async function GET() {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-interface MaterialChoiceModalProps {
-  isOpen: boolean;
-  promocodeCode: string;
-  requiredChoiceCount: number;
-  onClose: () => void;
-}
-
-export default function MaterialChoiceModal({
-  isOpen,
-  promocodeCode,
-  requiredChoiceCount,
-  onClose,
-}: MaterialChoiceModalProps) {
-  const [loading, setLoading] = useState(true);
-  const [projects, setProjects] = useState<ProjectItem[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
-  const [materials, setMaterials] = useState<MaterialItem[]>([]);
-  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-
-  // Фильтры в стиле Заявок
-  const [activeKind, setActiveKind] = useState<string>("all");
-  const [selectedLevelFilter, setSelectedLevelCode] = useState<string>("all");
-
-  useEffect(() => {
-    if (isOpen) {
-      void loadProjects();
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Необходима авторизация" },
+        { status: 401 }
+      );
     }
-  }, [isOpen]);
 
-  const loadProjects = async () => {
-    setLoading(true);
+    const adminSupabase = getSupabaseAdminClient();
+
+    // ЕДИНСТВЕННЫЙ источник правды по сериям — таблица `profiles`
+    // (current_streak / max_streak / longest_streak / last_completed_at).
+    // Именно её обновляет RPC record_streak_completion при выполнении
+    // задания, и именно её читают getStreakPath/claimStreakReward.
+    // Раньше здесь отдельно читалась таблица user_streaks — она не
+    // синхронизирована с profiles, из-за чего "Серия" в шапке показывала
+    // неверные значения, а награды/титулы за стрик выглядели заблокированными.
+    let path: any[] = [];
+    let stats: {
+      currentStreak: number;
+      maxStreak: number;
+      completedToday: boolean;
+      lastCompletedAt: string | null;
+    } = {
+      currentStreak: 0,
+      maxStreak: 0,
+      completedToday: false,
+      lastCompletedAt: null,
+    };
+
     try {
-      const res = await fetch("/api/projects");
-      if (res.ok) {
-        const data = await res.json();
-        const activeProjects: ProjectItem[] = data.projects || [];
-        setProjects(activeProjects);
-        if (activeProjects.length > 0) {
-          setSelectedProjectId(activeProjects[0].id);
-          void loadMaterialsForProject(activeProjects[0].slug);
+      const streakPathRes = await getStreakPath(supabase, user.id);
+      path = streakPathRes.path || [];
+      stats = streakPathRes.stats;
+    } catch (e) {
+      console.warn("Фоновое предупреждение при получении дорожки наград:", e);
+    }
+
+    const currentStreak = stats.currentStreak;
+    const longestStreak = stats.maxStreak;
+    const doneToday = stats.completedToday;
+
+    // Определяем надетый титул пользователя
+    let equippedTitleLabel: string | null = null;
+    let equippedAvatarUrl: string | null = null;
+
+    const { data: mascot } = await adminSupabase
+      .from("mascot_settings")
+      .select("equipped_title_id, equipped_base_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (mascot?.equipped_title_id) {
+      const { data: rewardTitle } = await adminSupabase
+        .from("rewards")
+        .select("title")
+        .eq("id", mascot.equipped_title_id)
+        .maybeSingle();
+
+      if (rewardTitle?.title) {
+        equippedTitleLabel = rewardTitle.title;
+      }
+    }
+
+    // Резервный поиск титула в каталоге, если в mascot_settings пусто
+    if (!equippedTitleLabel) {
+      const { data: profile } = await adminSupabase
+        .from("profiles")
+        .select("selected_streak_title_code")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profile?.selected_streak_title_code) {
+        const { data: titleCatalog } = await adminSupabase
+          .from("streak_title_catalog")
+          .select("label")
+          .eq("code", profile.selected_streak_title_code)
+          .maybeSingle();
+
+        if (titleCatalog?.label) {
+          equippedTitleLabel = titleCatalog.label;
         }
       }
-    } catch (e) {
-      console.error("Failed to load projects:", e);
-    } finally {
-      setLoading(false);
     }
-  };
 
-  const loadMaterialsForProject = async (projectSlug: string) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/projects/${projectSlug}/materials`);
-      if (res.ok) {
-        const data = await res.json();
-        setMaterials(data.materials || []);
+    if (mascot?.equipped_base_id) {
+      const { data: rewardBase } = await adminSupabase
+        .from("rewards")
+        .select("asset_url")
+        .eq("id", mascot.equipped_base_id)
+        .maybeSingle();
+
+      if (rewardBase?.asset_url) {
+        equippedAvatarUrl = rewardBase.asset_url;
       }
-    } catch (e) {
-      console.error("Failed to load materials:", e);
-    } finally {
-      setLoading(false);
     }
-  };
 
-  const isAlreadyUnlocked = (m: MaterialItem): boolean => {
-    return Boolean(
-      m.has_access || m.is_unlocked || m.unlocked || m.already_unlocked
+    return NextResponse.json({
+      ok: true,
+      success: true,
+      streak: {
+        currentStreak,
+        longestStreak,
+        doneToday,
+        tierCode: calculateTierCode(currentStreak),
+      },
+      equippedTitle: equippedTitleLabel ? { label: equippedTitleLabel } : null,
+      equippedAvatarUrl,
+      stats,
+      currentStreak,
+      longestStreak,
+      path,
+    });
+  } catch (error: any) {
+    console.error("Ошибка при получении данных серии:", error);
+    return NextResponse.json(
+      { error: error?.message || "Внутренняя ошибка сервера" },
+      { status: 500 }
     );
-  };
+  }
+}
 
-  const handleToggleMaterial = (m: MaterialItem) => {
-    if (isAlreadyUnlocked(m)) return;
+export async function POST(request: Request) {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-    if (selectedMaterialIds.includes(m.id)) {
-      setSelectedMaterialIds(selectedMaterialIds.filter((id) => id !== m.id));
-    } else {
-      if (selectedMaterialIds.length < requiredChoiceCount) {
-        setSelectedMaterialIds([...selectedMaterialIds, m.id]);
-      }
-    }
-  };
-
-  const handleSubmitChoice = async () => {
-    if (selectedMaterialIds.length < requiredChoiceCount) {
-      alert(`Пожалуйста, выберите ${requiredChoiceCount} материал(а).`);
-      return;
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Необходима авторизация" },
+        { status: 401 }
+      );
     }
 
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/promocodes/redeem", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: promocodeCode,
-          chosenMaterialIds: selectedMaterialIds,
-        }),
-      });
-
-      if (res.ok) {
-        alert("Материалы успешно разблокированы!");
-        onClose();
-      } else {
-        const err = await res.json();
-        alert(err.error || "Ошибка сохранения выбора");
-      }
-    } catch (e) {
-      alert("Ошибка соединения с сервером");
-    } finally {
-      setSubmitting(false);
+    const body = await request.json().catch(() => null);
+    if (!body) {
+      return NextResponse.json(
+        { error: "Невалидный JSON в теле запроса" },
+        { status: 400 }
+      );
     }
-  };
 
-  if (!isOpen) return null;
+    const dayNumber = Number(body.dayNumber);
 
-  // Рассчитываем уникальные уровни для фильтра чипсов (Hippo 1-4, CEFR, и т.д.)
-  const availableLevels = Array.from(
-    new Set(
-      materials.flatMap((m) => [...(m.target_levels || []), ...(m.class_levels || [])])
-    )
-  ).filter(Boolean);
+    if (!Number.isInteger(dayNumber) || dayNumber <= 0) {
+      return NextResponse.json(
+        { error: "Некорректный номер дня серии" },
+        { status: 400 }
+      );
+    }
 
-  // Отфильтрованные материалы
-  const filteredMaterials = materials.filter((m) => {
-    const matchKind = activeKind === "all" || m.kind === activeKind;
-    const levels = [...(m.target_levels || []), ...(m.class_levels || [])];
-    const matchLevel =
-      selectedLevelFilter === "all" ||
-      levels.some((l) => l.toLowerCase() === selectedLevelFilter.toLowerCase());
+    const result = await claimStreakReward(supabase, user.id, dayNumber);
 
-    return matchKind && matchLevel;
-  });
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
-      style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
-    >
-      <div
-        className="rounded-[32px] max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-hidden relative border transition-all"
-        style={{
-          backgroundColor: "var(--project-card-bg, #ffffff)",
-          color: "var(--project-text, #0f172a)",
-          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
-        }}
-      >
-        {/* Шапка модалки */}
-        <div
-          className="flex justify-between items-start border-b pb-4"
-          style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
-        >
-          <div>
-            <h3 className="text-lg font-black uppercase tracking-wider">
-              Выбор материалов по промокоду
-            </h3>
-            <p className="text-xs font-medium opacity-60 mt-1">
-              Выберите {requiredChoiceCount} материал(а) для получения доступа:
-            </p>
-          </div>
-          <div
-            className="font-mono text-xs font-black px-3 py-1.5 border rounded-xl uppercase tracking-wider"
-            style={{
-              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
-              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
-              color: "var(--project-primary, #0ea5e9)",
-            }}
-          >
-            Выбрано: {selectedMaterialIds.length} / {requiredChoiceCount}
-          </div>
-        </div>
-
-        {/* Выбор проекта/раздела */}
-        {projects.length > 1 && (
-          <div
-            className="flex gap-2 border-b pb-3 overflow-x-auto"
-            style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
-          >
-            {projects.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  setSelectedProjectId(p.id);
-                  void loadMaterialsForProject(p.slug);
-                }}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border"
-                style={{
-                  backgroundColor:
-                    selectedProjectId === p.id
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
-                  borderColor:
-                    selectedProjectId === p.id
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
-                  color:
-                    selectedProjectId === p.id ? "#ffffff" : "var(--project-text, #0f172a)",
-                }}
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Фильтры в стиле Заявок (Витрина / Чипсы уровней) */}
-        <div className="space-y-3">
-          {/* Чипсы категорий (Учебники / Кроссворды) */}
-          <div className="flex gap-2">
-            {[
-              { id: "all", label: "Все категории" },
-              { id: "textbook", label: "📚 Учебники" },
-              { id: "crossword", label: "🧩 Кроссворды" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveKind(tab.id)}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border"
-                style={{
-                  backgroundColor:
-                    activeKind === tab.id
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
-                  borderColor:
-                    activeKind === tab.id
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
-                  color: activeKind === tab.id ? "#ffffff" : "var(--project-text, #0f172a)",
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Чипсы уровней (Hippo 1-4, CEFR...) */}
-          {availableLevels.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => setSelectedLevelCode("all")}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all"
-                style={{
-                  backgroundColor:
-                    selectedLevelFilter === "all"
-                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent)"
-                      : "transparent",
-                  borderColor:
-                    selectedLevelFilter === "all"
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
-                  color: "var(--project-text, #0f172a)",
-                }}
-              >
-                Все уровни
-              </button>
-              {availableLevels.map((lvl) => (
-                <button
-                  key={lvl}
-                  type="button"
-                  onClick={() => setSelectedLevelCode(lvl)}
-                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all"
-                  style={{
-                    backgroundColor:
-                      selectedLevelFilter === lvl
-                        ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent)"
-                        : "transparent",
-                    borderColor:
-                      selectedLevelFilter === lvl
-                        ? "var(--project-primary, #0ea5e9)"
-                        : "var(--glass-border, rgba(15, 23, 42, 0.1))",
-                    color: "var(--project-text, #0f172a)",
-                  }}
-                >
-                  {lvl}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Список материалов в виде карточек */}
-        <div className="max-h-72 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 pr-1">
-          {loading ? (
-            <div className="col-span-full text-center py-12 text-xs font-bold uppercase tracking-wider opacity-60">
-              Загрузка каталога материалов...
-            </div>
-          ) : filteredMaterials.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-xs font-bold uppercase tracking-wider opacity-60">
-              Материалы не найдены
-            </div>
-          ) : (
-            filteredMaterials.map((m) => {
-              const unlocked = isAlreadyUnlocked(m);
-              const isSelected = selectedMaterialIds.includes(m.id);
-
-              return (
-                <div
-                  key={m.id}
-                  onClick={() => handleToggleMaterial(m)}
-                  className="p-3.5 rounded-2xl border flex items-center justify-between transition-all"
-                  style={{
-                    backgroundColor: unlocked
-                      ? "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)"
-                      : isSelected
-                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)"
-                      : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
-                    borderColor: isSelected
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
-                    opacity: unlocked ? 0.6 : 1,
-                    cursor: unlocked ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <div className="flex items-center gap-3 min-w-0 pr-2">
-                    {/* Обложка / Иконка */}
-                    <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 border"
-                      style={{
-                        backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
-                        borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
-                      }}
-                    >
-                      {m.cover_image_url ? (
-                        <img
-                          src={m.cover_image_url}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-xl">
-                          {m.kind === "crossword" ? "🧩" : "📚"}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="font-extrabold text-xs truncate">
-                        {m.title}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        {m.is_secret && (
-                          <span className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">
-                            ★ Секретный
-                          </span>
-                        )}
-                        {unlocked && (
-                          <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
-                            ✓ Доступ есть
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Чекбокс кнопка */}
-                  <div
-                    className="w-7 h-7 rounded-xl border flex items-center justify-center flex-shrink-0 font-bold text-xs transition-colors"
-                    style={{
-                      backgroundColor: isSelected
-                        ? "var(--project-primary, #0ea5e9)"
-                        : "transparent",
-                      borderColor: isSelected
-                        ? "var(--project-primary, #0ea5e9)"
-                        : "var(--glass-border, rgba(15, 23, 42, 0.2))",
-                      color: isSelected ? "#ffffff" : "var(--project-text, #0f172a)",
-                    }}
-                  >
-                    {unlocked ? "✓" : isSelected ? "✓" : "+"}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Панель действий */}
-        <div
-          className="flex justify-end gap-3 pt-3 border-t"
-          style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border font-bold text-xs uppercase tracking-wider rounded-xl transition-colors"
-            style={{
-              backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
-              borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
-              color: "var(--project-text, #0f172a)",
-            }}
-          >
-            Отмена
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmitChoice}
-            disabled={
-              submitting || selectedMaterialIds.length < requiredChoiceCount
-            }
-            className="px-5 py-2 text-white font-black text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-md"
-            style={{
-              backgroundColor: "var(--project-primary, #0ea5e9)",
-            }}
-          >
-            {submitting ? "Сохранение..." : "Подтвердить выбор"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+    return NextResponse.json({
+      ok: true,
+      success: true,
+      reward: result.reward,
+    });
+  } catch (error: any) {
+    console.error("Ошибка при получении награды за серию:", error);
+    return NextResponse.json(
+      { error: error?.message || "Внутренняя ошибка сервера" },
+      { status: 500 }
+    );
+  }
 }
 </file>
 
@@ -42547,6 +41628,413 @@ export function isKnownMaterialKind(kind: unknown): kind is OlympiadMaterialKind
 }
 </file>
 
+<file path="lib/rewards/data.ts">
+// lib/rewards/data.ts
+// Серверный слой работы с базой данных Supabase: Маскот, Стрики и Промокоды.
+//
+// ВАЖНО: единственный источник правды по сериям (стрикам) во всей системе —
+// таблица `profiles` (колонки current_streak / max_streak / longest_streak /
+// last_completed_at). Её обновляет RPC record_streak_completion при
+// выполнении задания. Все функции этого файла и все API-роуты, которые
+// показывают/начисляют/ранжируют стрики, должны читать именно её —
+// не заводите параллельных таблиц вроде user_streaks, иначе данные разъедутся.
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type {
+  MascotSettings,
+  RewardItem,
+  RewardType,
+  StreakConfigItem,
+  StreakLeaderboardEntry,
+  StreakStats,
+  UserInventoryItem,
+  PromocodeRedeemResult,
+  PromocodeRewardsBundle,
+} from "./types";
+
+// ---------------------------------------------------------------------------
+// 1. МАСКОТ И НАСТРОЙКИ ЭКИПИРОВКИ
+// ---------------------------------------------------------------------------
+
+export async function getMascotSettings(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<MascotSettings> {
+  const { data: rawSettings } = await supabase
+    .from("mascot_settings")
+    .select(
+      `
+      user_id,
+      equipped_base_id,
+      equipped_hat_id,
+      equipped_aura_id,
+      equipped_emotion_id,
+      equipped_title_id,
+      updated_at,
+      equipped_base:rewards!mascot_settings_equipped_base_id_fkey(*),
+      equipped_hat:rewards!mascot_settings_equipped_hat_id_fkey(*),
+      equipped_aura:rewards!mascot_settings_equipped_aura_id_fkey(*),
+      equipped_emotion:rewards!mascot_settings_equipped_emotion_id_fkey(*),
+      equipped_title:rewards!mascot_settings_equipped_title_id_fkey(*)
+    `
+    )
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!rawSettings) {
+    return {
+      user_id: userId,
+      equipped_base_id: null,
+      equipped_hat_id: null,
+      equipped_aura_id: null,
+      equipped_emotion_id: null,
+      equipped_title_id: null,
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  return rawSettings as unknown as MascotSettings;
+}
+
+export async function equipMascotItem(
+  supabase: SupabaseClient,
+  userId: string,
+  category: RewardType,
+  rewardId: string | null
+): Promise<{ success: boolean; error?: string }> {
+  if (rewardId) {
+    const { data: hasItem } = await supabase
+      .from("user_inventory")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("reward_id", rewardId)
+      .maybeSingle();
+
+    if (!hasItem) {
+      return { success: false, error: "У вас нет этой награды в инвентаре." };
+    }
+  }
+
+  const columnMap: Record<RewardType, string> = {
+    base: "equipped_base_id",
+    hat: "equipped_hat_id",
+    aura: "equipped_aura_id",
+    emotion: "equipped_emotion_id",
+    title: "equipped_title_id",
+  };
+
+  const targetColumn = columnMap[category];
+  if (!targetColumn) {
+    return { success: false, error: "Неверная категория элемента." };
+  }
+
+  const payload = {
+    user_id: userId,
+    [targetColumn]: rewardId,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from("mascot_settings")
+    .upsert(payload, { onConflict: "user_id" });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// 2. ИНВЕНТАРЬ ПОЛЬЗОВАТЕЛЯ
+// ---------------------------------------------------------------------------
+
+export async function getUserInventory(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<UserInventoryItem[]> {
+  const { data, error } = await supabase
+    .from("user_inventory")
+    .select("*, reward:rewards(*)")
+    .eq("user_id", userId)
+    .order("unlocked_at", { ascending: false });
+
+  if (error || !Array.isArray(data)) return [];
+  return data as unknown as UserInventoryItem[];
+}
+
+// ---------------------------------------------------------------------------
+// 3. ДОРОЖКА СЕРИИ (СТРИКИ) И ЛИДЕРБОРД
+// ---------------------------------------------------------------------------
+
+export async function getStreakPath(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<{
+  stats: StreakStats;
+  path: StreakConfigItem[];
+}> {
+  const [{ data: profile }, { data: streakConfig }, { data: inventory }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("current_streak, max_streak, longest_streak, last_completed_at")
+        .eq("id", userId)
+        .maybeSingle(),
+      supabase
+        .from("streak_config")
+        .select("day_number, reward_id, created_at, reward:rewards(*)")
+        .order("day_number", { ascending: true }),
+      supabase
+        .from("user_inventory")
+        .select("reward_id")
+        .eq("user_id", userId)
+        .eq("source", "streak"),
+    ]);
+
+  const currentStreak = Number(profile?.current_streak || 0);
+  const maxStreak = Number(
+    profile?.max_streak ?? profile?.longest_streak ?? currentStreak
+  );
+  const lastCompletedAt = profile?.last_completed_at
+    ? String(profile.last_completed_at)
+    : null;
+
+  // Проверка выполнения хотя бы одного задания сегодня (в UTC)
+  let completedToday = false;
+  if (lastCompletedAt) {
+    const lastDate = new Date(lastCompletedAt).toISOString().split("T")[0];
+    const todayDate = new Date().toISOString().split("T")[0];
+    completedToday = lastDate === todayDate;
+  }
+
+  const claimedRewardIds = new Set(
+    Array.isArray(inventory) ? inventory.map((item) => item.reward_id) : []
+  );
+
+  const path: StreakConfigItem[] = Array.isArray(streakConfig)
+    ? streakConfig.map((item: any) => {
+        const isClaimed = claimedRewardIds.has(item.reward_id);
+        const isAvailable = currentStreak >= item.day_number && !isClaimed;
+        return {
+          ...item,
+          is_claimed: isClaimed,
+          is_available: isAvailable,
+        };
+      })
+    : [];
+
+  return {
+    stats: {
+      currentStreak,
+      maxStreak,
+      completedToday,
+      lastCompletedAt,
+    },
+    path,
+  };
+}
+
+export async function getStreakLeaderboard(
+  supabase: SupabaseClient,
+  currentUserId?: string
+): Promise<StreakLeaderboardEntry[]> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, current_streak, max_streak, longest_streak")
+    // Не засоряем топ пользователями без единого дня серии
+    .or("current_streak.gt.0,max_streak.gt.0,longest_streak.gt.0")
+    .order("max_streak", { ascending: false })
+    .order("current_streak", { ascending: false })
+    .limit(20);
+
+  if (error || !Array.isArray(data)) return [];
+
+  return data.map((row: any, index: number) => {
+    const current = Number(row.current_streak || 0);
+    const max = Number(row.max_streak ?? row.longest_streak ?? current);
+
+    return {
+      rank: index + 1,
+      user_id: row.id,
+      current_streak: current,
+      max_streak: max,
+      is_current_user: row.id === currentUserId,
+    };
+  });
+}
+
+export async function claimStreakReward(
+  supabase: SupabaseClient,
+  userId: string,
+  dayNumber: number
+): Promise<{ success: boolean; reward?: RewardItem; error?: string }> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("current_streak")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const currentStreak = Number(profile?.current_streak || 0);
+  if (currentStreak < dayNumber) {
+    return { success: false, error: "Вы ещё не достигли этого дня серии." };
+  }
+
+  const { data: streakConfig } = await supabase
+    .from("streak_config")
+    .select("reward_id, reward:rewards(*)")
+    .eq("day_number", dayNumber)
+    .maybeSingle();
+
+  if (!streakConfig || !streakConfig.reward_id) {
+    return { success: false, error: "Награда для этого дня не настроена." };
+  }
+
+  const rewardId = streakConfig.reward_id;
+
+  const { error: insertError } = await supabase.from("user_inventory").insert({
+    user_id: userId,
+    reward_id: rewardId,
+    source: "streak",
+  });
+
+  if (insertError) {
+    if (insertError.code === "23505") {
+      return { success: false, error: "Награда за этот день уже получена." };
+    }
+    return { success: false, error: insertError.message };
+  }
+
+  return {
+    success: true,
+    reward: streakConfig.reward as unknown as RewardItem,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 4. ПРОМОКОДЫ И АКТИВАЦИЯ
+// ---------------------------------------------------------------------------
+
+export async function redeemPromocode(
+  supabase: SupabaseClient,
+  userId: string,
+  rawCode: string,
+  chosenMaterialIds: string[] = []
+): Promise<PromocodeRedeemResult> {
+  const code = String(rawCode || "").trim().toUpperCase();
+  if (!code) return { success: false, error: "Введите промокод." };
+
+  const { data: promo, error: promoError } = await supabase
+    .from("promocodes")
+    .select("*")
+    .eq("code", code)
+    .maybeSingle();
+
+  if (promoError || !promo) {
+    return { success: false, error: "Промокод не найден." };
+  }
+
+  if (!promo.is_active) {
+    return { success: false, error: "Промокод деактивирован." };
+  }
+
+  if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
+    return { success: false, error: "Срок действия промокода истёк." };
+  }
+
+  if (promo.max_uses !== null && promo.current_uses >= promo.max_uses) {
+    return { success: false, error: "Лимит активаций промокода исчерпан." };
+  }
+
+  const { data: existingRedemption } = await supabase
+    .from("promocode_redemptions")
+    .select("id")
+    .eq("promocode_id", promo.id)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingRedemption) {
+    return { success: false, error: "Вы уже активировали этот промокод." };
+  }
+
+  const bundle: PromocodeRewardsBundle = promo.rewards_bundle || {};
+  const requiredChoiceCount = Number(bundle.material_choice_count || 0);
+
+  if (requiredChoiceCount > 0 && chosenMaterialIds.length < requiredChoiceCount) {
+    return {
+      success: true,
+      requiresMaterialChoice: true,
+      remainingMaterialChoices: requiredChoiceCount - chosenMaterialIds.length,
+      physicalPrize: bundle.custom_physical || null,
+    };
+  }
+
+  const grantedRewards: RewardItem[] = [];
+
+  if (Array.isArray(bundle.reward_ids) && bundle.reward_ids.length > 0) {
+    const inventoryRows = bundle.reward_ids.map((rewardId) => ({
+      user_id: userId,
+      reward_id: rewardId,
+      source: "promocode" as const,
+    }));
+
+    await supabase
+      .from("user_inventory")
+      .upsert(inventoryRows, { onConflict: "user_id,reward_id" });
+
+    const { data: rewardsData } = await supabase
+      .from("rewards")
+      .select("*")
+      .in("id", bundle.reward_ids);
+
+    if (Array.isArray(rewardsData)) {
+      grantedRewards.push(...(rewardsData as unknown as RewardItem[]));
+    }
+  }
+
+  const allMaterialIdsToGrant = [
+    ...(bundle.specific_material_ids || []),
+    ...chosenMaterialIds,
+  ].filter(Boolean);
+
+  if (allMaterialIdsToGrant.length > 0) {
+    const accessRows = allMaterialIdsToGrant.map((mId) => ({
+      user_id: userId,
+      material_id: mId,
+    }));
+
+    await supabase
+      .from("material_access")
+      .upsert(accessRows, { onConflict: "user_id,material_id" });
+  }
+
+  const { error: rpcError } = await supabase.rpc("increment_promocode_uses", {
+    promo_id: promo.id,
+  });
+
+  if (rpcError) {
+    await supabase
+      .from("promocodes")
+      .update({ current_uses: (promo.current_uses || 0) + 1 })
+      .eq("id", promo.id);
+  }
+
+  await supabase.from("promocode_redemptions").insert({
+    promocode_id: promo.id,
+    user_id: userId,
+    chosen_material_ids: chosenMaterialIds,
+  });
+
+  return {
+    success: true,
+    requiresMaterialChoice: false,
+    grantedRewards,
+    physicalPrize: bundle.custom_physical || null,
+    grantedMaterialIds: allMaterialIdsToGrant,
+  };
+}
+</file>
+
 <file path="app/(app)/projects/[slug]/materials/[materialId]/page.tsx">
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
@@ -42961,6 +42449,572 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
   .materials-tabs { padding: 6px; gap: 4px; border-radius: 16px; }
   .material-tab { padding: 10px 16px; font-size: 13px; border-radius: 12px; }
   .materials-panel { padding: 16px; border-radius: 20px; }
+}
+</file>
+
+<file path="components/rewards/MaterialChoiceModal.tsx">
+"use client";
+
+import React, { useState, useEffect } from "react";
+
+interface MaterialItem {
+  id: string;
+  title: string;
+  is_secret?: boolean;
+  kind?: "textbook" | "crossword" | string;
+  hasAccess?: boolean;
+  cover_image_url?: string | null;
+  target_levels?: string[] | null;
+  class_levels?: string[] | null;
+  project_tab_id?: string | null;
+}
+
+interface ProjectItem {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface ProjectTab {
+  id: string;
+  slug: string;
+  title: string;
+  icon?: string | null;
+  orderIndex?: number;
+}
+
+// Совпадает по форме с UnboxedRewardItem из RewardUnboxModal —
+// специально не импортируем тип оттуда, чтобы не тащить лишнюю зависимость.
+export interface MaterialChoiceUnboxItem {
+  id: string;
+  title: string;
+  type: string;
+  description?: string | null;
+  asset_url?: string | null;
+  meta?: Record<string, any>;
+}
+
+export interface MaterialChoiceSuccessResult {
+  unboxItems: MaterialChoiceUnboxItem[];
+  physicalPrize?: any | null;
+}
+
+interface MaterialChoiceModalProps {
+  isOpen: boolean;
+  promocodeCode: string;
+  requiredChoiceCount: number;
+  onClose: () => void;
+  onSuccess: (result: MaterialChoiceSuccessResult) => void;
+}
+
+export default function MaterialChoiceModal({
+  isOpen,
+  promocodeCode,
+  requiredChoiceCount,
+  onClose,
+  onSuccess,
+}: MaterialChoiceModalProps) {
+  const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [selectedProjectSlug, setSelectedProjectSlug] = useState<string>("");
+
+  const [projectTabs, setProjectTabs] = useState<ProjectTab[]>([]);
+  const [activeTabSlug, setActiveTabSlug] = useState<string>("all");
+
+  const [materials, setMaterials] = useState<MaterialItem[]>([]);
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const [selectedLevelFilter, setSelectedLevelCode] = useState<string>("all");
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedMaterialIds([]);
+      setSubmitError(null);
+      void loadProjects();
+    }
+  }, [isOpen]);
+
+  const loadProjects = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/projects");
+      if (res.ok) {
+        const data = await res.json();
+        const activeProjects: ProjectItem[] = data.projects || [];
+        setProjects(activeProjects);
+        if (activeProjects.length > 0) {
+          await selectProject(activeProjects[0]);
+        } else {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    } catch (e) {
+      console.error("Failed to load projects:", e);
+      setLoading(false);
+    }
+  };
+
+  // Переключение проекта: сначала подтягиваем реальные табы этого проекта
+  // (учебники/кроссворды — лишь пример, у каждого проекта свой набор табов),
+  // затем — все материалы проекта, чтобы фильтровать их по табу на клиенте.
+  const selectProject = async (project: ProjectItem) => {
+    setSelectedProjectId(project.id);
+    setSelectedProjectSlug(project.slug);
+    setActiveTabSlug("all");
+    setSelectedLevelCode("all");
+    setLoading(true);
+
+    try {
+      const [tabsRes, materialsRes] = await Promise.all([
+        fetch(`/api/projects/${project.slug}`),
+        fetch(`/api/projects/${project.slug}/materials`),
+      ]);
+
+      if (tabsRes.ok) {
+        const tabsData = await tabsRes.json();
+        const tabs: ProjectTab[] = (tabsData?.project?.tabs || [])
+          .slice()
+          .sort(
+            (a: ProjectTab, b: ProjectTab) =>
+              (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+          );
+        setProjectTabs(tabs);
+      } else {
+        setProjectTabs([]);
+      }
+
+      if (materialsRes.ok) {
+        const materialsData = await materialsRes.json();
+        setMaterials(materialsData.materials || []);
+      } else {
+        setMaterials([]);
+      }
+    } catch (e) {
+      console.error("Failed to load project tabs/materials:", e);
+      setProjectTabs([]);
+      setMaterials([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isAlreadyUnlocked = (m: MaterialItem): boolean => {
+    return Boolean(m.hasAccess);
+  };
+
+  const handleToggleMaterial = (m: MaterialItem) => {
+    if (isAlreadyUnlocked(m)) return;
+
+    if (selectedMaterialIds.includes(m.id)) {
+      setSelectedMaterialIds(selectedMaterialIds.filter((id) => id !== m.id));
+    } else {
+      if (selectedMaterialIds.length < requiredChoiceCount) {
+        setSelectedMaterialIds([...selectedMaterialIds, m.id]);
+      }
+    }
+  };
+
+  const handleSubmitChoice = async () => {
+    if (selectedMaterialIds.length < requiredChoiceCount) {
+      setSubmitError(`Пожалуйста, выберите ${requiredChoiceCount} материал(а).`);
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch("/api/promocodes/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: promocodeCode,
+          chosenMaterialIds: selectedMaterialIds,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data) {
+        // Собираем карточки для пошагового анбоксинга: сначала выбранные
+        // материалы (то, ради чего был этот шаг), затем прочие награды
+        // бандла промокода, если они тоже были выданы вместе с выбором.
+        const chosenMaterials = materials.filter((m) =>
+          selectedMaterialIds.includes(m.id)
+        );
+
+        const materialItems: MaterialChoiceUnboxItem[] = chosenMaterials.map(
+          (m) => ({
+            id: m.id,
+            title: m.title,
+            type: "material",
+            description:
+              m.kind === "crossword"
+                ? "Открыт доступ к кроссворду"
+                : "Открыт доступ к материалу",
+            asset_url: m.cover_image_url || null,
+          })
+        );
+
+        const rewardItems: MaterialChoiceUnboxItem[] = Array.isArray(
+          data.grantedRewards
+        )
+          ? data.grantedRewards.map((r: any) => ({
+              id: r.id,
+              title: r.title,
+              type: r.type,
+              description: r.description,
+              asset_url: r.asset_url,
+              meta: r.meta,
+            }))
+          : [];
+
+        onSuccess({
+          unboxItems: [...materialItems, ...rewardItems],
+          physicalPrize: data.physicalPrize || null,
+        });
+        onClose();
+      } else {
+        setSubmitError(data?.error || "Ошибка сохранения выбора");
+      }
+    } catch (e) {
+      setSubmitError("Ошибка соединения с сервером");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  const availableLevels = Array.from(
+    new Set(
+      materials.flatMap((m) => [
+        ...(m.target_levels || []),
+        ...(m.class_levels || []),
+      ])
+    )
+  ).filter(Boolean);
+
+  const activeTab = projectTabs.find((t) => t.slug === activeTabSlug) || null;
+
+  const filteredMaterials = materials.filter((m) => {
+    const matchTab =
+      activeTabSlug === "all" ||
+      (activeTab ? m.project_tab_id === activeTab.id : true);
+
+    const levels = [...(m.target_levels || []), ...(m.class_levels || [])];
+    const matchLevel =
+      selectedLevelFilter === "all" ||
+      levels.some((l) => l.toLowerCase() === selectedLevelFilter.toLowerCase());
+
+    return matchTab && matchLevel;
+  });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
+    >
+      <div
+        className="rounded-[32px] max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-hidden relative border transition-all"
+        style={{
+          backgroundColor: "var(--project-card-bg, #ffffff)",
+          color: "var(--project-text, #0f172a)",
+          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
+        }}
+      >
+        {/* Шапка модалки */}
+        <div
+          className="flex justify-between items-start border-b pb-4"
+          style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
+        >
+          <div>
+            <h3 className="text-lg font-black uppercase tracking-wider">
+              Выбор материалов по промокоду
+            </h3>
+            <p className="text-xs font-medium opacity-60 mt-1">
+              Выберите {requiredChoiceCount} материал(а) для получения доступа:
+            </p>
+          </div>
+          <div
+            className="font-mono text-xs font-black px-3 py-1.5 border rounded-xl uppercase tracking-wider"
+            style={{
+              backgroundColor:
+                "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+              borderColor:
+                "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
+              color: "var(--project-primary, #0ea5e9)",
+            }}
+          >
+            Выбрано: {selectedMaterialIds.length} / {requiredChoiceCount}
+          </div>
+        </div>
+
+        {/* Выбор проекта/раздела */}
+        {projects.length > 1 && (
+          <div
+            className="flex gap-2 border-b pb-3 overflow-x-auto"
+            style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
+          >
+            {projects.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  if (p.id !== selectedProjectId) void selectProject(p);
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border"
+                style={{
+                  backgroundColor:
+                    selectedProjectId === p.id
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
+                  borderColor:
+                    selectedProjectId === p.id
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                  color:
+                    selectedProjectId === p.id
+                      ? "#ffffff"
+                      : "var(--project-text, #0f172a)",
+                }}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Фильтры */}
+        <div className="space-y-3">
+          {/* Чипсы табов — динамические, из реальной конфигурации проекта */}
+          <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setActiveTabSlug("all")}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border"
+              style={{
+                backgroundColor:
+                  activeTabSlug === "all"
+                    ? "var(--project-primary, #0ea5e9)"
+                    : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
+                borderColor:
+                  activeTabSlug === "all"
+                    ? "var(--project-primary, #0ea5e9)"
+                    : "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                color: activeTabSlug === "all" ? "#ffffff" : "var(--project-text, #0f172a)",
+              }}
+            >
+              Все категории
+            </button>
+            {projectTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTabSlug(tab.slug)}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border"
+                style={{
+                  backgroundColor:
+                    activeTabSlug === tab.slug
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
+                  borderColor:
+                    activeTabSlug === tab.slug
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                  color:
+                    activeTabSlug === tab.slug
+                      ? "#ffffff"
+                      : "var(--project-text, #0f172a)",
+                }}
+              >
+                {tab.icon ? `${tab.icon} ` : ""}
+                {tab.title}
+              </button>
+            ))}
+          </div>
+
+          {/* Чипсы уровней (Hippo 1-4, CEFR...) */}
+          {availableLevels.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setSelectedLevelCode("all")}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all"
+                style={{
+                  backgroundColor:
+                    selectedLevelFilter === "all"
+                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent)"
+                      : "transparent",
+                  borderColor:
+                    selectedLevelFilter === "all"
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                  color: "var(--project-text, #0f172a)",
+                }}
+              >
+                Все уровни
+              </button>
+              {availableLevels.map((lvl) => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => setSelectedLevelCode(lvl)}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all"
+                  style={{
+                    backgroundColor:
+                      selectedLevelFilter === lvl
+                        ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent)"
+                        : "transparent",
+                    borderColor:
+                      selectedLevelFilter === lvl
+                        ? "var(--project-primary, #0ea5e9)"
+                        : "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                    color: "var(--project-text, #0f172a)",
+                  }}
+                >
+                  {lvl}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Список материалов в виде карточек */}
+        <div className="max-h-72 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 pr-1">
+          {loading ? (
+            <div className="col-span-full text-center py-12 text-xs font-bold uppercase tracking-wider opacity-60">
+              Загрузка каталога материалов...
+            </div>
+          ) : filteredMaterials.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-xs font-bold uppercase tracking-wider opacity-60">
+              Материалы не найдены
+            </div>
+          ) : (
+            filteredMaterials.map((m) => {
+              const unlocked = isAlreadyUnlocked(m);
+              const isSelected = selectedMaterialIds.includes(m.id);
+
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => handleToggleMaterial(m)}
+                  className="p-3.5 rounded-2xl border flex items-center justify-between transition-all"
+                  style={{
+                    backgroundColor: unlocked
+                      ? "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)"
+                      : isSelected
+                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)"
+                      : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
+                    borderColor: isSelected
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                    opacity: unlocked ? 0.6 : 1,
+                    cursor: unlocked ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 border"
+                      style={{
+                        backgroundColor:
+                          "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
+                        borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                      }}
+                    >
+                      {m.cover_image_url ? (
+                        <img
+                          src={m.cover_image_url}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-xl">
+                          {m.kind === "crossword" ? "🧩" : "📚"}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="font-extrabold text-xs truncate">{m.title}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        {m.is_secret && (
+                          <span className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">
+                            ★ Секретный
+                          </span>
+                        )}
+                        {unlocked && (
+                          <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
+                            ✓ Доступ есть
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    className="w-7 h-7 rounded-xl border flex items-center justify-center flex-shrink-0 font-bold text-xs transition-colors"
+                    style={{
+                      backgroundColor: isSelected
+                        ? "var(--project-primary, #0ea5e9)"
+                        : "transparent",
+                      borderColor: isSelected
+                        ? "var(--project-primary, #0ea5e9)"
+                        : "var(--glass-border, rgba(15, 23, 42, 0.2))",
+                      color: isSelected ? "#ffffff" : "var(--project-text, #0f172a)",
+                    }}
+                  >
+                    {unlocked ? "✓" : isSelected ? "✓" : "+"}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {submitError && (
+          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-600 text-center font-bold">
+            {submitError}
+          </div>
+        )}
+
+        {/* Панель действий */}
+        <div
+          className="flex justify-end gap-3 pt-3 border-t"
+          style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border font-bold text-xs uppercase tracking-wider rounded-xl transition-colors"
+            style={{
+              backgroundColor:
+                "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
+              borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
+              color: "var(--project-text, #0f172a)",
+            }}
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmitChoice}
+            disabled={submitting || selectedMaterialIds.length < requiredChoiceCount}
+            className="px-5 py-2 text-white font-black text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-md"
+            style={{
+              backgroundColor: "var(--project-primary, #0ea5e9)",
+            }}
+          >
+            {submitting ? "Сохранение..." : "Подтвердить выбор"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -44447,682 +44501,6 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
 }
 </file>
 
-<file path="components/rewards/RewardsModal.tsx">
-"use client";
-
-import React, { useState, useEffect } from "react";
-import MascotViewer from "../mascot/MascotViewer";
-import StreakTimeline from "./StreakTimeline";
-import MaterialChoiceModal from "./MaterialChoiceModal";
-import PhysicalPrizeModal from "./PhysicalPrizeModal";
-import RewardUnboxModal, { UnboxedRewardItem } from "./RewardUnboxModal";
-
-import type {
-  MascotSettings,
-  RewardType,
-  StreakConfigItem,
-  StreakStats,
-  UserInventoryItem,
-  CustomPhysicalPrize,
-} from "@/lib/rewards/types";
-
-export type RewardsTabType = "wardrobe" | "streaks" | "promocode" | "timeline";
-
-export interface RewardsModalProps {
-  isOpen?: boolean;
-  open?: boolean;
-  onClose: () => void;
-  defaultTab?: RewardsTabType;
-  initialTab?: RewardsTabType;
-}
-
-export default function RewardsModal({
-  isOpen,
-  open,
-  onClose,
-  defaultTab = "wardrobe",
-  initialTab,
-}: RewardsModalProps) {
-  const showModal = Boolean(isOpen ?? open);
-
-  const normalizeTab = (tab?: RewardsTabType): "wardrobe" | "streaks" | "promocode" => {
-    const raw = tab || initialTab || defaultTab;
-    if (raw === "timeline") return "streaks";
-    return raw === "promocode" || raw === "streaks" ? raw : "wardrobe";
-  };
-
-  const [activeTab, setActiveTab] = useState<"wardrobe" | "streaks" | "promocode">(
-    () => normalizeTab(initialTab || defaultTab)
-  );
-
-  const [loading, setLoading] = useState(true);
-
-  const [mascot, setMascot] = useState<MascotSettings | null>(null);
-  const [inventory, setInventory] = useState<UserInventoryItem[]>([]);
-  const [streakStats, setStreakStats] = useState<StreakStats>({
-    currentStreak: 0,
-    maxStreak: 0,
-    completedToday: false,
-    lastCompletedAt: null,
-  });
-  const [streakPath, setStreakPath] = useState<StreakConfigItem[]>([]);
-
-  const [wardrobeCategory, setWardrobeCategory] = useState<RewardType>("hat");
-
-  const [promoCodeInput, setPromoCodeInput] = useState("");
-  const [promoError, setPromoError] = useState<string | null>(null);
-  const [promoSuccessMsg, setPromoSuccessMsg] = useState<string | null>(null);
-  const [redeeming, setRedeeming] = useState(false);
-
-  // Стейты для пошагового анбоксинга
-  const [unboxModalOpen, setUnboxModalOpen] = useState(false);
-  const [unboxedItems, setUnboxedItems] = useState<UnboxedRewardItem[]>([]);
-
-  const [materialChoiceState, setMaterialChoiceState] = useState<{
-    isOpen: boolean;
-    code: string;
-    remainingCount: number;
-  }>({ isOpen: false, code: "", remainingCount: 0 });
-
-  const [physicalPrizeState, setPhysicalPrizeState] = useState<{
-    isOpen: boolean;
-    prize: CustomPhysicalPrize | null;
-  }>({ isOpen: false, prize: null });
-
-  useEffect(() => {
-    if (showModal) {
-      setActiveTab(normalizeTab(initialTab || defaultTab));
-      void loadData();
-    }
-  }, [showModal, initialTab, defaultTab]);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [mascotRes, streaksRes] = await Promise.all([
-        fetch("/api/mascot"),
-        fetch("/api/streaks"),
-      ]);
-
-      const mascotData = await mascotRes.json();
-      const streaksData = await streaksRes.json();
-
-      if (mascotRes.ok) {
-        setMascot(mascotData.mascot || null);
-        setInventory(mascotData.inventory || []);
-      }
-      if (streaksRes.ok) {
-        const curr =
-          streaksData.streak?.currentStreak ??
-          streaksData.stats?.currentStreak ??
-          streaksData.currentStreak ??
-          0;
-        const max =
-          streaksData.streak?.longestStreak ??
-          streaksData.stats?.longestStreak ??
-          streaksData.stats?.maxStreak ??
-          streaksData.longestStreak ??
-          0;
-        const done =
-          streaksData.streak?.doneToday ??
-          streaksData.stats?.doneToday ??
-          streaksData.stats?.completedToday ??
-          false;
-
-        setStreakStats({
-          currentStreak: Number(curr),
-          maxStreak: Number(max),
-          completedToday: Boolean(done),
-          lastCompletedAt: null,
-        });
-
-        setStreakPath(streaksData.path || []);
-      }
-    } catch (e) {
-      console.error("Error loading rewards data:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEquip = async (category: RewardType, rewardId: string | null) => {
-    try {
-      const res = await fetch("/api/mascot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, rewardId }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setMascot(data.mascot);
-      }
-    } catch (e) {
-      console.error("Failed to equip item:", e);
-    }
-  };
-
-  const handleClaimStreak = async (dayNumber: number) => {
-    try {
-      const res = await fetch("/api/streaks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dayNumber }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.reward) {
-          setUnboxedItems([
-            {
-              id: data.reward.id || String(dayNumber),
-              title: data.reward.title || `Награда за День ${dayNumber}`,
-              type: data.reward.type || "hat",
-              description: data.reward.description || `Награда за ${dayNumber} дн. серии`,
-              asset_url: data.reward.asset_url,
-              meta: data.reward.meta,
-            },
-          ]);
-          setUnboxModalOpen(true);
-        }
-        await loadData();
-      } else {
-        const err = await res.json();
-        alert(err.error || "Ошибка получения награды");
-      }
-    } catch (e) {
-      alert("Ошибка сети");
-    }
-  };
-
-  const handleRedeemPromo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!promoCodeInput.trim()) return;
-
-    setRedeeming(true);
-    setPromoError(null);
-    setPromoSuccessMsg(null);
-
-    try {
-      const res = await fetch("/api/promocodes/redeem", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: promoCodeInput }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setPromoError(data.error || "Неверный промокод");
-      } else {
-        if (data.requiresMaterialChoice) {
-          setMaterialChoiceState({
-            isOpen: true,
-            code: promoCodeInput.trim().toUpperCase(),
-            remainingCount: data.remainingMaterialChoices || 1,
-          });
-        } else if (data.physicalPrize) {
-          setPhysicalPrizeState({
-            isOpen: true,
-            prize: data.physicalPrize,
-          });
-        } else if (data.grantedRewards && data.grantedRewards.length > 0) {
-          const itemsToUnbox: UnboxedRewardItem[] = data.grantedRewards.map((r: any) => ({
-            id: r.id,
-            title: r.title,
-            type: r.type,
-            description: r.description,
-            asset_url: r.asset_url,
-            meta: r.meta,
-          }));
-
-          setUnboxedItems(itemsToUnbox);
-          setUnboxModalOpen(true);
-          setPromoCodeInput("");
-          void loadData();
-        } else {
-          setPromoSuccessMsg("Промокод успешно активирован!");
-          setPromoCodeInput("");
-          void loadData();
-        }
-      }
-    } catch (e) {
-      setPromoError("Ошибка сети при активации");
-    } finally {
-      setRedeeming(false);
-    }
-  };
-
-  if (!showModal) return null;
-
-  const filteredInventory = inventory.filter(
-    (item) => item.reward?.type === wardrobeCategory
-  );
-
-  const isItemEquipped = (rewardId: string) => {
-    if (!mascot) return false;
-    return (
-      mascot.equipped_base_id === rewardId ||
-      mascot.equipped_hat_id === rewardId ||
-      mascot.equipped_aura_id === rewardId ||
-      mascot.equipped_emotion_id === rewardId ||
-      mascot.equipped_title_id === rewardId
-    );
-  };
-
-  return (
-    <>
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
-        style={{ backgroundColor: "rgba(0,0,0,0.8)" }}
-      >
-        <div
-          className="rounded-[32px] max-w-4xl w-full h-[88vh] flex flex-col shadow-2xl overflow-hidden relative border transition-all"
-          style={{
-            backgroundColor: "var(--project-card-bg, #ffffff)",
-            color: "var(--project-text, #0f172a)",
-            borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
-          }}
-        >
-          {/* Шапка модалки */}
-          <div
-            className="flex items-center justify-between p-5 sm:p-6 border-b"
-            style={{
-              borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
-              backgroundColor: "var(--project-card-bg, #ffffff)",
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="w-3.5 h-3.5 rounded-full"
-                style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
-              />
-              <h2 className="text-xl font-black tracking-wide uppercase">
-                Центр наград
-              </h2>
-            </div>
-
-            {/* Табы */}
-            <div
-              className="flex gap-1 p-1.5 rounded-2xl border"
-              style={{
-                backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
-                borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setActiveTab("wardrobe")}
-                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
-                style={{
-                  backgroundColor:
-                    activeTab === "wardrobe"
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "transparent",
-                  color: activeTab === "wardrobe" ? "#ffffff" : "var(--project-text, #0f172a)",
-                }}
-              >
-                Гардероб
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("streaks")}
-                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
-                style={{
-                  backgroundColor:
-                    activeTab === "streaks"
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "transparent",
-                  color: activeTab === "streaks" ? "#ffffff" : "var(--project-text, #0f172a)",
-                }}
-              >
-                Серия ({streakStats.currentStreak} дн.)
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("promocode")}
-                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
-                style={{
-                  backgroundColor:
-                    activeTab === "promocode"
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "transparent",
-                  color: activeTab === "promocode" ? "#ffffff" : "var(--project-text, #0f172a)",
-                }}
-              >
-                Промокод
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3.5 py-1.5 font-bold text-xs rounded-xl transition-all border"
-              style={{
-                backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
-                borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
-                color: "var(--project-text, #0f172a)",
-              }}
-            >
-              Закрыть
-            </button>
-          </div>
-
-          {/* Контент модалки */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-            {loading ? (
-              <div className="h-full flex items-center justify-center font-bold text-sm uppercase tracking-wider opacity-60">
-                Загрузка данных...
-              </div>
-            ) : (
-              <>
-                {/* Вкладка 1: ГАРДЕРОБ */}
-                {activeTab === "wardrobe" && (
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
-                    {/* Левая панель: Примерка */}
-                    <div
-                      className="md:col-span-5 border rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-sm"
-                      style={{
-                        backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
-                        borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
-                      }}
-                    >
-                      <MascotViewer mascotSettings={mascot} size={230} />
-                      <div className="text-xs font-extrabold uppercase tracking-wider mt-4 text-center opacity-60">
-                        Предпросмотр гардероба
-                      </div>
-                    </div>
-
-                    {/* Правая панель: Инвентарь */}
-                    <div className="md:col-span-7 flex flex-col space-y-4">
-                      {/* Селектор категорий */}
-                      <div className="flex gap-2 border-b pb-3 overflow-x-auto" style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}>
-                        {[
-                          { type: "hat", label: "Шляпы" },
-                          { type: "aura", label: "Ауры" },
-                          { type: "emotion", label: "Эмоции" },
-                          { type: "base", label: "Базы" },
-                          { type: "title", label: "Титулы" },
-                        ].map((cat) => (
-                          <button
-                            key={cat.type}
-                            type="button"
-                            onClick={() =>
-                              setWardrobeCategory(cat.type as RewardType)
-                            }
-                            className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all border"
-                            style={{
-                              backgroundColor:
-                                wardrobeCategory === cat.type
-                                  ? "var(--project-primary, #0ea5e9)"
-                                  : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
-                              borderColor:
-                                wardrobeCategory === cat.type
-                                  ? "var(--project-primary, #0ea5e9)"
-                                  : "var(--glass-border, rgba(15,23,42,0.1))",
-                              color:
-                                wardrobeCategory === cat.type
-                                  ? "#ffffff"
-                                  : "var(--project-text, #0f172a)",
-                            }}
-                          >
-                            {cat.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Сетка предметов */}
-                      <div
-                        className={`flex-1 overflow-y-auto pr-1 ${
-                          wardrobeCategory === "title"
-                            ? "flex flex-col gap-2.5"
-                            : "grid grid-cols-2 sm:grid-cols-3 gap-3"
-                        }`}
-                      >
-                        {filteredInventory.length === 0 ? (
-                          <div
-                            className="col-span-full py-16 text-center border rounded-2xl p-6"
-                            style={{
-                              backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
-                              borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
-                            }}
-                          >
-                            <div className="text-sm font-bold uppercase tracking-wider mb-1">
-                              Предметы отсутствуют
-                            </div>
-                            <div className="text-xs font-medium opacity-60">
-                              Продлевайте ежедневную серию или активируйте промокоды для получения наград.
-                            </div>
-                          </div>
-                        ) : (
-                          filteredInventory.map((item) => {
-                            if (!item.reward) return null;
-                            const equipped = isItemEquipped(item.reward.id);
-
-                            if (wardrobeCategory === "title") {
-                              return (
-                                <div
-                                  key={item.id}
-                                  onClick={() =>
-                                    handleEquip(
-                                      wardrobeCategory,
-                                      equipped ? null : item.reward!.id
-                                    )
-                                  }
-                                  className="w-full border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all"
-                                  style={{
-                                    backgroundColor: equipped
-                                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
-                                      : "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
-                                    borderColor: equipped
-                                      ? "var(--project-primary, #0ea5e9)"
-                                      : "var(--glass-border, rgba(15,23,42,0.08))",
-                                  }}
-                                >
-                                  <div className="min-w-0 pr-3">
-                                    <span
-                                      className="font-black text-xs sm:text-sm px-3 py-1 rounded-lg border inline-block truncate max-w-full uppercase tracking-wider"
-                                      style={{
-                                        borderColor:
-                                          item.reward.meta?.color || "var(--project-primary, #0ea5e9)",
-                                        color:
-                                          item.reward.meta?.color || "var(--project-primary, #0ea5e9)",
-                                        backgroundColor: `${
-                                          item.reward.meta?.color || "var(--project-primary, #0ea5e9)"
-                                        }18`,
-                                      }}
-                                    >
-                                      «{item.reward.title}»
-                                    </span>
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    className="text-xs font-black uppercase tracking-wider px-4 py-2 rounded-xl flex-shrink-0 transition-colors"
-                                    style={{
-                                      backgroundColor: equipped
-                                        ? "var(--project-primary, #0ea5e9)"
-                                        : "color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent)",
-                                      color: equipped ? "#ffffff" : "var(--project-text, #0f172a)",
-                                    }}
-                                  >
-                                    {equipped ? "Надето" : "Надеть"}
-                                  </button>
-                                </div>
-                              );
-                            }
-
-                            return (
-                              <div
-                                key={item.id}
-                                onClick={() =>
-                                  handleEquip(
-                                    wardrobeCategory,
-                                    equipped ? null : item.reward!.id
-                                  )
-                                }
-                                className="border rounded-2xl p-4 flex flex-col items-center justify-between cursor-pointer transition-all"
-                                style={{
-                                  backgroundColor: equipped
-                                    ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
-                                    : "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
-                                  borderColor: equipped
-                                    ? "var(--project-primary, #0ea5e9)"
-                                    : "var(--glass-border, rgba(15,23,42,0.08))",
-                                }}
-                              >
-                                {equipped && (
-                                  <span
-                                    className="self-end text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider"
-                                    style={{
-                                      backgroundColor: "var(--project-primary, #0ea5e9)",
-                                      color: "#ffffff",
-                                    }}
-                                  >
-                                    Надето
-                                  </span>
-                                )}
-
-                                <div className="w-16 h-16 flex items-center justify-center my-3">
-                                  {item.reward.asset_url ? (
-                                    <img
-                                      src={item.reward.asset_url}
-                                      alt=""
-                                      className="max-h-14 max-w-14 object-contain"
-                                    />
-                                  ) : (
-                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold opacity-50">
-                                      N/A
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="text-center w-full">
-                                  <div className="font-bold text-xs truncate">
-                                    {item.reward.title}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Вкладка 2: ДОРОЖКА СЕРИИ */}
-                {activeTab === "streaks" && (
-                  <StreakTimeline
-                    stats={streakStats}
-                    path={streakPath}
-                    onClaimReward={handleClaimStreak}
-                  />
-                )}
-
-                {/* Вкладка 3: ПРОМОКОД */}
-                {activeTab === "promocode" && (
-                  <div className="max-w-md mx-auto py-12 space-y-6">
-                    <div className="text-center space-y-2">
-                      <h3 className="text-lg font-black uppercase tracking-wider">
-                        Активация промокода
-                      </h3>
-                      <p className="text-xs font-medium opacity-60">
-                        Введите персональный код для получения наград или доступа к материалам.
-                      </p>
-                    </div>
-
-                    <form onSubmit={handleRedeemPromo} className="space-y-4">
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="ВВЕДИТЕ КОД"
-                          value={promoCodeInput}
-                          onChange={(e) =>
-                            setPromoCodeInput(e.target.value.toUpperCase())
-                          }
-                          className="w-full border-2 rounded-2xl p-4 text-center text-lg font-mono font-black uppercase tracking-widest focus:outline-none transition-colors"
-                          style={{
-                            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-                            borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
-                            color: "var(--project-primary, #0ea5e9)",
-                          }}
-                        />
-                      </div>
-
-                      {promoError && (
-                        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-600 text-center font-bold">
-                          {promoError}
-                        </div>
-                      )}
-
-                      {promoSuccessMsg && (
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-600 text-center font-bold">
-                          {promoSuccessMsg}
-                        </div>
-                      )}
-
-                      <button
-                        type="submit"
-                        disabled={redeeming || !promoCodeInput.trim()}
-                        className="w-full py-4 font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg disabled:opacity-50"
-                        style={{
-                          backgroundColor: "var(--project-primary, #0ea5e9)",
-                          color: "#ffffff",
-                        }}
-                      >
-                        {redeeming ? "Активация..." : "Активировать"}
-                      </button>
-                    </form>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Модалка демонстрации выданных предметов (Unboxing step-by-step) */}
-      {unboxModalOpen && (
-        <RewardUnboxModal
-          isOpen={unboxModalOpen}
-          items={unboxedItems}
-          onClose={() => {
-            setUnboxModalOpen(false);
-            setUnboxedItems([]);
-          }}
-        />
-      )}
-
-      {/* Выбор материала по промокоду */}
-      {materialChoiceState.isOpen && (
-        <MaterialChoiceModal
-          isOpen={materialChoiceState.isOpen}
-          promocodeCode={materialChoiceState.code}
-          requiredChoiceCount={materialChoiceState.remainingCount}
-          onClose={() => {
-            setMaterialChoiceState({ ...materialChoiceState, isOpen: false });
-            void loadData();
-          }}
-        />
-      )}
-
-      {/* Физический приз */}
-      {physicalPrizeState.isOpen && physicalPrizeState.prize && (
-        <PhysicalPrizeModal
-          isOpen={physicalPrizeState.isOpen}
-          prize={physicalPrizeState.prize}
-          onClose={() => {
-            setPhysicalPrizeState({ ...physicalPrizeState, isOpen: false });
-            void loadData();
-          }}
-        />
-      )}
-    </>
-  );
-}
-</file>
-
 <file path="app/(admin)/admin/requests/RequestsTab.tsx">
 /* app/(admin)/admin/requests/RequestsTab.tsx */
 "use client";
@@ -46540,6 +45918,692 @@ export async function POST(
     console.error("🔴 [ADMIN POST MATERIAL] Ошибка сервера:", e);
     return fail(e?.message || "Внутренняя ошибка сервера", 500, "SERVER_ERROR");
   }
+}
+</file>
+
+<file path="components/rewards/RewardsModal.tsx">
+"use client";
+
+import React, { useState, useEffect } from "react";
+import MascotViewer from "../mascot/MascotViewer";
+import StreakTimeline from "./StreakTimeline";
+import MaterialChoiceModal, {
+  MaterialChoiceSuccessResult,
+} from "./MaterialChoiceModal";
+import PhysicalPrizeModal from "./PhysicalPrizeModal";
+import RewardUnboxModal, { UnboxedRewardItem } from "./RewardUnboxModal";
+
+import type {
+  MascotSettings,
+  RewardType,
+  StreakConfigItem,
+  StreakStats,
+  UserInventoryItem,
+  CustomPhysicalPrize,
+} from "@/lib/rewards/types";
+
+export type RewardsTabType = "wardrobe" | "streaks" | "promocode" | "timeline";
+
+export interface RewardsModalProps {
+  isOpen?: boolean;
+  open?: boolean;
+  onClose: () => void;
+  defaultTab?: RewardsTabType;
+  initialTab?: RewardsTabType;
+}
+
+export default function RewardsModal({
+  isOpen,
+  open,
+  onClose,
+  defaultTab = "wardrobe",
+  initialTab,
+}: RewardsModalProps) {
+  const showModal = Boolean(isOpen ?? open);
+
+  const normalizeTab = (tab?: RewardsTabType): "wardrobe" | "streaks" | "promocode" => {
+    const raw = tab || initialTab || defaultTab;
+    if (raw === "timeline") return "streaks";
+    return raw === "promocode" || raw === "streaks" ? raw : "wardrobe";
+  };
+
+  const [activeTab, setActiveTab] = useState<"wardrobe" | "streaks" | "promocode">(
+    () => normalizeTab(initialTab || defaultTab)
+  );
+
+  const [loading, setLoading] = useState(true);
+
+  const [mascot, setMascot] = useState<MascotSettings | null>(null);
+  const [inventory, setInventory] = useState<UserInventoryItem[]>([]);
+  const [streakStats, setStreakStats] = useState<StreakStats>({
+    currentStreak: 0,
+    maxStreak: 0,
+    completedToday: false,
+    lastCompletedAt: null,
+  });
+  const [streakPath, setStreakPath] = useState<StreakConfigItem[]>([]);
+
+  const [wardrobeCategory, setWardrobeCategory] = useState<RewardType>("hat");
+
+  const [promoCodeInput, setPromoCodeInput] = useState("");
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoSuccessMsg, setPromoSuccessMsg] = useState<string | null>(null);
+  const [redeeming, setRedeeming] = useState(false);
+
+  // Стейты для пошагового анбоксинга
+  const [unboxModalOpen, setUnboxModalOpen] = useState(false);
+  const [unboxedItems, setUnboxedItems] = useState<UnboxedRewardItem[]>([]);
+  // Награды, которые нужно показать ПОСЛЕ того как закроется окно физ. приза
+  const [pendingUnboxItems, setPendingUnboxItems] = useState<UnboxedRewardItem[]>([]);
+
+  const [materialChoiceState, setMaterialChoiceState] = useState<{
+    isOpen: boolean;
+    code: string;
+    remainingCount: number;
+  }>({ isOpen: false, code: "", remainingCount: 0 });
+
+  const [physicalPrizeState, setPhysicalPrizeState] = useState<{
+    isOpen: boolean;
+    prize: CustomPhysicalPrize | null;
+  }>({ isOpen: false, prize: null });
+
+  useEffect(() => {
+    if (showModal) {
+      setActiveTab(normalizeTab(initialTab || defaultTab));
+      void loadData();
+    }
+  }, [showModal, initialTab, defaultTab]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [mascotRes, streaksRes] = await Promise.all([
+        fetch("/api/mascot"),
+        fetch("/api/streaks"),
+      ]);
+
+      const mascotData = await mascotRes.json();
+      const streaksData = await streaksRes.json();
+
+      if (mascotRes.ok) {
+        setMascot(mascotData.mascot || null);
+        setInventory(mascotData.inventory || []);
+      }
+      if (streaksRes.ok) {
+        // Единственный источник правды — streaksData.stats (он всегда
+        // построен из profiles на бэкенде). streaksData.streak дублирует
+        // те же значения для обратной совместимости, поэтому больше не
+        // отдаём ему приоритет через `??`.
+        const stats = streaksData.stats || {};
+
+        setStreakStats({
+          currentStreak: Number(stats.currentStreak ?? 0),
+          maxStreak: Number(stats.maxStreak ?? 0),
+          completedToday: Boolean(stats.completedToday ?? false),
+          lastCompletedAt: stats.lastCompletedAt ?? null,
+        });
+
+        setStreakPath(streaksData.path || []);
+      }
+    } catch (e) {
+      console.error("Error loading rewards data:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEquip = async (category: RewardType, rewardId: string | null) => {
+    try {
+      const res = await fetch("/api/mascot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category, rewardId }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMascot(data.mascot);
+      }
+    } catch (e) {
+      console.error("Failed to equip item:", e);
+    }
+  };
+
+  const handleClaimStreak = async (dayNumber: number) => {
+    try {
+      const res = await fetch("/api/streaks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dayNumber }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.reward) {
+          setUnboxedItems([
+            {
+              id: data.reward.id || String(dayNumber),
+              title: data.reward.title || `Награда за День ${dayNumber}`,
+              type: data.reward.type || "hat",
+              description: data.reward.description || `Награда за ${dayNumber} дн. серии`,
+              asset_url: data.reward.asset_url,
+              meta: data.reward.meta,
+            },
+          ]);
+          setUnboxModalOpen(true);
+        }
+        await loadData();
+      } else {
+        const err = await res.json();
+        alert(err.error || "Ошибка получения награды");
+      }
+    } catch (e) {
+      alert("Ошибка сети");
+    }
+  };
+
+  // Общий обработчик результата активации промокода — используется и для
+  // прямого ввода кода, и для завершения выбора материалов. Гарантирует,
+  // что физ. приз и обычные награды не "съедают" друг друга: если есть и
+  // то и другое — сначала показываем приз, а после его закрытия открываем
+  // пошаговый анбоксинг остальных наград.
+  const processRedeemResult = (data: {
+    physicalPrize?: CustomPhysicalPrize | null;
+    grantedRewards?: any[];
+  }) => {
+    const rewardItems: UnboxedRewardItem[] = Array.isArray(data.grantedRewards)
+      ? data.grantedRewards.map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          type: r.type,
+          description: r.description,
+          asset_url: r.asset_url,
+          meta: r.meta,
+        }))
+      : [];
+
+    if (data.physicalPrize) {
+      setPhysicalPrizeState({ isOpen: true, prize: data.physicalPrize });
+      setPendingUnboxItems(rewardItems);
+    } else if (rewardItems.length > 0) {
+      setUnboxedItems(rewardItems);
+      setUnboxModalOpen(true);
+    } else {
+      setPromoSuccessMsg("Промокод успешно активирован!");
+    }
+
+    void loadData();
+  };
+
+  const handleMaterialChoiceSuccess = (result: MaterialChoiceSuccessResult) => {
+    setMaterialChoiceState((prev) => ({ ...prev, isOpen: false }));
+
+    if (result.physicalPrize) {
+      setPhysicalPrizeState({ isOpen: true, prize: result.physicalPrize });
+      setPendingUnboxItems(result.unboxItems as UnboxedRewardItem[]);
+    } else if (result.unboxItems.length > 0) {
+      setUnboxedItems(result.unboxItems as UnboxedRewardItem[]);
+      setUnboxModalOpen(true);
+    } else {
+      setPromoSuccessMsg("Материалы успешно разблокированы!");
+    }
+
+    void loadData();
+  };
+
+  const handleRedeemPromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoCodeInput.trim()) return;
+
+    setRedeeming(true);
+    setPromoError(null);
+    setPromoSuccessMsg(null);
+
+    try {
+      const res = await fetch("/api/promocodes/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: promoCodeInput }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setPromoError(data.error || "Неверный промокод");
+      } else if (data.requiresMaterialChoice) {
+        setMaterialChoiceState({
+          isOpen: true,
+          code: promoCodeInput.trim().toUpperCase(),
+          remainingCount: data.remainingMaterialChoices || 1,
+        });
+        setPromoCodeInput("");
+      } else {
+        processRedeemResult(data);
+        setPromoCodeInput("");
+      }
+    } catch (e) {
+      setPromoError("Ошибка сети при активации");
+    } finally {
+      setRedeeming(false);
+    }
+  };
+
+  const closePhysicalPrizeModal = () => {
+    setPhysicalPrizeState({ isOpen: false, prize: null });
+
+    // Если пока показывали приз, "в очереди" ждали ещё награды — открываем их
+    if (pendingUnboxItems.length > 0) {
+      setUnboxedItems(pendingUnboxItems);
+      setPendingUnboxItems([]);
+      setUnboxModalOpen(true);
+    }
+
+    void loadData();
+  };
+
+  if (!showModal) return null;
+
+  const filteredInventory = inventory.filter(
+    (item) => item.reward?.type === wardrobeCategory
+  );
+
+  const isItemEquipped = (rewardId: string) => {
+    if (!mascot) return false;
+    return (
+      mascot.equipped_base_id === rewardId ||
+      mascot.equipped_hat_id === rewardId ||
+      mascot.equipped_aura_id === rewardId ||
+      mascot.equipped_emotion_id === rewardId ||
+      mascot.equipped_title_id === rewardId
+    );
+  };
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+        style={{ backgroundColor: "rgba(0,0,0,0.8)" }}
+      >
+        <div
+          className="rounded-[32px] max-w-4xl w-full h-[88vh] flex flex-col shadow-2xl overflow-hidden relative border transition-all"
+          style={{
+            backgroundColor: "var(--project-card-bg, #ffffff)",
+            color: "var(--project-text, #0f172a)",
+            borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
+          }}
+        >
+          {/* Шапка модалки */}
+          <div
+            className="flex items-center justify-between p-5 sm:p-6 border-b"
+            style={{
+              borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
+              backgroundColor: "var(--project-card-bg, #ffffff)",
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-3.5 h-3.5 rounded-full"
+                style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
+              />
+              <h2 className="text-xl font-black tracking-wide uppercase">Центр наград</h2>
+            </div>
+
+            {/* Табы */}
+            <div
+              className="flex gap-1 p-1.5 rounded-2xl border"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
+                borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setActiveTab("wardrobe")}
+                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
+                style={{
+                  backgroundColor:
+                    activeTab === "wardrobe" ? "var(--project-primary, #0ea5e9)" : "transparent",
+                  color: activeTab === "wardrobe" ? "#ffffff" : "var(--project-text, #0f172a)",
+                }}
+              >
+                Гардероб
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("streaks")}
+                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
+                style={{
+                  backgroundColor:
+                    activeTab === "streaks" ? "var(--project-primary, #0ea5e9)" : "transparent",
+                  color: activeTab === "streaks" ? "#ffffff" : "var(--project-text, #0f172a)",
+                }}
+              >
+                Серия ({streakStats.currentStreak} дн.)
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("promocode")}
+                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
+                style={{
+                  backgroundColor:
+                    activeTab === "promocode" ? "var(--project-primary, #0ea5e9)" : "transparent",
+                  color: activeTab === "promocode" ? "#ffffff" : "var(--project-text, #0f172a)",
+                }}
+              >
+                Промокод
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-1.5 font-bold text-xs rounded-xl transition-all border"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
+                borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+                color: "var(--project-text, #0f172a)",
+              }}
+            >
+              Закрыть
+            </button>
+          </div>
+
+          {/* Контент модалки */}
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6">
+            {loading ? (
+              <div className="h-full flex items-center justify-center font-bold text-sm uppercase tracking-wider opacity-60">
+                Загрузка данных...
+              </div>
+            ) : (
+              <>
+                {/* Вкладка 1: ГАРДЕРОБ */}
+                {activeTab === "wardrobe" && (
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
+                    <div
+                      className="md:col-span-5 border rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-sm"
+                      style={{
+                        backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                        borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
+                      }}
+                    >
+                      <MascotViewer mascotSettings={mascot} size={230} />
+                      <div className="text-xs font-extrabold uppercase tracking-wider mt-4 text-center opacity-60">
+                        Предпросмотр гардероба
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-7 flex flex-col space-y-4">
+                      <div
+                        className="flex gap-2 border-b pb-3 overflow-x-auto"
+                        style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
+                      >
+                        {[
+                          { type: "hat", label: "Шляпы" },
+                          { type: "aura", label: "Ауры" },
+                          { type: "emotion", label: "Эмоции" },
+                          { type: "base", label: "Базы" },
+                          { type: "title", label: "Титулы" },
+                        ].map((cat) => (
+                          <button
+                            key={cat.type}
+                            type="button"
+                            onClick={() => setWardrobeCategory(cat.type as RewardType)}
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all border"
+                            style={{
+                              backgroundColor:
+                                wardrobeCategory === cat.type
+                                  ? "var(--project-primary, #0ea5e9)"
+                                  : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
+                              borderColor:
+                                wardrobeCategory === cat.type
+                                  ? "var(--project-primary, #0ea5e9)"
+                                  : "var(--glass-border, rgba(15,23,42,0.1))",
+                              color:
+                                wardrobeCategory === cat.type
+                                  ? "#ffffff"
+                                  : "var(--project-text, #0f172a)",
+                            }}
+                          >
+                            {cat.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div
+                        className={`flex-1 overflow-y-auto pr-1 ${
+                          wardrobeCategory === "title"
+                            ? "flex flex-col gap-2.5"
+                            : "grid grid-cols-2 sm:grid-cols-3 gap-3"
+                        }`}
+                      >
+                        {filteredInventory.length === 0 ? (
+                          <div
+                            className="col-span-full py-16 text-center border rounded-2xl p-6"
+                            style={{
+                              backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                              borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
+                            }}
+                          >
+                            <div className="text-sm font-bold uppercase tracking-wider mb-1">
+                              Предметы отсутствуют
+                            </div>
+                            <div className="text-xs font-medium opacity-60">
+                              Продлевайте ежедневную серию или активируйте промокоды для получения наград.
+                            </div>
+                          </div>
+                        ) : (
+                          filteredInventory.map((item) => {
+                            if (!item.reward) return null;
+                            const equipped = isItemEquipped(item.reward.id);
+
+                            if (wardrobeCategory === "title") {
+                              return (
+                                <div
+                                  key={item.id}
+                                  onClick={() =>
+                                    handleEquip(wardrobeCategory, equipped ? null : item.reward!.id)
+                                  }
+                                  className="w-full border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all"
+                                  style={{
+                                    backgroundColor: equipped
+                                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
+                                      : "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                                    borderColor: equipped
+                                      ? "var(--project-primary, #0ea5e9)"
+                                      : "var(--glass-border, rgba(15,23,42,0.08))",
+                                  }}
+                                >
+                                  <div className="min-w-0 pr-3">
+                                    <span
+                                      className="font-black text-xs sm:text-sm px-3 py-1 rounded-lg border inline-block truncate max-w-full uppercase tracking-wider"
+                                      style={{
+                                        borderColor:
+                                          item.reward.meta?.color || "var(--project-primary, #0ea5e9)",
+                                        color:
+                                          item.reward.meta?.color || "var(--project-primary, #0ea5e9)",
+                                        backgroundColor: `${
+                                          item.reward.meta?.color || "var(--project-primary, #0ea5e9)"
+                                        }18`,
+                                      }}
+                                    >
+                                      «{item.reward.title}»
+                                    </span>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    className="text-xs font-black uppercase tracking-wider px-4 py-2 rounded-xl flex-shrink-0 transition-colors"
+                                    style={{
+                                      backgroundColor: equipped
+                                        ? "var(--project-primary, #0ea5e9)"
+                                        : "color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent)",
+                                      color: equipped ? "#ffffff" : "var(--project-text, #0f172a)",
+                                    }}
+                                  >
+                                    {equipped ? "Надето" : "Надеть"}
+                                  </button>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div
+                                key={item.id}
+                                onClick={() =>
+                                  handleEquip(wardrobeCategory, equipped ? null : item.reward!.id)
+                                }
+                                className="border rounded-2xl p-4 flex flex-col items-center justify-between cursor-pointer transition-all"
+                                style={{
+                                  backgroundColor: equipped
+                                    ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
+                                    : "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                                  borderColor: equipped
+                                    ? "var(--project-primary, #0ea5e9)"
+                                    : "var(--glass-border, rgba(15,23,42,0.08))",
+                                }}
+                              >
+                                {equipped && (
+                                  <span
+                                    className="self-end text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider"
+                                    style={{
+                                      backgroundColor: "var(--project-primary, #0ea5e9)",
+                                      color: "#ffffff",
+                                    }}
+                                  >
+                                    Надето
+                                  </span>
+                                )}
+
+                                <div className="w-16 h-16 flex items-center justify-center my-3">
+                                  {item.reward.asset_url ? (
+                                    <img
+                                      src={item.reward.asset_url}
+                                      alt=""
+                                      className="max-h-14 max-w-14 object-contain"
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold opacity-50">
+                                      N/A
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="text-center w-full">
+                                  <div className="font-bold text-xs truncate">{item.reward.title}</div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Вкладка 2: ДОРОЖКА СЕРИИ */}
+                {activeTab === "streaks" && (
+                  <StreakTimeline
+                    stats={streakStats}
+                    path={streakPath}
+                    onClaimReward={handleClaimStreak}
+                  />
+                )}
+
+                {/* Вкладка 3: ПРОМОКОД */}
+                {activeTab === "promocode" && (
+                  <div className="max-w-md mx-auto py-12 space-y-6">
+                    <div className="text-center space-y-2">
+                      <h3 className="text-lg font-black uppercase tracking-wider">
+                        Активация промокода
+                      </h3>
+                      <p className="text-xs font-medium opacity-60">
+                        Введите персональный код для получения наград или доступа к материалам.
+                      </p>
+                    </div>
+
+                    <form onSubmit={handleRedeemPromo} className="space-y-4">
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="ВВЕДИТЕ КОД"
+                          value={promoCodeInput}
+                          onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
+                          className="w-full border-2 rounded-2xl p-4 text-center text-lg font-mono font-black uppercase tracking-widest focus:outline-none transition-colors"
+                          style={{
+                            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
+                            borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
+                            color: "var(--project-primary, #0ea5e9)",
+                          }}
+                        />
+                      </div>
+
+                      {promoError && (
+                        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-600 text-center font-bold">
+                          {promoError}
+                        </div>
+                      )}
+
+                      {promoSuccessMsg && (
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-600 text-center font-bold">
+                          {promoSuccessMsg}
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={redeeming || !promoCodeInput.trim()}
+                        className="w-full py-4 font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg disabled:opacity-50"
+                        style={{
+                          backgroundColor: "var(--project-primary, #0ea5e9)",
+                          color: "#ffffff",
+                        }}
+                      >
+                        {redeeming ? "Активация..." : "Активировать"}
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Модалка демонстрации выданных предметов (Unboxing step-by-step) */}
+      {unboxModalOpen && (
+        <RewardUnboxModal
+          isOpen={unboxModalOpen}
+          items={unboxedItems}
+          onClose={() => {
+            setUnboxModalOpen(false);
+            setUnboxedItems([]);
+          }}
+        />
+      )}
+
+      {/* Выбор материала по промокоду */}
+      {materialChoiceState.isOpen && (
+        <MaterialChoiceModal
+          isOpen={materialChoiceState.isOpen}
+          promocodeCode={materialChoiceState.code}
+          requiredChoiceCount={materialChoiceState.remainingCount}
+          onClose={() => {
+            setMaterialChoiceState({ ...materialChoiceState, isOpen: false });
+          }}
+          onSuccess={handleMaterialChoiceSuccess}
+        />
+      )}
+
+      {/* Физический приз */}
+      {physicalPrizeState.isOpen && physicalPrizeState.prize && (
+        <PhysicalPrizeModal
+          isOpen={physicalPrizeState.isOpen}
+          prize={physicalPrizeState.prize}
+          onClose={closePhysicalPrizeModal}
+        />
+      )}
+    </>
+  );
 }
 </file>
 

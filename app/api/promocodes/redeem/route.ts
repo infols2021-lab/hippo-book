@@ -28,18 +28,21 @@ export async function POST(request: Request) {
 
     const { code, chosenMaterialIds } = body;
     const normalizedChosenIds = Array.isArray(chosenMaterialIds)
-      ? chosenMaterialIds.map(String)
+      ? chosenMaterialIds.map((id) => String(id).trim()).filter(Boolean)
       : [];
 
     const result = await redeemPromocode(
       supabase,
       user.id,
-      String(code),
+      String(code).trim(),
       normalizedChosenIds
     );
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(
+        { error: result.error || "Не удалось активировать промокод" },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({

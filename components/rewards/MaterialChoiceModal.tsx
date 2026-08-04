@@ -28,8 +28,6 @@ interface ProjectTab {
   orderIndex?: number;
 }
 
-// Совпадает по форме с UnboxedRewardItem из RewardUnboxModal —
-// специально не импортируем тип оттуда, чтобы не тащить лишнюю зависимость.
 export interface MaterialChoiceUnboxItem {
   id: string;
   title: string;
@@ -88,8 +86,14 @@ export default function MaterialChoiceModal({
       const res = await fetch("/api/projects");
       if (res.ok) {
         const data = await res.json();
-        const activeProjects: ProjectItem[] = data.projects || [];
+        const activeProjects: ProjectItem[] = Array.isArray(data.projects)
+          ? data.projects
+          : Array.isArray(data)
+          ? data
+          : [];
+
         setProjects(activeProjects);
+
         if (activeProjects.length > 0) {
           await selectProject(activeProjects[0]);
         } else {
@@ -104,30 +108,34 @@ export default function MaterialChoiceModal({
     }
   };
 
-  // Переключение проекта: сначала подтягиваем реальные табы этого проекта
-  // (учебники/кроссворды — лишь пример, у каждого проекта свой набор табов),
-  // затем — все материалы проекта, чтобы фильтровать их по табу на клиенте.
+  const isProjectSelected = (p: ProjectItem): boolean => {
+    if (selectedProjectId && p.id && selectedProjectId === p.id) return true;
+    if (selectedProjectSlug && p.slug && selectedProjectSlug === p.slug) return true;
+    return false;
+  };
+
   const selectProject = async (project: ProjectItem) => {
-    setSelectedProjectId(project.id);
-    setSelectedProjectSlug(project.slug);
+    const projId = project.id || project.slug || "";
+    const projSlug = project.slug || project.id || "";
+
+    setSelectedProjectId(projId);
+    setSelectedProjectSlug(projSlug);
     setActiveTabSlug("all");
     setSelectedLevelCode("all");
     setLoading(true);
 
     try {
       const [tabsRes, materialsRes] = await Promise.all([
-        fetch(`/api/projects/${project.slug}`),
-        fetch(`/api/projects/${project.slug}/materials`),
+        fetch(`/api/projects/${projSlug}`),
+        fetch(`/api/projects/${projSlug}/materials`),
       ]);
 
       if (tabsRes.ok) {
         const tabsData = await tabsRes.json();
-        const tabs: ProjectTab[] = (tabsData?.project?.tabs || [])
-          .slice()
-          .sort(
-            (a: ProjectTab, b: ProjectTab) =>
-              (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
-          );
+        const rawTabs = tabsData?.project?.tabs || tabsData?.tabs || [];
+        const tabs: ProjectTab[] = Array.isArray(rawTabs)
+          ? rawTabs.slice().sort((a: ProjectTab, b: ProjectTab) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+          : [];
         setProjectTabs(tabs);
       } else {
         setProjectTabs([]);
@@ -135,7 +143,8 @@ export default function MaterialChoiceModal({
 
       if (materialsRes.ok) {
         const materialsData = await materialsRes.json();
-        setMaterials(materialsData.materials || []);
+        const rawList = materialsData?.materials || materialsData?.data || [];
+        setMaterials(Array.isArray(rawList) ? rawList : []);
       } else {
         setMaterials([]);
       }
@@ -184,30 +193,23 @@ export default function MaterialChoiceModal({
 
       const data = await res.json().catch(() => null);
 
-      if (res.ok && data) {
-        // Собираем карточки для пошагового анбоксинга: сначала выбранные
-        // материалы (то, ради чего был этот шаг), затем прочие награды
-        // бандла промокода, если они тоже были выданы вместе с выбором.
+      if (res.ok && data && (data.ok || data.success)) {
         const chosenMaterials = materials.filter((m) =>
           selectedMaterialIds.includes(m.id)
         );
 
-        const materialItems: MaterialChoiceUnboxItem[] = chosenMaterials.map(
-          (m) => ({
-            id: m.id,
-            title: m.title,
-            type: "material",
-            description:
-              m.kind === "crossword"
-                ? "Открыт доступ к кроссворду"
-                : "Открыт доступ к материалу",
-            asset_url: m.cover_image_url || null,
-          })
-        );
+        const materialItems: MaterialChoiceUnboxItem[] = chosenMaterials.map((m) => ({
+          id: m.id,
+          title: m.title,
+          type: "material",
+          description:
+            m.kind === "crossword"
+              ? "Открыт доступ к кроссворду"
+              : "Открыт доступ к материалу",
+          asset_url: m.cover_image_url || null,
+        }));
 
-        const rewardItems: MaterialChoiceUnboxItem[] = Array.isArray(
-          data.grantedRewards
-        )
+        const rewardItems: MaterialChoiceUnboxItem[] = Array.isArray(data.grantedRewards)
           ? data.grantedRewards.map((r: any) => ({
               id: r.id,
               title: r.title,
@@ -305,38 +307,37 @@ export default function MaterialChoiceModal({
             className="flex gap-2 border-b pb-3 overflow-x-auto"
             style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
           >
-            {projects.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  if (p.id !== selectedProjectId) void selectProject(p);
-                }}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border"
-                style={{
-                  backgroundColor:
-                    selectedProjectId === p.id
+            {projects.map((p) => {
+              const active = isProjectSelected(p);
+
+              return (
+                <button
+                  key={p.id || p.slug}
+                  type="button"
+                  onClick={() => {
+                    if (!active) void selectProject(p);
+                  }}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border"
+                  style={{
+                    backgroundColor: active
                       ? "var(--project-primary, #0ea5e9)"
                       : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
-                  borderColor:
-                    selectedProjectId === p.id
+                    borderColor: active
                       ? "var(--project-primary, #0ea5e9)"
                       : "var(--glass-border, rgba(15, 23, 42, 0.1))",
-                  color:
-                    selectedProjectId === p.id
-                      ? "#ffffff"
-                      : "var(--project-text, #0f172a)",
-                }}
-              >
-                {p.name}
-              </button>
-            ))}
+                    color: active ? "#ffffff" : "var(--project-text, #0f172a)",
+                  }}
+                >
+                  {p.name}
+                </button>
+              );
+            })}
           </div>
         )}
 
         {/* Фильтры */}
         <div className="space-y-3">
-          {/* Чипсы табов — динамические, из реальной конфигурации проекта */}
+          {/* Категории */}
           <div className="flex gap-2 flex-wrap">
             <button
               type="button"
@@ -358,7 +359,7 @@ export default function MaterialChoiceModal({
             </button>
             {projectTabs.map((tab) => (
               <button
-                key={tab.id}
+                key={tab.id || tab.slug}
                 type="button"
                 onClick={() => setActiveTabSlug(tab.slug)}
                 className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border"
@@ -383,7 +384,7 @@ export default function MaterialChoiceModal({
             ))}
           </div>
 
-          {/* Чипсы уровней (Hippo 1-4, CEFR...) */}
+          {/* Уровни */}
           {availableLevels.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               <button
@@ -429,7 +430,7 @@ export default function MaterialChoiceModal({
           )}
         </div>
 
-        {/* Список материалов в виде карточек */}
+        {/* Список материалов */}
         <div className="max-h-72 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 pr-1">
           {loading ? (
             <div className="col-span-full text-center py-12 text-xs font-bold uppercase tracking-wider opacity-60">
@@ -527,7 +528,7 @@ export default function MaterialChoiceModal({
           </div>
         )}
 
-        {/* Панель действий */}
+        {/* Кнопки */}
         <div
           className="flex justify-end gap-3 pt-3 border-t"
           style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}

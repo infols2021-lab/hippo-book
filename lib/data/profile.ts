@@ -55,17 +55,39 @@ function normalizeRecentAssignment(row: any): ProfileRecentAssignment {
 }
 
 export async function loadProfileStreakSnapshot(ctx: DataAuthContext): Promise<ProfileStreakSnapshot | null> {
-  const { supabase } = ctx;
+  const { supabase, user } = ctx;
 
-  const { data, error } = await supabase.rpc("get_my_streak_snapshot");
+  // 1. Попытка вызова RPC
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc("get_my_streak_snapshot");
 
-  if (error) {
-    throw new Error(error.message);
+    if (!rpcError && rpcData && typeof rpcData === "object") {
+      return rpcData as ProfileStreakSnapshot;
+    }
+  } catch (e) {
+    console.warn("RPC get_my_streak_snapshot не сработал, переходим на прямое чтение user_streaks:", e);
   }
 
-  if (!data || typeof data !== "object") return null;
+  // 2. Фолбэк: прямое чтение таблицы user_streaks
+  const { data: streakRow } = await supabase
+    .from("user_streaks")
+    .select("current_streak, longest_streak, last_completed_date")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  return data as ProfileStreakSnapshot;
+  if (streakRow) {
+    return {
+      current_streak: streakRow.current_streak || 0,
+      longest_streak: streakRow.longest_streak || 0,
+      last_completed_date: streakRow.last_completed_date || null,
+    };
+  }
+
+  return {
+    current_streak: 0,
+    longest_streak: 0,
+    last_completed_date: null,
+  };
 }
 
 export async function loadRecentAssignments(ctx: DataAuthContext, limit = 8): Promise<ProfileRecentAssignment[]> {

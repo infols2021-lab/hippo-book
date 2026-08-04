@@ -20,18 +20,41 @@ export async function GET() {
     }
 
     const adminSupabase = getSupabaseAdminClient();
+    let leaderboard: any[] = [];
 
-    // Раньше здесь был отдельный (и неверный) запрос к таблице user_streaks,
-    // которая не синхронизирована с profiles — из-за этого лидерборд всегда
-    // был пустым. Теперь используем ту же функцию, что и остальная система
-    // наград (`lib/rewards/data.ts`), которая читает из `profiles` —
-    // единственного источника правды по сериям.
-    const leaderboard = await getStreakLeaderboard(adminSupabase, user.id);
+    // 1. Пробуем получить лидерборд через стандартную логику rewards/data
+    try {
+      leaderboard = await getStreakLeaderboard(adminSupabase, user.id);
+    } catch (e) {
+      console.warn("Ошибка при получении лидерборда через RPC:", e);
+    }
+
+    // 2. Фолбэк: если RPC вернул пустоту или упал, запрашиваем напрямую из user_streaks
+    if (!Array.isArray(leaderboard) || leaderboard.length === 0) {
+      const { data: rawRows } = await adminSupabase
+        .from("user_streaks")
+        .select("user_id, current_streak, longest_streak")
+        .gt("longest_streak", 0)
+        .order("longest_streak", { ascending: false })
+        .order("current_streak", { ascending: false })
+        .limit(20);
+
+      if (Array.isArray(rawRows) && rawRows.length > 0) {
+        leaderboard = rawRows.map((row, idx) => ({
+          rank: idx + 1,
+          user_id: row.user_id,
+          current_streak: row.current_streak || 0,
+          max_streak: row.longest_streak || 0,
+          longest_streak: row.longest_streak || 0,
+          is_current_user: row.user_id === user.id,
+        }));
+      }
+    }
 
     return NextResponse.json({
       ok: true,
       success: true,
-      leaderboard,
+      leaderboard: leaderboard || [],
     });
   } catch (error: any) {
     console.error("Ошибка при получении лидерборда:", error);

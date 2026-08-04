@@ -31,39 +31,56 @@ export async function GET() {
 
     const adminSupabase = getSupabaseAdminClient();
 
-    // ЕДИНСТВЕННЫЙ источник правды по сериям — таблица `profiles`
-    // (current_streak / max_streak / longest_streak / last_completed_at).
-    // Именно её обновляет RPC record_streak_completion при выполнении
-    // задания, и именно её читают getStreakPath/claimStreakReward.
-    // Раньше здесь отдельно читалась таблица user_streaks — она не
-    // синхронизирована с profiles, из-за чего "Серия" в шапке показывала
-    // неверные значения, а награды/титулы за стрик выглядели заблокированными.
+    // 1. Напрямую запрашиваем ground-truth из user_streaks через adminSupabase
+    const { data: userStreakRow } = await adminSupabase
+      .from("user_streaks")
+      .select("current_streak, longest_streak, last_completed_date")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    // 2. Проверяем, было ли сегодня выполнение
+    const todayStr = new Date().toISOString().split("T")[0];
+    const { data: todayDay } = await adminSupabase
+      .from("user_streak_days")
+      .select("activity_date")
+      .eq("user_id", user.id)
+      .eq("activity_date", todayStr)
+      .maybeSingle();
+
+    const isCompletedToday = Boolean(
+      todayDay || userStreakRow?.last_completed_date === todayStr
+    );
+
+    // 3. Пытаемся забрать дорожку наград
     let path: any[] = [];
-    let stats: {
-      currentStreak: number;
-      maxStreak: number;
-      completedToday: boolean;
-      lastCompletedAt: string | null;
-    } = {
-      currentStreak: 0,
-      maxStreak: 0,
-      completedToday: false,
-      lastCompletedAt: null,
-    };
+    let pathStats: any = null;
 
     try {
       const streakPathRes = await getStreakPath(supabase, user.id);
-      path = streakPathRes.path || [];
-      stats = streakPathRes.stats;
+      path = streakPathRes?.path || [];
+      pathStats = streakPathRes?.stats || null;
     } catch (e) {
       console.warn("Фоновое предупреждение при получении дорожки наград:", e);
     }
 
-    const currentStreak = stats.currentStreak;
-    const longestStreak = stats.maxStreak;
-    const doneToday = stats.completedToday;
+    // 4. Формируем гарантированно верные финальные показатели
+    const currentStreak = Number(
+      userStreakRow?.current_streak ?? pathStats?.currentStreak ?? 0
+    );
+    const longestStreak = Number(
+      userStreakRow?.longest_streak ?? pathStats?.maxStreak ?? 0
+    );
+    const completedToday = isCompletedToday || Boolean(pathStats?.completedToday);
 
-    // Определяем надетый титул пользователя
+    const stats = {
+      currentStreak,
+      maxStreak: longestStreak,
+      longestStreak,
+      completedToday,
+      lastCompletedAt: userStreakRow?.last_completed_date || pathStats?.lastCompletedAt || null,
+    };
+
+    // 5. Определяем надетый титул и аватар
     let equippedTitleLabel: string | null = null;
     let equippedAvatarUrl: string | null = null;
 
@@ -85,7 +102,6 @@ export async function GET() {
       }
     }
 
-    // Резервный поиск титула в каталоге, если в mascot_settings пусто
     if (!equippedTitleLabel) {
       const { data: profile } = await adminSupabase
         .from("profiles")
@@ -124,7 +140,8 @@ export async function GET() {
       streak: {
         currentStreak,
         longestStreak,
-        doneToday,
+        maxStreak: longestStreak,
+        doneToday: completedToday,
         tierCode: calculateTierCode(currentStreak),
       },
       equippedTitle: equippedTitleLabel ? { label: equippedTitleLabel } : null,
@@ -132,6 +149,7 @@ export async function GET() {
       stats,
       currentStreak,
       longestStreak,
+      maxStreak: longestStreak,
       path,
     });
   } catch (error: any) {

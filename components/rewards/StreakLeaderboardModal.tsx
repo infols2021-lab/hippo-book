@@ -27,7 +27,10 @@ export default function StreakLeaderboardModal({
       const res = await fetch("/api/streaks/leaderboard");
       if (res.ok) {
         const data = await res.json();
-        setLeaderboard(data.leaderboard || []);
+        const list = Array.isArray(data)
+          ? data
+          : data.leaderboard || data.data || data.items || [];
+        setLeaderboard(list);
       }
     } catch (e) {
       console.error("Ошибка при загрузке лидерборда:", e);
@@ -99,57 +102,63 @@ export default function StreakLeaderboardModal({
               Рейтинг пока пуст
             </div>
           ) : (
-            leaderboard.map((item) => (
-              <div
-                key={item.user_id}
-                className="p-3.5 rounded-2xl border flex items-center justify-between transition-all"
-                style={{
-                  backgroundColor: item.is_current_user
-                    ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 15%, transparent)"
-                    : "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-                  borderColor: item.is_current_user
-                    ? "var(--project-primary, #0ea5e9)"
-                    : "var(--glass-border, rgba(15,23,42,0.08))",
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`font-black text-sm min-w-[32px] ${
-                      item.rank === 1
-                        ? "text-amber-500"
-                        : item.rank === 2
-                        ? "text-slate-400"
-                        : item.rank === 3
-                        ? "text-amber-700"
-                        : "opacity-60"
-                    }`}
-                  >
-                    {item.is_current_user ? "Вы" : ""} #{item.rank}
-                  </span>
-                </div>
+            leaderboard.map((item, idx) => {
+              const current = item.current_streak ?? (item as any).currentStreak ?? 0;
+              const max = item.max_streak ?? (item as any).longest_streak ?? (item as any).maxStreak ?? 0;
+              const rank = item.rank ?? idx + 1;
 
-                <div className="flex items-center gap-4 text-xs font-semibold">
-                  <div>
-                    Текущая:{" "}
+              return (
+                <div
+                  key={item.user_id || idx}
+                  className="p-3.5 rounded-2xl border flex items-center justify-between transition-all"
+                  style={{
+                    backgroundColor: item.is_current_user
+                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 15%, transparent)"
+                      : "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
+                    borderColor: item.is_current_user
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "var(--glass-border, rgba(15,23,42,0.08))",
+                  }}
+                >
+                  <div className="flex items-center gap-3">
                     <span
-                      className="font-bold"
-                      style={{ color: "var(--project-primary, #0ea5e9)" }}
+                      className={`font-black text-sm min-w-[32px] ${
+                        rank === 1
+                          ? "text-amber-500"
+                          : rank === 2
+                          ? "text-slate-400"
+                          : rank === 3
+                          ? "text-amber-700"
+                          : "opacity-60"
+                      }`}
                     >
-                      {item.current_streak}
+                      {item.is_current_user ? "Вы " : ""}#{rank}
                     </span>
                   </div>
-                  <div>
-                    Максимум:{" "}
-                    <span
-                      className="font-bold"
-                      style={{ color: "var(--project-primary, #0ea5e9)" }}
-                    >
-                      {item.max_streak}
-                    </span>
+
+                  <div className="flex items-center gap-4 text-xs font-semibold">
+                    <div>
+                      Текущая:{" "}
+                      <span
+                        className="font-bold"
+                        style={{ color: "var(--project-primary, #0ea5e9)" }}
+                      >
+                        {current}
+                      </span>
+                    </div>
+                    <div>
+                      Максимум:{" "}
+                      <span
+                        className="font-bold"
+                        style={{ color: "var(--project-primary, #0ea5e9)" }}
+                      >
+                        {max}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

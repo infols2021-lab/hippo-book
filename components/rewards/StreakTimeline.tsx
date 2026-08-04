@@ -12,11 +12,15 @@ interface StreakTimelineProps {
 
 export default function StreakTimeline({
   stats,
-  path,
+  path = [],
   onClaimReward,
 }: StreakTimelineProps) {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [claimingDay, setClaimingDay] = useState<number | null>(null);
+
+  const currentStreak = stats?.currentStreak ?? 0;
+  const maxStreak = stats?.maxStreak ?? (stats as any)?.longestStreak ?? 0;
+  const completedToday = Boolean(stats?.completedToday);
 
   const handleClaim = async (dayNumber: number) => {
     setClaimingDay(dayNumber);
@@ -48,7 +52,7 @@ export default function StreakTimeline({
             >
               Серия
             </div>
-            <div className="text-2xl font-black">{stats.currentStreak} дн.</div>
+            <div className="text-2xl font-black">{currentStreak} дн.</div>
             <div
               className="text-xs font-medium mt-0.5"
               style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
@@ -59,12 +63,18 @@ export default function StreakTimeline({
           <div
             className="px-3 py-1 text-xs font-bold rounded-lg uppercase tracking-wider border"
             style={{
-              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
-              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
-              color: "var(--project-primary, #0ea5e9)",
+              backgroundColor: currentStreak > 0 || completedToday
+                ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)"
+                : "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
+              borderColor: currentStreak > 0 || completedToday
+                ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)"
+                : "var(--glass-border, rgba(15,23,42,0.1))",
+              color: currentStreak > 0 || completedToday
+                ? "var(--project-primary, #0ea5e9)"
+                : "color-mix(in srgb, var(--project-text, #0f172a) 50%, transparent)",
             }}
           >
-            Активна
+            {currentStreak > 0 || completedToday ? "Активна" : "Не активна"}
           </div>
         </div>
 
@@ -84,7 +94,7 @@ export default function StreakTimeline({
             >
               Рекорд
             </div>
-            <div className="text-2xl font-black">{stats.maxStreak} дн.</div>
+            <div className="text-2xl font-black">{maxStreak} дн.</div>
             <div
               className="text-xs font-medium mt-0.5"
               style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
@@ -113,30 +123,26 @@ export default function StreakTimeline({
           }}
         >
           <div>
-            <div
-              className="text-[10px] font-black uppercase tracking-wider mb-1 opacity-60"
-            >
+            <div className="text-[10px] font-black uppercase tracking-wider mb-1 opacity-60">
               Статус дня
             </div>
             <div
               className={`text-lg font-black uppercase tracking-wider ${
-                stats.completedToday ? "text-emerald-600" : "text-rose-500"
+                completedToday ? "text-emerald-600" : "text-rose-500"
               }`}
             >
-              {stats.completedToday ? "Засчитано" : "Не засчитано"}
+              {completedToday ? "Засчитано" : "Не засчитано"}
             </div>
             <div
               className="text-xs font-medium mt-0.5"
               style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
             >
-              {stats.completedToday
-                ? "Задание выполнено"
-                : "Сделайте задание сегодня"}
+              {completedToday ? "Задание выполнено" : "Сделайте задание сегодня"}
             </div>
           </div>
           <div
             className={`w-3.5 h-3.5 rounded-full ${
-              stats.completedToday ? "bg-emerald-500 shadow-md shadow-emerald-500/50" : "bg-rose-500"
+              completedToday ? "bg-emerald-500 shadow-md shadow-emerald-500/50" : "bg-rose-500"
             }`}
           />
         </div>
@@ -166,10 +172,7 @@ export default function StreakTimeline({
               >
                 Осталось дней серии:{" "}
                 <span className="font-bold">
-                  {Math.max(
-                    0,
-                    nextUpcomingReward.day_number - stats.currentStreak
-                  )}
+                  {Math.max(0, nextUpcomingReward.day_number - currentStreak)}
                 </span>
               </div>
             </div>
@@ -226,7 +229,6 @@ export default function StreakTimeline({
           </div>
         ) : (
           <div className="relative py-4">
-            {/* Центральная линия */}
             <div
               className="absolute left-1/2 top-0 bottom-0 w-0.5 -translate-x-1/2 z-0"
               style={{ backgroundColor: "var(--glass-border, rgba(15,23,42,0.12))" }}
