@@ -5,6 +5,8 @@ import MascotViewer from "../mascot/MascotViewer";
 import StreakTimeline from "./StreakTimeline";
 import MaterialChoiceModal from "./MaterialChoiceModal";
 import PhysicalPrizeModal from "./PhysicalPrizeModal";
+import RewardUnboxModal, { UnboxedRewardItem } from "./RewardUnboxModal";
+
 import type {
   MascotSettings,
   RewardType,
@@ -61,6 +63,10 @@ export default function RewardsModal({
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoSuccessMsg, setPromoSuccessMsg] = useState<string | null>(null);
   const [redeeming, setRedeeming] = useState(false);
+
+  // Стейты для пошагового анбоксинга
+  const [unboxModalOpen, setUnboxModalOpen] = useState(false);
+  const [unboxedItems, setUnboxedItems] = useState<UnboxedRewardItem[]>([]);
 
   const [materialChoiceState, setMaterialChoiceState] = useState<{
     isOpen: boolean;
@@ -155,6 +161,20 @@ export default function RewardsModal({
       });
 
       if (res.ok) {
+        const data = await res.json();
+        if (data.reward) {
+          setUnboxedItems([
+            {
+              id: data.reward.id || String(dayNumber),
+              title: data.reward.title || `Награда за День ${dayNumber}`,
+              type: data.reward.type || "hat",
+              description: data.reward.description || `Награда за ${dayNumber} дн. серии`,
+              asset_url: data.reward.asset_url,
+              meta: data.reward.meta,
+            },
+          ]);
+          setUnboxModalOpen(true);
+        }
         await loadData();
       } else {
         const err = await res.json();
@@ -196,6 +216,20 @@ export default function RewardsModal({
             isOpen: true,
             prize: data.physicalPrize,
           });
+        } else if (data.grantedRewards && data.grantedRewards.length > 0) {
+          const itemsToUnbox: UnboxedRewardItem[] = data.grantedRewards.map((r: any) => ({
+            id: r.id,
+            title: r.title,
+            type: r.type,
+            description: r.description,
+            asset_url: r.asset_url,
+            meta: r.meta,
+          }));
+
+          setUnboxedItems(itemsToUnbox);
+          setUnboxModalOpen(true);
+          setPromoCodeInput("");
+          void loadData();
         } else {
           setPromoSuccessMsg("Промокод успешно активирован!");
           setPromoCodeInput("");
@@ -228,55 +262,80 @@ export default function RewardsModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto" style={{ backgroundColor: "rgba(0,0,0,0.75)" }}>
         <div
-          className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full h-[88vh] flex flex-col shadow-2xl overflow-hidden relative"
+          className="rounded-[32px] max-w-4xl w-full h-[88vh] flex flex-col shadow-2xl overflow-hidden relative border transition-all"
           style={{
-            backgroundColor: "var(--project-card-bg, #0f172a)",
-            color: "var(--project-text, #ffffff)",
+            backgroundColor: "var(--project-card-bg, #ffffff)",
+            color: "var(--project-text, #0f172a)",
+            borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
           }}
         >
           {/* Шапка модалки */}
-          <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-800 bg-slate-900/90">
+          <div
+            className="flex items-center justify-between p-5 sm:p-6 border-b"
+            style={{
+              borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
+              backgroundColor: "var(--project-card-bg, #ffffff)",
+            }}
+          >
             <div className="flex items-center gap-3">
-              <div className="w-3 h-3 rounded-full bg-blue-500" />
-              <h2 className="text-xl font-black text-white tracking-wide uppercase">
+              <div
+                className="w-3.5 h-3.5 rounded-full"
+                style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
+              />
+              <h2 className="text-xl font-black tracking-wide uppercase">
                 Центр наград
               </h2>
             </div>
 
-            {/* Сегментированные табы */}
-            <div className="flex gap-1 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+            {/* Табы */}
+            <div
+              className="flex gap-1 p-1.5 rounded-2xl border"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
+                borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+              }}
+            >
               <button
                 type="button"
                 onClick={() => setActiveTab("wardrobe")}
-                className={`px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all ${
-                  activeTab === "wardrobe"
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
-                    : "text-slate-400 hover:text-white"
-                }`}
+                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
+                style={{
+                  backgroundColor:
+                    activeTab === "wardrobe"
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "transparent",
+                  color: activeTab === "wardrobe" ? "#ffffff" : "var(--project-text, #0f172a)",
+                }}
               >
                 Гардероб
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("streaks")}
-                className={`px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all ${
-                  activeTab === "streaks"
-                    ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
-                    : "text-slate-400 hover:text-white"
-                }`}
+                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
+                style={{
+                  backgroundColor:
+                    activeTab === "streaks"
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "transparent",
+                  color: activeTab === "streaks" ? "#ffffff" : "var(--project-text, #0f172a)",
+                }}
               >
                 Серия ({streakStats.currentStreak} дн.)
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("promocode")}
-                className={`px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all ${
-                  activeTab === "promocode"
-                    ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
-                    : "text-slate-400 hover:text-white"
-                }`}
+                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
+                style={{
+                  backgroundColor:
+                    activeTab === "promocode"
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "transparent",
+                  color: activeTab === "promocode" ? "#ffffff" : "var(--project-text, #0f172a)",
+                }}
               >
                 Промокод
               </button>
@@ -285,16 +344,21 @@ export default function RewardsModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold transition-colors"
+              className="px-3.5 py-1.5 font-bold text-xs rounded-xl transition-all border"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
+                borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+                color: "var(--project-text, #0f172a)",
+              }}
             >
               Закрыть
             </button>
           </div>
 
           {/* Контент модалки */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-6 bg-slate-900">
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6">
             {loading ? (
-              <div className="h-full flex items-center justify-center text-slate-400 font-bold text-sm uppercase tracking-wider">
+              <div className="h-full flex items-center justify-center font-bold text-sm uppercase tracking-wider opacity-60">
                 Загрузка данных...
               </div>
             ) : (
@@ -303,17 +367,23 @@ export default function RewardsModal({
                 {activeTab === "wardrobe" && (
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
                     {/* Левая панель: Примерка */}
-                    <div className="md:col-span-5 bg-slate-950 border border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-inner">
+                    <div
+                      className="md:col-span-5 border rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-sm"
+                      style={{
+                        backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                        borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
+                      }}
+                    >
                       <MascotViewer mascotSettings={mascot} size={230} />
-                      <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-4 text-center">
-                        Предпросмотр комбинации
+                      <div className="text-xs font-extrabold uppercase tracking-wider mt-4 text-center opacity-60">
+                        Предпросмотр гардероба
                       </div>
                     </div>
 
                     {/* Правая панель: Инвентарь */}
                     <div className="md:col-span-7 flex flex-col space-y-4">
                       {/* Селектор категорий */}
-                      <div className="flex gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
+                      <div className="flex gap-2 border-b pb-3 overflow-x-auto" style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}>
                         {[
                           { type: "hat", label: "Шляпы" },
                           { type: "aura", label: "Ауры" },
@@ -327,11 +397,21 @@ export default function RewardsModal({
                             onClick={() =>
                               setWardrobeCategory(cat.type as RewardType)
                             }
-                            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
-                              wardrobeCategory === cat.type
-                                ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-                                : "bg-slate-800/60 text-slate-400 hover:bg-slate-800 hover:text-white"
-                            }`}
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all border"
+                            style={{
+                              backgroundColor:
+                                wardrobeCategory === cat.type
+                                  ? "var(--project-primary, #0ea5e9)"
+                                  : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
+                              borderColor:
+                                wardrobeCategory === cat.type
+                                  ? "var(--project-primary, #0ea5e9)"
+                                  : "var(--glass-border, rgba(15,23,42,0.1))",
+                              color:
+                                wardrobeCategory === cat.type
+                                  ? "#ffffff"
+                                  : "var(--project-text, #0f172a)",
+                            }}
                           >
                             {cat.label}
                           </button>
@@ -347,11 +427,17 @@ export default function RewardsModal({
                         }`}
                       >
                         {filteredInventory.length === 0 ? (
-                          <div className="col-span-full py-16 text-center bg-slate-950 border border-slate-800 rounded-2xl p-6">
-                            <div className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          <div
+                            className="col-span-full py-16 text-center border rounded-2xl p-6"
+                            style={{
+                              backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                              borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
+                            }}
+                          >
+                            <div className="text-sm font-bold uppercase tracking-wider mb-1">
                               Предметы отсутствуют
                             </div>
-                            <div className="text-xs text-slate-500 font-medium">
+                            <div className="text-xs font-medium opacity-60">
                               Продлевайте ежедневную серию или активируйте промокоды для получения наград.
                             </div>
                           </div>
@@ -370,21 +456,27 @@ export default function RewardsModal({
                                       equipped ? null : item.reward!.id
                                     )
                                   }
-                                  className={`w-full border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all ${
-                                    equipped
-                                      ? "border-blue-500 bg-blue-950/40 shadow-md shadow-blue-500/10"
-                                      : "border-slate-800 bg-slate-950 hover:border-slate-700"
-                                  }`}
+                                  className="w-full border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all"
+                                  style={{
+                                    backgroundColor: equipped
+                                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
+                                      : "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                                    borderColor: equipped
+                                      ? "var(--project-primary, #0ea5e9)"
+                                      : "var(--glass-border, rgba(15,23,42,0.08))",
+                                  }}
                                 >
                                   <div className="min-w-0 pr-3">
                                     <span
                                       className="font-black text-xs sm:text-sm px-3 py-1 rounded-lg border inline-block truncate max-w-full uppercase tracking-wider"
                                       style={{
                                         borderColor:
-                                          item.reward.meta?.color || "#3b82f6",
+                                          item.reward.meta?.color || "var(--project-primary, #0ea5e9)",
                                         color:
-                                          item.reward.meta?.color || "#3b82f6",
-                                        backgroundColor: "rgba(15, 23, 42, 0.8)",
+                                          item.reward.meta?.color || "var(--project-primary, #0ea5e9)",
+                                        backgroundColor: `${
+                                          item.reward.meta?.color || "var(--project-primary, #0ea5e9)"
+                                        }18`,
                                       }}
                                     >
                                       «{item.reward.title}»
@@ -393,11 +485,13 @@ export default function RewardsModal({
 
                                   <button
                                     type="button"
-                                    className={`text-xs font-black uppercase tracking-wider px-4 py-2 rounded-xl flex-shrink-0 transition-colors ${
-                                      equipped
-                                        ? "bg-blue-600 text-white"
-                                        : "bg-slate-800 text-slate-300 group-hover:bg-blue-600 group-hover:text-white"
-                                    }`}
+                                    className="text-xs font-black uppercase tracking-wider px-4 py-2 rounded-xl flex-shrink-0 transition-colors"
+                                    style={{
+                                      backgroundColor: equipped
+                                        ? "var(--project-primary, #0ea5e9)"
+                                        : "color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent)",
+                                      color: equipped ? "#ffffff" : "var(--project-text, #0f172a)",
+                                    }}
                                   >
                                     {equipped ? "Надето" : "Надеть"}
                                   </button>
@@ -414,14 +508,24 @@ export default function RewardsModal({
                                     equipped ? null : item.reward!.id
                                   )
                                 }
-                                className={`border rounded-2xl p-4 flex flex-col items-center justify-between cursor-pointer transition-all bg-slate-950 ${
-                                  equipped
-                                    ? "border-blue-500 bg-blue-950/30 shadow-md shadow-blue-500/10"
-                                    : "border-slate-800 hover:border-slate-700"
-                                }`}
+                                className="border rounded-2xl p-4 flex flex-col items-center justify-between cursor-pointer transition-all"
+                                style={{
+                                  backgroundColor: equipped
+                                    ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
+                                    : "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                                  borderColor: equipped
+                                    ? "var(--project-primary, #0ea5e9)"
+                                    : "var(--glass-border, rgba(15,23,42,0.08))",
+                                }}
                               >
                                 {equipped && (
-                                  <span className="self-end text-[10px] bg-blue-600 text-white font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
+                                  <span
+                                    className="self-end text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider"
+                                    style={{
+                                      backgroundColor: "var(--project-primary, #0ea5e9)",
+                                      color: "#ffffff",
+                                    }}
+                                  >
                                     Надето
                                   </span>
                                 )}
@@ -434,14 +538,14 @@ export default function RewardsModal({
                                       className="max-h-14 max-w-14 object-contain"
                                     />
                                   ) : (
-                                    <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400">
+                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold opacity-50">
                                       N/A
                                     </div>
                                   )}
                                 </div>
 
                                 <div className="text-center w-full">
-                                  <div className="font-bold text-xs text-white truncate">
+                                  <div className="font-bold text-xs truncate">
                                     {item.reward.title}
                                   </div>
                                 </div>
@@ -467,10 +571,10 @@ export default function RewardsModal({
                 {activeTab === "promocode" && (
                   <div className="max-w-md mx-auto py-12 space-y-6">
                     <div className="text-center space-y-2">
-                      <h3 className="text-lg font-black text-white uppercase tracking-wider">
+                      <h3 className="text-lg font-black uppercase tracking-wider">
                         Активация промокода
                       </h3>
-                      <p className="text-xs text-slate-400 font-medium">
+                      <p className="text-xs font-medium opacity-60">
                         Введите персональный код для получения наград или доступа к материалам.
                       </p>
                     </div>
@@ -484,18 +588,23 @@ export default function RewardsModal({
                           onChange={(e) =>
                             setPromoCodeInput(e.target.value.toUpperCase())
                           }
-                          className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-center text-lg font-mono font-black text-emerald-400 uppercase tracking-widest focus:outline-none focus:border-emerald-500 transition-colors shadow-inner"
+                          className="w-full border-2 rounded-2xl p-4 text-center text-lg font-mono font-black uppercase tracking-widest focus:outline-none transition-colors"
+                          style={{
+                            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
+                            borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
+                            color: "var(--project-primary, #0ea5e9)",
+                          }}
                         />
                       </div>
 
                       {promoError && (
-                        <div className="p-3 bg-red-950/60 border border-red-800 rounded-xl text-xs text-red-400 text-center font-bold">
+                        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-600 text-center font-bold">
                           {promoError}
                         </div>
                       )}
 
                       {promoSuccessMsg && (
-                        <div className="p-3 bg-emerald-950/60 border border-emerald-800 rounded-xl text-xs text-emerald-400 text-center font-bold">
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-600 text-center font-bold">
                           {promoSuccessMsg}
                         </div>
                       )}
@@ -503,7 +612,11 @@ export default function RewardsModal({
                       <button
                         type="submit"
                         disabled={redeeming || !promoCodeInput.trim()}
-                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                        className="w-full py-4 font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg disabled:opacity-50"
+                        style={{
+                          backgroundColor: "var(--project-primary, #0ea5e9)",
+                          color: "#ffffff",
+                        }}
                       >
                         {redeeming ? "Активация..." : "Активировать"}
                       </button>
@@ -515,6 +628,18 @@ export default function RewardsModal({
           </div>
         </div>
       </div>
+
+      {/* Модалка демонстрации выданных предметов (Unboxing step-by-step) */}
+      {unboxModalOpen && (
+        <RewardUnboxModal
+          isOpen={unboxModalOpen}
+          items={unboxedItems}
+          onClose={() => {
+            setUnboxModalOpen(false);
+            setUnboxedItems([]);
+          }}
+        />
+      )}
 
       {/* Выбор материала по промокоду */}
       {materialChoiceState.isOpen && (

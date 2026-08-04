@@ -5,12 +5,16 @@ import React, { useState, useEffect } from "react";
 interface MaterialItem {
   id: string;
   title: string;
+  description?: string | null;
+  cover_image_url?: string | null;
+  price?: number;
   is_secret?: boolean;
-  kind?: "textbook" | "crossword";
+  kind?: string;
   has_access?: boolean;
   is_unlocked?: boolean;
   unlocked?: boolean;
   already_unlocked?: boolean;
+  project_tab_id?: string | null;
 }
 
 interface ProjectItem {
@@ -135,32 +139,46 @@ export default function MaterialChoiceModal({
     materials.length > 0 && materials.every((m) => isAlreadyUnlocked(m));
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+      style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
+    >
       <div
-        className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl overflow-hidden"
+        className="rounded-[32px] max-w-3xl w-full p-6 space-y-6 shadow-2xl overflow-hidden relative border transition-all"
         style={{
-          backgroundColor: "var(--project-card-bg, #0f172a)",
-          color: "var(--project-text, #ffffff)",
+          backgroundColor: "var(--project-card-bg, #ffffff)",
+          color: "var(--project-text, #0f172a)",
+          borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
         }}
       >
         {/* Шапка модалки */}
-        <div className="flex justify-between items-start border-b border-slate-800 pb-4">
+        <div
+          className="flex justify-between items-start border-b pb-4"
+          style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
+        >
           <div>
-            <h3 className="text-lg font-black text-white uppercase tracking-wider">
-              Выбор награды по промокоду
+            <h3 className="text-lg font-black uppercase tracking-wider">
+              Выбор материалов по промокоду
             </h3>
-            <p className="text-xs text-slate-400 font-medium mt-1">
-              Выберите {requiredChoiceCount} материал(а) для получения бессрочного доступа:
+            <p className="text-xs font-medium opacity-60 mt-1">
+              Выберите {requiredChoiceCount} материал(а) для бесплатного бессрочного доступа:
             </p>
           </div>
-          <div className="font-mono text-xs font-black px-3 py-1.5 bg-slate-950 border border-slate-800 text-emerald-400 rounded-xl uppercase tracking-wider">
+          <div
+            className="font-mono text-xs font-black px-3 py-1.5 border rounded-xl uppercase tracking-wider"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)",
+              borderColor: "var(--project-primary, #0ea5e9)",
+              color: "var(--project-primary, #0ea5e9)",
+            }}
+          >
             Выбрано: {selectedMaterialIds.length} / {requiredChoiceCount}
           </div>
         </div>
 
         {/* Выбор проекта/раздела */}
         {projects.length > 1 && (
-          <div className="flex gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
+          <div className="flex gap-2 border-b pb-3 overflow-x-auto" style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}>
             {projects.map((p) => (
               <button
                 key={p.id}
@@ -169,11 +187,18 @@ export default function MaterialChoiceModal({
                   setSelectedProjectId(p.id);
                   void loadMaterialsForProject(p.slug);
                 }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
-                  selectedProjectId === p.id
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-                    : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
-                }`}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border"
+                style={{
+                  backgroundColor:
+                    selectedProjectId === p.id
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
+                  borderColor:
+                    selectedProjectId === p.id
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "var(--glass-border, rgba(15,23,42,0.1))",
+                  color: selectedProjectId === p.id ? "#ffffff" : "var(--project-text, #0f172a)",
+                }}
               >
                 {p.name}
               </button>
@@ -181,27 +206,27 @@ export default function MaterialChoiceModal({
           </div>
         )}
 
-        {/* Сообщение, если все материалы уже доступны */}
+        {/* Если все материалы уже открыты */}
         {allUnlockedInProject && !loading && (
-          <div className="p-4 bg-emerald-950/40 border border-emerald-800/80 rounded-2xl text-center">
-            <div className="text-xs font-black text-emerald-400 uppercase tracking-wider mb-1">
-              Все материалы доступны
+          <div className="p-4 rounded-2xl border text-center" style={{ backgroundColor: "rgba(16,185,129,0.1)", borderColor: "rgba(16,185,129,0.3)" }}>
+            <div className="text-xs font-black uppercase tracking-wider mb-1" style={{ color: "#10b981" }}>
+              Все материалы уже открыты
             </div>
-            <div className="text-xs text-slate-300 font-medium">
-              Все учебные материалы текущего раздела уже открыты на вашем аккаунте.
+            <div className="text-xs font-medium opacity-75">
+              Все учебные материалы текущего раздела уже присутствуют на вашем аккаунте.
             </div>
           </div>
         )}
 
-        {/* Список материалов */}
-        <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1">
+        {/* Сетка материалов в стиле витрины */}
+        <div className="max-h-80 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pr-1">
           {loading ? (
-            <div className="text-center py-12 text-slate-500 text-xs font-bold uppercase tracking-wider">
+            <div className="col-span-full text-center py-12 text-xs font-bold uppercase tracking-wider opacity-60">
               Загрузка каталога материалов...
             </div>
           ) : materials.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 text-xs font-bold uppercase tracking-wider">
-              В данном разделе нет доступных материалов
+            <div className="col-span-full text-center py-12 text-xs font-bold uppercase tracking-wider opacity-60">
+              В данном разделе нет материалов
             </div>
           ) : (
             materials.map((m) => {
@@ -212,53 +237,57 @@ export default function MaterialChoiceModal({
                 <div
                   key={m.id}
                   onClick={() => handleToggleMaterial(m)}
-                  className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${
-                    unlocked
-                      ? "bg-slate-950/50 border-slate-800/60 opacity-60 cursor-not-allowed"
+                  className="p-3 rounded-2xl border flex flex-col justify-between transition-all"
+                  style={{
+                    backgroundColor: unlocked
+                      ? "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)"
                       : isSelected
-                      ? "bg-emerald-950/30 border-emerald-500 text-white cursor-pointer shadow-md shadow-emerald-500/10"
-                      : "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700 cursor-pointer"
-                  }`}
+                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)"
+                      : "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                    borderColor: unlocked
+                      ? "var(--glass-border, rgba(15,23,42,0.06))"
+                      : isSelected
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "var(--glass-border, rgba(15,23,42,0.1))",
+                    cursor: unlocked ? "not-allowed" : "pointer",
+                    opacity: unlocked ? 0.6 : 1,
+                  }}
                 >
-                  <div className="flex items-center gap-3 min-w-0 pr-3">
-                    <span className="text-[10px] font-black px-2 py-1 bg-slate-800 text-slate-300 rounded-md uppercase tracking-wider flex-shrink-0">
-                      {m.kind === "crossword" ? "Кроссворд" : "Учебник"}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="font-bold text-xs text-white truncate">
-                        {m.title}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        {m.is_secret && (
-                          <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
-                            [Секретный]
-                          </span>
-                        )}
-                        {unlocked && (
-                          <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">
-                            [Доступ уже есть]
-                          </span>
-                        )}
-                      </div>
+                  <div className="space-y-2">
+                    <div className="w-full h-24 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center relative">
+                      {m.cover_image_url ? (
+                        <img
+                          src={m.cover_image_url}
+                          alt={m.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-3xl">📖</span>
+                      )}
+                    </div>
+
+                    <div className="font-extrabold text-xs leading-snug line-clamp-2">
+                      {m.title}
                     </div>
                   </div>
 
-                  <div
-                    className={`w-6 h-6 rounded-lg border flex items-center justify-center flex-shrink-0 transition-colors ${
-                      unlocked
-                        ? "border-slate-800 bg-slate-900 text-slate-600"
-                        : isSelected
-                        ? "border-emerald-500 bg-emerald-600 text-white"
-                        : "border-slate-700 bg-slate-900"
-                    }`}
-                  >
-                    {isSelected && (
-                      <svg
-                        className="w-4 h-4 fill-current"
-                        viewBox="0 0 20 20"
+                  <div className="mt-3 pt-2 border-t flex items-center justify-between" style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.06))" }}>
+                    {unlocked ? (
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600">
+                        ✅ Доступ есть
+                      </span>
+                    ) : (
+                      <span
+                        className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg"
+                        style={{
+                          backgroundColor: isSelected
+                            ? "var(--project-primary, #0ea5e9)"
+                            : "color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent)",
+                          color: isSelected ? "#ffffff" : "var(--project-text, #0f172a)",
+                        }}
                       >
-                        <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
-                      </svg>
+                        {isSelected ? "✅ Выбрано" : "➕ Выбрать"}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -267,22 +296,32 @@ export default function MaterialChoiceModal({
           )}
         </div>
 
-        {/* Панель действий */}
-        <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+        {/* Кнопки модалки */}
+        <div
+          className="flex justify-end gap-3 pt-3 border-t"
+          style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
+        >
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors"
+            className="px-4 py-2 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors border"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
+              borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+              color: "var(--project-text, #0f172a)",
+            }}
           >
             Отмена
           </button>
           <button
             type="button"
             onClick={handleSubmitChoice}
-            disabled={
-              submitting || selectedMaterialIds.length < requiredChoiceCount
-            }
-            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-lg shadow-emerald-600/20"
+            disabled={submitting || selectedMaterialIds.length < requiredChoiceCount}
+            className="px-5 py-2 font-black text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-md"
+            style={{
+              backgroundColor: "var(--project-primary, #0ea5e9)",
+              color: "#ffffff",
+            }}
           >
             {submitting ? "Сохранение..." : "Подтвердить выбор"}
           </button>

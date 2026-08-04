@@ -34,19 +34,33 @@ export default function StreakTimeline({
       {/* 1. ВЕРХНИЕ КАРТОЧКИ СТАТИСТИКИ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Карточка 1: Текущая серия */}
-        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+        <div
+          className="border rounded-2xl p-4 flex items-center justify-between shadow-xs"
+          style={{
+            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+            borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+          }}
+        >
           <div>
-            <div className="text-[10px] font-black uppercase tracking-wider text-amber-500 mb-1">
+            <div
+              className="text-[10px] font-black uppercase tracking-wider mb-1"
+              style={{ color: "var(--project-primary, #0ea5e9)" }}
+            >
               Серия
             </div>
-            <div className="text-2xl font-black text-white">
-              {stats.currentStreak} дн.
-            </div>
-            <div className="text-xs font-medium text-slate-400 mt-0.5">
+            <div className="text-2xl font-black">{stats.currentStreak} дн.</div>
+            <div className="text-xs font-medium opacity-60 mt-0.5">
               Текущая серия
             </div>
           </div>
-          <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold rounded-lg uppercase tracking-wider">
+          <div
+            className="px-3 py-1 text-xs font-bold rounded-lg uppercase tracking-wider border"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)",
+              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 30%, transparent)",
+              color: "var(--project-primary, #0ea5e9)",
+            }}
+          >
             Активна
           </div>
         </div>
@@ -54,66 +68,90 @@ export default function StreakTimeline({
         {/* Карточка 2: Рекорд */}
         <div
           onClick={() => setIsLeaderboardOpen(true)}
-          className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:border-blue-500/50 transition-all group"
+          className="border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01] shadow-xs"
+          style={{
+            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+            borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+          }}
         >
           <div>
-            <div className="text-[10px] font-black uppercase tracking-wider text-blue-400 mb-1">
+            <div
+              className="text-[10px] font-black uppercase tracking-wider mb-1"
+              style={{ color: "var(--project-primary, #0ea5e9)" }}
+            >
               Рекорд
             </div>
-            <div className="text-2xl font-black text-white">
-              {stats.maxStreak} дн.
-            </div>
-            <div className="text-xs font-medium text-slate-400 mt-0.5">
+            <div className="text-2xl font-black">{stats.maxStreak} дн.</div>
+            <div className="text-xs font-medium opacity-60 mt-0.5">
               Максимум за всё время
             </div>
           </div>
-          <span className="text-xs font-extrabold text-blue-400 uppercase tracking-wider bg-slate-900 border border-slate-800 px-3 py-2 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all">
+          <span
+            className="text-xs font-extrabold uppercase tracking-wider border px-3 py-2 rounded-xl transition-all"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 30%, transparent)",
+              color: "var(--project-primary, #0ea5e9)",
+            }}
+          >
             Топ-20
           </span>
         </div>
 
         {/* Карточка 3: Статус за сегодня */}
-        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+        <div
+          className="border rounded-2xl p-4 flex items-center justify-between shadow-xs"
+          style={{
+            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+            borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+          }}
+        >
           <div>
-            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+            <div className="text-[10px] font-black uppercase tracking-wider opacity-60 mb-1">
               Статус дня
             </div>
             <div
               className={`text-lg font-black uppercase tracking-wider ${
-                stats.completedToday ? "text-emerald-400" : "text-rose-400"
+                stats.completedToday ? "text-emerald-600" : "text-amber-600"
               }`}
             >
-              {stats.completedToday ? "Засчитано" : "Не засчитано"}
+              {stats.completedToday ? "Засчитано" : "Не зачтено"}
             </div>
-            <div className="text-xs font-medium text-slate-400 mt-0.5">
+            <div className="text-xs font-medium opacity-60 mt-0.5">
               {stats.completedToday
                 ? "Задание выполнено"
-                : "Сделайте задание сегодня"}
+                : "Выполните задание сегодня"}
             </div>
           </div>
           <div
-            className={`w-3 h-3 rounded-full ${
-              stats.completedToday ? "bg-emerald-500 shadow-md shadow-emerald-500/50" : "bg-rose-500"
+            className={`w-3.5 h-3.5 rounded-full ${
+              stats.completedToday ? "bg-emerald-500 shadow-md shadow-emerald-500/40" : "bg-amber-500"
             }`}
           />
         </div>
       </div>
 
       {/* 2. БАННЕР СЛЕДУЮЩЕЙ НАГРАДЫ */}
-      <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5">
-        <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-3">
+      <div
+        className="border rounded-2xl p-5"
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+          borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+        }}
+      >
+        <h4 className="text-[10px] font-black uppercase tracking-wider opacity-60 mb-3">
           Следующая награда
         </h4>
         {nextUpcomingReward ? (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <div className="text-base font-black text-white uppercase tracking-wider">
+              <div className="text-base font-black uppercase tracking-wider">
                 {nextUpcomingReward.reward?.title || "Награда"} — День{" "}
                 {nextUpcomingReward.day_number}
               </div>
-              <div className="text-xs font-medium text-slate-400 mt-1">
+              <div className="text-xs font-medium opacity-60 mt-1">
                 Осталось дней серии:{" "}
-                <span className="font-bold text-white">
+                <span className="font-bold">
                   {Math.max(
                     0,
                     nextUpcomingReward.day_number - stats.currentStreak
@@ -127,7 +165,11 @@ export default function StreakTimeline({
                 type="button"
                 onClick={() => handleClaim(nextUpcomingReward.day_number)}
                 disabled={claimingDay === nextUpcomingReward.day_number}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-600/20 disabled:opacity-50 transition-all flex-shrink-0"
+                className="px-5 py-2.5 font-black text-xs uppercase tracking-wider rounded-xl shadow-md disabled:opacity-50 transition-all flex-shrink-0"
+                style={{
+                  backgroundColor: "var(--project-primary, #0ea5e9)",
+                  color: "#ffffff",
+                }}
               >
                 {claimingDay === nextUpcomingReward.day_number
                   ? "Получение..."
@@ -136,31 +178,42 @@ export default function StreakTimeline({
             )}
           </div>
         ) : (
-          <div className="text-xs font-black text-emerald-400 uppercase tracking-wider">
+          <div className="text-xs font-black uppercase tracking-wider text-emerald-600">
             Все награды в текущей дорожке уже разблокированы
           </div>
         )}
       </div>
 
       {/* 3. ТАЙМЛАЙН / ДОРОЖКА НАГРАД */}
-      <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 relative">
+      <div
+        className="border rounded-3xl p-6 relative"
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+          borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+        }}
+      >
         <div className="text-center mb-8">
-          <h3 className="text-lg font-black text-white uppercase tracking-wider">
+          <h3 className="text-lg font-black uppercase tracking-wider">
             Дорожка наград
           </h3>
-          <p className="text-xs font-medium text-slate-400 mt-1">
+          <p className="text-xs font-medium opacity-60 mt-1">
             Титулы слева • Предметы и иконки справа
           </p>
         </div>
 
         {path.length === 0 ? (
-          <div className="text-center py-12 text-slate-500 text-xs font-bold uppercase tracking-wider">
+          <div className="text-center py-12 opacity-60 text-xs font-bold uppercase tracking-wider">
             Дорожка наград пока не настроена
           </div>
         ) : (
           <div className="relative py-4">
             {/* Центральная линия */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-slate-800 -translate-x-1/2 z-0" />
+            <div
+              className="absolute left-1/2 top-0 bottom-0 w-0.5 -translate-x-1/2 z-0"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 15%, transparent)",
+              }}
+            />
 
             <div className="space-y-8 relative z-10">
               {path.map((item) => {
@@ -176,13 +229,23 @@ export default function StreakTimeline({
                     {/* ЦЕНТРАЛЬНАЯ МЕТКА ДНЯ */}
                     <div className="absolute left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
                       <div
-                        className={`w-10 h-10 rounded-full border-2 font-black text-xs flex items-center justify-center uppercase tracking-wider transition-all ${
-                          isClaimed
-                            ? "bg-emerald-600 border-emerald-400 text-white"
+                        className="w-10 h-10 rounded-full border-2 font-black text-xs flex items-center justify-center uppercase tracking-wider transition-all"
+                        style={{
+                          backgroundColor: isClaimed
+                            ? "#10b981"
                             : isAvailable
-                            ? "bg-amber-500 border-amber-300 text-white shadow-lg shadow-amber-500/20"
-                            : "bg-slate-900 border-slate-800 text-slate-500"
-                        }`}
+                            ? "var(--project-primary, #0ea5e9)"
+                            : "var(--project-card-bg, #ffffff)",
+                          borderColor: isClaimed
+                            ? "#059669"
+                            : isAvailable
+                            ? "var(--project-primary, #0ea5e9)"
+                            : "var(--glass-border, rgba(15,23,42,0.2))",
+                          color: isClaimed || isAvailable ? "#ffffff" : "var(--project-text, #0f172a)",
+                          boxShadow: isAvailable
+                            ? "0 0 15px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)"
+                            : "none",
+                        }}
                       >
                         {item.day_number}d
                       </div>
@@ -192,26 +255,40 @@ export default function StreakTimeline({
                     <div className="pr-6">
                       {isTitle && (
                         <div
-                          className={`p-4 rounded-2xl border transition-all ${
-                            isClaimed
-                              ? "bg-slate-900/50 border-slate-800/80 opacity-70"
+                          className="p-4 rounded-2xl border transition-all"
+                          style={{
+                            backgroundColor: isClaimed
+                              ? "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)"
                               : isAvailable
-                              ? "bg-slate-900 border-blue-500 shadow-md shadow-blue-500/10"
-                              : "bg-slate-900 border-slate-800"
-                          }`}
+                              ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
+                              : "var(--project-card-bg, #ffffff)",
+                            borderColor: isAvailable
+                              ? "var(--project-primary, #0ea5e9)"
+                              : "var(--glass-border, rgba(15,23,42,0.1))",
+                            opacity: isClaimed ? 0.75 : 1,
+                          }}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-purple-950 border border-purple-800 text-purple-400 tracking-wider">
+                            <span
+                              className="text-[10px] font-black uppercase px-2 py-0.5 rounded border tracking-wider"
+                              style={{
+                                backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+                                borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 30%, transparent)",
+                                color: "var(--project-primary, #0ea5e9)",
+                              }}
+                            >
                               Титул
                             </span>
                             <span
-                              className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
-                                isClaimed
-                                  ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
+                              className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded"
+                              style={{
+                                color: isClaimed
+                                  ? "#10b981"
                                   : isAvailable
-                                  ? "bg-amber-950 text-amber-400 border border-amber-800"
-                                  : "text-slate-500"
-                              }`}
+                                  ? "var(--project-primary, #0ea5e9)"
+                                  : "var(--project-text, #0f172a)",
+                                opacity: isClaimed || isAvailable ? 1 : 0.5,
+                              }}
                             >
                               {isClaimed
                                 ? "Открыт"
@@ -221,11 +298,11 @@ export default function StreakTimeline({
                             </span>
                           </div>
 
-                          <div className="font-bold text-sm text-white mb-1">
+                          <div className="font-bold text-sm mb-1">
                             «{item.reward?.title}»
                           </div>
                           {item.reward?.description && (
-                            <p className="text-xs text-slate-400 font-medium line-clamp-2">
+                            <p className="text-xs font-medium opacity-60 line-clamp-2">
                               {item.reward.description}
                             </p>
                           )}
@@ -235,7 +312,11 @@ export default function StreakTimeline({
                               type="button"
                               onClick={() => handleClaim(item.day_number)}
                               disabled={claimingDay === item.day_number}
-                              className="mt-3 w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md shadow-amber-600/20 disabled:opacity-50"
+                              className="mt-3 w-full py-2 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md disabled:opacity-50"
+                              style={{
+                                backgroundColor: "var(--project-primary, #0ea5e9)",
+                                color: "#ffffff",
+                              }}
                             >
                               {claimingDay === item.day_number
                                 ? "Забор..."
@@ -250,26 +331,40 @@ export default function StreakTimeline({
                     <div className="pl-6">
                       {!isTitle && (
                         <div
-                          className={`p-4 rounded-2xl border transition-all ${
-                            isClaimed
-                              ? "bg-slate-900/50 border-slate-800/80 opacity-70"
+                          className="p-4 rounded-2xl border transition-all"
+                          style={{
+                            backgroundColor: isClaimed
+                              ? "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)"
                               : isAvailable
-                              ? "bg-slate-900 border-blue-500 shadow-md shadow-blue-500/10"
-                              : "bg-slate-900 border-slate-800"
-                          }`}
+                              ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
+                              : "var(--project-card-bg, #ffffff)",
+                            borderColor: isAvailable
+                              ? "var(--project-primary, #0ea5e9)"
+                              : "var(--glass-border, rgba(15,23,42,0.1))",
+                            opacity: isClaimed ? 0.75 : 1,
+                          }}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-950 border border-blue-800 text-blue-400 tracking-wider">
+                            <span
+                              className="text-[10px] font-black uppercase px-2 py-0.5 rounded border tracking-wider"
+                              style={{
+                                backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+                                borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 30%, transparent)",
+                                color: "var(--project-primary, #0ea5e9)",
+                              }}
+                            >
                               Предмет
                             </span>
                             <span
-                              className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
-                                isClaimed
-                                  ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
+                              className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded"
+                              style={{
+                                color: isClaimed
+                                  ? "#10b981"
                                   : isAvailable
-                                  ? "bg-amber-950 text-amber-400 border border-amber-800"
-                                  : "text-slate-500"
-                              }`}
+                                  ? "var(--project-primary, #0ea5e9)"
+                                  : "var(--project-text, #0f172a)",
+                                opacity: isClaimed || isAvailable ? 1 : 0.5,
+                              }}
                             >
                               {isClaimed
                                 ? "Открыт"
@@ -287,15 +382,15 @@ export default function StreakTimeline({
                                 className="w-10 h-10 object-contain"
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400">
+                              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xs font-bold opacity-50">
                                 N/A
                               </div>
                             )}
                             <div>
-                              <div className="font-bold text-sm text-white">
+                              <div className="font-bold text-sm">
                                 {item.reward?.title || "Награда"}
                               </div>
-                              <div className="text-[10px] text-slate-400 uppercase font-black tracking-wider">
+                              <div className="text-[10px] uppercase font-black tracking-wider opacity-50">
                                 {item.reward?.type || "предмет"}
                               </div>
                             </div>
@@ -306,7 +401,11 @@ export default function StreakTimeline({
                               type="button"
                               onClick={() => handleClaim(item.day_number)}
                               disabled={claimingDay === item.day_number}
-                              className="mt-2 w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md shadow-amber-600/20 disabled:opacity-50"
+                              className="mt-2 w-full py-2 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md disabled:opacity-50"
+                              style={{
+                                backgroundColor: "var(--project-primary, #0ea5e9)",
+                                color: "#ffffff",
+                              }}
                             >
                               {claimingDay === item.day_number
                                 ? "Забор..."
