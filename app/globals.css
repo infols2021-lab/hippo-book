@@ -2,51 +2,46 @@
 @import "tailwindcss";
 
 :root {
-  /* 1. Дефолтные базовые цвета (если админ ничего не задал) */
+  /* 1. Дефолтные базовые цвета */
   --project-primary: #0ea5e9; 
   --project-secondary: #38bdf8;
-  --project-bg: #f8fafc;
-  --project-text: #0f172a;
-  --project-card-bg: #ffffff;
+  --project-bg: #0b0f19;
+  --project-text: #ffffff;
+  --project-card-bg: #1e293b;
   --danger-color: #ef4444;
   
-  /* 2. ДВИЖОК ПРЕМИУМ-СТЕКЛА (генерируется автоматически) */
-  /* Прозрачный фон карточки (75% заливки) */
-  --glass-bg: color-mix(in srgb, var(--project-card-bg) 75%, transparent);
-  
-  /* Тончайшая полупрозрачная рамка (берет цвет текста с прозрачностью 8%) */
-  --glass-border: color-mix(in srgb, var(--project-text) 8%, transparent);
-  
-  /* Внутренний блик сверху (создает физический объем стекла) */
-  --glass-highlight: color-mix(in srgb, #ffffff 70%, transparent);
-  
-  /* Мягкая, рассеянная тень (без грязи и свечения) */
-  --glass-shadow: 0 12px 40px -12px color-mix(in srgb, var(--project-text) 12%, transparent);
-  
-  /* Сила размытия заднего фона */
+  /* 2. ДВИЖОК ПРЕМИУМ-СТЕКЛА */
+  --glass-bg: color-mix(in srgb, var(--p-card-bg, var(--project-card-bg)) 75%, transparent);
+  --glass-border: color-mix(in srgb, var(--p-text, var(--project-text)) 10%, transparent);
+  --glass-highlight: color-mix(in srgb, #ffffff 15%, transparent);
+  --glass-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.35);
   --glass-blur: blur(24px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ГЛОБАЛЬНЫЙ ФОН И ТЕКСТ (Защита от белых полос) */
+html {
+  height: 100%;
+  background-color: var(--p-page-bg, var(--project-bg, #0b0f19));
+  margin: 0;
+  padding: 0;
 }
 
-/* ГЛОБАЛЬНЫЙ ФОН И ТЕКСТ */
 body {
-  background-color: var(--project-bg);
-  color: var(--project-text);
-  min-height: 100vh;
-  /* Если у проекта есть картинка на фоне, она будет плавно фиксироваться */
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--p-page-bg, var(--project-bg, #0b0f19));
+  color: var(--p-text, var(--project-text, #ffffff));
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
-  transition: background-color 0.4s ease, color 0.4s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
 }
 
-/* УТИЛИТЫ */
+/* УТИЛИТЫ СКРОЛЛБАРА */
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -55,12 +50,16 @@ body {
   display: none;
 }
 
-.custom-scrollbar::-webkit-scrollbar { width: 6px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar { 
+  width: 6px; 
+}
+.custom-scrollbar::-webkit-scrollbar-track { 
+  background: transparent; 
+}
 .custom-scrollbar::-webkit-scrollbar-thumb { 
-  background: color-mix(in srgb, var(--project-text) 20%, transparent); 
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 20%, transparent); 
   border-radius: 10px; 
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { 
-  background: color-mix(in srgb, var(--project-text) 40%, transparent); 
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 40%, transparent); 
 }

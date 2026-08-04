@@ -1,16 +1,31 @@
 /* public/styles/base.css */
 
 /* ===== Hard reset ===== */
-* { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-html, body { height: 100%; margin: 0 !important; padding: 0 !important; }
+* { 
+  box-sizing: border-box; 
+}
+
+html { 
+  -webkit-text-size-adjust: 100%; 
+  text-size-adjust: 100%; 
+  height: 100%;
+  background-color: var(--p-page-bg, var(--project-bg, #0b0f19));
+}
+
+html, body { 
+  margin: 0 !important; 
+  padding: 0 !important; 
+}
 
 body {
-  min-height: 100vh;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--p-page-bg, var(--project-bg, #0b0f19));
   overflow-x: hidden;
-  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--p-font-family, var(--font-sans, system-ui, -apple-system, sans-serif));
   font-style: normal;
-  color: var(--project-text);
+  color: var(--p-text, var(--project-text, #ffffff));
   position: relative;
 }
 
@@ -45,15 +60,14 @@ button, input, optgroup, select, textarea {
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  background: var(--project-primary);
+  background: var(--p-primary, var(--project-primary));
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
   color: #fff;
   font-size: 20px;
-  /* Мягкая тень в цвет акцента */
-  box-shadow: 0 8px 24px -6px color-mix(in srgb, var(--project-primary) 50%, transparent);
+  box-shadow: 0 8px 24px -6px color-mix(in srgb, var(--p-primary, var(--project-primary)) 50%, transparent);
 }
 
 .header .nav {
@@ -62,7 +76,7 @@ button, input, optgroup, select, textarea {
   align-items: center;
 }
 
-/* ===== Cards (Идеальное Жидкое Стекло) ===== */
+/* ===== Cards (Жидкое Стекло) ===== */
 .card {
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
@@ -71,16 +85,16 @@ button, input, optgroup, select, textarea {
   padding: 24px;
   border: 1px solid var(--glass-border);
   box-shadow: 
-    inset 0 1px 1px var(--glass-highlight), /* Блик сверху для объема */
-    var(--glass-shadow); /* Рассеянная тень */
+    inset 0 1px 1px var(--glass-highlight),
+    var(--glass-shadow);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* ===== Buttons (Премиум-матовость) ===== */
+/* ===== Buttons ===== */
 .btn {
-  background: var(--project-primary);
+  background: var(--p-primary, var(--project-primary));
   color: #ffffff;
-  border: 1px solid color-mix(in srgb, #000000 10%, transparent); /* Едва заметный контур */
+  border: 1px solid color-mix(in srgb, #000000 10%, transparent);
   padding: 10px 20px;
   border-radius: 12px;
   font-weight: 600;
@@ -88,47 +102,50 @@ button, input, optgroup, select, textarea {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 
     inset 0 1px 1px rgba(255, 255, 255, 0.2), 
-    0 4px 12px -4px color-mix(in srgb, var(--project-primary) 50%, transparent);
+    0 4px 12px -4px color-mix(in srgb, var(--p-primary, var(--project-primary)) 50%, transparent);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
 }
+
 .btn:hover {
   transform: translateY(-2px);
   filter: brightness(1.05);
   box-shadow: 
     inset 0 1px 1px rgba(255, 255, 255, 0.3), 
-    0 8px 20px -6px color-mix(in srgb, var(--project-primary) 60%, transparent);
+    0 8px 20px -6px color-mix(in srgb, var(--p-primary, var(--project-primary)) 60%, transparent);
 }
+
 .btn:active {
   transform: translateY(0);
   box-shadow: none;
 }
 
 .btn.secondary {
-  background: var(--danger-color);
+  background: var(--danger-color, #ef4444);
   box-shadow: 
     inset 0 1px 1px rgba(255, 255, 255, 0.2), 
-    0 4px 12px -4px color-mix(in srgb, var(--danger-color) 50%, transparent);
+    0 4px 12px -4px color-mix(in srgb, var(--danger-color, #ef4444) 50%, transparent);
 }
 
 .btn.info {
-  background: var(--project-secondary);
+  background: var(--p-secondary, var(--project-secondary));
   box-shadow: 
     inset 0 1px 1px rgba(255, 255, 255, 0.2), 
-    0 4px 12px -4px color-mix(in srgb, var(--project-secondary) 50%, transparent);
+    0 4px 12px -4px color-mix(in srgb, var(--p-secondary, var(--project-secondary)) 50%, transparent);
 }
 
 .btn.ghost {
-  background: color-mix(in srgb, var(--project-text) 5%, transparent);
-  color: var(--project-text);
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 5%, transparent);
+  color: var(--p-text, var(--project-text));
   border: 1px solid var(--glass-border);
   box-shadow: none;
 }
+
 .btn.ghost:hover {
-  background: color-mix(in srgb, var(--project-text) 8%, transparent);
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 10%, transparent);
 }
 
 .btn.small {
@@ -143,11 +160,15 @@ button, input, optgroup, select, textarea {
   grid-template-columns: 360px 1fr;
   gap: 24px;
 }
+
 @media (max-width: 880px) {
-  .grid-2 { grid-template-columns: 1fr; gap: 16px; }
+  .grid-2 { 
+    grid-template-columns: 1fr; 
+    gap: 16px; 
+  }
 }
 
-/* ===== Profile (Обновленный чистый дизайн) ===== */
+/* ===== Profile ===== */
 .profile-card {
   display: flex;
   flex-direction: column;
@@ -181,20 +202,22 @@ button, input, optgroup, select, textarea {
   inset: 12px;
   pointer-events: none;
 }
+
 .key-circle {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--project-card-bg);
+  background: var(--p-card-bg, var(--project-card-bg));
   border: 1px solid var(--glass-border);
   position: absolute;
   transform: translate(-50%, -50%);
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
+
 .key-circle.filled {
-  background: var(--project-primary);
+  background: var(--p-primary, var(--project-primary));
   border: none;
-  box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 4px 12px color-mix(in srgb, var(--project-primary) 40%, transparent);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 4px 12px color-mix(in srgb, var(--p-primary, var(--project-primary)) 40%, transparent);
 }
 
 .kpos1 { left: 20%; top: 28%; }
@@ -205,13 +228,16 @@ button, input, optgroup, select, textarea {
 .kpos6 { left: 50%; top: 66%; }
 .kpos7 { left: 26%; top: 58%; }
 
-.profile-info { width: 100%; }
+.profile-info { 
+  width: 100%; 
+}
+
 .badge {
   display: inline-block;
   padding: 6px 12px;
   border-radius: 99px;
-  background: color-mix(in srgb, var(--project-primary) 15%, transparent);
-  color: var(--project-primary);
+  background: color-mix(in srgb, var(--p-primary, var(--project-primary)) 15%, transparent);
+  color: var(--p-primary, var(--project-primary));
   font-weight: 700;
   font-size: 13px;
 }
@@ -223,56 +249,56 @@ button, input, optgroup, select, textarea {
   flex-wrap: wrap;
   margin-bottom: 16px;
 }
+
 .table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 8px;
 }
+
 .table th,
 .table td {
   padding: 14px;
   border-bottom: 1px solid var(--glass-border);
   text-align: left;
 }
+
 .table th {
   font-weight: 700;
-  color: color-mix(in srgb, var(--project-text) 60%, transparent);
+  color: color-mix(in srgb, var(--p-text, var(--project-text)) 60%, transparent);
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-/* ===== Modals (Стеклянные) ===== */
+/* ===== Modals (Адаптированы под Modal.tsx) ===== */
 .modal-overlay,
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 20000;
+  z-index: 99999;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.4);
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
 
 .modal-panel,
-.modal-body {
+.modal-content {
   width: 100%;
+  max-width: 760px;
   border-radius: 24px;
-  background: var(--project-card-bg) !important;
+  background: var(--p-card-bg, var(--project-card-bg, #ffffff)) !important;
   border: 1px solid var(--glass-border);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
   overflow: hidden;
   outline: none;
-}
-
-.modal-content {
-  background: var(--project-card-bg) !important;
-  padding: 0;
-  max-height: min(85vh, 800px);
-  overflow: hidden;
 }
 
 .modal-header {
@@ -280,15 +306,17 @@ button, input, optgroup, select, textarea {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 20px 24px;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 2%, transparent);
+  flex-shrink: 0;
 }
 
 .modal-title {
   margin: 0;
   font-size: 18px;
   font-weight: 800;
-  color: var(--project-text);
+  color: var(--p-text, var(--project-text));
 }
 
 .modal-close {
@@ -297,52 +325,55 @@ button, input, optgroup, select, textarea {
   border-radius: 12px;
   border: none;
   cursor: pointer;
-  background: color-mix(in srgb, var(--project-text) 5%, transparent);
-  color: var(--project-text);
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 5%, transparent);
+  color: var(--p-text, var(--project-text));
   font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
 }
-.modal-close:hover { background: color-mix(in srgb, var(--project-text) 10%, transparent); }
 
-.modal-body,
-.modal-content > *:not(.modal-header) {
+.modal-close:hover { 
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 12%, transparent); 
+}
+
+.modal-body {
   padding: 24px;
-  max-height: min(85vh, 800px);
-  overflow: auto;
+  overflow-y: auto;
+  flex: 1;
 }
 
 /* ===== Form Helpers ===== */
 .row { display: flex; gap: 12px; align-items: center; }
 .col { display: flex; flex-direction: column; gap: 12px; }
 
-/* Полупрозрачные инпуты */
 .input, textarea, select {
   padding: 12px 16px;
   border-radius: 12px;
   border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--project-text) 3%, transparent);
-  color: var(--project-text);
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 3%, transparent);
+  color: var(--p-text, var(--project-text));
   font-size: 15px;
   width: 100%;
   transition: all 0.2s ease;
 }
+
 .input:focus, textarea:focus, select:focus {
   outline: none;
-  border-color: var(--project-primary);
-  background: var(--project-card-bg);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--project-primary) 15%, transparent);
+  border-color: var(--p-primary, var(--project-primary));
+  background: var(--p-card-bg, var(--project-card-bg));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--p-primary, var(--project-primary)) 15%, transparent);
 }
 
 .small-muted {
   font-size: 13px;
-  color: color-mix(in srgb, var(--project-text) 60%, transparent);
+  color: color-mix(in srgb, var(--p-text, var(--project-text)) 60%, transparent);
 }
 
 /* ===== Score pill ===== */
 .assignment-status { display: flex; align-items: center; gap: 8px; }
+
 .score-pill {
   display: inline-flex;
   align-items: center;
@@ -352,10 +383,11 @@ button, input, optgroup, select, textarea {
   border-radius: 99px;
   font-weight: 800;
   font-size: 13px;
-  background: color-mix(in srgb, var(--project-primary) 12%, transparent);
-  color: var(--project-primary);
+  background: color-mix(in srgb, var(--p-primary, var(--project-primary)) 12%, transparent);
+  color: var(--p-primary, var(--project-primary));
 }
+
 .score-pill.red {
-  background: color-mix(in srgb, var(--danger-color) 12%, transparent);
-  color: var(--danger-color);
+  background: color-mix(in srgb, var(--danger-color, #ef4444) 12%, transparent);
+  color: var(--danger-color, #ef4444);
 }

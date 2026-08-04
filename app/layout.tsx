@@ -18,11 +18,14 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ru" className={`${fontSans.variable} h-full`}>
+    <html 
+      lang="ru" 
+      className={`${fontSans.variable} h-full bg-[var(--p-page-bg,#0b0f19)] m-0 p-0`}
+    >
       <head>
         <link rel="stylesheet" href="/styles/base.css" />
       </head>
-      <body className="min-h-full m-0 p-0 bg-[var(--p-page-bg,#0b0f19)] text-white antialiased">
+      <body className="min-h-full m-0 p-0 flex flex-col bg-[var(--p-page-bg,#0b0f19)] text-white antialiased">
         {children}
       </body>
     </html>
