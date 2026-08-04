@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { code, chosenMaterialIds } = body;
+    const { code, chosenMaterialIds, allowSkipIfAllUnlocked } = body;
     const normalizedChosenIds = Array.isArray(chosenMaterialIds)
       ? chosenMaterialIds.map((id) => String(id).trim()).filter(Boolean)
       : [];
@@ -35,7 +35,8 @@ export async function POST(request: Request) {
       supabase,
       user.id,
       String(code).trim(),
-      normalizedChosenIds
+      normalizedChosenIds,
+      Boolean(allowSkipIfAllUnlocked)
     );
 
     if (!result.success) {

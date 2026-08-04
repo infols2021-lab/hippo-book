@@ -331,8 +331,11 @@ export async function redeemPromocode(
   const bundle: PromocodeRewardsBundle = promo.rewards_bundle || {};
   const requiredChoiceCount = Number(bundle.material_choice_count || 0);
 
-  // Проверка требования выбора материалов
-  if (requiredChoiceCount > 0 && chosenMaterialIds.length < requiredChoiceCount && !allowSkipIfAllUnlocked) {
+  if (
+    requiredChoiceCount > 0 &&
+    chosenMaterialIds.length < requiredChoiceCount &&
+    !allowSkipIfAllUnlocked
+  ) {
     return {
       success: true,
       requiresMaterialChoice: true,

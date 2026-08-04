@@ -262,8 +262,8 @@ export default function MaterialChoiceModal({
     return matchTab && matchLevel;
   });
 
-  const unlockedCount = materials.filter((m) => isAlreadyUnlocked(m)).length;
-  const allUnlocked = materials.length > 0 && unlockedCount === materials.length;
+  const lockedMaterials = materials.filter((m) => !isAlreadyUnlocked(m));
+  const cannotFulfillChoice = materials.length > 0 && lockedMaterials.length < requiredChoiceCount;
 
   return (
     <div
@@ -305,13 +305,13 @@ export default function MaterialChoiceModal({
           </div>
         </div>
 
-        {allUnlocked && (
+        {cannotFulfillChoice && (
           <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-800 font-bold text-center">
-            🎉 У вас уже открыт доступ ко всем материалам данного раздела! Вы можете пропустить выбор и забрать остальные награды промокода.
+            🎉 У вас уже открыто большинство или все материалы этого раздела! Вы можете пропустить выбор материалов и получить остальные призы из промокода.
           </div>
         )}
 
-        {/* Выбор проекта/раздела */}
+        {/* Выбор проекта */}
         {projects.length > 1 && (
           <div
             className="flex gap-2 border-b pb-3 overflow-x-auto"
@@ -555,7 +555,7 @@ export default function MaterialChoiceModal({
             Отмена
           </button>
 
-          {allUnlocked ? (
+          {cannotFulfillChoice ? (
             <button
               type="button"
               onClick={() => handleSubmitChoice(true)}
