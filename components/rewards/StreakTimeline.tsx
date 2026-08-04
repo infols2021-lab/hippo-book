@@ -19,7 +19,7 @@ export default function StreakTimeline({
   const [claimingDay, setClaimingDay] = useState<number | null>(null);
 
   const currentStreak = stats?.currentStreak ?? 0;
-  const maxStreak = stats?.maxStreak ?? (stats as any)?.longestStreak ?? 0;
+  const maxStreak = stats?.maxStreak ?? (stats as any)?.longestStreak ?? currentStreak;
   const completedToday = Boolean(stats?.completedToday);
 
   const handleClaim = async (dayNumber: number) => {
@@ -37,7 +37,7 @@ export default function StreakTimeline({
     <div className="space-y-6 max-w-4xl mx-auto py-2">
       {/* 1. ВЕРХНИЕ КАРТОЧКИ СТАТИСТИКИ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {/* Карточка 1: Текущая серия */}
+        {/* Текущая серия */}
         <div
           className="border rounded-2xl p-4 flex items-center justify-between shadow-sm transition-all"
           style={{
@@ -78,7 +78,7 @@ export default function StreakTimeline({
           </div>
         </div>
 
-        {/* Карточка 2: Рекорд */}
+        {/* Рекорд */}
         <div
           onClick={() => setIsLeaderboardOpen(true)}
           className="border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all shadow-sm group hover:-translate-y-0.5"
@@ -114,7 +114,7 @@ export default function StreakTimeline({
           </span>
         </div>
 
-        {/* Карточка 3: Статус за сегодня */}
+        {/* Статус за сегодня */}
         <div
           className="border rounded-2xl p-4 flex items-center justify-between shadow-sm"
           style={{
@@ -170,14 +170,14 @@ export default function StreakTimeline({
                 className="text-xs font-medium mt-1"
                 style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
               >
-                Осталось дней серии:{" "}
+                Осталось дней рекорда:{" "}
                 <span className="font-bold">
-                  {Math.max(0, nextUpcomingReward.day_number - currentStreak)}
+                  {Math.max(0, nextUpcomingReward.day_number - maxStreak)}
                 </span>
               </div>
             </div>
 
-            {nextUpcomingReward.is_available && (
+            {(nextUpcomingReward.is_available || maxStreak >= nextUpcomingReward.day_number) && (
               <button
                 type="button"
                 onClick={() => handleClaim(nextUpcomingReward.day_number)}
@@ -238,14 +238,15 @@ export default function StreakTimeline({
               {path.map((item) => {
                 const isTitle = item.reward?.type === "title";
                 const isClaimed = item.is_claimed;
-                const isAvailable = item.is_available;
+                const isAvailable =
+                  (item.is_available || maxStreak >= item.day_number) && !isClaimed;
 
                 return (
                   <div
                     key={item.day_number}
                     className="grid grid-cols-2 gap-4 items-center relative"
                   >
-                    {/* ЦЕНТРАЛЬНАЯ МЕТКА ДНЯ */}
+                    {/* МЕТКА ДНЯ */}
                     <div className="absolute left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
                       <div
                         className="w-10 h-10 rounded-full border-2 font-black text-xs flex items-center justify-center uppercase tracking-wider transition-all"
@@ -267,7 +268,7 @@ export default function StreakTimeline({
                       </div>
                     </div>
 
-                    {/* ЛЕВАЯ СТОРОНА: ТИТУЛЫ */}
+                    {/* ТИТУЛЫ (ЛЕВО) */}
                     <div className="pr-6">
                       {isTitle && (
                         <div
@@ -341,7 +342,7 @@ export default function StreakTimeline({
                       )}
                     </div>
 
-                    {/* ПРАВАЯ СТОРОНА: ИКОНКИ / ПРЕДМЕТЫ / ШМОТКИ */}
+                    {/* ПРЕДМЕТЫ (ПРАВО) */}
                     <div className="pl-6">
                       {!isTitle && (
                         <div
@@ -435,7 +436,6 @@ export default function StreakTimeline({
         )}
       </div>
 
-      {/* МОДАЛКА ТОП-20 ЛИДЕРБОРДА */}
       <StreakLeaderboardModal
         isOpen={isLeaderboardOpen}
         onClose={() => setIsLeaderboardOpen(false)}

@@ -31,14 +31,21 @@ export async function GET() {
 
     const adminSupabase = getSupabaseAdminClient();
 
-    // 1. Напрямую запрашиваем ground-truth из user_streaks через adminSupabase
-    const { data: userStreakRow } = await adminSupabase
-      .from("user_streaks")
-      .select("current_streak, longest_streak, last_completed_date")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    // 1. Запрашиваем данные из profiles и user_streaks (добавлено selected_streak_title_code)
+    const [{ data: userStreakRow }, { data: profileRow }] = await Promise.all([
+      adminSupabase
+        .from("user_streaks")
+        .select("current_streak, longest_streak, last_completed_date")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      adminSupabase
+        .from("profiles")
+        .select("current_streak, max_streak, longest_streak, last_completed_at, selected_streak_title_code")
+        .eq("id", user.id)
+        .maybeSingle(),
+    ]);
 
-    // 2. Проверяем, было ли сегодня выполнение
+    // 2. Проверяем выполнение за сегодня
     const todayStr = new Date().toISOString().split("T")[0];
     const { data: todayDay } = await adminSupabase
       .from("user_streak_days")
@@ -48,10 +55,12 @@ export async function GET() {
       .maybeSingle();
 
     const isCompletedToday = Boolean(
-      todayDay || userStreakRow?.last_completed_date === todayStr
+      todayDay ||
+        userStreakRow?.last_completed_date === todayStr ||
+        profileRow?.last_completed_at?.startsWith(todayStr)
     );
 
-    // 3. Пытаемся забрать дорожку наград
+    // 3. Запрашиваем дорожку наград
     let path: any[] = [];
     let pathStats: any = null;
 
@@ -63,12 +72,11 @@ export async function GET() {
       console.warn("Фоновое предупреждение при получении дорожки наград:", e);
     }
 
-    // 4. Формируем гарантированно верные финальные показатели
     const currentStreak = Number(
-      userStreakRow?.current_streak ?? pathStats?.currentStreak ?? 0
+      profileRow?.current_streak ?? userStreakRow?.current_streak ?? pathStats?.currentStreak ?? 0
     );
     const longestStreak = Number(
-      userStreakRow?.longest_streak ?? pathStats?.maxStreak ?? 0
+      profileRow?.max_streak ?? profileRow?.longest_streak ?? userStreakRow?.longest_streak ?? pathStats?.maxStreak ?? currentStreak
     );
     const completedToday = isCompletedToday || Boolean(pathStats?.completedToday);
 
@@ -77,10 +85,10 @@ export async function GET() {
       maxStreak: longestStreak,
       longestStreak,
       completedToday,
-      lastCompletedAt: userStreakRow?.last_completed_date || pathStats?.lastCompletedAt || null,
+      lastCompletedAt: userStreakRow?.last_completed_date || profileRow?.last_completed_at || pathStats?.lastCompletedAt || null,
     };
 
-    // 5. Определяем надетый титул и аватар
+    // 4. Экипировка маскота / титулы
     let equippedTitleLabel: string | null = null;
     let equippedAvatarUrl: string | null = null;
 
@@ -102,23 +110,15 @@ export async function GET() {
       }
     }
 
-    if (!equippedTitleLabel) {
-      const { data: profile } = await adminSupabase
-        .from("profiles")
-        .select("selected_streak_title_code")
-        .eq("id", user.id)
+    if (!equippedTitleLabel && profileRow?.selected_streak_title_code) {
+      const { data: titleCatalog } = await adminSupabase
+        .from("streak_title_catalog")
+        .select("label")
+        .eq("code", profileRow.selected_streak_title_code)
         .maybeSingle();
 
-      if (profile?.selected_streak_title_code) {
-        const { data: titleCatalog } = await adminSupabase
-          .from("streak_title_catalog")
-          .select("label")
-          .eq("code", profile.selected_streak_title_code)
-          .maybeSingle();
-
-        if (titleCatalog?.label) {
-          equippedTitleLabel = titleCatalog.label;
-        }
+      if (titleCatalog?.label) {
+        equippedTitleLabel = titleCatalog.label;
       }
     }
 
@@ -142,7 +142,7 @@ export async function GET() {
         longestStreak,
         maxStreak: longestStreak,
         doneToday: completedToday,
-        tierCode: calculateTierCode(currentStreak),
+        tierCode: calculateTierCode(longestStreak),
       },
       equippedTitle: equippedTitleLabel ? { label: equippedTitleLabel } : null,
       equippedAvatarUrl,
