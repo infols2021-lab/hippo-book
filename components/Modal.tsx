@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useId, useRef } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 type Props = {
   open: boolean;
@@ -8,14 +9,11 @@ type Props = {
   onClose: () => void;
   children: React.ReactNode;
   maxWidth?: number; // px
-  /** если вдруг нужно запретить закрытие по клику на оверлей */
   closeOnOverlayClick?: boolean;
-  /** если нужно запретить закрытие по ESC */
   closeOnEsc?: boolean;
 };
 
 function getScrollbarWidth() {
-  // window.innerWidth включает scrollbar, documentElement.clientWidth — без него
   return Math.max(0, window.innerWidth - document.documentElement.clientWidth);
 }
 
@@ -31,8 +29,12 @@ export default function Modal({
   const titleId = useId();
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // ✅ lock scroll на body + компенсация ширины scrollbar, чтобы не было "дёргания"
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
 
@@ -50,7 +52,6 @@ export default function Modal({
     };
   }, [open]);
 
-  // ✅ ESC close
   useEffect(() => {
     if (!open || !closeOnEsc) return;
 
@@ -61,19 +62,17 @@ export default function Modal({
     return () => document.removeEventListener("keydown", handler);
   }, [open, closeOnEsc, onClose]);
 
-  // ✅ автофокус в модалку (чтобы скролл колёсиком сразу работал внутри)
   useEffect(() => {
     if (!open) return;
-    // маленькая задержка чтобы DOM точно был
     const t = window.setTimeout(() => {
       panelRef.current?.focus();
     }, 0);
     return () => window.clearTimeout(t);
   }, [open]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  const modalContent = (
     <div
       ref={overlayRef}
       className="modal-overlay"
@@ -82,7 +81,6 @@ export default function Modal({
       aria-labelledby={title ? titleId : undefined}
       onMouseDown={(e) => {
         if (!closeOnOverlayClick) return;
-        // закрываем только если кликнули именно по оверлею, не по панели
         if (e.target === e.currentTarget) onClose();
       }}
     >
@@ -92,7 +90,6 @@ export default function Modal({
         style={{ maxWidth }}
         tabIndex={-1}
         onMouseDown={(e) => {
-          // чтобы клик внутри панели не "пробивал" закрытие
           e.stopPropagation();
         }}
       >
@@ -111,9 +108,10 @@ export default function Modal({
           </button>
         </div>
 
-        {/* ✅ ВАЖНО: скроллим не всю панель, а body внутри */}
         <div className="modal-body">{children}</div>
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

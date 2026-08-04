@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, DragEvent, ChangeEvent, useMemo } from "react";
+import { createPortal } from "react-dom";
 import type { PromocodeItem, PromocodeRedemption, RewardItem } from "@/lib/rewards/types";
 
 interface ProjectItem {
@@ -22,7 +23,6 @@ export default function PromocodeManager() {
   const [materialsCatalog, setMaterialsCatalog] = useState<MaterialCatalogItem[]>([]);
   const [projectsList, setProjectsList] = useState<ProjectItem[]>([]);
 
-  // Состояние для поиска материалов в селекторе
   const [materialSearch, setMaterialSearch] = useState<string>("");
   
   const [loading, setLoading] = useState(true);
@@ -31,6 +31,7 @@ export default function PromocodeManager() {
   const [activeSubTab, setActiveSubTab] = useState<"constructor" | "logs">("constructor");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   // Drag and Drop
   const [uploading, setUploading] = useState(false);
@@ -61,10 +62,10 @@ export default function PromocodeManager() {
   const [physicalImageUrl, setPhysicalImageUrl] = useState("");
 
   useEffect(() => {
+    setMounted(true);
     void loadAllData();
   }, []);
 
-  // Фильтрация материалов по поисковому запросу (без учёта регистра)
   const filteredMaterials = useMemo(() => {
     if (!materialSearch.trim()) return materialsCatalog;
     const search = materialSearch.trim().toLowerCase();
@@ -79,10 +80,6 @@ export default function PromocodeManager() {
       const [promosRes, rewardsRes, projectsRes] = await Promise.all([
         fetch("/api/admin/promocodes"),
         fetch("/api/admin/rewards"),
-        // ВАЖНО: используем АДМИНСКИЙ эндпоинт списка проектов, а не публичный /api/projects.
-        // Публичный роут не отдаёт поле id у проекта (только slug/name/tabs и т.п.),
-        // из-за чего дальнейший запрос материалов уходил на /api/admin/projects/undefined/materials
-        // и каталог материалов всегда оставался пустым.
         fetch("/api/admin/projects"),
       ]);
 
@@ -101,14 +98,12 @@ export default function PromocodeManager() {
         const pList = projectsData.projects || [];
         setProjectsList(pList);
 
-        // Если проектов нет — не загружаем материалы
         if (pList.length === 0) {
           setMaterialsCatalog([]);
           setLoading(false);
           return;
         }
 
-        // Загружаем материалы через админский эндпоинт, чтобы видеть секретные
         const matPromises = pList.map((p: ProjectItem) =>
           fetch(`/api/admin/projects/${p.id}/materials`).then(async (r) => {
             if (!r.ok) {
@@ -120,17 +115,10 @@ export default function PromocodeManager() {
         );
         const matResults = await Promise.all(matPromises);
         
-        // Маппинг с fallback на разные возможные имена полей
         const allMats = matResults.flatMap((mRes) => {
-          // Логируем ответ для отладки
-          if (process.env.NODE_ENV !== "production") {
-            console.log("Materials response for project:", mRes);
-          }
-          // Поддерживаем разные варианты: materials, data, items
           return mRes.materials || mRes.data || mRes.items || [];
         });
 
-        // Убедимся, что у всех материалов есть is_secret (по умолчанию false)
         const normalizedMats = allMats.map((m: any) => ({
           ...m,
           is_secret: m.is_secret ?? false,
@@ -140,7 +128,6 @@ export default function PromocodeManager() {
       }
     } catch (e) {
       console.error("Failed to load data:", e);
-      // При ошибке показываем пустой каталог, но не ломаем интерфейс
       setMaterialsCatalog([]);
     } finally {
       setLoading(false);
@@ -149,7 +136,6 @@ export default function PromocodeManager() {
 
   const handleOpenModal = (item?: PromocodeItem) => {
     setUploadError(null);
-    // Сбрасываем поиск при открытии модалки
     setMaterialSearch("");
     if (item) {
       setFormId(item.id);
@@ -345,9 +331,353 @@ export default function PromocodeManager() {
     }
   };
 
+  const modalElement = isModalOpen && mounted ? (
+    <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+      <div 
+        className="modal-panel max-w-2xl" 
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header">
+          <div className="modal-title-wrap">
+            <span className="modal-icon">🎁</span>
+            <h2 className="modal-title">
+              {formId ? "Редактировать промокод" : "Конструктор промокода"}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(false)}
+            className="modal-close"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="modal-body">
+          <form onSubmit={handleSavePromocode} className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Промокод (слово)
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Например: HIPPO2026"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs font-mono font-black text-emerald-700 focus:outline-none focus:border-emerald-500 uppercase transition-colors"
+                />
+              </div>
+
+              <div className="flex items-center pt-6">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span>Промокод активен</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-4">
+              <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
+                Ограничения
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={hasMaxUses}
+                      onChange={(e) => setHasMaxUses(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+                    />
+                    <span>Лимит кол-ва активаций</span>
+                  </label>
+
+                  {hasMaxUses && (
+                    <input
+                      type="number"
+                      min={1}
+                      value={maxUses}
+                      onChange={(e) => setMaxUses(Number(e.target.value))}
+                      className="w-full bg-white border-2 border-gray-200 rounded-xl p-2 text-xs font-bold text-gray-800"
+                      placeholder="Количество"
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={hasExpiresAt}
+                      onChange={(e) => setHasExpiresAt(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+                    />
+                    <span>Ограничение по времени</span>
+                  </label>
+
+                  {hasExpiresAt && (
+                    <input
+                      type="datetime-local"
+                      value={expiresAt}
+                      onChange={(e) => setExpiresAt(e.target.value)}
+                      className="w-full bg-white border-2 border-gray-200 rounded-xl p-2 text-xs font-bold text-gray-800"
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
+                Начинка промокода
+              </h3>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-2">
+                  🎽 Награды из каталога
+                </label>
+                <div className="max-h-36 overflow-y-auto bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-1.5">
+                  {rewardsCatalog.length === 0 ? (
+                    <div className="text-xs text-gray-400 font-bold">Каталог пуст</div>
+                  ) : (
+                    rewardsCatalog.map((r: RewardItem) => (
+                      <label
+                        key={r.id}
+                        className="flex items-center gap-2 cursor-pointer hover:bg-white p-1.5 rounded-lg text-xs text-gray-800 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedRewardIds.includes(r.id)}
+                          onChange={() => handleToggleReward(r.id)}
+                          className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600"
+                        />
+                        <span>
+                          [{r.type}] <b>{r.title}</b>
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs font-bold text-gray-700">
+                    📚 Конкретные материалы ({selectedSpecificMaterialIds.length} выбр.)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPickerOpen(!isPickerOpen);
+                      if (!isPickerOpen) setMaterialSearch("");
+                    }}
+                    className="text-xs font-bold text-emerald-600 hover:text-emerald-800"
+                  >
+                    {isPickerOpen ? "Закрыть селектор" : "Выбрать из каталога"}
+                  </button>
+                </div>
+
+                {isPickerOpen && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 space-y-3">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="🔍 Поиск по названию..."
+                        value={materialSearch}
+                        onChange={(e) => setMaterialSearch(e.target.value)}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-emerald-500 transition-colors"
+                      />
+                      {materialSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setMaterialSearch("")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto space-y-1.5">
+                      {filteredMaterials.length === 0 ? (
+                        <div className="text-xs text-gray-400 font-bold py-4 text-center">
+                          {materialSearch ? "Ничего не найдено" : "Материалы не загружены"}
+                        </div>
+                      ) : (
+                        filteredMaterials.map((m) => {
+                          const isChecked = selectedSpecificMaterialIds.includes(m.id);
+                          return (
+                            <label
+                              key={m.id}
+                              className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors"
+                            >
+                              <span className="font-bold text-xs text-gray-800">
+                                {m.title}
+                                {m.is_secret && (
+                                  <span className="ml-2 text-[10px] text-purple-600 font-extrabold bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                                    🔒 Секретный
+                                  </span>
+                                )}
+                              </span>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleToggleSpecificMaterial(m.id)}
+                                className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
+                              />
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  🎓 Сколько материалов ученик выбирает САМ
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={materialChoiceCount}
+                  onChange={(e) => setMaterialChoiceCount(Number(e.target.value))}
+                  className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80 space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-amber-900">
+                  <input
+                    type="checkbox"
+                    checked={hasPhysicalPrize}
+                    onChange={(e) => setHasPhysicalPrize(e.target.checked)}
+                    className="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span>🧸 Добавить физический подарок</span>
+                </label>
+
+                {hasPhysicalPrize && (
+                  <div className="space-y-3 pt-2">
+                    <input
+                      type="text"
+                      required={hasPhysicalPrize}
+                      placeholder="Заголовок"
+                      value={physicalTitle}
+                      onChange={(e) => setPhysicalTitle(e.target.value)}
+                      className="w-full bg-white border-2 border-amber-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
+                    />
+
+                    <textarea
+                      rows={2}
+                      required={hasPhysicalPrize}
+                      placeholder="Инструкция для ученика"
+                      value={physicalText}
+                      onChange={(e) => setPhysicalText(e.target.value)}
+                      className="w-full bg-white border-2 border-amber-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
+                    />
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-900 mb-1">
+                        Изображение подарка
+                      </label>
+                      <div
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onClick={() => !uploading && fileInputRef.current?.click()}
+                        className={`border-2 border-dashed rounded-2xl p-3 text-center cursor-pointer transition-all ${
+                          isDragging
+                            ? "border-amber-500 bg-amber-100/50 scale-[1.01]"
+                            : "border-amber-200 bg-white hover:bg-amber-50/50"
+                        }`}
+                      >
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={fileInputRef}
+                          onChange={handleFileSelect}
+                          className="hidden"
+                          disabled={uploading}
+                        />
+
+                        {physicalImageUrl ? (
+                          <div className="flex items-center justify-between gap-3 bg-amber-50 p-2 rounded-xl border border-amber-200">
+                            <img
+                              src={physicalImageUrl}
+                              alt="Превью"
+                              className="w-10 h-10 object-contain rounded-lg border bg-white"
+                            />
+                            <div className="flex-1 text-left min-w-0">
+                              <div className="text-[10px] font-extrabold text-amber-900 truncate">
+                                ✅ Картинка загружена
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPhysicalImageUrl("");
+                              }}
+                              className="text-xs font-bold text-red-500 hover:text-red-700 p-1"
+                            >
+                              ✖
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="py-1">
+                            <div className="text-xl mb-0.5">{uploading ? "⚡" : "🎁"}</div>
+                            <div className="text-xs font-bold text-amber-900">
+                              {uploading ? "Загрузка..." : "Перетащите картинку приза"}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {uploadError && (
+                        <div className="text-[10px] font-bold text-red-600 mt-1">
+                          ⚠️ {uploadError}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={saving || uploading}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl disabled:opacity-50 transition-colors shadow-sm"
+              >
+                {saving ? "Сохранение..." : "Сохранить промокод"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-6">
-      {/* Переключатель подтабов */}
       <div className="flex justify-between items-center bg-gray-50 p-4 border border-gray-200 rounded-2xl">
         <div className="flex gap-2">
           <button
@@ -394,7 +724,6 @@ export default function PromocodeManager() {
         )}
       </div>
 
-      {/* Список промокодов */}
       {activeSubTab === "constructor" && (
         <>
           {loading ? (
@@ -529,7 +858,6 @@ export default function PromocodeManager() {
         </>
       )}
 
-      {/* Таблица логов */}
       {activeSubTab === "logs" && (
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden">
           <h2 className="text-base font-black text-gray-900 mb-4">История активации промокодов</h2>
@@ -597,346 +925,7 @@ export default function PromocodeManager() {
         </div>
       )}
 
-      {/* Модалка Конструктора */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-gray-200 rounded-3xl max-w-2xl w-full p-6 space-y-6 my-8 max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h2 className="text-lg font-black text-gray-900">
-                {formId ? "Редактировать промокод" : "Конструктор промокода"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-700 font-bold p-1 rounded-lg text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSavePromocode} className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Промокод (слово)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Например: HIPPO2026"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
-                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs font-mono font-black text-emerald-700 focus:outline-none focus:border-emerald-500 uppercase transition-colors"
-                  />
-                </div>
-
-                <div className="flex items-center pt-6">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={isActive}
-                      onChange={(e) => setIsActive(e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span>Промокод активен</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-4">
-                <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
-                  Ограничения
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={hasMaxUses}
-                        onChange={(e) => setHasMaxUses(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-emerald-600"
-                      />
-                      <span>Лимит кол-ва активаций</span>
-                    </label>
-
-                    {hasMaxUses && (
-                      <input
-                        type="number"
-                        min={1}
-                        value={maxUses}
-                        onChange={(e) => setMaxUses(Number(e.target.value))}
-                        className="w-full bg-white border-2 border-gray-200 rounded-xl p-2 text-xs font-bold text-gray-800"
-                        placeholder="Количество"
-                      />
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={hasExpiresAt}
-                        onChange={(e) => setHasExpiresAt(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-emerald-600"
-                      />
-                      <span>Ограничение по времени</span>
-                    </label>
-
-                    {hasExpiresAt && (
-                      <input
-                        type="datetime-local"
-                        value={expiresAt}
-                        onChange={(e) => setExpiresAt(e.target.value)}
-                        className="w-full bg-white border-2 border-gray-200 rounded-xl p-2 text-xs font-bold text-gray-800"
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
-                  Начинка промокода
-                </h3>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-2">
-                    🎽 Награды из каталога
-                  </label>
-                  <div className="max-h-36 overflow-y-auto bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-1.5">
-                    {rewardsCatalog.length === 0 ? (
-                      <div className="text-xs text-gray-400 font-bold">Каталог пуст</div>
-                    ) : (
-                      rewardsCatalog.map((r: RewardItem) => (
-                        <label
-                          key={r.id}
-                          className="flex items-center gap-2 cursor-pointer hover:bg-white p-1.5 rounded-lg text-xs text-gray-800 transition-colors"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedRewardIds.includes(r.id)}
-                            onChange={() => handleToggleReward(r.id)}
-                            className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600"
-                          />
-                          <span>
-                            [{r.type}] <b>{r.title}</b>
-                          </span>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Выбор конкретных материалов */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block text-xs font-bold text-gray-700">
-                      📚 Конкретные материалы ({selectedSpecificMaterialIds.length} выбр.)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPickerOpen(!isPickerOpen);
-                        if (!isPickerOpen) setMaterialSearch("");
-                      }}
-                      className="text-xs font-bold text-emerald-600 hover:text-emerald-800"
-                    >
-                      {isPickerOpen ? "Закрыть селектор" : "Выбрать из каталога"}
-                    </button>
-                  </div>
-
-                  {isPickerOpen && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 space-y-3">
-                      {/* Поле поиска */}
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder="🔍 Поиск по названию..."
-                          value={materialSearch}
-                          onChange={(e) => setMaterialSearch(e.target.value)}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-emerald-500 transition-colors"
-                        />
-                        {materialSearch && (
-                          <button
-                            type="button"
-                            onClick={() => setMaterialSearch("")}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Список материалов с прокруткой */}
-                      <div className="max-h-48 overflow-y-auto space-y-1.5">
-                        {filteredMaterials.length === 0 ? (
-                          <div className="text-xs text-gray-400 font-bold py-4 text-center">
-                            {materialSearch ? "Ничего не найдено" : "Материалы не загружены"}
-                          </div>
-                        ) : (
-                          filteredMaterials.map((m) => {
-                            const isChecked = selectedSpecificMaterialIds.includes(m.id);
-                            return (
-                              <label
-                                key={m.id}
-                                className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors"
-                              >
-                                <span className="font-bold text-xs text-gray-800">
-                                  {m.title}
-                                  {m.is_secret && (
-                                    <span className="ml-2 text-[10px] text-purple-600 font-extrabold bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                                      🔒 Секретный
-                                    </span>
-                                  )}
-                                </span>
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => handleToggleSpecificMaterial(m.id)}
-                                  className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
-                                />
-                              </label>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    🎓 Сколько материалов ученик выбирает САМ
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={materialChoiceCount}
-                    onChange={(e) => setMaterialChoiceCount(Number(e.target.value))}
-                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80 space-y-3">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-amber-900">
-                    <input
-                      type="checkbox"
-                      checked={hasPhysicalPrize}
-                      onChange={(e) => setHasPhysicalPrize(e.target.checked)}
-                      className="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
-                    />
-                    <span>🧸 Добавить физический подарок</span>
-                  </label>
-
-                  {hasPhysicalPrize && (
-                    <div className="space-y-3 pt-2">
-                      <input
-                        type="text"
-                        required={hasPhysicalPrize}
-                        placeholder="Заголовок"
-                        value={physicalTitle}
-                        onChange={(e) => setPhysicalTitle(e.target.value)}
-                        className="w-full bg-white border-2 border-amber-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
-                      />
-
-                      <textarea
-                        rows={2}
-                        required={hasPhysicalPrize}
-                        placeholder="Инструкция для ученика"
-                        value={physicalText}
-                        onChange={(e) => setPhysicalText(e.target.value)}
-                        className="w-full bg-white border-2 border-amber-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
-                      />
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-amber-900 mb-1">
-                          Изображение подарка
-                        </label>
-                        <div
-                          onDragOver={handleDragOver}
-                          onDragLeave={handleDragLeave}
-                          onDrop={handleDrop}
-                          onClick={() => !uploading && fileInputRef.current?.click()}
-                          className={`border-2 border-dashed rounded-2xl p-3 text-center cursor-pointer transition-all ${
-                            isDragging
-                              ? "border-amber-500 bg-amber-100/50 scale-[1.01]"
-                              : "border-amber-200 bg-white hover:bg-amber-50/50"
-                          }`}
-                        >
-                          <input
-                            type="file"
-                            accept="image/*"
-                            ref={fileInputRef}
-                            onChange={handleFileSelect}
-                            className="hidden"
-                            disabled={uploading}
-                          />
-
-                          {physicalImageUrl ? (
-                            <div className="flex items-center justify-between gap-3 bg-amber-50 p-2 rounded-xl border border-amber-200">
-                              <img
-                                src={physicalImageUrl}
-                                alt="Превью"
-                                className="w-10 h-10 object-contain rounded-lg border bg-white"
-                              />
-                              <div className="flex-1 text-left min-w-0">
-                                <div className="text-[10px] font-extrabold text-amber-900 truncate">
-                                  ✅ Картинка загружена
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPhysicalImageUrl("");
-                                }}
-                                className="text-xs font-bold text-red-500 hover:text-red-700 p-1"
-                              >
-                                ✖
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="py-1">
-                              <div className="text-xl mb-0.5">{uploading ? "⚡" : "🎁"}</div>
-                              <div className="text-xs font-bold text-amber-900">
-                                {uploading ? "Загрузка..." : "Перетащите картинку приза"}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {uploadError && (
-                          <div className="text-[10px] font-bold text-red-600 mt-1">
-                            ⚠️ {uploadError}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving || uploading}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl disabled:opacity-50 transition-colors shadow-sm"
-                >
-                  {saving ? "Сохранение..." : "Сохранить промокод"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {modalElement && createPortal(modalElement, document.body)}
     </div>
   );
 }
