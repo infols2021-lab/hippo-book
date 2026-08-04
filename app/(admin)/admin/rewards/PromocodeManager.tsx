@@ -79,7 +79,11 @@ export default function PromocodeManager() {
       const [promosRes, rewardsRes, projectsRes] = await Promise.all([
         fetch("/api/admin/promocodes"),
         fetch("/api/admin/rewards"),
-        fetch("/api/projects"),
+        // ВАЖНО: используем АДМИНСКИЙ эндпоинт списка проектов, а не публичный /api/projects.
+        // Публичный роут не отдаёт поле id у проекта (только slug/name/tabs и т.п.),
+        // из-за чего дальнейший запрос материалов уходил на /api/admin/projects/undefined/materials
+        // и каталог материалов всегда оставался пустым.
+        fetch("/api/admin/projects"),
       ]);
 
       const promosData = await promosRes.json();
