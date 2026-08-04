@@ -13,13 +13,13 @@ export default function PromocodeManager() {
   const [activeSubTab, setActiveSubTab] = useState<"constructor" | "logs">("constructor");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Drag and Drop загрузка изображений физического подарка
+  // Drag and Drop
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Поля формы промокода
+  // Поля формы
   const [formId, setFormId] = useState<string | undefined>(undefined);
   const [code, setCode] = useState("");
   const [isActive, setIsActive] = useState(true);
@@ -30,7 +30,7 @@ export default function PromocodeManager() {
   const [hasExpiresAt, setHasExpiresAt] = useState(false);
   const [expiresAt, setExpiresAt] = useState<string>("");
 
-  // Начинка (rewards_bundle)
+  // Начинка
   const [selectedRewardIds, setSelectedRewardIds] = useState<string[]>([]);
   const [specificMaterialIdsText, setSpecificMaterialIdsText] = useState("");
   const [materialChoiceCount, setMaterialChoiceCount] = useState<number>(0);
@@ -127,10 +127,9 @@ export default function PromocodeManager() {
     );
   };
 
-  // Загрузка изображений подарка в Storage
   const handleFileUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      setUploadError("Пожалуйста, загружайте только изображения (PNG, WEBP, SVG, JPG)");
+      setUploadError("Пожалуйста, загружайте только изображения");
       return;
     }
 
@@ -239,7 +238,7 @@ export default function PromocodeManager() {
   };
 
   const handleDeletePromocode = async (id: string) => {
-    if (!confirm("Удалить этот промокод? Ученики больше не смогут его вводить.")) return;
+    if (!confirm("Удалить этот промокод?")) return;
 
     try {
       const res = await fetch(`/api/admin/promocodes?id=${id}`, { method: "DELETE" });
@@ -253,7 +252,7 @@ export default function PromocodeManager() {
 
   return (
     <div className="space-y-6">
-      {/* Переключатель Подтабов */}
+      {/* Переключатель подтабов */}
       <div className="flex justify-between items-center bg-gray-50 p-4 border border-gray-200 rounded-2xl">
         <div className="flex gap-2">
           <button
@@ -291,7 +290,7 @@ export default function PromocodeManager() {
         )}
       </div>
 
-      {/* Вкладка 1: Список Промокодов */}
+      {/* Список промокодов */}
       {activeSubTab === "constructor" && (
         <>
           {loading ? (
@@ -344,7 +343,6 @@ export default function PromocodeManager() {
                         </div>
                       </div>
 
-                      {/* Статусы и ограничения */}
                       <div className="flex flex-wrap gap-1.5 mb-4">
                         <span
                           className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
@@ -374,7 +372,6 @@ export default function PromocodeManager() {
                         )}
                       </div>
 
-                      {/* Начинка промокода */}
                       <div className="space-y-1.5 text-xs text-gray-700 bg-gray-50 p-3 rounded-xl border border-gray-200">
                         {bundle.reward_ids && bundle.reward_ids.length > 0 && (
                           <div className="flex items-center gap-1.5">
@@ -428,7 +425,7 @@ export default function PromocodeManager() {
         </>
       )}
 
-      {/* Вкладка 2: Таблица Логов Активаций */}
+      {/* Таблица логов */}
       {activeSubTab === "logs" && (
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden">
           <h2 className="text-base font-black text-gray-900 mb-4">История ввода промокодов</h2>
@@ -483,7 +480,7 @@ export default function PromocodeManager() {
         </div>
       )}
 
-      {/* Модалка Конструктора Промокода */}
+      {/* Модалка конструктора */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white border border-gray-200 rounded-3xl max-w-2xl w-full p-6 space-y-6 my-8 max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95">
@@ -501,7 +498,6 @@ export default function PromocodeManager() {
             </div>
 
             <form onSubmit={handleSavePromocode} className="space-y-6">
-              {/* Основные настройки */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
@@ -530,14 +526,12 @@ export default function PromocodeManager() {
                 </div>
               </div>
 
-              {/* Ограничения */}
               <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-4">
                 <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
                   Ограничения (необязательно)
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Лимит использования */}
                   <div className="space-y-2">
                     <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
                       <input
@@ -556,12 +550,11 @@ export default function PromocodeManager() {
                         value={maxUses}
                         onChange={(e) => setMaxUses(Number(e.target.value))}
                         className="w-full bg-white border-2 border-gray-200 rounded-xl p-2 text-xs font-bold text-gray-800"
-                        placeholder="Количество (например: 50)"
+                        placeholder="Количество"
                       />
                     )}
                   </div>
 
-                  {/* Ограничение по дате */}
                   <div className="space-y-2">
                     <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
                       <input
@@ -585,16 +578,14 @@ export default function PromocodeManager() {
                 </div>
               </div>
 
-              {/* Бандл Наград */}
               <div className="space-y-4">
                 <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
-                  Начинка промокода (выберите призы)
+                  Начинка промокода
                 </h3>
 
-                {/* 1. Предметы из каталога */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-2">
-                    🎽 Награды из каталога (шмотки, базы, титулы)
+                    🎽 Награды из каталога
                   </label>
                   <div className="max-h-36 overflow-y-auto bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-1.5">
                     {rewardsCatalog.length === 0 ? (
@@ -620,10 +611,9 @@ export default function PromocodeManager() {
                   </div>
                 </div>
 
-                {/* 2. Конкретные и секретные материалы */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    📚 Конкретные / Секретные материалы (UUID через запятую)
+                    📚 Конкретные материалы (UUID)
                   </label>
                   <input
                     type="text"
@@ -634,7 +624,6 @@ export default function PromocodeManager() {
                   />
                 </div>
 
-                {/* 3. Материал на выбор ученика */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
                     🎓 Сколько материалов ученик выбирает САМ
@@ -648,7 +637,6 @@ export default function PromocodeManager() {
                   />
                 </div>
 
-                {/* 4. Физический подарок с Drag & Drop загрузкой изображения */}
                 <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80 space-y-3">
                   <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-amber-900">
                     <input
@@ -657,7 +645,7 @@ export default function PromocodeManager() {
                       onChange={(e) => setHasPhysicalPrize(e.target.checked)}
                       className="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
                     />
-                    <span>🧸 Добавить физический подарок / Поздравление</span>
+                    <span>🧸 Добавить физический подарок</span>
                   </label>
 
                   {hasPhysicalPrize && (
@@ -665,7 +653,7 @@ export default function PromocodeManager() {
                       <input
                         type="text"
                         required={hasPhysicalPrize}
-                        placeholder="Заголовок (например: 🎉 Ты выиграл плюшевую тучку!)"
+                        placeholder="Заголовок"
                         value={physicalTitle}
                         onChange={(e) => setPhysicalTitle(e.target.value)}
                         className="w-full bg-white border-2 border-amber-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
@@ -674,16 +662,15 @@ export default function PromocodeManager() {
                       <textarea
                         rows={2}
                         required={hasPhysicalPrize}
-                        placeholder="Инструкция для ученика (например: Покажи этот экран администратору...)"
+                        placeholder="Инструкция для ученика"
                         value={physicalText}
                         onChange={(e) => setPhysicalText(e.target.value)}
                         className="w-full bg-white border-2 border-amber-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
                       />
 
-                      {/* Drag and Drop зона для картинки подарка */}
                       <div>
                         <label className="block text-[11px] font-bold text-amber-900 mb-1">
-                          Изображение подарка (PNG / JPG / WEBP)
+                          Изображение подарка
                         </label>
                         <div
                           onDragOver={handleDragOver}
@@ -714,10 +701,7 @@ export default function PromocodeManager() {
                               />
                               <div className="flex-1 text-left min-w-0">
                                 <div className="text-[10px] font-extrabold text-amber-900 truncate">
-                                  ✅ Картинка подарка загружена
-                                </div>
-                                <div className="text-[9px] text-amber-700/70 font-mono truncate">
-                                  {physicalImageUrl}
+                                  ✅ Картинка загружена
                                 </div>
                               </div>
                               <button
@@ -735,10 +719,7 @@ export default function PromocodeManager() {
                             <div className="py-1">
                               <div className="text-xl mb-0.5">{uploading ? "⚡" : "🎁"}</div>
                               <div className="text-xs font-bold text-amber-900">
-                                {uploading ? "Загрузка изображения..." : "Перетащите сюда картинку приза"}
-                              </div>
-                              <div className="text-[10px] text-amber-700/70">
-                                или кликните для выбора
+                                {uploading ? "Загрузка..." : "Перетащите картинку приза"}
                               </div>
                             </div>
                           )}
@@ -752,7 +733,7 @@ export default function PromocodeManager() {
 
                         <input
                           type="text"
-                          placeholder="Или вставьте прямую ссылку..."
+                          placeholder="Прямая ссылка..."
                           value={physicalImageUrl}
                           onChange={(e) => setPhysicalImageUrl(e.target.value)}
                           className="w-full bg-white border border-amber-200 rounded-xl p-2 text-[10px] font-mono text-gray-700 mt-2 focus:outline-none focus:border-amber-500"
@@ -763,7 +744,6 @@ export default function PromocodeManager() {
                 </div>
               </div>
 
-              {/* Кнопки */}
               <div className="flex justify-end gap-2 pt-4 border-t">
                 <button
                   type="button"

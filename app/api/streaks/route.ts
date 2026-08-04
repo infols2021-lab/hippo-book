@@ -31,7 +31,7 @@ export async function GET() {
 
     const adminSupabase = getSupabaseAdminClient();
 
-    // 1. Запрашиваем данные из profiles и user_streaks (добавлено selected_streak_title_code)
+    // 1. Запрашиваем данные из user_streaks и profiles
     const [{ data: userStreakRow }, { data: profileRow }] = await Promise.all([
       adminSupabase
         .from("user_streaks")
@@ -40,7 +40,7 @@ export async function GET() {
         .maybeSingle(),
       adminSupabase
         .from("profiles")
-        .select("current_streak, max_streak, longest_streak, last_completed_at, selected_streak_title_code")
+        .select("selected_streak_title_code")
         .eq("id", user.id)
         .maybeSingle(),
     ]);
@@ -55,9 +55,7 @@ export async function GET() {
       .maybeSingle();
 
     const isCompletedToday = Boolean(
-      todayDay ||
-        userStreakRow?.last_completed_date === todayStr ||
-        profileRow?.last_completed_at?.startsWith(todayStr)
+      todayDay || userStreakRow?.last_completed_date === todayStr
     );
 
     // 3. Запрашиваем дорожку наград
@@ -73,10 +71,10 @@ export async function GET() {
     }
 
     const currentStreak = Number(
-      profileRow?.current_streak ?? userStreakRow?.current_streak ?? pathStats?.currentStreak ?? 0
+      userStreakRow?.current_streak ?? pathStats?.currentStreak ?? 0
     );
     const longestStreak = Number(
-      profileRow?.max_streak ?? profileRow?.longest_streak ?? userStreakRow?.longest_streak ?? pathStats?.maxStreak ?? currentStreak
+      userStreakRow?.longest_streak ?? pathStats?.maxStreak ?? currentStreak
     );
     const completedToday = isCompletedToday || Boolean(pathStats?.completedToday);
 
@@ -85,7 +83,7 @@ export async function GET() {
       maxStreak: longestStreak,
       longestStreak,
       completedToday,
-      lastCompletedAt: userStreakRow?.last_completed_date || profileRow?.last_completed_at || pathStats?.lastCompletedAt || null,
+      lastCompletedAt: userStreakRow?.last_completed_date || pathStats?.lastCompletedAt || null,
     };
 
     // 4. Экипировка маскота / титулы

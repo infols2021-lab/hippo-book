@@ -2,6 +2,7 @@
 // Серверный слой работы с базой данных Supabase: Маскот, Стрики и Промокоды.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type {
   MascotSettings,
   RewardItem,
@@ -136,35 +137,35 @@ export async function getStreakPath(
   stats: StreakStats;
   path: StreakConfigItem[];
 }> {
-  const [{ data: profile }, { data: streakConfig }, { data: inventory }] =
+  const adminSupabase = getSupabaseAdminClient();
+
+  const [{ data: streakRow }, { data: streakConfig }, { data: inventory }] =
     await Promise.all([
-      supabase
-        .from("profiles")
-        .select("current_streak, max_streak, longest_streak, last_completed_at")
-        .eq("id", userId)
+      adminSupabase
+        .from("user_streaks")
+        .select("current_streak, longest_streak, last_completed_date")
+        .eq("user_id", userId)
         .maybeSingle(),
-      supabase
+      adminSupabase
         .from("streak_config")
         .select("day_number, reward_id, created_at, reward:rewards(*)")
         .order("day_number", { ascending: true }),
-      supabase
+      adminSupabase
         .from("user_inventory")
         .select("reward_id")
         .eq("user_id", userId)
         .eq("source", "streak"),
     ]);
 
-  const currentStreak = Number(profile?.current_streak || 0);
-  const maxStreak = Number(
-    profile?.max_streak ?? profile?.longest_streak ?? currentStreak
-  );
-  const lastCompletedAt = profile?.last_completed_at
-    ? String(profile.last_completed_at)
+  const currentStreak = Number(streakRow?.current_streak || 0);
+  const maxStreak = Number(streakRow?.longest_streak ?? currentStreak);
+  const lastCompletedAt = streakRow?.last_completed_date
+    ? String(streakRow.last_completed_date)
     : null;
 
   let completedToday = false;
   if (lastCompletedAt) {
-    const lastDate = new Date(lastCompletedAt).toISOString().split("T")[0];
+    const lastDate = lastCompletedAt.split("T")[0];
     const todayDate = new Date().toISOString().split("T")[0];
     completedToday = lastDate === todayDate;
   }
@@ -173,7 +174,6 @@ export async function getStreakPath(
     Array.isArray(inventory) ? inventory.map((item) => item.reward_id) : []
   );
 
-  // Награды разблокируются по МАКСИМАЛЬНОЙ серии (рекорду)
   const path: StreakConfigItem[] = Array.isArray(streakConfig)
     ? streakConfig.map((item: any) => {
         const isClaimed = claimedRewardIds.has(item.reward_id);
@@ -201,11 +201,13 @@ export async function getStreakLeaderboard(
   supabase: SupabaseClient,
   currentUserId?: string
 ): Promise<StreakLeaderboardEntry[]> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, current_streak, max_streak, longest_streak")
-    .or("current_streak.gt.0,max_streak.gt.0,longest_streak.gt.0")
-    .order("max_streak", { ascending: false })
+  const adminSupabase = getSupabaseAdminClient();
+
+  const { data, error } = await adminSupabase
+    .from("user_streaks")
+    .select("user_id, current_streak, longest_streak")
+    .or("current_streak.gt.0,longest_streak.gt.0")
+    .order("longest_streak", { ascending: false })
     .order("current_streak", { ascending: false })
     .limit(20);
 
@@ -213,14 +215,14 @@ export async function getStreakLeaderboard(
 
   return data.map((row: any, index: number) => {
     const current = Number(row.current_streak || 0);
-    const max = Number(row.max_streak ?? row.longest_streak ?? current);
+    const max = Number(row.longest_streak ?? current);
 
     return {
       rank: index + 1,
-      user_id: row.id,
+      user_id: row.user_id,
       current_streak: current,
       max_streak: max,
-      is_current_user: row.id === currentUserId,
+      is_current_user: row.user_id === currentUserId,
     };
   });
 }
@@ -230,21 +232,23 @@ export async function claimStreakReward(
   userId: string,
   dayNumber: number
 ): Promise<{ success: boolean; reward?: RewardItem; error?: string }> {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("current_streak, max_streak, longest_streak")
-    .eq("id", userId)
+  const adminSupabase = getSupabaseAdminClient();
+
+  const { data: streakRow } = await adminSupabase
+    .from("user_streaks")
+    .select("current_streak, longest_streak")
+    .eq("user_id", userId)
     .maybeSingle();
 
   const maxStreak = Number(
-    profile?.max_streak ?? profile?.longest_streak ?? profile?.current_streak ?? 0
+    streakRow?.longest_streak ?? streakRow?.current_streak ?? 0
   );
 
   if (maxStreak < dayNumber) {
     return { success: false, error: "Вы ещё не достигли этого рекорда серии." };
   }
 
-  const { data: streakConfig } = await supabase
+  const { data: streakConfig } = await adminSupabase
     .from("streak_config")
     .select("reward_id, reward:rewards(*)")
     .eq("day_number", dayNumber)
@@ -256,7 +260,7 @@ export async function claimStreakReward(
 
   const rewardId = streakConfig.reward_id;
 
-  const { error: insertError } = await supabase.from("user_inventory").insert({
+  const { error: insertError } = await adminSupabase.from("user_inventory").insert({
     user_id: userId,
     reward_id: rewardId,
     source: "streak",
@@ -288,7 +292,9 @@ export async function redeemPromocode(
   const code = String(rawCode || "").trim().toUpperCase();
   if (!code) return { success: false, error: "Введите промокод." };
 
-  const { data: promo, error: promoError } = await supabase
+  const adminSupabase = getSupabaseAdminClient();
+
+  const { data: promo, error: promoError } = await adminSupabase
     .from("promocodes")
     .select("*")
     .eq("code", code)
@@ -310,8 +316,8 @@ export async function redeemPromocode(
     return { success: false, error: "Лимит активаций промокода исчерпан." };
   }
 
-  // Проверка на повторную активацию
-  const { data: existingRedemption } = await supabase
+  // Строгая проверка на повторную активацию через admin-клиент
+  const { data: existingRedemption } = await adminSupabase
     .from("promocode_redemptions")
     .select("id")
     .eq("promocode_id", promo.id)
@@ -343,11 +349,11 @@ export async function redeemPromocode(
       source: "promocode" as const,
     }));
 
-    await supabase
+    await adminSupabase
       .from("user_inventory")
       .upsert(inventoryRows, { onConflict: "user_id,reward_id" });
 
-    const { data: rewardsData } = await supabase
+    const { data: rewardsData } = await adminSupabase
       .from("rewards")
       .select("*")
       .in("id", bundle.reward_ids);
@@ -368,27 +374,34 @@ export async function redeemPromocode(
       material_id: mId,
     }));
 
-    await supabase
+    await adminSupabase
       .from("material_access")
       .upsert(accessRows, { onConflict: "user_id,material_id" });
   }
 
-  const { error: rpcError } = await supabase.rpc("increment_promocode_uses", {
+  const { error: rpcError } = await adminSupabase.rpc("increment_promocode_uses", {
     promo_id: promo.id,
   });
 
   if (rpcError) {
-    await supabase
+    await adminSupabase
       .from("promocodes")
       .update({ current_uses: (promo.current_uses || 0) + 1 })
       .eq("id", promo.id);
   }
 
-  await supabase.from("promocode_redemptions").insert({
-    promocode_id: promo.id,
-    user_id: userId,
-    chosen_material_ids: chosenMaterialIds,
-  });
+  // Фиксация активации через adminSupabase для гарантированного преодоления RLS
+  const { error: redemptionInsertError } = await adminSupabase
+    .from("promocode_redemptions")
+    .insert({
+      promocode_id: promo.id,
+      user_id: userId,
+      chosen_material_ids: chosenMaterialIds,
+    });
+
+  if (redemptionInsertError) {
+    console.error("Ошибка сохранения записи об активации промокода:", redemptionInsertError);
+  }
 
   return {
     success: true,

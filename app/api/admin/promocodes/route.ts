@@ -55,7 +55,7 @@ export async function GET() {
             profiles:user_id(email, full_name)
           `)
           .order("redeemed_at", { ascending: false })
-          .limit(150),
+          .limit(200),
       ]);
 
     if (promoErr) {
