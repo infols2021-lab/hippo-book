@@ -209,28 +209,49 @@ export default function ProfileClient({
       setStreakLoading(true);
       const res = await fetch("/api/streaks", { cache: "no-store" });
       const json = await res.json();
-      if (res.ok && json.ok) {
+      if (res.ok && (json.ok || json.success)) {
+        const curr =
+          json.streak?.currentStreak ??
+          json.currentStreak ??
+          json.stats?.currentStreak ??
+          0;
+        const longest =
+          json.streak?.longestStreak ??
+          json.longestStreak ??
+          json.stats?.longestStreak ??
+          json.stats?.maxStreak ??
+          0;
+        const done =
+          json.streak?.doneToday ??
+          json.stats?.doneToday ??
+          json.stats?.completedToday ??
+          false;
+        const tier = json.streak?.tierCode ?? "none";
+        const title =
+          json.equippedTitle?.label ??
+          json.equippedTitle ??
+          null;
+        const avatar = json.equippedAvatarUrl ?? null;
+
         setStreakData({
-          currentStreak: json.streak?.currentStreak ?? 0,
-          longestStreak: json.streak?.longestStreak ?? 0,
-          doneToday: json.streak?.doneToday ?? false,
-          tierCode: json.streak?.tierCode ?? "none",
-          equippedTitle: json.equippedTitle?.label ?? null,
-          equippedAvatarUrl: json.equippedAvatarUrl ?? null,
+          currentStreak: Number(curr),
+          longestStreak: Number(longest),
+          doneToday: Boolean(done),
+          tierCode: String(tier),
+          equippedTitle: title ? String(title) : null,
+          equippedAvatarUrl: avatar ? String(avatar) : null,
         });
       }
-    } catch {
-      // Игнорируем фоновую ошибку
+    } catch (e) {
+      console.error("Ошибка получения стриков:", e);
     } finally {
       setStreakLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!streakProp) {
-      void fetchStreakData();
-    }
-  }, [streakProp]);
+    void fetchStreakData();
+  }, []);
 
   // Фоновое изображение
   useEffect(() => {

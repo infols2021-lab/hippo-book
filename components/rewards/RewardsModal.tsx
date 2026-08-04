@@ -102,14 +102,30 @@ export default function RewardsModal({
         setInventory(mascotData.inventory || []);
       }
       if (streaksRes.ok) {
-        if (streaksData.stats) {
-          setStreakStats(streaksData.stats);
-        } else {
-          setStreakStats((prev) => ({
-            ...prev,
-            currentStreak: streaksData.currentStreak || 0,
-          }));
-        }
+        const curr =
+          streaksData.streak?.currentStreak ??
+          streaksData.stats?.currentStreak ??
+          streaksData.currentStreak ??
+          0;
+        const max =
+          streaksData.streak?.longestStreak ??
+          streaksData.stats?.longestStreak ??
+          streaksData.stats?.maxStreak ??
+          streaksData.longestStreak ??
+          0;
+        const done =
+          streaksData.streak?.doneToday ??
+          streaksData.stats?.doneToday ??
+          streaksData.stats?.completedToday ??
+          false;
+
+        setStreakStats({
+          currentStreak: Number(curr),
+          maxStreak: Number(max),
+          completedToday: Boolean(done),
+          lastCompletedAt: null,
+        });
+
         setStreakPath(streaksData.path || []);
       }
     } catch (e) {
@@ -333,8 +349,14 @@ export default function RewardsModal({
                         ))}
                       </div>
 
-                      {/* Сетка инвентаря */}
-                      <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3 pr-1">
+                      {/* Инвентарь предметов */}
+                      <div
+                        className={`flex-1 overflow-y-auto pr-1 ${
+                          wardrobeCategory === "title"
+                            ? "flex flex-col gap-2.5"
+                            : "grid grid-cols-2 sm:grid-cols-3 gap-3"
+                        }`}
+                      >
                         {filteredInventory.length === 0 ? (
                           <div className="col-span-full py-12 text-center text-slate-400 text-xs">
                             У вас пока нет предметов в этой категории.
@@ -346,6 +368,57 @@ export default function RewardsModal({
                             if (!item.reward) return null;
                             const equipped = isItemEquipped(item.reward.id);
 
+                            // Оформление для ТИТУЛОВ (полноширинная плашка)
+                            if (wardrobeCategory === "title") {
+                              return (
+                                <div
+                                  key={item.id}
+                                  onClick={() =>
+                                    handleEquip(
+                                      wardrobeCategory,
+                                      equipped ? null : item.reward!.id
+                                    )
+                                  }
+                                  className={`w-full border rounded-2xl p-3.5 flex items-center justify-between cursor-pointer transition-all relative group ${
+                                    equipped
+                                      ? "border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/10"
+                                      : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-950"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                                    <span className="text-xl flex-shrink-0">🏷️</span>
+                                    <div className="min-w-0">
+                                      <span
+                                        className="font-bold text-xs sm:text-sm px-3 py-1 rounded-full border inline-block truncate max-w-full"
+                                        style={{
+                                          borderColor:
+                                            item.reward.meta?.color || "#8b5cf6",
+                                          color:
+                                            item.reward.meta?.color || "#8b5cf6",
+                                          backgroundColor: `color-mix(in srgb, ${
+                                            item.reward.meta?.color || "#8b5cf6"
+                                          } 10%, transparent)`,
+                                        }}
+                                      >
+                                        «{item.reward.title}»
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <span
+                                    className={`text-xs font-bold px-3 py-1.5 rounded-xl flex-shrink-0 transition-colors ${
+                                      equipped
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 group-hover:bg-indigo-600 group-hover:text-white"
+                                    }`}
+                                  >
+                                    {equipped ? "Надето" : "Надеть"}
+                                  </span>
+                                </div>
+                              );
+                            }
+
+                            // Оформление для ВСЕХ ОСТАЛЬНЫХ ПРЕДМЕТОВ (сетка)
                             return (
                               <div
                                 key={item.id}
@@ -368,19 +441,7 @@ export default function RewardsModal({
                                 )}
 
                                 <div className="w-16 h-16 flex items-center justify-center my-2">
-                                  {item.reward.type === "title" ? (
-                                    <span
-                                      className="font-bold text-xs px-2 py-1 rounded-full border truncate max-w-full"
-                                      style={{
-                                        borderColor:
-                                          item.reward.meta?.color || "#8b5cf6",
-                                        color:
-                                          item.reward.meta?.color || "#8b5cf6",
-                                      }}
-                                    >
-                                      «{item.reward.title}»
-                                    </span>
-                                  ) : item.reward.asset_url ? (
+                                  {item.reward.asset_url ? (
                                     <img
                                       src={item.reward.asset_url}
                                       alt=""
