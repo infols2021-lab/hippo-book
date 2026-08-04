@@ -72,33 +72,40 @@
 }
 
 .admin-root .modal-panel,
-.admin-root .modal-content {
+.admin-root .modal-content,
+.modal-panel,
+.modal-content {
   background: #ffffff !important;
   color: #0f172a !important;
   border: 1px solid #e2e8f0 !important;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2) !important;
 }
 
-.admin-root .modal-header {
+.admin-root .modal-header,
+.modal-header {
   background: #f8fafc !important;
   border-bottom: 1px solid #e2e8f0 !important;
 }
 
-.admin-root .modal-title {
+.admin-root .modal-title,
+.modal-title {
   color: #0f172a !important;
 }
 
-.admin-root .modal-close {
+.admin-root .modal-close,
+.modal-close {
   color: #64748b !important;
   background: #f1f5f9 !important;
 }
 
-.admin-root .modal-close:hover {
+.admin-root .modal-close:hover,
+.modal-close:hover {
   background: #e2e8f0 !important;
   color: #0f172a !important;
 }
 
-.admin-root .modal-body {
+.admin-root .modal-body,
+.modal-body {
   color: #0f172a !important;
   background: #ffffff !important;
 }
@@ -334,7 +341,10 @@
 
 .admin-root input,
 .admin-root textarea,
-.admin-root select {
+.admin-root select,
+.modal-body input,
+.modal-body textarea,
+.modal-body select {
   border: 1px solid #cbd5e1 !important;
   background: #ffffff !important;
   color: #0f172a !important;
@@ -342,7 +352,10 @@
 
 .admin-root input:focus,
 .admin-root textarea:focus,
-.admin-root select:focus {
+.admin-root select:focus,
+.modal-body input:focus,
+.modal-body textarea:focus,
+.modal-body select:focus {
   border-color: #0ea5e9 !important;
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15) !important;
 }
@@ -727,4 +740,44 @@
   color: #64748b;
   margin-top: 4px;
   font-weight: 500;
+}
+
+/* ===== СТИЛИ СПИСКА ДОСТУПОВ (UserAccessModal) ===== */
+.access-category { 
+  margin-top: 12px; 
+}
+
+.access-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.access-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0 !important;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.access-item:hover {
+  background: #f1f5f9 !important;
+}
+
+.access-item.active {
+  background: #f0f9ff !important;
+  border-color: #0ea5e9 !important;
+}
+
+.access-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #0ea5e9;
 }

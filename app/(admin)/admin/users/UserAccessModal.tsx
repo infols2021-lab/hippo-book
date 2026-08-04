@@ -62,7 +62,6 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
   const userId = user?.id ?? null;
   const userName = user?.full_name || user?.email || "Пользователь";
 
-  // Секции: "Новые проекты" или "Старые легаси материалы"
   const [section, setSection] = useState<"projects" | "legacy">("projects");
 
   const [loading, setLoading] = useState(false);
@@ -74,7 +73,6 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
   const [projects, setProjects] = useState<AccessLoad["projects"]>([]);
   const [tabs, setTabs] = useState<AccessLoad["project_tabs"]>([]);
 
-  // Состояния для выпадающих списков
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [selectedTabId, setSelectedTabId] = useState<string>("");
 
@@ -107,7 +105,6 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
         setCwChecked(new Set((data.selectedCrosswordIds ?? []).map(String)));
         setMaterialChecked(new Set((data.selectedMaterialIds ?? []).map(String)));
 
-        // Авто-выбор первого проекта, если они есть
         if (data.projects && data.projects.length > 0) {
           setSelectedProjectId(data.projects[0].id);
         }
@@ -122,7 +119,6 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
     return () => { cancelled = true; };
   }, [open, userId]);
 
-  // Авто-выбор первого таба при смене проекта
   useEffect(() => {
     const projectTabs = tabs.filter(t => t.project_id === selectedProjectId);
     if (projectTabs.length > 0) {
@@ -157,14 +153,13 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
     }
   }
 
-  // Фильтруем материалы под выбранный таб
   const currentTabMaterials = materials.filter(m => m.project_tab_id === selectedTabId);
   const currentProjectTabs = tabs.filter(t => t.project_id === selectedProjectId);
 
   /* ================= render ================= */
 
   return (
-    <Modal open={open} onClose={onClose} title={title} maxWidth={1000}>
+    <Modal open={open} onClose={onClose} title={title} maxWidth={960}>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
         <button
           className={section === "projects" ? "btn small" : "btn small ghost"}
@@ -187,16 +182,17 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
 
       {/* =========== НОВАЯ АРХИТЕКТУРА (ПРОЕКТЫ И ТАБЫ) =========== */}
       {!loading && section === "projects" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          
-          <div style={{ display: "flex", gap: 16 }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: "block", fontWeight: "bold", marginBottom: 6 }}>1. Выберите ветку (Проект):</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div>
+              <label style={{ display: "block", fontWeight: 800, fontSize: 13, color: "#1e293b", marginBottom: 6 }}>
+                1. Выберите ветку (Проект):
+              </label>
               <select 
                 className="input" 
                 value={selectedProjectId} 
                 onChange={e => setSelectedProjectId(e.target.value)}
-                style={{ width: "100%" }}
+                style={{ width: "100%", background: "#ffffff", color: "#0f172a" }}
               >
                 {projects.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
@@ -204,13 +200,15 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
               </select>
             </div>
 
-            <div style={{ flex: 1 }}>
-              <label style={{ display: "block", fontWeight: "bold", marginBottom: 6 }}>2. Выберите вкладку (Таб):</label>
+            <div>
+              <label style={{ display: "block", fontWeight: 800, fontSize: 13, color: "#1e293b", marginBottom: 6 }}>
+                2. Выберите вкладку (Таб):
+              </label>
               <select 
                 className="input" 
                 value={selectedTabId} 
                 onChange={e => setSelectedTabId(e.target.value)}
-                style={{ width: "100%" }}
+                style={{ width: "100%", background: "#ffffff", color: "#0f172a" }}
                 disabled={currentProjectTabs.length === 0}
               >
                 {currentProjectTabs.length === 0 && <option value="">Нет вкладок</option>}
@@ -221,11 +219,14 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
             </div>
           </div>
 
-          <div style={{ marginTop: 10 }}>
-            <h3 style={{ margin: "0 0 10px 0" }}>Доступные материалы:</h3>
-            <div style={{ display: "grid", gap: 8, maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
+          <div>
+            <h3 style={{ margin: "0 0 12px 0", fontSize: 15, fontWeight: 800, color: "#0f172a" }}>
+              Доступные материалы:
+            </h3>
+            
+            <div style={{ display: "grid", gap: 10, maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
               {currentTabMaterials.length === 0 ? (
-                <div className="small-muted" style={{ padding: 20, textAlign: "center", background: "#f9fafb", borderRadius: 10 }}>
+                <div style={{ padding: 24, textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1", color: "#64748b", fontWeight: 600, fontSize: 13 }}>
                   В этом табе пока нет материалов.
                 </div>
               ) : (
@@ -235,15 +236,25 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
                   const levels = [...(m.target_levels || []), ...(m.class_levels || [])];
 
                   return (
-                    <label key={id} style={{
-                      display: "flex", gap: 10, alignItems: "center", padding: "10px 12px",
-                      borderRadius: 10, border: "1px solid rgba(0,0,0,0.08)",
-                      background: checked ? "rgba(99,102,241,0.10)" : "#fff", cursor: "pointer",
-                      transition: "all 0.2s"
-                    }}>
+                    <label 
+                      key={id} 
+                      className={`access-item ${checked ? "active" : ""}`}
+                      style={{
+                        display: "flex", 
+                        gap: 12, 
+                        alignItems: "center", 
+                        padding: "12px 14px",
+                        borderRadius: 12, 
+                        border: checked ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
+                        background: checked ? "#f0f9ff" : "#f8fafc", 
+                        cursor: "pointer",
+                        transition: "all 0.15s ease"
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={checked}
+                        style={{ width: 18, height: 18, accentColor: "#0ea5e9" }}
                         onChange={(e) => {
                           setMaterialChecked((prev) => {
                             const next = new Set(prev);
@@ -253,8 +264,10 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
                         }}
                       />
                       <div>
-                        <div style={{ fontWeight: 800 }}>{m.title}</div>
-                        <div className="small-muted">
+                        <div style={{ fontWeight: 800, color: checked ? "#0284c7" : "#0f172a", fontSize: 14 }}>
+                          {m.title}
+                        </div>
+                        <div className="small-muted" style={{ fontSize: 12, marginTop: 2 }}>
                           {levels.length ? levels.join(", ") : "уровни не указаны"}
                         </div>
                       </div>
@@ -269,57 +282,84 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
 
       {/* =========== СТАРАЯ АРХИТЕКТУРА (ЛЕГАСИ) =========== */}
       {!loading && section === "legacy" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
-            <h3 style={{ marginTop: 0 }}>📚 Учебники</h3>
-            <div style={{ display: "grid", gap: 8, maxHeight: 380, overflowY: "auto" }}>
-              {textbooks.length === 0 ? <div className="small-muted">Нет учебников</div> : textbooks.map((t) => {
-                const checked = tbChecked.has(String(t.id));
-                return (
-                  <label key={t.id} style={{
-                    display: "flex", gap: 10, alignItems: "center", padding: "10px 12px",
-                    borderRadius: 10, border: "1px solid rgba(0,0,0,0.08)",
-                    background: checked ? "rgba(78,205,196,0.10)" : "#fff", cursor: "pointer"
-                  }}>
-                    <input type="checkbox" checked={checked} onChange={(e) => {
-                      setTbChecked(prev => { const n = new Set(prev); e.target.checked ? n.add(t.id) : n.delete(t.id); return n; });
-                    }} />
-                    <div>
-                      <div style={{ fontWeight: 800 }}>{t.title}</div>
-                      <div className="small-muted">{t.class_level?.join(", ") || "без класса"}</div>
-                    </div>
-                  </label>
-                );
-              })}
+            <h3 style={{ marginTop: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>📚 Учебники</h3>
+            <div style={{ display: "grid", gap: 10, maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
+              {textbooks.length === 0 ? (
+                <div style={{ padding: 16, textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1", color: "#64748b", fontSize: 13 }}>
+                  Нет учебников
+                </div>
+              ) : (
+                textbooks.map((t) => {
+                  const checked = tbChecked.has(String(t.id));
+                  return (
+                    <label key={t.id} style={{
+                      display: "flex", gap: 12, alignItems: "center", padding: "12px 14px",
+                      borderRadius: 12, border: checked ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
+                      background: checked ? "#f0f9ff" : "#f8fafc", cursor: "pointer", transition: "all 0.15s ease"
+                    }}>
+                      <input 
+                        type="checkbox" 
+                        checked={checked} 
+                        style={{ width: 18, height: 18, accentColor: "#0ea5e9" }}
+                        onChange={(e) => {
+                          setTbChecked(prev => { const n = new Set(prev); e.target.checked ? n.add(t.id) : n.delete(t.id); return n; });
+                        }} 
+                      />
+                      <div>
+                        <div style={{ fontWeight: 800, color: checked ? "#0284c7" : "#0f172a", fontSize: 14 }}>{t.title}</div>
+                        <div className="small-muted" style={{ fontSize: 12, marginTop: 2 }}>
+                          {t.class_level?.join(", ") || "без класса"}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
             </div>
           </div>
+
           <div>
-            <h3 style={{ marginTop: 0 }}>🧩 Кроссворды</h3>
-            <div style={{ display: "grid", gap: 8, maxHeight: 380, overflowY: "auto" }}>
-              {crosswords.length === 0 ? <div className="small-muted">Нет кроссвордов</div> : crosswords.map((c) => {
-                const checked = cwChecked.has(String(c.id));
-                return (
-                  <label key={c.id} style={{
-                    display: "flex", gap: 10, alignItems: "center", padding: "10px 12px",
-                    borderRadius: 10, border: "1px solid rgba(0,0,0,0.08)",
-                    background: checked ? "rgba(78,205,196,0.10)" : "#fff", cursor: "pointer"
-                  }}>
-                    <input type="checkbox" checked={checked} onChange={(e) => {
-                      setCwChecked(prev => { const n = new Set(prev); e.target.checked ? n.add(c.id) : n.delete(c.id); return n; });
-                    }} />
-                    <div>
-                      <div style={{ fontWeight: 800 }}>{c.title}</div>
-                      <div className="small-muted">{c.class_level?.join(", ") || "без класса"}</div>
-                    </div>
-                  </label>
-                );
-              })}
+            <h3 style={{ marginTop: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>🧩 Кроссворды</h3>
+            <div style={{ display: "grid", gap: 10, maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
+              {crosswords.length === 0 ? (
+                <div style={{ padding: 16, textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1", color: "#64748b", fontSize: 13 }}>
+                  Нет кроссвордов
+                </div>
+              ) : (
+                crosswords.map((c) => {
+                  const checked = cwChecked.has(String(c.id));
+                  return (
+                    <label key={c.id} style={{
+                      display: "flex", gap: 12, alignItems: "center", padding: "12px 14px",
+                      borderRadius: 12, border: checked ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
+                      background: checked ? "#f0f9ff" : "#f8fafc", cursor: "pointer", transition: "all 0.15s ease"
+                    }}>
+                      <input 
+                        type="checkbox" 
+                        checked={checked} 
+                        style={{ width: 18, height: 18, accentColor: "#0ea5e9" }}
+                        onChange={(e) => {
+                          setCwChecked(prev => { const n = new Set(prev); e.target.checked ? n.add(c.id) : n.delete(c.id); return n; });
+                        }} 
+                      />
+                      <div>
+                        <div style={{ fontWeight: 800, color: checked ? "#0284c7" : "#0f172a", fontSize: 14 }}>{c.title}</div>
+                        <div className="small-muted" style={{ fontSize: 12, marginTop: 2 }}>
+                          {c.class_level?.join(", ") || "без класса"}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
       )}
 
-      <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border-color)", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: 10 }}>
         <button className="btn secondary" onClick={onClose} type="button">
           ❌ Отмена
         </button>
