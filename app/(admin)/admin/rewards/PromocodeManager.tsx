@@ -3,15 +3,32 @@
 import React, { useState, useEffect, useRef, DragEvent, ChangeEvent } from "react";
 import type { PromocodeItem, PromocodeRedemption, RewardItem } from "@/lib/rewards/types";
 
+interface ProjectItem {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface MaterialCatalogItem {
+  id: string;
+  title: string;
+  project_id?: string;
+  project_tab_id?: string;
+}
+
 export default function PromocodeManager() {
   const [promocodes, setPromocodes] = useState<PromocodeItem[]>([]);
   const [redemptions, setRedemptions] = useState<PromocodeRedemption[]>([]);
   const [rewardsCatalog, setRewardsCatalog] = useState<RewardItem[]>([]);
+  const [materialsCatalog, setMaterialsCatalog] = useState<MaterialCatalogItem[]>([]);
+  const [projectsList, setProjectsList] = useState<ProjectItem[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [activeSubTab, setActiveSubTab] = useState<"constructor" | "logs">("constructor");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
 
   // Drag and Drop
   const [uploading, setUploading] = useState(false);
@@ -32,7 +49,7 @@ export default function PromocodeManager() {
 
   // Начинка
   const [selectedRewardIds, setSelectedRewardIds] = useState<string[]>([]);
-  const [specificMaterialIdsText, setSpecificMaterialIdsText] = useState("");
+  const [selectedSpecificMaterialIds, setSelectedSpecificMaterialIds] = useState<string[]>([]);
   const [materialChoiceCount, setMaterialChoiceCount] = useState<number>(0);
 
   // Физический приз
@@ -48,13 +65,15 @@ export default function PromocodeManager() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [promosRes, rewardsRes] = await Promise.all([
+      const [promosRes, rewardsRes, projectsRes] = await Promise.all([
         fetch("/api/admin/promocodes"),
         fetch("/api/admin/rewards"),
+        fetch("/api/projects"),
       ]);
 
       const promosData = await promosRes.json();
       const rewardsData = await rewardsRes.json();
+      const projectsData = await projectsRes.json();
 
       if (promosRes.ok) {
         setPromocodes(promosData.promocodes || []);
@@ -63,8 +82,20 @@ export default function PromocodeManager() {
       if (rewardsRes.ok) {
         setRewardsCatalog(rewardsData.rewards || []);
       }
+      if (projectsRes.ok) {
+        const pList = projectsData.projects || [];
+        setProjectsList(pList);
+        
+        // Загружаем материалы всех проектов для визуал-селектора
+        const matPromises = pList.map((p: ProjectItem) =>
+          fetch(`/api/projects/${p.slug}/materials`).then((r) => r.json())
+        );
+        const matResults = await Promise.all(matPromises);
+        const allMats = matResults.flatMap((mRes) => mRes.materials || mRes.data || []);
+        setMaterialsCatalog(allMats);
+      }
     } catch (e) {
-      console.error("Failed to load promocodes or rewards:", e);
+      console.error("Failed to load data:", e);
     } finally {
       setLoading(false);
     }
@@ -87,7 +118,7 @@ export default function PromocodeManager() {
 
       const bundle = item.rewards_bundle || {};
       setSelectedRewardIds(bundle.reward_ids || []);
-      setSpecificMaterialIdsText((bundle.specific_material_ids || []).join(", "));
+      setSelectedSpecificMaterialIds(bundle.specific_material_ids || []);
       setMaterialChoiceCount(bundle.material_choice_count || 0);
 
       const phys = bundle.custom_physical;
@@ -111,7 +142,7 @@ export default function PromocodeManager() {
       setHasExpiresAt(false);
       setExpiresAt("");
       setSelectedRewardIds([]);
-      setSpecificMaterialIdsText("");
+      setSelectedSpecificMaterialIds([]);
       setMaterialChoiceCount(0);
       setHasPhysicalPrize(false);
       setPhysicalTitle("");
@@ -124,6 +155,12 @@ export default function PromocodeManager() {
   const handleToggleReward = (id: string) => {
     setSelectedRewardIds((prev) =>
       prev.includes(id) ? prev.filter((rId) => rId !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSpecificMaterial = (id: string) => {
+    setSelectedSpecificMaterialIds((prev) =>
+      prev.includes(id) ? prev.filter((mId) => mId !== id) : [...prev, id]
     );
   };
 
@@ -191,11 +228,6 @@ export default function PromocodeManager() {
     e.preventDefault();
     setSaving(true);
 
-    const specificMaterialIds = specificMaterialIdsText
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
     const payload = {
       id: formId,
       code,
@@ -204,7 +236,7 @@ export default function PromocodeManager() {
       expires_at: hasExpiresAt && expiresAt ? new Date(expiresAt).toISOString() : null,
       rewards_bundle: {
         reward_ids: selectedRewardIds,
-        specific_material_ids: specificMaterialIds,
+        specific_material_ids: selectedSpecificMaterialIds,
         material_choice_count: Number(materialChoiceCount) || 0,
         custom_physical: hasPhysicalPrize
           ? {
@@ -250,6 +282,21 @@ export default function PromocodeManager() {
     }
   };
 
+  const handleClearAllLogs = async () => {
+    if (!confirm("Вы уверены, что хотите полностью очистить всю историю активаций промокодов?")) return;
+
+    try {
+      const res = await fetch("/api/admin/promocodes?clearLogs=true", { method: "DELETE" });
+      if (res.ok) {
+        void loadAllData();
+      } else {
+        alert("Не удалось очистить историю логов.");
+      }
+    } catch (e) {
+      alert("Ошибка сети при очистке логов.");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Переключатель подтабов */}
@@ -279,13 +326,22 @@ export default function PromocodeManager() {
           </button>
         </div>
 
-        {activeSubTab === "constructor" && (
+        {activeSubTab === "constructor" ? (
           <button
             type="button"
             onClick={() => handleOpenModal()}
             className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-2"
           >
             <span className="text-base leading-none">+</span> Создать Промокод
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleClearAllLogs}
+            disabled={redemptions.length === 0}
+            className="px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-2"
+          >
+            🗑️ Очистить историю логов
           </button>
         )}
       </div>
@@ -428,7 +484,7 @@ export default function PromocodeManager() {
       {/* Таблица логов */}
       {activeSubTab === "logs" && (
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden">
-          <h2 className="text-base font-black text-gray-900 mb-4">История ввода промокодов</h2>
+          <h2 className="text-base font-black text-gray-900 mb-4">История активации промокодов</h2>
 
           {loading ? (
             <div className="text-center py-8 text-gray-500 font-bold text-sm">Загрузка истории...</div>
@@ -444,13 +500,13 @@ export default function PromocodeManager() {
                     <th className="p-3">Дата / Время</th>
                     <th className="p-3">Ученик</th>
                     <th className="p-3">Промокод</th>
-                    <th className="p-3">Выбранные материалы</th>
+                    <th className="p-3">Выданные награды & Материалы</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {redemptions.map((log: PromocodeRedemption) => (
+                  {redemptions.map((log: any) => (
                     <tr key={log.id} className="hover:bg-gray-50/80 transition-colors">
-                      <td className="p-3 font-mono font-bold text-gray-500">
+                      <td className="p-3 font-mono font-bold text-gray-500 whitespace-nowrap">
                         {new Date(log.redeemed_at).toLocaleString("ru-RU")}
                       </td>
                       <td className="p-3">
@@ -462,13 +518,26 @@ export default function PromocodeManager() {
                           {log.promocode_code}
                         </span>
                       </td>
-                      <td className="p-3 font-mono text-[10px] text-gray-500">
-                        {log.chosen_material_ids && log.chosen_material_ids.length > 0 ? (
-                          <span className="text-blue-600 font-bold">
-                            IDs: {log.chosen_material_ids.join(", ")}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
+                      <td className="p-3 space-y-1">
+                        {log.bundle_reward_ids && log.bundle_reward_titles.length > 0 && (
+                          <div className="text-[11px] text-purple-700 font-bold">
+                            🎽 {log.bundle_reward_titles.join(", ")}
+                          </div>
+                        )}
+                        {log.bundle_material_titles && log.bundle_material_titles.length > 0 && (
+                          <div className="text-[11px] text-blue-700 font-bold">
+                            📚 {log.bundle_material_titles.join(", ")}
+                          </div>
+                        )}
+                        {log.chosen_material_titles && log.chosen_material_titles.length > 0 && (
+                          <div className="text-[11px] text-emerald-700 font-bold">
+                            🎓 Выбрано самими: {log.chosen_material_titles.join(", ")}
+                          </div>
+                        )}
+                        {log.physical_title && (
+                          <div className="text-[11px] text-amber-700 font-bold">
+                            🧸 Физический приз: {log.physical_title}
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -480,7 +549,7 @@ export default function PromocodeManager() {
         </div>
       )}
 
-      {/* Модалка конструктора */}
+      {/* Модалка Конструктора */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white border border-gray-200 rounded-3xl max-w-2xl w-full p-6 space-y-6 my-8 max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95">
@@ -528,7 +597,7 @@ export default function PromocodeManager() {
 
               <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-4">
                 <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
-                  Ограничения (необязательно)
+                  Ограничения
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -611,17 +680,39 @@ export default function PromocodeManager() {
                   </div>
                 </div>
 
+                {/* Выбор конкретных материалов без вбивания UUID */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    📚 Конкретные материалы (UUID)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="uuid-1, uuid-2"
-                    value={specificMaterialIdsText}
-                    onChange={(e) => setSpecificMaterialIdsText(e.target.value)}
-                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-2.5 text-xs text-gray-800 font-mono font-bold focus:outline-none focus:border-emerald-500"
-                  />
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-bold text-gray-700">
+                      📚 Конкретные материалы ({selectedSpecificMaterialIds.length} выбр.)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsPickerOpen(!isPickerOpen)}
+                      className="text-xs font-bold text-emerald-600 hover:text-emerald-800"
+                    >
+                      {isPickerOpen ? "Закрыть селектор" : "Выбрать из каталога"}
+                    </button>
+                  </div>
+
+                  {isPickerOpen && (
+                    <div className="max-h-48 overflow-y-auto bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-2 mb-2">
+                      {materialsCatalog.map((m) => (
+                        <label
+                          key={m.id}
+                          className="flex items-center justify-between p-1.5 bg-white border border-gray-200 rounded-xl cursor-pointer text-xs"
+                        >
+                          <span className="font-bold text-gray-800">{m.title}</span>
+                          <input
+                            type="checkbox"
+                            checked={selectedSpecificMaterialIds.includes(m.id)}
+                            onChange={() => handleToggleSpecificMaterial(m.id)}
+                            className="w-4 h-4 text-emerald-600 rounded"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -730,14 +821,6 @@ export default function PromocodeManager() {
                             ⚠️ {uploadError}
                           </div>
                         )}
-
-                        <input
-                          type="text"
-                          placeholder="Прямая ссылка..."
-                          value={physicalImageUrl}
-                          onChange={(e) => setPhysicalImageUrl(e.target.value)}
-                          className="w-full bg-white border border-amber-200 rounded-xl p-2 text-[10px] font-mono text-gray-700 mt-2 focus:outline-none focus:border-amber-500"
-                        />
                       </div>
                     </div>
                   )}

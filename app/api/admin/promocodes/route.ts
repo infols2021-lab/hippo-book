@@ -37,7 +37,7 @@ export async function GET() {
       return NextResponse.json({ error: adminErr }, { status: 403 });
     }
 
-    const [{ data: promocodes, error: promoErr }, { data: redemptions, error: redemptionsErr }] =
+    const [{ data: promocodes, error: promoErr }, { data: redemptions, error: redemptionsErr }, { data: allMaterials }, { data: allRewards }] =
       await Promise.all([
         adminSupabase
           .from("promocodes")
@@ -51,28 +51,50 @@ export async function GET() {
             user_id,
             chosen_material_ids,
             redeemed_at,
-            promocodes(code),
+            promocodes(code, rewards_bundle),
             profiles:user_id(email, full_name)
           `)
           .order("redeemed_at", { ascending: false })
           .limit(200),
+        adminSupabase.from("materials").select("id, title"),
+        adminSupabase.from("rewards").select("id, title, type"),
       ]);
 
     if (promoErr) {
       return NextResponse.json({ error: promoErr.message }, { status: 400 });
     }
 
+    const materialsMap = new Map((allMaterials || []).map((m: any) => [m.id, m.title]));
+    const rewardsMap = new Map((allRewards || []).map((r: any) => [r.id, `${r.title} (${r.type})`]));
+
     const formattedRedemptions = Array.isArray(redemptions)
-      ? redemptions.map((r: any) => ({
-          id: r.id,
-          promocode_id: r.promocode_id,
-          promocode_code: r.promocodes?.code || "—",
-          user_id: r.user_id,
-          user_email: r.profiles?.email || "—",
-          user_full_name: r.profiles?.full_name || "Ученик",
-          chosen_material_ids: r.chosen_material_ids || [],
-          redeemed_at: r.redeemed_at,
-        }))
+      ? redemptions.map((r: any) => {
+          const chosenTitles = (r.chosen_material_ids || []).map(
+            (id: string) => materialsMap.get(id) || id
+          );
+
+          const bundle = r.promocodes?.rewards_bundle || {};
+          const bundleRewardTitles = (bundle.reward_ids || []).map(
+            (id: string) => rewardsMap.get(id) || id
+          );
+          const bundleMaterialTitles = (bundle.specific_material_ids || []).map(
+            (id: string) => materialsMap.get(id) || id
+          );
+
+          return {
+            id: r.id,
+            promocode_id: r.promocode_id,
+            promocode_code: r.promocodes?.code || "—",
+            user_id: r.user_id,
+            user_email: r.profiles?.email || "—",
+            user_full_name: r.profiles?.full_name || "Ученик",
+            chosen_material_titles: chosenTitles,
+            bundle_reward_titles: bundleRewardTitles,
+            bundle_material_titles: bundleMaterialTitles,
+            physical_title: bundle.custom_physical?.title || null,
+            redeemed_at: r.redeemed_at,
+          };
+        })
       : [];
 
     return NextResponse.json({
@@ -193,6 +215,19 @@ export async function DELETE(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
+    const clearLogs = searchParams.get("clearLogs");
+
+    if (clearLogs === "true") {
+      const { error } = await adminSupabase
+        .from("promocode_redemptions")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      return NextResponse.json({ success: true });
+    }
 
     if (!id) {
       return NextResponse.json({ error: "Укажите id промокода" }, { status: 400 });
@@ -205,7 +240,7 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Ошибка при удалении промокода:", error);
+    console.error("Ошибка при удалении промокода/логов:", error);
     return NextResponse.json(
       { error: error?.message || "Внутренняя ошибка сервера" },
       { status: 500 }

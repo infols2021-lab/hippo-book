@@ -173,8 +173,8 @@ export default function MaterialChoiceModal({
     }
   };
 
-  const handleSubmitChoice = async () => {
-    if (selectedMaterialIds.length < requiredChoiceCount) {
+  const handleSubmitChoice = async (skipChoice: boolean = false) => {
+    if (!skipChoice && selectedMaterialIds.length < requiredChoiceCount) {
       setSubmitError(`Пожалуйста, выберите ${requiredChoiceCount} материал(а).`);
       return;
     }
@@ -187,7 +187,8 @@ export default function MaterialChoiceModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: promocodeCode,
-          chosenMaterialIds: selectedMaterialIds,
+          chosenMaterialIds: skipChoice ? [] : selectedMaterialIds,
+          allowSkipIfAllUnlocked: skipChoice,
         }),
       });
 
@@ -261,6 +262,9 @@ export default function MaterialChoiceModal({
     return matchTab && matchLevel;
   });
 
+  const unlockedCount = materials.filter((m) => isAlreadyUnlocked(m)).length;
+  const allUnlocked = materials.length > 0 && unlockedCount === materials.length;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
@@ -301,6 +305,12 @@ export default function MaterialChoiceModal({
           </div>
         </div>
 
+        {allUnlocked && (
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-800 font-bold text-center">
+            🎉 У вас уже открыт доступ ко всем материалам данного раздела! Вы можете пропустить выбор и забрать остальные награды промокода.
+          </div>
+        )}
+
         {/* Выбор проекта/раздела */}
         {projects.length > 1 && (
           <div
@@ -337,7 +347,6 @@ export default function MaterialChoiceModal({
 
         {/* Фильтры */}
         <div className="space-y-3">
-          {/* Категории */}
           <div className="flex gap-2 flex-wrap">
             <button
               type="button"
@@ -384,7 +393,6 @@ export default function MaterialChoiceModal({
             ))}
           </div>
 
-          {/* Уровни */}
           {availableLevels.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               <button
@@ -546,17 +554,29 @@ export default function MaterialChoiceModal({
           >
             Отмена
           </button>
-          <button
-            type="button"
-            onClick={handleSubmitChoice}
-            disabled={submitting || selectedMaterialIds.length < requiredChoiceCount}
-            className="px-5 py-2 text-white font-black text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-md"
-            style={{
-              backgroundColor: "var(--project-primary, #0ea5e9)",
-            }}
-          >
-            {submitting ? "Сохранение..." : "Подтвердить выбор"}
-          </button>
+
+          {allUnlocked ? (
+            <button
+              type="button"
+              onClick={() => handleSubmitChoice(true)}
+              disabled={submitting}
+              className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-md"
+            >
+              {submitting ? "Сохранение..." : "Пропустить выбор материалов"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleSubmitChoice(false)}
+              disabled={submitting || selectedMaterialIds.length < requiredChoiceCount}
+              className="px-5 py-2 text-white font-black text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-md"
+              style={{
+                backgroundColor: "var(--project-primary, #0ea5e9)",
+              }}
+            >
+              {submitting ? "Сохранение..." : "Подтвердить выбор"}
+            </button>
+          )}
         </div>
       </div>
     </div>

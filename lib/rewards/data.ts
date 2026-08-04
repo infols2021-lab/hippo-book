@@ -287,7 +287,8 @@ export async function redeemPromocode(
   supabase: SupabaseClient,
   userId: string,
   rawCode: string,
-  chosenMaterialIds: string[] = []
+  chosenMaterialIds: string[] = [],
+  allowSkipIfAllUnlocked: boolean = false
 ): Promise<PromocodeRedeemResult> {
   const code = String(rawCode || "").trim().toUpperCase();
   if (!code) return { success: false, error: "Введите промокод." };
@@ -316,7 +317,6 @@ export async function redeemPromocode(
     return { success: false, error: "Лимит активаций промокода исчерпан." };
   }
 
-  // Строгая проверка на повторную активацию через admin-клиент
   const { data: existingRedemption } = await adminSupabase
     .from("promocode_redemptions")
     .select("id")
@@ -331,7 +331,8 @@ export async function redeemPromocode(
   const bundle: PromocodeRewardsBundle = promo.rewards_bundle || {};
   const requiredChoiceCount = Number(bundle.material_choice_count || 0);
 
-  if (requiredChoiceCount > 0 && chosenMaterialIds.length < requiredChoiceCount) {
+  // Проверка требования выбора материалов
+  if (requiredChoiceCount > 0 && chosenMaterialIds.length < requiredChoiceCount && !allowSkipIfAllUnlocked) {
     return {
       success: true,
       requiresMaterialChoice: true,
@@ -390,7 +391,6 @@ export async function redeemPromocode(
       .eq("id", promo.id);
   }
 
-  // Фиксация активации через adminSupabase для гарантированного преодоления RLS
   const { error: redemptionInsertError } = await adminSupabase
     .from("promocode_redemptions")
     .insert({
