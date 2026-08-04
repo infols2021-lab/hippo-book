@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, DragEvent, ChangeEvent } from "react";
+import React, { useState, useEffect, useRef, DragEvent, ChangeEvent, useMemo } from "react";
 import type { PromocodeItem, PromocodeRedemption, RewardItem } from "@/lib/rewards/types";
 
 interface ProjectItem {
@@ -21,6 +21,9 @@ export default function PromocodeManager() {
   const [rewardsCatalog, setRewardsCatalog] = useState<RewardItem[]>([]);
   const [materialsCatalog, setMaterialsCatalog] = useState<MaterialCatalogItem[]>([]);
   const [projectsList, setProjectsList] = useState<ProjectItem[]>([]);
+
+  // ✅ Состояние для поиска материалов в селекторе
+  const [materialSearch, setMaterialSearch] = useState<string>("");
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -61,6 +64,15 @@ export default function PromocodeManager() {
     void loadAllData();
   }, []);
 
+  // ✅ Фильтрация материалов по поисковому запросу (без учёта регистра)
+  const filteredMaterials = useMemo(() => {
+    if (!materialSearch.trim()) return materialsCatalog;
+    const search = materialSearch.trim().toLowerCase();
+    return materialsCatalog.filter((m) =>
+      m.title.toLowerCase().includes(search)
+    );
+  }, [materialsCatalog, materialSearch]);
+
   const loadAllData = async () => {
     setLoading(true);
     try {
@@ -84,9 +96,10 @@ export default function PromocodeManager() {
       if (projectsRes.ok) {
         const pList = projectsData.projects || [];
         setProjectsList(pList);
-        
+
+        // ✅ Загружаем материалы через админский эндпоинт, чтобы видеть секретные
         const matPromises = pList.map((p: ProjectItem) =>
-          fetch(`/api/projects/${p.slug}/materials`).then((r) => r.json())
+          fetch(`/api/admin/projects/${p.id}/materials`).then((r) => r.json())
         );
         const matResults = await Promise.all(matPromises);
         const allMats = matResults.flatMap((mRes) => mRes.materials || mRes.data || []);
@@ -101,6 +114,8 @@ export default function PromocodeManager() {
 
   const handleOpenModal = (item?: PromocodeItem) => {
     setUploadError(null);
+    // Сбрасываем поиск при открытии модалки
+    setMaterialSearch("");
     if (item) {
       setFormId(item.id);
       setCode(item.code);
@@ -678,7 +693,7 @@ export default function PromocodeManager() {
                   </div>
                 </div>
 
-                {/* Выбор конкретных материалов без вбивания UUID */}
+                {/* Выбор конкретных материалов */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <label className="block text-xs font-bold text-gray-700">
@@ -686,7 +701,10 @@ export default function PromocodeManager() {
                     </label>
                     <button
                       type="button"
-                      onClick={() => setIsPickerOpen(!isPickerOpen)}
+                      onClick={() => {
+                        setIsPickerOpen(!isPickerOpen);
+                        if (!isPickerOpen) setMaterialSearch(""); // сброс поиска при открытии
+                      }}
                       className="text-xs font-bold text-emerald-600 hover:text-emerald-800"
                     >
                       {isPickerOpen ? "Закрыть селектор" : "Выбрать из каталога"}
@@ -694,23 +712,60 @@ export default function PromocodeManager() {
                   </div>
 
                   {isPickerOpen && (
-                    <div className="max-h-48 overflow-y-auto bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-2 mb-2">
-                      {materialsCatalog.map((m) => (
-                        <label
-                          key={m.id}
-                          className="flex items-center justify-between p-1.5 bg-white border border-gray-200 rounded-xl cursor-pointer text-xs"
-                        >
-                          <span className="font-bold text-gray-800">
-                            {m.title} {m.is_secret && "🔒 (Секретный)"}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={selectedSpecificMaterialIds.includes(m.id)}
-                            onChange={() => handleToggleSpecificMaterial(m.id)}
-                            className="w-4 h-4 text-emerald-600 rounded"
-                          />
-                        </label>
-                      ))}
+                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 space-y-3">
+                      {/* Поле поиска */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="🔍 Поиск по названию..."
+                          value={materialSearch}
+                          onChange={(e) => setMaterialSearch(e.target.value)}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-emerald-500 transition-colors"
+                        />
+                        {materialSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setMaterialSearch("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Список материалов с прокруткой */}
+                      <div className="max-h-48 overflow-y-auto space-y-1.5">
+                        {filteredMaterials.length === 0 ? (
+                          <div className="text-xs text-gray-400 font-bold py-4 text-center">
+                            {materialSearch ? "Ничего не найдено" : "Материалы не загружены"}
+                          </div>
+                        ) : (
+                          filteredMaterials.map((m) => {
+                            const isChecked = selectedSpecificMaterialIds.includes(m.id);
+                            return (
+                              <label
+                                key={m.id}
+                                className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors"
+                              >
+                                <span className="font-bold text-xs text-gray-800">
+                                  {m.title}
+                                  {m.is_secret && (
+                                    <span className="ml-2 text-[10px] text-purple-600 font-extrabold bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                                      🔒 Секретный
+                                    </span>
+                                  )}
+                                </span>
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => handleToggleSpecificMaterial(m.id)}
+                                  className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
+                                />
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
