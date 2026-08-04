@@ -25,22 +25,49 @@ export async function GET(
   const { id: projectId } = await ctx.params;
 
   try {
-    let query = supabase
-      .from("materials")
-      .select(`
-        *,
-        project_tabs!inner ( id, title, slug, project_id )
-      `)
-      .order("order_index", { ascending: false })
-      .order("created_at", { ascending: false });
+    // Получаем все табы проекта (включая неактивные, чтобы админ видел все материалы)
+    const { data: tabs, error: tabsError } = await supabase
+      .from("project_tabs")
+      .select("id")
+      .eq("project_id", projectId);
 
-    if (tabId) {
-      query = query.eq("project_tab_id", tabId);
-    } else {
-      query = query.eq("project_tabs.project_id", projectId);
+    if (tabsError) {
+      console.error("🔴 [ADMIN GET MATERIALS] Ошибка получения табов:", tabsError.message);
+      return fail(tabsError.message, 500, "DB_ERROR");
     }
 
-    const { data, error } = await query;
+    const tabIds = tabs?.map((t) => t.id) || [];
+
+    // Если передан конкретный tab_id, проверяем принадлежность проекту
+    if (tabId) {
+      if (!tabIds.includes(tabId)) {
+        return ok({ materials: [] });
+      }
+      const { data, error } = await supabase
+        .from("materials")
+        .select("*")
+        .eq("project_tab_id", tabId)
+        .order("order_index", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("🔴 [ADMIN GET MATERIALS] Ошибка БД:", error.message);
+        return fail(error.message, 500, "DB_ERROR");
+      }
+      return ok({ materials: data ?? [] });
+    }
+
+    // Если tab_id не передан, возвращаем все материалы, привязанные к любому табу проекта
+    if (tabIds.length === 0) {
+      return ok({ materials: [] });
+    }
+
+    const { data, error } = await supabase
+      .from("materials")
+      .select("*")
+      .in("project_tab_id", tabIds)
+      .order("order_index", { ascending: false })
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("🔴 [ADMIN GET MATERIALS] Ошибка БД:", error.message);

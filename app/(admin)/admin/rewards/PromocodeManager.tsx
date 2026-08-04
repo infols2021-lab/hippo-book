@@ -22,7 +22,7 @@ export default function PromocodeManager() {
   const [materialsCatalog, setMaterialsCatalog] = useState<MaterialCatalogItem[]>([]);
   const [projectsList, setProjectsList] = useState<ProjectItem[]>([]);
 
-  // ✅ Состояние для поиска материалов в селекторе
+  // Состояние для поиска материалов в селекторе
   const [materialSearch, setMaterialSearch] = useState<string>("");
   
   const [loading, setLoading] = useState(true);
@@ -64,7 +64,7 @@ export default function PromocodeManager() {
     void loadAllData();
   }, []);
 
-  // ✅ Фильтрация материалов по поисковому запросу (без учёта регистра)
+  // Фильтрация материалов по поисковому запросу (без учёта регистра)
   const filteredMaterials = useMemo(() => {
     if (!materialSearch.trim()) return materialsCatalog;
     const search = materialSearch.trim().toLowerCase();
@@ -97,16 +97,47 @@ export default function PromocodeManager() {
         const pList = projectsData.projects || [];
         setProjectsList(pList);
 
-        // ✅ Загружаем материалы через админский эндпоинт, чтобы видеть секретные
+        // Если проектов нет — не загружаем материалы
+        if (pList.length === 0) {
+          setMaterialsCatalog([]);
+          setLoading(false);
+          return;
+        }
+
+        // Загружаем материалы через админский эндпоинт, чтобы видеть секретные
         const matPromises = pList.map((p: ProjectItem) =>
-          fetch(`/api/admin/projects/${p.id}/materials`).then((r) => r.json())
+          fetch(`/api/admin/projects/${p.id}/materials`).then(async (r) => {
+            if (!r.ok) {
+              console.error(`Failed to fetch materials for project ${p.id}:`, r.status);
+              return { materials: [] };
+            }
+            return r.json();
+          })
         );
         const matResults = await Promise.all(matPromises);
-        const allMats = matResults.flatMap((mRes) => mRes.materials || mRes.data || []);
-        setMaterialsCatalog(allMats);
+        
+        // Маппинг с fallback на разные возможные имена полей
+        const allMats = matResults.flatMap((mRes) => {
+          // Логируем ответ для отладки
+          if (process.env.NODE_ENV !== "production") {
+            console.log("Materials response for project:", mRes);
+          }
+          // Поддерживаем разные варианты: materials, data, items
+          return mRes.materials || mRes.data || mRes.items || [];
+        });
+
+        // Убедимся, что у всех материалов есть is_secret (по умолчанию false)
+        const normalizedMats = allMats.map((m: any) => ({
+          ...m,
+          is_secret: m.is_secret ?? false,
+        }));
+
+        setMaterialsCatalog(normalizedMats);
       }
     } catch (e) {
       console.error("Failed to load data:", e);
+      // При ошибке показываем пустой каталог, но не ломаем интерфейс
+      setMaterialsCatalog([]);
     } finally {
       setLoading(false);
     }
@@ -703,7 +734,7 @@ export default function PromocodeManager() {
                       type="button"
                       onClick={() => {
                         setIsPickerOpen(!isPickerOpen);
-                        if (!isPickerOpen) setMaterialSearch(""); // сброс поиска при открытии
+                        if (!isPickerOpen) setMaterialSearch("");
                       }}
                       className="text-xs font-bold text-emerald-600 hover:text-emerald-800"
                     >
