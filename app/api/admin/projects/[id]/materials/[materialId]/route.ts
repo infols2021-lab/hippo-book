@@ -57,6 +57,11 @@ function normalizePatchPayload(body: any) {
     payload.is_active = normalizeBool(body.is_active ?? body.isActive);
   }
 
+  // ✅ КРИТИЧЕСКОЕ ДОБАВЛЕНИЕ: поддержка is_secret
+  if ("is_secret" in body || "isSecret" in body) {
+    payload.is_secret = normalizeBool(body.is_secret ?? body.isSecret);
+  }
+
   if ("order_index" in body || "orderIndex" in body) {
     payload.order_index = normalizeOrderIndex(body.order_index ?? body.orderIndex);
   }

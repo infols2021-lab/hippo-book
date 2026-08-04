@@ -188,6 +188,7 @@ export type NormalizedMaterial = {
   class_levels: string[];
   is_available: boolean;
   is_active: boolean;
+  is_secret: boolean; // ✅ Добавлено
   order_index: number;
   project_tab_id: string | null;
   meta: Record<string, unknown>;
@@ -219,6 +220,7 @@ export function normalizeMaterialInput(
     
     is_available: normalizeBool(safeBody.is_available ?? safeBody.isAvailable ?? true),
     is_active: normalizeBool(safeBody.is_active ?? safeBody.isActive ?? true),
+    is_secret: normalizeBool(safeBody.is_secret ?? safeBody.isSecret ?? false), // ✅ Критическое добавление
     
     order_index: normalizeOrderIndex(safeBody.order_index ?? safeBody.orderIndex),
     
