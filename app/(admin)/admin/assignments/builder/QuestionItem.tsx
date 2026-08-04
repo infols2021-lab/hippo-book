@@ -68,8 +68,6 @@ export default function QuestionItem({
   onMoveDown,
   onTypeChange,
 }: Props) {
-  
-  // Локальный стейт для текста, чтобы не вызывать глобальный ре-рендер на каждый символ
   const [localText, setLocalText] = useState(value.q ?? "");
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -80,7 +78,6 @@ export default function QuestionItem({
   const canUp = !disabled && index > 0;
   const canDown = !disabled && index < total - 1;
 
-  // ====== ОПТИМИЗИРОВАННЫЙ ЗУМ (ЧЕРЕЗ DOM REFS, БЕЗ РЕ-РЕНДЕРОВ) ======
   const imgUrl: string = typeof value.image === "string" ? value.image : "";
   
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -107,7 +104,6 @@ export default function QuestionItem({
       const { tx, ty, scale } = tRef.current;
       imgRef.current.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
       
-      // Меняем курсор в зависимости от состояния
       if (wrapRef.current) {
          wrapRef.current.style.cursor = scale > 1 ? (dragging.current ? "grabbing" : "grab") : "default";
       }
@@ -122,13 +118,11 @@ export default function QuestionItem({
     applyTransform();
   }
 
-  // Сброс при смене картинки
   useEffect(() => {
     resetZoom();
     dragging.current = false;
     dragStart.current = null;
     pinchStart.current = null;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imgUrl, value.type]);
 
   function clientToLocal(eClientX: number, eClientY: number) {
@@ -168,7 +162,7 @@ export default function QuestionItem({
     
     dragging.current = true;
     dragStart.current = { x: e.clientX, y: e.clientY, tx: tRef.current.tx, ty: tRef.current.ty };
-    applyTransform(); // Для смены курсора на grabbing
+    applyTransform();
   }
 
   function onMouseMove(e: React.MouseEvent) {
@@ -187,7 +181,6 @@ export default function QuestionItem({
     applyTransform();
   }
 
-  // Touch события также оптимизированы на useRef
   function onTouchStart(e: React.TouchEvent) {
     if (disabled || !imgUrl) return;
 
@@ -243,9 +236,6 @@ export default function QuestionItem({
     if (e.touches.length === 0) endDrag();
   }
 
-  // ====== РЕНДЕР ======
-
-  // Type Guards: Строгая типизация редакторов без ts-ignore
   const renderSpecificEditor = () => {
     switch (value.type) {
       case "test": return <TestEditor value={value} disabled={disabled} onChange={onChange} />;
@@ -261,157 +251,168 @@ export default function QuestionItem({
   };
 
   return (
-    <div className={`subtask-item qtype-${value.type}`} style={{ position: "relative" }}>
-      <div className="question-number">{index + 1}</div>
-
-      {/* Header */}
-      <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ fontWeight: 800 }}>{typeLabel(value.type)}</div>
+    <div className={`subtask-item qtype-${value.type}`}>
+      {/* Шапка карточки вопроса */}
+      <div className="question-card-header">
+        <div className="question-header-left">
+          <div className="question-number-badge">
+            {index + 1}
+          </div>
+          <div className="question-type-badge">
+            {typeLabel(value.type)}
+          </div>
           <QuestionTypeSwitch value={value.type} onChange={(t) => onTypeChange(t)} disabled={disabled} />
         </div>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button className="btn btn-small" type="button" onClick={onMoveUp} disabled={!canUp}>↑</button>
-          <button className="btn btn-small" type="button" onClick={onMoveDown} disabled={!canDown}>↓</button>
+        <div className="question-header-actions">
+          <button className="btn btn-small ghost" type="button" onClick={onMoveUp} disabled={!canUp} title="Поднять выше">
+            ↑
+          </button>
+          <button className="btn btn-small ghost" type="button" onClick={onMoveDown} disabled={!canDown} title="Опустить ниже">
+            ↓
+          </button>
           
           {isDeleting ? (
-            <div style={{ display: "flex", gap: 4, alignItems: "center", background: "var(--danger-light, #fee)", padding: "2px 8px", borderRadius: 6 }}>
-              <span style={{ fontSize: 13, color: "red", fontWeight: "bold" }}>Точно?</span>
+            <div className="confirm-delete-box">
+              <span>Удалить?</span>
               <button className="btn btn-small btn-danger" type="button" onClick={onRemove}>Да</button>
-              <button className="btn btn-small" type="button" onClick={() => setIsDeleting(false)}>Нет</button>
+              <button className="btn btn-small ghost" type="button" onClick={() => setIsDeleting(false)}>Отмена</button>
             </div>
           ) : (
-            <button className="btn btn-small btn-danger" type="button" onClick={() => setIsDeleting(true)} disabled={disabled}>
-              🗑️ Удалить
+            <button className="btn btn-small btn-danger ghost" type="button" onClick={() => setIsDeleting(true)} disabled={disabled}>
+              🗑️
             </button>
           )}
         </div>
       </div>
 
-      <div style={{ height: 12 }} />
+      <div className="question-card-body">
+        {/* Текст вопроса (кроме кроссворда) */}
+        {value.type !== "crossword" && (
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label style={{ display: "block", marginBottom: 6, fontWeight: 700, color: "#1e293b", fontSize: 13 }}>
+              Текст вопроса:
+            </label>
+            <textarea
+              className="question-textarea"
+              value={localText}
+              placeholder="Введите текст вопроса. Используйте Enter для переноса строки..."
+              onChange={(e) => setLocalText(e.target.value)}
+              onBlur={() => {
+                if (localText !== value.q) {
+                  onChange({ ...value, q: localText } as Question);
+                }
+              }}
+              disabled={disabled}
+            />
+            <div className="format-hint">💡 Заполните формулировку задания для ученика</div>
+          </div>
+        )}
 
-      {/* Текст вопроса (кроме кроссворда) */}
-      {value.type !== "crossword" && (
-        <div className="form-group">
-          <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Текст вопроса:</label>
-          <textarea
-            className="question-textarea"
-            value={localText}
-            placeholder="Введите текст вопроса. Enter — новая строка"
-            onChange={(e) => setLocalText(e.target.value)}
-            onBlur={() => {
-               // Отправляем наверх только при потере фокуса (мощнейшая оптимизация)
-               if (localText !== value.q) {
-                 onChange({ ...value, q: localText } as Question);
-               }
-            }}
-            disabled={disabled}
-          />
-          <div className="format-hint">💡 Используйте Enter для переноса строк</div>
-        </div>
-      )}
-
-      {/* Общий загрузчик медиа (кроме кроссворда) */}
-      {value.type !== "crossword" && (
-        <>
-          {value.type !== "imagemap" && value.image && typeof value.image === "string" && (!value.media || value.media.length === 0) && (
-            <div className="form-group" style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Устаревшее изображение:</label>
-              <img src={value.image} alt="old media" style={{ maxWidth: 200, borderRadius: 8 }} />
-              <button 
-                className="btn btn-small btn-danger" 
-                style={{ marginTop: 8 }} 
-                onClick={() => onChange({ ...value, image: "" } as Question)}
-              >
-                Удалить
-              </button>
-            </div>
-          )}
-
-          <MediaUpload
-            value={value.media || []}
-            onChange={(nextMedia) => onChange({ ...value, media: nextMedia } as Question)}
-            disabled={disabled}
-            bucket="question-images"
-            audioBucket="hippo-book-audio"
-            label="Прикрепленные медиафайлы (Изображения, Аудио, PDF):"
-          />
-        </>
-      )}
-
-      {/* Изображение кроссворда с оптимизированным зумом */}
-      {value.type === "crossword" && (
-        <div className="form-group">
-          <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Изображение кроссворда (опционально):</label>
-          <ImageUpload
-            value={imgUrl}
-            onChange={(nextUrl) => onChange({ ...value, image: nextUrl || "" } as Question)}
-            disabled={disabled}
-            bucket="question-images"
-            label="Загрузить изображение (можно перетаскиванием):"
-          />
-
-          {imgUrl && (
-            <div style={{ marginTop: 10 }}>
-              <div className="card" style={{ padding: 10, borderRadius: 16 }}>
-                <div className="small-muted" style={{ marginBottom: 8 }}>
-                  Zoom: колесико/тачпад • телефон: pinch • двойной клик/тап — сброс • drag при увеличении
-                </div>
-
-                <div
-                  ref={wrapRef}
-                  onWheel={onWheel}
-                  onMouseDown={onMouseDown}
-                  onMouseMove={onMouseMove}
-                  onMouseLeave={endDrag}
-                  onMouseUp={endDrag}
-                  onDoubleClick={() => resetZoom()}
-                  onTouchStart={onTouchStart}
-                  onTouchMove={onTouchMove}
-                  onTouchEnd={onTouchEnd}
-                  style={{
-                    width: "100%", height: 320, overflow: "hidden", borderRadius: 14,
-                    border: "1px solid rgba(0,0,0,0.12)", background: "rgba(0,0,0,0.03)",
-                    position: "relative", touchAction: "none", cursor: disabled ? "not-allowed" : "default"
-                  }}
+        {/* Общий загрузчик медиа (кроме кроссворда) */}
+        {value.type !== "crossword" && (
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            {value.type !== "imagemap" && value.image && typeof value.image === "string" && (!value.media || value.media.length === 0) && (
+              <div style={{ marginBottom: 12, padding: 10, background: "#fff5f5", borderRadius: 10, border: "1px solid #fed7d7" }}>
+                <label style={{ display: "block", marginBottom: 6, fontWeight: 700, fontSize: 12, color: "#c53030" }}>
+                  Устаревшее изображение:
+                </label>
+                <img src={value.image} alt="old media" style={{ maxWidth: 200, borderRadius: 8, display: "block" }} />
+                <button 
+                  className="btn btn-small btn-danger" 
+                  style={{ marginTop: 8 }} 
+                  onClick={() => onChange({ ...value, image: "" } as Question)}
                 >
-                  <img
-                    ref={imgRef}
-                    src={imgUrl}
-                    alt="Кроссворд"
-                    draggable={false}
+                  Удалить
+                </button>
+              </div>
+            )}
+
+            <MediaUpload
+              value={value.media || []}
+              onChange={(nextMedia) => onChange({ ...value, media: nextMedia } as Question)}
+              disabled={disabled}
+              bucket="question-images"
+              audioBucket="hippo-book-audio"
+              label="Прикрепленные медиафайлы (Изображения, Аудио, PDF):"
+            />
+          </div>
+        )}
+
+        {/* Изображение кроссворда с оптимизированным зумом */}
+        {value.type === "crossword" && (
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label style={{ display: "block", marginBottom: 6, fontWeight: 700, color: "#1e293b", fontSize: 13 }}>
+              Изображение кроссворда (опционально):
+            </label>
+            <ImageUpload
+              value={imgUrl}
+              onChange={(nextUrl) => onChange({ ...value, image: nextUrl || "" } as Question)}
+              disabled={disabled}
+              bucket="question-images"
+              label="Загрузить изображение (можно перетаскиванием):"
+            />
+
+            {imgUrl && (
+              <div style={{ marginTop: 10 }}>
+                <div className="card" style={{ padding: 12, borderRadius: 16, background: "#f8fafc" }}>
+                  <div className="small-muted" style={{ marginBottom: 8 }}>
+                    Zoom: колесико/тачпад • телефон: pinch • двойной клик — сброс • drag при увеличении
+                  </div>
+
+                  <div
+                    ref={wrapRef}
+                    onWheel={onWheel}
+                    onMouseDown={onMouseDown}
+                    onMouseMove={onMouseMove}
+                    onMouseLeave={endDrag}
+                    onMouseUp={endDrag}
+                    onDoubleClick={() => resetZoom()}
+                    onTouchStart={onTouchStart}
+                    onTouchMove={onTouchMove}
+                    onTouchEnd={onTouchEnd}
                     style={{
-                      transformOrigin: "0 0", willChange: "transform", userSelect: "none",
-                      pointerEvents: "none", maxWidth: "none", maxHeight: "none",
-                      width: "auto", height: "auto", display: "block",
+                      width: "100%", height: 320, overflow: "hidden", borderRadius: 14,
+                      border: "1px solid #cbd5e1", background: "#f1f5f9",
+                      position: "relative", touchAction: "none", cursor: disabled ? "not-allowed" : "default"
                     }}
-                  />
-                  
-                  {/* Мини-панель управления */}
-                  <div style={{
-                    position: "absolute", right: 10, top: 10, display: "flex", gap: 6,
-                    alignItems: "center", padding: "6px 8px", borderRadius: 12,
-                    background: "rgba(255,255,255,0.85)", border: "1px solid rgba(0,0,0,0.12)", backdropFilter: "blur(8px)"
-                  }}>
-                    <button type="button" className="btn small ghost" disabled={disabled} onClick={() => applyZoom(tRef.current.scale * 1.15, { x: 160, y: 160 })}>＋</button>
-                    <button type="button" className="btn small ghost" disabled={disabled} onClick={() => applyZoom(tRef.current.scale * 0.87, { x: 160, y: 160 })}>－</button>
-                    <button type="button" className="btn small secondary" disabled={disabled} onClick={resetZoom}>Reset</button>
+                  >
+                    <img
+                      ref={imgRef}
+                      src={imgUrl}
+                      alt="Кроссворд"
+                      draggable={false}
+                      style={{
+                        transformOrigin: "0 0", willChange: "transform", userSelect: "none",
+                        pointerEvents: "none", maxWidth: "none", maxHeight: "none",
+                        width: "auto", height: "auto", display: "block",
+                      }}
+                    />
+                    
+                    <div style={{
+                      position: "absolute", right: 10, top: 10, display: "flex", gap: 6,
+                      alignItems: "center", padding: "6px 8px", borderRadius: 12,
+                      background: "rgba(255,255,255,0.9)", border: "1px solid #cbd5e1", backdropFilter: "blur(8px)"
+                    }}>
+                      <button type="button" className="btn small ghost" disabled={disabled} onClick={() => applyZoom(tRef.current.scale * 1.15, { x: 160, y: 160 })}>＋</button>
+                      <button type="button" className="btn small ghost" disabled={disabled} onClick={() => applyZoom(tRef.current.scale * 0.87, { x: 160, y: 160 })}>－</button>
+                      <button type="button" className="btn small secondary" disabled={disabled} onClick={resetZoom}>Reset</button>
+                    </div>
+                  </div>
+
+                  <div className="small-muted" style={{ marginTop: 8 }}>
+                    Масштаб: <b ref={zoomTextRef}>100%</b>
                   </div>
                 </div>
-
-                <div className="small-muted" style={{ marginTop: 8 }}>
-                  Масштаб: <b ref={zoomTextRef}>100%</b>
-                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
 
-      {/* Рендер конкретного редактора (Type-Safe) */}
-      <div className="question-type-content">
-        {renderSpecificEditor()}
+        {/* Контент специфичного редактора */}
+        <div className="question-type-content">
+          {renderSpecificEditor()}
+        </div>
       </div>
     </div>
   );

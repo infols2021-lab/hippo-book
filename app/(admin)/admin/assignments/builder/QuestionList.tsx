@@ -17,7 +17,6 @@ export default function QuestionList({ value, onChange, disabled }: Props) {
 
   const canAdd = !disabled;
 
-  // Оптимизированное, иммутабельное обновление элемента
   function patchAt(index: number, nextQ: Question) {
     const next = [...questions];
     next[index] = nextQ;
@@ -29,7 +28,6 @@ export default function QuestionList({ value, onChange, disabled }: Props) {
     const next = [...questions];
     next.splice(index, 1);
     
-    // Если удалили последний вопрос, создаем пустой тестовый (чтобы список не был пустым)
     if (next.length === 0) {
       next.push(newQuestion("test"));
     }
@@ -53,9 +51,9 @@ export default function QuestionList({ value, onChange, disabled }: Props) {
   }
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* Список вопросов */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {questions.map((q, idx) => (
           <QuestionItem
             key={q.id || `${idx}-${q.type}`}
@@ -68,7 +66,6 @@ export default function QuestionList({ value, onChange, disabled }: Props) {
             onMoveUp={() => move(idx, idx - 1)}
             onMoveDown={() => move(idx, idx + 1)}
             onTypeChange={(newType) => {
-              // Меняем тип "чисто" — пересоздаем вопрос, но сохраняем общие данные (текст, старую картинку, медиа)
               const base = newQuestion(newType);
               
               if (q.q) base.q = q.q;
@@ -81,17 +78,41 @@ export default function QuestionList({ value, onChange, disabled }: Props) {
         ))}
       </div>
 
-      {/* Панель добавления СНИЗУ */}
-      <div style={{ marginTop: 16 }}>
-        <div className="card" style={{ padding: 14 }}>
-          <div className="small-muted" style={{ marginBottom: 10 }}>
-            ➕ Добавляй вопросы сверху вниз — поэтому панель создания здесь, внизу.
+      {/* Панель добавления вопроса СНИЗУ */}
+      <div style={{ marginTop: 10 }}>
+        <div 
+          className="card" 
+          style={{ 
+            padding: 20, 
+            background: "#ffffff", 
+            border: "2px dashed #cbd5e1", 
+            borderRadius: 18,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.02)"
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: 14, color: "#0f172a", marginBottom: 6 }}>
+            ➕ Добавить следующий вопрос
+          </div>
+          <div className="small-muted" style={{ marginBottom: 14 }}>
+            Выберите тип механики и нажмите кнопку добавления
           </div>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
             <QuestionTypeSwitch value={newType} onChange={setNewType} disabled={disabled} />
 
-            <button className="btn" type="button" onClick={add} disabled={!canAdd}>
+            <button 
+              className="btn" 
+              type="button" 
+              onClick={add} 
+              disabled={!canAdd}
+              style={{
+                padding: "10px 20px",
+                borderRadius: 12,
+                fontWeight: 800,
+                fontSize: 14,
+                boxShadow: "0 4px 14px rgba(14, 165, 233, 0.25)"
+              }}
+            >
               ➕ Добавить вопрос
             </button>
           </div>
