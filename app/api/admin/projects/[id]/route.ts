@@ -1,5 +1,5 @@
 // app/api/admin/projects/[id]/route.ts
-// ADMIN: управление одним проектом (GET/PUT/DELETE) + его табами и уровными.
+// ADMIN: управление одним проектом (GET/PUT/DELETE) + его табами и уровнями.
 
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 type UpdateProjectInput = {
   name?: string;
+  slug?: string | null;
   description?: string | null;
   theme_color?: string | null;
   fallback_icon?: string | null;
@@ -123,6 +124,7 @@ export async function PUT(
   // --- 1. Обновление полей проекта ---
   const patch: UpdateProjectInput = {};
   if (body.name !== undefined) patch.name = body.name;
+  if (body.slug !== undefined) patch.slug = body.slug ? body.slug.trim() : null;
   if (body.description !== undefined) patch.description = body.description;
   if (body.theme_color !== undefined) patch.theme_color = body.theme_color;
   if (body.fallback_icon !== undefined) patch.fallback_icon = body.fallback_icon;
@@ -182,7 +184,6 @@ export async function PUT(
       }
     }
 
-    // Удалить табы, которых нет в новом списке
     const { data: existingTabs, error: listErr } = await supabase
       .from("project_tabs")
       .select("id")
@@ -260,7 +261,6 @@ export async function PUT(
 
   invalidateProjectsCache();
 
-  // Вернём обновлённый проект + табы + уровни
   const [
     { data: project, error: projectError },
     { data: tabs, error: tabsError },
@@ -287,7 +287,7 @@ export async function PUT(
 }
 
 // ---------------------------------------------------------------------------
-// DELETE: удалить проект (умное каскадное удаление)
+// DELETE: удалить проект
 // ---------------------------------------------------------------------------
 export async function DELETE(
   _req: Request,
@@ -300,7 +300,6 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    // 1. Получаем все материалы этого проекта, чтобы удалить связи
     const { data: projectTabs } = await supabase.from("project_tabs").select("id").eq("project_id", id);
     const tabIds = projectTabs?.map(t => t.id) || [];
     
@@ -310,7 +309,6 @@ export async function DELETE(
       materialIds = materials?.map(m => m.id) || [];
     }
 
-    // 2. Если есть материалы, удаляем их зависимости (доступы, заявки, результаты)
     if (materialIds.length > 0) {
       await Promise.all([
         supabase.from("material_access").delete().in("material_id", materialIds),
@@ -320,7 +318,6 @@ export async function DELETE(
       ]);
     }
 
-    // 3. Получаем и удаляем заявки проекта
     const { data: requests } = await supabase.from("purchase_requests").select("id").eq("project_id", id);
     const requestIds = requests?.map(r => r.id) || [];
     if (requestIds.length > 0) {
@@ -328,12 +325,10 @@ export async function DELETE(
       await supabase.from("purchase_requests").delete().eq("project_id", id);
     }
 
-    // 4. Удаляем сами материалы
     if (materialIds.length > 0) {
       await supabase.from("materials").delete().in("id", materialIds);
     }
 
-    // 5. Удаляем проект (табы и уровни удалятся каскадно)
     const { error: finalError } = await supabase.from("projects").delete().eq("id", id);
 
     if (finalError) {

@@ -9,7 +9,6 @@ import {
   normalizeBool,
   normalizeOrderIndex,
   normalizeUUID,
-  normalizeBranchType,
   normalizeMaterialKind,
   normalizeClassLevels,
   normalizeTargetLevels,
@@ -24,7 +23,7 @@ function normalizePatchPayload(body: any) {
   const payload: Record<string, any> = {};
 
   if ("branch_type" in body || "branchType" in body) {
-    payload.branch_type = normalizeBranchType(body.branch_type ?? body.branchType);
+    payload.branch_type = String(body.branch_type ?? body.branchType ?? "").trim();
   }
 
   if ("material_kind" in body || "materialKind" in body) {
@@ -86,26 +85,6 @@ function normalizePatchPayload(body: any) {
 
 function validatePatchPayload(payload: Record<string, any>) {
   if ("title" in payload && !payload.title) return "title required";
-  if ("material_kind" in payload && !payload.material_kind) return "material_kind required";
-
-  if (
-    "branch_type" in payload &&
-    payload.branch_type === "gatehouse" &&
-    "target_levels" in payload &&
-    (!payload.target_levels || payload.target_levels.length === 0)
-  ) {
-    return "target_levels required";
-  }
-
-  if (
-    "branch_type" in payload &&
-    payload.branch_type === "olympiad" &&
-    "class_levels" in payload &&
-    (!payload.class_levels || payload.class_levels.length === 0)
-  ) {
-    return "class_levels required";
-  }
-
   return null;
 }
 
@@ -210,7 +189,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             .update(legacyPayload)
             .eq("id", data.legacy_source_id);
         } catch {
-          // Игнорируем ошибки синхронизации легаси-таблиц
+          // Игнорируем ошибки синхронизации
         }
       }
     }
@@ -220,6 +199,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     console.error("🔴 [ADMIN PATCH MATERIAL] Серверная ошибка:", error);
     return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
+}
+
+// Дублируем PATCH метод для обработки PUT запросов
+export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  return PATCH(req, ctx);
 }
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {

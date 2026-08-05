@@ -40,7 +40,6 @@ export default function MaterialsManager() {
       return;
     }
 
-    // Находим slug выбранного проекта
     const project = projects.find(p => p.id === selectedProjectId);
     setSelectedProjectSlug(project?.slug || "");
 
@@ -69,30 +68,31 @@ export default function MaterialsManager() {
     const updated = current.includes(code)
       ? current.filter((c: string) => c !== code)
       : [...current, code];
-    setEditingMaterial({ ...editingMaterial, target_levels: updated });
+    setEditingMaterial({ 
+      ...editingMaterial, 
+      target_levels: updated,
+      class_levels: updated,
+    });
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const isEdit = !!editingMaterial.id;
     const url = isEdit 
-      ? `/api/admin/projects/${selectedProjectId}/materials/${editingMaterial.id}` 
-      : `/api/admin/projects/${selectedProjectId}/materials`;
+      ? `/api/admin/materials/${editingMaterial.id}` 
+      : `/api/admin/materials`;
     
-    // Определяем branch_type на основе выбранного проекта
     const project = projects.find(p => p.id === selectedProjectId);
-    const branchType = project?.slug || "olympiad";
+    const branchType = project?.slug || "general";
 
-    // Формируем уровень/классы: используем target_levels как основной массив
     const levelCodes = editingMaterial.target_levels || [];
 
     const payload = {
       ...editingMaterial,
-      branch_type: branchType, // динамически подставляем slug проекта
+      branch_type: branchType,
       price: Number(editingMaterial.price) || 1000,
       is_secret: Boolean(editingMaterial.is_secret),
       project_tab_id: selectedTabId === "none" || !selectedTabId ? null : selectedTabId,
-      // Отправляем оба поля: class_levels для олимпиады, target_levels для gatehouse и других
       class_levels: levelCodes,
       target_levels: levelCodes,
     };
@@ -123,7 +123,7 @@ export default function MaterialsManager() {
     if (!okConfirm) return;
 
     try {
-      const res = await fetch(`/api/admin/projects/${selectedProjectId}/materials/${materialId}`, {
+      const res = await fetch(`/api/admin/materials/${materialId}`, {
         method: "DELETE",
       });
 
@@ -168,14 +168,17 @@ export default function MaterialsManager() {
     }
   }
 
-  // При открытии редактирования подтягиваем уровни из обоих полей
   const openEdit = (material: any) => {
-    const levels = material.target_levels?.length 
-      ? material.target_levels 
-      : material.class_levels || [];
+    const currentLevels = Array.from(
+      new Set([
+        ...(Array.isArray(material.target_levels) ? material.target_levels : []),
+        ...(Array.isArray(material.class_levels) ? material.class_levels : []),
+      ])
+    );
     setEditingMaterial({
       ...material,
-      target_levels: levels,
+      target_levels: currentLevels,
+      class_levels: currentLevels,
     });
   };
 
@@ -215,11 +218,11 @@ export default function MaterialsManager() {
             cover_image_url: "", 
             price: 1000,
             target_levels: [], 
+            class_levels: [],
             is_active: true, 
             is_available: false, 
             is_secret: false,
             order_index: 0,
-            // branch_type будет подставлен динамически при сохранении
             material_kind: "material",
           })}
           className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed"
@@ -400,61 +403,69 @@ export default function MaterialsManager() {
                   </td>
                 </tr>
               ) : (
-                materials.map(mat => (
-                  <tr key={mat.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4 font-bold flex items-center gap-4">
-                      {mat.cover_image_url ? (
-                        <img src={mat.cover_image_url} alt="" className="w-12 h-12 object-cover rounded-lg shadow-sm border" />
-                      ) : (
-                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl shadow-sm border">📄</div>
-                      )}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span>{mat.title}</span>
-                          {mat.is_secret && (
-                            <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">
-                              ★ Секретный
-                            </span>
-                          )}
+                materials.map(mat => {
+                  const displayLevels = Array.from(
+                    new Set([
+                      ...(Array.isArray(mat.target_levels) ? mat.target_levels : []),
+                      ...(Array.isArray(mat.class_levels) ? mat.class_levels : []),
+                    ])
+                  );
+
+                  return (
+                    <tr key={mat.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4 font-bold flex items-center gap-4">
+                        {mat.cover_image_url ? (
+                          <img src={mat.cover_image_url} alt="" className="w-12 h-12 object-cover rounded-lg shadow-sm border" />
+                        ) : (
+                          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl shadow-sm border">📄</div>
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span>{mat.title}</span>
+                            {mat.is_secret && (
+                              <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                ★ Секретный
+                              </span>
+                            )}
+                          </div>
+                          {mat.description && <div className="text-xs font-normal text-gray-500 mt-0.5 truncate max-w-xs">{mat.description}</div>}
                         </div>
-                        {mat.description && <div className="text-xs font-normal text-gray-500 mt-0.5 truncate max-w-xs">{mat.description}</div>}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1">
-                        {/* Показываем уровни из target_levels или class_levels */}
-                        {(mat.target_levels?.length ? mat.target_levels : mat.class_levels || []).map((code: string) => (
-                          <span key={code} className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded uppercase">
-                            {code}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-4 text-center text-sm font-bold text-gray-800">
-                      {mat.price ?? 1000} ₽
-                    </td>
-                    <td className="p-4 text-center text-sm font-bold">
-                      {mat.is_available ? <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg">Всем</span> : <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-lg">По заявке</span>}
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => openEdit(mat)} 
-                          className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-bold transition-colors"
-                        >
-                          Изменить
-                        </button>
-                        <button 
-                          onClick={() => void handleDelete(mat.id, mat.title)} 
-                          className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg font-bold transition-colors" 
-                          title="Удалить"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1">
+                          {displayLevels.map((code: string) => (
+                            <span key={code} className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded uppercase">
+                              {code}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="p-4 text-center text-sm font-bold text-gray-800">
+                        {mat.price ?? 1000} ₽
+                      </td>
+                      <td className="p-4 text-center text-sm font-bold">
+                        {mat.is_available ? <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg">Всем</span> : <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-lg">По заявке</span>}
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button 
+                            onClick={() => openEdit(mat)} 
+                            className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-bold transition-colors"
+                          >
+                            Изменить
+                          </button>
+                          <button 
+                            onClick={() => void handleDelete(mat.id, mat.title)} 
+                            className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg font-bold transition-colors" 
+                            title="Удалить"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
