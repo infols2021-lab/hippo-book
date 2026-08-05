@@ -1,10 +1,12 @@
-// lib/materials/types.ts
-import type { BranchType } from "@/lib/branches/types";
+import type { BranchType as KnownBranchType } from "@/lib/branches/types";
+
+// Поддерживаем как известную строго типизированную ветку, так и кастомные строки веток
+export type BranchType = KnownBranchType | (string & {});
 
 export type OlympiadMaterialKind = "textbook" | "crossword";
 export type GatehouseMaterialKind = "mock_test";
 
-// Поддерживаем как старые строго типизированные виды, так и новые кастомные строки (string & {})
+// Поддерживаем как старые строго типизированные виды, так и новые кастомные строки
 export type MaterialKind = OlympiadMaterialKind | GatehouseMaterialKind | (string & {});
 
 export type MaterialTargetMode = "class_level" | "target_levels";
@@ -13,7 +15,7 @@ export type MaterialLegacySourceTable = "textbooks" | "crosswords" | null;
 
 export type MaterialDbRow = {
   id: string;
-  branch_type: BranchType;
+  branch_type: string;
   material_kind: MaterialKind;
   title: string;
   description: string | null;
@@ -51,7 +53,7 @@ export type LegacyTextbookDbRow = {
   is_available: boolean | null;
   order_index: number | null;
   class_level: string[] | null;
-  branch_type?: BranchType | null;
+  branch_type?: string | null;
   target_levels?: string[] | null;
   created_by: string | null;
   created_at: string | null;
@@ -66,7 +68,7 @@ export type LegacyCrosswordDbRow = {
   is_available: boolean | null;
   order_index: number | null;
   class_level: string[] | null;
-  branch_type?: BranchType | null;
+  branch_type?: string | null;
   target_levels?: string[] | null;
   created_by: string | null;
   created_at: string | null;
@@ -77,7 +79,7 @@ export type AssignmentMaterialLink = {
   material_id: string | null;
   textbook_id?: string | null;
   crossword_id?: string | null;
-  branch_type?: BranchType | null;
+  branch_type?: string | null;
 };
 
 export type MaterialWithProgress = MaterialDbRow & {
@@ -88,7 +90,7 @@ export type MaterialWithProgress = MaterialDbRow & {
 };
 
 export type MaterialCreateInput = {
-  branch_type: BranchType;
+  branch_type: string;
   material_kind: MaterialKind;
   title: string;
   description?: string | null;
@@ -120,7 +122,7 @@ export type MaterialGrantRow = {
   kind: MaterialKind;
   item_id: string;
   material_id: string;
-  branch_type: BranchType;
+  branch_type: string;
   material_kind: MaterialKind;
   title: string;
   granted_by: string;

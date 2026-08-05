@@ -1,10 +1,8 @@
-// app/api/admin/materials/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
 import { 
   normalizeMaterialInput, 
-  normalizeBranchType, 
   normalizeMaterialKind 
 } from "@/lib/materials/normalize";
 
@@ -27,7 +25,7 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (branch_type) {
-      query = query.eq("branch_type", normalizeBranchType(branch_type));
+      query = query.eq("branch_type", String(branch_type).trim());
     }
 
     if (material_kind) {
@@ -86,19 +84,16 @@ export async function POST(req: NextRequest) {
     return fail("Bad JSON", 400, "BAD_JSON");
   }
 
+  const rawBranchType = String(body.branch_type || body.branch || body.project_slug || "general").trim();
+
   const payload = {
     ...normalizeMaterialInput(body, user.id),
+    branch_type: rawBranchType,
     is_secret: typeof body.is_secret === "boolean" ? body.is_secret : Boolean(body.isSecret),
   };
 
   if (!payload.title) {
     return fail("title required", 400, "VALIDATION");
-  }
-  if (payload.branch_type === "olympiad" && payload.class_levels.length === 0) {
-    return fail("class_levels required", 400, "VALIDATION");
-  }
-  if (payload.branch_type === "gatehouse" && payload.target_levels.length === 0) {
-    return fail("target_levels required", 400, "VALIDATION");
   }
 
   try {
