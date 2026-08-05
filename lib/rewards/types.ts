@@ -117,3 +117,12 @@ export type PromocodeRedeemResult = {
   physicalPrize?: CustomPhysicalPrize | null;
   grantedMaterialIds?: string[];
 };
+
+export type UserPromocodeHistoryItem = {
+  id: string;
+  code: string;
+  redeemed_at: string;
+  granted_reward_titles?: string[];
+  granted_material_titles?: string[];
+  physical_prize?: CustomPhysicalPrize | null;
+};

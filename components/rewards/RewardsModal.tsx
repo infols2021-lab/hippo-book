@@ -16,6 +16,7 @@ import type {
   StreakStats,
   UserInventoryItem,
   CustomPhysicalPrize,
+  UserPromocodeHistoryItem,
 } from "@/lib/rewards/types";
 
 export type RewardsTabType = "wardrobe" | "streaks" | "promocode" | "timeline";
@@ -66,10 +67,13 @@ export default function RewardsModal({
   const [promoSuccessMsg, setPromoSuccessMsg] = useState<string | null>(null);
   const [redeeming, setRedeeming] = useState(false);
 
+  // История промокодов текущего ученика
+  const [promoHistory, setPromoHistory] = useState<UserPromocodeHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   // Стейты для пошагового анбоксинга
   const [unboxModalOpen, setUnboxModalOpen] = useState(false);
   const [unboxedItems, setUnboxedItems] = useState<UnboxedRewardItem[]>([]);
-  // Награды, которые нужно показать ПОСЛЕ того как закроется окно физ. приза
   const [pendingUnboxItems, setPendingUnboxItems] = useState<UnboxedRewardItem[]>([]);
 
   const [materialChoiceState, setMaterialChoiceState] = useState<{
@@ -93,23 +97,21 @@ export default function RewardsModal({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [mascotRes, streaksRes] = await Promise.all([
+      const [mascotRes, streaksRes, promoHistoryRes] = await Promise.all([
         fetch("/api/mascot"),
         fetch("/api/streaks"),
+        fetch("/api/rewards/promocodes/history"),
       ]);
 
       const mascotData = await mascotRes.json();
       const streaksData = await streaksRes.json();
+      const promoHistoryData = await promoHistoryRes.json();
 
       if (mascotRes.ok) {
         setMascot(mascotData.mascot || null);
         setInventory(mascotData.inventory || []);
       }
       if (streaksRes.ok) {
-        // Единственный источник правды — streaksData.stats (он всегда
-        // построен из profiles на бэкенде). streaksData.streak дублирует
-        // те же значения для обратной совместимости, поэтому больше не
-        // отдаём ему приоритет через `??`.
         const stats = streaksData.stats || {};
 
         setStreakStats({
@@ -120,6 +122,9 @@ export default function RewardsModal({
         });
 
         setStreakPath(streaksData.path || []);
+      }
+      if (promoHistoryRes.ok) {
+        setPromoHistory(promoHistoryData.history || []);
       }
     } catch (e) {
       console.error("Error loading rewards data:", e);
@@ -178,11 +183,6 @@ export default function RewardsModal({
     }
   };
 
-  // Общий обработчик результата активации промокода — используется и для
-  // прямого ввода кода, и для завершения выбора материалов. Гарантирует,
-  // что физ. приз и обычные награды не "съедают" друг друга: если есть и
-  // то и другое — сначала показываем приз, а после его закрытия открываем
-  // пошаговый анбоксинг остальных наград.
   const processRedeemResult = (data: {
     physicalPrize?: CustomPhysicalPrize | null;
     grantedRewards?: any[];
@@ -267,7 +267,6 @@ export default function RewardsModal({
   const closePhysicalPrizeModal = () => {
     setPhysicalPrizeState({ isOpen: false, prize: null });
 
-    // Если пока показывали приз, "в очереди" ждали ещё награды — открываем их
     if (pendingUnboxItems.length > 0) {
       setUnboxedItems(pendingUnboxItems);
       setPendingUnboxItems([]);
@@ -587,7 +586,7 @@ export default function RewardsModal({
 
                 {/* Вкладка 3: ПРОМОКОД */}
                 {activeTab === "promocode" && (
-                  <div className="max-w-md mx-auto py-12 space-y-6">
+                  <div className="max-w-xl mx-auto py-6 space-y-6">
                     <div className="text-center space-y-2">
                       <h3 className="text-lg font-black uppercase tracking-wider">
                         Активация промокода
@@ -597,7 +596,7 @@ export default function RewardsModal({
                       </p>
                     </div>
 
-                    <form onSubmit={handleRedeemPromo} className="space-y-4">
+                    <form onSubmit={handleRedeemPromo} className="space-y-4 max-w-md mx-auto">
                       <div>
                         <input
                           type="text"
@@ -637,6 +636,94 @@ export default function RewardsModal({
                         {redeeming ? "Активация..." : "Активировать"}
                       </button>
                     </form>
+
+                    {/* История активированных промокодов */}
+                    <div
+                      className="border-t pt-6"
+                      style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
+                    >
+                      <h4 className="text-xs font-black uppercase tracking-wider mb-4 text-center opacity-70">
+                        История ваших промокодов
+                      </h4>
+
+                      {promoHistory.length === 0 ? (
+                        <div
+                          className="text-center py-6 border rounded-2xl p-4 text-xs font-bold opacity-50"
+                          style={{
+                            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                            borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
+                          }}
+                        >
+                          Вы пока не активировали ни одного промокода
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                          {promoHistory.map((item) => (
+                            <div
+                              key={item.id}
+                              className="border rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-all"
+                              style={{
+                                backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                                borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
+                              }}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span
+                                  className="font-mono font-black px-2.5 py-1 rounded-xl text-xs uppercase tracking-wider"
+                                  style={{
+                                    backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+                                    color: "var(--project-primary, #0ea5e9)",
+                                    border: "1px solid color-mix(in srgb, var(--project-primary, #0ea5e9) 30%, transparent)",
+                                  }}
+                                >
+                                  {item.code}
+                                </span>
+                                <span className="text-[11px] font-medium opacity-50 whitespace-nowrap">
+                                  {new Date(item.redeemed_at).toLocaleDateString("ru-RU", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              </div>
+
+                              <div className="flex flex-wrap gap-1.5 justify-start sm:justify-end">
+                                {item.granted_reward_titles?.map((title, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-purple-500/10 text-purple-600 border border-purple-500/20"
+                                  >
+                                    🎽 {title}
+                                  </span>
+                                ))}
+                                {item.granted_material_titles?.map((title, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20"
+                                  >
+                                    📚 {title}
+                                  </span>
+                                ))}
+                                {item.physical_prize && (
+                                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                                    🧸 {item.physical_prize.title}
+                                  </span>
+                                )}
+                                {!item.granted_reward_titles?.length &&
+                                  !item.granted_material_titles?.length &&
+                                  !item.physical_prize && (
+                                    <span className="text-[10px] font-medium opacity-50">
+                                      Доступ активирован
+                                    </span>
+                                  )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </>
