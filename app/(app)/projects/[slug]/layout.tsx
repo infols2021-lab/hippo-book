@@ -17,13 +17,6 @@ function isDark(hexColor: string): boolean {
   return luminance < 128; // Если меньше 128 — значит цвет тёмный
 }
 
-/**
- * Значения темы приходят из БД (project.theme) и попадают в <style> через
- * dangerouslySetInnerHTML. Без проверки это открытая дыра для CSS/HTML-инъекции
- * (кто-то мог бы записать в theme.colors.primary что-то вроде
- * `red;}</style><script>...`). Разрешаем только безопасные для CSS-значения цвета
- * символы: hex, rgb()/rgba()/hsl()/color-mix(), проценты, запятые, пробелы, точки.
- */
 function sanitizeCssColor(value: string, fallback: string): string {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
@@ -54,7 +47,7 @@ export default async function ProjectLayout({
 
   const theme = project.theme || {};
 
-  // Базовые цвета (сначала берём "сырые" значения, потом санитизируем)
+  // Базовые цвета
   const primaryColor = sanitizeCssColor(
     theme?.colors?.primary || theme?.primaryColor || project.theme_color || "#0ea5e9",
     "#0ea5e9",
@@ -78,23 +71,26 @@ export default async function ProjectLayout({
 
   // Анализируем тему: Темная или Светлая
   const isDarkTheme = isDark(bgColor);
+  
+  // ЖБ Фон для инпутов, чтобы они не сливались в грязь
+  const inputBgColor = isDarkTheme ? "rgba(0, 0, 0, 0.25)" : "#ffffff";
 
-  // 🚀 ГЕНЕРАЦИЯ "УМНОГО СТЕКЛА" В ЗАВИСИМОСТИ ОТ ТЕМЫ
+  // 🚀 ГЕНЕРАЦИЯ "УМНОГО СТЕКЛА"
   const glassBg = isDarkTheme
-    ? `color-mix(in srgb, ${cardBgColor} 65%, rgba(0,0,0,0.3))` // Чуть затемняем темное стекло
+    ? `color-mix(in srgb, ${cardBgColor} 65%, rgba(0,0,0,0.3))`
     : `color-mix(in srgb, ${cardBgColor} 75%, transparent)`;
 
   const glassBorder = isDarkTheme
-    ? `color-mix(in srgb, #ffffff 12%, transparent)` // В темной теме рамки всегда белые полупрозрачные
+    ? `color-mix(in srgb, #ffffff 12%, transparent)`
     : `color-mix(in srgb, ${textColor} 8%, transparent)`;
 
   const glassHighlight = isDarkTheme
-    ? `color-mix(in srgb, #ffffff 6%, transparent)` // Слабый блик в темной теме
-    : `color-mix(in srgb, #ffffff 70%, transparent)`; // Яркий белый блик в светлой
+    ? `color-mix(in srgb, #ffffff 6%, transparent)`
+    : `color-mix(in srgb, #ffffff 70%, transparent)`;
 
   const glassShadow = isDarkTheme
-    ? `0 16px 40px -8px rgba(0,0,0,0.6)` // Глубокая черная тень
-    : `0 12px 40px -12px color-mix(in srgb, ${textColor} 12%, transparent)`; // Мягкая цветная тень
+    ? `0 16px 40px -8px rgba(0,0,0,0.6)`
+    : `0 12px 40px -12px color-mix(in srgb, ${textColor} 12%, transparent)`;
 
   const themeVars = {
     "--project-primary": primaryColor,
@@ -102,6 +98,7 @@ export default async function ProjectLayout({
     "--project-bg": bgColor,
     "--project-text": textColor,
     "--project-card-bg": cardBgColor,
+    "--project-input-bg": inputBgColor, // Добавили переменную инпутов
     "--accent2": primaryColor,
     "--accent3": secondaryColor,
 
@@ -119,14 +116,6 @@ export default async function ProjectLayout({
     color: "var(--project-text)",
   } as React.CSSProperties;
 
-  // ⚠️ КРИТИЧНО: те же переменные дублируем в :root через <style>.
-  // Модалки (components/Modal.tsx) рендерятся через createPortal(..., document.body),
-  // то есть их DOM-узел физически лежит ВНЕ этого <div style={themeStyles}>.
-  // CSS-переменные наследуются по реальному DOM-дереву, а не по дереву React,
-  // поэтому без этого блока портализированный контент (модалки, тултипы и т.п.)
-  // всегда падал на дефолты из globals.css, игнорируя тему проекта.
-  // :root — общий предок и для <body>, и для всего, что в него портализировано,
-  // так что через :root тема долетает куда угодно.
   const rootCssText = Object.entries(themeVars)
     .map(([k, v]) => `${k}: ${v};`)
     .join(" ");

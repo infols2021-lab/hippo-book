@@ -2,6 +2,7 @@
 
 import React, { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 
 type Props = {
   open: boolean;
@@ -31,15 +32,12 @@ export default function Modal({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
   
-  // ДОБАВЛЕНО: Стейт для определения, находимся ли мы в админке
-  const [portalClass, setPortalClass] = useState("");
+  // ЖБ проверка: находимся ли мы в роутах админки?
+  const pathname = usePathname();
+  const isAdmin = pathname?.startsWith("/admin");
 
   useEffect(() => {
     setMounted(true);
-    // Проверяем, есть ли на странице обертка админки
-    if (document.querySelector('.admin-root')) {
-      setPortalClass("admin-root");
-    }
   }, []);
 
   useEffect(() => {
@@ -82,8 +80,8 @@ export default function Modal({
   const modalContent = (
     <div
       ref={overlayRef}
-      // ДОБАВЛЕНО: передаем класс portalClass (admin-root), чтобы стили админки сработали
-      className={`modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200 ${portalClass}`}
+      // Если это админка — накидываем admin-root, чтобы админские стили не ломали портал
+      className={`modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200 ${isAdmin ? "admin-root" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? titleId : undefined}
