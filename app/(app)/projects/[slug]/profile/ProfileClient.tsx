@@ -409,15 +409,15 @@ export default function ProfileClient({
             void saveProfile();
           }}
         >
-          <div className="form-group">
+          <div className="form-group" style={{ marginBottom: 16 }}>
             <label htmlFor="editFullName">ФИО:</label>
             <input id="editFullName" type="text" required value={editFullName} onChange={(e) => setEditFullName(e.target.value)} />
           </div>
-          <div className="form-group">
+          <div className="form-group" style={{ marginBottom: 16 }}>
             <label htmlFor="editPhone">Контактный телефон:</label>
             <input id="editPhone" type="tel" required value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
           </div>
-          <div className="form-group">
+          <div className="form-group" style={{ marginBottom: 16 }}>
             <label htmlFor="editRegion">Область проживания:</label>
             <select id="editRegion" required value={editRegion} onChange={(e) => setEditRegion(e.target.value)}>
               <option value="">-- Выберите область --</option>
@@ -429,14 +429,14 @@ export default function ProfileClient({
               <option value="Другое">Другая область</option>
             </select>
           </div>
-          <div className="form-group">
+          <div className="form-group" style={{ marginBottom: 24 }}>
             <label>Email:</label>
             <input type="email" value={userEmail} disabled />
             <div className="small-muted" style={{ marginTop: 5 }}>
               Email нельзя изменить
             </div>
           </div>
-          <div className="modal-actions">
+          <div className="modal-actions" style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
             <button type="button" className="btn ghost" onClick={() => setEditOpen(false)}>
               Отмена
             </button>
@@ -470,7 +470,7 @@ export default function ProfileClient({
         {/* Верхняя панель сайта */}
         <div className="profile-topbar">
           
-          {/* НОВОЕ: Project Switcher */}
+          {/* Project Switcher */}
           <div className="brand-switcher-wrapper">
             <button 
               type="button" 

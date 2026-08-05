@@ -77,9 +77,9 @@ export default function Modal({
       ref={overlayRef}
       className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
       style={{
-        backgroundColor: "rgba(0, 0, 0, 0.65)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
+        backgroundColor: "rgba(11, 15, 25, 0.8)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
       }}
       role="dialog"
       aria-modal="true"
@@ -97,7 +97,8 @@ export default function Modal({
           maxHeight: "90vh",
           backgroundColor: "var(--project-card-bg, #ffffff)",
           color: "var(--project-text, #0f172a)",
-          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
+          borderColor: "var(--glass-border, rgba(255, 255, 255, 0.15))",
+          opacity: 1,
         }}
         tabIndex={-1}
         onMouseDown={(e) => {
@@ -105,15 +106,12 @@ export default function Modal({
         }}
       >
         <div
-          className="modal-header flex items-center justify-between pb-3 border-b flex-shrink-0"
-          style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
+          className="modal-header flex items-center justify-between pb-4 border-b flex-shrink-0"
+          style={{ borderColor: "color-mix(in srgb, var(--project-text, #0f172a) 10%, transparent)" }}
         >
           <div className="modal-title-wrap flex items-center gap-2.5 min-w-0 pr-2">
-            <div className="modal-icon text-xl flex-shrink-0" aria-hidden="true">
-              ✏️
-            </div>
             <h3
-              className="modal-title text-lg font-black tracking-tight truncate"
+              className="modal-title text-xl font-black tracking-tight truncate"
               id={title ? titleId : undefined}
               style={{ color: "var(--project-text, #0f172a)" }}
             >
@@ -122,10 +120,12 @@ export default function Modal({
           </div>
 
           <button
-            className="modal-close w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm transition-colors flex-shrink-0"
+            className="modal-close w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm transition-all flex-shrink-0"
             style={{
               backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent)",
               color: "var(--project-text, #0f172a)",
+              border: "none",
+              cursor: "pointer",
             }}
             onClick={onClose}
             type="button"

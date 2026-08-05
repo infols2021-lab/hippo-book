@@ -547,8 +547,8 @@ export default function RequestsClient({
           editingId
             ? "Редактировать заявку"
             : modalStep === 1
-            ? "🛒 Шаг 1: Выбор материалов"
-            : "📝 Шаг 2: Оформление заказа"
+            ? "Шаг 1: Выбор материалов"
+            : "Шаг 2: Оформление заказа"
         }
         maxWidth={modalStep === 1 ? 760 : 520}
       >
@@ -569,24 +569,26 @@ export default function RequestsClient({
           {modalStep === 1 ? (
             /* ================= ШАГ 1: ВИТРИНА КАРТОЧЕК ================= */
             <div>
-              <div className="form-group">
-                <label>Номер заявки:</label>
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Номер заявки:</label>
                 <input
                   type="text"
                   value={requestNumber}
                   readOnly
+                  style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: "color-mix(in srgb, var(--project-text) 5%, transparent)", color: "var(--project-text)" }}
                 />
               </div>
 
               {/* Фильтр по уровням проекта */}
               {levels && levels.length > 0 && (
-                <div className="level-filter-container">
-                  <div className="level-filter-title">🎯 Уровень / Класс:</div>
-                  <div className="level-filter-chips">
+                <div className="level-filter-container" style={{ marginBottom: 16 }}>
+                  <div className="level-filter-title" style={{ fontWeight: 700, marginBottom: 8 }}>Уровень / Класс:</div>
+                  <div className="level-filter-chips" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     <button
                       type="button"
                       className={`level-chip ${selectedLevelCode === "all" ? "active" : ""}`}
                       onClick={() => setSelectedLevelCode("all")}
+                      style={{ padding: "8px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: selectedLevelCode === "all" ? "var(--project-primary)" : "transparent", color: selectedLevelCode === "all" ? "#fff" : "var(--project-text)", fontWeight: 700, cursor: "pointer" }}
                     >
                       Все уровни
                     </button>
@@ -596,6 +598,7 @@ export default function RequestsClient({
                         type="button"
                         className={`level-chip ${selectedLevelCode === lvl.code ? "active" : ""}`}
                         onClick={() => setSelectedLevelCode(lvl.code)}
+                        style={{ padding: "8px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: selectedLevelCode === lvl.code ? "var(--project-primary)" : "transparent", color: selectedLevelCode === lvl.code ? "#fff" : "var(--project-text)", fontWeight: 700, cursor: "pointer" }}
                       >
                         {lvl.label}
                       </button>
@@ -605,11 +608,12 @@ export default function RequestsClient({
               )}
 
               {/* Табы разделов */}
-              <div className="vitrine-tabs">
+              <div className="vitrine-tabs" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
                 <button
                   type="button"
                   className={`vitrine-tab-btn ${activeTabId === "all" ? "active" : ""}`}
                   onClick={() => setActiveTabId("all")}
+                  style={{ padding: "8px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: activeTabId === "all" ? "var(--project-primary)" : "transparent", color: activeTabId === "all" ? "#fff" : "var(--project-text)", fontWeight: 700, cursor: "pointer" }}
                 >
                   Все разделы
                 </button>
@@ -619,8 +623,9 @@ export default function RequestsClient({
                     type="button"
                     className={`vitrine-tab-btn ${activeTabId === t.id ? "active" : ""}`}
                     onClick={() => setActiveTabId(t.id)}
+                    style={{ padding: "8px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: activeTabId === t.id ? "var(--project-primary)" : "transparent", color: activeTabId === t.id ? "#fff" : "var(--project-text)", fontWeight: 700, cursor: "pointer" }}
                   >
-                    {t.icon || "📁"} {t.title}
+                    {t.title}
                   </button>
                 ))}
               </div>
@@ -628,7 +633,7 @@ export default function RequestsClient({
               {/* Сетка материалов */}
               {materialsLoading ? (
                 <div style={{ textAlign: "center", padding: "30px", fontWeight: 700 }}>
-                  ⏳ Загружаем доступные материалы...
+                  Загружаем доступные материалы...
                 </div>
               ) : filteredMaterials.length === 0 ? (
                 <div
@@ -642,7 +647,7 @@ export default function RequestsClient({
                   В этом разделе пока нет материалов
                 </div>
               ) : (
-                <div className="materials-grid">
+                <div className="materials-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16, maxHeight: 360, overflowY: "auto", padding: 4 }}>
                   {filteredMaterials.map((item) => {
                     const isOwned = ownedMaterialSet.has(item.id);
                     const isSelected = selectedMaterialIds.includes(item.id);
@@ -652,14 +657,16 @@ export default function RequestsClient({
                         key={item.id}
                         className={`material-card ${isSelected ? "selected" : ""} ${isOwned ? "owned" : ""}`}
                         onClick={() => toggleMaterialSelection(item.id)}
+                        style={{ border: `2px solid ${isSelected ? "var(--project-primary)" : "var(--glass-border)"}`, borderRadius: 16, padding: 16, cursor: isOwned ? "default" : "pointer", background: isSelected ? "color-mix(in srgb, var(--project-primary) 10%, transparent)" : "color-mix(in srgb, var(--project-text) 2%, transparent)", display: "flex", flexDirection: "column", justifyContent: "space-between", opacity: isOwned ? 0.6 : 1 }}
                       >
-                        <div className="material-cover-wrapper">
+                        <div className="material-cover-wrapper" style={{ height: 100, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
                           {item.cover_image_url ? (
                             <img
                               src={item.cover_image_url}
                               alt={item.title}
                               loading="lazy"
                               className="material-cover-img"
+                              style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain", borderRadius: 8 }}
                             />
                           ) : (
                             <div style={{ fontSize: "28px" }}>
@@ -669,13 +676,13 @@ export default function RequestsClient({
                         </div>
 
                         <div className="material-card-body">
-                          <div className="material-card-title">{item.title}</div>
-                          <div className="material-card-footer">
-                            <span className="material-card-price">{formatPrice(item.price)}</span>
+                          <div className="material-card-title" style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: "var(--project-text)" }}>{item.title}</div>
+                          <div className="material-card-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span className="material-card-price" style={{ fontWeight: 700, color: "var(--project-primary)" }}>{formatPrice(item.price)}</span>
                             {isOwned ? (
-                              <span className="owned-badge">✅ Выдан</span>
+                              <span className="owned-badge" style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>Выдан</span>
                             ) : (
-                              <span className={`vitrine-card-btn ${isSelected ? "remove" : "add"}`}>
+                              <span className={`vitrine-card-btn ${isSelected ? "remove" : "add"}`} style={{ fontSize: 12, fontWeight: 800, color: isSelected ? "#ef4444" : "var(--project-primary)" }}>
                                 {isSelected ? "✓ Выбрано" : "+ Выбрать"}
                               </span>
                             )}
@@ -688,27 +695,27 @@ export default function RequestsClient({
               )}
 
               {/* Итог снизу */}
-              <div className="cart-summary-bar">
+              <div className="cart-summary-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, padding: "16px 20px", borderRadius: 16, background: "color-mix(in srgb, var(--project-text) 4%, transparent)", border: "1px solid var(--glass-border)" }}>
                 <div>
                   <span style={{ fontSize: "13px", opacity: 0.8 }}>Выбрано товаров: </span>
                   <strong style={{ fontSize: "15px" }}>{selectedMaterialIds.length}</strong>
                 </div>
                 <div>
                   <span style={{ fontSize: "13px", opacity: 0.8 }}>Итого: </span>
-                  <strong style={{ fontSize: "18px", color: "var(--project-primary, #0ea5e9)" }}>
+                  <strong style={{ fontSize: "18px", color: "var(--project-primary)" }}>
                     {formatPrice(totalPrice)}
                   </strong>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3" style={{ marginTop: "16px" }}>
+              <div className="flex justify-end gap-3" style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: 12 }}>
                 <button
                   type="button"
-                  className="btn secondary"
+                  className="btn ghost"
                   onClick={() => setRequestModalOpen(false)}
                   disabled={busy}
                 >
-                  ❌ Отмена
+                  Отмена
                 </button>
                 <button
                   type="submit"
@@ -722,54 +729,54 @@ export default function RequestsClient({
           ) : (
             /* ================= ШАГ 2: ИТОГОВЫЙ ЧЕК ================= */
             <div>
-              <div className="receipt-box">
+              <div className="receipt-box" style={{ padding: 16, borderRadius: 16, background: "color-mix(in srgb, var(--project-text) 3%, transparent)", border: "1px solid var(--glass-border)", marginBottom: 20 }}>
                 <div
                   style={{
                     fontWeight: 800,
-                    marginBottom: "10px",
-                    color: "var(--project-text, #0f172a)",
+                    marginBottom: "12px",
+                    color: "var(--project-text)",
                     fontSize: "14px",
                   }}
                 >
-                  🧾 Ваш состав заказа:
+                  Ваш состав заказа:
                 </div>
 
                 {selectedMaterialsList.map((m) => (
-                  <div key={m.id} className="receipt-item">
+                  <div key={m.id} className="receipt-item" style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--glass-border)", fontSize: 14, fontWeight: 600 }}>
                     <span>{m.title}</span>
                     <span>{formatPrice(m.price)}</span>
                   </div>
                 ))}
 
-                <div className="receipt-total">
+                <div className="receipt-total" style={{ display: "flex", justifyContent: "space-between", paddingTop: 12, marginTop: 4, fontWeight: 900, fontSize: 16 }}>
                   <span>Итого к оплате:</span>
-                  <span style={{ color: "var(--project-primary, #0ea5e9)" }}>
+                  <span style={{ color: "var(--project-primary)" }}>
                     {formatPrice(totalPrice)}
                   </span>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Email (🔒 Из профиля):</label>
-                <input type="email" value={userEmail} disabled />
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Email (Из профиля):</label>
+                <input type="email" value={userEmail} disabled style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: "color-mix(in srgb, var(--project-text) 5%, transparent)", color: "var(--project-text)", opacity: 0.7 }} />
               </div>
 
-              <div className="form-group">
-                <label>ФИО ученика (🔒 Из профиля):</label>
-                <input type="text" value={userFullName} disabled />
+              <div className="form-group" style={{ marginBottom: 24 }}>
+                <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>ФИО ученика (Из профиля):</label>
+                <input type="text" value={userFullName} disabled style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: "color-mix(in srgb, var(--project-text) 5%, transparent)", color: "var(--project-text)", opacity: 0.7 }} />
               </div>
 
-              <div className="flex justify-end gap-3" style={{ marginTop: "20px" }}>
+              <div className="flex justify-end gap-3" style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: 12 }}>
                 <button
                   type="button"
-                  className="btn secondary"
+                  className="btn ghost"
                   onClick={() => setModalStep(1)}
                   disabled={busy}
                 >
-                  ← Назад к выбору
+                  ← Назад
                 </button>
                 <button type="submit" className="btn" disabled={busy}>
-                  {busy ? "Создаем заявку..." : "💳 Оформить и оплатить"}
+                  {busy ? "Создаем заявку..." : "Оформить и оплатить"}
                 </button>
               </div>
             </div>
@@ -781,37 +788,38 @@ export default function RequestsClient({
       <Modal
         open={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
-        title="✅ Оплата заявки"
+        title="Оплата заявки"
         maxWidth={540}
       >
         <div
           style={{
-            background: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+            background: "color-mix(in srgb, var(--project-primary) 10%, transparent)",
             padding: "18px",
-            borderRadius: "14px",
-            border: "1px solid color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
+            borderRadius: "16px",
+            border: "1px solid color-mix(in srgb, var(--project-primary) 25%, transparent)",
             marginBottom: "20px",
           }}
         >
           <h4
             style={{
               margin: "0 0 10px 0",
-              color: "var(--project-primary, #0ea5e9)",
+              color: "var(--project-primary)",
               fontSize: "16px",
+              fontWeight: 800,
             }}
           >
-            📋 Инструкция по оплате
+            Инструкция по оплате
           </h4>
 
           {aggregatedPendingSummary.items.length > 0 && (
-            <div className="summary-items-list">
-              <div style={{ fontSize: "12px", fontWeight: 700, opacity: 0.8 }}>
+            <div className="summary-items-list" style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, opacity: 0.8, marginBottom: 6 }}>
                 Заказываемые материалы ({aggregatedPendingSummary.count} заявка/заявок):
               </div>
               {aggregatedPendingSummary.items.map((item, idx) => (
-                <div key={idx} className="summary-item">
+                <div key={idx} className="summary-item" style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 600, padding: "4px 0" }}>
                   <span className="summary-item-title">{item.title}</span>
-                  <span className="summary-item-badge">
+                  <span className="summary-item-badge" style={{ fontWeight: 700, color: "var(--project-primary)" }}>
                     {item.count > 1 ? `x${item.count} • ` : ""}
                     {item.unitPrice * item.count} ₽
                   </span>
@@ -824,11 +832,12 @@ export default function RequestsClient({
             style={{
               margin: 0,
               paddingLeft: "18px",
-              color: "var(--project-text, #0f172a)",
+              color: "var(--project-text)",
               display: "flex",
               flexDirection: "column",
               gap: "8px",
               fontSize: "14px",
+              fontWeight: 600,
             }}
           >
             <li>
@@ -836,7 +845,7 @@ export default function RequestsClient({
             </li>
             <li>
               Сумма к оплате (все неоплаченные заявки):{" "}
-              <strong style={{ fontSize: "17px", color: "var(--project-primary, #0ea5e9)" }}>
+              <strong style={{ fontSize: "17px", color: "var(--project-primary)" }}>
                 {paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "0 руб."}
               </strong>
             </li>
@@ -844,12 +853,12 @@ export default function RequestsClient({
               В назначении платежа (сообщении) <strong>ОБЯЗАТЕЛЬНО</strong> укажите: <br />
               <span
                 style={{
-                  background: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
+                  background: "color-mix(in srgb, var(--project-text) 6%, transparent)",
                   padding: "6px 10px",
                   borderRadius: "8px",
                   display: "inline-block",
                   marginTop: "6px",
-                  border: "1px solid var(--glass-border, rgba(15, 23, 42, 0.12))",
+                  border: "1px solid var(--glass-border)",
                   fontWeight: 700,
                 }}
               >
@@ -859,29 +868,30 @@ export default function RequestsClient({
           </ul>
         </div>
 
-        <div className="qr-head">
-          <div className="qr-title">QR-код для перевода</div>
+        <div className="qr-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div className="qr-title" style={{ fontWeight: 800 }}>QR-код для перевода</div>
           <button
             type="button"
             className="qr-refresh"
             onClick={resetQrStateAndRefresh}
             title="Обновить QR"
             aria-label="Обновить QR"
+            style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 18, fontWeight: 900, color: "var(--project-text)" }}
           >
             ↻
           </button>
         </div>
 
-        <div className="payment-qr payment-qr--smart">
+        <div className="payment-qr payment-qr--smart" style={{ display: "flex", justifyContent: "center", background: "#fff", padding: 16, borderRadius: 16, marginBottom: 20 }}>
           {qrLoading && !qrError ? (
-            <div className="qr-loader" role="status">
+            <div className="qr-loader" role="status" style={{ textAlign: "center", padding: 20 }}>
               <span className="qr-spinner" />
-              <div className="qr-loader-text">Загружаем QR-код...</div>
+              <div className="qr-loader-text" style={{ fontSize: 13, fontWeight: 700, color: "#333" }}>Загружаем QR-код...</div>
             </div>
           ) : null}
 
           {qrError ? (
-            <div className="qr-error" role="alert" style={{ textAlign: "center" }}>
+            <div className="qr-error" role="alert" style={{ textAlign: "center", padding: 20 }}>
               <div style={{ fontWeight: 800, marginBottom: 6, color: "#d32f2f" }}>
                 Не удалось загрузить QR-код
               </div>
@@ -910,11 +920,13 @@ export default function RequestsClient({
             }}
             style={{
               display: qrLoading || qrError ? "none" : "block",
+              maxWidth: 220,
+              height: "auto",
             }}
           />
         </div>
 
-        <div style={{ marginTop: "24px" }}>
+        <div style={{ marginTop: "20px" }}>
           <button
             className="btn"
             style={{ width: "100%" }}
@@ -954,21 +966,21 @@ export default function RequestsClient({
 
         <div className="card">
           <h2 style={{ color: "var(--project-primary, #0ea5e9)", marginBottom: 20 }}>
-            📝 Мои заявки на доступы
+            Мои заявки на доступы
           </h2>
 
-          <div className="payment-info">
-            <h4>💰 Информация об оплате</h4>
-            <p>
+          <div className="payment-info" style={{ marginBottom: 20, padding: 16, borderRadius: 16, background: "color-mix(in srgb, var(--project-primary) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--project-primary) 20%, transparent)" }}>
+            <h4 style={{ margin: "0 0 6px 0", color: "var(--project-primary)", fontSize: 15, fontWeight: 800 }}>Информация об оплате</h4>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, lineHeight: 1.5 }}>
               Выберите нужные материалы в каталоге. QR-код для оплаты появится сразу после создания
               заявки. После подтверждения оплаты администратором доступ к выбранным материалам
               будет открыт автоматически.
             </p>
           </div>
 
-          <div className="requests-actions">
+          <div className="requests-actions" style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
             <button className="btn" onClick={openCreate} type="button" disabled={busy}>
-              ➕ Создать новую заявку
+              + Создать новую заявку
             </button>
             <button
               className="btn ghost qr-open"
@@ -981,29 +993,29 @@ export default function RequestsClient({
                 openPaymentModal(aggregatedPendingSummary.totalPrice);
               }}
             >
-              💳 Оплатить заявку (QR)
+              Оплатить заявку (QR)
             </button>
           </div>
 
           {requests.length === 0 ? (
-            <div className="empty-state">
-              <h3>📭 Заявок пока нет</h3>
-              <p>Создайте свою первую заявку на покупку доступа к учебным материалам</p>
+            <div className="empty-state" style={{ textAlign: "center", padding: "40px 0" }}>
+              <h3>Заявок пока нет</h3>
+              <p style={{ opacity: 0.7, marginBottom: 16 }}>Создайте свою первую заявку на покупку доступа к учебным материалам</p>
               <button className="btn" onClick={openCreate} type="button" disabled={busy}>
-                ➕ Создать заявку
+                + Создать заявку
               </button>
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
-              <table className="requests-table">
+              <table className="requests-table" style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
-                  <tr>
-                    <th>Номер заявки</th>
-                    <th>Дата создания</th>
-                    <th>Выбранные материалы</th>
-                    <th>Итоговая цена</th>
-                    <th>Статус</th>
-                    <th>Действия</th>
+                  <tr style={{ borderBottom: "2px solid var(--glass-border)" }}>
+                    <th style={{ padding: "12px", textAlign: "left" }}>Номер заявки</th>
+                    <th style={{ padding: "12px", textAlign: "left" }}>Дата создания</th>
+                    <th style={{ padding: "12px", textAlign: "left" }}>Выбранные материалы</th>
+                    <th style={{ padding: "12px", textAlign: "left" }}>Итоговая цена</th>
+                    <th style={{ padding: "12px", textAlign: "left" }}>Статус</th>
+                    <th style={{ padding: "12px", textAlign: "right" }}>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1026,36 +1038,44 @@ export default function RequestsClient({
                     const price = getRequestPrice(r);
 
                     return (
-                      <tr key={r.id}>
-                        <td className="font-bold">{r.request_number}</td>
-                        <td>{formatDateTime(r.created_at)}</td>
-                        <td>{displayMaterials}</td>
-                        <td className="font-bold">
+                      <tr key={r.id} style={{ borderBottom: "1px solid var(--glass-border)" }}>
+                        <td style={{ padding: "14px 12px", fontWeight: 800 }}>{r.request_number}</td>
+                        <td style={{ padding: "14px 12px", opacity: 0.8 }}>{formatDateTime(r.created_at)}</td>
+                        <td style={{ padding: "14px 12px" }}>{displayMaterials}</td>
+                        <td style={{ padding: "14px 12px", fontWeight: 800, color: "var(--project-primary)" }}>
                           {formatPrice(price)}
                         </td>
-                        <td>
+                        <td style={{ padding: "14px 12px" }}>
                           <span
                             className={`status-badge ${
                               r.is_processed ? "status-processed" : "status-pending"
                             }`}
+                            style={{
+                              padding: "4px 10px",
+                              borderRadius: 8,
+                              fontSize: 12,
+                              fontWeight: 800,
+                              background: r.is_processed ? "rgba(34, 197, 94, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                              color: r.is_processed ? "#16a34a" : "#d97706",
+                            }}
                           >
-                            {r.is_processed ? "✅ Выдано" : "⏳ Ожидает"}
+                            {r.is_processed ? "Выдано" : "Ожидает"}
                           </span>
                         </td>
-                        <td>
+                        <td style={{ padding: "14px 12px", textAlign: "right" }}>
                           {locked ? (
-                            <span className="actions-locked">
-                              🔒 Действия недоступны
+                            <span className="actions-locked" style={{ fontSize: 12, opacity: 0.6, fontWeight: 700 }}>
+                              Действия недоступны
                             </span>
                           ) : (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
                               <button
                                 className="btn btn-small"
                                 onClick={() => openEdit(r)}
                                 type="button"
                                 disabled={busy}
                               >
-                                ✏️ Изменить
+                                Изменить
                               </button>
                               <button
                                 className="btn btn-small secondary"
@@ -1063,7 +1083,7 @@ export default function RequestsClient({
                                 type="button"
                                 disabled={busy}
                               >
-                                🗑️ Удалить
+                                Удалить
                               </button>
                             </div>
                           )}
