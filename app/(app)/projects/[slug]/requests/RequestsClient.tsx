@@ -1,4 +1,3 @@
-// app/(app)/projects/[slug]/requests/RequestsClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -10,7 +9,13 @@ import "./requests.css";
 
 type ProjectLevel = { id: string; code: string; label: string; price?: number | null };
 type ProjectTab = { id: string; slug: string; title: string; icon: string | null };
-type Project = { id: string; name: string; slug: string };
+type Project = {
+  id: string;
+  name: string;
+  slug: string;
+  theme?: { primaryColor?: string; secondaryColor?: string } | null;
+  themeColor?: string | null;
+};
 
 type MaterialItem = {
   id: string;
@@ -172,7 +177,7 @@ export default function RequestsClient({
   const [qrError, setQrError] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
+  const primaryColor = project.theme?.primaryColor || project.themeColor || "#6366f1";
 
   // Загрузка всех материалов проекта по всем табам для витрины
   useEffect(() => {
@@ -254,7 +259,6 @@ export default function RequestsClient({
     setRequests(initialRequests.map(normalizeRequestRow));
   }, [initialRequests]);
 
-  // Объединенное множество всех выданных доступов (из БД и из обработанных заявок)
   const ownedMaterialSet = useMemo(() => {
     const set = new Set<string>(ownedMaterialIds);
     for (const req of requests) {
@@ -266,7 +270,6 @@ export default function RequestsClient({
     return set;
   }, [ownedMaterialIds, requests]);
 
-  // Расчёт цены заявки с фиксированным приоритетом за сохраненной total_price
   const getRequestPrice = (r: PurchaseRequest) => {
     if (typeof r.total_price === "number" && r.total_price > 0) {
       return r.total_price;
@@ -281,7 +284,6 @@ export default function RequestsClient({
     return calculated;
   };
 
-  // Фильтрация материалов по выбранному табу и уровню проекта
   const filteredMaterials = useMemo(() => {
     return materials.filter((m) => {
       const matchTab =
@@ -301,23 +303,19 @@ export default function RequestsClient({
     });
   }, [materials, activeTabId, selectedLevelCode]);
 
-  // Выбранные объекты материалов
   const selectedMaterialsList = useMemo(() => {
     const set = new Set(selectedMaterialIds);
     return materials.filter((m) => set.has(m.id));
   }, [materials, selectedMaterialIds]);
 
-  // Расчет итоговой суммы выбранных материалов
   const totalPrice = useMemo(() => {
     return selectedMaterialsList.reduce((sum, item) => sum + item.price, 0);
   }, [selectedMaterialsList]);
 
-  // Список ВСЕХ необработанных (pending) заявок пользователя
   const pendingRequests = useMemo(() => {
     return requests.filter((r) => !r.is_processed);
   }, [requests]);
 
-  // Сводка всех заказываемых материалов по ВСЕМ необработанным заявкам
   const aggregatedPendingSummary = useMemo(() => {
     let sum = 0;
     const itemsMap = new Map<string, { title: string; count: number; unitPrice: number }>();
@@ -490,11 +488,222 @@ export default function RequestsClient({
   };
 
   return (
-    <div className="page-requests">
+    <div
+      className="page-requests"
+      style={{ "--project-primary": primaryColor } as React.CSSProperties}
+    >
       <style>{`
         @keyframes toastSlideIn {
           from { transform: translate3d(100%, 0, 0); opacity: 0; }
           to { transform: translate3d(0, 0, 0); opacity: 1; }
+        }
+
+        /* ==== СТИЛИЗАЦИЯ И ФИКСЫ ВИТРИНЫ И МОДАЛКИ ==== */
+        .level-filter-container {
+          margin-bottom: 12px;
+        }
+        .level-filter-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: #475569;
+          margin-bottom: 6px;
+        }
+        .level-filter-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+        .level-chip {
+          padding: 6px 12px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 700;
+          background: #f1f5f9;
+          color: #334155 !important;
+          border: 1px solid #cbd5e1;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .level-chip:hover {
+          background: #e2e8f0;
+          color: #0f172a !important;
+        }
+        .level-chip.active {
+          background: var(--project-primary, #6366f1) !important;
+          color: #ffffff !important;
+          border-color: var(--project-primary, #6366f1) !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+
+        .vitrine-tabs {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+        .vitrine-tab-btn {
+          padding: 8px 16px;
+          border-radius: 12px;
+          font-size: 13px;
+          font-weight: 700;
+          background: #f1f5f9;
+          color: #334155 !important;
+          border: 1px solid #cbd5e1;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .vitrine-tab-btn:hover {
+          background: #e2e8f0;
+          color: #0f172a !important;
+        }
+        .vitrine-tab-btn.active {
+          background: var(--project-primary, #6366f1) !important;
+          color: #ffffff !important;
+          border-color: var(--project-primary, #6366f1) !important;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+        }
+
+        /* Ограниченная адаптивная сетка (карточки не растягиваются на всю модалку) */
+        .materials-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 230px));
+          gap: 16px;
+          justify-content: center;
+          max-height: 420px;
+          overflow-y: auto;
+          padding: 4px 4px 12px 4px;
+        }
+
+        .material-card {
+          background: #ffffff;
+          border: 2px solid #e2e8f0;
+          border-radius: 16px;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          user-select: none;
+        }
+        .material-card:hover {
+          border-color: #cbd5e1;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+        }
+        .material-card.selected {
+          border-color: var(--project-primary, #6366f1) !important;
+          background: #fafafa;
+          box-shadow: 0 0 0 2px var(--project-primary, #6366f1);
+        }
+        .material-card.owned {
+          opacity: 0.65;
+          cursor: not-allowed;
+          background: #f8fafc;
+        }
+
+        .material-cover-wrapper {
+          height: 130px;
+          background: #f8fafc;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .material-cover-img {
+          max-height: 100%;
+          max-width: 100%;
+          object-fit: contain;
+          border-radius: 8px;
+        }
+
+        .material-card-body {
+          padding: 12px;
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          justify-content: space-between;
+        }
+        .material-card-title {
+          font-size: 13px;
+          font-weight: 800;
+          color: #0f172a;
+          line-height: 1.3;
+          margin-bottom: 10px;
+        }
+        .material-card-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-top: auto;
+          gap: 6px;
+        }
+        .material-card-price {
+          font-size: 14px;
+          font-weight: 900;
+          color: var(--project-primary, #6366f1);
+        }
+
+        .vitrine-card-btn {
+          font-size: 11px;
+          font-weight: 800;
+          padding: 4px 8px;
+          border-radius: 8px;
+        }
+        .vitrine-card-btn.add {
+          background: #f1f5f9;
+          color: #334155;
+        }
+        .vitrine-card-btn.remove {
+          background: #dcfce7;
+          color: #166534;
+        }
+
+        .cart-summary-bar {
+          margin-top: 16px;
+          padding: 12px 18px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 14px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .receipt-box {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 14px;
+          padding: 16px;
+          margin-bottom: 16px;
+        }
+        .receipt-item {
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+          font-weight: 600;
+          color: #334155;
+          padding: 6px 0;
+          border-bottom: 1px dashed #e2e8f0;
+        }
+        .receipt-total {
+          display: flex;
+          justify-content: space-between;
+          font-size: 15px;
+          font-weight: 800;
+          color: #0f172a;
+          margin-top: 10px;
+          padding-top: 8px;
+        }
+
+        .user-locked-field {
+          background: #f1f5f9 !important;
+          color: #475569 !important;
+          font-weight: 700;
+          border: 1px solid #cbd5e1;
         }
       `}</style>
 
@@ -582,13 +791,13 @@ export default function RequestsClient({
             /* ================= ШАГ 1: ВИТРИНА КАРТОЧЕК ================= */
             <div>
               <div className="form-group" style={{ marginBottom: "12px" }}>
-                <label>Номер заявки:</label>
+                <label style={{ fontSize: "12px", color: "#64748b", fontWeight: 700 }}>Номер заявки:</label>
                 <input
                   type="text"
                   value={requestNumber}
                   readOnly
                   className="bg-gray-100"
-                  style={{ fontSize: "13px" }}
+                  style={{ fontSize: "13px", fontWeight: 700 }}
                 />
               </div>
 
@@ -618,7 +827,7 @@ export default function RequestsClient({
                 </div>
               )}
 
-              {/* Табы фильтрации витрины (красивые чипсы) */}
+              {/* Табы фильтрации витрины */}
               <div className="vitrine-tabs">
                 <button
                   type="button"
@@ -639,7 +848,7 @@ export default function RequestsClient({
                 ))}
               </div>
 
-              {/* Сетка материалов (3 в ряд) */}
+              {/* Сетка материалов */}
               {materialsLoading ? (
                 <div style={{ textAlign: "center", padding: "30px", fontWeight: 700 }}>
                   ⏳ Загружаем доступные материалы...
@@ -713,7 +922,7 @@ export default function RequestsClient({
               <div className="cart-summary-bar">
                 <div>
                   <span style={{ fontSize: "13px", color: "#64748b" }}>Выбрано товаров: </span>
-                  <strong style={{ fontSize: "15px" }}>{selectedMaterialIds.length}</strong>
+                  <strong style={{ fontSize: "15px", color: "#0f172a" }}>{selectedMaterialIds.length}</strong>
                 </div>
                 <div>
                   <span style={{ fontSize: "13px", color: "#64748b" }}>Итого: </span>
@@ -750,7 +959,7 @@ export default function RequestsClient({
                   style={{
                     fontWeight: 800,
                     marginBottom: "10px",
-                    color: "var(--project-text)",
+                    color: "#0f172a",
                     fontSize: "14px",
                   }}
                 >
@@ -774,12 +983,12 @@ export default function RequestsClient({
 
               {/* Данные покупателя */}
               <div className="form-group">
-                <label>Email (🔒 Из профиля):</label>
+                <label style={{ fontSize: "12px", color: "#64748b", fontWeight: 700 }}>Email (🔒 Из профиля):</label>
                 <input type="email" value={userEmail} disabled className="user-locked-field" />
               </div>
 
               <div className="form-group">
-                <label>ФИО ученика (🔒 Из профиля):</label>
+                <label style={{ fontSize: "12px", color: "#64748b", fontWeight: 700 }}>ФИО ученика (🔒 Из профиля):</label>
                 <input type="text" value={userFullName} disabled className="user-locked-field" />
               </div>
 
@@ -801,7 +1010,7 @@ export default function RequestsClient({
         </form>
       </Modal>
 
-      {/* МОДАЛКА ОПЛАТЫ (QR-КОД) С АГРЕГАЦИЕЙ ВСЕХ ЗАЯВОК */}
+      {/* МОДАЛКА ОПЛАТЫ (QR-КОД) */}
       <Modal
         open={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
@@ -810,34 +1019,34 @@ export default function RequestsClient({
       >
         <div
           style={{
-            background: "color-mix(in srgb, var(--project-primary) 12%, transparent)",
+            background: "color-mix(in srgb, var(--project-primary, #6366f1) 12%, #f8fafc)",
             padding: "18px",
             borderRadius: "14px",
-            border: "1px solid color-mix(in srgb, var(--project-primary) 25%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--project-primary, #6366f1) 25%, transparent)",
             marginBottom: "20px",
           }}
         >
           <h4
             style={{
               margin: "0 0 10px 0",
-              color: "var(--project-primary)",
+              color: "var(--project-primary, #6366f1)",
               fontSize: "16px",
-              filter: "brightness(0.7)",
+              fontWeight: 800,
             }}
           >
             📋 Инструкция по оплате
           </h4>
 
-          {/* Список всех сгруппированных товаров во всех неоплаченных заявках */}
+          {/* Список всех сгруппированных товаров */}
           {aggregatedPendingSummary.items.length > 0 && (
-            <div className="summary-items-list">
-              <div style={{ fontSize: "12px", fontWeight: 700, opacity: 0.8 }}>
+            <div className="summary-items-list" style={{ marginBottom: "12px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: "#475569" }}>
                 Заказываемые материалы ({aggregatedPendingSummary.count} заявка/заявок):
               </div>
               {aggregatedPendingSummary.items.map((item, idx) => (
-                <div key={idx} className="summary-item">
-                  <span className="summary-item-title">{item.title}</span>
-                  <span className="summary-item-badge">
+                <div key={idx} className="summary-item" style={{ fontSize: "13px", display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
+                  <span className="summary-item-title" style={{ fontWeight: 600 }}>{item.title}</span>
+                  <span className="summary-item-badge" style={{ fontWeight: 800 }}>
                     {item.count > 1 ? `x${item.count} • ` : ""}
                     {item.unitPrice * item.count} ₽
                   </span>
@@ -850,7 +1059,7 @@ export default function RequestsClient({
             style={{
               margin: 0,
               paddingLeft: "18px",
-              color: "var(--project-text)",
+              color: "#334155",
               display: "flex",
               flexDirection: "column",
               gap: "8px",
@@ -862,7 +1071,7 @@ export default function RequestsClient({
             </li>
             <li>
               Сумма к оплате (все неоплаченные заявки):{" "}
-              <strong style={{ fontSize: "17px", color: "var(--project-primary)" }}>
+              <strong style={{ fontSize: "17px", color: "var(--project-primary, #6366f1)" }}>
                 {paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "0 руб."}
               </strong>
             </li>
@@ -870,13 +1079,14 @@ export default function RequestsClient({
               В назначении платежа (сообщении) <strong>ОБЯЗАТЕЛЬНО</strong> укажите: <br />
               <span
                 style={{
-                  background: "var(--project-card-bg)",
+                  background: "#ffffff",
                   padding: "6px 10px",
                   borderRadius: "8px",
                   display: "inline-block",
                   marginTop: "6px",
-                  border: "1px solid var(--glass-border)",
+                  border: "1px solid #cbd5e1",
                   fontWeight: 700,
+                  color: "#0f172a",
                 }}
               >
                 ФИО ребенка, оплата за учебные материалы
@@ -1001,7 +1211,7 @@ export default function RequestsClient({
         </div>
 
         <div className="card">
-          <h2 style={{ color: "var(--project-primary)", marginBottom: 20 }}>
+          <h2 style={{ color: "var(--project-primary, #6366f1)", marginBottom: 20 }}>
             📝 Мои заявки на доступы
           </h2>
 
