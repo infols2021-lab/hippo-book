@@ -177,6 +177,7 @@ export default function RequestsClient({
   const [qrError, setQrError] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
   const primaryColor = project.theme?.primaryColor || project.themeColor || "#6366f1";
 
   // Загрузка всех материалов проекта по всем табам для витрины
