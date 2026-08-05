@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-// @ts-ignore
-import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET() {
   try {
-    // @ts-ignore
-    const supabase = await createClient();
+    const supabase = await createSupabaseServerClient();
 
     const {
       data: { user },
