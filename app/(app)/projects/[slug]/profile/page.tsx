@@ -23,7 +23,7 @@ export default async function ProjectProfilePage({
     redirect("/login");
   }
 
-  // 2. Получаем ядро ветки (проекта)
+  // 2. Получаем ядро текущей ветки (проекта)
   const { data: project } = await supabase
     .from("projects")
     .select("id, name, slug, features, is_active, theme, theme_color")
@@ -35,7 +35,14 @@ export default async function ProjectProfilePage({
     notFound();
   }
 
-  // 3. Получаем данные профиля пользователя
+  // 3. НОВОЕ: Получаем ВСЕ активные проекты для меню-переключателя
+  const { data: activeProjects } = await supabase
+    .from("projects")
+    .select("id, name, slug, theme, theme_color")
+    .eq("is_active", true)
+    .order("order_index", { ascending: true });
+
+  // 4. Получаем данные профиля пользователя
   const { data: userProfile } = await supabase
     .from("profiles")
     .select("full_name, contact_phone, region, is_admin")
@@ -49,7 +56,7 @@ export default async function ProjectProfilePage({
     is_admin: Boolean(userProfile?.is_admin),
   };
 
-  // 4. Флаги геймификации
+  // 5. Флаги геймификации
   const rawFeatures = project.features || {};
   const features = {
     streaks: true,
@@ -61,11 +68,12 @@ export default async function ProjectProfilePage({
   const backgroundUrl =
     project.theme?.backgroundUrl || project.theme?.bgImage || null;
 
-  // 5. Передаём всё в клиентский компонент профиля
+  // 6. Передаём всё в клиентский компонент профиля
   return (
     <ProfileClient
       projectName={project.name}
       projectSlug={project.slug}
+      availableProjects={activeProjects || []}
       features={features}
       userId={user.id}
       userEmail={user.email || ""}

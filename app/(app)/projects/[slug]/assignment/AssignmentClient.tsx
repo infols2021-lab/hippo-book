@@ -267,6 +267,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     setShowChoice(false);
     setCurrentIndex(0);
     setCompletedScreen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function viewPrevious() {
@@ -274,6 +275,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     setShowChoice(false);
     setCurrentIndex(0);
     setCompletedScreen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function switchMode() {
@@ -283,6 +285,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     setFinalStats(null);
     setReviewItems([]);
     setGatehouseRecommendation(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function finishInformational() {
@@ -309,6 +312,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
 
       if (res.ok) {
         setCompletedScreen(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
         window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
       } else {
         alert("Ошибка при сохранении результатов");
@@ -363,6 +367,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
         setFinalStats(finalStatsToDisplay);
         setReviewItems(review);
         setCompletedScreen(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
         window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
       } else {
         alert(json.error || "Ошибка при сохранении результатов");
@@ -382,6 +387,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     if (!v.ok) {
       alert(`❌ Заполните вопрос №${v.index + 1}`);
       setCurrentIndex(v.index);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
@@ -559,7 +565,10 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
               >
                 {back.actionLabel}
               </button>
-              <button className="btn-premium secondary" style={{ flex: 1 }} onClick={() => window.location.reload()}>
+              <button className="btn-premium secondary" style={{ flex: 1 }} onClick={() => {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                window.location.reload();
+              }}>
                 Пройти еще раз
               </button>
             </div>
@@ -607,7 +616,10 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
                           return (
                             <button
                               key={i}
-                              onClick={() => setCurrentIndex(i)}
+                              onClick={() => {
+                                setCurrentIndex(i);
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                              }}
                               title={`Вопрос ${i + 1}${answered ? " ✓" : ""}`}
                               style={{
                                 width: dotSize,
@@ -717,7 +729,10 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
                         <button
                           className="nav-btn"
                           disabled={currentIndex === 0 || isSaving}
-                          onClick={() => setCurrentIndex((i) => i - 1)}
+                          onClick={() => {
+                            setCurrentIndex((i) => i - 1);
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
                           style={{ opacity: currentIndex === 0 ? 0.3 : 1 }}
                         >
                           Назад
@@ -728,7 +743,10 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
                             className="btn-premium primary"
                             style={{ flex: 1, background: theme.primary }}
                             disabled={isSaving}
-                            onClick={() => setCurrentIndex((i) => i + 1)}
+                            onClick={() => {
+                              setCurrentIndex((i) => i + 1);
+                              window.scrollTo({ top: 0, behavior: "smooth" });
+                            }}
                           >
                             Далее
                           </button>

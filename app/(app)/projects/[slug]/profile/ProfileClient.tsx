@@ -62,9 +62,18 @@ type ProfileUpdateApiResponse = {
   } | null;
 };
 
+type AvailableProject = {
+  id: string;
+  name: string;
+  slug: string;
+  theme?: any;
+  theme_color?: string;
+};
+
 type Props = {
   projectName: string;
   projectSlug: string;
+  availableProjects: AvailableProject[];
   features: {
     streaks?: boolean;
     titles?: boolean;
@@ -145,6 +154,7 @@ function normalizeUiErrorMessage(error: unknown, fallback = "Произошла 
 export default function ProfileClient({
   projectName,
   projectSlug,
+  availableProjects,
   features,
   userEmail,
   initialProfile,
@@ -159,6 +169,9 @@ export default function ProfileClient({
 
   // Основное состояние профиля
   const [profile, setProfile] = useState<ProfileData>(initialProfile);
+
+  // Меню переключения проектов
+  const [switcherOpen, setSwitcherOpen] = useState(false);
 
   // Состояние фона
   const [bgLoading, setBgLoading] = useState<boolean>(Boolean(backgroundProxyUrl));
@@ -434,7 +447,7 @@ export default function ProfileClient({
         </form>
       </Modal>
 
-      {/* 🎭 ЕДИНЫЙ ЦЕНТР НАГРАД (Гардероб, Дорожка, Промокоды) */}
+      {/* 🎭 ЕДИНЫЙ ЦЕНТР НАГРАД */}
       {rewardsModalOpen && (
         <RewardsModal
           isOpen={rewardsModalOpen}
@@ -456,12 +469,58 @@ export default function ProfileClient({
       <div className="profile-container">
         {/* Верхняя панель сайта */}
         <div className="profile-topbar">
-          <div className="brand">
-            <div className="brand-mark">{brandMark}</div>
-            <div>
-              <div className="brand-title">{projectName}</div>
-              <div className="brand-subtitle">Профиль ученика</div>
-            </div>
+          
+          {/* НОВОЕ: Project Switcher */}
+          <div className="brand-switcher-wrapper">
+            <button 
+              type="button" 
+              className={`brand brand-interactive ${switcherOpen ? "open" : ""}`}
+              onClick={() => setSwitcherOpen(!switcherOpen)}
+            >
+              <div className="brand-mark">{brandMark}</div>
+              <div className="brand-text-wrapper">
+                <div className="brand-title">{projectName}</div>
+                <div className="brand-subtitle">Профиль ученика</div>
+              </div>
+              <div className="switcher-chevron">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+            </button>
+
+            {switcherOpen && (
+              <>
+                <div className="switcher-overlay" onClick={() => setSwitcherOpen(false)} />
+                <div className="project-switcher-menu">
+                  <div className="switcher-header">Сменить направление</div>
+                  <div className="switcher-list">
+                    {availableProjects.map((p) => {
+                      const isActive = p.slug === projectSlug;
+                      const dotColor = p.theme?.primaryColor || p.theme_color || "#6366f1";
+                      
+                      return (
+                        <Link
+                          key={p.id}
+                          href={`/projects/${p.slug}/profile`}
+                          className={`project-switcher-item ${isActive ? "active" : ""}`}
+                          onClick={() => setSwitcherOpen(false)}
+                        >
+                          <div className="switcher-dot" style={{ backgroundColor: dotColor }} />
+                          <div className="switcher-item-name">{p.name}</div>
+                          {isActive && <div className="switcher-item-check">✓</div>}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                  <div className="switcher-footer">
+                    <Link href="/portal" className="switcher-portal-link">
+                      ← На главный портал
+                    </Link>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="top-actions">
