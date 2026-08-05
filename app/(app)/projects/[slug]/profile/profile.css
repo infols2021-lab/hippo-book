@@ -59,7 +59,7 @@
 
 .brand { display: flex; align-items: center; gap: 16px; }
 
-/* ===== Project Switcher (НОВОЕ) ===== */
+/* ===== Project Switcher ===== */
 .brand-switcher-wrapper {
   position: relative;
   display: flex;
@@ -102,17 +102,18 @@
   z-index: 99;
 }
 
+/* Раньше был полупрозрачный var(--glass-bg) + backdrop-filter blur — сквозь меню
+   просвечивал фон страницы (лого/картинки), выглядело неряшливо. Теперь сплошной
+   непрозрачный фон в цвет карточки темы проекта, без блюра. */
 .project-switcher-menu {
   position: absolute;
   top: calc(100% + 12px);
   left: 0;
   width: 300px;
-  background: var(--glass-bg, rgba(15, 23, 42, 0.9));
-  backdrop-filter: var(--glass-blur, blur(24px));
-  -webkit-backdrop-filter: var(--glass-blur, blur(24px));
+  background: var(--p-card-bg, var(--project-card-bg));
   border: 1px solid var(--glass-border);
   border-radius: 24px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   z-index: 1000;
   padding: 12px;
   animation: menuSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;

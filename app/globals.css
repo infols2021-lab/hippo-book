@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 :root {
-  /* 1. Дефолтные базовые цвета */
+  /* 1. Дефолтные базовые цвета (используются, пока не применена тема проекта) */
   --project-primary: #0ea5e9; 
   --project-secondary: #38bdf8;
   --project-bg: #0b0f19;
@@ -62,4 +62,72 @@ body {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { 
   background: color-mix(in srgb, var(--p-text, var(--project-text)) 40%, transparent); 
+}
+
+/* =========================================================================
+   ✅ УНИВЕРСАЛЬНЫЕ МОДАЛЬНЫЕ ОКНА (components/Modal.tsx)
+   Работают на ЛЮБОЙ странице (портал/заявки/материалы/профиль) и берут
+   цвета из темы проекта. В админке (app/(admin)/admin/admin.css) эти же
+   классы переопределяются внутри .admin-root с !important — там своя,
+   изолированная светлая тема, и это НЕ конфликтует с этими правилами.
+   ========================================================================= */
+
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.modal-panel {
+  background: var(--p-card-bg, var(--project-card-bg));
+  color: var(--p-text, var(--project-text));
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: var(--glass-shadow);
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.modal-title {
+  color: var(--p-text, var(--project-text));
+}
+
+.modal-close {
+  color: color-mix(in srgb, var(--p-text, var(--project-text)) 70%, transparent);
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 8%, transparent);
+}
+
+.modal-close:hover {
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 16%, transparent);
+  color: var(--p-text, var(--project-text));
+}
+
+.modal-body {
+  color: var(--p-text, var(--project-text));
+}
+
+/* Инпуты внутри модалок (если не завёрнуты в .form-group со своими стилями) */
+.modal-body input,
+.modal-body select,
+.modal-body textarea {
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 4%, transparent);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  color: var(--p-text, var(--project-text));
+  padding: 12px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.modal-body input:focus,
+.modal-body select:focus,
+.modal-body textarea:focus {
+  outline: none;
+  border-color: var(--p-primary, var(--project-primary));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--p-primary, var(--project-primary)) 15%, transparent);
 }

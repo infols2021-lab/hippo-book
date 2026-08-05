@@ -25,10 +25,22 @@ const COLOR_VARS: Array<{ key: keyof ProjectThemeColors; varName: string }> = [
   { key: "glow", varName: "--p-glow" },
 ];
 
-/** Алиасы для совместимости со старыми переменными (--accent2 и т.п.). */
+/**
+ * Алиасы для совместимости со старыми переменными (--accent2, --project-* и т.п.).
+ * Много компонентов и *.css файлов в проекте исторически написаны на этих старых
+ * именах (--project-primary, --project-text, --project-card-bg, --project-bg,
+ * --project-secondary) — раньше applyTheme() их не обновлял, и они навсегда
+ * оставались дефолтными (тёмными) значениями из :root в globals.css, из-за чего
+ * модалки/формы не подхватывали тему проекта. Теперь прокидываем их тоже.
+ */
 const LEGACY_ALIASES: Array<{ from: keyof ProjectThemeColors; varName: string }> = [
   { from: "primary", varName: "--accent2" },
   { from: "primarySoft", varName: "--accent2-soft" },
+  { from: "primary", varName: "--project-primary" },
+  { from: "secondary", varName: "--project-secondary" },
+  { from: "pageBg", varName: "--project-bg" },
+  { from: "cardBg", varName: "--project-card-bg" },
+  { from: "text", varName: "--project-text" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -56,7 +68,7 @@ export function buildCssVars(theme: ProjectThemeConfig): ProjectCssVars {
     if (value) style[varName] = value;
   }
 
-  // Алиасы для legacy CSS (старые компоненты ссылаются на --accent2 и т.п.)
+  // Алиасы для legacy CSS (старые компоненты ссылаются на --accent2, --project-* и т.п.)
   for (const { from, varName } of LEGACY_ALIASES) {
     const value = theme.colors[from];
     if (value && !style[varName]) style[varName] = value;

@@ -63,49 +63,44 @@
   background: #dc2626 !important;
 }
 
-/* === МОДАЛЬНЫЕ ОКНА В АДМИНКЕ (СВЕТЛАЯ ТЕМА) === */
-.admin-root .modal-overlay,
-.modal-overlay {
+/* === МОДАЛЬНЫЕ ОКНА В АДМИНКЕ (СВЕТЛАЯ ТЕМА) ===
+   Важно: только через .admin-root, БЕЗ "голых" .modal-overlay/.modal-panel и т.п.
+   Раньше эти селекторы были не заскоупены и могли перебить тему модалок
+   на пользовательских страницах в зависимости от порядка загрузки CSS. */
+.admin-root .modal-overlay {
   background: rgba(15, 23, 42, 0.5) !important;
   backdrop-filter: blur(6px) !important;
   -webkit-backdrop-filter: blur(6px) !important;
 }
 
 .admin-root .modal-panel,
-.admin-root .modal-content,
-.modal-panel,
-.modal-content {
+.admin-root .modal-content {
   background: #ffffff !important;
   color: #0f172a !important;
   border: 1px solid #e2e8f0 !important;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2) !important;
 }
 
-.admin-root .modal-header,
-.modal-header {
+.admin-root .modal-header {
   background: #f8fafc !important;
   border-bottom: 1px solid #e2e8f0 !important;
 }
 
-.admin-root .modal-title,
-.modal-title {
+.admin-root .modal-title {
   color: #0f172a !important;
 }
 
-.admin-root .modal-close,
-.modal-close {
+.admin-root .modal-close {
   color: #64748b !important;
   background: #f1f5f9 !important;
 }
 
-.admin-root .modal-close:hover,
-.modal-close:hover {
+.admin-root .modal-close:hover {
   background: #e2e8f0 !important;
   color: #0f172a !important;
 }
 
-.admin-root .modal-body,
-.modal-body {
+.admin-root .modal-body {
   color: #0f172a !important;
   background: #ffffff !important;
 }
@@ -342,9 +337,9 @@
 .admin-root input,
 .admin-root textarea,
 .admin-root select,
-.modal-body input,
-.modal-body textarea,
-.modal-body select {
+.admin-root .modal-body input,
+.admin-root .modal-body textarea,
+.admin-root .modal-body select {
   border: 1px solid #cbd5e1 !important;
   background: #ffffff !important;
   color: #0f172a !important;
@@ -353,9 +348,9 @@
 .admin-root input:focus,
 .admin-root textarea:focus,
 .admin-root select:focus,
-.modal-body input:focus,
-.modal-body textarea:focus,
-.modal-body select:focus {
+.admin-root .modal-body input:focus,
+.admin-root .modal-body textarea:focus,
+.admin-root .modal-body select:focus {
   border-color: #0ea5e9 !important;
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15) !important;
 }
