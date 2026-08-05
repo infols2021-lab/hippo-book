@@ -22,13 +22,13 @@
   width: 100%;
   border-collapse: collapse;
   margin-top: 20px;
-  background: var(--glass-bg, #ffffff);
-  backdrop-filter: var(--glass-blur, blur(10px));
-  -webkit-backdrop-filter: var(--glass-blur, blur(10px));
+  background: var(--glass-bg, rgba(255, 255, 255, 0.8));
+  backdrop-filter: var(--glass-blur, blur(12px));
+  -webkit-backdrop-filter: var(--glass-blur, blur(12px));
   border-radius: 24px;
   overflow: hidden;
   border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.12));
-  box-shadow: inset 0 1px 1px var(--glass-highlight, rgba(255, 255, 255, 0.5)), var(--glass-shadow, 0 10px 30px rgba(0,0,0,0.05));
+  box-shadow: 0 10px 30px rgba(0,0,0,0.04);
   table-layout: auto;
   word-break: break-word;
 }
@@ -101,7 +101,7 @@
 }
 
 /* =========================================================
-   ✅ ЧИПСЫ ФИЛЬТРОВ И ТАБЫ (ЧЁТКИЙ КОНТРАСТ)
+   ✅ ДИНАМИЧЕСКИЕ ЧИПСЫ И ТАБЫ
    ========================================================= */
 
 .level-filter-container {
@@ -109,65 +109,32 @@
 }
 
 .level-filter-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--project-text, #334155);
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent);
   margin-bottom: 8px;
 }
 
-.level-filter-chips {
+.level-filter-chips,
+.vitrine-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-bottom: 14px;
 }
 
-.level-chip {
+.level-chip,
+.vitrine-tab-btn {
   padding: 8px 16px;
   border-radius: 99px;
-  border: 1px solid var(--glass-border, #cbd5e1);
-  background: #f8fafc;
-  color: var(--project-text, #1e293b) !important;
+  border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.12));
+  background: color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent);
+  color: var(--project-text, #0f172a) !important;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  user-select: none;
-}
-
-.level-chip:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
-}
-
-.level-chip.active {
-  background: var(--project-primary, #0ea5e9) !important;
-  color: #ffffff !important;
-  border-color: var(--project-primary, #0ea5e9) !important;
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--project-primary, #0ea5e9) 35%, transparent);
-}
-
-.vitrine-tabs {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 6px;
-  margin-top: 10px;
-  margin-bottom: 16px;
-  -webkit-overflow-scrolling: touch;
-}
-
-.vitrine-tab-btn {
-  padding: 8px 18px;
-  border-radius: 99px;
-  border: 1px solid var(--glass-border, #cbd5e1);
-  background: #f8fafc;
-  color: var(--project-text, #1e293b) !important;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
   display: inline-flex;
@@ -175,11 +142,13 @@
   gap: 6px;
 }
 
+.level-chip:hover,
 .vitrine-tab-btn:hover {
-  background: #f1f5f9;
+  background: color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent);
   transform: translateY(-1px);
 }
 
+.level-chip.active,
 .vitrine-tab-btn.active {
   background: var(--project-primary, #0ea5e9) !important;
   color: #ffffff !important;
@@ -193,15 +162,13 @@
 
 .materials-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 14px;
-  align-items: start; /* Важно: предотвращает вертикальное растягивание! */
-  max-height: 420px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: start;
+  max-height: 380px;
   overflow-y: auto;
   padding: 4px;
-  margin-bottom: 20px;
-  contain: content;
-  will-change: scroll-position;
+  margin-bottom: 16px;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -209,42 +176,30 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
-  border: 2px solid var(--glass-border, #e2e8f0);
-  border-radius: 16px;
-  padding: 12px;
+  background: color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent);
+  border: 1.5px solid var(--glass-border, rgba(15, 23, 42, 0.12));
+  border-radius: 20px;
+  padding: 10px;
   cursor: pointer;
   user-select: none;
-  height: auto;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.2s ease,
-              box-shadow 0.2s ease,
-              background-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .material-card:hover {
   transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--project-primary, #0ea5e9) 50%, transparent);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 
 .material-card.selected {
   border-color: var(--project-primary, #0ea5e9);
-  background: color-mix(in srgb, var(--project-primary, #0ea5e9) 8%, #ffffff);
+  background: color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent);
   box-shadow: 0 8px 20px color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent);
 }
 
 .material-card.owned {
-  opacity: 0.65;
+  opacity: 0.5;
   cursor: not-allowed;
-  background: #f8fafc;
-  border-color: #e2e8f0;
-}
-
-.material-card.owned:hover {
-  transform: none;
-  border-color: #e2e8f0;
+  background: color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent);
 }
 
 .owned-badge {
@@ -252,22 +207,21 @@
   font-weight: 800;
   padding: 4px 8px;
   border-radius: 6px;
-  background: rgba(16, 185, 129, 0.12);
+  background: color-mix(in srgb, #10b981 15%, transparent);
   color: #059669;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-/* Фиксированный блок обложки */
+/* Обложка */
 .material-cover-wrapper {
-  position: relative;
   width: 100%;
-  height: 110px;
+  height: 100px;
   border-radius: 12px;
   overflow: hidden;
-  background: #f1f5f9;
-  margin-bottom: 10px;
+  background: color-mix(in srgb, var(--project-text, #0f172a) 5%, transparent);
+  margin-bottom: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -277,7 +231,6 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 4px;
 }
 
 .material-card-body {
@@ -290,9 +243,9 @@
 .material-card-title {
   font-weight: 800;
   font-size: 13px;
-  line-height: 1.35;
+  line-height: 1.3;
   color: var(--project-text, #0f172a);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -304,9 +257,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #f1f5f9;
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent);
 }
 
 .material-card-price {
@@ -316,16 +269,15 @@
 }
 
 .vitrine-card-btn {
-  padding: 5px 12px;
+  padding: 4px 10px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
-  transition: all 0.15s ease;
 }
 
 .vitrine-card-btn.add {
-  background: #f1f5f9;
-  color: #334155;
+  background: color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent);
+  color: var(--project-text, #0f172a);
 }
 
 .vitrine-card-btn.remove {
@@ -338,29 +290,29 @@
    ========================================================= */
 
 .form-group {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   font-weight: 700;
   color: var(--project-text, #0f172a);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .form-group input,
 .form-group select {
   width: 100%;
   padding: 12px 16px;
-  border: 1px solid var(--glass-border, #cbd5e1);
+  border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.12));
   border-radius: 12px;
   font-size: 14px;
   transition: all 0.2s ease;
   box-sizing: border-box;
   font-family: inherit;
-  background: #ffffff;
-  color: var(--project-text, #0f172a);
+  background: color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent);
+  color: var(--project-text, #0f172a) !important;
 }
 
 .form-group input:focus,
@@ -372,14 +324,14 @@
 
 .form-group input:read-only,
 .form-group input:disabled {
-  background: #f1f5f9;
-  opacity: 0.8;
+  opacity: 0.7;
   cursor: not-allowed;
+  background: color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent);
 }
 
-/* Инфо-плашки и карточка корзины */
+/* Плашки информации и суммарная строка */
 .payment-info {
-  background: color-mix(in srgb, var(--project-primary, #0ea5e9) 8%, #ffffff);
+  background: color-mix(in srgb, var(--project-primary, #0ea5e9) 8%, transparent);
   border-left: 4px solid var(--project-primary, #0ea5e9);
   padding: 16px 20px;
   border-radius: 12px;
@@ -394,8 +346,8 @@
 }
 
 .receipt-box {
-  background: #f8fafc;
-  border: 1px solid var(--glass-border, #e2e8f0);
+  background: color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent);
+  border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.12));
   border-radius: 14px;
   padding: 16px;
   margin-bottom: 16px;
@@ -407,7 +359,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 8px 0;
-  border-bottom: 1px dashed #cbd5e1;
+  border-bottom: 1px dashed color-mix(in srgb, var(--project-text, #0f172a) 15%, transparent);
   font-size: 14px;
   font-weight: 600;
   color: var(--project-text, #0f172a);
@@ -431,14 +383,15 @@
 }
 
 .cart-summary-bar {
-  margin-top: 16px;
-  padding: 14px 18px;
+  margin-top: 14px;
+  padding: 12px 16px;
   border-radius: 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: color-mix(in srgb, var(--project-primary, #0ea5e9) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  color: var(--project-text, #0f172a);
 }
 
 /* =========================================================

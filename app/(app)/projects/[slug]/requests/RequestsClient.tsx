@@ -569,13 +569,12 @@ export default function RequestsClient({
           {modalStep === 1 ? (
             /* ================= ШАГ 1: ВИТРИНА КАРТОЧЕК ================= */
             <div>
-              <div className="form-group" style={{ marginBottom: "12px" }}>
+              <div className="form-group">
                 <label>Номер заявки:</label>
                 <input
                   type="text"
                   value={requestNumber}
                   readOnly
-                  style={{ fontSize: "13px" }}
                 />
               </div>
 
@@ -636,7 +635,7 @@ export default function RequestsClient({
                   style={{
                     textAlign: "center",
                     padding: "30px",
-                    color: "#64748b",
+                    opacity: 0.7,
                     fontWeight: 600,
                   }}
                 >
@@ -691,18 +690,18 @@ export default function RequestsClient({
               {/* Итог снизу */}
               <div className="cart-summary-bar">
                 <div>
-                  <span style={{ fontSize: "13px", color: "#64748b" }}>Выбрано товаров: </span>
+                  <span style={{ fontSize: "13px", opacity: 0.8 }}>Выбрано товаров: </span>
                   <strong style={{ fontSize: "15px" }}>{selectedMaterialIds.length}</strong>
                 </div>
                 <div>
-                  <span style={{ fontSize: "13px", color: "#64748b" }}>Итого: </span>
+                  <span style={{ fontSize: "13px", opacity: 0.8 }}>Итого: </span>
                   <strong style={{ fontSize: "18px", color: "var(--project-primary, #0ea5e9)" }}>
                     {formatPrice(totalPrice)}
                   </strong>
                 </div>
               </div>
 
-              <div className="modal-actions" style={{ marginTop: "16px" }}>
+              <div className="flex justify-end gap-3" style={{ marginTop: "16px" }}>
                 <button
                   type="button"
                   className="btn secondary"
@@ -760,7 +759,7 @@ export default function RequestsClient({
                 <input type="text" value={userFullName} disabled />
               </div>
 
-              <div className="modal-actions" style={{ marginTop: "20px" }}>
+              <div className="flex justify-end gap-3" style={{ marginTop: "20px" }}>
                 <button
                   type="button"
                   className="btn secondary"
@@ -845,12 +844,12 @@ export default function RequestsClient({
               В назначении платежа (сообщении) <strong>ОБЯЗАТЕЛЬНО</strong> укажите: <br />
               <span
                 style={{
-                  background: "#ffffff",
+                  background: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
                   padding: "6px 10px",
                   borderRadius: "8px",
                   display: "inline-block",
                   marginTop: "6px",
-                  border: "1px solid var(--glass-border, #cbd5e1)",
+                  border: "1px solid var(--glass-border, rgba(15, 23, 42, 0.12))",
                   fontWeight: 700,
                 }}
               >
@@ -915,7 +914,7 @@ export default function RequestsClient({
           />
         </div>
 
-        <div className="modal-actions" style={{ marginTop: "24px" }}>
+        <div style={{ marginTop: "24px" }}>
           <button
             className="btn"
             style={{ width: "100%" }}
