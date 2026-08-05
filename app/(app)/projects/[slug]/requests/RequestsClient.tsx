@@ -569,26 +569,25 @@ export default function RequestsClient({
           {modalStep === 1 ? (
             /* ================= ШАГ 1: ВИТРИНА КАРТОЧЕК ================= */
             <div>
-              <div className="form-group" style={{ marginBottom: 16 }}>
-                <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Номер заявки:</label>
+              <div className="form-group">
+                <label>Номер заявки:</label>
                 <input
                   type="text"
+                  className="input"
                   value={requestNumber}
                   readOnly
-                  style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: "color-mix(in srgb, var(--project-text) 5%, transparent)", color: "var(--project-text)" }}
                 />
               </div>
 
               {/* Фильтр по уровням проекта */}
               {levels && levels.length > 0 && (
                 <div className="level-filter-container" style={{ marginBottom: 16 }}>
-                  <div className="level-filter-title" style={{ fontWeight: 700, marginBottom: 8 }}>Уровень / Класс:</div>
+                  <div className="level-filter-title" style={{ fontWeight: 800, marginBottom: 8, fontSize: 12, color: "color-mix(in srgb, var(--project-text) 80%, transparent)", textTransform: "uppercase" }}>Уровень / Класс:</div>
                   <div className="level-filter-chips" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     <button
                       type="button"
-                      className={`level-chip ${selectedLevelCode === "all" ? "active" : ""}`}
+                      className={`btn small ${selectedLevelCode === "all" ? "" : "ghost"}`}
                       onClick={() => setSelectedLevelCode("all")}
-                      style={{ padding: "8px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: selectedLevelCode === "all" ? "var(--project-primary)" : "transparent", color: selectedLevelCode === "all" ? "#fff" : "var(--project-text)", fontWeight: 700, cursor: "pointer" }}
                     >
                       Все уровни
                     </button>
@@ -596,9 +595,8 @@ export default function RequestsClient({
                       <button
                         key={lvl.id}
                         type="button"
-                        className={`level-chip ${selectedLevelCode === lvl.code ? "active" : ""}`}
+                        className={`btn small ${selectedLevelCode === lvl.code ? "" : "ghost"}`}
                         onClick={() => setSelectedLevelCode(lvl.code)}
-                        style={{ padding: "8px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: selectedLevelCode === lvl.code ? "var(--project-primary)" : "transparent", color: selectedLevelCode === lvl.code ? "#fff" : "var(--project-text)", fontWeight: 700, cursor: "pointer" }}
                       >
                         {lvl.label}
                       </button>
@@ -611,9 +609,8 @@ export default function RequestsClient({
               <div className="vitrine-tabs" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
                 <button
                   type="button"
-                  className={`vitrine-tab-btn ${activeTabId === "all" ? "active" : ""}`}
+                  className={`btn small ${activeTabId === "all" ? "" : "ghost"}`}
                   onClick={() => setActiveTabId("all")}
-                  style={{ padding: "8px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: activeTabId === "all" ? "var(--project-primary)" : "transparent", color: activeTabId === "all" ? "#fff" : "var(--project-text)", fontWeight: 700, cursor: "pointer" }}
                 >
                   Все разделы
                 </button>
@@ -621,9 +618,8 @@ export default function RequestsClient({
                   <button
                     key={t.id}
                     type="button"
-                    className={`vitrine-tab-btn ${activeTabId === t.id ? "active" : ""}`}
+                    className={`btn small ${activeTabId === t.id ? "" : "ghost"}`}
                     onClick={() => setActiveTabId(t.id)}
-                    style={{ padding: "8px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: activeTabId === t.id ? "var(--project-primary)" : "transparent", color: activeTabId === t.id ? "#fff" : "var(--project-text)", fontWeight: 700, cursor: "pointer" }}
                   >
                     {t.title}
                   </button>
@@ -655,9 +651,19 @@ export default function RequestsClient({
                     return (
                       <div
                         key={item.id}
-                        className={`material-card ${isSelected ? "selected" : ""} ${isOwned ? "owned" : ""}`}
                         onClick={() => toggleMaterialSelection(item.id)}
-                        style={{ border: `2px solid ${isSelected ? "var(--project-primary)" : "var(--glass-border)"}`, borderRadius: 16, padding: 16, cursor: isOwned ? "default" : "pointer", background: isSelected ? "color-mix(in srgb, var(--project-primary) 10%, transparent)" : "color-mix(in srgb, var(--project-text) 2%, transparent)", display: "flex", flexDirection: "column", justifyContent: "space-between", opacity: isOwned ? 0.6 : 1 }}
+                        style={{
+                          border: `2px solid ${isSelected ? "var(--project-primary)" : "var(--glass-border)"}`,
+                          borderRadius: 16,
+                          padding: 16,
+                          cursor: isOwned ? "default" : "pointer",
+                          background: isSelected ? "color-mix(in srgb, var(--project-primary) 10%, transparent)" : "color-mix(in srgb, var(--project-text) 3%, transparent)",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "space-between",
+                          opacity: isOwned ? 0.6 : 1,
+                          transition: "all 0.2s ease"
+                        }}
                       >
                         <div className="material-cover-wrapper" style={{ height: 100, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
                           {item.cover_image_url ? (
@@ -756,14 +762,14 @@ export default function RequestsClient({
                 </div>
               </div>
 
-              <div className="form-group" style={{ marginBottom: 16 }}>
-                <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Email (Из профиля):</label>
-                <input type="email" value={userEmail} disabled style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: "color-mix(in srgb, var(--project-text) 5%, transparent)", color: "var(--project-text)", opacity: 0.7 }} />
+              <div className="form-group">
+                <label>Email (Из профиля):</label>
+                <input type="email" className="input" value={userEmail} disabled />
               </div>
 
-              <div className="form-group" style={{ marginBottom: 24 }}>
-                <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>ФИО ученика (Из профиля):</label>
-                <input type="text" value={userFullName} disabled style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "1px solid var(--glass-border)", background: "color-mix(in srgb, var(--project-text) 5%, transparent)", color: "var(--project-text)", opacity: 0.7 }} />
+              <div className="form-group">
+                <label>ФИО ученика (Из профиля):</label>
+                <input type="text" className="input" value={userFullName} disabled />
               </div>
 
               <div className="flex justify-end gap-3" style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: 12 }}>
@@ -872,13 +878,12 @@ export default function RequestsClient({
           <div className="qr-title" style={{ fontWeight: 800 }}>QR-код для перевода</div>
           <button
             type="button"
-            className="qr-refresh"
+            className="btn ghost small"
             onClick={resetQrStateAndRefresh}
             title="Обновить QR"
             aria-label="Обновить QR"
-            style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 18, fontWeight: 900, color: "var(--project-text)" }}
           >
-            ↻
+            ↻ Обновить
           </button>
         </div>
 

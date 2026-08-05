@@ -167,39 +167,26 @@ export default function ProfileClient({
   const router = useRouter();
   const backgroundProxyUrl = useMemo(() => toStorageProxyUrl(backgroundUrl), [backgroundUrl]);
 
-  // Основное состояние профиля
   const [profile, setProfile] = useState<ProfileData>(initialProfile);
-
-  // Меню переключения проектов
   const [switcherOpen, setSwitcherOpen] = useState(false);
-
-  // Состояние фона
   const [bgLoading, setBgLoading] = useState<boolean>(Boolean(backgroundProxyUrl));
   const [bgReady, setBgReady] = useState<boolean>(false);
-
-  // Уведомления
   const [notif, setNotif] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Модалка редактирования профиля
   const [editOpen, setEditOpen] = useState(false);
   const [editFullName, setEditFullName] = useState(profile.full_name ?? "");
   const [editPhone, setEditPhone] = useState(profile.contact_phone ?? "");
   const [editRegion, setEditRegion] = useState(profile.region ?? "");
   const [saving, setSaving] = useState(false);
 
-  // Модалка Центра Наград
   const [rewardsModalOpen, setRewardsModalOpen] = useState(false);
-
-  // Модалка Лидерборда
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
-  // Прогресс и статистика
   const [stats, setStats] = useState<Stats | null>(statsProp ?? null);
   const [materialsProgress, setMaterialsProgress] = useState<MaterialProgressItem[] | null>(progressProp ?? null);
   const [progressLoading, setProgressLoading] = useState<boolean>(!statsProp && !progressProp);
   const [progressError, setProgressError] = useState<string | null>(null);
 
-  // Стрики и Титулы
   const [streakData, setStreakData] = useState<StreakData | null>(
     streakProp ?? {
       currentStreak: 0,
@@ -216,34 +203,17 @@ export default function ProfileClient({
     setTimeout(() => setNotif(null), 3500);
   }
 
-  // Загрузка актуального состояния стрика
   const fetchStreakData = async () => {
     try {
       setStreakLoading(true);
       const res = await fetch("/api/streaks", { cache: "no-store" });
       const json = await res.json();
       if (res.ok && (json.ok || json.success)) {
-        const curr =
-          json.streak?.currentStreak ??
-          json.currentStreak ??
-          json.stats?.currentStreak ??
-          0;
-        const longest =
-          json.streak?.longestStreak ??
-          json.longestStreak ??
-          json.stats?.longestStreak ??
-          json.stats?.maxStreak ??
-          0;
-        const done =
-          json.streak?.doneToday ??
-          json.stats?.doneToday ??
-          json.stats?.completedToday ??
-          false;
+        const curr = json.streak?.currentStreak ?? json.currentStreak ?? json.stats?.currentStreak ?? 0;
+        const longest = json.streak?.longestStreak ?? json.longestStreak ?? json.stats?.longestStreak ?? json.stats?.maxStreak ?? 0;
+        const done = json.streak?.doneToday ?? json.stats?.doneToday ?? json.stats?.completedToday ?? false;
         const tier = json.streak?.tierCode ?? "none";
-        const title =
-          json.equippedTitle?.label ??
-          json.equippedTitle ??
-          null;
+        const title = json.equippedTitle?.label ?? json.equippedTitle ?? null;
         const avatar = json.equippedAvatarUrl ?? null;
 
         setStreakData({
@@ -266,7 +236,6 @@ export default function ProfileClient({
     void fetchStreakData();
   }, []);
 
-  // Фоновое изображение
   useEffect(() => {
     if (!backgroundProxyUrl) {
       setBgLoading(false);
@@ -288,7 +257,6 @@ export default function ProfileClient({
     return () => clearTimeout(t);
   }, [backgroundProxyUrl]);
 
-  // Подгрузка прогресса по учебникам
   useEffect(() => {
     if (statsProp && progressProp) return;
 
@@ -409,17 +377,17 @@ export default function ProfileClient({
             void saveProfile();
           }}
         >
-          <div className="form-group" style={{ marginBottom: 16 }}>
+          <div className="form-group">
             <label htmlFor="editFullName">ФИО:</label>
-            <input id="editFullName" type="text" required value={editFullName} onChange={(e) => setEditFullName(e.target.value)} />
+            <input id="editFullName" className="input" type="text" required value={editFullName} onChange={(e) => setEditFullName(e.target.value)} />
           </div>
-          <div className="form-group" style={{ marginBottom: 16 }}>
+          <div className="form-group">
             <label htmlFor="editPhone">Контактный телефон:</label>
-            <input id="editPhone" type="tel" required value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+            <input id="editPhone" className="input" type="tel" required value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
           </div>
-          <div className="form-group" style={{ marginBottom: 16 }}>
+          <div className="form-group">
             <label htmlFor="editRegion">Область проживания:</label>
-            <select id="editRegion" required value={editRegion} onChange={(e) => setEditRegion(e.target.value)}>
+            <select id="editRegion" className="input" required value={editRegion} onChange={(e) => setEditRegion(e.target.value)}>
               <option value="">-- Выберите область --</option>
               <option value="Белгородская">Белгородская область</option>
               <option value="Курская">Курская область</option>
@@ -431,8 +399,8 @@ export default function ProfileClient({
           </div>
           <div className="form-group" style={{ marginBottom: 24 }}>
             <label>Email:</label>
-            <input type="email" value={userEmail} disabled />
-            <div className="small-muted" style={{ marginTop: 5 }}>
+            <input type="email" className="input" value={userEmail} disabled />
+            <div className="small-muted">
               Email нельзя изменить
             </div>
           </div>
