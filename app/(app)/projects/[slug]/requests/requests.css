@@ -15,20 +15,20 @@
 }
 
 /* =========================================================
-   ✅ УЛУЧШЕННАЯ ТАБЛИЦА (Стеклянная, без вылезаний)
+   ✅ ТАБЛИЦА ЗАЯВОК
    ========================================================= */
 
 .requests-table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 20px;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  background: var(--glass-bg, #ffffff);
+  backdrop-filter: var(--glass-blur, blur(10px));
+  -webkit-backdrop-filter: var(--glass-blur, blur(10px));
   border-radius: 24px;
   overflow: hidden;
-  border: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 1px var(--glass-highlight), var(--glass-shadow);
+  border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.12));
+  box-shadow: inset 0 1px 1px var(--glass-highlight, rgba(255, 255, 255, 0.5)), var(--glass-shadow, 0 10px 30px rgba(0,0,0,0.05));
   table-layout: auto;
   word-break: break-word;
 }
@@ -38,13 +38,13 @@
   padding: 18px 20px;
   text-align: left;
   vertical-align: middle;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border, rgba(15, 23, 42, 0.08));
 }
 
 .requests-table th {
-  background: color-mix(in srgb, var(--project-text) 4%, transparent);
+  background: color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent);
   font-weight: 800;
-  color: color-mix(in srgb, var(--project-text) 70%, transparent);
+  color: color-mix(in srgb, var(--project-text, #0f172a) 70%, transparent);
   white-space: nowrap;
   font-size: 13px;
   text-transform: uppercase;
@@ -52,7 +52,7 @@
 }
 
 .requests-table td {
-  color: var(--project-text);
+  color: var(--project-text, #0f172a);
   font-size: 15px;
 }
 
@@ -71,7 +71,7 @@
 .actions-locked {
   font-size: 13px;
   font-weight: 500;
-  color: color-mix(in srgb, var(--project-text) 45%, transparent);
+  color: color-mix(in srgb, var(--project-text, #0f172a) 45%, transparent);
   text-align: center;
   opacity: 0.8;
   align-self: center;
@@ -101,7 +101,7 @@
 }
 
 /* =========================================================
-   ✅ ФИЛЬТРЫ И ТАБЫ (Красивые чипсы)
+   ✅ ЧИПСЫ ФИЛЬТРОВ И ТАБЫ (ЧЁТКИЙ КОНТРАСТ)
    ========================================================= */
 
 .level-filter-container {
@@ -113,7 +113,7 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: color-mix(in srgb, var(--project-text) 60%, transparent);
+  color: var(--project-text, #334155);
   margin-bottom: 8px;
 }
 
@@ -126,9 +126,9 @@
 .level-chip {
   padding: 8px 16px;
   border-radius: 99px;
-  border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--project-text) 4%, transparent);
-  color: var(--project-text);
+  border: 1px solid var(--glass-border, #cbd5e1);
+  background: #f8fafc;
+  color: var(--project-text, #1e293b) !important;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -137,17 +137,17 @@
 }
 
 .level-chip:hover {
-  background: color-mix(in srgb, var(--project-text) 8%, transparent);
+  background: #f1f5f9;
+  border-color: #94a3b8;
 }
 
 .level-chip.active {
-  background: var(--project-primary);
-  color: #ffffff;
-  border-color: var(--project-primary);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--project-primary) 35%, transparent);
+  background: var(--project-primary, #0ea5e9) !important;
+  color: #ffffff !important;
+  border-color: var(--project-primary, #0ea5e9) !important;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--project-primary, #0ea5e9) 35%, transparent);
 }
 
-/* Красивые кнопки выбора разделов (табов) */
 .vitrine-tabs {
   display: flex;
   gap: 8px;
@@ -161,9 +161,9 @@
 .vitrine-tab-btn {
   padding: 8px 18px;
   border-radius: 99px;
-  border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--project-text) 4%, transparent);
-  color: var(--project-text);
+  border: 1px solid var(--glass-border, #cbd5e1);
+  background: #f8fafc;
+  color: var(--project-text, #1e293b) !important;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -176,25 +176,26 @@
 }
 
 .vitrine-tab-btn:hover {
-  background: color-mix(in srgb, var(--project-text) 8%, transparent);
+  background: #f1f5f9;
   transform: translateY(-1px);
 }
 
 .vitrine-tab-btn.active {
-  background: var(--project-primary);
-  color: #ffffff;
-  border-color: var(--project-primary);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--project-primary) 35%, transparent);
+  background: var(--project-primary, #0ea5e9) !important;
+  color: #ffffff !important;
+  border-color: var(--project-primary, #0ea5e9) !important;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--project-primary, #0ea5e9) 35%, transparent);
 }
 
 /* =========================================================
-   ✅ СЕТКА МАТЕРИАЛОВ (3 В РЯД)
+   ✅ СЕТКА МАТЕРИАЛОВ (БЕЗ РАСТЯГИВАНИЯ ПО ВЫСОТЕ)
    ========================================================= */
 
 .materials-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 14px;
+  align-items: start; /* Важно: предотвращает вертикальное растягивание! */
   max-height: 420px;
   overflow-y: auto;
   padding: 4px;
@@ -208,42 +209,42 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  background: color-mix(in srgb, var(--project-text) 3%, transparent);
-  border: 2px solid var(--glass-border);
+  background: #ffffff;
+  border: 2px solid var(--glass-border, #e2e8f0);
   border-radius: 16px;
-  padding: 10px;
+  padding: 12px;
   cursor: pointer;
   user-select: none;
-  contain: layout style;
+  height: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
               border-color 0.2s ease,
               box-shadow 0.2s ease,
               background-color 0.2s ease;
-  transform: translateZ(0);
 }
 
 .material-card:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--project-primary) 50%, transparent);
+  border-color: color-mix(in srgb, var(--project-primary, #0ea5e9) 50%, transparent);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 
 .material-card.selected {
-  border-color: var(--project-primary);
-  background: color-mix(in srgb, var(--project-primary) 10%, transparent);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--project-primary) 20%, transparent);
+  border-color: var(--project-primary, #0ea5e9);
+  background: color-mix(in srgb, var(--project-primary, #0ea5e9) 8%, #ffffff);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent);
 }
 
-/* Карточка уже выданного материала */
 .material-card.owned {
   opacity: 0.65;
   cursor: not-allowed;
-  background: color-mix(in srgb, var(--project-text) 2%, transparent);
-  border-color: color-mix(in srgb, var(--project-text) 10%, transparent);
+  background: #f8fafc;
+  border-color: #e2e8f0;
 }
 
 .material-card.owned:hover {
   transform: none;
-  border-color: color-mix(in srgb, var(--project-text) 10%, transparent);
+  border-color: #e2e8f0;
 }
 
 .owned-badge {
@@ -251,33 +252,32 @@
   font-weight: 800;
   padding: 4px 8px;
   border-radius: 6px;
-  background: color-mix(in srgb, #10b981 15%, transparent);
+  background: rgba(16, 185, 129, 0.12);
   color: #059669;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-/* Компактная обложка */
+/* Фиксированный блок обложки */
 .material-cover-wrapper {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 10;
-  border-radius: 10px;
+  height: 110px;
+  border-radius: 12px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--project-text) 6%, transparent);
-  margin-bottom: 8px;
+  background: #f1f5f9;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .material-cover-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.material-card:hover .material-cover-img {
-  transform: scale(1.04);
+  object-fit: contain;
+  padding: 4px;
 }
 
 .material-card-body {
@@ -290,9 +290,9 @@
 .material-card-title {
   font-weight: 800;
   font-size: 13px;
-  line-height: 1.3;
-  color: var(--project-text);
-  margin-bottom: 6px;
+  line-height: 1.35;
+  color: var(--project-text, #0f172a);
+  margin-bottom: 8px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -304,13 +304,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: auto;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
 }
 
 .material-card-price {
   font-weight: 900;
   font-size: 14px;
-  color: var(--project-primary);
+  color: var(--project-primary, #0ea5e9);
 }
 
 .vitrine-card-btn {
@@ -322,17 +324,17 @@
 }
 
 .vitrine-card-btn.add {
-  background: color-mix(in srgb, var(--project-text) 6%, transparent);
-  color: var(--project-text);
+  background: #f1f5f9;
+  color: #334155;
 }
 
 .vitrine-card-btn.remove {
-  background: var(--project-primary);
+  background: var(--project-primary, #0ea5e9);
   color: #ffffff;
 }
 
 /* =========================================================
-   ✅ ФОРМЫ И ЧЕКБОКСЫ
+   ✅ ФОРМЫ
    ========================================================= */
 
 .form-group {
@@ -343,60 +345,57 @@
   display: block;
   margin-bottom: 8px;
   font-weight: 700;
-  color: var(--project-text);
+  color: var(--project-text, #0f172a);
   font-size: 14px;
 }
 
 .form-group input,
 .form-group select {
   width: 100%;
-  padding: 14px 16px;
-  border: 1px solid var(--glass-border);
+  padding: 12px 16px;
+  border: 1px solid var(--glass-border, #cbd5e1);
   border-radius: 12px;
-  font-size: 15px;
+  font-size: 14px;
   transition: all 0.2s ease;
   box-sizing: border-box;
   font-family: inherit;
-  background: color-mix(in srgb, var(--project-text) 3%, transparent);
-  color: var(--project-text);
+  background: #ffffff;
+  color: var(--project-text, #0f172a);
 }
 
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: var(--project-primary);
-  background: var(--project-card-bg);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--project-primary) 15%, transparent);
+  border-color: var(--project-primary, #0ea5e9);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--project-primary, #0ea5e9) 15%, transparent);
 }
 
 .form-group input:read-only,
 .form-group input:disabled {
-  opacity: 0.6;
+  background: #f1f5f9;
+  opacity: 0.8;
   cursor: not-allowed;
 }
 
-/* =========================================================
-   ✅ ИНФО-ПЛАШКИ И ЧЕК СМЕТЫ (Разнесение по краям)
-   ========================================================= */
-
+/* Инфо-плашки и карточка корзины */
 .payment-info {
-  background: color-mix(in srgb, var(--project-primary) 8%, transparent);
-  border-left: 4px solid var(--project-primary);
+  background: color-mix(in srgb, var(--project-primary, #0ea5e9) 8%, #ffffff);
+  border-left: 4px solid var(--project-primary, #0ea5e9);
   padding: 16px 20px;
   border-radius: 12px;
   margin-bottom: 20px;
-  color: var(--project-text);
+  color: var(--project-text, #0f172a);
 }
 
 .payment-info h4 {
-  color: var(--project-primary);
+  color: var(--project-primary, #0ea5e9);
   margin: 0 0 6px 0;
   font-weight: 800;
 }
 
 .receipt-box {
-  background: color-mix(in srgb, var(--project-text) 3%, transparent);
-  border: 1px solid var(--glass-border);
+  background: #f8fafc;
+  border: 1px solid var(--glass-border, #e2e8f0);
   border-radius: 14px;
   padding: 16px;
   margin-bottom: 16px;
@@ -408,10 +407,10 @@
   justify-content: space-between;
   gap: 16px;
   padding: 8px 0;
-  border-bottom: 1px dashed color-mix(in srgb, var(--project-text) 15%, transparent);
+  border-bottom: 1px dashed #cbd5e1;
   font-size: 14px;
   font-weight: 600;
-  color: var(--project-text);
+  color: var(--project-text, #0f172a);
 }
 
 .receipt-item:last-child {
@@ -425,164 +424,27 @@
   gap: 16px;
   padding-top: 12px;
   margin-top: 6px;
-  border-top: 2px solid var(--project-text);
+  border-top: 2px solid var(--project-text, #0f172a);
   font-weight: 900;
   font-size: 16px;
-  color: var(--project-text);
-}
-
-.summary-items-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 180px;
-  overflow-y: auto;
-  margin: 14px 0;
-  padding-right: 4px;
-}
-
-.summary-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 14px;
-  background: color-mix(in srgb, var(--project-text) 4%, transparent);
-  border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  font-size: 14px;
-}
-
-.summary-item-title {
-  font-weight: 700;
-  color: var(--project-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.summary-item-badge {
-  font-weight: 800;
-  color: var(--project-primary);
-  background: color-mix(in srgb, var(--project-primary) 14%, transparent);
-  padding: 4px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  white-space: nowrap;
+  color: var(--project-text, #0f172a);
 }
 
 .cart-summary-bar {
   margin-top: 16px;
-  padding: 14px;
+  padding: 14px 18px;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--project-primary) 10%, var(--project-card-bg, #ffffff));
-  border: 1px solid color-mix(in srgb, var(--project-primary) 25%, transparent);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 /* =========================================================
-   ✅ QR-КОД И АДМИН-ЭЛЕМЕНТЫ
+   ✅ АДАПТИВНОСТЬ
    ========================================================= */
 
-.qr-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.qr-title {
-  font-weight: 800;
-  color: var(--project-text);
-}
-
-.qr-refresh {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--project-text) 4%, transparent);
-  color: var(--project-text);
-  cursor: pointer;
-  display: inline-grid;
-  place-items: center;
-  transition: all 0.2s ease;
-}
-
-.qr-refresh:hover {
-  background: color-mix(in srgb, var(--project-text) 8%, transparent);
-}
-
-.payment-qr--smart {
-  position: relative;
-  min-height: 240px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--project-text) 2%, transparent);
-  border-radius: 20px;
-  border: 1px dashed var(--glass-border);
-  padding: 20px;
-}
-
-.qr-loader-text {
-  font-weight: 700;
-  color: var(--project-text);
-  margin-top: 12px;
-}
-
-.qr-spinner {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 4px solid var(--glass-border);
-  border-top: 4px solid var(--project-primary);
-  animation: spin 1s linear infinite;
-  display: block;
-  margin: 0 auto;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.qr-img {
-  max-width: 220px;
-  border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.15);
-}
-
-.requests-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  background: color-mix(in srgb, var(--project-text) 2%, transparent);
-  border-radius: 24px;
-  border: 1px dashed var(--glass-border);
-}
-
-.empty-state h3 {
-  font-size: 20px;
-  color: var(--project-text);
-  margin-bottom: 8px;
-  font-weight: 800;
-}
-
-.empty-state p {
-  color: color-mix(in srgb, var(--project-text) 60%, transparent);
-  margin-bottom: 24px;
-}
-
-/* Мобильная адаптация */
 @media (max-width: 768px) {
   .container {
     width: 100%;
@@ -596,19 +458,8 @@
     white-space: nowrap;
   }
 
-  .actions-cell {
-    flex-direction: row;
-    gap: 6px;
-    align-items: center;
-  }
-
-  .actions-locked {
-    white-space: normal;
-    text-align: center;
-  }
-
   .materials-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 10px;
   }
 }

@@ -1,3 +1,4 @@
+// app/(app)/projects/[slug]/requests/RequestsClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -9,13 +10,7 @@ import "./requests.css";
 
 type ProjectLevel = { id: string; code: string; label: string; price?: number | null };
 type ProjectTab = { id: string; slug: string; title: string; icon: string | null };
-type Project = {
-  id: string;
-  name: string;
-  slug: string;
-  theme?: { primaryColor?: string; secondaryColor?: string } | null;
-  themeColor?: string | null;
-};
+type Project = { id: string; name: string; slug: string };
 
 type MaterialItem = {
   id: string;
@@ -155,22 +150,18 @@ export default function RequestsClient({
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
-  // Шаг модалки создания заявки: 1 - выбор в витрине, 2 - подтверждение и чек
   const [modalStep, setModalStep] = useState<1 | 2>(1);
 
-  // Данные витрины
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [materialsLoading, setMaterialsLoading] = useState(false);
   const [activeTabId, setActiveTabId] = useState<string>("all");
   const [selectedLevelCode, setSelectedLevelCode] = useState<string>("all");
 
-  // Состояние формы
   const [editingId, setEditingId] = useState<string | null>(null);
   const [requestNumber, setRequestNumber] = useState("");
   const [requestDateTime, setRequestDateTime] = useState("");
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
 
-  // Данные оплаты
   const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
   const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
   const [qrLoading, setQrLoading] = useState(true);
@@ -178,9 +169,7 @@ export default function RequestsClient({
   const [busy, setBusy] = useState(false);
 
   const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
-  const primaryColor = project.theme?.primaryColor || project.themeColor || "#6366f1";
 
-  // Загрузка всех материалов проекта по всем табам для витрины
   useEffect(() => {
     let alive = true;
     async function loadMaterials() {
@@ -489,226 +478,15 @@ export default function RequestsClient({
   };
 
   return (
-    <div
-      className="page-requests"
-      style={{ "--project-primary": primaryColor } as React.CSSProperties}
-    >
+    <div className="page-requests">
       <style>{`
         @keyframes toastSlideIn {
           from { transform: translate3d(100%, 0, 0); opacity: 0; }
           to { transform: translate3d(0, 0, 0); opacity: 1; }
         }
-
-        /* ==== СТИЛИЗАЦИЯ И ФИКСЫ ВИТРИНЫ И МОДАЛКИ ==== */
-        .level-filter-container {
-          margin-bottom: 12px;
-        }
-        .level-filter-title {
-          font-size: 13px;
-          font-weight: 700;
-          color: #475569;
-          margin-bottom: 6px;
-        }
-        .level-filter-chips {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-        }
-        .level-chip {
-          padding: 6px 12px;
-          border-radius: 999px;
-          font-size: 12px;
-          font-weight: 700;
-          background: #f1f5f9;
-          color: #334155 !important;
-          border: 1px solid #cbd5e1;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-        .level-chip:hover {
-          background: #e2e8f0;
-          color: #0f172a !important;
-        }
-        .level-chip.active {
-          background: var(--project-primary, #6366f1) !important;
-          color: #ffffff !important;
-          border-color: var(--project-primary, #6366f1) !important;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-        }
-
-        .vitrine-tabs {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          margin-bottom: 16px;
-        }
-        .vitrine-tab-btn {
-          padding: 8px 16px;
-          border-radius: 12px;
-          font-size: 13px;
-          font-weight: 700;
-          background: #f1f5f9;
-          color: #334155 !important;
-          border: 1px solid #cbd5e1;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .vitrine-tab-btn:hover {
-          background: #e2e8f0;
-          color: #0f172a !important;
-        }
-        .vitrine-tab-btn.active {
-          background: var(--project-primary, #6366f1) !important;
-          color: #ffffff !important;
-          border-color: var(--project-primary, #6366f1) !important;
-          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-        }
-
-        /* Ограниченная адаптивная сетка (карточки не растягиваются на всю модалку) */
-        .materials-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 230px));
-          gap: 16px;
-          justify-content: center;
-          max-height: 420px;
-          overflow-y: auto;
-          padding: 4px 4px 12px 4px;
-        }
-
-        .material-card {
-          background: #ffffff;
-          border: 2px solid #e2e8f0;
-          border-radius: 16px;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          user-select: none;
-        }
-        .material-card:hover {
-          border-color: #cbd5e1;
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(0,0,0,0.06);
-        }
-        .material-card.selected {
-          border-color: var(--project-primary, #6366f1) !important;
-          background: #fafafa;
-          box-shadow: 0 0 0 2px var(--project-primary, #6366f1);
-        }
-        .material-card.owned {
-          opacity: 0.65;
-          cursor: not-allowed;
-          background: #f8fafc;
-        }
-
-        .material-cover-wrapper {
-          height: 130px;
-          background: #f8fafc;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 10px;
-          border-bottom: 1px solid #f1f5f9;
-        }
-        .material-cover-img {
-          max-height: 100%;
-          max-width: 100%;
-          object-fit: contain;
-          border-radius: 8px;
-        }
-
-        .material-card-body {
-          padding: 12px;
-          display: flex;
-          flex-direction: column;
-          flex: 1;
-          justify-content: space-between;
-        }
-        .material-card-title {
-          font-size: 13px;
-          font-weight: 800;
-          color: #0f172a;
-          line-height: 1.3;
-          margin-bottom: 10px;
-        }
-        .material-card-footer {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-top: auto;
-          gap: 6px;
-        }
-        .material-card-price {
-          font-size: 14px;
-          font-weight: 900;
-          color: var(--project-primary, #6366f1);
-        }
-
-        .vitrine-card-btn {
-          font-size: 11px;
-          font-weight: 800;
-          padding: 4px 8px;
-          border-radius: 8px;
-        }
-        .vitrine-card-btn.add {
-          background: #f1f5f9;
-          color: #334155;
-        }
-        .vitrine-card-btn.remove {
-          background: #dcfce7;
-          color: #166534;
-        }
-
-        .cart-summary-bar {
-          margin-top: 16px;
-          padding: 12px 18px;
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
-          border-radius: 14px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .receipt-box {
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
-          border-radius: 14px;
-          padding: 16px;
-          margin-bottom: 16px;
-        }
-        .receipt-item {
-          display: flex;
-          justify-content: space-between;
-          font-size: 13px;
-          font-weight: 600;
-          color: #334155;
-          padding: 6px 0;
-          border-bottom: 1px dashed #e2e8f0;
-        }
-        .receipt-total {
-          display: flex;
-          justify-content: space-between;
-          font-size: 15px;
-          font-weight: 800;
-          color: #0f172a;
-          margin-top: 10px;
-          padding-top: 8px;
-        }
-
-        .user-locked-field {
-          background: #f1f5f9 !important;
-          color: #475569 !important;
-          font-weight: 700;
-          border: 1px solid #cbd5e1;
-        }
       `}</style>
 
-      {/* Плавающее уведомление (Toast) */}
+      {/* Toast */}
       {notif && (
         <div
           style={{
@@ -792,13 +570,12 @@ export default function RequestsClient({
             /* ================= ШАГ 1: ВИТРИНА КАРТОЧЕК ================= */
             <div>
               <div className="form-group" style={{ marginBottom: "12px" }}>
-                <label style={{ fontSize: "12px", color: "#64748b", fontWeight: 700 }}>Номер заявки:</label>
+                <label>Номер заявки:</label>
                 <input
                   type="text"
                   value={requestNumber}
                   readOnly
-                  className="bg-gray-100"
-                  style={{ fontSize: "13px", fontWeight: 700 }}
+                  style={{ fontSize: "13px" }}
                 />
               </div>
 
@@ -828,7 +605,7 @@ export default function RequestsClient({
                 </div>
               )}
 
-              {/* Табы фильтрации витрины */}
+              {/* Табы разделов */}
               <div className="vitrine-tabs">
                 <button
                   type="button"
@@ -886,16 +663,8 @@ export default function RequestsClient({
                               className="material-cover-img"
                             />
                           ) : (
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                height: "100%",
-                                fontSize: "28px",
-                              }}
-                            >
-                              📖
+                            <div style={{ fontSize: "28px" }}>
+                              {item.material_kind === "crossword" ? "🧩" : "📖"}
                             </div>
                           )}
                         </div>
@@ -908,7 +677,7 @@ export default function RequestsClient({
                               <span className="owned-badge">✅ Выдан</span>
                             ) : (
                               <span className={`vitrine-card-btn ${isSelected ? "remove" : "add"}`}>
-                                {isSelected ? "✅ Выбрано" : "➕ Выбрать"}
+                                {isSelected ? "✓ Выбрано" : "+ Выбрать"}
                               </span>
                             )}
                           </div>
@@ -919,15 +688,15 @@ export default function RequestsClient({
                 </div>
               )}
 
-              {/* Полоса итогов снизу */}
+              {/* Итог снизу */}
               <div className="cart-summary-bar">
                 <div>
                   <span style={{ fontSize: "13px", color: "#64748b" }}>Выбрано товаров: </span>
-                  <strong style={{ fontSize: "15px", color: "#0f172a" }}>{selectedMaterialIds.length}</strong>
+                  <strong style={{ fontSize: "15px" }}>{selectedMaterialIds.length}</strong>
                 </div>
                 <div>
                   <span style={{ fontSize: "13px", color: "#64748b" }}>Итого: </span>
-                  <strong style={{ fontSize: "18px", color: "var(--project-primary, #6366f1)" }}>
+                  <strong style={{ fontSize: "18px", color: "var(--project-primary, #0ea5e9)" }}>
                     {formatPrice(totalPrice)}
                   </strong>
                 </div>
@@ -952,15 +721,14 @@ export default function RequestsClient({
               </div>
             </div>
           ) : (
-            /* ================= ШАГ 2: ИТОГОВЫЙ ЧЕК И ДАННЫЕ ================= */
+            /* ================= ШАГ 2: ИТОГОВЫЙ ЧЕК ================= */
             <div>
-              {/* Чек-смета заказа */}
               <div className="receipt-box">
                 <div
                   style={{
                     fontWeight: 800,
                     marginBottom: "10px",
-                    color: "#0f172a",
+                    color: "var(--project-text, #0f172a)",
                     fontSize: "14px",
                   }}
                 >
@@ -976,21 +744,20 @@ export default function RequestsClient({
 
                 <div className="receipt-total">
                   <span>Итого к оплате:</span>
-                  <span style={{ color: "var(--project-primary, #6366f1)" }}>
+                  <span style={{ color: "var(--project-primary, #0ea5e9)" }}>
                     {formatPrice(totalPrice)}
                   </span>
                 </div>
               </div>
 
-              {/* Данные покупателя */}
               <div className="form-group">
-                <label style={{ fontSize: "12px", color: "#64748b", fontWeight: 700 }}>Email (🔒 Из профиля):</label>
-                <input type="email" value={userEmail} disabled className="user-locked-field" />
+                <label>Email (🔒 Из профиля):</label>
+                <input type="email" value={userEmail} disabled />
               </div>
 
               <div className="form-group">
-                <label style={{ fontSize: "12px", color: "#64748b", fontWeight: 700 }}>ФИО ученика (🔒 Из профиля):</label>
-                <input type="text" value={userFullName} disabled className="user-locked-field" />
+                <label>ФИО ученика (🔒 Из профиля):</label>
+                <input type="text" value={userFullName} disabled />
               </div>
 
               <div className="modal-actions" style={{ marginTop: "20px" }}>
@@ -1011,7 +778,7 @@ export default function RequestsClient({
         </form>
       </Modal>
 
-      {/* МОДАЛКА ОПЛАТЫ (QR-КОД) */}
+      {/* МОДАЛКА ОПЛАТЫ */}
       <Modal
         open={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
@@ -1020,34 +787,32 @@ export default function RequestsClient({
       >
         <div
           style={{
-            background: "color-mix(in srgb, var(--project-primary, #6366f1) 12%, #f8fafc)",
+            background: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
             padding: "18px",
             borderRadius: "14px",
-            border: "1px solid color-mix(in srgb, var(--project-primary, #6366f1) 25%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
             marginBottom: "20px",
           }}
         >
           <h4
             style={{
               margin: "0 0 10px 0",
-              color: "var(--project-primary, #6366f1)",
+              color: "var(--project-primary, #0ea5e9)",
               fontSize: "16px",
-              fontWeight: 800,
             }}
           >
             📋 Инструкция по оплате
           </h4>
 
-          {/* Список всех сгруппированных товаров */}
           {aggregatedPendingSummary.items.length > 0 && (
-            <div className="summary-items-list" style={{ marginBottom: "12px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 700, color: "#475569" }}>
+            <div className="summary-items-list">
+              <div style={{ fontSize: "12px", fontWeight: 700, opacity: 0.8 }}>
                 Заказываемые материалы ({aggregatedPendingSummary.count} заявка/заявок):
               </div>
               {aggregatedPendingSummary.items.map((item, idx) => (
-                <div key={idx} className="summary-item" style={{ fontSize: "13px", display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
-                  <span className="summary-item-title" style={{ fontWeight: 600 }}>{item.title}</span>
-                  <span className="summary-item-badge" style={{ fontWeight: 800 }}>
+                <div key={idx} className="summary-item">
+                  <span className="summary-item-title">{item.title}</span>
+                  <span className="summary-item-badge">
                     {item.count > 1 ? `x${item.count} • ` : ""}
                     {item.unitPrice * item.count} ₽
                   </span>
@@ -1060,7 +825,7 @@ export default function RequestsClient({
             style={{
               margin: 0,
               paddingLeft: "18px",
-              color: "#334155",
+              color: "var(--project-text, #0f172a)",
               display: "flex",
               flexDirection: "column",
               gap: "8px",
@@ -1072,7 +837,7 @@ export default function RequestsClient({
             </li>
             <li>
               Сумма к оплате (все неоплаченные заявки):{" "}
-              <strong style={{ fontSize: "17px", color: "var(--project-primary, #6366f1)" }}>
+              <strong style={{ fontSize: "17px", color: "var(--project-primary, #0ea5e9)" }}>
                 {paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "0 руб."}
               </strong>
             </li>
@@ -1085,9 +850,8 @@ export default function RequestsClient({
                   borderRadius: "8px",
                   display: "inline-block",
                   marginTop: "6px",
-                  border: "1px solid #cbd5e1",
+                  border: "1px solid var(--glass-border, #cbd5e1)",
                   fontWeight: 700,
-                  color: "#0f172a",
                 }}
               >
                 ФИО ребенка, оплата за учебные материалы
@@ -1109,24 +873,11 @@ export default function RequestsClient({
           </button>
         </div>
 
-        <div
-          className="payment-qr payment-qr--smart"
-          style={{
-            minHeight: "220px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
+        <div className="payment-qr payment-qr--smart">
           {qrLoading && !qrError ? (
             <div className="qr-loader" role="status">
               <span className="qr-spinner" />
-              <div
-                className="qr-loader-text"
-                style={{ marginTop: "12px", fontWeight: 700 }}
-              >
-                Загружаем QR-код...
-              </div>
+              <div className="qr-loader-text">Загружаем QR-код...</div>
             </div>
           ) : null}
 
@@ -1134,9 +885,6 @@ export default function RequestsClient({
             <div className="qr-error" role="alert" style={{ textAlign: "center" }}>
               <div style={{ fontWeight: 800, marginBottom: 6, color: "#d32f2f" }}>
                 Не удалось загрузить QR-код
-              </div>
-              <div style={{ fontSize: "12px", color: "#666", marginBottom: 12 }}>
-                Возможно, файл oplata.png отсутствует на сервере.
               </div>
               <button
                 type="button"
@@ -1152,7 +900,7 @@ export default function RequestsClient({
             key={qrUrl}
             src={qrUrl}
             alt="QR-код для оплаты"
-            className={`qr-img`}
+            className="qr-img"
             onLoad={() => {
               setQrLoading(false);
               setQrError(false);
@@ -1163,12 +911,6 @@ export default function RequestsClient({
             }}
             style={{
               display: qrLoading || qrError ? "none" : "block",
-              width: "100%",
-              maxWidth: "240px",
-              margin: "0 auto",
-              borderRadius: "16px",
-              border: "1px solid rgba(0,0,0,0.1)",
-              boxShadow: "0 12px 30px rgba(0,0,0,0.08)",
             }}
           />
         </div>
@@ -1185,7 +927,7 @@ export default function RequestsClient({
         </div>
       </Modal>
 
-      {/* ОСНОВНОЙ ИНТЕРФЕЙС СТРАНИЦЫ ЗАЯВОК */}
+      {/* ОСНОВНОЙ ИНТЕРФЕЙС */}
       <div className="container">
         <div className="profile-topbar">
           <div className="brand">
@@ -1212,7 +954,7 @@ export default function RequestsClient({
         </div>
 
         <div className="card">
-          <h2 style={{ color: "var(--project-primary, #6366f1)", marginBottom: 20 }}>
+          <h2 style={{ color: "var(--project-primary, #0ea5e9)", marginBottom: 20 }}>
             📝 Мои заявки на доступы
           </h2>
 
@@ -1303,13 +1045,11 @@ export default function RequestsClient({
                         </td>
                         <td>
                           {locked ? (
-                            <span className="text-xs text-gray-400 font-medium italic">
+                            <span className="actions-locked">
                               🔒 Действия недоступны
                             </span>
                           ) : (
-                            <div
-                              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-                            >
+                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                               <button
                                 className="btn btn-small"
                                 onClick={() => openEdit(r)}

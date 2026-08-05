@@ -1,3 +1,4 @@
+// app/(app)/projects/[slug]/requests/page.tsx
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import RequestsClient from "./RequestsClient";
@@ -12,10 +13,8 @@ export default async function ProjectRequestsPage({
   const supabase = await createSupabaseServerClient();
   const { slug } = await params;
 
-  // 1. Проверяем пользователя
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 1. Проверяем юзера
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   // Данные профиля
@@ -25,10 +24,10 @@ export default async function ProjectRequestsPage({
     .eq("id", user.id)
     .single();
 
-  // 2. Получаем текущий проект вместе с его темой
+  // 2. Получаем текущий проект
   const { data: project } = await supabase
     .from("projects")
-    .select("id, name, slug, is_active, theme, themeColor")
+    .select("id, name, slug, is_active")
     .eq("slug", slug)
     .single();
 
@@ -36,23 +35,9 @@ export default async function ProjectRequestsPage({
 
   // 3. Собираем табы, уровни, историю заявок и реальные выданные доступы
   const [tabsRes, levelsRes, requestsRes, accessRes, grantsRes] = await Promise.all([
-    supabase
-      .from("project_tabs")
-      .select("*")
-      .eq("project_id", project.id)
-      .eq("is_active", true)
-      .order("order_index"),
-    supabase
-      .from("project_levels")
-      .select("*")
-      .eq("project_id", project.id)
-      .eq("is_active", true)
-      .order("order_index"),
-    supabase
-      .from("purchase_requests")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false }),
+    supabase.from("project_tabs").select("*").eq("project_id", project.id).eq("is_active", true).order("order_index"),
+    supabase.from("project_levels").select("*").eq("project_id", project.id).eq("is_active", true).order("order_index"),
+    supabase.from("purchase_requests").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
     supabase.from("material_access").select("material_id").eq("user_id", user.id),
     supabase.from("purchase_request_grants").select("material_id, item_id").eq("user_id", user.id),
   ]);
@@ -103,7 +88,7 @@ export default async function ProjectRequestsPage({
   const projectRequests = allRequests
     .filter((r) => r.project_id === project.id || !r.project_id)
     .map((r) => {
-      // Если заявка уже имеет зафиксированную цену в БД (> 0) — используем её
+      // Если заявка уже имеет зафиксированную цену в БД (> 0) — используем её без перерасчёта!
       if (typeof r.total_price === "number" && r.total_price > 0) {
         return r;
       }

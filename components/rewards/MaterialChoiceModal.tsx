@@ -294,10 +294,8 @@ export default function MaterialChoiceModal({
           <div
             className="font-mono text-xs font-black px-3 py-1.5 border rounded-xl uppercase tracking-wider"
             style={{
-              backgroundColor:
-                "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
-              borderColor:
-                "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
+              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
               color: "var(--project-primary, #0ea5e9)",
             }}
           >
@@ -331,10 +329,10 @@ export default function MaterialChoiceModal({
                   style={{
                     backgroundColor: active
                       ? "var(--project-primary, #0ea5e9)"
-                      : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
+                      : "#f1f5f9",
                     borderColor: active
                       ? "var(--project-primary, #0ea5e9)"
-                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                      : "#cbd5e1",
                     color: active ? "#ffffff" : "var(--project-text, #0f172a)",
                   }}
                 >
@@ -353,14 +351,8 @@ export default function MaterialChoiceModal({
               onClick={() => setActiveTabSlug("all")}
               className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border"
               style={{
-                backgroundColor:
-                  activeTabSlug === "all"
-                    ? "var(--project-primary, #0ea5e9)"
-                    : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
-                borderColor:
-                  activeTabSlug === "all"
-                    ? "var(--project-primary, #0ea5e9)"
-                    : "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                backgroundColor: activeTabSlug === "all" ? "var(--project-primary, #0ea5e9)" : "#f1f5f9",
+                borderColor: activeTabSlug === "all" ? "var(--project-primary, #0ea5e9)" : "#cbd5e1",
                 color: activeTabSlug === "all" ? "#ffffff" : "var(--project-text, #0f172a)",
               }}
             >
@@ -373,18 +365,9 @@ export default function MaterialChoiceModal({
                 onClick={() => setActiveTabSlug(tab.slug)}
                 className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border"
                 style={{
-                  backgroundColor:
-                    activeTabSlug === tab.slug
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
-                  borderColor:
-                    activeTabSlug === tab.slug
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
-                  color:
-                    activeTabSlug === tab.slug
-                      ? "#ffffff"
-                      : "var(--project-text, #0f172a)",
+                  backgroundColor: activeTabSlug === tab.slug ? "var(--project-primary, #0ea5e9)" : "#f1f5f9",
+                  borderColor: activeTabSlug === tab.slug ? "var(--project-primary, #0ea5e9)" : "#cbd5e1",
+                  color: activeTabSlug === tab.slug ? "#ffffff" : "var(--project-text, #0f172a)",
                 }}
               >
                 {tab.icon ? `${tab.icon} ` : ""}
@@ -400,14 +383,8 @@ export default function MaterialChoiceModal({
                 onClick={() => setSelectedLevelCode("all")}
                 className="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all"
                 style={{
-                  backgroundColor:
-                    selectedLevelFilter === "all"
-                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent)"
-                      : "transparent",
-                  borderColor:
-                    selectedLevelFilter === "all"
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                  backgroundColor: selectedLevelFilter === "all" ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent)" : "#f8fafc",
+                  borderColor: selectedLevelFilter === "all" ? "var(--project-primary, #0ea5e9)" : "#cbd5e1",
                   color: "var(--project-text, #0f172a)",
                 }}
               >
@@ -420,14 +397,8 @@ export default function MaterialChoiceModal({
                   onClick={() => setSelectedLevelCode(lvl)}
                   className="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all"
                   style={{
-                    backgroundColor:
-                      selectedLevelFilter === lvl
-                        ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent)"
-                        : "transparent",
-                    borderColor:
-                      selectedLevelFilter === lvl
-                        ? "var(--project-primary, #0ea5e9)"
-                        : "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                    backgroundColor: selectedLevelFilter === lvl ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent)" : "#f8fafc",
+                    borderColor: selectedLevelFilter === lvl ? "var(--project-primary, #0ea5e9)" : "#cbd5e1",
                     color: "var(--project-text, #0f172a)",
                   }}
                 >
@@ -438,8 +409,8 @@ export default function MaterialChoiceModal({
           )}
         </div>
 
-        {/* Список материалов */}
-        <div className="max-h-72 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 pr-1">
+        {/* Список материалов (сетка с верным выравниванием) */}
+        <div className="max-h-72 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 pr-1 items-start">
           {loading ? (
             <div className="col-span-full text-center py-12 text-xs font-bold uppercase tracking-wider opacity-60">
               Загрузка каталога материалов...
@@ -460,31 +431,27 @@ export default function MaterialChoiceModal({
                   className="p-3.5 rounded-2xl border flex items-center justify-between transition-all"
                   style={{
                     backgroundColor: unlocked
-                      ? "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)"
+                      ? "#f8fafc"
                       : isSelected
-                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)"
-                      : "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
+                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, #ffffff)"
+                      : "#ffffff",
                     borderColor: isSelected
                       ? "var(--project-primary, #0ea5e9)"
-                      : "var(--glass-border, rgba(15, 23, 42, 0.1))",
+                      : "#e2e8f0",
                     opacity: unlocked ? 0.6 : 1,
                     cursor: unlocked ? "not-allowed" : "pointer",
                   }}
                 >
                   <div className="flex items-center gap-3 min-w-0 pr-2">
                     <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 border"
-                      style={{
-                        backgroundColor:
-                          "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
-                        borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
-                      }}
+                      className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 border bg-slate-100"
+                      style={{ borderColor: "#e2e8f0" }}
                     >
                       {m.cover_image_url ? (
                         <img
                           src={m.cover_image_url}
                           alt=""
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                       ) : (
                         <span className="text-xl">
@@ -494,7 +461,9 @@ export default function MaterialChoiceModal({
                     </div>
 
                     <div className="min-w-0">
-                      <div className="font-extrabold text-xs truncate">{m.title}</div>
+                      <div className="font-extrabold text-xs truncate" style={{ color: "var(--project-text, #0f172a)" }}>
+                        {m.title}
+                      </div>
                       <div className="flex items-center gap-2 mt-1">
                         {m.is_secret && (
                           <span className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">
@@ -518,7 +487,7 @@ export default function MaterialChoiceModal({
                         : "transparent",
                       borderColor: isSelected
                         ? "var(--project-primary, #0ea5e9)"
-                        : "var(--glass-border, rgba(15, 23, 42, 0.2))",
+                        : "#cbd5e1",
                       color: isSelected ? "#ffffff" : "var(--project-text, #0f172a)",
                     }}
                   >
@@ -544,13 +513,7 @@ export default function MaterialChoiceModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border font-bold text-xs uppercase tracking-wider rounded-xl transition-colors"
-            style={{
-              backgroundColor:
-                "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
-              borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
-              color: "var(--project-text, #0f172a)",
-            }}
+            className="px-4 py-2 border font-bold text-xs uppercase tracking-wider rounded-xl transition-colors bg-slate-100 hover:bg-slate-200 text-slate-700"
           >
             Отмена
           </button>
