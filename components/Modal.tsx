@@ -32,7 +32,7 @@ export default function Modal({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
   
-  // ЖБ проверка: находимся ли мы в роутах админки?
+  // ЖБ ПРОВЕРКА: Сразу при рендере узнаем, находимся ли мы в админке
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith("/admin");
 
@@ -80,7 +80,7 @@ export default function Modal({
   const modalContent = (
     <div
       ref={overlayRef}
-      // Если это админка — накидываем admin-root, чтобы админские стили не ломали портал
+      // Если это админка — сразу вешаем admin-root, стили подхватятся идеально
       className={`modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200 ${isAdmin ? "admin-root" : ""}`}
       role="dialog"
       aria-modal="true"

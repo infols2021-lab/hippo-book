@@ -205,7 +205,12 @@ button, input, optgroup, select, textarea {
   letter-spacing: 0.05em;
 }
 
-/* ===== Modals (Чистый Глассморфизм) ===== */
+/* =========================================================================
+   ✅ ЖБ МОДАЛЬНЫЕ ОКНА (БЕЗ !IMPORTANT)
+   Теперь admin.css спокойно переопределит их для админки,
+   а на портале/профиле они будут красивыми и стеклянными.
+   ========================================================================= */
+
 .modal-overlay,
 .modal-backdrop {
   position: fixed;
@@ -215,9 +220,9 @@ button, input, optgroup, select, textarea {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(5, 8, 15, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(11, 15, 25, 0.65); /* Чуть темнее для контраста */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .modal-panel,
@@ -225,17 +230,18 @@ button, input, optgroup, select, textarea {
   width: 100%;
   max-width: 760px;
   border-radius: 28px;
-  background: var(--glass-bg, color-mix(in srgb, var(--project-bg, #0b0f19) 90%, transparent)) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12)) !important;
-  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05) !important;
+  /* Убрали !important, берем фон карточки профиля */
+  background: var(--glass-bg, var(--p-card-bg, var(--project-card-bg, #ffffff)));
+  backdrop-filter: var(--glass-blur, blur(16px));
+  -webkit-backdrop-filter: var(--glass-blur, blur(16px));
+  border: 1px solid var(--glass-border, color-mix(in srgb, var(--p-text, var(--project-text, #000)) 15%, transparent));
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
   max-height: 90vh;
   overflow: hidden;
   outline: none;
-  color: var(--p-text, var(--project-text, #ffffff)) !important;
+  color: var(--p-text, var(--project-text, #0f172a));
 }
 
 .modal-header {
@@ -244,8 +250,7 @@ button, input, optgroup, select, textarea {
   justify-content: space-between;
   gap: 12px;
   padding: 20px 24px;
-  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
-  background: color-mix(in srgb, var(--p-text, var(--project-text, #ffffff)) 2%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--p-text, var(--project-text, #000)) 10%, transparent);
   flex-shrink: 0;
 }
 
@@ -262,7 +267,7 @@ button, input, optgroup, select, textarea {
   border-radius: 12px;
   border: none;
   cursor: pointer;
-  background: color-mix(in srgb, var(--p-text, var(--project-text, #ffffff)) 8%, transparent);
+  background: color-mix(in srgb, var(--p-text, var(--project-text, #000)) 8%, transparent);
   color: inherit;
   font-size: 16px;
   font-weight: bold;
@@ -273,7 +278,7 @@ button, input, optgroup, select, textarea {
 }
 
 .modal-close:hover { 
-  background: color-mix(in srgb, var(--p-text, var(--project-text, #ffffff)) 15%, transparent); 
+  background: color-mix(in srgb, var(--p-text, var(--project-text, #000)) 15%, transparent); 
 }
 
 .modal-body {
@@ -293,7 +298,7 @@ button, input, optgroup, select, textarea {
 .form-group label {
   font-size: 12px;
   font-weight: 800;
-  color: color-mix(in srgb, var(--p-text, var(--project-text, #ffffff)) 80%, transparent);
+  color: color-mix(in srgb, var(--p-text, var(--project-text, #000)) 80%, transparent);
   margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -303,9 +308,10 @@ button, input, optgroup, select, textarea {
 .input, textarea, select {
   padding: 14px 16px;
   border-radius: 14px;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.15));
-  background: color-mix(in srgb, var(--p-text, var(--project-text, #ffffff)) 4%, transparent);
-  color: var(--p-text, var(--project-text, #ffffff));
+  /* Четкая обводка и фон для читаемости в любой теме */
+  border: 1px solid color-mix(in srgb, var(--p-text, var(--project-text, #000)) 25%, transparent);
+  background: color-mix(in srgb, var(--p-text, var(--project-text, #000)) 3%, transparent);
+  color: var(--p-text, var(--project-text, #000));
   font-size: 15px;
   width: 100%;
   transition: all 0.2s ease;
@@ -314,14 +320,13 @@ button, input, optgroup, select, textarea {
 
 .input:focus, textarea:focus, select:focus {
   border-color: var(--p-primary, var(--project-primary));
-  background: color-mix(in srgb, var(--p-text, var(--project-text, #ffffff)) 2%, transparent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--p-primary, var(--project-primary)) 15%, transparent);
 }
 
 .input:disabled, select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background: color-mix(in srgb, var(--p-text, var(--project-text, #ffffff)) 2%, transparent);
+  background: color-mix(in srgb, var(--p-text, var(--project-text, #000)) 5%, transparent);
 }
 
 .small-muted {
