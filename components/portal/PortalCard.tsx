@@ -14,9 +14,6 @@ export default function PortalCard({ project, index }: PortalCardProps) {
   // Определяем стиль карточки: четные (0, 2) светлые, нечетные (1, 3) темные.
   const isLight = index % 2 === 0;
 
-  // Эмодзи-фоллбэки вместо картинок (пока не загрузишь реальные картинки)
-  const icons = isLight ? "🏆" : "🎓"; 
-
   return (
     <Link
       href={`/projects/${project.slug}`}
@@ -54,11 +51,6 @@ export default function PortalCard({ project, index }: PortalCardProps) {
         <p className={`text-sm md:text-base font-medium leading-relaxed max-w-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
           {project.description || "Учебники, кроссворды, задания, прогресс и аналитика."}
         </p>
-
-        {/* Большая иконка / картинка */}
-        <div className="absolute bottom-6 right-6 text-[100px] sm:text-[140px] drop-shadow-2xl transform group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
-          {icons}
-        </div>
 
         {/* Кнопка "Перейти" */}
         <div className="mt-auto pt-16">

@@ -1,6 +1,5 @@
 // lib/projects/loader.ts
 // Загрузчик конфигов проектов из БД с in-memory кэшем.
-// Серверная сторона. Для клиента — тот же API через /api/projects.
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
@@ -92,10 +91,6 @@ const DEFAULT_UI_TEXTS: ProjectUiTextsJson = {};
 // МАРШРУТЫ
 // ---------------------------------------------------------------------------
 
-/**
- * Известные slug → legacy-роуты (старые хардкод-папки app/(app)/...).
- * Для новых веток — универсальный /projects/[slug]/*.
- */
 const LEGACY_ROUTES: Partial<Record<ProjectSlug, ProjectRouteConfig>> = {
   olympiad: {
     portal: "/portal",
@@ -197,7 +192,7 @@ function mapTab(row: ProjectTabRow): ProjectTabConfig {
     title: asString(row.title, asString(ui.label, row.slug)),
     componentType: asString(row.component_type, "materials"),
     materialKind: row.material_kind ?? null,
-    icon: asString(row.icon, "📁"),
+    icon: asString(row.icon, ""),
     orderIndex: asInt(row.order_index, 0),
     isActive: asBoolean(row.is_active, true),
     isHidden: asBoolean(row.is_hidden, false),
@@ -223,7 +218,7 @@ function buildConfig(row: ProjectRow, tabs: ProjectTabRow[], levels: ProjectLeve
   const features = (row.features ?? {}) as ProjectFeaturesJson;
   const ui = (row.ui_texts ?? {}) as ProjectUiTextsJson;
   const routes = buildRoutes(row.slug);
-  const fallbackIcon = asString(row.fallback_icon, "📁");
+  const fallbackIcon = asString(row.fallback_icon, "");
 
   return {
     id: row.id,
@@ -310,7 +305,6 @@ async function fetchLevels(supabase: Awaited<ReturnType<typeof createSupabaseSer
 // ПУБЛИЧНЫЕ ФУНКЦИИ
 // ---------------------------------------------------------------------------
 
-/** Возвращает полный список активных проектов. */
 export async function getProjects(): Promise<ProjectConfig[]> {
   if (cache.list && isFresh(cache.list.fetchedAt)) {
     return cache.list.items;
@@ -331,7 +325,6 @@ export async function getProjects(): Promise<ProjectConfig[]> {
   return items;
 }
 
-/** Возвращает конфиг одного проекта по slug. null, если не найден/неактивен. */
 export async function getProjectBySlug(slug: unknown): Promise<ProjectConfig | null> {
   const key = typeof slug === "string" ? slug : "";
 
@@ -354,18 +347,15 @@ export async function getProjectBySlug(slug: unknown): Promise<ProjectConfig | n
   return config;
 }
 
-/** Возвращает конфиг проекта. Если не найден — бросает. */
 export async function requireProject(slug: unknown): Promise<ProjectConfig> {
   const config = await getProjectBySlug(slug);
   if (!config) throw new Error(`Проект "${slug}" не найден или неактивен.`);
   return config;
 }
 
-/** Быстрая проверка: существует ли проект. */
 export async function projectExists(slug: unknown): Promise<boolean> {
   const config = await getProjectBySlug(slug);
   return Boolean(config);
 }
 
-/** Сбросить кэш (вызывать из админки после изменения данных). */
 export { invalidateProjectsCache as invalidateProjectCache };
