@@ -236,6 +236,20 @@ export default function ProfileClient({
     void fetchStreakData();
   }, []);
 
+  // ДОБАВЛЕНО: Глобально вешаем цвета профиля на body, чтобы модалки (порталы) их видели
+  useEffect(() => {
+    const currProject = availableProjects.find(p => p.slug === projectSlug);
+    const themeColor = currProject?.theme?.primaryColor || currProject?.theme_color || "#0ea5e9";
+
+    document.body.style.setProperty('--project-primary', themeColor);
+    document.body.style.setProperty('--accent2', themeColor);
+
+    return () => {
+      document.body.style.removeProperty('--project-primary');
+      document.body.style.removeProperty('--accent2');
+    };
+  }, [projectSlug, availableProjects]);
+
   useEffect(() => {
     if (!backgroundProxyUrl) {
       setBgLoading(false);

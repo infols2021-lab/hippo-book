@@ -19941,154 +19941,6 @@ export async function getGatehouseRecommendationShortMessage(
 }
 </file>
 
-<file path="lib/projects/theme.ts">
-// lib/projects/theme.ts
-// Применение темы проекта (theme jsonb → CSS-переменные / className).
-// Серверная (buildCssVars) и клиентская (applyTheme) версии.
-
-import type { ProjectThemeConfig, ProjectThemeColors, ProjectSlug } from "./types";
-import { getProjectBySlug } from "./loader";
-
-// ---------------------------------------------------------------------------
-// КАРТА colors → CSS custom property
-// ---------------------------------------------------------------------------
-
-/** CSS-переменные, которые проставляются из colors проекта. */
-const COLOR_VARS: Array<{ key: keyof ProjectThemeColors; varName: string }> = [
-  { key: "pageBg", varName: "--p-page-bg" },
-  { key: "cardBg", varName: "--p-card-bg" },
-  { key: "cardBgSoft", varName: "--p-card-bg-soft" },
-  { key: "primary", varName: "--p-primary" },
-  { key: "primarySoft", varName: "--p-primary-soft" },
-  { key: "secondary", varName: "--p-secondary" },
-  { key: "accent", varName: "--p-accent" },
-  { key: "accentSoft", varName: "--p-accent-soft" },
-  { key: "text", varName: "--p-text" },
-  { key: "muted", varName: "--p-muted" },
-  { key: "border", varName: "--p-border" },
-  { key: "glow", varName: "--p-glow" },
-];
-
-/** Алиасы для совместимости со старыми переменными (--accent2 и т.п.). */
-const LEGACY_ALIASES: Array<{ from: keyof ProjectThemeColors; varName: string }> = [
-  { from: "primary", varName: "--accent2" },
-  { from: "primarySoft", varName: "--accent2-soft" },
-];
-
-// ---------------------------------------------------------------------------
-// СЕРВЕР: генерация строки CSS
-// ---------------------------------------------------------------------------
-
-export type ProjectCssVars = {
-  /** Inline-стиль для style={{ ...cssVars.style }} */
-  style: Record<string, string>;
-  /** className корневого элемента (rootClassName из темы). */
-  className: string;
-  /** Готовая строка для <style> (если нужно глобально). */
-  cssText: string;
-};
-
-/**
- * Строит CSS-переменные из темы проекта.
- * Серверная функция — использует theme из уже загруженного конфига.
- */
-export function buildCssVars(theme: ProjectThemeConfig): ProjectCssVars {
-  const style: Record<string, string> = {};
-
-  for (const { key, varName } of COLOR_VARS) {
-    const value = theme.colors[key];
-    if (value) style[varName] = value;
-  }
-
-  // Алиасы для legacy CSS (старые компоненты ссылаются на --accent2 и т.п.)
-  for (const { from, varName } of LEGACY_ALIASES) {
-    const value = theme.colors[from];
-    if (value && !style[varName]) style[varName] = value;
-  }
-
-  if (theme.fontFamily && theme.fontFamily !== "inherit") {
-    style["--p-font-family"] = theme.fontFamily;
-  }
-
-  const cssText = Object.entries(style)
-    .map(([k, v]) => `${k}: ${v};`)
-    .join(" ");
-
-  return {
-    style,
-    className: theme.rootClassName,
-    cssText,
-  };
-}
-
-/** Серверный хелпер: тема + CSS-переменные по slug проекта. */
-export async function getProjectThemeCssVars(slug: ProjectSlug): Promise<ProjectCssVars | null> {
-  const project = await getProjectBySlug(slug);
-  if (!project) return null;
-  return buildCssVars(project.theme);
-}
-
-// ---------------------------------------------------------------------------
-// КЛИЕНТ: применение темы к DOM
-// ---------------------------------------------------------------------------
-
-/**
- * Применяет тему к HTML-элементу (документу или контейнеру).
- * Клиентская функция — вызывает после загрузки конфига с сервера.
- */
-export function applyTheme(
-  theme: ProjectThemeConfig,
-  options: { target?: HTMLElement; scope?: "global" | "local" } = {},
-): void {
-  const target = options.target ?? document.documentElement;
-  const { style, className } = buildCssVars(theme);
-
-  for (const [k, v] of Object.entries(style)) {
-    target.style.setProperty(k, v);
-  }
-
-  if (options.scope === "global" && className) {
-    if (!document.documentElement.classList.contains(className)) {
-      document.documentElement.classList.add(className);
-    }
-  }
-}
-
-/** Снимает тему с элемента (полезно при размонтировании/смене ветки). */
-export function removeTheme(
-  theme: ProjectThemeConfig,
-  options: { target?: HTMLElement; scope?: "global" | "local" } = {},
-): void {
-  const target = options.target ?? document.documentElement;
-  const { style, className } = buildCssVars(theme);
-
-  for (const k of Object.keys(style)) {
-    target.style.removeProperty(k);
-  }
-
-  if (options.scope === "global" && className) {
-    document.documentElement.classList.remove(className);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// УТИЛИТЫ ДЛЯ РЕНДЕРА
-// ---------------------------------------------------------------------------
-
-/**
- * Превращает colors темы в объект для инлайн-стиля React.
- * Например: style={{ background: themeColor('pageBg', theme) }}
- */
-export function themeColor(key: keyof ProjectThemeColors, theme: ProjectThemeConfig): string {
-  return theme.colors[key] ?? "";
-}
-
-/** Все CSS-переменные как объект для React style={{}}. */
-export function themeStyle(theme: ProjectThemeConfig): Record<string, string> {
-  return buildCssVars(theme).style;
-}
-</file>
-
 <file path="lib/storage/publicUrl.ts">
 // lib/storage/publicUrl.ts
 const STORAGE_PROXY_PREFIX = "/api/storage/public";
@@ -24795,6 +24647,335 @@ export async function GET(
 }
 </file>
 
+<file path="app/api/assignment-progress/route.ts">
+// app/api/assignment-progress/route.ts
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { calcAndBuildReview } from "@/lib/assignments/scoring";
+import type { AssignmentData } from "@/lib/assignments/types";
+import { requireUser } from "@/lib/api/auth";
+
+import {
+  assertOlympiadAssignmentAccess,
+  assertGatehouseAssignmentAccess,
+} from "@/lib/assignments/access";
+
+import { recommendGatehouseLevel as recommendLevel } from "@/lib/exams/recommendLevel";
+
+type Body = {
+  assignmentId: string;
+  answers: Record<string, any>;
+  isCompleted: boolean;
+  score: number | null;
+  source?: string;
+  sourceId?: string;
+  branchType?: string;
+};
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function normalizeScore(value: unknown): number {
+  const score = Number(value);
+  return Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+}
+
+function getMaterial(assignment: any) {
+  if (!assignment) return null;
+  if (assignment.material && !Array.isArray(assignment.material)) return assignment.material;
+  if (assignment.materials && !Array.isArray(assignment.materials)) return assignment.materials;
+  if (Array.isArray(assignment.materials)) return assignment.materials[0] || null;
+  if (Array.isArray(assignment.material)) return assignment.material[0] || null;
+  return null;
+}
+
+function getMaterialLevels(assignment: AssignmentData | null): string[] {
+  const material = getMaterial(assignment);
+  return normalizeStringArray(material?.target_levels);
+}
+
+function getMaterialId(assignment: AssignmentData | null): string | null {
+  const material = getMaterial(assignment);
+  return assignment?.material_id || material?.id || null;
+}
+
+function getProjectConfig(assignment: AssignmentData | null) {
+  const material = getMaterial(assignment);
+  const project = material?.project_tabs?.projects;
+  const isLegacyGatehouse = assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
+
+  return {
+    slug: project?.slug ?? (isLegacyGatehouse ? "gatehouse" : "olympiad"),
+    hasStreaks: project?.features?.hasStreaks ?? !isLegacyGatehouse,
+    hasRecommendations: project?.features?.hasRecommendations ?? isLegacyGatehouse,
+  };
+}
+
+async function recalcCompletedCounters(supabase: any, userId: string) {
+  const { data } = await supabase
+    .from("user_progress")
+    .select(`
+      id,
+      assignments (
+        branch_type,
+        material_id,
+        textbook_id,
+        crossword_id
+      )
+    `)
+    .eq("user_id", userId)
+    .eq("is_completed", true);
+
+  let olympiadCount = 0;
+  let gatehouseCount = 0;
+
+  for (const row of data || []) {
+    const assignment = row.assignments;
+    if (!assignment) continue;
+
+    if (assignment.branch_type === "gatehouse") {
+      gatehouseCount++;
+    } else {
+      olympiadCount++;
+    }
+  }
+
+  await supabase
+    .from("profiles")
+    .update({
+      completed_assignments_count: olympiadCount,
+      ga_completed_assignments_count: gatehouseCount,
+    })
+    .eq("id", userId);
+
+  return {
+    olympiadCompletedAssignmentsCount: olympiadCount,
+    gatehouseCompletedAssignmentsCount: gatehouseCount,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// POST handler
+// ─────────────────────────────────────────────────────────────
+
+export async function POST(req: Request) {
+  // ✅ Используем requireUser() для единообразной проверки авторизации
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
+  const { supabase, user } = auth;
+
+  let body: Body;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: "Bad JSON" }, { status: 400 });
+  }
+
+  if (!body?.assignmentId) {
+    return NextResponse.json({ ok: false, error: "assignmentId required" }, { status: 400 });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Дебаг-задания — ТОЛЬКО В РЕЖИМЕ РАЗРАБОТКИ
+  // ─────────────────────────────────────────────────────────────
+  if (process.env.NODE_ENV !== "production") {
+    const debugIds = [
+      "debug-all",
+      "debug-review",
+      "debug-perfect",
+      "debug-mode-choice",
+      "debug-gatehouse",
+    ];
+    if (
+      debugIds.includes(body.assignmentId) ||
+      body.assignmentId?.startsWith("debug-single-")
+    ) {
+      return NextResponse.json({
+        ok: true,
+        score: body.score,
+        branch_type: "olympiad",
+        counters: {
+          olympiadCompletedAssignmentsCount: 0,
+          gatehouseCompletedAssignmentsCount: 0,
+        },
+      });
+    }
+  }
+
+  if (!body.isCompleted) {
+    return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Получение задания + данные проекта
+  // ─────────────────────────────────────────────────────────────
+  const { data: rawAssignment, error: assignmentErr } = await supabase
+    .from("assignments")
+    .select(`
+      id,
+      branch_type,
+      material_id,
+      textbook_id,
+      crossword_id,
+      content,
+      assignment_type,
+      material:materials(
+        id,
+        branch_type,
+        project_tab_id,
+        material_kind,
+        target_levels,
+        is_active,
+        is_available,
+        project_tabs ( projects ( id, slug, features ) )
+      )
+    `)
+    .eq("id", body.assignmentId)
+    .single();
+
+  if (assignmentErr || !rawAssignment) {
+    console.error("🔴 [API ASSIGNMENT-PROGRESS] Ошибка получения задания:", assignmentErr?.message);
+    return NextResponse.json(
+      { ok: false, error: assignmentErr?.message || "Assignment not found" },
+      { status: 404 },
+    );
+  }
+
+  const assignment = rawAssignment as AssignmentData;
+  const projectConfig = getProjectConfig(assignment);
+
+  // ─────────────────────────────────────────────────────────────
+  // Проверка доступа
+  // ─────────────────────────────────────────────────────────────
+  try {
+    if (projectConfig.slug === "gatehouse") {
+      await assertGatehouseAssignmentAccess(supabase, user.id, assignment);
+    } else {
+      await assertOlympiadAssignmentAccess(supabase, user.id, assignment);
+    }
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: err.message || "Access denied" },
+      { status: err.status || 403 },
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Оценка
+  // ─────────────────────────────────────────────────────────────
+  const assignmentType = assignment.assignment_type || "test";
+  const isInformational = assignmentType === "intro" || assignment.content?.mode === "informational";
+
+  let realScore: number | null = null;
+
+  if (!isInformational) {
+    const questions = assignment.content?.questions;
+    if (!Array.isArray(questions)) {
+      return NextResponse.json(
+        { ok: false, error: "Некорректное содержимое" },
+        { status: 500 },
+      );
+    }
+    const { stats } = calcAndBuildReview(questions, body.answers);
+    realScore = normalizeScore(stats.score);
+  }
+
+  const payload = {
+    user_id: user.id,
+    assignment_id: body.assignmentId,
+    answers: body.answers ?? {},
+    is_completed: true,
+    completed_at: new Date().toISOString(),
+    score: realScore,
+  };
+
+  const { error: upsertError } = await supabase
+    .from("user_progress")
+    .upsert(payload, { onConflict: "user_id,assignment_id" });
+
+  if (upsertError) {
+    console.error("🔴 [ERROR] user_progress upsert failed:", upsertError.message);
+    return NextResponse.json({ ok: false, error: upsertError.message }, { status: 500 });
+  }
+
+  const counters = await recalcCompletedCounters(supabase, user.id);
+
+  // ─────────────────────────────────────────────────────────────
+  // Динамические модули
+  // ─────────────────────────────────────────────────────────────
+  let recommendation: any = null;
+  let streak: any = null;
+
+  if (projectConfig.hasRecommendations) {
+    const materialId = getMaterialId(assignment);
+
+    if (!isInformational && realScore !== null) {
+      recommendation = recommendLevel({
+        score: realScore,
+        maxScore: 100,
+        percent: realScore,
+        materialLevels: getMaterialLevels(assignment),
+      });
+    }
+
+    const { error: examErr } = await supabase
+      .from("exam_results")
+      .upsert(
+        {
+          user_id: user.id,
+          assignment_id: body.assignmentId,
+          material_id: materialId,
+          score: realScore,
+          recommended_level: recommendation?.recommendedLevel || null,
+          breakdown: {
+            recommendation,
+            source: body.source ?? null,
+            sourceId: body.sourceId ?? null,
+          },
+          answers: body.answers ?? {},
+          completed_at: payload.completed_at,
+        },
+        { onConflict: "user_id,assignment_id" },
+      );
+
+    if (examErr) console.error("🔴 [ERROR] exam_results upsert failed:", examErr.message);
+  }
+
+  if (projectConfig.hasStreaks) {
+    const { data: streakData, error: streakErr } = await supabase.rpc(
+      "record_streak_completion",
+      { _assignment_id: body.assignmentId },
+    );
+    if (!streakErr) streak = streakData ?? null;
+    else console.error("🔴 [ERROR] record_streak_completion RPC failed:", streakErr.message);
+  }
+
+  return NextResponse.json(
+    {
+      ok: true,
+      branch_type: projectConfig.slug,
+      score: realScore,
+      recommendation,
+      streak,
+      counters,
+    },
+    { status: 200 },
+  );
+}
+</file>
+
 <file path="app/api/auth/logout/route.ts">
 // app/api/auth/logout/route.ts
 import { NextResponse } from "next/server";
@@ -29167,6 +29348,166 @@ export async function updateOwnProfile(
 }
 </file>
 
+<file path="lib/projects/theme.ts">
+// lib/projects/theme.ts
+// Применение темы проекта (theme jsonb → CSS-переменные / className).
+// Серверная (buildCssVars) и клиентская (applyTheme) версии.
+
+import type { ProjectThemeConfig, ProjectThemeColors, ProjectSlug } from "./types";
+import { getProjectBySlug } from "./loader";
+
+// ---------------------------------------------------------------------------
+// КАРТА colors → CSS custom property
+// ---------------------------------------------------------------------------
+
+/** CSS-переменные, которые проставляются из colors проекта. */
+const COLOR_VARS: Array<{ key: keyof ProjectThemeColors; varName: string }> = [
+  { key: "pageBg", varName: "--p-page-bg" },
+  { key: "cardBg", varName: "--p-card-bg" },
+  { key: "cardBgSoft", varName: "--p-card-bg-soft" },
+  { key: "primary", varName: "--p-primary" },
+  { key: "primarySoft", varName: "--p-primary-soft" },
+  { key: "secondary", varName: "--p-secondary" },
+  { key: "accent", varName: "--p-accent" },
+  { key: "accentSoft", varName: "--p-accent-soft" },
+  { key: "text", varName: "--p-text" },
+  { key: "muted", varName: "--p-muted" },
+  { key: "border", varName: "--p-border" },
+  { key: "glow", varName: "--p-glow" },
+];
+
+/**
+ * Алиасы для совместимости со старыми переменными (--accent2, --project-* и т.п.).
+ * Много компонентов и *.css файлов в проекте исторически написаны на этих старых
+ * именах (--project-primary, --project-text, --project-card-bg, --project-bg,
+ * --project-secondary) — раньше applyTheme() их не обновлял, и они навсегда
+ * оставались дефолтными (тёмными) значениями из :root в globals.css, из-за чего
+ * модалки/формы не подхватывали тему проекта. Теперь прокидываем их тоже.
+ */
+const LEGACY_ALIASES: Array<{ from: keyof ProjectThemeColors; varName: string }> = [
+  { from: "primary", varName: "--accent2" },
+  { from: "primarySoft", varName: "--accent2-soft" },
+  { from: "primary", varName: "--project-primary" },
+  { from: "secondary", varName: "--project-secondary" },
+  { from: "pageBg", varName: "--project-bg" },
+  { from: "cardBg", varName: "--project-card-bg" },
+  { from: "text", varName: "--project-text" },
+];
+
+// ---------------------------------------------------------------------------
+// СЕРВЕР: генерация строки CSS
+// ---------------------------------------------------------------------------
+
+export type ProjectCssVars = {
+  /** Inline-стиль для style={{ ...cssVars.style }} */
+  style: Record<string, string>;
+  /** className корневого элемента (rootClassName из темы). */
+  className: string;
+  /** Готовая строка для <style> (если нужно глобально). */
+  cssText: string;
+};
+
+/**
+ * Строит CSS-переменные из темы проекта.
+ * Серверная функция — использует theme из уже загруженного конфига.
+ */
+export function buildCssVars(theme: ProjectThemeConfig): ProjectCssVars {
+  const style: Record<string, string> = {};
+
+  for (const { key, varName } of COLOR_VARS) {
+    const value = theme.colors[key];
+    if (value) style[varName] = value;
+  }
+
+  // Алиасы для legacy CSS (старые компоненты ссылаются на --accent2, --project-* и т.п.)
+  for (const { from, varName } of LEGACY_ALIASES) {
+    const value = theme.colors[from];
+    if (value && !style[varName]) style[varName] = value;
+  }
+
+  if (theme.fontFamily && theme.fontFamily !== "inherit") {
+    style["--p-font-family"] = theme.fontFamily;
+  }
+
+  const cssText = Object.entries(style)
+    .map(([k, v]) => `${k}: ${v};`)
+    .join(" ");
+
+  return {
+    style,
+    className: theme.rootClassName,
+    cssText,
+  };
+}
+
+/** Серверный хелпер: тема + CSS-переменные по slug проекта. */
+export async function getProjectThemeCssVars(slug: ProjectSlug): Promise<ProjectCssVars | null> {
+  const project = await getProjectBySlug(slug);
+  if (!project) return null;
+  return buildCssVars(project.theme);
+}
+
+// ---------------------------------------------------------------------------
+// КЛИЕНТ: применение темы к DOM
+// ---------------------------------------------------------------------------
+
+/**
+ * Применяет тему к HTML-элементу (документу или контейнеру).
+ * Клиентская функция — вызывает после загрузки конфига с сервера.
+ */
+export function applyTheme(
+  theme: ProjectThemeConfig,
+  options: { target?: HTMLElement; scope?: "global" | "local" } = {},
+): void {
+  const target = options.target ?? document.documentElement;
+  const { style, className } = buildCssVars(theme);
+
+  for (const [k, v] of Object.entries(style)) {
+    target.style.setProperty(k, v);
+  }
+
+  if (options.scope === "global" && className) {
+    if (!document.documentElement.classList.contains(className)) {
+      document.documentElement.classList.add(className);
+    }
+  }
+}
+
+/** Снимает тему с элемента (полезно при размонтировании/смене ветки). */
+export function removeTheme(
+  theme: ProjectThemeConfig,
+  options: { target?: HTMLElement; scope?: "global" | "local" } = {},
+): void {
+  const target = options.target ?? document.documentElement;
+  const { style, className } = buildCssVars(theme);
+
+  for (const k of Object.keys(style)) {
+    target.style.removeProperty(k);
+  }
+
+  if (options.scope === "global" && className) {
+    document.documentElement.classList.remove(className);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// УТИЛИТЫ ДЛЯ РЕНДЕРА
+// ---------------------------------------------------------------------------
+
+/**
+ * Превращает colors темы в объект для инлайн-стиля React.
+ * Например: style={{ background: themeColor('pageBg', theme) }}
+ */
+export function themeColor(key: keyof ProjectThemeColors, theme: ProjectThemeConfig): string {
+  return theme.colors[key] ?? "";
+}
+
+/** Все CSS-переменные как объект для React style={{}}. */
+export function themeStyle(theme: ProjectThemeConfig): Record<string, string> {
+  return buildCssVars(theme).style;
+}
+</file>
+
 <file path="lib/security/domains.ts">
 /**
  * lib/security/domains.ts
@@ -31797,106 +32138,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
 }
 </file>
 
-<file path="app/(app)/projects/[slug]/layout.tsx">
-import { notFound } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-export const revalidate = 0;
-
-// Умный хелпер для определения яркости цвета (светлая или темная тема)
-function isDark(hexColor: string): boolean {
-  const hex = hexColor.replace("#", "");
-  if (hex.length !== 3 && hex.length !== 6) return false;
-  
-  const r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.slice(0, 2), 16);
-  const g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.slice(2, 4), 16);
-  const b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.slice(4, 6), 16);
-  
-  // Формула воспринимаемой яркости (Luminance)
-  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-  return luminance < 128; // Если меньше 128 — значит цвет тёмный
-}
-
-export default async function ProjectLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: Promise<{ slug: string }>;
-}) {
-  const supabase = await createSupabaseServerClient();
-  const { slug } = await params;
-
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, is_active, theme, theme_color")
-    .eq("slug", slug)
-    .single();
-
-  if (!project || project.is_active === false) {
-    notFound();
-  }
-
-  const theme = project.theme || {};
-
-  // Базовые цвета
-  const primaryColor = theme?.colors?.primary || theme?.primaryColor || project.theme_color || "#0ea5e9";
-  const secondaryColor = theme?.colors?.secondary || theme?.secondaryColor || "#38bdf8";
-  const bgColor = theme?.colors?.pageBg || theme?.backgroundColor || "#f8fafc";
-  const textColor = theme?.colors?.textColor || theme?.textColor || "#0f172a";
-  const cardBgColor = theme?.colors?.cardBg || theme?.cardBg || "#ffffff";
-
-  // Анализируем тему: Темная или Светлая
-  const isDarkTheme = isDark(bgColor);
-
-  // 🚀 ГЕНЕРАЦИЯ "УМНОГО СТЕКЛА" В ЗАВИСИМОСТИ ОТ ТЕМЫ
-  const glassBg = isDarkTheme
-    ? `color-mix(in srgb, ${cardBgColor} 65%, rgba(0,0,0,0.3))` // Чуть затемняем темное стекло
-    : `color-mix(in srgb, ${cardBgColor} 75%, transparent)`;
-
-  const glassBorder = isDarkTheme
-    ? `color-mix(in srgb, #ffffff 12%, transparent)` // В темной теме рамки всегда белые полупрозрачные
-    : `color-mix(in srgb, ${textColor} 8%, transparent)`;
-
-  const glassHighlight = isDarkTheme
-    ? `color-mix(in srgb, #ffffff 6%, transparent)` // Слабый блик в темной теме
-    : `color-mix(in srgb, #ffffff 70%, transparent)`; // Яркий белый блик в светлой
-
-  const glassShadow = isDarkTheme
-    ? `0 16px 40px -8px rgba(0,0,0,0.6)` // Глубокая черная тень
-    : `0 12px 40px -12px color-mix(in srgb, ${textColor} 12%, transparent)`; // Мягкая цветная тень
-
-  const themeStyles = {
-    "--project-primary": primaryColor,
-    "--project-secondary": secondaryColor,
-    "--project-bg": bgColor,
-    "--project-text": textColor,
-    "--project-card-bg": cardBgColor,
-    "--accent2": primaryColor,
-    "--accent3": secondaryColor,
-    
-    // Глобальные переменные стекла
-    "--glass-bg": glassBg,
-    "--glass-border": glassBorder,
-    "--glass-highlight": glassHighlight,
-    "--glass-shadow": glassShadow,
-    "--glass-blur": "24px",
-
-    backgroundColor: "var(--project-bg)",
-    color: "var(--project-text)",
-  } as React.CSSProperties;
-
-  return (
-    <div 
-      style={themeStyles} 
-      className="min-h-screen w-full transition-colors duration-500 project-layout-wrapper"
-    >
-      {children}
-    </div>
-  );
-}
-</file>
-
 <file path="app/api/admin/users/access/route.ts">
 // app/api/admin/users/access/route.ts
 import { ok, fail } from "@/lib/api/response";
@@ -32069,335 +32310,6 @@ export async function POST(req: NextRequest) {
     console.error("🔴 [ADMIN USER ACCESS] Ошибка сохранения:", e);
     return fail(e?.message || "Server error", 500, "SERVER_ERROR");
   }
-}
-</file>
-
-<file path="app/api/assignment-progress/route.ts">
-// app/api/assignment-progress/route.ts
-import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { calcAndBuildReview } from "@/lib/assignments/scoring";
-import type { AssignmentData } from "@/lib/assignments/types";
-import { requireUser } from "@/lib/api/auth";
-
-import {
-  assertOlympiadAssignmentAccess,
-  assertGatehouseAssignmentAccess,
-} from "@/lib/assignments/access";
-
-import { recommendGatehouseLevel as recommendLevel } from "@/lib/exams/recommendLevel";
-
-type Body = {
-  assignmentId: string;
-  answers: Record<string, any>;
-  isCompleted: boolean;
-  score: number | null;
-  source?: string;
-  sourceId?: string;
-  branchType?: string;
-};
-
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-
-function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
-}
-
-function normalizeScore(value: unknown): number {
-  const score = Number(value);
-  return Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0;
-}
-
-function normalizeStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item ?? "").trim()).filter(Boolean);
-}
-
-function getMaterial(assignment: any) {
-  if (!assignment) return null;
-  if (assignment.material && !Array.isArray(assignment.material)) return assignment.material;
-  if (assignment.materials && !Array.isArray(assignment.materials)) return assignment.materials;
-  if (Array.isArray(assignment.materials)) return assignment.materials[0] || null;
-  if (Array.isArray(assignment.material)) return assignment.material[0] || null;
-  return null;
-}
-
-function getMaterialLevels(assignment: AssignmentData | null): string[] {
-  const material = getMaterial(assignment);
-  return normalizeStringArray(material?.target_levels);
-}
-
-function getMaterialId(assignment: AssignmentData | null): string | null {
-  const material = getMaterial(assignment);
-  return assignment?.material_id || material?.id || null;
-}
-
-function getProjectConfig(assignment: AssignmentData | null) {
-  const material = getMaterial(assignment);
-  const project = material?.project_tabs?.projects;
-  const isLegacyGatehouse = assignment?.branch_type === "gatehouse" || material?.branch_type === "gatehouse";
-
-  return {
-    slug: project?.slug ?? (isLegacyGatehouse ? "gatehouse" : "olympiad"),
-    hasStreaks: project?.features?.hasStreaks ?? !isLegacyGatehouse,
-    hasRecommendations: project?.features?.hasRecommendations ?? isLegacyGatehouse,
-  };
-}
-
-async function recalcCompletedCounters(supabase: any, userId: string) {
-  const { data } = await supabase
-    .from("user_progress")
-    .select(`
-      id,
-      assignments (
-        branch_type,
-        material_id,
-        textbook_id,
-        crossword_id
-      )
-    `)
-    .eq("user_id", userId)
-    .eq("is_completed", true);
-
-  let olympiadCount = 0;
-  let gatehouseCount = 0;
-
-  for (const row of data || []) {
-    const assignment = row.assignments;
-    if (!assignment) continue;
-
-    if (assignment.branch_type === "gatehouse") {
-      gatehouseCount++;
-    } else {
-      olympiadCount++;
-    }
-  }
-
-  await supabase
-    .from("profiles")
-    .update({
-      completed_assignments_count: olympiadCount,
-      ga_completed_assignments_count: gatehouseCount,
-    })
-    .eq("id", userId);
-
-  return {
-    olympiadCompletedAssignmentsCount: olympiadCount,
-    gatehouseCompletedAssignmentsCount: gatehouseCount,
-  };
-}
-
-// ─────────────────────────────────────────────────────────────
-// POST handler
-// ─────────────────────────────────────────────────────────────
-
-export async function POST(req: Request) {
-  // ✅ Используем requireUser() для единообразной проверки авторизации
-  const auth = await requireUser();
-  if ("response" in auth) return auth.response;
-
-  const { supabase, user } = auth;
-
-  let body: Body;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "Bad JSON" }, { status: 400 });
-  }
-
-  if (!body?.assignmentId) {
-    return NextResponse.json({ ok: false, error: "assignmentId required" }, { status: 400 });
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // Дебаг-задания — ТОЛЬКО В РЕЖИМЕ РАЗРАБОТКИ
-  // ─────────────────────────────────────────────────────────────
-  if (process.env.NODE_ENV !== "production") {
-    const debugIds = [
-      "debug-all",
-      "debug-review",
-      "debug-perfect",
-      "debug-mode-choice",
-      "debug-gatehouse",
-    ];
-    if (
-      debugIds.includes(body.assignmentId) ||
-      body.assignmentId?.startsWith("debug-single-")
-    ) {
-      return NextResponse.json({
-        ok: true,
-        score: body.score,
-        branch_type: "olympiad",
-        counters: {
-          olympiadCompletedAssignmentsCount: 0,
-          gatehouseCompletedAssignmentsCount: 0,
-        },
-      });
-    }
-  }
-
-  if (!body.isCompleted) {
-    return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // Получение задания + данные проекта
-  // ─────────────────────────────────────────────────────────────
-  const { data: rawAssignment, error: assignmentErr } = await supabase
-    .from("assignments")
-    .select(`
-      id,
-      branch_type,
-      material_id,
-      textbook_id,
-      crossword_id,
-      content,
-      assignment_type,
-      material:materials(
-        id,
-        branch_type,
-        project_tab_id,
-        material_kind,
-        target_levels,
-        is_active,
-        is_available,
-        project_tabs ( projects ( id, slug, features ) )
-      )
-    `)
-    .eq("id", body.assignmentId)
-    .single();
-
-  if (assignmentErr || !rawAssignment) {
-    console.error("🔴 [API ASSIGNMENT-PROGRESS] Ошибка получения задания:", assignmentErr?.message);
-    return NextResponse.json(
-      { ok: false, error: assignmentErr?.message || "Assignment not found" },
-      { status: 404 },
-    );
-  }
-
-  const assignment = rawAssignment as AssignmentData;
-  const projectConfig = getProjectConfig(assignment);
-
-  // ─────────────────────────────────────────────────────────────
-  // Проверка доступа
-  // ─────────────────────────────────────────────────────────────
-  try {
-    if (projectConfig.slug === "gatehouse") {
-      await assertGatehouseAssignmentAccess(supabase, user.id, assignment);
-    } else {
-      await assertOlympiadAssignmentAccess(supabase, user.id, assignment);
-    }
-  } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err.message || "Access denied" },
-      { status: err.status || 403 },
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // Оценка
-  // ─────────────────────────────────────────────────────────────
-  const assignmentType = assignment.assignment_type || "test";
-  const isInformational = assignmentType === "intro" || assignment.content?.mode === "informational";
-
-  let realScore: number | null = null;
-
-  if (!isInformational) {
-    const questions = assignment.content?.questions;
-    if (!Array.isArray(questions)) {
-      return NextResponse.json(
-        { ok: false, error: "Некорректное содержимое" },
-        { status: 500 },
-      );
-    }
-    const { stats } = calcAndBuildReview(questions, body.answers);
-    realScore = normalizeScore(stats.score);
-  }
-
-  const payload = {
-    user_id: user.id,
-    assignment_id: body.assignmentId,
-    answers: body.answers ?? {},
-    is_completed: true,
-    completed_at: new Date().toISOString(),
-    score: realScore,
-  };
-
-  const { error: upsertError } = await supabase
-    .from("user_progress")
-    .upsert(payload, { onConflict: "user_id,assignment_id" });
-
-  if (upsertError) {
-    console.error("🔴 [ERROR] user_progress upsert failed:", upsertError.message);
-    return NextResponse.json({ ok: false, error: upsertError.message }, { status: 500 });
-  }
-
-  const counters = await recalcCompletedCounters(supabase, user.id);
-
-  // ─────────────────────────────────────────────────────────────
-  // Динамические модули
-  // ─────────────────────────────────────────────────────────────
-  let recommendation: any = null;
-  let streak: any = null;
-
-  if (projectConfig.hasRecommendations) {
-    const materialId = getMaterialId(assignment);
-
-    if (!isInformational && realScore !== null) {
-      recommendation = recommendLevel({
-        score: realScore,
-        maxScore: 100,
-        percent: realScore,
-        materialLevels: getMaterialLevels(assignment),
-      });
-    }
-
-    const { error: examErr } = await supabase
-      .from("exam_results")
-      .upsert(
-        {
-          user_id: user.id,
-          assignment_id: body.assignmentId,
-          material_id: materialId,
-          score: realScore,
-          recommended_level: recommendation?.recommendedLevel || null,
-          breakdown: {
-            recommendation,
-            source: body.source ?? null,
-            sourceId: body.sourceId ?? null,
-          },
-          answers: body.answers ?? {},
-          completed_at: payload.completed_at,
-        },
-        { onConflict: "user_id,assignment_id" },
-      );
-
-    if (examErr) console.error("🔴 [ERROR] exam_results upsert failed:", examErr.message);
-  }
-
-  if (projectConfig.hasStreaks) {
-    const { data: streakData, error: streakErr } = await supabase.rpc(
-      "record_streak_completion",
-      { _assignment_id: body.assignmentId },
-    );
-    if (!streakErr) streak = streakData ?? null;
-    else console.error("🔴 [ERROR] record_streak_completion RPC failed:", streakErr.message);
-  }
-
-  return NextResponse.json(
-    {
-      ok: true,
-      branch_type: projectConfig.slug,
-      score: realScore,
-      recommendation,
-      streak,
-      counters,
-    },
-    { status: 200 },
-  );
 }
 </file>
 
@@ -33933,74 +33845,6 @@ export default function LoginPage() {
 }
 </file>
 
-<file path="app/globals.css">
-/* app/globals.css */
-@import "tailwindcss";
-
-:root {
-  /* 1. Дефолтные базовые цвета */
-  --project-primary: #0ea5e9; 
-  --project-secondary: #38bdf8;
-  --project-bg: #0b0f19;
-  --project-text: #ffffff;
-  --project-card-bg: #1e293b;
-  --danger-color: #ef4444;
-  
-  /* 2. ДВИЖОК ПРЕМИУМ-СТЕКЛА */
-  --glass-bg: color-mix(in srgb, var(--p-card-bg, var(--project-card-bg)) 75%, transparent);
-  --glass-border: color-mix(in srgb, var(--p-text, var(--project-text)) 10%, transparent);
-  --glass-highlight: color-mix(in srgb, #ffffff 15%, transparent);
-  --glass-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.35);
-  --glass-blur: blur(24px);
-}
-
-/* ГЛОБАЛЬНЫЙ ФОН И ТЕКСТ (Защита от белых полос) */
-html {
-  height: 100%;
-  background-color: var(--p-page-bg, var(--project-bg, #0b0f19));
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  min-height: 100%;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--p-page-bg, var(--project-bg, #0b0f19));
-  color: var(--p-text, var(--project-text, #ffffff));
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-  transition: background-color 0.3s ease, color 0.3s ease;
-  overflow-x: hidden;
-}
-
-/* УТИЛИТЫ СКРОЛЛБАРА */
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.custom-scrollbar::-webkit-scrollbar { 
-  width: 6px; 
-}
-.custom-scrollbar::-webkit-scrollbar-track { 
-  background: transparent; 
-}
-.custom-scrollbar::-webkit-scrollbar-thumb { 
-  background: color-mix(in srgb, var(--p-text, var(--project-text)) 20%, transparent); 
-  border-radius: 10px; 
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { 
-  background: color-mix(in srgb, var(--p-text, var(--project-text)) 40%, transparent); 
-}
-</file>
-
 <file path="components/mascot/MascotViewer.tsx">
 "use client";
 
@@ -35441,6 +35285,158 @@ export default async function ProjectProfilePage({
       initialProfile={initialProfile}
       backgroundUrl={backgroundUrl}
     />
+  );
+}
+</file>
+
+<file path="app/(app)/projects/[slug]/layout.tsx">
+import { notFound } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+export const revalidate = 0;
+
+// Умный хелпер для определения яркости цвета (светлая или темная тема)
+function isDark(hexColor: string): boolean {
+  const hex = hexColor.replace("#", "");
+  if (hex.length !== 3 && hex.length !== 6) return false;
+
+  const r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.slice(0, 2), 16);
+  const g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.slice(2, 4), 16);
+  const b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.slice(4, 6), 16);
+
+  // Формула воспринимаемой яркости (Luminance)
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminance < 128; // Если меньше 128 — значит цвет тёмный
+}
+
+/**
+ * Значения темы приходят из БД (project.theme) и попадают в <style> через
+ * dangerouslySetInnerHTML. Без проверки это открытая дыра для CSS/HTML-инъекции
+ * (кто-то мог бы записать в theme.colors.primary что-то вроде
+ * `red;}</style><script>...`). Разрешаем только безопасные для CSS-значения цвета
+ * символы: hex, rgb()/rgba()/hsl()/color-mix(), проценты, запятые, пробелы, точки.
+ */
+function sanitizeCssColor(value: string, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > 200) return fallback;
+  if (!/^[#a-zA-Z0-9(),.%\s-]+$/.test(trimmed)) return fallback;
+  return trimmed;
+}
+
+export default async function ProjectLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ slug: string }>;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const { slug } = await params;
+
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, is_active, theme, theme_color")
+    .eq("slug", slug)
+    .single();
+
+  if (!project || project.is_active === false) {
+    notFound();
+  }
+
+  const theme = project.theme || {};
+
+  // Базовые цвета (сначала берём "сырые" значения, потом санитизируем)
+  const primaryColor = sanitizeCssColor(
+    theme?.colors?.primary || theme?.primaryColor || project.theme_color || "#0ea5e9",
+    "#0ea5e9",
+  );
+  const secondaryColor = sanitizeCssColor(
+    theme?.colors?.secondary || theme?.secondaryColor || "#38bdf8",
+    "#38bdf8",
+  );
+  const bgColor = sanitizeCssColor(
+    theme?.colors?.pageBg || theme?.backgroundColor || "#f8fafc",
+    "#f8fafc",
+  );
+  const textColor = sanitizeCssColor(
+    theme?.colors?.textColor || theme?.textColor || "#0f172a",
+    "#0f172a",
+  );
+  const cardBgColor = sanitizeCssColor(
+    theme?.colors?.cardBg || theme?.cardBg || "#ffffff",
+    "#ffffff",
+  );
+
+  // Анализируем тему: Темная или Светлая
+  const isDarkTheme = isDark(bgColor);
+
+  // 🚀 ГЕНЕРАЦИЯ "УМНОГО СТЕКЛА" В ЗАВИСИМОСТИ ОТ ТЕМЫ
+  const glassBg = isDarkTheme
+    ? `color-mix(in srgb, ${cardBgColor} 65%, rgba(0,0,0,0.3))` // Чуть затемняем темное стекло
+    : `color-mix(in srgb, ${cardBgColor} 75%, transparent)`;
+
+  const glassBorder = isDarkTheme
+    ? `color-mix(in srgb, #ffffff 12%, transparent)` // В темной теме рамки всегда белые полупрозрачные
+    : `color-mix(in srgb, ${textColor} 8%, transparent)`;
+
+  const glassHighlight = isDarkTheme
+    ? `color-mix(in srgb, #ffffff 6%, transparent)` // Слабый блик в темной теме
+    : `color-mix(in srgb, #ffffff 70%, transparent)`; // Яркий белый блик в светлой
+
+  const glassShadow = isDarkTheme
+    ? `0 16px 40px -8px rgba(0,0,0,0.6)` // Глубокая черная тень
+    : `0 12px 40px -12px color-mix(in srgb, ${textColor} 12%, transparent)`; // Мягкая цветная тень
+
+  const themeVars = {
+    "--project-primary": primaryColor,
+    "--project-secondary": secondaryColor,
+    "--project-bg": bgColor,
+    "--project-text": textColor,
+    "--project-card-bg": cardBgColor,
+    "--accent2": primaryColor,
+    "--accent3": secondaryColor,
+
+    // Глобальные переменные стекла
+    "--glass-bg": glassBg,
+    "--glass-border": glassBorder,
+    "--glass-highlight": glassHighlight,
+    "--glass-shadow": glassShadow,
+    "--glass-blur": "24px",
+  };
+
+  const themeStyles = {
+    ...themeVars,
+    backgroundColor: "var(--project-bg)",
+    color: "var(--project-text)",
+  } as React.CSSProperties;
+
+  // ⚠️ КРИТИЧНО: те же переменные дублируем в :root через <style>.
+  // Модалки (components/Modal.tsx) рендерятся через createPortal(..., document.body),
+  // то есть их DOM-узел физически лежит ВНЕ этого <div style={themeStyles}>.
+  // CSS-переменные наследуются по реальному DOM-дереву, а не по дереву React,
+  // поэтому без этого блока портализированный контент (модалки, тултипы и т.п.)
+  // всегда падал на дефолты из globals.css, игнорируя тему проекта.
+  // :root — общий предок и для <body>, и для всего, что в него портализировано,
+  // так что через :root тема долетает куда угодно.
+  const rootCssText = Object.entries(themeVars)
+    .map(([k, v]) => `${k}: ${v};`)
+    .join(" ");
+
+  return (
+    <>
+      <style
+        id="project-theme-vars"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: `:root { ${rootCssText} }` }}
+      />
+      <div
+        style={themeStyles}
+        className="min-h-screen w-full transition-colors duration-500 project-layout-wrapper"
+      >
+        {children}
+      </div>
+    </>
   );
 }
 </file>
@@ -38491,6 +38487,153 @@ export async function GET() {
 }
 </file>
 
+<file path="app/globals.css">
+/* app/globals.css */
+@import "tailwindcss";
+
+:root {
+  /* 1. Дефолтные базовые цвета (используются, пока не применена тема проекта) */
+  --project-primary: #0ea5e9; 
+  --project-secondary: #38bdf8;
+  --project-bg: #0b0f19;
+  --project-text: #ffffff;
+  --project-card-bg: #1e293b;
+  --danger-color: #ef4444;
+  
+  /* 2. ДВИЖОК ПРЕМИУМ-СТЕКЛА */
+  --glass-bg: color-mix(in srgb, var(--p-card-bg, var(--project-card-bg)) 75%, transparent);
+  --glass-border: color-mix(in srgb, var(--p-text, var(--project-text)) 10%, transparent);
+  --glass-highlight: color-mix(in srgb, #ffffff 15%, transparent);
+  --glass-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.35);
+  --glass-blur: blur(24px);
+}
+
+/* ГЛОБАЛЬНЫЙ ФОН И ТЕКСТ (Защита от белых полос) */
+html {
+  height: 100%;
+  background-color: var(--p-page-bg, var(--project-bg, #0b0f19));
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--p-page-bg, var(--project-bg, #0b0f19));
+  color: var(--p-text, var(--project-text, #ffffff));
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+}
+
+/* УТИЛИТЫ СКРОЛЛБАРА */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar { 
+  width: 6px; 
+}
+.custom-scrollbar::-webkit-scrollbar-track { 
+  background: transparent; 
+}
+.custom-scrollbar::-webkit-scrollbar-thumb { 
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 20%, transparent); 
+  border-radius: 10px; 
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { 
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 40%, transparent); 
+}
+
+/* =========================================================================
+   ✅ УНИВЕРСАЛЬНЫЕ МОДАЛЬНЫЕ ОКНА (components/Modal.tsx)
+   Работают на ЛЮБОЙ странице (портал/заявки/материалы/профиль) и берут
+   цвета из темы проекта. В админке (app/(admin)/admin/admin.css) эти же
+   классы переопределяются внутри .admin-root с !important — там своя,
+   изолированная светлая тема, и это НЕ конфликтует с этими правилами.
+   ========================================================================= */
+
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.modal-panel {
+  background: var(--p-card-bg, var(--project-card-bg));
+  color: var(--p-text, var(--project-text));
+  /* Рамка заметнее дефолтного --glass-border (10%), чтобы панель отделялась
+     от заблюренного фона позади, а не сливалась с ним. */
+  border: 1px solid color-mix(in srgb, var(--p-text, var(--project-text)) 14%, transparent);
+  border-radius: 24px;
+  box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.45), var(--glass-shadow);
+}
+
+.modal-header {
+  border-bottom: 1px solid color-mix(in srgb, var(--p-text, var(--project-text)) 14%, transparent);
+}
+
+.modal-title {
+  color: var(--p-text, var(--project-text));
+}
+
+.modal-close {
+  color: color-mix(in srgb, var(--p-text, var(--project-text)) 70%, transparent);
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 10%, transparent);
+}
+
+.modal-close:hover {
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 20%, transparent);
+  color: var(--p-text, var(--project-text));
+}
+
+.modal-body {
+  color: var(--p-text, var(--project-text));
+}
+
+/* Инпуты внутри модалок (если не завёрнуты в .form-group со своими стилями).
+   Раньше фон был почти таким же светлым, как у самой панели (4% примеси текста,
+   рамка 10%) — на светлой теме это визуально сливалось в один плоский серый
+   блок. Подняли контраст, чтобы поле явно читалось как отдельный элемент. */
+.modal-body input,
+.modal-body select,
+.modal-body textarea {
+  background: color-mix(in srgb, var(--p-text, var(--project-text)) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--p-text, var(--project-text)) 20%, transparent);
+  border-radius: 12px;
+  color: var(--p-text, var(--project-text));
+  padding: 12px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.modal-body input:focus,
+.modal-body select:focus,
+.modal-body textarea:focus {
+  outline: none;
+  border-color: var(--p-primary, var(--project-primary));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--p-primary, var(--project-primary)) 15%, transparent);
+}
+
+.modal-body input:disabled,
+.modal-body input:read-only {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+</file>
+
 <file path="components/rewards/StreakLeaderboardModal.tsx">
 "use client";
 
@@ -39783,792 +39926,6 @@ export type UserPromocodeHistoryItem = {
   granted_material_titles?: string[];
   physical_prize?: CustomPhysicalPrize | null;
 };
-</file>
-
-<file path="app/(admin)/admin/admin.css">
-/* app/(admin)/admin/admin.css */
-
-/* Изоляция темы админки от тёмной пользовательской темы */
-.admin-root {
-  min-height: 100vh;
-  background-color: #f1f5f9 !important;
-  color: #0f172a !important;
-  color-scheme: light;
-  padding-bottom: 40px;
-}
-
-.admin-container {
-  width: 95%;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding-top: 20px;
-  color: #0f172a !important;
-}
-
-.admin-root .card {
-  background: #ffffff !important;
-  color: #0f172a !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
-}
-
-.admin-root .small-muted {
-  color: #64748b !important;
-}
-
-/* === УНИФИКАЦИЯ КНОПОК В АДМИНКЕ === */
-.admin-root .btn {
-  background: #0ea5e9;
-  color: #ffffff !important;
-  border: 1px solid #0284c7;
-  font-weight: 700;
-}
-
-.admin-root .btn:hover {
-  background: #0284c7;
-  color: #ffffff !important;
-}
-
-.admin-root .btn.ghost {
-  background: #e2e8f0 !important;
-  color: #334155 !important;
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: none !important;
-}
-
-.admin-root .btn.ghost:hover {
-  background: #cbd5e1 !important;
-  color: #0f172a !important;
-}
-
-.admin-root .btn.secondary {
-  background: #ef4444 !important;
-  color: #ffffff !important;
-  border: 1px solid #dc2626 !important;
-}
-
-.admin-root .btn.secondary:hover {
-  background: #dc2626 !important;
-}
-
-/* === МОДАЛЬНЫЕ ОКНА В АДМИНКЕ (СВЕТЛАЯ ТЕМА) === */
-.admin-root .modal-overlay,
-.modal-overlay {
-  background: rgba(15, 23, 42, 0.5) !important;
-  backdrop-filter: blur(6px) !important;
-  -webkit-backdrop-filter: blur(6px) !important;
-}
-
-.admin-root .modal-panel,
-.admin-root .modal-content,
-.modal-panel,
-.modal-content {
-  background: #ffffff !important;
-  color: #0f172a !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2) !important;
-}
-
-.admin-root .modal-header,
-.modal-header {
-  background: #f8fafc !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-}
-
-.admin-root .modal-title,
-.modal-title {
-  color: #0f172a !important;
-}
-
-.admin-root .modal-close,
-.modal-close {
-  color: #64748b !important;
-  background: #f1f5f9 !important;
-}
-
-.admin-root .modal-close:hover,
-.modal-close:hover {
-  background: #e2e8f0 !important;
-  color: #0f172a !important;
-}
-
-.admin-root .modal-body,
-.modal-body {
-  color: #0f172a !important;
-  background: #ffffff !important;
-}
-
-/* Tabs */
-.admin-tabs {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin: 14px 0 18px;
-}
-
-.admin-tab {
-  border: 0;
-  cursor: pointer;
-  padding: 12px 18px;
-  border-radius: 14px;
-  font-weight: 900;
-  background: #e2e8f0;
-  color: #334155;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.04);
-  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
-}
-
-.admin-tab:hover {
-  transform: translateY(-2px);
-  background: #cbd5e1;
-  color: #0f172a;
-}
-
-.admin-tab.active {
-  background: linear-gradient(135deg, var(--accent2, #0ea5e9), #0284c7);
-  color: #fff !important;
-}
-
-/* Dashboard stats */
-.admin-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.admin-stat {
-  background: white;
-  border-radius: 14px;
-  padding: 14px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  border-left: 4px solid var(--accent2, #0ea5e9);
-  text-align: center;
-}
-
-.admin-stat .num {
-  font-size: 28px;
-  font-weight: 900;
-  color: var(--accent2, #0ea5e9);
-}
-
-.admin-stat .lbl {
-  font-size: 13px;
-  color: #666;
-  font-weight: 700;
-}
-
-/* ===== Materials admin UI ===== */
-
-.admin-section-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.admin-section-head h2,
-.admin-section-head h3 {
-  margin: 0;
-  color: #111827;
-}
-
-.admin-section-head p {
-  margin: 6px 0 0;
-  color: #6b7280;
-  font-weight: 600;
-  line-height: 1.45;
-}
-
-.admin-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-  gap: 16px;
-  margin-top: 16px;
-}
-
-.admin-card {
-  background: #fff;
-  border-radius: 18px;
-  overflow: hidden;
-  border: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 12px 34px rgba(0,0,0,0.08);
-}
-
-.admin-card-cover {
-  height: 170px;
-  position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(78, 205, 196, 0.24), transparent 34%),
-    linear-gradient(135deg, rgba(78, 205, 196, 0.14), rgba(109, 211, 192, 0.18));
-}
-
-.admin-card-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.admin-card-cover-placeholder {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  color: var(--accent2, #0ea5e9);
-  font-size: 54px;
-  font-weight: 900;
-}
-
-.admin-card-badge {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  display: inline-flex;
-  align-items: center;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.92);
-  color: #111827;
-  font-size: 12px;
-  font-weight: 900;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-}
-
-.admin-card-body {
-  padding: 16px;
-}
-
-.admin-card-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  font-weight: 900;
-  color: var(--accent2, #0ea5e9);
-  margin-bottom: 10px;
-}
-
-.admin-card-body h3 {
-  margin: 0 0 8px;
-  color: #111827;
-  font-size: 18px;
-  font-weight: 950;
-  line-height: 1.2;
-}
-
-.admin-card-body p {
-  margin: 0;
-  color: #6b7280;
-  line-height: 1.45;
-  font-weight: 600;
-}
-
-.admin-card-stats {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-}
-
-.admin-card-stats span {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  background: rgba(78, 205, 196, 0.12);
-  color: #0f766e;
-  border: 1px solid rgba(78, 205, 196, 0.22);
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.admin-card-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 16px;
-}
-
-.admin-form-card {
-  background: #fff;
-  border-radius: 18px;
-  padding: 18px;
-  border: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 12px 34px rgba(0,0,0,0.08);
-  margin: 14px 0 18px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.form-field {
-  display: grid;
-  gap: 7px;
-  margin: 12px 0;
-}
-
-.form-field > span,
-.form-check span {
-  font-weight: 900;
-  color: #111827;
-}
-
-.form-field small {
-  color: #6b7280;
-  font-weight: 650;
-}
-
-.admin-root input,
-.admin-root textarea,
-.admin-root select,
-.modal-body input,
-.modal-body textarea,
-.modal-body select {
-  border: 1px solid #cbd5e1 !important;
-  background: #ffffff !important;
-  color: #0f172a !important;
-}
-
-.admin-root input:focus,
-.admin-root textarea:focus,
-.admin-root select:focus,
-.modal-body input:focus,
-.modal-body textarea:focus,
-.modal-body select:focus {
-  border-color: #0ea5e9 !important;
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15) !important;
-}
-
-.form-check {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 12px 0;
-  padding: 12px;
-  border-radius: 14px;
-  background: rgba(78, 205, 196, 0.08);
-  border: 1px solid rgba(78, 205, 196, 0.18);
-  cursor: pointer;
-}
-
-.form-check input {
-  width: 18px;
-  height: 18px;
-}
-
-.chips-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.chip {
-  border: 1px solid rgba(0,0,0,0.10);
-  background: #fff;
-  color: #111827;
-  border-radius: 999px;
-  padding: 9px 13px;
-  cursor: pointer;
-  font-weight: 900;
-  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
-}
-
-.chip:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-}
-
-.chip.active {
-  border-color: rgba(78, 205, 196, 0.4);
-  background: linear-gradient(135deg, var(--accent2, #0ea5e9), #6dd3c0);
-  color: #fff;
-}
-
-.cover-editor {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 14px;
-  align-items: start;
-}
-
-.cover-preview {
-  min-height: 180px;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: rgba(78, 205, 196, 0.08);
-}
-
-.cover-preview img {
-  width: 100%;
-  height: 100%;
-  min-height: 180px;
-  object-fit: cover;
-  display: block;
-}
-
-.cover-placeholder {
-  min-height: 180px;
-  display: grid;
-  place-items: center;
-  text-align: center;
-  padding: 18px;
-  color: var(--accent2, #0ea5e9);
-}
-
-.cover-placeholder span {
-  font-size: 46px;
-}
-
-.cover-placeholder p {
-  margin: 8px 0 0;
-  color: #6b7280;
-  font-weight: 800;
-}
-
-.cover-actions {
-  display: grid;
-  gap: 10px;
-}
-
-.admin-form-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 16px;
-}
-
-.success-box {
-  background: rgba(34,197,94,0.12);
-  color: #166534;
-  border: 1px solid rgba(34,197,94,0.22);
-  border-radius: 14px;
-  padding: 12px 14px;
-  font-weight: 800;
-  margin: 12px 0;
-}
-
-.error {
-  background: rgba(239,68,68,0.12);
-  color: #991b1b;
-  border: 1px solid rgba(239,68,68,0.22);
-  border-radius: 14px;
-  padding: 12px 14px;
-  font-weight: 800;
-  margin: 12px 0;
-}
-
-.btn.danger {
-  background: #ef4444;
-  color: #fff;
-}
-
-.btn.danger:hover {
-  background: #dc2626;
-}
-
-/* ===== Admin requests table ===== */
-
-.admin-requests-card {
-  overflow: hidden;
-}
-
-.admin-requests-table-wrap {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: visible;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #ffffff;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
-}
-
-.admin-requests-table {
-  min-width: 1540px;
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  table-layout: fixed;
-}
-
-.admin-requests-table th,
-.admin-requests-table td {
-  vertical-align: middle;
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.admin-requests-table th {
-  color: #1f2937;
-  font-size: 14px;
-  line-height: 1.25;
-}
-
-.admin-requests-table td {
-  color: #1f2937;
-  line-height: 1.35;
-}
-
-/* Users controls / filters */
-.users-controls {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  margin-bottom: 14px;
-}
-
-.users-stats {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.stat-badge-large {
-  background: white;
-  padding: 12px 18px;
-  border-radius: 14px;
-  box-shadow: 0 8px 26px rgba(0,0,0,0.08);
-  border-left: 4px solid var(--accent2, #0ea5e9);
-  font-weight: 800;
-}
-
-.stat-badge-large .number {
-  display: block;
-  font-size: 1.4rem;
-  font-weight: 900;
-  color: var(--accent2, #0ea5e9);
-}
-
-/* Admin table */
-.admin-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 8px 26px rgba(0,0,0,0.08);
-}
-
-.admin-table th,
-.admin-table td {
-  padding: 12px 14px;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
-  text-align: left;
-  vertical-align: top;
-}
-
-.admin-table th {
-  background: #f8fafc;
-  font-weight: 900;
-  color: #334155;
-}
-
-.material-badge {
-  display: inline-block;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-weight: 900;
-  font-size: 12px;
-  background: rgba(14, 165, 233, 0.12);
-  color: #0284c7;
-  border: 1px solid rgba(14, 165, 233, 0.25);
-}
-
-/* ===== КАРТОЧКА ВОПРОСА В РЕДАКТОРЕ ЗАДАНИЙ ===== */
-.subtask-item {
-  background: #ffffff;
-  border-radius: 18px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
-  position: relative;
-  overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.subtask-item:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-}
-
-/* Хедер карточки вопроса */
-.question-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 18px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  flex-wrap: wrap;
-}
-
-.question-header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.question-number-badge {
-  background: #0f172a;
-  color: #ffffff;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 6px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  font-size: 13px;
-}
-
-.question-type-badge {
-  font-weight: 800;
-  font-size: 13px;
-  color: #334155;
-  padding: 4px 10px;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-}
-
-.question-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.confirm-delete-box {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #fef2f2;
-  border: 1px solid #fca5a5;
-  padding: 2px 8px;
-  border-radius: 8px;
-}
-
-.confirm-delete-box span {
-  font-size: 12px;
-  font-weight: 800;
-  color: #dc2626;
-}
-
-.question-card-body {
-  padding: 20px;
-}
-
-/* Пастельные акцентные рамки слева по типам вопросов */
-.subtask-item.qtype-test {
-  border-left: 5px solid #3b82f6;
-}
-
-.subtask-item.qtype-fill {
-  border-left: 5px solid #10b981;
-}
-
-.subtask-item.qtype-sentence {
-  border-left: 5px solid #f59e0b;
-}
-
-.subtask-item.qtype-crossword {
-  border-left: 5px solid #a855f7;
-}
-
-.subtask-item.qtype-complex {
-  border-left: 5px solid #6366f1;
-}
-
-.subtask-item.qtype-matching {
-  border-left: 5px solid #14b8a6;
-}
-
-.subtask-item.qtype-imagemap {
-  border-left: 5px solid #f43f5e;
-}
-
-.subtask-item.qtype-reading {
-  border-left: 5px solid #06b6d4;
-}
-
-.question-textarea {
-  width: 100%;
-  min-height: 90px;
-  padding: 12px 14px;
-  border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  font-size: 14px;
-  line-height: 1.5;
-  font-family: inherit;
-  resize: vertical;
-  background: #ffffff;
-  color: #0f172a;
-}
-
-.question-textarea:focus {
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
-  outline: none;
-}
-
-.format-hint {
-  font-size: 12px;
-  color: #64748b;
-  margin-top: 4px;
-  font-weight: 500;
-}
-
-/* ===== СТИЛИ СПИСКА ДОСТУПОВ (UserAccessModal) ===== */
-.access-category { 
-  margin-top: 12px; 
-}
-
-.access-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.access-item {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0 !important;
-  background: #f8fafc !important;
-  color: #0f172a !important;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.access-item:hover {
-  background: #f1f5f9 !important;
-}
-
-.access-item.active {
-  background: #f0f9ff !important;
-  border-color: #0ea5e9 !important;
-}
-
-.access-item input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: #0ea5e9;
-}
 </file>
 
 <file path="app/api/admin/projects/[id]/materials/[materialId]/route.ts">
@@ -42279,440 +41636,1017 @@ export default function RequestsTab({
 }
 </file>
 
-<file path="app/(app)/projects/[slug]/profile/profile.css">
-/* app/(app)/projects/[slug]/profile/profile.css */
+<file path="app/(admin)/admin/admin.css">
+/* app/(admin)/admin/admin.css */
 
-/* ===== Layout & Typography ===== */
-#profileBody, .profile-page {
-  margin: 0;
-  padding: 0;
+/* Изоляция темы админки от тёмной пользовательской темы */
+.admin-root {
   min-height: 100vh;
-  padding-bottom: 60px;
-  letter-spacing: 0.01em;
-  -webkit-font-smoothing: antialiased;
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  color-scheme: light;
+  padding-bottom: 40px;
 }
 
-.profile-container {
+.admin-container {
   width: 95%;
-  max-width: 1100px;
-  margin: 24px auto 40px;
-  position: relative;
-  z-index: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding-top: 20px;
+  color: #0f172a !important;
 }
 
-/* Typography helpers */
-.brand-subtitle, .streak-chip-sub, .profile-email, .mini-cap, 
-.mini-stat-label, .progress-sub, .info-li, .section-title, .streak-summary-key {
-  line-height: 1.35;
-  letter-spacing: 0.02em;
-}
-.progress-title, .mini-val, .brand-title, .profile-name {
-  letter-spacing: 0.005em;
+.admin-root .card {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* ===== Стеклянные Контейнеры (Panels) ===== */
-.profile-topbar, .profile-panel, .panel, .profile-card, .section {
-  border-radius: 28px;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
-  padding: 24px;
+.admin-root .small-muted {
+  color: #64748b !important;
 }
 
-.profile-layout {
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 24px;
-  margin-top: 24px;
+/* === УНИФИКАЦИЯ КНОПОК В АДМИНКЕ === */
+.admin-root .btn {
+  background: #0ea5e9;
+  color: #ffffff !important;
+  border: 1px solid #0284c7;
+  font-weight: 700;
 }
-.section + .section { margin-top: 24px; }
 
-/* ===== Topbar ===== */
-.profile-topbar {
+.admin-root .btn:hover {
+  background: #0284c7;
+  color: #ffffff !important;
+}
+
+.admin-root .btn.ghost {
+  background: #e2e8f0 !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: none !important;
+}
+
+.admin-root .btn.ghost:hover {
+  background: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.admin-root .btn.secondary {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border: 1px solid #dc2626 !important;
+}
+
+.admin-root .btn.secondary:hover {
+  background: #dc2626 !important;
+}
+
+/* === МОДАЛЬНЫЕ ОКНА В АДМИНКЕ (СВЕТЛАЯ ТЕМА) ===
+   Важно: только через .admin-root, БЕЗ "голых" .modal-overlay/.modal-panel и т.п.
+   Раньше эти селекторы были не заскоупены и могли перебить тему модалок
+   на пользовательских страницах в зависимости от порядка загрузки CSS. */
+.admin-root .modal-overlay {
+  background: rgba(15, 23, 42, 0.5) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+
+.admin-root .modal-panel,
+.admin-root .modal-content {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2) !important;
+}
+
+.admin-root .modal-header {
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.admin-root .modal-title {
+  color: #0f172a !important;
+}
+
+.admin-root .modal-close {
+  color: #64748b !important;
+  background: #f1f5f9 !important;
+}
+
+.admin-root .modal-close:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.admin-root .modal-body {
+  color: #0f172a !important;
+  background: #ffffff !important;
+}
+
+/* Tabs */
+.admin-tabs {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 24px;
-  margin-bottom: 24px;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0 18px;
 }
 
-.brand { display: flex; align-items: center; gap: 16px; }
-
-/* ===== Project Switcher (НОВОЕ) ===== */
-.brand-switcher-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.brand-interactive {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 20px;
-  padding: 6px 12px 6px 6px;
+.admin-tab {
+  border: 0;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  text-align: left;
-}
-
-.brand-interactive:hover, .brand-interactive.open {
-  background: color-mix(in srgb, var(--project-text) 5%, transparent);
-  border-color: var(--glass-border);
-}
-
-.brand-text-wrapper {
-  display: flex;
-  flex-direction: column;
-}
-
-.switcher-chevron {
-  margin-left: 8px;
-  color: color-mix(in srgb, var(--project-text) 50%, transparent);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.brand-interactive.open .switcher-chevron {
-  transform: rotate(180deg);
-}
-
-.switcher-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 99;
-}
-
-.project-switcher-menu {
-  position: absolute;
-  top: calc(100% + 12px);
-  left: 0;
-  width: 300px;
-  background: var(--glass-bg, rgba(15, 23, 42, 0.9));
-  backdrop-filter: var(--glass-blur, blur(24px));
-  -webkit-backdrop-filter: var(--glass-blur, blur(24px));
-  border: 1px solid var(--glass-border);
-  border-radius: 24px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  padding: 12px;
-  animation: menuSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  transform-origin: top left;
-}
-
-@keyframes menuSlideDown {
-  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.switcher-header {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--project-text) 60%, transparent);
-  padding: 4px 12px 12px;
-}
-
-.switcher-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.project-switcher-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
+  padding: 12px 18px;
   border-radius: 14px;
-  text-decoration: none;
-  color: var(--project-text);
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
-}
-
-.project-switcher-item:hover {
-  background: color-mix(in srgb, var(--project-text) 8%, transparent);
-  transform: translateX(4px);
-}
-
-.project-switcher-item.active {
-  border-color: var(--glass-border);
-  background: color-mix(in srgb, var(--project-text) 12%, transparent);
-}
-
-.switcher-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  box-shadow: inset 0 1px 2px rgba(255,255,255,0.5), 0 2px 8px rgba(0,0,0,0.2);
-  flex-shrink: 0;
-}
-
-.switcher-item-name {
-  font-size: 14px;
-  font-weight: 800;
-  flex: 1;
-}
-
-.switcher-item-check {
-  font-size: 14px;
   font-weight: 900;
-  color: var(--project-text);
-  opacity: 0.6;
+  background: #e2e8f0;
+  color: #334155;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.04);
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
 }
 
-.switcher-footer {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--glass-border);
+.admin-tab:hover {
+  transform: translateY(-2px);
+  background: #cbd5e1;
+  color: #0f172a;
 }
 
-.switcher-portal-link {
-  display: block;
+.admin-tab.active {
+  background: linear-gradient(135deg, var(--accent2, #0ea5e9), #0284c7);
+  color: #fff !important;
+}
+
+/* Dashboard stats */
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.admin-stat {
+  background: white;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border-left: 4px solid var(--accent2, #0ea5e9);
   text-align: center;
+}
+
+.admin-stat .num {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--accent2, #0ea5e9);
+}
+
+.admin-stat .lbl {
   font-size: 13px;
-  font-weight: 800;
-  color: color-mix(in srgb, var(--project-text) 70%, transparent);
-  text-decoration: none;
-  padding: 10px;
-  border-radius: 12px;
-  transition: background 0.2s ease;
+  color: #666;
+  font-weight: 700;
 }
 
-.switcher-portal-link:hover {
-  background: color-mix(in srgb, var(--project-text) 10%, transparent);
-  color: var(--project-text);
+/* ===== Materials admin UI ===== */
+
+.admin-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin-bottom: 16px;
 }
 
-/* ===== Остальные стили ===== */
-.brand-mark {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+.admin-section-head h2,
+.admin-section-head h3 {
+  margin: 0;
+  color: #111827;
+}
+
+.admin-section-head p {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.admin-card {
+  background: #fff;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 12px 34px rgba(0,0,0,0.08);
+}
+
+.admin-card-cover {
+  height: 170px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(78, 205, 196, 0.24), transparent 34%),
+    linear-gradient(135deg, rgba(78, 205, 196, 0.14), rgba(109, 211, 192, 0.18));
+}
+
+.admin-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.admin-card-cover-placeholder {
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
+  color: var(--accent2, #0ea5e9);
+  font-size: 54px;
   font-weight: 900;
-  color: #fff;
-  font-size: 20px;
-  background: var(--project-primary);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,0.3), 0 8px 24px -6px color-mix(in srgb, var(--project-primary) 50%, transparent);
 }
 
-.brand-title {
-  font-size: 20px;
+.admin-card-badge {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.92);
+  color: #111827;
+  font-size: 12px;
   font-weight: 900;
-  color: var(--project-text);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.admin-card-body {
+  padding: 16px;
+}
+
+.admin-card-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--accent2, #0ea5e9);
+  margin-bottom: 10px;
+}
+
+.admin-card-body h3 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 950;
   line-height: 1.2;
 }
 
-.brand-subtitle {
-  font-size: 13px;
-  font-weight: 700;
-  color: color-mix(in srgb, var(--project-text) 60%, transparent);
+.admin-card-body p {
+  margin: 0;
+  color: #6b7280;
+  line-height: 1.45;
+  font-weight: 600;
 }
 
-.top-actions {
+.admin-card-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.admin-card-stats span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(78, 205, 196, 0.12);
+  color: #0f766e;
+  border: 1px solid rgba(78, 205, 196, 0.22);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.admin-form-card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 18px;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 12px 34px rgba(0,0,0,0.08);
+  margin: 14px 0 18px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.form-field {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+}
+
+.form-field > span,
+.form-check span {
+  font-weight: 900;
+  color: #111827;
+}
+
+.form-field small {
+  color: #6b7280;
+  font-weight: 650;
+}
+
+.admin-root input,
+.admin-root textarea,
+.admin-root select,
+.admin-root .modal-body input,
+.admin-root .modal-body textarea,
+.admin-root .modal-body select {
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.admin-root input:focus,
+.admin-root textarea:focus,
+.admin-root select:focus,
+.admin-root .modal-body input:focus,
+.admin-root .modal-body textarea:focus,
+.admin-root .modal-body select:focus {
+  border-color: #0ea5e9 !important;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15) !important;
+}
+
+.form-check {
   display: flex;
   align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(78, 205, 196, 0.08);
+  border: 1px solid rgba(78, 205, 196, 0.18);
+  cursor: pointer;
+}
+
+.form-check input {
+  width: 18px;
+  height: 18px;
+}
+
+.chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  border: 1px solid rgba(0,0,0,0.10);
+  background: #fff;
+  color: #111827;
+  border-radius: 999px;
+  padding: 9px 13px;
+  cursor: pointer;
+  font-weight: 900;
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+}
+
+.chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.chip.active {
+  border-color: rgba(78, 205, 196, 0.4);
+  background: linear-gradient(135deg, var(--accent2, #0ea5e9), #6dd3c0);
+  color: #fff;
+}
+
+.cover-editor {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.cover-preview {
+  min-height: 180px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(78, 205, 196, 0.08);
+}
+
+.cover-preview img {
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.cover-placeholder {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 18px;
+  color: var(--accent2, #0ea5e9);
+}
+
+.cover-placeholder span {
+  font-size: 46px;
+}
+
+.cover-placeholder p {
+  margin: 8px 0 0;
+  color: #6b7280;
+  font-weight: 800;
+}
+
+.cover-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-form-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.success-box {
+  background: rgba(34,197,94,0.12);
+  color: #166534;
+  border: 1px solid rgba(34,197,94,0.22);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-weight: 800;
+  margin: 12px 0;
+}
+
+.error {
+  background: rgba(239,68,68,0.12);
+  color: #991b1b;
+  border: 1px solid rgba(239,68,68,0.22);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-weight: 800;
+  margin: 12px 0;
+}
+
+.btn.danger {
+  background: #ef4444;
+  color: #fff;
+}
+
+.btn.danger:hover {
+  background: #dc2626;
+}
+
+/* ===== Admin requests table ===== */
+
+.admin-requests-card {
+  overflow: hidden;
+}
+
+.admin-requests-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+}
+
+.admin-requests-table {
+  min-width: 1540px;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.admin-requests-table th,
+.admin-requests-table td {
+  vertical-align: middle;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.admin-requests-table th {
+  color: #1f2937;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.admin-requests-table td {
+  color: #1f2937;
+  line-height: 1.35;
+}
+
+/* Users controls / filters */
+.users-controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+.users-stats {
+  display: flex;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.nav-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+.stat-badge-large {
+  background: white;
+  padding: 12px 18px;
   border-radius: 14px;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.08);
+  border-left: 4px solid var(--accent2, #0ea5e9);
+  font-weight: 800;
+}
+
+.stat-badge-large .number {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--accent2, #0ea5e9);
+}
+
+/* Admin table */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.08);
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-table th {
+  background: #f8fafc;
+  font-weight: 900;
+  color: #334155;
+}
+
+.material-badge {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 12px;
+  background: rgba(14, 165, 233, 0.12);
+  color: #0284c7;
+  border: 1px solid rgba(14, 165, 233, 0.25);
+}
+
+/* ===== КАРТОЧКА ВОПРОСА В РЕДАКТОРЕ ЗАДАНИЙ ===== */
+.subtask-item {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.subtask-item:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* Хедер карточки вопроса */
+.question-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+
+.question-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.question-number-badge {
+  background: #0f172a;
+  color: #ffffff;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.question-type-badge {
   font-weight: 800;
   font-size: 13px;
-  color: var(--project-text);
-  background: color-mix(in srgb, var(--project-text) 6%, transparent);
-  border: 1px solid var(--glass-border);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  text-decoration: none;
-  cursor: pointer;
-}
-.nav-pill:hover {
-  background: color-mix(in srgb, var(--project-text) 12%, transparent);
-  transform: translateY(-2px);
-}
-.nav-pill--logout {
-  color: #ef4444;
-  background: color-mix(in srgb, #ef4444 10%, transparent);
-  border-color: color-mix(in srgb, #ef4444 25%, transparent);
-}
-.nav-pill--logout:hover { background: color-mix(in srgb, #ef4444 20%, transparent); }
-
-/* ===== Сетка Профиля ===== */
-.profile-grid {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 24px;
-  align-items: start;
-}
-.profile-sidebar { 
-  display: flex; 
-  flex-direction: column; 
-  align-items: center; 
-  text-align: center; 
+  color: #334155;
+  padding: 4px 10px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
 }
 
-/* ===== СТИЛИЗАЦИЯ АВАТАРА ===== */
-.profile-avatar-wrapper {
-  width: 220px;
-  height: 220px;
-  margin: 0 auto 24px;
-  border-radius: 50%;
-  position: relative;
-  display: grid;
-  place-items: center;
-  background: color-mix(in srgb, var(--project-primary) 8%, transparent);
-  border: 4px solid color-mix(in srgb, var(--project-primary) 20%, transparent);
-  padding: 8px;
-}
-
-.streak-visual--avatar {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  overflow: hidden;
-  position: relative;
-  z-index: 2;
-}
-
-.streak-visual__img--avatar {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-}
-
-.avatar-icon-bg {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--project-text) 5%, transparent), transparent 70%);
-  border-radius: 50%;
-  z-index: 1;
-}
-
-/* ===== Инфо Сайдбара ===== */
-.profile-name { font-size: 24px; font-weight: 900; color: var(--project-text); margin-bottom: 4px; line-height: 1.2;}
-.profile-email { font-size: 14px; font-weight: 700; color: color-mix(in srgb, var(--project-text) 60%, transparent); margin-bottom: 20px; }
-
-.profile-title-slot {
-  display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 99px;
-  background: color-mix(in srgb, var(--project-text) 4%, transparent); border: 1px solid var(--glass-border);
-  margin-bottom: 24px; transition: all 0.2s ease;
-}
-.profile-title-slot-icon { font-size: 16px; }
-.profile-title-slot-text { font-size: 13px; font-weight: 800; color: var(--project-text); }
-
-.details-list { width: 100%; display: flex; flex-direction: column; background: color-mix(in srgb, var(--project-text) 2%, transparent); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; }
-.detail-item { display: flex; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--glass-border); }
-.detail-item:last-child { border-bottom: none; }
-.detail-label { font-size: 13px; font-weight: 700; color: color-mix(in srgb, var(--project-text) 60%, transparent); }
-.detail-value { font-size: 14px; font-weight: 800; color: var(--project-text); }
-
-/* ===== Стрики / Фишки (Streak Chips) ===== */
-.streak-chip {
-  height: 48px; border-radius: 14px; padding: 6px 14px;
-  display: inline-grid; grid-template-columns: 32px auto; grid-template-rows: 1fr 1fr; column-gap: 10px;
-  align-items: center; background: color-mix(in srgb, var(--project-text) 5%, transparent);
-  border: 1px solid var(--glass-border); transition: all 0.2s ease; cursor: pointer; text-align: left;
-}
-.streak-chip:hover { background: color-mix(in srgb, var(--project-text) 10%, transparent); transform: translateY(-2px); }
-.streak-chip-icon {
-  grid-row: 1 / span 2; width: 32px; height: 32px; border-radius: 10px;
-  display: grid; place-items: center; background: var(--project-card-bg);
-  box-shadow: 0 4px 12px -4px rgba(0,0,0,0.1); font-size: 16px; overflow: hidden;
-}
-.streak-chip-value { font-size: 16px; font-weight: 900; color: var(--project-text); line-height: 1; }
-.streak-chip-sub { font-size: 11px; font-weight: 700; color: color-mix(in srgb, var(--project-text) 60%, transparent); }
-
-/* Иконки внутри чипов */
-.streak-visual { display: inline-grid; place-items: center; width: 100%; height: 100%; line-height: 1; user-select: none; }
-.streak-visual__emoji { display: inline-grid; place-items: center; width: 100%; height: 100%; line-height: 1; font-weight: 1000; color: var(--project-text); }
-.streak-visual__img--chip { width: 100%; height: 100%; object-fit: contain; }
-
-/* ===== Правая Панель (Статистика и Прогресс) ===== */
-.section-title { font-size: 16px; font-weight: 900; color: var(--project-text); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;}
-.section-title b { color: var(--project-primary); }
-
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; margin-bottom: 32px; }
-.stat-card {
-  background: color-mix(in srgb, var(--project-primary) 6%, transparent);
-  border: 1px solid color-mix(in srgb, var(--project-primary) 15%, transparent);
-  border-radius: 20px; padding: 20px; text-align: center;
-}
-.stat-value { font-size: 28px; font-weight: 900; color: var(--project-primary); margin-bottom: 4px; }
-.stat-label { font-size: 11px; font-weight: 800; color: color-mix(in srgb, var(--project-text) 60%, transparent); text-transform: uppercase; }
-
-.progress-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
-.progress-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px;
-  background: var(--project-card-bg); border: 1px solid var(--glass-border); border-radius: 16px;
-  box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--project-text) 10%, transparent);
-  transition: all 0.2s ease; cursor: pointer; text-decoration: none;
-}
-.progress-row:hover { transform: translateY(-2px); border-color: var(--project-primary); box-shadow: 0 8px 24px -8px color-mix(in srgb, var(--project-text) 15%, transparent); }
-.progress-left { flex: 1; }
-.progress-type { display: inline-block; padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 900; background: color-mix(in srgb, var(--project-text) 8%, transparent); color: var(--project-text); margin-bottom: 8px; }
-.progress-title { font-size: 16px; font-weight: 800; color: var(--project-text); margin-bottom: 4px; }
-.progress-sub { font-size: 13px; font-weight: 600; color: color-mix(in srgb, var(--project-text) 60%, transparent); }
-
-.progress-right { display: flex; align-items: center; gap: 16px; }
-.progress-bar { width: 140px; height: 8px; border-radius: 99px; background: color-mix(in srgb, var(--project-text) 10%, transparent); overflow: hidden; }
-.progress-fill { height: 100%; border-radius: 999px; background: var(--project-primary); transition: width 0.5s ease; }
-.progress-percent { font-size: 15px; font-weight: 900; color: var(--project-primary); min-width: 44px; text-align: right; }
-
-.info-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
-.info-li { display: flex; gap: 12px; font-size: 14px; font-weight: 600; color: color-mix(in srgb, var(--project-text) 80%, transparent); }
-.info-bullet { width: 6px; height: 6px; border-radius: 50%; background: var(--project-primary); flex-shrink: 0; margin-top: 6px; }
-
-/* Loader */
-.background-loading {
-  position: fixed; top: 18px; right: 18px; background: var(--project-text); color: var(--project-bg);
-  padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 900; z-index: 1000;
-}
-.spinner {
-  border: 3px solid color-mix(in srgb, var(--project-bg) 30%, transparent);
-  border-top: 3px solid var(--project-primary); border-radius: 50%; width: 18px; height: 18px;
-  animation: spin 1.2s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px;
-}
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-/* ===== Action Buttons (Кнопки в левой панели) ===== */
-.profile-actions {
+.question-header-actions {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-}
-.profile-actions .btn {
-  width: 100%;
-  justify-content: center;
+  align-items: center;
+  gap: 6px;
 }
 
-/* ===== АДАПТИВНОСТЬ ===== */
-@media (max-width: 980px) { 
-  .profile-grid { grid-template-columns: 1fr; } 
-  .profile-sidebar { flex-direction: row; flex-wrap: wrap; text-align: left; align-items: flex-start; justify-content: center; gap: 24px; } 
-  .profile-avatar-wrapper { margin: 0; } 
+.confirm-delete-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  padding: 2px 8px;
+  border-radius: 8px;
 }
-@media (max-width: 640px) { 
-  .profile-topbar { flex-direction: column; align-items: stretch; } 
-  .brand-switcher-wrapper { justify-content: center; }
-  .top-actions { justify-content: center; }
-  .progress-row { flex-direction: column; align-items: stretch; } 
-  .progress-right { justify-content: space-between; } 
-  .progress-bar { width: 100%; } 
-  .project-switcher-menu { width: 100%; }
+
+.confirm-delete-box span {
+  font-size: 12px;
+  font-weight: 800;
+  color: #dc2626;
+}
+
+.question-card-body {
+  padding: 20px;
+}
+
+/* Пастельные акцентные рамки слева по типам вопросов */
+.subtask-item.qtype-test {
+  border-left: 5px solid #3b82f6;
+}
+
+.subtask-item.qtype-fill {
+  border-left: 5px solid #10b981;
+}
+
+.subtask-item.qtype-sentence {
+  border-left: 5px solid #f59e0b;
+}
+
+.subtask-item.qtype-crossword {
+  border-left: 5px solid #a855f7;
+}
+
+.subtask-item.qtype-complex {
+  border-left: 5px solid #6366f1;
+}
+
+.subtask-item.qtype-matching {
+  border-left: 5px solid #14b8a6;
+}
+
+.subtask-item.qtype-imagemap {
+  border-left: 5px solid #f43f5e;
+}
+
+.subtask-item.qtype-reading {
+  border-left: 5px solid #06b6d4;
+}
+
+.question-textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: inherit;
+  resize: vertical;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.question-textarea:focus {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  outline: none;
+}
+
+.format-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* ===== СТИЛИ СПИСКА ДОСТУПОВ (UserAccessModal) ===== */
+.access-category { 
+  margin-top: 12px; 
+}
+
+.access-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.access-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0 !important;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.access-item:hover {
+  background: #f1f5f9 !important;
+}
+
+.access-item.active {
+  background: #f0f9ff !important;
+  border-color: #0ea5e9 !important;
+}
+
+.access-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #0ea5e9;
+}
+</file>
+
+<file path="app/api/admin/materials/[id]/route.ts">
+// app/api/admin/materials/[id]/route.ts
+import { NextRequest } from "next/server";
+import { ok, fail } from "@/lib/api/response";
+import { requireAdmin } from "@/lib/api/admin";
+
+import {
+  normalizeString,
+  normalizeNullableString,
+  normalizeBool,
+  normalizeOrderIndex,
+  normalizeUUID,
+  normalizeMaterialKind,
+  normalizeClassLevels,
+  normalizeTargetLevels,
+} from "@/lib/materials/normalize";
+
+function normalizePrice(value: any): number {
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? Math.round(num) : 1000;
+}
+
+function normalizePatchPayload(body: any) {
+  const payload: Record<string, any> = {};
+
+  if ("branch_type" in body || "branchType" in body) {
+    payload.branch_type = String(body.branch_type ?? body.branchType ?? "").trim();
+  }
+
+  if ("material_kind" in body || "materialKind" in body) {
+    payload.material_kind = normalizeMaterialKind(body.material_kind ?? body.materialKind);
+  }
+
+  if ("title" in body) {
+    payload.title = normalizeString(body.title);
+  }
+
+  if ("description" in body) {
+    payload.description = normalizeNullableString(body.description);
+  }
+
+  if ("cover_image_url" in body || "coverImageUrl" in body) {
+    payload.cover_image_url = normalizeNullableString(body.cover_image_url ?? body.coverImageUrl);
+  }
+
+  if ("price" in body) {
+    payload.price = normalizePrice(body.price);
+  }
+
+  if ("is_available" in body || "isAvailable" in body) {
+    payload.is_available = normalizeBool(body.is_available ?? body.isAvailable);
+  }
+
+  if ("is_active" in body || "isActive" in body) {
+    payload.is_active = normalizeBool(body.is_active ?? body.isActive);
+  }
+
+  if ("is_secret" in body || "isSecret" in body) {
+    payload.is_secret = normalizeBool(body.is_secret ?? body.isSecret);
+  }
+
+  if ("order_index" in body || "orderIndex" in body) {
+    payload.order_index = normalizeOrderIndex(body.order_index ?? body.orderIndex);
+  }
+
+  if ("class_levels" in body || "class_level" in body || "classLevels" in body) {
+    payload.class_levels = normalizeClassLevels(body.class_levels ?? body.class_level ?? body.classLevels);
+  }
+
+  if ("target_levels" in body || "target_level" in body || "targetLevels" in body) {
+    payload.target_levels = normalizeTargetLevels(body.target_levels ?? body.target_level ?? body.targetLevels);
+  }
+
+  if ("meta" in body) {
+    payload.meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
+  }
+
+  const hasTabId = "project_tab_id" in body || "tab_id" in body || "projectTabId" in body || "tabId" in body;
+  if (hasTabId) {
+    const rawTabId = body.project_tab_id ?? body.tab_id ?? body.projectTabId ?? body.tabId;
+    payload.project_tab_id = normalizeUUID(rawTabId);
+  }
+
+  return payload;
+}
+
+function validatePatchPayload(payload: Record<string, any>) {
+  if ("title" in payload && !payload.title) return "title required";
+  return null;
+}
+
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { id } = await ctx.params;
+
+  if (!id) return fail("id required", 400, "VALIDATION");
+
+  try {
+    const { data, error } = await supabase
+      .from("materials")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      console.error("🔴 [ADMIN GET MATERIAL] Ошибка поиска:", error.message);
+      return fail(error.message, 404, "NOT_FOUND");
+    }
+
+    const { count, error: countErr } = await supabase
+      .from("assignments")
+      .select("id", { count: "exact", head: true })
+      .or(`material_id.eq.${id},textbook_id.eq.${id},crossword_id.eq.${id}`);
+
+    if (countErr) {
+      console.error("🔴 [ADMIN GET MATERIAL] Ошибка подсчета заданий:", countErr.message);
+    }
+
+    return ok({
+      material: {
+        ...data,
+        assignments_count: count ?? 0,
+      },
+    });
+  } catch (error: any) {
+    console.error("🔴 [ADMIN GET MATERIAL] Серверная ошибка:", error);
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { id } = await ctx.params;
+
+  if (!id) return fail("id required", 400, "VALIDATION");
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return fail("Bad JSON", 400, "BAD_JSON");
+  }
+
+  const payload = normalizePatchPayload(body);
+  const validationError = validatePatchPayload(payload);
+
+  if (validationError) {
+    console.error("🔴 [ADMIN PATCH MATERIAL] Провал валидации:", validationError);
+    return fail(validationError, 400, "VALIDATION");
+  }
+
+  if (Object.keys(payload).length === 0) {
+    return fail("Nothing to update", 400, "VALIDATION");
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("materials")
+      .update(payload)
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("🔴 [ADMIN PATCH MATERIAL] Ошибка БД при сохранении:", error.message, error.details);
+
+      let errorMsg = error.message;
+      if (errorMsg.includes("foreign key")) errorMsg = "Ошибка привязки таба (несуществующий ID)";
+
+      return fail(errorMsg, 500, "DB_ERROR");
+    }
+
+    if (data?.legacy_source_table && data?.legacy_source_id) {
+      const legacyPayload: Record<string, any> = {};
+      if ("price" in payload) legacyPayload.price = payload.price;
+      if ("title" in payload) legacyPayload.title = payload.title;
+      if ("description" in payload) legacyPayload.description = payload.description;
+      if ("cover_image_url" in payload) legacyPayload.cover_image_url = payload.cover_image_url;
+
+      if (Object.keys(legacyPayload).length > 0) {
+        try {
+          await supabase
+            .from(data.legacy_source_table)
+            .update(legacyPayload)
+            .eq("id", data.legacy_source_id);
+        } catch {
+          // Игнорируем ошибки синхронизации
+        }
+      }
+    }
+
+    return ok({ material: data });
+  } catch (error: any) {
+    console.error("🔴 [ADMIN PATCH MATERIAL] Серверная ошибка:", error);
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
+}
+
+// Дублируем PATCH метод для обработки PUT запросов
+export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  return PATCH(req, ctx);
+}
+
+export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { supabase } = auth;
+  const { id } = await ctx.params;
+
+  if (!id) return fail("id required", 400, "VALIDATION");
+
+  try {
+    const { error } = await supabase.from("materials").delete().eq("id", id);
+
+    if (error) {
+      console.error("🔴 [ADMIN DELETE MATERIAL] Ошибка удаления:", error.message);
+      return fail(error.message, 500, "DB_ERROR");
+    }
+
+    return ok({ deleted: true });
+  } catch (error: any) {
+    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
+  }
 }
 </file>
 
@@ -43717,6 +43651,444 @@ export default function StreakTimeline({
       />
     </div>
   );
+}
+</file>
+
+<file path="app/(app)/projects/[slug]/profile/profile.css">
+/* app/(app)/projects/[slug]/profile/profile.css */
+
+/* ===== Layout & Typography ===== */
+#profileBody, .profile-page {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  padding-bottom: 60px;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+.profile-container {
+  width: 95%;
+  max-width: 1100px;
+  margin: 24px auto 40px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Typography helpers */
+.brand-subtitle, .streak-chip-sub, .profile-email, .mini-cap, 
+.mini-stat-label, .progress-sub, .info-li, .section-title, .streak-summary-key {
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+.progress-title, .mini-val, .brand-title, .profile-name {
+  letter-spacing: 0.005em;
+}
+
+/* ===== Стеклянные Контейнеры (Panels) ===== */
+.profile-topbar, .profile-panel, .panel, .profile-card, .section {
+  border-radius: 28px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  padding: 24px;
+}
+
+.profile-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 24px;
+  margin-top: 24px;
+}
+.section + .section { margin-top: 24px; }
+
+/* ===== Topbar ===== */
+.profile-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  margin-bottom: 24px;
+}
+
+.brand { display: flex; align-items: center; gap: 16px; }
+
+/* ===== Project Switcher ===== */
+.brand-switcher-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.brand-interactive {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  padding: 6px 12px 6px 6px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+}
+
+.brand-interactive:hover, .brand-interactive.open {
+  background: color-mix(in srgb, var(--project-text) 5%, transparent);
+  border-color: var(--glass-border);
+}
+
+.brand-text-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.switcher-chevron {
+  margin-left: 8px;
+  color: color-mix(in srgb, var(--project-text) 50%, transparent);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.brand-interactive.open .switcher-chevron {
+  transform: rotate(180deg);
+}
+
+.switcher-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
+/* Раньше был полупрозрачный var(--glass-bg) + backdrop-filter blur — сквозь меню
+   просвечивал фон страницы (лого/картинки), выглядело неряшливо. Теперь сплошной
+   непрозрачный фон в цвет карточки темы проекта, без блюра. */
+.project-switcher-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 0;
+  width: 300px;
+  background: var(--p-card-bg, var(--project-card-bg));
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  z-index: 1000;
+  padding: 12px;
+  animation: menuSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top left;
+}
+
+@keyframes menuSlideDown {
+  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.switcher-header {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--project-text) 60%, transparent);
+  padding: 4px 12px 12px;
+}
+
+.switcher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-switcher-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  text-decoration: none;
+  color: var(--project-text);
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.project-switcher-item:hover {
+  background: color-mix(in srgb, var(--project-text) 8%, transparent);
+  transform: translateX(4px);
+}
+
+.project-switcher-item.active {
+  border-color: var(--glass-border);
+  background: color-mix(in srgb, var(--project-text) 12%, transparent);
+}
+
+.switcher-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.5), 0 2px 8px rgba(0,0,0,0.2);
+  flex-shrink: 0;
+}
+
+.switcher-item-name {
+  font-size: 14px;
+  font-weight: 800;
+  flex: 1;
+}
+
+.switcher-item-check {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--project-text);
+  opacity: 0.6;
+}
+
+.switcher-footer {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.switcher-portal-link {
+  display: block;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--project-text) 70%, transparent);
+  text-decoration: none;
+  padding: 10px;
+  border-radius: 12px;
+  transition: background 0.2s ease;
+}
+
+.switcher-portal-link:hover {
+  background: color-mix(in srgb, var(--project-text) 10%, transparent);
+  color: var(--project-text);
+}
+
+/* ===== Остальные стили ===== */
+.brand-mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  color: #fff;
+  font-size: 20px;
+  background: var(--project-primary);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.3), 0 8px 24px -6px color-mix(in srgb, var(--project-primary) 50%, transparent);
+}
+
+.brand-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--project-text);
+  line-height: 1.2;
+}
+
+.brand-subtitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--project-text) 60%, transparent);
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--project-text);
+  background: color-mix(in srgb, var(--project-text) 6%, transparent);
+  border: 1px solid var(--glass-border);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  cursor: pointer;
+}
+.nav-pill:hover {
+  background: color-mix(in srgb, var(--project-text) 12%, transparent);
+  transform: translateY(-2px);
+}
+.nav-pill--logout {
+  color: #ef4444;
+  background: color-mix(in srgb, #ef4444 10%, transparent);
+  border-color: color-mix(in srgb, #ef4444 25%, transparent);
+}
+.nav-pill--logout:hover { background: color-mix(in srgb, #ef4444 20%, transparent); }
+
+/* ===== Сетка Профиля ===== */
+.profile-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.profile-sidebar { 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  text-align: center; 
+}
+
+/* ===== СТИЛИЗАЦИЯ АВАТАРА ===== */
+.profile-avatar-wrapper {
+  width: 220px;
+  height: 220px;
+  margin: 0 auto 24px;
+  border-radius: 50%;
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--project-primary) 8%, transparent);
+  border: 4px solid color-mix(in srgb, var(--project-primary) 20%, transparent);
+  padding: 8px;
+}
+
+.streak-visual--avatar {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
+}
+
+.streak-visual__img--avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatar-icon-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--project-text) 5%, transparent), transparent 70%);
+  border-radius: 50%;
+  z-index: 1;
+}
+
+/* ===== Инфо Сайдбара ===== */
+.profile-name { font-size: 24px; font-weight: 900; color: var(--project-text); margin-bottom: 4px; line-height: 1.2;}
+.profile-email { font-size: 14px; font-weight: 700; color: color-mix(in srgb, var(--project-text) 60%, transparent); margin-bottom: 20px; }
+
+.profile-title-slot {
+  display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 99px;
+  background: color-mix(in srgb, var(--project-text) 4%, transparent); border: 1px solid var(--glass-border);
+  margin-bottom: 24px; transition: all 0.2s ease;
+}
+.profile-title-slot-icon { font-size: 16px; }
+.profile-title-slot-text { font-size: 13px; font-weight: 800; color: var(--project-text); }
+
+.details-list { width: 100%; display: flex; flex-direction: column; background: color-mix(in srgb, var(--project-text) 2%, transparent); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; }
+.detail-item { display: flex; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--glass-border); }
+.detail-item:last-child { border-bottom: none; }
+.detail-label { font-size: 13px; font-weight: 700; color: color-mix(in srgb, var(--project-text) 60%, transparent); }
+.detail-value { font-size: 14px; font-weight: 800; color: var(--project-text); }
+
+/* ===== Стрики / Фишки (Streak Chips) ===== */
+.streak-chip {
+  height: 48px; border-radius: 14px; padding: 6px 14px;
+  display: inline-grid; grid-template-columns: 32px auto; grid-template-rows: 1fr 1fr; column-gap: 10px;
+  align-items: center; background: color-mix(in srgb, var(--project-text) 5%, transparent);
+  border: 1px solid var(--glass-border); transition: all 0.2s ease; cursor: pointer; text-align: left;
+}
+.streak-chip:hover { background: color-mix(in srgb, var(--project-text) 10%, transparent); transform: translateY(-2px); }
+.streak-chip-icon {
+  grid-row: 1 / span 2; width: 32px; height: 32px; border-radius: 10px;
+  display: grid; place-items: center; background: var(--project-card-bg);
+  box-shadow: 0 4px 12px -4px rgba(0,0,0,0.1); font-size: 16px; overflow: hidden;
+}
+.streak-chip-value { font-size: 16px; font-weight: 900; color: var(--project-text); line-height: 1; }
+.streak-chip-sub { font-size: 11px; font-weight: 700; color: color-mix(in srgb, var(--project-text) 60%, transparent); }
+
+/* Иконки внутри чипов */
+.streak-visual { display: inline-grid; place-items: center; width: 100%; height: 100%; line-height: 1; user-select: none; }
+.streak-visual__emoji { display: inline-grid; place-items: center; width: 100%; height: 100%; line-height: 1; font-weight: 1000; color: var(--project-text); }
+.streak-visual__img--chip { width: 100%; height: 100%; object-fit: contain; }
+
+/* ===== Правая Панель (Статистика и Прогресс) ===== */
+.section-title { font-size: 16px; font-weight: 900; color: var(--project-text); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;}
+.section-title b { color: var(--project-primary); }
+
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.stat-card {
+  background: color-mix(in srgb, var(--project-primary) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--project-primary) 15%, transparent);
+  border-radius: 20px; padding: 20px; text-align: center;
+}
+.stat-value { font-size: 28px; font-weight: 900; color: var(--project-primary); margin-bottom: 4px; }
+.stat-label { font-size: 11px; font-weight: 800; color: color-mix(in srgb, var(--project-text) 60%, transparent); text-transform: uppercase; }
+
+.progress-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+.progress-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px;
+  background: var(--project-card-bg); border: 1px solid var(--glass-border); border-radius: 16px;
+  box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--project-text) 10%, transparent);
+  transition: all 0.2s ease; cursor: pointer; text-decoration: none;
+}
+.progress-row:hover { transform: translateY(-2px); border-color: var(--project-primary); box-shadow: 0 8px 24px -8px color-mix(in srgb, var(--project-text) 15%, transparent); }
+.progress-left { flex: 1; }
+.progress-type { display: inline-block; padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 900; background: color-mix(in srgb, var(--project-text) 8%, transparent); color: var(--project-text); margin-bottom: 8px; }
+.progress-title { font-size: 16px; font-weight: 800; color: var(--project-text); margin-bottom: 4px; }
+.progress-sub { font-size: 13px; font-weight: 600; color: color-mix(in srgb, var(--project-text) 60%, transparent); }
+
+.progress-right { display: flex; align-items: center; gap: 16px; }
+.progress-bar { width: 140px; height: 8px; border-radius: 99px; background: color-mix(in srgb, var(--project-text) 10%, transparent); overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 999px; background: var(--project-primary); transition: width 0.5s ease; }
+.progress-percent { font-size: 15px; font-weight: 900; color: var(--project-primary); min-width: 44px; text-align: right; }
+
+.info-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.info-li { display: flex; gap: 12px; font-size: 14px; font-weight: 600; color: color-mix(in srgb, var(--project-text) 80%, transparent); }
+.info-bullet { width: 6px; height: 6px; border-radius: 50%; background: var(--project-primary); flex-shrink: 0; margin-top: 6px; }
+
+/* Loader */
+.background-loading {
+  position: fixed; top: 18px; right: 18px; background: var(--project-text); color: var(--project-bg);
+  padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 900; z-index: 1000;
+}
+.spinner {
+  border: 3px solid color-mix(in srgb, var(--project-bg) 30%, transparent);
+  border-top: 3px solid var(--project-primary); border-radius: 50%; width: 18px; height: 18px;
+  animation: spin 1.2s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* ===== Action Buttons (Кнопки в левой панели) ===== */
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+.profile-actions .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* ===== АДАПТИВНОСТЬ ===== */
+@media (max-width: 980px) { 
+  .profile-grid { grid-template-columns: 1fr; } 
+  .profile-sidebar { flex-direction: row; flex-wrap: wrap; text-align: left; align-items: flex-start; justify-content: center; gap: 24px; } 
+  .profile-avatar-wrapper { margin: 0; } 
+}
+@media (max-width: 640px) { 
+  .profile-topbar { flex-direction: column; align-items: stretch; } 
+  .brand-switcher-wrapper { justify-content: center; }
+  .top-actions { justify-content: center; }
+  .progress-row { flex-direction: column; align-items: stretch; } 
+  .progress-right { justify-content: space-between; } 
+  .progress-bar { width: 100%; } 
+  .project-switcher-menu { width: 100%; }
 }
 </file>
 
@@ -44914,239 +45286,6 @@ export function formatMaterialDate(value: unknown): string {
 @media (max-width: 480px) {
   .materials-grid {
     grid-template-columns: 1fr;
-  }
-}
-</file>
-
-<file path="app/api/admin/materials/[id]/route.ts">
-// app/api/admin/materials/[id]/route.ts
-import { NextRequest } from "next/server";
-import { ok, fail } from "@/lib/api/response";
-import { requireAdmin } from "@/lib/api/admin";
-
-import {
-  normalizeString,
-  normalizeNullableString,
-  normalizeBool,
-  normalizeOrderIndex,
-  normalizeUUID,
-  normalizeMaterialKind,
-  normalizeClassLevels,
-  normalizeTargetLevels,
-} from "@/lib/materials/normalize";
-
-function normalizePrice(value: any): number {
-  const num = Number(value);
-  return Number.isFinite(num) && num >= 0 ? Math.round(num) : 1000;
-}
-
-function normalizePatchPayload(body: any) {
-  const payload: Record<string, any> = {};
-
-  if ("branch_type" in body || "branchType" in body) {
-    payload.branch_type = String(body.branch_type ?? body.branchType ?? "").trim();
-  }
-
-  if ("material_kind" in body || "materialKind" in body) {
-    payload.material_kind = normalizeMaterialKind(body.material_kind ?? body.materialKind);
-  }
-
-  if ("title" in body) {
-    payload.title = normalizeString(body.title);
-  }
-
-  if ("description" in body) {
-    payload.description = normalizeNullableString(body.description);
-  }
-
-  if ("cover_image_url" in body || "coverImageUrl" in body) {
-    payload.cover_image_url = normalizeNullableString(body.cover_image_url ?? body.coverImageUrl);
-  }
-
-  if ("price" in body) {
-    payload.price = normalizePrice(body.price);
-  }
-
-  if ("is_available" in body || "isAvailable" in body) {
-    payload.is_available = normalizeBool(body.is_available ?? body.isAvailable);
-  }
-
-  if ("is_active" in body || "isActive" in body) {
-    payload.is_active = normalizeBool(body.is_active ?? body.isActive);
-  }
-
-  if ("is_secret" in body || "isSecret" in body) {
-    payload.is_secret = normalizeBool(body.is_secret ?? body.isSecret);
-  }
-
-  if ("order_index" in body || "orderIndex" in body) {
-    payload.order_index = normalizeOrderIndex(body.order_index ?? body.orderIndex);
-  }
-
-  if ("class_levels" in body || "class_level" in body || "classLevels" in body) {
-    payload.class_levels = normalizeClassLevels(body.class_levels ?? body.class_level ?? body.classLevels);
-  }
-
-  if ("target_levels" in body || "target_level" in body || "targetLevels" in body) {
-    payload.target_levels = normalizeTargetLevels(body.target_levels ?? body.target_level ?? body.targetLevels);
-  }
-
-  if ("meta" in body) {
-    payload.meta = body?.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? body.meta : {};
-  }
-
-  const hasTabId = "project_tab_id" in body || "tab_id" in body || "projectTabId" in body || "tabId" in body;
-  if (hasTabId) {
-    const rawTabId = body.project_tab_id ?? body.tab_id ?? body.projectTabId ?? body.tabId;
-    payload.project_tab_id = normalizeUUID(rawTabId);
-  }
-
-  return payload;
-}
-
-function validatePatchPayload(payload: Record<string, any>) {
-  if ("title" in payload && !payload.title) return "title required";
-  return null;
-}
-
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-  const { id } = await ctx.params;
-
-  if (!id) return fail("id required", 400, "VALIDATION");
-
-  try {
-    const { data, error } = await supabase
-      .from("materials")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error) {
-      console.error("🔴 [ADMIN GET MATERIAL] Ошибка поиска:", error.message);
-      return fail(error.message, 404, "NOT_FOUND");
-    }
-
-    const { count, error: countErr } = await supabase
-      .from("assignments")
-      .select("id", { count: "exact", head: true })
-      .or(`material_id.eq.${id},textbook_id.eq.${id},crossword_id.eq.${id}`);
-
-    if (countErr) {
-      console.error("🔴 [ADMIN GET MATERIAL] Ошибка подсчета заданий:", countErr.message);
-    }
-
-    return ok({
-      material: {
-        ...data,
-        assignments_count: count ?? 0,
-      },
-    });
-  } catch (error: any) {
-    console.error("🔴 [ADMIN GET MATERIAL] Серверная ошибка:", error);
-    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
-  }
-}
-
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-  const { id } = await ctx.params;
-
-  if (!id) return fail("id required", 400, "VALIDATION");
-
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Bad JSON", 400, "BAD_JSON");
-  }
-
-  const payload = normalizePatchPayload(body);
-  const validationError = validatePatchPayload(payload);
-
-  if (validationError) {
-    console.error("🔴 [ADMIN PATCH MATERIAL] Провал валидации:", validationError);
-    return fail(validationError, 400, "VALIDATION");
-  }
-
-  if (Object.keys(payload).length === 0) {
-    return fail("Nothing to update", 400, "VALIDATION");
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("materials")
-      .update(payload)
-      .eq("id", id)
-      .select("*")
-      .single();
-
-    if (error) {
-      console.error("🔴 [ADMIN PATCH MATERIAL] Ошибка БД при сохранении:", error.message, error.details);
-
-      let errorMsg = error.message;
-      if (errorMsg.includes("foreign key")) errorMsg = "Ошибка привязки таба (несуществующий ID)";
-
-      return fail(errorMsg, 500, "DB_ERROR");
-    }
-
-    if (data?.legacy_source_table && data?.legacy_source_id) {
-      const legacyPayload: Record<string, any> = {};
-      if ("price" in payload) legacyPayload.price = payload.price;
-      if ("title" in payload) legacyPayload.title = payload.title;
-      if ("description" in payload) legacyPayload.description = payload.description;
-      if ("cover_image_url" in payload) legacyPayload.cover_image_url = payload.cover_image_url;
-
-      if (Object.keys(legacyPayload).length > 0) {
-        try {
-          await supabase
-            .from(data.legacy_source_table)
-            .update(legacyPayload)
-            .eq("id", data.legacy_source_id);
-        } catch {
-          // Игнорируем ошибки синхронизации
-        }
-      }
-    }
-
-    return ok({ material: data });
-  } catch (error: any) {
-    console.error("🔴 [ADMIN PATCH MATERIAL] Серверная ошибка:", error);
-    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
-  }
-}
-
-// Дублируем PATCH метод для обработки PUT запросов
-export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  return PATCH(req, ctx);
-}
-
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
-  if ("response" in auth) return auth.response;
-
-  const { supabase } = auth;
-  const { id } = await ctx.params;
-
-  if (!id) return fail("id required", 400, "VALIDATION");
-
-  try {
-    const { error } = await supabase.from("materials").delete().eq("id", id);
-
-    if (error) {
-      console.error("🔴 [ADMIN DELETE MATERIAL] Ошибка удаления:", error.message);
-      return fail(error.message, 500, "DB_ERROR");
-    }
-
-    return ok({ deleted: true });
-  } catch (error: any) {
-    return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
 }
 </file>

@@ -30,9 +30,16 @@ export default function Modal({
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
+  
+  // ДОБАВЛЕНО: Стейт для определения, находимся ли мы в админке
+  const [portalClass, setPortalClass] = useState("");
 
   useEffect(() => {
     setMounted(true);
+    // Проверяем, есть ли на странице обертка админки
+    if (document.querySelector('.admin-root')) {
+      setPortalClass("admin-root");
+    }
   }, []);
 
   useEffect(() => {
@@ -75,7 +82,8 @@ export default function Modal({
   const modalContent = (
     <div
       ref={overlayRef}
-      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+      // ДОБАВЛЕНО: передаем класс portalClass (admin-root), чтобы стили админки сработали
+      className={`modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200 ${portalClass}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? titleId : undefined}
