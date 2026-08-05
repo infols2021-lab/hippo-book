@@ -67,11 +67,8 @@ export default function RewardsModal({
   const [promoSuccessMsg, setPromoSuccessMsg] = useState<string | null>(null);
   const [redeeming, setRedeeming] = useState(false);
 
-  // История промокодов текущего ученика
   const [promoHistory, setPromoHistory] = useState<UserPromocodeHistoryItem[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
 
-  // Стейты для пошагового анбоксинга
   const [unboxModalOpen, setUnboxModalOpen] = useState(false);
   const [unboxedItems, setUnboxedItems] = useState<UnboxedRewardItem[]>([]);
   const [pendingUnboxItems, setPendingUnboxItems] = useState<UnboxedRewardItem[]>([]);
@@ -97,21 +94,19 @@ export default function RewardsModal({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [mascotRes, streaksRes, promoHistoryRes] = await Promise.all([
+      const [mascotRes, streaksRes] = await Promise.all([
         fetch("/api/mascot"),
         fetch("/api/streaks"),
-        fetch("/api/rewards/promocodes/history"),
       ]);
 
-      const mascotData = await mascotRes.json();
-      const streaksData = await streaksRes.json();
-      const promoHistoryData = await promoHistoryRes.json();
-
       if (mascotRes.ok) {
+        const mascotData = await mascotRes.json();
         setMascot(mascotData.mascot || null);
         setInventory(mascotData.inventory || []);
       }
+
       if (streaksRes.ok) {
+        const streaksData = await streaksRes.json();
         const stats = streaksData.stats || {};
 
         setStreakStats({
@@ -123,8 +118,15 @@ export default function RewardsModal({
 
         setStreakPath(streaksData.path || []);
       }
-      if (promoHistoryRes.ok) {
-        setPromoHistory(promoHistoryData.history || []);
+
+      try {
+        const promoHistoryRes = await fetch("/api/promocodes/history");
+        if (promoHistoryRes.ok) {
+          const promoHistoryData = await promoHistoryRes.json();
+          setPromoHistory(promoHistoryData.history || []);
+        }
+      } catch (historyErr) {
+        console.warn("Error loading promo history:", historyErr);
       }
     } catch (e) {
       console.error("Error loading rewards data:", e);
@@ -586,7 +588,7 @@ export default function RewardsModal({
 
                 {/* Вкладка 3: ПРОМОКОД */}
                 {activeTab === "promocode" && (
-                  <div className="max-w-xl mx-auto py-6 space-y-6">
+                  <div className="max-w-xl mx-auto py-4 space-y-6">
                     <div className="text-center space-y-2">
                       <h3 className="text-lg font-black uppercase tracking-wider">
                         Активация промокода
@@ -657,7 +659,7 @@ export default function RewardsModal({
                           Вы пока не активировали ни одного промокода
                         </div>
                       ) : (
-                        <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                        <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
                           {promoHistory.map((item) => (
                             <div
                               key={item.id}
