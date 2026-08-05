@@ -42,12 +42,28 @@ export default function ReadingEditor({ value, onChange, disabled }: Props) {
 
   return (
     <div className="form-group" style={{ marginTop: 16 }}>
-      <label style={{ fontWeight: 800, display: "block", marginBottom: 8 }}>
+      <label style={{ fontWeight: 800, display: "block", marginBottom: 12 }}>
         📖 Редактор типа «Чтение + тестовые вопросы»
       </label>
 
+      {/* Текст для чтения (основная статья / рассказ) */}
+      <div className="form-group" style={{ marginBottom: 16 }}>
+        <label style={{ fontWeight: 700, display: "block", marginBottom: 6, fontSize: 13, color: "#1e293b" }}>
+          Текст для чтения (рассказ / статья / диалог):
+        </label>
+        <textarea
+          className="question-textarea"
+          rows={6}
+          value={value.text ?? ""}
+          placeholder="Вставьте сюда текст для чтения, по которому ученики будут отвечать на вопросы..."
+          disabled={disabled}
+          onChange={(e) => patch({ text: e.target.value })}
+        />
+        <div className="format-hint">💡 Этот текст будет показываться ученику перед вопросами</div>
+      </div>
+
       {/* Подвопросы */}
-      <div className="card" style={{ padding: 12, marginBottom: 14 }}>
+      <div className="card" style={{ padding: 14, marginBottom: 14 }}>
         <div
           style={{
             display: "flex",
