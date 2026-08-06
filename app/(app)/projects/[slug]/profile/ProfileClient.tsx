@@ -169,6 +169,7 @@ export default function ProfileClient({
 
   const [profile, setProfile] = useState<ProfileData>(initialProfile);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [bgLoading, setBgLoading] = useState<boolean>(Boolean(backgroundProxyUrl));
   const [bgReady, setBgReady] = useState<boolean>(false);
   const [notif, setNotif] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -186,6 +187,10 @@ export default function ProfileClient({
   const [materialsProgress, setMaterialsProgress] = useState<MaterialProgressItem[] | null>(progressProp ?? null);
   const [progressLoading, setProgressLoading] = useState<boolean>(!statsProp && !progressProp);
   const [progressError, setProgressError] = useState<string | null>(null);
+
+  // Категории материалов и аккордеон завершенных
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [completedExpanded, setCompletedExpanded] = useState<boolean>(false);
 
   const [streakData, setStreakData] = useState<StreakData | null>(
     streakProp ?? {
@@ -236,7 +241,6 @@ export default function ProfileClient({
     void fetchStreakData();
   }, []);
 
-  // ДОБАВЛЕНО: Глобально вешаем цвета профиля на body, чтобы модалки (порталы) их видели
   useEffect(() => {
     const currProject = availableProjects.find(p => p.slug === projectSlug);
     const themeColor = currProject?.theme?.primaryColor || currProject?.theme_color || "#0ea5e9";
@@ -352,6 +356,23 @@ export default function ProfileClient({
     }
   }
 
+  // Фильтрация и разделение материалов на Активные / Завершенные
+  const { filteredActive, filteredCompleted } = useMemo(() => {
+    if (!materialsProgress) return { filteredActive: [], filteredCompleted: [] };
+
+    const filtered = materialsProgress.filter((m) => {
+      if (selectedCategory === "all") return true;
+      if (selectedCategory === "textbook") return m.kind === "textbook";
+      if (selectedCategory === "crossword") return m.kind === "crossword";
+      return m.tabTitle?.toLowerCase() === selectedCategory.toLowerCase();
+    });
+
+    return {
+      filteredActive: filtered.filter((m) => m.progressPercent < 100),
+      filteredCompleted: filtered.filter((m) => m.progressPercent === 100),
+    };
+  }, [materialsProgress, selectedCategory]);
+
   const overlayCss = backgroundProxyUrl && (bgReady || !bgLoading) ? `url('${backgroundProxyUrl}')` : "none";
   const brandMark = projectName.substring(0, 2).toUpperCase() || "EK";
   const titleText = streakData?.equippedTitle?.trim() || "Без титула";
@@ -414,9 +435,7 @@ export default function ProfileClient({
           <div className="form-group" style={{ marginBottom: 24 }}>
             <label>Email:</label>
             <input type="email" className="input" value={userEmail} disabled />
-            <div className="small-muted">
-              Email нельзя изменить
-            </div>
+            <div className="small-muted">Email нельзя изменить</div>
           </div>
           <div className="modal-actions" style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
             <button type="button" className="btn ghost" onClick={() => setEditOpen(false)}>
@@ -429,7 +448,7 @@ export default function ProfileClient({
         </form>
       </Modal>
 
-      {/* 🎭 ЕДИНЫЙ ЦЕНТР НАГРАД */}
+      {/* 🎭 ЦЕНТР НАГРАД */}
       {rewardsModalOpen && (
         <RewardsModal
           isOpen={rewardsModalOpen}
@@ -440,7 +459,7 @@ export default function ProfileClient({
         />
       )}
 
-      {/* 🏅 ЕДИНЫЙ ТОП-20 ЛИДЕРБОРД */}
+      {/* 🏅 ТОП-20 ЛИДЕРБОРД */}
       {leaderboardOpen && (
         <StreakLeaderboardModal
           isOpen={leaderboardOpen}
@@ -448,11 +467,70 @@ export default function ProfileClient({
         />
       )}
 
+      {/* 📱 ВЫЕЗЖАЮЩЕЕ СНИЗУ МОБИЛЬНОЕ МЕНЮ (BOTTOM SHEET) */}
+      {mobileMenuOpen && (
+        <>
+          <div className="mobile-bottom-sheet-overlay" onClick={() => setMobileMenuOpen(false)} />
+          <div className="mobile-bottom-sheet">
+            <div className="sheet-handle" />
+            <div className="sheet-title">Меню профиля</div>
+            <div className="sheet-menu-list">
+              <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openRewards(); }}>
+                🎭 Награды и маскот
+              </button>
+              <Link className="sheet-item" href={`/projects/${projectSlug}/materials`} onClick={() => setMobileMenuOpen(false)}>
+                📚 Все материалы
+              </Link>
+              <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openEdit(); }}>
+                ✏️ Редактировать профиль
+              </button>
+              <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); router.push(`/projects/${projectSlug}/requests`); }}>
+                📦 Заявки на покупку
+              </button>
+              {profile.is_admin && (
+                <Link className="sheet-item" href="/admin" onClick={() => setMobileMenuOpen(false)}>
+                  ⚙️ Панель управления
+                </Link>
+              )}
+              <Link className="sheet-item" href="/portal" onClick={() => setMobileMenuOpen(false)}>
+                🌐 Главный портал
+              </Link>
+              <button className="sheet-item sheet-item--danger" onClick={() => void logout()}>
+                🚪 Выйти
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       <div className="profile-container">
-        {/* Верхняя панель сайта */}
+        
+        {/* 📱 1. МОБИЛЬНАЯ ШАПКА (видна только <= 768px) */}
+        <div className="mobile-header-bar">
+          <div className="mobile-header-left">
+            <div className="mobile-avatar" onClick={openRewards}>
+              {streakData?.equippedAvatarUrl ? (
+                <img src={streakData.equippedAvatarUrl} alt="Аватар" />
+              ) : (
+                <span>🎭</span>
+              )}
+            </div>
+            <div className="mobile-user-info">
+              <div className="mobile-user-name">{nameLabel(profile.full_name)}</div>
+              {features?.streaks && (
+                <button type="button" className="mobile-streak-pill" onClick={openRewards}>
+                  🔥 {streakData?.currentStreak ?? 0} дн. серия
+                </button>
+              )}
+            </div>
+          </div>
+          <button className="mobile-burger-btn" onClick={() => setMobileMenuOpen(true)} aria-label="Открыть меню">
+            ☰
+          </button>
+        </div>
+
+        {/* 🖥️ 2. ДЕСКТОПНАЯ ШАПКА (видна только > 768px) */}
         <div className="profile-topbar">
-          
-          {/* Project Switcher */}
           <div className="brand-switcher-wrapper">
             <button 
               type="button" 
@@ -535,8 +613,10 @@ export default function ProfileClient({
           </div>
         </div>
 
+        {/* ── СЕТКА ПРОФИЛЯ ── */}
         <div className="profile-grid">
-          {/* ЛЕВАЯ КОЛОНКА (Сайдбар) */}
+          
+          {/* 🖥️ ЛЕВАЯ КОЛОНКА (Сайдбар только на ПК) */}
           <aside className="profile-panel profile-sidebar">
             <div
               className="profile-avatar-wrapper"
@@ -612,9 +692,11 @@ export default function ProfileClient({
             </div>
           </aside>
 
-          {/* ПРАВАЯ КОЛОНКА (Статистика и Прогресс) */}
+          {/* ПРАВАЯ КОЛОНКА (Статистика и Материалы) */}
           <main className="profile-panel">
-            <div className="section-title">
+            
+            {/* 🖥️ ДЕСКТОП СТАТИСТИКА */}
+            <div className="section-title desktop-stats-title">
               Статистика <b>материалов</b>
             </div>
             <div className="stats-grid">
@@ -640,6 +722,48 @@ export default function ProfileClient({
               </div>
             </div>
 
+            {/* 📱 МОБИЛЬНАЯ КОМПАКТНАЯ СТАТИСТИКА (4 плашки в ряд как на скрине) */}
+            <div className="mobile-stats-row">
+              <div className="mobile-stat-card">
+                <div className="mobile-stat-val">{stats ? `${stats.successRate}%` : "0%"}</div>
+                <div className="mobile-stat-lbl">прогресс</div>
+              </div>
+              <div className="mobile-stat-card">
+                <div className="mobile-stat-val">{stats?.totalMaterials ?? 0}</div>
+                <div className="mobile-stat-lbl">материалов</div>
+              </div>
+              <div className="mobile-stat-card">
+                <div className="mobile-stat-val">{stats?.completedAvailableAssignments ?? 0}</div>
+                <div className="mobile-stat-lbl">решено</div>
+              </div>
+              <div className="mobile-stat-card">
+                <div className="mobile-stat-val">{stats?.totalAvailableAssignments ?? 0}</div>
+                <div className="mobile-stat-lbl">заданий</div>
+              </div>
+            </div>
+
+            {/* 📱 МОБИЛЬНЫЕ ТАБЫ-ФИЛЬТРЫ (Как на скрине: Все, Учебники, Кроссворды) */}
+            <div className="mobile-category-bar no-scrollbar">
+              <button 
+                className={`mobile-cat-pill ${selectedCategory === "all" ? "active" : ""}`}
+                onClick={() => setSelectedCategory("all")}
+              >
+                Все
+              </button>
+              <button 
+                className={`mobile-cat-pill ${selectedCategory === "textbook" ? "active" : ""}`}
+                onClick={() => setSelectedCategory("textbook")}
+              >
+                Учебники
+              </button>
+              <button 
+                className={`mobile-cat-pill ${selectedCategory === "crossword" ? "active" : ""}`}
+                onClick={() => setSelectedCategory("crossword")}
+              >
+                Кроссворды
+              </button>
+            </div>
+
             {progressLoading && (
               <div style={{ marginBottom: 24, fontWeight: 700, color: "var(--project-muted)" }}>
                 Подгружаем прогресс...
@@ -651,9 +775,10 @@ export default function ProfileClient({
               </div>
             )}
 
-            <div className="section-title">
+            <div className="section-title desktop-stats-title">
               Прогресс <b>обучения</b>
             </div>
+
             {!materialsProgress ? (
               <div style={{ fontWeight: 700, color: "var(--project-muted)" }}>Загрузка материалов...</div>
             ) : materialsProgress.length === 0 ? (
@@ -671,30 +796,64 @@ export default function ProfileClient({
                 <div style={{ marginTop: 8, fontSize: "14px" }}>Обратитесь к администратору для получения доступа</div>
               </div>
             ) : (
-              <div className="progress-list">
-                {materialsProgress.map((m) => (
-                  <Link key={`${m.kind}-${m.id}`} href={m.href} className="progress-row" style={{ textDecoration: "none" }}>
-                    <div className="progress-left">
-                      <div className="progress-type">
-                        {m.tabTitle ? m.tabTitle.toUpperCase() : m.kind === "textbook" ? "УЧЕБНИК" : "КРОССВОРД"}
+              <>
+                {/* АКТИВНЫЕ МАТЕРИАЛЫ */}
+                <div className="progress-list">
+                  {filteredActive.map((m) => (
+                    <Link key={`${m.kind}-${m.id}`} href={m.href} className="progress-row" style={{ textDecoration: "none" }}>
+                      <div className="progress-left">
+                        <div className="progress-type">
+                          {m.tabTitle ? m.tabTitle.toUpperCase() : m.kind === "textbook" ? "УЧЕБНИКИ" : "КРОССВОРДЫ"}
+                        </div>
+                        <div className="progress-title">{m.title}</div>
+                        <div className="progress-sub">
+                          {m.kind === "textbook"
+                            ? `${m.completed} из ${m.total} заданий выполнено`
+                            : `${m.completed} из ${m.total} слов отгадано`}
+                          {m.total === 0 ? " (нет заданий)" : ""}
+                        </div>
                       </div>
-                      <div className="progress-title">{m.title}</div>
-                      <div className="progress-sub">
-                        {m.kind === "textbook"
-                          ? `${m.completed} из ${m.total} заданий выполнено`
-                          : `${m.completed} из ${m.total} слов отгадано`}
-                        {m.total === 0 ? " (нет заданий)" : ""}
+                      <div className="progress-right">
+                        <div className="progress-bar">
+                          <div className="progress-fill" style={{ width: `${m.progressPercent}%` }} />
+                        </div>
+                        <div className="progress-percent">{m.progressPercent}%</div>
                       </div>
-                    </div>
-                    <div className="progress-right">
-                      <div className="progress-bar">
-                        <div className="progress-fill" style={{ width: `${m.progressPercent}%` }} />
+                    </Link>
+                  ))}
+                </div>
+
+                {/* 📱 СВОРАЧИВАЕМЫЙ АККОРДЕОН ДЛЯ ЗАВЕРШЕННЫХ (100%) МАТЕРИАЛОВ */}
+                {filteredCompleted.length > 0 && (
+                  <div className="completed-accordion">
+                    <button 
+                      className="accordion-trigger"
+                      onClick={() => setCompletedExpanded(!completedExpanded)}
+                    >
+                      <span>Завершено ({filteredCompleted.length})</span>
+                      <span className={`accordion-chevron ${completedExpanded ? "open" : ""}`}>▼</span>
+                    </button>
+
+                    {completedExpanded && (
+                      <div className="accordion-content">
+                        {filteredCompleted.map((m) => (
+                          <Link key={`${m.kind}-${m.id}`} href={m.href} className="progress-row" style={{ textDecoration: "none" }}>
+                            <div className="progress-left">
+                              <div className="progress-type">
+                                {m.tabTitle ? m.tabTitle.toUpperCase() : m.kind === "textbook" ? "УЧЕБНИКИ" : "КРОССВОРДЫ"}
+                              </div>
+                              <div className="progress-title">{m.title}</div>
+                            </div>
+                            <div className="progress-right">
+                              <div className="progress-percent">100%</div>
+                            </div>
+                          </Link>
+                        ))}
                       </div>
-                      <div className="progress-percent">{m.progressPercent}%</div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
 
             <div className="section-title" style={{ marginTop: "32px" }}>
