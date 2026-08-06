@@ -1,6 +1,6 @@
-// app/info/page.tsx
 import Link from "next/link";
 import SmartBackButton from "@/components/SmartBackButton";
+import "./info.css";
 
 type SP = { source?: string; sourceId?: string };
 
@@ -16,7 +16,7 @@ function formatRuDate(d: Date) {
 }
 
 export const metadata = {
-  title: "Информация",
+  title: "Информация для участников",
   description: "Прайс, контакты и документы. Оплата по QR в заявке, доступ выдаём после проверки.",
 };
 
@@ -35,93 +35,95 @@ export default async function InfoPage({
 }) {
   const sp = (await searchParams) ?? {};
   const qs = buildQs(sp);
-
   const stamp = lastDayOfCurrentMonthUTC();
 
   return (
     <div className="info-wrap">
       <div className="info-shell">
-        <section className="info-hero">
+        <div className="info-main-card">
+          
+          {/* Верхняя панель */}
           <div className="info-topbar">
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              
-              {/* Умная кнопка назад: сама вернет туда, откуда пришел юзер */}
+            <div className="info-topbar-left">
               <SmartBackButton />
-
               <div className="info-badge" aria-label="Дата обновления">
                 <span className="info-badge-dot" />
                 <div className="info-badge-text">
-                  <strong>Обновление страницы</strong>
-                  <span>{formatRuDate(stamp)}</span>
+                  <span>Обновление страницы:</span>
+                  <strong>{formatRuDate(stamp)}</strong>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="info-note">
-              Важно: оплата происходит через QR-код в заявке. Проверяем вручную и выдаём доступ обычно в течение 24 часов.
+          {/* Плашка с важным уведомлением */}
+          <div className="info-banner">
+            <span className="info-banner-icon">⚡</span>
+            <div>
+              <strong>Важно:</strong> оплата происходит через QR-код в заявке. Проверяем вручную и выдаём доступ обычно в течение 24 часов.
             </div>
           </div>
 
           <h1 className="info-title">Информация для участников</h1>
           <p className="info-subtitle">
-            Здесь всё, чтобы было понятно: что можно купить, сколько стоит, как происходит оплата и когда выдаётся доступ.
+            Здесь собраны все ключевые сведения: стоимость материалов, порядок оплаты и правила получения доступа.
           </p>
 
+          {/* Карточки с правилами */}
           <div className="info-grid">
             <div className="info-card">
-              <h3>🧾 Как проходит оплата</h3>
+              <div className="info-card-icon">🧾</div>
+              <h3>Как проходит оплата</h3>
               <p>
-                В заявке генерируется QR-код. Вы оплачиваете по QR, затем мы вручную проверяем оплату в банке и выдаём доступ.
-                Обычно это занимает до 24 часов.
+                В заявке генерируется QR-код. Вы оплачиваете по QR, затем мы вручную проверяем статус платежа в банке и открываем доступ в течение 24 часов.
               </p>
             </div>
 
             <div className="info-card">
-              <h3>🧩 Что можно купить</h3>
+              <div className="info-card-icon">🧩</div>
+              <h3>Что можно купить</h3>
               <p>
-                В одной заявке можно купить <strong>1 учебник</strong> и <strong>1 кроссворд</strong>. Материалы выдаются
-                автоматически под выбранный класс/уровень (после подтверждения оплаты).
+                В одной заявке можно приобрести <strong>1 учебник</strong> и <strong>1 кроссворд</strong>. Доступ подтягивается под выбранный класс/уровень.
               </p>
             </div>
 
             <div className="info-card">
-              <h3>📮 Поддержка</h3>
+              <div className="info-card-icon">📮</div>
+              <h3>Поддержка</h3>
               <p>
-                Если прошло больше 24 часов — напишите в поддержку, указав почту и номер заявки. Мы поможем быстрее найти оплату.
+                Если прошло более 24 часов — напишите в поддержку, указав ваш e-mail и номер заявки. Мы поможем оперативно найти платеж.
               </p>
             </div>
           </div>
 
-          {/* ✅ ВАЖНО: протаскиваем qs во все внутренние ссылки */}
+          {/* Навигационные кнопки-карточки */}
           <div className="info-actions">
-            <Link className="info-btn" href={`/info/pricing${qs}`}>
-              <span>
-                Прайс
-                <br />
-                <small>цены и правила покупки</small>
-              </span>
-              <span className="arrow">→</span>
+            <Link className="info-action-btn" href={`/info/pricing${qs}`}>
+              <div className="info-action-content">
+                <div className="info-action-title">Прайс и Каталог</div>
+                <div className="info-action-sub">актуальные цены и материалы</div>
+              </div>
+              <span className="info-action-arrow">→</span>
             </Link>
 
-            <Link className="info-btn" href={`/info/contacts${qs}`}>
-              <span>
-                Контакты
-                <br />
-                <small>связаться с нами</small>
-              </span>
-              <span className="arrow">→</span>
+            <Link className="info-action-btn" href={`/info/contacts${qs}`}>
+              <div className="info-action-content">
+                <div className="info-action-title">Контакты</div>
+                <div className="info-action-sub">способы связи с нами</div>
+              </div>
+              <span className="info-action-arrow">→</span>
             </Link>
 
-            <Link className="info-btn" href={`/info/documents${qs}`}>
-              <span>
-                Документы
-                <br />
-                <small>пока заглушка</small>
-              </span>
-              <span className="arrow">→</span>
+            <Link className="info-action-btn" href={`/info/documents${qs}`}>
+              <div className="info-action-content">
+                <div className="info-action-title">Документы</div>
+                <div className="info-action-sub">официальная информация</div>
+              </div>
+              <span className="info-action-arrow">→</span>
             </Link>
           </div>
-        </section>
+
+        </div>
       </div>
     </div>
   );

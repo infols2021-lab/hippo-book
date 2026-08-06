@@ -7,7 +7,7 @@ import "../info.css";
 
 type Project = { id: string; name: string; slug: string; theme_color?: string; theme?: any };
 type Tab = { id: string; project_id: string; title: string; icon?: string };
-type Material = { id: string; project_id?: string; tab_id?: string; title: string; cover_image_url?: string; price?: number };
+type Material = { id: string; project_id?: string; tab_id?: string; title: string; cover_image_url?: string; price?: number; description?: string };
 
 type Props = {
   projects: Project[];
@@ -47,9 +47,8 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
     return s ? `?${s}` : "";
   }, [source, sourceId]);
 
-  // Табы текущего проекта
   const currentProjectTabs = useMemo(() => {
-    return tabs.filter(t => t.project_id === activeProjectId);
+    return tabs.filter((t) => t.project_id === activeProjectId);
   }, [tabs, activeProjectId]);
 
   const handleProjectChange = (pid: string) => {
@@ -57,51 +56,48 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
     setActiveTabId("all");
   };
 
-  // Фильтрация материалов строго по Проекту И Табу
   const filteredMaterials = useMemo(() => {
-    return materials.filter(m => {
-      // 1. Проверяем проект
+    return materials.filter((m) => {
       if (m.project_id !== activeProjectId) return false;
-      // 2. Проверяем таб (если не выбрано "Все")
       if (activeTabId !== "all" && m.tab_id !== activeTabId) return false;
       return true;
     });
   }, [materials, activeProjectId, activeTabId]);
 
-  const activeProject = projects.find(p => p.id === activeProjectId);
+  const activeProject = projects.find((p) => p.id === activeProjectId);
   const projectColor = activeProject?.theme?.primaryColor || activeProject?.theme_color || "#0ea5e9";
 
   return (
     <div className="info-wrap">
       <div className="info-shell">
-        
         <div className="info-main-card">
           
           <div className="info-topbar">
-            <Link className="info-back-btn" href={`/info${qs}`}>
-              ← Назад
-            </Link>
-            
-            <div className="info-badge">
-              <span className="info-badge-dot" style={{ background: projectColor, boxShadow: `0 0 0 4px ${projectColor}30` }} />
-              <div className="info-badge-text">
-                Обновлено <span>{lastUpdateDate}</span>
+            <div className="info-topbar-left">
+              <Link className="info-back-btn" href={`/info${qs}`}>
+                ← Назад
+              </Link>
+              <div className="info-badge">
+                <span className="info-badge-dot" style={{ background: projectColor, boxShadow: `0 0 0 4px ${projectColor}30` }} />
+                <div className="info-badge-text">
+                  <span>Обновлено:</span> <strong>{lastUpdateDate}</strong>
+                </div>
               </div>
             </div>
           </div>
 
           <h1 className="info-title">Каталог материалов</h1>
           <p className="info-subtitle">
-            Выберите направление, чтобы посмотреть доступные учебники, кроссворды и тестирования. 
+            Выберите направление и раздел, чтобы посмотреть доступные учебники, кроссворды и тестирования. 
             Оплата происходит безопасно через QR-код.
           </p>
 
-          {/* ФИЛЬТР 1: ПРОЕКТЫ */}
+          {/* Выбор проекта */}
           {projects.length > 0 && (
             <div className="filter-section">
               <div className="filter-label">Направление:</div>
               <div className="filter-chips">
-                {projects.map(p => {
+                {projects.map((p) => {
                   const isActive = p.id === activeProjectId;
                   const color = p.theme?.primaryColor || p.theme_color || "#0ea5e9";
                   return (
@@ -110,6 +106,7 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
                       onClick={() => handleProjectChange(p.id)}
                       className={`chip-main ${isActive ? "active" : ""}`}
                       style={isActive ? { background: color, borderColor: color } : {}}
+                      type="button"
                     >
                       {p.name}
                     </button>
@@ -119,7 +116,7 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
             </div>
           )}
 
-          {/* ФИЛЬТР 2: ТАБЫ */}
+          {/* Выбор таба */}
           {currentProjectTabs.length > 0 && (
             <div className="filter-section" style={{ marginTop: 12 }}>
               <div className="filter-label">Раздел:</div>
@@ -128,10 +125,11 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
                   onClick={() => setActiveTabId("all")}
                   className={`chip-sub ${activeTabId === "all" ? "active" : ""}`}
                   style={activeTabId === "all" ? { background: `${projectColor}15`, color: projectColor, borderColor: projectColor } : {}}
+                  type="button"
                 >
-                  Все
+                  Все разделы
                 </button>
-                {currentProjectTabs.map(t => {
+                {currentProjectTabs.map((t) => {
                   const isActive = t.id === activeTabId;
                   return (
                     <button
@@ -139,8 +137,9 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
                       onClick={() => setActiveTabId(t.id)}
                       className={`chip-sub ${isActive ? "active" : ""}`}
                       style={isActive ? { background: `${projectColor}15`, color: projectColor, borderColor: projectColor } : {}}
+                      type="button"
                     >
-                      {t.icon} {t.title}
+                      {t.icon ? `${t.icon} ` : ""}{t.title}
                     </button>
                   );
                 })}
@@ -148,17 +147,17 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
             </div>
           )}
 
-          {/* СЕТКА МАТЕРИАЛОВ */}
+          {/* Сетка материалов */}
           <div className="materials-container">
             {filteredMaterials.length === 0 ? (
               <div className="empty-state">
                 <span className="empty-state-icon">📭</span>
                 <h3>Материалов пока нет</h3>
-                <p>В этом разделе еще не добавлены материалы. Выберите другой раздел.</p>
+                <p>В этом разделе еще не добавлены материалы. Выберите другой раздел или направление.</p>
               </div>
             ) : (
               <div className="materials-grid">
-                {filteredMaterials.map(m => {
+                {filteredMaterials.map((m) => {
                   const price = m.price || 1000;
                   const cover = toStorageProxyUrl(m.cover_image_url);
                   return (
@@ -173,7 +172,9 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
                       </div>
                       <div className="mat-body">
                         <div className="mat-title" title={m.title}>{m.title}</div>
-                        <div className="mat-desc">Доступ выдается администратором</div>
+                        <div className="mat-desc">
+                          {m.description || "Доступ выдается администратором после оплаты"}
+                        </div>
                       </div>
                     </div>
                   );
@@ -182,10 +183,8 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
             )}
           </div>
 
-          {/* ИНФОБЛОКИ */}
+          {/* Инфоблоки */}
           <div className="info-split">
-            
-            {/* Как оплатить */}
             <div className="info-box">
               <div className="info-box-head">
                 <h2>Как оформить доступ</h2>
@@ -198,22 +197,21 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
                 </div>
                 <div className="step">
                   <div className="step-num" style={{ background: projectColor }}>2</div>
-                  <div className="step-text">Оплатите по QR-коду в приложении любого банка.</div>
+                  <div className="step-text">Оплатите по QR-коду в приложении любого удобного банка.</div>
                 </div>
                 <div className="step">
                   <div className="step-num" style={{ background: projectColor }}>3</div>
-                  <div className="step-text">Обычно доступ открывается в течение <strong>24 часов</strong> после проверки.</div>
+                  <div className="step-text">Доступ откроется автоматически или в течение <strong>24 часов</strong> после проверки.</div>
                 </div>
               </div>
             </div>
 
-            {/* Классы */}
             <div className="info-box">
               <div className="info-box-head">
-                <h2>Соответствие по классам</h2>
+                <h2>Соответствие уровням</h2>
                 <div className="info-box-pill">Автовыдача</div>
               </div>
-              <p className="info-box-desc">Система автоматически подберет нужный уровень материалов, если он указан в вашей заявке.</p>
+              <p className="info-box-desc">Система автоматически подберут нужный уровень материалов при указании вашего класса.</p>
               
               <div className="class-table">
                 <div className="class-row">
@@ -229,23 +227,14 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
                   <div className="c-val">Hippo 1 • CEFR A2</div>
                 </div>
                 <div className="class-row">
-                  <div className="c-age">7 класс</div>
-                  <div className="c-val">Hippo 2 • CEFR B1</div>
-                </div>
-                <div className="class-row">
-                  <div className="c-age">8–9 класс</div>
-                  <div className="c-val">Hippo 3 • CEFR B2</div>
-                </div>
-                <div className="class-row">
-                  <div className="c-age">10–11 класс</div>
-                  <div className="c-val">Hippo 4 • CEFR C1</div>
+                  <div className="c-age">7–9 класс</div>
+                  <div className="c-val">Hippo 2-3 • CEFR B1-B2</div>
                 </div>
               </div>
             </div>
-
           </div>
+
         </div>
-        
       </div>
     </div>
   );

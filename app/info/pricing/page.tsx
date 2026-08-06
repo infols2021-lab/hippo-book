@@ -1,12 +1,13 @@
-/* app/info/pricing/page.tsx */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import PricingClient from "./PricingClient";
 
-export const revalidate = 0;
+type SP = { source?: string; sourceId?: string };
 
 function lastDayOfCurrentMonthUTC(): Date {
   const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 12, 0, 0));
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  return new Date(Date.UTC(y, m + 1, 0, 12, 0, 0));
 }
 
 function formatRuDate(d: Date) {
@@ -14,57 +15,62 @@ function formatRuDate(d: Date) {
 }
 
 export const metadata = {
-  title: "Каталог и Прайс | skilLS",
-  description: "Цены на учебники и кроссворды, правила покупки, выдача после проверки оплаты.",
+  title: "Каталог материалов и прайс",
+  description: "Доступные учебники, кроссворды и тестирования по направлениям.",
 };
+
+export const revalidate = 0;
 
 export default async function PricingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ source?: string; sourceId?: string }>;
+  searchParams?: Promise<SP>;
 }) {
   const sp = (await searchParams) ?? {};
   const supabase = await createSupabaseServerClient();
-  const stamp = lastDayOfCurrentMonthUTC();
 
-  // 1. Получаем все активные проекты
+  // 1. Получаем активные проекты
   const { data: projectsData } = await supabase
     .from("projects")
     .select("id, name, slug, theme_color, theme")
     .eq("is_active", true)
     .order("order_index", { ascending: true });
 
-  // 2. Получаем табы
-  const { data: tabsData } = await supabase
-    .from("tabs")
-    .select("id, project_id, title, icon")
-    .order("order_index", { ascending: true });
-
-  // 3. Получаем материалы (привязаны к проектам и табам)
-  const { data: materialsData } = await supabase
-    .from("materials")
-    .select("id, project_id, tab_id, title, cover_image_url, price")
-    .eq("is_active", true)
-    .order("created_at", { ascending: false });
-
   const projects = projectsData || [];
-  const tabs = tabsData || [];
-  const materials = materialsData || [];
+  const projectIds = projects.map((p) => p.id);
 
-  // Фоллбэк на случай пустой базы (чтобы не падало)
-  if (projects.length === 0) {
-    projects.push(
-      { id: "legacy_olympiad", name: "Олимпиада", slug: "olympiad", theme_color: "#0ea5e9", theme: null },
-      { id: "legacy_exams", name: "Экзамены", slug: "exams", theme_color: "#8b5cf6", theme: null }
-    );
+  let tabs: any[] = [];
+  let materials: any[] = [];
+
+  if (projectIds.length > 0) {
+    const [{ data: tabsData }, { data: matsData }] = await Promise.all([
+      supabase
+        .from("project_tabs")
+        .select("id, project_id, title, icon")
+        .in("project_id", projectIds)
+        .order("order_index", { ascending: true }),
+      supabase
+        .from("materials")
+        .select("id, project_id, project_tab_id, title, description, cover_image_url, price")
+        .eq("is_active", true)
+        .in("project_id", projectIds),
+    ]);
+
+    tabs = tabsData || [];
+    materials = (matsData || []).map((m) => ({
+      ...m,
+      tab_id: m.project_tab_id,
+    }));
   }
 
+  const stamp = formatRuDate(lastDayOfCurrentMonthUTC());
+
   return (
-    <PricingClient 
+    <PricingClient
       projects={projects}
       tabs={tabs}
       materials={materials}
-      lastUpdateDate={formatRuDate(stamp)}
+      lastUpdateDate={stamp}
       source={sp.source}
       sourceId={sp.sourceId}
     />
