@@ -298,36 +298,54 @@ export default function RewardsModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 overflow-y-auto"
         style={{ backgroundColor: "rgba(0,0,0,0.8)" }}
       >
         <div
-          className="rounded-[32px] max-w-4xl w-full h-[88vh] flex flex-col shadow-2xl overflow-hidden relative border transition-all"
+          className="rounded-t-[32px] sm:rounded-[32px] max-w-4xl w-full h-[90vh] sm:h-[88vh] flex flex-col shadow-2xl overflow-hidden relative border transition-all"
           style={{
             backgroundColor: "var(--project-card-bg, #ffffff)",
             color: "var(--project-text, #0f172a)",
             borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
           }}
         >
+          {/* Индикатор для свайпа на мобильных */}
+          <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto sm:hidden mt-2 -mb-2" />
+
           {/* Шапка модалки */}
           <div
-            className="flex items-center justify-between p-5 sm:p-6 border-b"
+            className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-6 border-b gap-3"
             style={{
               borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
               backgroundColor: "var(--project-card-bg, #ffffff)",
             }}
           >
-            <div className="flex items-center gap-3">
-              <div
-                className="w-3.5 h-3.5 rounded-full"
-                style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
-              />
-              <h2 className="text-xl font-black tracking-wide uppercase">Центр наград</h2>
+            <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
+                />
+                <h2 className="text-base sm:text-xl font-black tracking-wide uppercase">Центр наград</h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3 py-1 font-bold text-xs rounded-xl transition-all border sm:hidden"
+                style={{
+                  backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
+                  borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+                  color: "var(--project-text, #0f172a)",
+                }}
+              >
+                Закрыть
+              </button>
             </div>
 
             {/* Табы */}
             <div
-              className="flex gap-1 p-1.5 rounded-2xl border"
+              className="flex gap-1 p-1 rounded-2xl border overflow-x-auto no-scrollbar w-full sm:w-auto"
               style={{
                 backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
                 borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
@@ -336,7 +354,7 @@ export default function RewardsModal({
               <button
                 type="button"
                 onClick={() => setActiveTab("wardrobe")}
-                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
+                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
                 style={{
                   backgroundColor:
                     activeTab === "wardrobe" ? "var(--project-primary, #0ea5e9)" : "transparent",
@@ -348,7 +366,7 @@ export default function RewardsModal({
               <button
                 type="button"
                 onClick={() => setActiveTab("streaks")}
-                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
+                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
                 style={{
                   backgroundColor:
                     activeTab === "streaks" ? "var(--project-primary, #0ea5e9)" : "transparent",
@@ -360,7 +378,7 @@ export default function RewardsModal({
               <button
                 type="button"
                 onClick={() => setActiveTab("promocode")}
-                className="px-4 py-2 rounded-xl text-xs font-black tracking-wide uppercase transition-all"
+                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
                 style={{
                   backgroundColor:
                     activeTab === "promocode" ? "var(--project-primary, #0ea5e9)" : "transparent",
@@ -374,7 +392,7 @@ export default function RewardsModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-1.5 font-bold text-xs rounded-xl transition-all border"
+              className="hidden sm:block px-3.5 py-1.5 font-bold text-xs rounded-xl transition-all border"
               style={{
                 backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
                 borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
@@ -386,32 +404,32 @@ export default function RewardsModal({
           </div>
 
           {/* Контент модалки */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             {loading ? (
-              <div className="h-full flex items-center justify-center font-bold text-sm uppercase tracking-wider opacity-60">
+              <div className="h-full flex items-center justify-center font-bold text-xs sm:text-sm uppercase tracking-wider opacity-60">
                 Загрузка данных...
               </div>
             ) : (
               <>
                 {/* Вкладка 1: ГАРДЕРОБ */}
                 {activeTab === "wardrobe" && (
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 h-full">
                     <div
-                      className="md:col-span-5 border rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-sm"
+                      className="md:col-span-5 border rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col items-center justify-center relative shadow-sm"
                       style={{
                         backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
                         borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
                       }}
                     >
-                      <MascotViewer mascotSettings={mascot} size={230} />
-                      <div className="text-xs font-extrabold uppercase tracking-wider mt-4 text-center opacity-60">
-                        Предпросмотр гардероба
+                      <MascotViewer mascotSettings={mascot} size={180} />
+                      <div className="text-[11px] font-extrabold uppercase tracking-wider mt-2 sm:mt-4 text-center opacity-60">
+                        Предпросмотр маскота
                       </div>
                     </div>
 
-                    <div className="md:col-span-7 flex flex-col space-y-4">
+                    <div className="md:col-span-7 flex flex-col space-y-3 sm:space-y-4">
                       <div
-                        className="flex gap-2 border-b pb-3 overflow-x-auto"
+                        className="flex gap-2 border-b pb-2.5 overflow-x-auto no-scrollbar"
                         style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
                       >
                         {[
@@ -425,7 +443,7 @@ export default function RewardsModal({
                             key={cat.type}
                             type="button"
                             onClick={() => setWardrobeCategory(cat.type as RewardType)}
-                            className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all border"
+                            className="px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all border"
                             style={{
                               backgroundColor:
                                 wardrobeCategory === cat.type
@@ -450,21 +468,21 @@ export default function RewardsModal({
                         className={`flex-1 overflow-y-auto pr-1 ${
                           wardrobeCategory === "title"
                             ? "flex flex-col gap-2.5"
-                            : "grid grid-cols-2 sm:grid-cols-3 gap-3"
+                            : "grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3"
                         }`}
                       >
                         {filteredInventory.length === 0 ? (
                           <div
-                            className="col-span-full py-16 text-center border rounded-2xl p-6"
+                            className="col-span-full py-12 sm:py-16 text-center border rounded-2xl p-6"
                             style={{
                               backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
                               borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
                             }}
                           >
-                            <div className="text-sm font-bold uppercase tracking-wider mb-1">
+                            <div className="text-xs sm:text-sm font-bold uppercase tracking-wider mb-1">
                               Предметы отсутствуют
                             </div>
-                            <div className="text-xs font-medium opacity-60">
+                            <div className="text-[11px] sm:text-xs font-medium opacity-60">
                               Продлевайте ежедневную серию или активируйте промокоды для получения наград.
                             </div>
                           </div>
@@ -480,7 +498,7 @@ export default function RewardsModal({
                                   onClick={() =>
                                     handleEquip(wardrobeCategory, equipped ? null : item.reward!.id)
                                   }
-                                  className="w-full border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all"
+                                  className="w-full border rounded-2xl p-3.5 sm:p-4 flex items-center justify-between cursor-pointer transition-all"
                                   style={{
                                     backgroundColor: equipped
                                       ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
@@ -509,7 +527,7 @@ export default function RewardsModal({
 
                                   <button
                                     type="button"
-                                    className="text-xs font-black uppercase tracking-wider px-4 py-2 rounded-xl flex-shrink-0 transition-colors"
+                                    className="text-[11px] sm:text-xs font-black uppercase tracking-wider px-3.5 py-1.5 rounded-xl flex-shrink-0 transition-colors"
                                     style={{
                                       backgroundColor: equipped
                                         ? "var(--project-primary, #0ea5e9)"
@@ -529,7 +547,7 @@ export default function RewardsModal({
                                 onClick={() =>
                                   handleEquip(wardrobeCategory, equipped ? null : item.reward!.id)
                                 }
-                                className="border rounded-2xl p-4 flex flex-col items-center justify-between cursor-pointer transition-all"
+                                className="border rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-between cursor-pointer transition-all min-h-[110px]"
                                 style={{
                                   backgroundColor: equipped
                                     ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
@@ -541,7 +559,7 @@ export default function RewardsModal({
                               >
                                 {equipped && (
                                   <span
-                                    className="self-end text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider"
+                                    className="self-end text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider"
                                     style={{
                                       backgroundColor: "var(--project-primary, #0ea5e9)",
                                       color: "#ffffff",
@@ -551,22 +569,22 @@ export default function RewardsModal({
                                   </span>
                                 )}
 
-                                <div className="w-16 h-16 flex items-center justify-center my-3">
+                                <div className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center my-2">
                                   {item.reward.asset_url ? (
                                     <img
                                       src={item.reward.asset_url}
                                       alt=""
-                                      className="max-h-14 max-w-14 object-contain"
+                                      className="max-h-12 max-w-12 sm:max-h-14 sm:max-w-14 object-contain"
                                     />
                                   ) : (
-                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold opacity-50">
+                                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-bold opacity-40">
                                       N/A
                                     </div>
                                   )}
                                 </div>
 
                                 <div className="text-center w-full">
-                                  <div className="font-bold text-xs truncate">{item.reward.title}</div>
+                                  <div className="font-bold text-[11px] sm:text-xs truncate">{item.reward.title}</div>
                                 </div>
                               </div>
                             );
@@ -588,9 +606,9 @@ export default function RewardsModal({
 
                 {/* Вкладка 3: ПРОМОКОД */}
                 {activeTab === "promocode" && (
-                  <div className="max-w-xl mx-auto py-4 space-y-6">
-                    <div className="text-center space-y-2">
-                      <h3 className="text-lg font-black uppercase tracking-wider">
+                  <div className="max-w-xl mx-auto py-2 sm:py-4 space-y-6">
+                    <div className="text-center space-y-1.5">
+                      <h3 className="text-base sm:text-lg font-black uppercase tracking-wider">
                         Активация промокода
                       </h3>
                       <p className="text-xs font-medium opacity-60">
@@ -605,7 +623,7 @@ export default function RewardsModal({
                           placeholder="ВВЕДИТЕ КОД"
                           value={promoCodeInput}
                           onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
-                          className="w-full border-2 rounded-2xl p-4 text-center text-lg font-mono font-black uppercase tracking-widest focus:outline-none transition-colors"
+                          className="w-full border-2 rounded-2xl p-3.5 sm:p-4 text-center text-base sm:text-lg font-mono font-black uppercase tracking-widest focus:outline-none transition-colors"
                           style={{
                             backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
                             borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
@@ -629,7 +647,7 @@ export default function RewardsModal({
                       <button
                         type="submit"
                         disabled={redeeming || !promoCodeInput.trim()}
-                        className="w-full py-4 font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg disabled:opacity-50"
+                        className="w-full py-3.5 sm:py-4 font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg disabled:opacity-50"
                         style={{
                           backgroundColor: "var(--project-primary, #0ea5e9)",
                           color: "#ffffff",
@@ -663,7 +681,7 @@ export default function RewardsModal({
                           {promoHistory.map((item) => (
                             <div
                               key={item.id}
-                              className="border rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-all"
+                              className="border rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs transition-all"
                               style={{
                                 backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
                                 borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
@@ -697,7 +715,7 @@ export default function RewardsModal({
                                     key={idx}
                                     className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-purple-500/10 text-purple-600 border border-purple-500/20"
                                   >
-                                    🎽 {title}
+                                    Предмет: {title}
                                   </span>
                                 ))}
                                 {item.granted_material_titles?.map((title, idx) => (
@@ -705,12 +723,12 @@ export default function RewardsModal({
                                     key={idx}
                                     className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20"
                                   >
-                                    📚 {title}
+                                    Материал: {title}
                                   </span>
                                 ))}
                                 {item.physical_prize && (
                                   <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                                    🧸 {item.physical_prize.title}
+                                    Приз: {item.physical_prize.title}
                                   </span>
                                 )}
                                 {!item.granted_reward_titles?.length &&
@@ -734,7 +752,7 @@ export default function RewardsModal({
         </div>
       </div>
 
-      {/* Модалка демонстрации выданных предметов (Unboxing step-by-step) */}
+      {/* Модалка демонстрации выданных предметов */}
       {unboxModalOpen && (
         <RewardUnboxModal
           isOpen={unboxModalOpen}

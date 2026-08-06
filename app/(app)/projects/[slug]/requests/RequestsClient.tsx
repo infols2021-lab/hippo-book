@@ -486,7 +486,7 @@ export default function RequestsClient({
         }
       `}</style>
 
-      {/* Toast */}
+      {/* Уведомления */}
       {notif && (
         <div
           style={{
@@ -532,14 +532,11 @@ export default function RequestsClient({
             animation: "toastSlideIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards",
           }}
         >
-          <span style={{ fontSize: "22px" }}>
-            {notif.type === "error" ? "❌" : notif.type === "info" ? "ℹ️" : "✅"}
-          </span>
           {notif.text}
         </div>
       )}
 
-      {/* МОДАЛКА СОЗДАНИЯ / РЕДАКТИРОВАНИЯ ЗАЯВКИ */}
+      {/* МОДАЛКА СОЗДАНИЯ / РЕДАКТИРОВАНИЯ ZAЯВКИ */}
       <Modal
         open={requestModalOpen}
         onClose={() => setRequestModalOpen(false)}
@@ -582,8 +579,8 @@ export default function RequestsClient({
               {/* Фильтр по уровням проекта */}
               {levels && levels.length > 0 && (
                 <div className="level-filter-container" style={{ marginBottom: 16 }}>
-                  <div className="level-filter-title" style={{ fontWeight: 800, marginBottom: 8, fontSize: 12, color: "color-mix(in srgb, var(--project-text) 80%, transparent)", textTransform: "uppercase" }}>Уровень / Класс:</div>
-                  <div className="level-filter-chips" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  <div className="level-filter-title" style={{ fontWeight: 800, marginBottom: 8, fontSize: 11, color: "color-mix(in srgb, var(--project-text) 80%, transparent)", textTransform: "uppercase" }}>Уровень / Класс:</div>
+                  <div className="level-filter-chips no-scrollbar">
                     <button
                       type="button"
                       className={`btn small ${selectedLevelCode === "all" ? "" : "ghost"}`}
@@ -606,7 +603,7 @@ export default function RequestsClient({
               )}
 
               {/* Табы разделов */}
-              <div className="vitrine-tabs" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+              <div className="vitrine-tabs no-scrollbar">
                 <button
                   type="button"
                   className={`btn small ${activeTabId === "all" ? "" : "ghost"}`}
@@ -643,7 +640,7 @@ export default function RequestsClient({
                   В этом разделе пока нет материалов
                 </div>
               ) : (
-                <div className="materials-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16, maxHeight: 360, overflowY: "auto", padding: 4 }}>
+                <div className="materials-grid no-scrollbar">
                   {filteredMaterials.map((item) => {
                     const isOwned = ownedMaterialSet.has(item.id);
                     const isSelected = selectedMaterialIds.includes(item.id);
@@ -651,45 +648,33 @@ export default function RequestsClient({
                     return (
                       <div
                         key={item.id}
+                        className={`material-card ${isSelected ? "selected" : ""} ${isOwned ? "owned" : ""}`}
                         onClick={() => toggleMaterialSelection(item.id)}
-                        style={{
-                          border: `2px solid ${isSelected ? "var(--project-primary)" : "var(--glass-border)"}`,
-                          borderRadius: 16,
-                          padding: 16,
-                          cursor: isOwned ? "default" : "pointer",
-                          background: isSelected ? "color-mix(in srgb, var(--project-primary) 10%, transparent)" : "color-mix(in srgb, var(--project-text) 3%, transparent)",
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "space-between",
-                          opacity: isOwned ? 0.6 : 1,
-                          transition: "all 0.2s ease"
-                        }}
                       >
-                        <div className="material-cover-wrapper" style={{ height: 100, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                        <div className="material-cover-wrapper">
                           {item.cover_image_url ? (
                             <img
                               src={item.cover_image_url}
                               alt={item.title}
                               loading="lazy"
                               className="material-cover-img"
-                              style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain", borderRadius: 8 }}
                             />
                           ) : (
-                            <div style={{ fontSize: "28px" }}>
-                              {item.material_kind === "crossword" ? "🧩" : "📖"}
+                            <div style={{ fontSize: "13px", fontWeight: 800, opacity: 0.6, textTransform: "uppercase" }}>
+                              {item.material_kind === "crossword" ? "Кроссворд" : "Учебник"}
                             </div>
                           )}
                         </div>
 
                         <div className="material-card-body">
-                          <div className="material-card-title" style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: "var(--project-text)" }}>{item.title}</div>
-                          <div className="material-card-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span className="material-card-price" style={{ fontWeight: 700, color: "var(--project-primary)" }}>{formatPrice(item.price)}</span>
+                          <div className="material-card-title">{item.title}</div>
+                          <div className="material-card-footer">
+                            <span className="material-card-price">{formatPrice(item.price)}</span>
                             {isOwned ? (
-                              <span className="owned-badge" style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>Выдан</span>
+                              <span className="owned-badge">Выдан</span>
                             ) : (
-                              <span className={`vitrine-card-btn ${isSelected ? "remove" : "add"}`} style={{ fontSize: 12, fontWeight: 800, color: isSelected ? "#ef4444" : "var(--project-primary)" }}>
-                                {isSelected ? "✓ Выбрано" : "+ Выбрать"}
+                              <span className={`vitrine-card-btn ${isSelected ? "remove" : "add"}`}>
+                                {isSelected ? "Выбрано" : "+ Выбрать"}
                               </span>
                             )}
                           </div>
@@ -701,7 +686,7 @@ export default function RequestsClient({
               )}
 
               {/* Итог снизу */}
-              <div className="cart-summary-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, padding: "16px 20px", borderRadius: 16, background: "color-mix(in srgb, var(--project-text) 4%, transparent)", border: "1px solid var(--glass-border)" }}>
+              <div className="cart-summary-bar">
                 <div>
                   <span style={{ fontSize: "13px", opacity: 0.8 }}>Выбрано товаров: </span>
                   <strong style={{ fontSize: "15px" }}>{selectedMaterialIds.length}</strong>
@@ -714,7 +699,7 @@ export default function RequestsClient({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3" style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              <div style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: 12 }}>
                 <button
                   type="button"
                   className="btn ghost"
@@ -728,14 +713,14 @@ export default function RequestsClient({
                   className="btn"
                   disabled={busy || selectedMaterialIds.length === 0}
                 >
-                  Далее: Оформление →
+                  Далее: Оформление
                 </button>
               </div>
             </div>
           ) : (
             /* ================= ШАГ 2: ИТОГОВЫЙ ЧЕК ================= */
             <div>
-              <div className="receipt-box" style={{ padding: 16, borderRadius: 16, background: "color-mix(in srgb, var(--project-text) 3%, transparent)", border: "1px solid var(--glass-border)", marginBottom: 20 }}>
+              <div className="receipt-box">
                 <div
                   style={{
                     fontWeight: 800,
@@ -748,13 +733,13 @@ export default function RequestsClient({
                 </div>
 
                 {selectedMaterialsList.map((m) => (
-                  <div key={m.id} className="receipt-item" style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--glass-border)", fontSize: 14, fontWeight: 600 }}>
+                  <div key={m.id} className="receipt-item">
                     <span>{m.title}</span>
                     <span>{formatPrice(m.price)}</span>
                   </div>
                 ))}
 
-                <div className="receipt-total" style={{ display: "flex", justifyContent: "space-between", paddingTop: 12, marginTop: 4, fontWeight: 900, fontSize: 16 }}>
+                <div className="receipt-total">
                   <span>Итого к оплате:</span>
                   <span style={{ color: "var(--project-primary)" }}>
                     {formatPrice(totalPrice)}
@@ -772,14 +757,14 @@ export default function RequestsClient({
                 <input type="text" className="input" value={userFullName} disabled />
               </div>
 
-              <div className="flex justify-end gap-3" style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              <div style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: 12 }}>
                 <button
                   type="button"
                   className="btn ghost"
                   onClick={() => setModalStep(1)}
                   disabled={busy}
                 >
-                  ← Назад
+                  Назад
                 </button>
                 <button type="submit" className="btn" disabled={busy}>
                   {busy ? "Создаем заявку..." : "Оформить и оплатить"}
@@ -797,23 +782,8 @@ export default function RequestsClient({
         title="Оплата заявки"
         maxWidth={540}
       >
-        <div
-          style={{
-            background: "color-mix(in srgb, var(--project-primary) 10%, transparent)",
-            padding: "18px",
-            borderRadius: "16px",
-            border: "1px solid color-mix(in srgb, var(--project-primary) 25%, transparent)",
-            marginBottom: "20px",
-          }}
-        >
-          <h4
-            style={{
-              margin: "0 0 10px 0",
-              color: "var(--project-primary)",
-              fontSize: "16px",
-              fontWeight: 800,
-            }}
-          >
+        <div className="payment-info">
+          <h4 style={{ margin: "0 0 10px 0", fontSize: "16px", fontWeight: 800 }}>
             Инструкция по оплате
           </h4>
 
@@ -883,14 +853,13 @@ export default function RequestsClient({
             title="Обновить QR"
             aria-label="Обновить QR"
           >
-            ↻ Обновить
+            Обновить
           </button>
         </div>
 
-        <div className="payment-qr payment-qr--smart" style={{ display: "flex", justifyContent: "center", background: "#fff", padding: 16, borderRadius: 16, marginBottom: 20 }}>
+        <div className="payment-qr" style={{ display: "flex", justifyContent: "center", background: "#fff", padding: 16, borderRadius: 16, marginBottom: 20 }}>
           {qrLoading && !qrError ? (
             <div className="qr-loader" role="status" style={{ textAlign: "center", padding: 20 }}>
-              <span className="qr-spinner" />
               <div className="qr-loader-text" style={{ fontSize: 13, fontWeight: 700, color: "#333" }}>Загружаем QR-код...</div>
             </div>
           ) : null}
@@ -905,7 +874,7 @@ export default function RequestsClient({
                 className="btn secondary"
                 onClick={resetQrStateAndRefresh}
               >
-                ↻ Попробовать снова
+                Попробовать снова
               </button>
             </div>
           ) : null}
@@ -938,7 +907,7 @@ export default function RequestsClient({
             type="button"
             onClick={() => setPaymentModalOpen(false)}
           >
-            Я всё оплатил(а)
+            Подтвердить оплату
           </button>
         </div>
       </Modal>
@@ -954,17 +923,14 @@ export default function RequestsClient({
             </div>
           </div>
           <div className="top-actions">
-            <Link className="nav-pill nav-pill--info" href={`/projects/${project.slug}/profile`}>
-              👤 Профиль
+            <Link className="nav-pill" href={`/projects/${project.slug}/profile`}>
+              Профиль
             </Link>
-            <Link
-              className="nav-pill nav-pill--materials"
-              href={`/projects/${project.slug}/materials`}
-            >
-              📚 Материалы
+            <Link className="nav-pill" href={`/projects/${project.slug}/materials`}>
+              Материалы
             </Link>
             <Link className="nav-pill nav-pill--logout" href="/portal">
-              🏠 Портал
+              Портал
             </Link>
           </div>
         </div>
@@ -974,8 +940,8 @@ export default function RequestsClient({
             Мои заявки на доступы
           </h2>
 
-          <div className="payment-info" style={{ marginBottom: 20, padding: 16, borderRadius: 16, background: "color-mix(in srgb, var(--project-primary) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--project-primary) 20%, transparent)" }}>
-            <h4 style={{ margin: "0 0 6px 0", color: "var(--project-primary)", fontSize: 15, fontWeight: 800 }}>Информация об оплате</h4>
+          <div className="payment-info">
+            <h4 style={{ margin: "0 0 6px 0", fontSize: 15, fontWeight: 800 }}>Информация об оплате</h4>
             <p style={{ margin: 0, fontSize: 14, fontWeight: 600, lineHeight: 1.5 }}>
               Выберите нужные материалы в каталоге. QR-код для оплаты появится сразу после создания
               заявки. После подтверждения оплаты администратором доступ к выбранным материалам
@@ -988,7 +954,7 @@ export default function RequestsClient({
               + Создать новую заявку
             </button>
             <button
-              className="btn ghost qr-open"
+              className="btn ghost"
               type="button"
               onClick={() => {
                 if (aggregatedPendingSummary.count === 0) {
@@ -1011,69 +977,124 @@ export default function RequestsClient({
               </button>
             </div>
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table className="requests-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom: "2px solid var(--glass-border)" }}>
-                    <th style={{ padding: "12px", textAlign: "left" }}>Номер заявки</th>
-                    <th style={{ padding: "12px", textAlign: "left" }}>Дата создания</th>
-                    <th style={{ padding: "12px", textAlign: "left" }}>Выбранные материалы</th>
-                    <th style={{ padding: "12px", textAlign: "left" }}>Итоговая цена</th>
-                    <th style={{ padding: "12px", textAlign: "left" }}>Статус</th>
-                    <th style={{ padding: "12px", textAlign: "right" }}>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((r) => {
-                    const locked = r.is_processed;
+            <>
+              {/* 🖥️ ДЕСКТОПНАЯ ТАБЛИЦА (для ПК) */}
+              <div className="requests-table-wrapper">
+                <table className="requests-table">
+                  <thead>
+                    <tr>
+                      <th>Номер заявки</th>
+                      <th>Дата создания</th>
+                      <th>Выбранные материалы</th>
+                      <th>Итоговая цена</th>
+                      <th>Статус</th>
+                      <th style={{ textAlign: "right" }}>Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {requests.map((r) => {
+                      const locked = r.is_processed;
 
-                    const matchedMaterials = materials.filter(
-                      (m) => r.material_ids && r.material_ids.includes(m.id)
-                    );
+                      const matchedMaterials = materials.filter(
+                        (m) => r.material_ids && r.material_ids.includes(m.id)
+                      );
 
-                    const displayMaterials =
-                      matchedMaterials.length > 0
-                        ? matchedMaterials.map((m) => m.title).join(", ")
-                        : r.material_kinds?.length
-                        ? r.material_kinds.join(", ")
-                        : r.textbook_types?.length
-                        ? r.textbook_types.join(", ")
-                        : "—";
+                      const displayMaterials =
+                        matchedMaterials.length > 0
+                          ? matchedMaterials.map((m) => m.title).join(", ")
+                          : r.material_kinds?.length
+                          ? r.material_kinds.join(", ")
+                          : r.textbook_types?.length
+                          ? r.textbook_types.join(", ")
+                          : "—";
 
-                    const price = getRequestPrice(r);
+                      const price = getRequestPrice(r);
 
-                    return (
-                      <tr key={r.id} style={{ borderBottom: "1px solid var(--glass-border)" }}>
-                        <td style={{ padding: "14px 12px", fontWeight: 800 }}>{r.request_number}</td>
-                        <td style={{ padding: "14px 12px", opacity: 0.8 }}>{formatDateTime(r.created_at)}</td>
-                        <td style={{ padding: "14px 12px" }}>{displayMaterials}</td>
-                        <td style={{ padding: "14px 12px", fontWeight: 800, color: "var(--project-primary)" }}>
-                          {formatPrice(price)}
-                        </td>
-                        <td style={{ padding: "14px 12px" }}>
-                          <span
-                            className={`status-badge ${
-                              r.is_processed ? "status-processed" : "status-pending"
-                            }`}
-                            style={{
-                              padding: "4px 10px",
-                              borderRadius: 8,
-                              fontSize: 12,
-                              fontWeight: 800,
-                              background: r.is_processed ? "rgba(34, 197, 94, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                              color: r.is_processed ? "#16a34a" : "#d97706",
-                            }}
-                          >
-                            {r.is_processed ? "Выдано" : "Ожидает"}
-                          </span>
-                        </td>
-                        <td style={{ padding: "14px 12px", textAlign: "right" }}>
-                          {locked ? (
-                            <span className="actions-locked" style={{ fontSize: 12, opacity: 0.6, fontWeight: 700 }}>
-                              Действия недоступны
+                      return (
+                        <tr key={r.id}>
+                          <td style={{ fontWeight: 800 }}>{r.request_number}</td>
+                          <td style={{ opacity: 0.8 }}>{formatDateTime(r.created_at)}</td>
+                          <td>{displayMaterials}</td>
+                          <td style={{ fontWeight: 800, color: "var(--project-primary)" }}>
+                            {formatPrice(price)}
+                          </td>
+                          <td>
+                            <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
+                              {r.is_processed ? "Выдано" : "Ожидает"}
                             </span>
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            {locked ? (
+                              <span className="actions-locked">Недоступно</span>
+                            ) : (
+                              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                                <button
+                                  className="btn btn-small"
+                                  onClick={() => openEdit(r)}
+                                  type="button"
+                                  disabled={busy}
+                                >
+                                  Изменить
+                                </button>
+                                <button
+                                  className="btn btn-small secondary"
+                                  onClick={() => void deleteRequest(r)}
+                                  type="button"
+                                  disabled={busy}
+                                >
+                                  Удалить
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 📱 МОБИЛЬНЫЕ КАРТОЧКИ (для смартфонов <= 768px) */}
+              <div className="requests-cards-mobile">
+                {requests.map((r) => {
+                  const locked = r.is_processed;
+
+                  const matchedMaterials = materials.filter(
+                    (m) => r.material_ids && r.material_ids.includes(m.id)
+                  );
+
+                  const displayMaterials =
+                    matchedMaterials.length > 0
+                      ? matchedMaterials.map((m) => m.title).join(", ")
+                      : r.material_kinds?.length
+                      ? r.material_kinds.join(", ")
+                      : r.textbook_types?.length
+                      ? r.textbook_types.join(", ")
+                      : "—";
+
+                  const price = getRequestPrice(r);
+
+                  return (
+                    <div key={r.id} className="request-card-mobile">
+                      <div className="request-card-header">
+                        <span className="request-card-num">{r.request_number}</span>
+                        <span className={`status-badge ${r.is_processed ? "status-processed" : "status-pending"}`}>
+                          {r.is_processed ? "Выдано" : "Ожидает"}
+                        </span>
+                      </div>
+
+                      <div className="request-card-body">
+                        <div className="request-card-materials">{displayMaterials}</div>
+                        <div className="request-card-date">{formatDateTime(r.created_at)}</div>
+                      </div>
+
+                      <div className="request-card-footer">
+                        <span className="request-card-price">{formatPrice(price)}</span>
+                        <div className="request-card-actions">
+                          {locked ? (
+                            <span className="actions-locked">Заявка закрыта</span>
                           ) : (
-                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                            <>
                               <button
                                 className="btn btn-small"
                                 onClick={() => openEdit(r)}
@@ -1090,15 +1111,15 @@ export default function RequestsClient({
                               >
                                 Удалить
                               </button>
-                            </div>
+                            </>
                           )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </div>
