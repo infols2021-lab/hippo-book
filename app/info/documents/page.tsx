@@ -5,10 +5,10 @@ type SP = { source?: string; sourceId?: string };
 
 // ⚡ Ссылки на документы (замените на реальные адреса Google Drive)
 const DOC_LINKS = {
-  offerta: "https://drive.google.com/file/d/ВАШ_ID_ОФЕРТЫ/view",
-  terms: "https://drive.google.com/file/d/ВАШ_ID_ПОЛЬЗОВАТЕЛЬСКОГО_СОГЛАШЕНИЯ/view",
-  privacy: "https://drive.google.com/file/d/ВАШ_ID_ПОЛИТИКИ_КОНФИДЕНЦИАЛЬНОСТИ/view",
-  consent: "https://drive.google.com/file/d/ВАШ_ID_СОГЛАСИЯ_НА_ОБРАБОТКУ_ПД/view",
+  offerta: "https://drive.google.com/file/d/1JAxMcGYTXJNRaFuzixTyYDjdIUGSpkjE/view?usp=sharing",
+  terms: "https://drive.google.com/file/d/1yTOeNnBXHW2CR2uL2dBYTNFvi2vulS1O/view?usp=sharing",
+  privacy: "https://drive.google.com/file/d/1DNhhfyLugcHJh0qbXO2brtJyjAojkkd-/view?usp=sharing",
+  consent: "https://drive.google.com/file/d/1YcsYnuo-HgZM-Vnulym0znkQM6R8Fiu2/view?usp=sharing",
 } as const;
 
 export const metadata = {
@@ -105,7 +105,7 @@ export default async function DocumentsPage({
                 <div className="info-action-title">← Назад к информации</div>
                 <div className="info-action-sub">прайс, контакты, документы</div>
               </div>
-              <span className="info-action-arrow">→</span>
+              <span className="info-action-arrow"></span>
             </Link>
           </div>
         </div>
