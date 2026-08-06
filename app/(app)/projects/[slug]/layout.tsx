@@ -3,18 +3,14 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const revalidate = 0;
 
-// Умный хелпер для определения яркости цвета (светлая или темная тема)
 function isDark(hexColor: string): boolean {
   const hex = hexColor.replace("#", "");
   if (hex.length !== 3 && hex.length !== 6) return false;
-
   const r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.slice(0, 2), 16);
   const g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.slice(2, 4), 16);
   const b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.slice(4, 6), 16);
-
-  // Формула воспринимаемой яркости (Luminance)
   const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-  return luminance < 128; // Если меньше 128 — значит цвет тёмный
+  return luminance < 128; 
 }
 
 function sanitizeCssColor(value: string, fallback: string): string {
@@ -47,35 +43,19 @@ export default async function ProjectLayout({
 
   const theme = project.theme || {};
 
-  // Базовые цвета
-  const primaryColor = sanitizeCssColor(
-    theme?.colors?.primary || theme?.primaryColor || project.theme_color || "#0ea5e9",
-    "#0ea5e9",
-  );
-  const secondaryColor = sanitizeCssColor(
-    theme?.colors?.secondary || theme?.secondaryColor || "#38bdf8",
-    "#38bdf8",
-  );
-  const bgColor = sanitizeCssColor(
-    theme?.colors?.pageBg || theme?.backgroundColor || "#f8fafc",
-    "#f8fafc",
-  );
-  const textColor = sanitizeCssColor(
-    theme?.colors?.textColor || theme?.textColor || "#0f172a",
-    "#0f172a",
-  );
-  const cardBgColor = sanitizeCssColor(
-    theme?.colors?.cardBg || theme?.cardBg || "#ffffff",
-    "#ffffff",
-  );
+  const primaryColor = sanitizeCssColor(theme?.colors?.primary || theme?.primaryColor || project.theme_color || "#0ea5e9", "#0ea5e9");
+  const secondaryColor = sanitizeCssColor(theme?.colors?.secondary || theme?.secondaryColor || "#38bdf8", "#38bdf8");
+  const bgColor = sanitizeCssColor(theme?.colors?.pageBg || theme?.backgroundColor || "#f8fafc", "#f8fafc");
+  const textColor = sanitizeCssColor(theme?.colors?.textColor || theme?.textColor || "#0f172a", "#0f172a");
+  const cardBgColor = sanitizeCssColor(theme?.colors?.cardBg || theme?.cardBg || "#ffffff", "#ffffff");
 
-  // Анализируем тему: Темная или Светлая
   const isDarkTheme = isDark(bgColor);
   
-  // ЖБ Фон для инпутов, чтобы они не сливались в грязь
+  // ЖБ Фон для инпутов, чтобы текст всегда читался!
   const inputBgColor = isDarkTheme ? "rgba(0, 0, 0, 0.25)" : "#ffffff";
+  const inputTextColor = textColor;
+  const inputBorderColor = isDarkTheme ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.15)";
 
-  // 🚀 ГЕНЕРАЦИЯ "УМНОГО СТЕКЛА"
   const glassBg = isDarkTheme
     ? `color-mix(in srgb, ${cardBgColor} 65%, rgba(0,0,0,0.3))`
     : `color-mix(in srgb, ${cardBgColor} 75%, transparent)`;
@@ -98,11 +78,11 @@ export default async function ProjectLayout({
     "--project-bg": bgColor,
     "--project-text": textColor,
     "--project-card-bg": cardBgColor,
-    "--project-input-bg": inputBgColor, // Добавили переменную инпутов
+    "--project-input-bg": inputBgColor, 
+    "--project-input-text": inputTextColor,
+    "--project-input-border": inputBorderColor,
     "--accent2": primaryColor,
     "--accent3": secondaryColor,
-
-    // Глобальные переменные стекла
     "--glass-bg": glassBg,
     "--glass-border": glassBorder,
     "--glass-highlight": glassHighlight,
@@ -110,25 +90,19 @@ export default async function ProjectLayout({
     "--glass-blur": "24px",
   };
 
-  const themeStyles = {
-    ...themeVars,
-    backgroundColor: "var(--project-bg)",
-    color: "var(--project-text)",
-  } as React.CSSProperties;
-
   const rootCssText = Object.entries(themeVars)
     .map(([k, v]) => `${k}: ${v};`)
     .join(" ");
 
   return (
     <>
+      {/* Переписываем :root динамически. Теперь body и модалки всё поймут */}
       <style
         id="project-theme-vars"
-        // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: `:root { ${rootCssText} }` }}
       />
       <div
-        style={themeStyles}
+        style={themeVars as React.CSSProperties}
         className="min-h-screen w-full transition-colors duration-500 project-layout-wrapper"
       >
         {children}

@@ -2,7 +2,6 @@
 
 import React, { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { usePathname } from "next/navigation";
 
 type Props = {
   open: boolean;
@@ -31,10 +30,6 @@ export default function Modal({
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
-  
-  // ЖБ ПРОВЕРКА: Сразу при рендере узнаем, находимся ли мы в админке
-  const pathname = usePathname();
-  const isAdmin = pathname?.startsWith("/admin");
 
   useEffect(() => {
     setMounted(true);
@@ -80,8 +75,7 @@ export default function Modal({
   const modalContent = (
     <div
       ref={overlayRef}
-      // Если это админка — сразу вешаем admin-root, стили подхватятся идеально
-      className={`modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200 ${isAdmin ? "admin-root" : ""}`}
+      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? titleId : undefined}
