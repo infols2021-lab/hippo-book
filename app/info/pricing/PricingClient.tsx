@@ -7,7 +7,16 @@ import "../info.css";
 
 type Project = { id: string; name: string; slug: string; theme_color?: string; theme?: any };
 type Tab = { id: string; project_id: string; title: string; icon?: string };
-type Material = { id: string; project_id?: string; tab_id?: string; title: string; cover_image_url?: string; price?: number; description?: string };
+type Material = {
+  id: string;
+  project_id?: string;
+  project_tab_id?: string;
+  tab_id?: string;
+  title: string;
+  cover_image_url?: string;
+  price?: number;
+  description?: string;
+};
 
 type Props = {
   projects: Project[];
@@ -47,6 +56,7 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
     return s ? `?${s}` : "";
   }, [source, sourceId]);
 
+  // Табы текущего проекта
   const currentProjectTabs = useMemo(() => {
     return tabs.filter((t) => t.project_id === activeProjectId);
   }, [tabs, activeProjectId]);
@@ -56,13 +66,23 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
     setActiveTabId("all");
   };
 
+  // Фильтрация материалов
   const filteredMaterials = useMemo(() => {
+    const projectTabIds = new Set(currentProjectTabs.map((t) => t.id));
+
     return materials.filter((m) => {
-      if (m.project_id !== activeProjectId) return false;
-      if (activeTabId !== "all" && m.tab_id !== activeTabId) return false;
+      const tabId = m.project_tab_id || m.tab_id;
+      
+      // 1. Проверяем связь с проектом (по m.project_id или по принадлежности m.project_tab_id к табам проекта)
+      const belongsToProject = m.project_id ? m.project_id === activeProjectId : (tabId ? projectTabIds.has(tabId) : false);
+      if (!belongsToProject) return false;
+
+      // 2. Проверяем выбор конкретного таба
+      if (activeTabId !== "all" && tabId !== activeTabId) return false;
+
       return true;
     });
-  }, [materials, activeProjectId, activeTabId]);
+  }, [materials, activeProjectId, activeTabId, currentProjectTabs]);
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
   const projectColor = activeProject?.theme?.primaryColor || activeProject?.theme_color || "#0ea5e9";
@@ -211,7 +231,7 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
                 <h2>Соответствие уровням</h2>
                 <div className="info-box-pill">Автовыдача</div>
               </div>
-              <p className="info-box-desc">Система автоматически подберут нужный уровень материалов при указании вашего класса.</p>
+              <p className="info-box-desc">Система автоматически подберет нужный уровень материалов при указании вашего класса.</p>
               
               <div className="class-table">
                 <div className="class-row">
