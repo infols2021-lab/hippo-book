@@ -37,9 +37,7 @@ export default async function ProjectLayout({
     .eq("slug", slug)
     .single();
 
-  if (!project || project.is_active === false) {
-    notFound();
-  }
+  if (!project || project.is_active === false) notFound();
 
   const theme = project.theme || {};
 
@@ -51,43 +49,26 @@ export default async function ProjectLayout({
 
   const isDarkTheme = isDark(bgColor);
   
-  // ЖБ Фон для инпутов, чтобы текст всегда читался!
-  const inputBgColor = isDarkTheme ? "rgba(0, 0, 0, 0.25)" : "#ffffff";
+  // ИДЕАЛЬНЫЕ ИНПУТЫ: Светло-серые на белом фоне, полупрозрачно-черные на тёмном.
+  const inputBgColor = isDarkTheme ? "rgba(0, 0, 0, 0.3)" : "#f8fafc";
   const inputTextColor = textColor;
-  const inputBorderColor = isDarkTheme ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.15)";
+  const inputBorderColor = isDarkTheme ? "rgba(255, 255, 255, 0.1)" : "#e2e8f0";
 
-  const glassBg = isDarkTheme
-    ? `color-mix(in srgb, ${cardBgColor} 65%, rgba(0,0,0,0.3))`
-    : `color-mix(in srgb, ${cardBgColor} 75%, transparent)`;
-
-  const glassBorder = isDarkTheme
-    ? `color-mix(in srgb, #ffffff 12%, transparent)`
-    : `color-mix(in srgb, ${textColor} 8%, transparent)`;
-
-  const glassHighlight = isDarkTheme
-    ? `color-mix(in srgb, #ffffff 6%, transparent)`
-    : `color-mix(in srgb, #ffffff 70%, transparent)`;
-
-  const glassShadow = isDarkTheme
-    ? `0 16px 40px -8px rgba(0,0,0,0.6)`
-    : `0 12px 40px -12px color-mix(in srgb, ${textColor} 12%, transparent)`;
+  // Плотные рамки и тени
+  const glassBorder = isDarkTheme ? `rgba(255, 255, 255, 0.08)` : `rgba(15, 23, 42, 0.08)`;
+  const glassShadow = isDarkTheme ? `0 16px 40px -8px rgba(0,0,0,0.6)` : `0 12px 30px -12px rgba(15, 23, 42, 0.15)`;
 
   const themeVars = {
     "--project-primary": primaryColor,
     "--project-secondary": secondaryColor,
     "--project-bg": bgColor,
     "--project-text": textColor,
-    "--project-card-bg": cardBgColor,
+    "--project-card-bg": cardBgColor, /* Модалки и карточки будут ПЛОТНЫЕ */
     "--project-input-bg": inputBgColor, 
     "--project-input-text": inputTextColor,
     "--project-input-border": inputBorderColor,
-    "--accent2": primaryColor,
-    "--accent3": secondaryColor,
-    "--glass-bg": glassBg,
     "--glass-border": glassBorder,
-    "--glass-highlight": glassHighlight,
     "--glass-shadow": glassShadow,
-    "--glass-blur": "24px",
   };
 
   const rootCssText = Object.entries(themeVars)
@@ -96,15 +77,8 @@ export default async function ProjectLayout({
 
   return (
     <>
-      {/* Переписываем :root динамически. Теперь body и модалки всё поймут */}
-      <style
-        id="project-theme-vars"
-        dangerouslySetInnerHTML={{ __html: `:root { ${rootCssText} }` }}
-      />
-      <div
-        style={themeVars as React.CSSProperties}
-        className="min-h-screen w-full transition-colors duration-500 project-layout-wrapper"
-      >
+      <style id="project-theme-vars" dangerouslySetInnerHTML={{ __html: `:root { ${rootCssText} }` }} />
+      <div style={themeVars as React.CSSProperties} className="min-h-screen w-full transition-colors duration-500 project-layout-wrapper">
         {children}
       </div>
     </>

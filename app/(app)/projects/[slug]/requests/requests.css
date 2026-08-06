@@ -172,12 +172,14 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* В файле app/(app)/projects/[slug]/requests/requests.css найди .material-card и замени этот блок: */
+
 .material-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  background: color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent);
-  border: 1.5px solid var(--glass-border, rgba(15, 23, 42, 0.12));
+  background: var(--project-input-bg); /* Идеально впишется в фон модалки */
+  border: 1px solid var(--project-input-border);
   border-radius: 20px;
   padding: 10px;
   cursor: pointer;
@@ -187,13 +189,13 @@
 
 .material-card:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--project-primary, #0ea5e9) 50%, transparent);
+  border-color: var(--project-primary);
 }
 
 .material-card.selected {
-  border-color: var(--project-primary, #0ea5e9);
-  background: color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent);
+  border-color: var(--project-primary);
+  background: color-mix(in srgb, var(--project-primary) 10%, transparent);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--project-primary) 20%, transparent);
 }
 
 .material-card.owned {
