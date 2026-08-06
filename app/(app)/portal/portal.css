@@ -1,7 +1,9 @@
 .portal-page {
   position: relative;
   min-height: 100vh;
-  overflow: hidden;
+  min-height: 100dvh; /* фикс для мобильных браузеров: адресная строка не наезжает на контент */
+  overflow-x: hidden;
+  overflow-y: auto;
   color: #ffffff;
   background: #080816;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -92,6 +94,7 @@
   z-index: 1;
   width: min(1180px, calc(100% - 32px));
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0 auto;
   padding: 28px 0;
   display: flex;
@@ -175,6 +178,7 @@
   font-family: inherit;
 }
 
+/* ====== ДЕСКТОП: сетка карточек (как было) ====== */
 .portal-split {
   flex: 1;
   display: grid;
@@ -187,6 +191,39 @@
 .portal-split__side {
   min-width: 0;
   display: flex;
+}
+
+/* ====== МОБИЛКА: свайп-карусель вместо грида ======
+   Работает через тот же .portal-split — на узких экранах он
+   становится горизонтальным scroll-snap контейнером, где
+   каждая карточка занимает всю ширину экрана. Пользователь
+   листает пальцем, карточки никогда не накладываются друг
+   на друга. */
+@media (max-width: 900px) {
+  .portal-split {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 14px;
+    padding: 6px 4px 18px;
+    margin: 0 -4px;
+  }
+
+  .portal-split::-webkit-scrollbar {
+    display: none;
+  }
+
+  .portal-split__side {
+    flex: 0 0 100%;
+    width: 100%;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
 }
 
 .portal-card {
@@ -451,6 +488,34 @@
   background: rgba(255, 255, 255, 0.52);
 }
 
+/* Индикаторы-точки для карусели (рендерятся в PortalClient.tsx) */
+.portal-carousel-dots {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 0 10px;
+}
+
+@media (max-width: 900px) {
+  .portal-carousel-dots {
+    display: flex;
+  }
+}
+
+.portal-carousel-dots__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  transition: all 0.2s ease;
+}
+
+.portal-carousel-dots__dot--active {
+  width: 20px;
+  background: #ffffff;
+}
+
 @media (max-width: 900px) {
   .portal-bg__half {
     width: 100%;
@@ -491,10 +556,6 @@
     justify-content: flex-start;
   }
 
-  .portal-split {
-    grid-template-columns: 1fr;
-  }
-
   .portal-card {
     min-height: 420px;
     border-radius: 30px;
@@ -520,7 +581,7 @@
   }
 
   .portal-card {
-    min-height: 360px;
+    min-height: 400px;
     border-radius: 24px;
   }
 
