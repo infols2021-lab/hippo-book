@@ -20,16 +20,11 @@ type ApiPayload = {
 
 async function readApiPayload(res: Response): Promise<ApiPayload | null> {
   const text = await res.text();
-
   if (!text) return null;
-
   try {
     return JSON.parse(text) as ApiPayload;
   } catch {
-    return {
-      ok: false,
-      error: text,
-    };
+    return { ok: false, error: text };
   }
 }
 
@@ -99,31 +94,22 @@ export default function UpdatePasswordPage() {
       err.toLowerCase().includes("captcha") ||
       err.toLowerCase().includes("капч")
     ) {
-      return (
-        (err || "Капча не пройдена или не загрузилась.") +
-        "\n\nПопробуйте:\n" +
-        "• Нажать «Перезагрузить капчу»\n" +
-        "• Отключить VPN/прокси\n" +
-        "• Обновить страницу"
-      );
+      return "Проверка безопасности не пройдена.\n\nПопробуйте перезагрузить капчу или отключить VPN.";
     }
 
     if (code === "NO_SESSION" || code === "UNAUTHORIZED" || status === 401) {
-      return (
-        err ||
-        "Сессия восстановления не найдена или устарела.\n\nЗапросите восстановление заново и перейдите по новой ссылке из письма."
-      );
+      return err || "Сеанс восстановления не найден или истек.\nПожалуйста, запросите восстановление заново.";
     }
 
     if (code === "INVALID_OR_EXPIRED_LINK") {
       return err || "Ссылка недействительна или устарела. Запросите восстановление заново.";
     }
 
-    if (code === "VALIDATION") return err || "Проверьте пароль (не менее 6 символов).";
+    if (code === "VALIDATION") return err || "Проверьте введенный пароль (не менее 6 символов).";
 
     if (err) return err;
 
-    return `Не удалось обновить пароль (${status}). Попробуйте перезагрузить капчу и повторить.`;
+    return `Не удалось обновить пароль (Код: ${status}). Попробуйте перезагрузить страницу.`;
   }
 
   useEffect(() => {
@@ -136,9 +122,7 @@ export default function UpdatePasswordPage() {
       if (code) {
         const res = await fetch("/api/auth/exchange-code", {
           method: "POST",
-          headers: {
-            "content-type": "application/json",
-          },
+          headers: { "content-type": "application/json" },
           body: JSON.stringify({ code }),
         });
 
@@ -149,18 +133,13 @@ export default function UpdatePasswordPage() {
 
         if (!res.ok || !json?.ok) {
           throw new Error(
-            payload?.error ||
-              payload?.message ||
-              json?.error ||
-              "Ссылка недействительна или устарела. Запросите восстановление заново.",
+            payload?.error || payload?.message || json?.error || "Ссылка недействительна. Запросите восстановление заново."
           );
         }
-
         return Boolean(payload?.hasSession);
       }
 
       const hash = window.location.hash || "";
-
       if (hash.includes("access_token=") && hash.includes("refresh_token=")) {
         const p = new URLSearchParams(hash.replace(/^#/, ""));
         const access_token = p.get("access_token") || "";
@@ -169,13 +148,8 @@ export default function UpdatePasswordPage() {
         if (access_token && refresh_token) {
           const res = await fetch("/api/auth/exchange-code", {
             method: "POST",
-            headers: {
-              "content-type": "application/json",
-            },
-            body: JSON.stringify({
-              access_token,
-              refresh_token,
-            }),
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ access_token, refresh_token }),
           });
 
           const json = await readApiPayload(res);
@@ -185,64 +159,47 @@ export default function UpdatePasswordPage() {
 
           if (!res.ok || !json?.ok) {
             throw new Error(
-              payload?.error ||
-                payload?.message ||
-                json?.error ||
-                "Ссылка недействительна или устарела. Запросите восстановление заново.",
+              payload?.error || payload?.message || json?.error || "Ссылка недействительна. Запросите восстановление заново."
             );
           }
-
           return Boolean(payload?.hasSession);
         }
       }
-
       return null;
     }
 
     async function fetchSession() {
-      const res = await fetch("/api/auth/session", {
-        method: "GET",
-        cache: "no-store",
-      });
-
+      const res = await fetch("/api/auth/session", { method: "GET", cache: "no-store" });
       const json = await readApiPayload(res);
       const payload = unwrapApiData(json);
-
       if (!res.ok || !json?.ok) return false;
-
       return Boolean(payload?.authenticated);
     }
 
     async function run() {
       try {
         const exchanged = await exchangeRecoverySession();
-
         if (cancelled) return;
 
         const sessionExists = exchanged === true ? true : await fetchSession();
-
         if (cancelled) return;
 
         setHasSession(sessionExists);
         setReady(true);
 
         if (!sessionExists) {
-          showBanner("warning", "ℹ️ Откройте эту страницу по ссылке из письма восстановления пароля.");
+          showBanner("warning", "Пожалуйста, откройте эту страницу по ссылке из письма для восстановления.");
         }
       } catch (e: any) {
         if (cancelled) return;
-
         setReady(true);
         setHasSession(false);
-        showBanner("error", "❌ " + (e?.message || "Не удалось обработать ссылку. Попробуйте запросить восстановление заново."));
+        showBanner("error", "Ошибка: " + (e?.message || "Не удалось обработать ссылку."));
       }
     }
 
     run();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const canSubmit = useMemo(() => {
@@ -261,32 +218,28 @@ export default function UpdatePasswordPage() {
     if (!ready) return;
 
     if (!hasSession) {
-      openModal("warning", "Нет сессии восстановления", "Откройте эту страницу по ссылке из письма восстановления пароля.");
+      openModal("warning", "Нет доступа", "Откройте эту страницу по актуальной ссылке из письма восстановления.");
       return;
     }
 
     if (password.length < 6) {
-      openModal("error", "Ошибка", "Пароль должен быть не менее 6 символов.");
+      openModal("error", "Ошибка", "Пароль должен состоять минимум из 6 символов.");
       return;
     }
 
     if (password !== confirm) {
-      openModal("error", "Ошибка", "Пароли не совпадают.");
+      openModal("error", "Ошибка", "Введенные пароли не совпадают.");
       return;
     }
 
     if (!captchaToken) {
-      openModal(
-        "warning",
-        "Нужна капча",
-        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
-      );
+      openModal("warning", "Необходима проверка", "Пожалуйста, пройдите проверку безопасности.");
       return;
     }
 
     try {
       setBusy(true);
-      showBanner("warning", "🔄 Обновляем пароль...");
+      showBanner("warning", "Сохраняем новый пароль...");
 
       const res = await fetch("/api/auth/update-password", {
         method: "POST",
@@ -302,19 +255,16 @@ export default function UpdatePasswordPage() {
         setBusy(false);
         clearBanner();
         resetCaptchaHard();
-        openModal("error", "Ошибка", msg);
+        openModal("error", "Ошибка обновления", msg);
         return;
       }
 
       setBusy(false);
       clearBanner();
 
-      openModal("success", "Пароль изменён", payload?.message || json?.message || "✅ Пароль успешно изменён! Теперь войдите в систему.");
+      openModal("success", "Пароль изменён", payload?.message || json?.message || "Ваш пароль успешно обновлен. Сейчас вы будете перенаправлены на страницу входа.");
 
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        cache: "no-store",
-      }).catch(() => null);
+      await fetch("/api/auth/logout", { method: "POST", cache: "no-store" }).catch(() => null);
 
       setTimeout(() => {
         window.location.href = "/login";
@@ -323,17 +273,11 @@ export default function UpdatePasswordPage() {
       setBusy(false);
       clearBanner();
       resetCaptchaHard();
-
-      openModal(
-        "error",
-        "Ошибка",
-        "Не удалось обновить пароль.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n\nДетали: " +
-          (e?.message || String(e)),
-      );
+      openModal("error", "Сбой", "Произошла системная ошибка.\nДетали: " + (e?.message || String(e)));
     }
   }
 
-  const showTopBanner = bannerType === "warning" && !!bannerText;
+  const showTopBanner = bannerType !== null && !!bannerText;
 
   return (
     <div className="page-update-password">
@@ -349,7 +293,6 @@ export default function UpdatePasswordPage() {
           <div className="upd-modal">
             <div className="upd-modal-header">
               <div className="upd-modal-title">
-                {modalKind === "success" ? "✅ " : modalKind === "error" ? "❌ " : "⚠️ "}
                 {modalTitle}
               </div>
               <button type="button" className="upd-modal-close" onClick={closeModal} aria-label="Закрыть">
@@ -364,6 +307,7 @@ export default function UpdatePasswordPage() {
                 <button
                   type="button"
                   className="btn btn-captcha-reload"
+                  style={{ width: "auto", margin: 0 }}
                   onClick={() => {
                     resetCaptchaHard();
                     closeModal();
@@ -373,8 +317,8 @@ export default function UpdatePasswordPage() {
                 </button>
               ) : null}
 
-              <button type="button" className="btn btn-primary" onClick={closeModal}>
-                Ок
+              <button type="button" className="btn btn-primary" style={{ width: "auto", margin: 0 }} onClick={closeModal}>
+                Понятно
               </button>
             </div>
           </div>
@@ -383,67 +327,78 @@ export default function UpdatePasswordPage() {
 
       <div className="upd-container">
         <div className="upd-card">
-          <h2>Смена пароля</h2>
+          
+          <div className="brand">
+            <div className="brand-mark">EK</div>
+            <div>
+              <div className="brand-title">skilLS</div>
+              <div className="brand-subtitle">Создание нового пароля</div>
+            </div>
+          </div>
 
           {showTopBanner ? (
-            <div className="warning" style={{ whiteSpace: "pre-line" }}>
+            <div className={`banner ${bannerType}`} style={{ whiteSpace: "pre-line" }}>
               {bannerText}
             </div>
           ) : null}
 
           {!ready ? (
-            <div className="warning">⏳ Проверяем ссылку...</div>
+            <div className="info-box">Проверка защищенного соединения...</div>
           ) : !hasSession ? (
             <div className="info-box">
-              ℹ️ Чтобы сменить пароль, сначала запросите восстановление:
-              <div style={{ marginTop: 10 }}>
+              <strong>Доступ ограничен.</strong><br />Для смены пароля необходимо использовать персональную ссылку из электронного письма.
+              <div style={{ marginTop: 14 }}>
                 <Link className="btn btn-primary" href="/reset">
-                  Перейти к восстановлению
+                  Запросить ссылку
                 </Link>
               </div>
             </div>
           ) : (
             <>
-              {!siteKey ? <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div> : null}
+              {!siteKey ? <div className="banner error-message">Отсутствует конфигурация безопасности</div> : null}
 
               <div className="form-group">
-                <label htmlFor="password">Новый пароль:</label>
+                <label htmlFor="password">Новый пароль</label>
                 <input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Не менее 6 символов"
+                  placeholder="Минимум 6 символов"
                   autoComplete="new-password"
+                  autoFocus
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="confirm">Повторите пароль:</label>
+                <label htmlFor="confirm">Повторите пароль</label>
                 <input
                   id="confirm"
                   type="password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  placeholder="Повторите пароль"
+                  placeholder="Введите пароль еще раз"
                   autoComplete="new-password"
                 />
+                {confirm && password !== confirm && (
+                  <div className="field-error">Введенные пароли не совпадают</div>
+                )}
               </div>
 
               {siteKey ? (
                 <>
-                  <TurnstileWidget
-                    siteKey={siteKey}
-                    action="update_password"
-                    reloadNonce={reloadNonce}
-                    onToken={(t) => setCaptchaToken(t)}
-                  />
+                  <div className="captcha-wrapper">
+                    <TurnstileWidget
+                      siteKey={siteKey}
+                      action="update_password"
+                      reloadNonce={reloadNonce}
+                      onToken={(t) => setCaptchaToken(t)}
+                    />
+                  </div>
 
                   {!captchaToken ? (
-                    <div className="captcha-hint">
-                      🧩 <strong>Если вы не видите капчу</strong> — нажмите <strong>«Перезагрузить капчу»</strong>.
-                      <br />
-                      Если не помогло: обновите страницу.
+                    <div className="rate-limit">
+                      Не отображается проверка? Нажмите «Перезагрузить капчу».
                     </div>
                   ) : null}
 
@@ -454,13 +409,11 @@ export default function UpdatePasswordPage() {
               ) : null}
 
               <button className="btn btn-primary" disabled={!canSubmit} onClick={() => void onUpdate()}>
-                {busy ? "Сохраняем..." : "Сменить пароль"}
+                {busy ? "Сохранение..." : "Подтвердить смену"}
               </button>
 
-              <div className="link" style={{ marginTop: 16 }}>
-                <p>
-                  Вернуться ко входу: <Link href="/login">Войти</Link>
-                </p>
+              <div className="link">
+                <Link href="/login">Отменить и вернуться ко входу</Link>
               </div>
             </>
           )}

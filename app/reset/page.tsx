@@ -71,30 +71,30 @@ export default function ResetPage() {
       err.toLowerCase().includes("капч")
     ) {
       return (
-        (err || "Капча не пройдена или не загрузилась.") +
-        "\n\nПопробуйте:\n" +
-        "• Нажать «Перезагрузить капчу»\n" +
-        "• Отключить VPN/прокси\n" +
-        "• Обновить страницу"
+        (err || "Проверка безопасности не пройдена.") +
+        "\n\nВозможные решения:\n" +
+        "• Нажмите «Перезагрузить капчу»\n" +
+        "• Отключите VPN или прокси-сервер\n" +
+        "• Обновите страницу"
       );
     }
 
-    if (code === "VALIDATION") return err || "Проверьте правильность email.";
-    if (status === 429 || code === "RATE_LIMIT") return "Слишком много попыток. Попробуйте позже.";
+    if (code === "VALIDATION") return err || "Проверьте правильность введенного email.";
+    if (status === 429 || code === "RATE_LIMIT") return "Превышен лимит попыток. Пожалуйста, подождите несколько минут.";
 
     if (err) return err;
-    return `Не удалось отправить письмо (${status}). Попробуйте перезагрузить капчу и повторить.`;
+    return `Не удалось отправить письмо (Код: ${status}). Попробуйте обновить страницу.`;
   }
 
   async function onSend() {
     const e = email.trim().toLowerCase();
 
     if (!e) {
-      openModal("error", "Ошибка", "Введите email.");
+      openModal("error", "Ошибка", "Пожалуйста, введите ваш email.");
       return;
     }
     if (!isValidEmailFormat(e)) {
-      openModal("error", "Ошибка", "Неверный формат email.");
+      openModal("error", "Ошибка", "Введен некорректный формат email.");
       return;
     }
 
@@ -107,15 +107,15 @@ export default function ResetPage() {
     if (!captchaToken) {
       openModal(
         "warning",
-        "Нужна капча",
-        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
+        "Необходима проверка",
+        "Пожалуйста, пройдите проверку безопасности.\n\nЕсли блок проверки не отображается, нажмите «Перезагрузить капчу»."
       );
       return;
     }
 
     try {
       setBusy(true);
-      showBanner("warning", "📧 Отправляем письмо для восстановления...");
+      showBanner("warning", "Отправляем письмо для восстановления...");
 
       const res = await fetch("/api/auth/request-password-reset", {
         method: "POST",
@@ -133,11 +133,9 @@ export default function ResetPage() {
 
       if (!res.ok || !json?.ok) {
         const msg = friendlyErrorFromApi(json, res.status);
-
         setBusy(false);
         clearBanner();
         resetCaptchaHard();
-
         openModal("error", "Ошибка", msg);
         return;
       }
@@ -148,9 +146,9 @@ export default function ResetPage() {
 
       openModal(
         "success",
-        "Готово!",
+        "Письмо отправлено",
         json.message ||
-          "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\n\nПроверьте «Входящие» и «Спам».",
+          "Если указанный email зарегистрирован в системе, мы отправили на него ссылку для смены пароля.\n\nПожалуйста, проверьте папку «Входящие» и «Спам»."
       );
 
       setCaptchaToken(null);
@@ -161,9 +159,9 @@ export default function ResetPage() {
 
       openModal(
         "error",
-        "Ошибка",
-        "Не удалось отправить запрос.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n• Отключить VPN/прокси\n\nДетали: " +
-          (e?.message || String(e)),
+        "Ошибка соединения",
+        "Не удалось отправить запрос.\n\nПопробуйте:\n• Перезагрузить страницу\n• Отключить VPN\n\nТехническая информация: " +
+          (e?.message || String(e))
       );
     }
   }
@@ -184,7 +182,6 @@ export default function ResetPage() {
           <div className="reset-modal">
             <div className="reset-modal-header">
               <div className="reset-modal-title">
-                {modalKind === "success" ? "✅ " : modalKind === "error" ? "❌ " : "⚠️ "}
                 {modalTitle}
               </div>
               <button type="button" className="reset-modal-close" onClick={closeModal} aria-label="Закрыть">
@@ -199,6 +196,7 @@ export default function ResetPage() {
                 <button
                   type="button"
                   className="btn btn-captcha-reload"
+                  style={{ width: "auto", margin: 0 }}
                   onClick={() => {
                     resetCaptchaHard();
                     closeModal();
@@ -208,7 +206,7 @@ export default function ResetPage() {
                 </button>
               ) : null}
 
-              <button type="button" className="btn btn-primary" onClick={closeModal}>
+              <button type="button" className="btn btn-primary" style={{ width: "auto", margin: 0 }} onClick={closeModal}>
                 Ок
               </button>
             </div>
@@ -218,48 +216,52 @@ export default function ResetPage() {
 
       <div className="reset-container">
         <div className="reset-card">
-          <h2>Восстановление пароля</h2>
+          
+          <div className="brand">
+            <div className="brand-mark">EK</div>
+            <div>
+              <div className="brand-title">skilLS</div>
+              <div className="brand-subtitle">Восстановление пароля</div>
+            </div>
+          </div>
 
           {showTopBanner ? (
-            <div className="warning" style={{ whiteSpace: "pre-line" }}>
+            <div className="banner warning" style={{ whiteSpace: "pre-line" }}>
               {bannerText}
             </div>
           ) : null}
 
+          {!siteKey ? <div className="banner error-message">Отсутствует ключ конфигурации (NEXT_PUBLIC_TURNSTILE_SITE_KEY)</div> : null}
+
           <div className="info-box">
-            🔒 Мы отправим письмо со ссылкой. <strong>Пароль меняется только после перехода по ссылке из письма.</strong>
-            <br />
-            Проверьте также папку <strong>Спам</strong>.
+            Мы отправим письмо со ссылкой для сброса. <strong>Пароль изменится только после перехода по ссылке.</strong>
           </div>
 
-          {!siteKey ? <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div> : null}
-
           <div className="form-group">
-            <label htmlFor="email">Email:</label>
+            <label htmlFor="email">Email</label>
             <input
               id="email"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
-              placeholder="example@gmail.com"
+              placeholder="Введите ваш email"
               autoComplete="email"
             />
           </div>
 
           {siteKey ? (
             <>
-              <TurnstileWidget
-                siteKey={siteKey}
-                action="reset_request"
-                reloadNonce={reloadNonce}
-                onToken={(t) => setCaptchaToken(t)}
-              />
+              <div className="captcha-wrapper">
+                <TurnstileWidget
+                  siteKey={siteKey}
+                  action="reset_request"
+                  reloadNonce={reloadNonce}
+                  onToken={(t) => setCaptchaToken(t)}
+                />
+              </div>
 
               {!captchaToken ? (
-                <div className="captcha-hint">
-                  🧩 <strong>Если вы не видите капчу</strong> — нажмите{" "}
-                  <strong>«Перезагрузить капчу»</strong>.
-                  <br />
-                  Если не помогло: отключите VPN/прокси и обновите страницу.
+                <div className="rate-limit">
+                  <strong>Не отображается проверка?</strong> Нажмите «Перезагрузить капчу» ниже или отключите VPN.
                 </div>
               ) : null}
 
@@ -275,13 +277,11 @@ export default function ResetPage() {
           ) : null}
 
           <button className="btn btn-primary" disabled={!canSubmit} onClick={() => void onSend()}>
-            {busy ? "Отправляем..." : sent ? "Письмо отправлено" : "Отправить письмо"}
+            {busy ? "Отправка..." : sent ? "Письмо отправлено" : "Получить ссылку"}
           </button>
 
           <div className="link">
-            <p>
-              Вспомнили пароль? <Link href="/login">Вернуться ко входу</Link>
-            </p>
+            Вспомнили пароль? <Link href="/login">Вернуться ко входу</Link>
           </div>
         </div>
       </div>
