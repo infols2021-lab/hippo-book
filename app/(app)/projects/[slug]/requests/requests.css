@@ -63,7 +63,6 @@
   border-bottom: none;
 }
 
-/* МОБИЛЬНЫЕ КАРТОЧКИ ZAЯВОК (по умолчанию скрыты на ПК) */
 .requests-cards-mobile {
   display: none;
 }
@@ -94,6 +93,19 @@
 /* =========================================================
    ФИЛЬТРЫ И ВИТРИНА МАТЕРИАЛОВ
    ========================================================= */
+
+.level-filter-container {
+  margin-bottom: 14px;
+}
+
+.level-filter-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent);
+  margin-bottom: 8px;
+}
 
 .level-filter-chips,
 .vitrine-tabs {
@@ -315,12 +327,10 @@
     box-sizing: border-box;
   }
 
-  /* Скрытие стандартной таблицы */
   .requests-table-wrapper {
     display: none !important;
   }
 
-  /* Включение мобильного карточного списка */
   .requests-cards-mobile {
     display: flex !important;
     flex-direction: column;
@@ -390,7 +400,6 @@
     gap: 8px;
   }
 
-  /* Полноширинные кнопки действий */
   .requests-actions {
     flex-direction: column;
     gap: 10px !important;
@@ -401,34 +410,63 @@
     justify-content: center;
   }
 
-  /* Табы и чипсы со скроллом пальцем */
+  /* ИСПРАВЛЕНИЕ УРОВНЕЙ И ТАБОВ: нативный скролл без обрезания границ */
   .level-filter-chips,
   .vitrine-tabs {
-    overflow-x: auto;
-    white-space: nowrap;
-    flex-wrap: nowrap;
-    padding-bottom: 4px;
+    display: flex !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    flex-wrap: nowrap !important;
+    padding: 4px 2px 8px 2px !important;
+    gap: 6px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    -webkit-overflow-scrolling: touch;
   }
 
+  .level-filter-chips button,
+  .vitrine-tabs button {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    font-size: 12px !important;
+    padding: 6px 12px !important;
+  }
+
+  /* ИСПРАВЛЕНИЕ СЕТКИ МАТЕРИАЛОВ: ровно 2 колонки на любом смартфоне */
   .materials-grid {
-    grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
-    gap: 8px;
-    max-height: 320px;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    max-height: 280px !important;
+    overflow-y: auto !important;
+    padding: 2px !important;
   }
 
   .material-card {
-    padding: 8px;
+    padding: 8px !important;
+    border-radius: 12px !important;
   }
 
   .material-cover-wrapper {
-    height: 70px;
+    height: 65px !important;
+    margin-bottom: 6px !important;
   }
 
   .material-card-title {
-    font-size: 12px;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 4px !important;
   }
 
-  /* Преобразование модального окна в выезжающую снизу панель (Bottom Sheet) */
+  .material-card-price {
+    font-size: 12px !important;
+  }
+
+  .vitrine-card-btn {
+    padding: 3px 6px !important;
+    font-size: 10px !important;
+  }
+
+  /* Модальное окно — Bottom Sheet */
   .modal-overlay {
     align-items: flex-end !important;
     padding: 0 !important;
@@ -437,9 +475,10 @@
   .modal-container {
     width: 100% !important;
     max-width: 100% !important;
-    border-radius: 24px 24px 0 0 !important;
-    max-height: 88vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 90vh !important;
     margin: 0 !important;
+    padding: 16px !important;
     animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
   }
 

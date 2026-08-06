@@ -578,8 +578,8 @@ export default function RequestsClient({
 
               {/* Фильтр по уровням проекта */}
               {levels && levels.length > 0 && (
-                <div className="level-filter-container" style={{ marginBottom: 16 }}>
-                  <div className="level-filter-title" style={{ fontWeight: 800, marginBottom: 8, fontSize: 11, color: "color-mix(in srgb, var(--project-text) 80%, transparent)", textTransform: "uppercase" }}>Уровень / Класс:</div>
+                <div className="level-filter-container">
+                  <div className="level-filter-title">Уровень / Класс:</div>
                   <div className="level-filter-chips no-scrollbar">
                     <button
                       type="button"
@@ -660,7 +660,7 @@ export default function RequestsClient({
                               className="material-cover-img"
                             />
                           ) : (
-                            <div style={{ fontSize: "13px", fontWeight: 800, opacity: 0.6, textTransform: "uppercase" }}>
+                            <div style={{ fontSize: "12px", fontWeight: 800, opacity: 0.6, textTransform: "uppercase" }}>
                               {item.material_kind === "crossword" ? "Кроссворд" : "Учебник"}
                             </div>
                           )}
