@@ -316,6 +316,70 @@
 }
 
 /* =========================================================
+   МОДАЛЬНОЕ ОКНО (ОБЩИЕ СТИЛИ)
+   ========================================================= */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.modal-panel {
+  background: var(--project-card-bg, #ffffff);
+  color: var(--project-text, #0f172a);
+  border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.12));
+  border-radius: 24px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--glass-border, rgba(15, 23, 42, 0.08));
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.modal-close {
+  background: color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent);
+  border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.1));
+  color: var(--project-text, #0f172a);
+  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* =========================================================
    МОБИЛЬНАЯ АДАПТАЦИЯ (экраны <= 768px)
    ========================================================= */
 
@@ -410,29 +474,27 @@
     justify-content: center;
   }
 
-  /* ИСПРАВЛЕНИЕ УРОВНЕЙ И ТАБОВ: нативный скролл без обрезания границ */
+  /* ВСЕ КНОПКИ УРОВНЕЙ И ТАБОВ ПЕРЕНОСЯТСЯ НА НОВЫЕ СТРОКИ И НЕ ОБРЕЗАЮТСЯ */
   .level-filter-chips,
   .vitrine-tabs {
     display: flex !important;
-    overflow-x: auto !important;
-    white-space: nowrap !important;
-    flex-wrap: nowrap !important;
-    padding: 4px 2px 8px 2px !important;
-    gap: 6px !important;
+    flex-wrap: wrap !important;
+    gap: 6px 8px !important;
     width: 100% !important;
+    padding: 0 !important;
+    margin-bottom: 12px !important;
     box-sizing: border-box !important;
-    -webkit-overflow-scrolling: touch;
   }
 
   .level-filter-chips button,
   .vitrine-tabs button {
     flex-shrink: 0 !important;
-    white-space: nowrap !important;
     font-size: 12px !important;
     padding: 6px 12px !important;
+    white-space: normal !important;
   }
 
-  /* ИСПРАВЛЕНИЕ СЕТКИ МАТЕРИАЛОВ: ровно 2 колонки на любом смартфоне */
+  /* СЕТКА МАТЕРИАЛОВ НА МОБИЛЬНОМ */
   .materials-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px !important;
@@ -466,20 +528,27 @@
     font-size: 10px !important;
   }
 
-  /* Модальное окно — Bottom Sheet */
+  /* Модальное окно — Bottom Sheet на мобильных */
   .modal-overlay {
     align-items: flex-end !important;
     padding: 0 !important;
   }
 
-  .modal-container {
+  .modal-panel {
     width: 100% !important;
     max-width: 100% !important;
     border-radius: 20px 20px 0 0 !important;
     max-height: 90vh !important;
     margin: 0 !important;
-    padding: 16px !important;
     animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  }
+
+  .modal-header {
+    padding: 14px 16px !important;
+  }
+
+  .modal-body {
+    padding: 14px 16px !important;
   }
 
   @keyframes modalSlideUp {

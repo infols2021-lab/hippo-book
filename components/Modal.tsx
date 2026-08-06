@@ -18,14 +18,22 @@ function getScrollbarWidth() {
 }
 
 export default function Modal({
-  open, title, onClose, children, maxWidth = 760, closeOnOverlayClick = true, closeOnEsc = true,
+  open,
+  title,
+  onClose,
+  children,
+  maxWidth = 760,
+  closeOnOverlayClick = true,
+  closeOnEsc = true,
 }: Props) {
   const titleId = useId();
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -33,7 +41,7 @@ export default function Modal({
     const prevOverflow = body.style.overflow;
     const prevPaddingRight = body.style.paddingRight;
     const sbw = getScrollbarWidth();
-    
+
     body.style.overflow = "hidden";
     if (sbw > 0) body.style.paddingRight = `${sbw}px`;
 
@@ -45,7 +53,9 @@ export default function Modal({
 
   useEffect(() => {
     if (!open || !closeOnEsc) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [open, closeOnEsc, onClose]);
@@ -72,8 +82,17 @@ export default function Modal({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h3 className="modal-title" id={title ? titleId : undefined}>{title ?? ""}</h3>
-          <button className="modal-close" onClick={onClose} type="button" aria-label="Закрыть">✕</button>
+          <h3 className="modal-title" id={title ? titleId : undefined}>
+            {title ?? ""}
+          </h3>
+          <button
+            className="modal-close"
+            onClick={onClose}
+            type="button"
+            aria-label="Закрыть"
+          >
+            ✕
+          </button>
         </div>
         <div className="modal-body">{children}</div>
       </div>
