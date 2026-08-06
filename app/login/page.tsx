@@ -521,8 +521,8 @@ export default function LoginPage() {
           <div className="brand">
             <div className="brand-mark">HH</div>
             <div>
-              <div className="brand-title">Учебники Хиппоши</div>
-              <div className="brand-subtitle">🎓 Образовательная платформа</div>
+              <div className="brand-title">SkilLS</div>
+              <div className="brand-subtitle">Образовательная платформа</div>
             </div>
           </div>
 
