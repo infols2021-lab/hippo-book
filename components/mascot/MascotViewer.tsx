@@ -5,7 +5,7 @@ import type { MascotSettings, RewardItem } from "@/lib/rewards/types";
 
 interface MascotViewerProps {
   mascotSettings?: MascotSettings | null;
-  size?: number; // Размер в пикселях (по умолчанию 300)
+  size?: number;
   className?: string;
   showTitle?: boolean;
 }
@@ -22,7 +22,6 @@ export default function MascotViewer({
   const emotion = mascotSettings?.equipped_emotion;
   const title = mascotSettings?.equipped_title;
 
-  // Стиль трансформов для наслоения предметов (оффсеты и скейл)
   const getLayerStyle = (item?: RewardItem | null) => {
     if (!item?.meta) return {};
     const { offset_x = 0, offset_y = 0, scale = 1 } = item.meta;
@@ -33,14 +32,14 @@ export default function MascotViewer({
 
   return (
     <div
-      className={`relative flex flex-col items-center justify-center ${className}`}
-      style={{ width: size, height: showTitle && title ? size + 40 : size }}
+      className={`relative flex flex-col items-center justify-center max-w-full ${className}`}
+      style={{ width: size, minHeight: size }}
     >
-      {/* 👑 ТИТУЛ ПРОФИЛЯ (сверху маскота) */}
+      {/* ТИТУЛ ПРОФИЛЯ */}
       {showTitle && title && (
-        <div className="z-20 mb-2">
+        <div className="z-20 mb-3 max-w-full px-2 text-center">
           <span
-            className="font-black text-xs px-3.5 py-1 rounded-full border shadow-md tracking-wide"
+            className="font-black text-[11px] sm:text-xs px-3 py-1 rounded-full border shadow-sm tracking-wide inline-block max-w-full truncate align-middle uppercase"
             style={{
               borderColor: title.meta?.color || "var(--project-primary, #0ea5e9)",
               color: title.meta?.color || "var(--project-primary, #0ea5e9)",
@@ -53,9 +52,9 @@ export default function MascotViewer({
         </div>
       )}
 
-      {/* 🎨 ОСНОВНОЙ ХОЛСТ С АНИМАЦИЕЙ ПОКАЧИВАНИЯ */}
+      {/* ОСНОВНОЙ ХОЛСТ С АНИМАЦИЕЙ ПОКАЧИВАНИЯ */}
       <div
-        className="relative w-full h-full flex items-center justify-center animate-[mascotFloat_4s_ease-in-out_infinite]"
+        className="relative flex items-center justify-center animate-[mascotFloat_4s_ease-in-out_infinite]"
         style={{ width: size, height: size }}
       >
         {/* 1. СЛОЙ 1: Аура / Эффекты сзади */}
@@ -67,7 +66,6 @@ export default function MascotViewer({
             className="absolute inset-0 w-full h-full object-contain pointer-events-none z-0 transition-transform duration-300"
           />
         ) : (
-          /* Дефолтное свечение, если аура не надета */
           <div
             className="absolute inset-4 rounded-full blur-2xl z-0 opacity-20"
             style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
@@ -83,7 +81,6 @@ export default function MascotViewer({
             className="absolute inset-0 w-full h-full object-contain z-10 transition-transform duration-300"
           />
         ) : (
-          /* Фолбэк базового облачка, если база не надета */
           <div
             className="z-10 w-2/3 h-2/3 rounded-full flex items-center justify-center shadow-2xl border-4"
             style={{
@@ -129,7 +126,7 @@ export default function MascotViewer({
             transform: translateY(0px) rotate(0deg);
           }
           50% {
-            transform: translateY(-8px) rotate(1deg);
+            transform: translateY(-6px) rotate(1deg);
           }
         }
       `}</style>
