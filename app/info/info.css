@@ -495,11 +495,35 @@
   color: #64748b;
 }
 
-/* Адаптивная верстка */
+/* ==================== Документы (ссылки-карточки) ==================== */
+
+/* Делаем карточки-ссылки в разделе документов */
+a.info-card {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+a.info-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
+  border-color: #0ea5e9;
+}
+
+/* Сетка документов: 4 колонки */
+.info-grid.docs-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* ==================== Адаптивная верстка ==================== */
+
 @media (max-width: 900px) {
   .info-grid,
   .info-actions,
-  .info-split {
+  .info-split,
+  .info-grid.docs-grid {
     grid-template-columns: 1fr;
   }
 }
