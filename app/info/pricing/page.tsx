@@ -2,7 +2,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import PricingClient from "./PricingClient";
 
-export const revalidate = 0; // Всегда свежие данные
+export const revalidate = 0;
 
 function lastDayOfCurrentMonthUTC(): Date {
   const now = new Date();
@@ -14,7 +14,7 @@ function formatRuDate(d: Date) {
 }
 
 export const metadata = {
-  title: "Прайс",
+  title: "Каталог и Прайс | skilLS",
   description: "Цены на учебники и кроссворды, правила покупки, выдача после проверки оплаты.",
 };
 
@@ -34,13 +34,13 @@ export default async function PricingPage({
     .eq("is_active", true)
     .order("order_index", { ascending: true });
 
-  // 2. Получаем табы (вкладки)
+  // 2. Получаем табы
   const { data: tabsData } = await supabase
     .from("tabs")
     .select("id, project_id, title, icon")
     .order("order_index", { ascending: true });
 
-  // 3. Получаем материалы
+  // 3. Получаем материалы (привязаны к проектам и табам)
   const { data: materialsData } = await supabase
     .from("materials")
     .select("id, project_id, tab_id, title, cover_image_url, price")
@@ -51,8 +51,7 @@ export default async function PricingPage({
   const tabs = tabsData || [];
   const materials = materialsData || [];
 
-  // Добавляем legacy-фоллбек, если проектов пока нет, чтобы страница не ломалась.
-  // ДОБАВЛЕНО: theme: null, чтобы TypeScript не ругался на отсутствие обязательного свойства.
+  // Фоллбэк на случай пустой базы (чтобы не падало)
   if (projects.length === 0) {
     projects.push(
       { id: "legacy_olympiad", name: "Олимпиада", slug: "olympiad", theme_color: "#0ea5e9", theme: null },
