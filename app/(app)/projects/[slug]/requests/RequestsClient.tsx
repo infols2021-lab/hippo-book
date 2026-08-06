@@ -537,7 +537,7 @@ export default function RequestsClient({
         </div>
       )}
 
-      {/* МОДАЛКА СОЗДАНИЯ / РЕДАКТИРОВАНИЯ ZAЯВКИ */}
+      {/* МОДАЛКА СОЗДАНИЯ / РЕДАКТИРОВАНИЯ ЗАЯВКИ */}
       <Modal
         open={requestModalOpen}
         onClose={() => setRequestModalOpen(false)}
@@ -950,7 +950,7 @@ export default function RequestsClient({
       {/* ОСНОВНОЙ ИНТЕРФЕЙС */}
       <div className="container">
         
-        {/* 📱 МОБИЛЬНАЯ ШАПКАНАВИГАЦИИ */}
+        {/* 📱 МОБИЛЬНАЯ ШАПКА С НАЗВАНИЕМ И БУРГЕРОМ */}
         <div className="mobile-header-bar">
           <div className="mobile-header-left">
             <div className="brand-mark">{brandMark}</div>
@@ -967,19 +967,6 @@ export default function RequestsClient({
           >
             ☰
           </button>
-        </div>
-
-        {/* 📱 БЫСТРАЯ МОБИЛЬНАЯ ПАНЕЛЬ С КНОПКАМИ НАВИГАЦИИ */}
-        <div className="mobile-category-bar no-scrollbar">
-          <Link className="mobile-cat-pill" href={`/projects/${project.slug}/profile`}>
-            Профиль
-          </Link>
-          <Link className="mobile-cat-pill" href={`/projects/${project.slug}/materials`}>
-            Материалы
-          </Link>
-          <Link className="mobile-cat-pill" href="/portal">
-            Портал
-          </Link>
         </div>
 
         {/* 🖥️ ДЕСКТОПНАЯ ШАПКА */}
