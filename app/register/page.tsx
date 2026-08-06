@@ -347,7 +347,7 @@ export default function RegisterPage() {
                   <div className="step-actions">
                     <button type="button" className="btn btn-ghost" onClick={prevStep}>← Назад</button>
                     <button type="button" className="btn btn-primary" disabled={!step3Valid} onClick={() => void onRegister()}>
-                      {busy ? "Загрузка..." : "Создать аккаунт ✨"}
+                      {busy ? "Загрузка..." : "Создать аккаунт"}
                     </button>
                   </div>
                   
