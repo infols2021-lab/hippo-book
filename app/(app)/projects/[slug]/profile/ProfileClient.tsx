@@ -448,7 +448,7 @@ export default function ProfileClient({
         </form>
       </Modal>
 
-      {/* 🎭 ЦЕНТР НАГРАД */}
+      {/* ЦЕНТР НАГРАД */}
       {rewardsModalOpen && (
         <RewardsModal
           isOpen={rewardsModalOpen}
