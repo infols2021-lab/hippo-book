@@ -1,5 +1,4 @@
 import Link from "next/link";
-import SmartBackButton from "@/components/SmartBackButton";
 import "./info.css";
 
 type SP = { source?: string; sourceId?: string };
@@ -57,7 +56,9 @@ export default async function InfoPage({
           {/* Верхняя панель */}
           <div className="info-topbar">
             <div className="info-topbar-left">
-              <SmartBackButton />
+              <Link href="/login" className="info-back-btn" aria-label="Назад ко входу">
+                ← Назад
+              </Link>
               <div className="info-badge" aria-label="Дата обновления">
                 <span className="info-badge-dot" />
                 <div className="info-badge-text">
