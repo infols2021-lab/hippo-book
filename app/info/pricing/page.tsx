@@ -51,11 +51,12 @@ export default async function PricingPage({
   const tabs = tabsData || [];
   const materials = materialsData || [];
 
-  // Добавляем legacy-фоллбек, если проектов пока нет, чтобы страница не ломалась
+  // Добавляем legacy-фоллбек, если проектов пока нет, чтобы страница не ломалась.
+  // ДОБАВЛЕНО: theme: null, чтобы TypeScript не ругался на отсутствие обязательного свойства.
   if (projects.length === 0) {
     projects.push(
-      { id: "legacy_olympiad", name: "Олимпиада", slug: "olympiad", theme_color: "#0ea5e9" },
-      { id: "legacy_exams", name: "Экзамены", slug: "exams", theme_color: "#8b5cf6" }
+      { id: "legacy_olympiad", name: "Олимпиада", slug: "olympiad", theme_color: "#0ea5e9", theme: null },
+      { id: "legacy_exams", name: "Экзамены", slug: "exams", theme_color: "#8b5cf6", theme: null }
     );
   }
 
