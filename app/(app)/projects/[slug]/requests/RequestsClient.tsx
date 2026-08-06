@@ -149,6 +149,7 @@ export default function RequestsClient({
 
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [modalStep, setModalStep] = useState<1 | 2>(1);
 
@@ -912,8 +913,76 @@ export default function RequestsClient({
         </div>
       </Modal>
 
+      {/* 📱 МОБИЛЬНОЕ ВЫЕЗЖАЮЩЕЕ МЕНЮ (BOTTOM SHEET) */}
+      {mobileMenuOpen && (
+        <>
+          <div className="mobile-bottom-sheet-overlay" onClick={() => setMobileMenuOpen(false)} />
+          <div className="mobile-bottom-sheet">
+            <div className="sheet-handle" />
+            <div className="sheet-title">Навигация</div>
+            <div className="sheet-menu-list">
+              <Link
+                className="sheet-item"
+                href={`/projects/${project.slug}/profile`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Профиль
+              </Link>
+              <Link
+                className="sheet-item"
+                href={`/projects/${project.slug}/materials`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Материалы
+              </Link>
+              <Link
+                className="sheet-item"
+                href="/portal"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Главный портал
+              </Link>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* ОСНОВНОЙ ИНТЕРФЕЙС */}
       <div className="container">
+        
+        {/* 📱 МОБИЛЬНАЯ ШАПКАНАВИГАЦИИ */}
+        <div className="mobile-header-bar">
+          <div className="mobile-header-left">
+            <div className="brand-mark">{brandMark}</div>
+            <div className="mobile-user-info">
+              <div className="mobile-user-name">{project.name}</div>
+              <div className="mobile-streak-pill">Заявки на доступы</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="mobile-burger-btn"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Открыть меню"
+          >
+            ☰
+          </button>
+        </div>
+
+        {/* 📱 БЫСТРАЯ МОБИЛЬНАЯ ПАНЕЛЬ С КНОПКАМИ НАВИГАЦИИ */}
+        <div className="mobile-category-bar no-scrollbar">
+          <Link className="mobile-cat-pill" href={`/projects/${project.slug}/profile`}>
+            Профиль
+          </Link>
+          <Link className="mobile-cat-pill" href={`/projects/${project.slug}/materials`}>
+            Материалы
+          </Link>
+          <Link className="mobile-cat-pill" href="/portal">
+            Портал
+          </Link>
+        </div>
+
+        {/* 🖥️ ДЕСКТОПНАЯ ШАПКА */}
         <div className="profile-topbar">
           <div className="brand">
             <div className="brand-mark">{brandMark}</div>
