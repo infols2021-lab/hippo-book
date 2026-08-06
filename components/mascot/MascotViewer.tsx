@@ -30,6 +30,17 @@ export default function MascotViewer({
     };
   };
 
+  const titleText = title?.title || "";
+  const titleLength = titleText.length;
+
+  // Динамическая настройка размера текста и формы бейджа для длинных титулов
+  const titleStyleClasses =
+    titleLength > 24
+      ? "text-[9px] sm:text-[10px] px-2.5 py-1 rounded-xl leading-tight"
+      : titleLength > 16
+      ? "text-[10px] sm:text-[11px] px-3 py-1 rounded-xl leading-tight"
+      : "text-[11px] sm:text-xs px-3.5 py-1 rounded-full";
+
   return (
     <div
       className={`relative flex flex-col items-center justify-center max-w-full ${className}`}
@@ -37,9 +48,9 @@ export default function MascotViewer({
     >
       {/* ТИТУЛ ПРОФИЛЯ */}
       {showTitle && title && (
-        <div className="z-20 mb-3 max-w-full px-2 text-center">
+        <div className="z-20 mb-3 max-w-[260px] sm:max-w-[300px] px-2 text-center">
           <span
-            className="font-black text-[11px] sm:text-xs px-3 py-1 rounded-full border shadow-sm tracking-wide inline-block max-w-full truncate align-middle uppercase"
+            className={`font-black border shadow-sm tracking-wide inline-block max-w-full uppercase align-middle whitespace-normal break-words ${titleStyleClasses}`}
             style={{
               borderColor: title.meta?.color || "var(--project-primary, #0ea5e9)",
               color: title.meta?.color || "var(--project-primary, #0ea5e9)",
