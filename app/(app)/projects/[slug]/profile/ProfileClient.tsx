@@ -476,27 +476,27 @@ export default function ProfileClient({
             <div className="sheet-title">Меню профиля</div>
             <div className="sheet-menu-list">
               <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openRewards(); }}>
-                🎭 Награды и маскот
+                Награды и маскот
               </button>
               <Link className="sheet-item" href={`/projects/${projectSlug}/materials`} onClick={() => setMobileMenuOpen(false)}>
-                📚 Все материалы
+                Все материалы
               </Link>
               <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openEdit(); }}>
-                ✏️ Редактировать профиль
+                Редактировать профиль
               </button>
               <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); router.push(`/projects/${projectSlug}/requests`); }}>
-                📦 Заявки на покупку
+                Заявки на покупку
               </button>
               {profile.is_admin && (
                 <Link className="sheet-item" href="/admin" onClick={() => setMobileMenuOpen(false)}>
-                  ⚙️ Панель управления
+                Панель управления
                 </Link>
               )}
               <Link className="sheet-item" href="/portal" onClick={() => setMobileMenuOpen(false)}>
-                🌐 Главный портал
+                Главный портал
               </Link>
               <button className="sheet-item sheet-item--danger" onClick={() => void logout()}>
-                🚪 Выйти
+                Выйти
               </button>
             </div>
           </div>
@@ -601,14 +601,14 @@ export default function ProfileClient({
             )}
 
             <button type="button" className="nav-pill" onClick={openRewards}>
-              🎭 Награды
+              Награды
             </button>
 
             <Link className="nav-pill" href={`/projects/${projectSlug}/materials`}>
-              📚 Материалы
+              Материалы
             </Link>
             <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}>
-              🚪 Выйти
+              Выйти
             </button>
           </div>
         </div>
@@ -627,7 +627,7 @@ export default function ProfileClient({
               {streakData?.equippedAvatarUrl ? (
                 <img src={streakData.equippedAvatarUrl} alt="Маскот" className="profile-avatar-img" />
               ) : (
-                <span style={{ fontSize: "48px" }}>🎭</span>
+                <span style={{ fontSize: "48px" }}></span>
               )}
             </div>
 
