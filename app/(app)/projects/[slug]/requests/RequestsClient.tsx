@@ -913,7 +913,7 @@ export default function RequestsClient({
         </div>
       </Modal>
 
-      {/* 📱 МОБИЛЬНОЕ ВЫЕЗЖАЮЩЕЕ МЕНЮ (BOTTOM SHEET) */}
+      {/* МОБИЛЬНОЕ ВЫЕЗЖАЮЩЕЕ МЕНЮ (BOTTOM SHEET) */}
       {mobileMenuOpen && (
         <>
           <div className="mobile-bottom-sheet-overlay" onClick={() => setMobileMenuOpen(false)} />
@@ -950,7 +950,7 @@ export default function RequestsClient({
       {/* ОСНОВНОЙ ИНТЕРФЕЙС */}
       <div className="container">
         
-        {/* 📱 МОБИЛЬНАЯ ШАПКА С НАЗВАНИЕМ И БУРГЕРОМ */}
+        {/* МОБИЛЬНАЯ ШАПКА С НАЗВАНИЕМ И БУРГЕРОМ */}
         <div className="mobile-header-bar">
           <div className="mobile-header-left">
             <div className="brand-mark">{brandMark}</div>
@@ -969,7 +969,7 @@ export default function RequestsClient({
           </button>
         </div>
 
-        {/* 🖥️ ДЕСКТОПНАЯ ШАПКА */}
+        {/* ДЕСКТОПНАЯ ШАПКА */}
         <div className="profile-topbar">
           <div className="brand">
             <div className="brand-mark">{brandMark}</div>
@@ -1034,7 +1034,7 @@ export default function RequestsClient({
             </div>
           ) : (
             <>
-              {/* 🖥️ ДЕСКТОПНАЯ ТАБЛИЦА (для ПК) */}
+              {/* ДЕСКТОПНАЯ ТАБЛИЦА (для ПК) */}
               <div className="requests-table-wrapper">
                 <table className="requests-table">
                   <thead>
@@ -1110,7 +1110,7 @@ export default function RequestsClient({
                 </table>
               </div>
 
-              {/* 📱 МОБИЛЬНЫЕ КАРТОЧКИ (для смартфонов <= 768px) */}
+              {/* МОБИЛЬНЫЕ КАРТОЧКИ (для смартфонов <= 768px) */}
               <div className="requests-cards-mobile">
                 {requests.map((r) => {
                   const locked = r.is_processed;
