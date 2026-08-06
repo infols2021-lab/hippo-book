@@ -263,5 +263,5 @@
   .help-modal-content { max-height: 90vh; border-radius: 24px; }
   .help-modal-tabs { flex-direction: column; }
   .help-tab { padding: 12px; font-size: 12px; }
-  .help-html-inner { padding: 16px 12px; }  
+  .help-html-inner { padding: 16px 12px; }
 }

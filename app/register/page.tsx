@@ -124,11 +124,7 @@ export default function RegisterPage() {
       return "Слишком много попыток. Подождите несколько минут и попробуйте снова.";
     }
 
-    if (
-      code.includes("CAPTCHA") ||
-      code.includes("TURNSTILE") ||
-      err.toLowerCase().includes("капч")
-    ) {
+    if (code.includes("CAPTCHA") || code.includes("TURNSTILE") || err.toLowerCase().includes("капч")) {
       return (
         (err || "Капча не пройдена или не загрузилась.") +
         "\n\nПопробуйте:\n" +
@@ -182,7 +178,7 @@ export default function RegisterPage() {
       openModal(
         "warning",
         "Нужна капча",
-        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу».",
+        "Пожалуйста, пройдите капчу.\n\nЕсли капча не отображается — нажмите «Перезагрузить капчу»."
       );
       return;
     }
@@ -214,25 +210,21 @@ export default function RegisterPage() {
 
       if (!res.ok || !json?.ok) {
         const msg = friendlyErrorFromApi(json, res.status);
-
         setBusy(false);
         clearBanner();
         resetCaptchaHard();
-
         openModal("error", "Ошибка регистрации", msg);
         return;
       }
 
       setBusy(false);
       clearBanner();
-
       openModal(
         "success",
         "Успешно!",
         json.message ||
-          "✅ Регистрация принята!\n\n📧 Проверьте почту (и папку Спам) и подтвердите email.\nБез подтверждения вход невозможен.",
+          "✅ Регистрация принята!\n\n📧 Проверьте почту (и папку Спам) и подтвердите email.\nБез подтверждения вход невозможен."
       );
-
       setRegistered(true);
 
       setFullName("");
@@ -250,12 +242,11 @@ export default function RegisterPage() {
       setBusy(false);
       clearBanner();
       resetCaptchaHard();
-
       openModal(
         "error",
         "Ошибка",
         "Не удалось отправить запрос.\n\nПопробуйте:\n• Перезагрузить капчу\n• Обновить страницу\n• Отключить VPN/прокси\n\nДетали: " +
-          (e?.message || String(e)),
+          (e?.message || String(e))
       );
     }
   }
@@ -272,24 +263,17 @@ export default function RegisterPage() {
   }, [canSubmit]);
 
   function validationRow(ok: boolean, activeInvalid: boolean, text: string) {
+    const statusClass = ok ? "valid" : activeInvalid ? "invalid" : "neutral";
+    const icon = ok ? "✓" : activeInvalid ? "✕" : "!";
     return (
-      <div className={"validation-item " + (ok ? "valid" : activeInvalid ? "invalid" : "")}>
-        <span className="validation-icon">{ok ? "✅" : activeInvalid ? "❌" : "⭕"}</span>
+      <div className={`validation-item ${statusClass}`}>
+        <span className="validation-icon">{icon}</span>
         {text}
       </div>
     );
   }
 
-  const bannerClass =
-    bannerType === "warning"
-      ? "warning"
-      : bannerType === "error"
-        ? "error-message"
-        : bannerType === "success"
-          ? "success"
-          : "";
-
-  const showTopBanner = bannerType === "warning" && !!bannerText;
+  const showTopBanner = bannerType !== null && !!bannerText;
 
   return (
     <div className="page-register">
@@ -303,34 +287,35 @@ export default function RegisterPage() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.38)",
+            background: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(6px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 16,
+            padding: 24,
             zIndex: 9999,
           }}
         >
           <div
             style={{
               width: "100%",
-              maxWidth: 520,
-              background: "#fff",
-              borderRadius: 16,
-              boxShadow: "0 18px 60px rgba(0,0,0,0.25)",
+              maxWidth: 440,
+              background: "#ffffff",
+              borderRadius: 24,
+              boxShadow: "0 24px 60px rgba(0,0,0,0.2)",
               overflow: "hidden",
             }}
           >
             <div
               style={{
-                padding: "14px 16px",
+                padding: "20px 24px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                borderBottom: "1px solid rgba(0,0,0,0.06)",
+                borderBottom: "1px solid #f1f5f9",
               }}
             >
-              <div style={{ fontWeight: 800, color: "#222" }}>
+              <div style={{ fontWeight: 800, fontSize: 18, color: "#1e293b" }}>
                 {modalKind === "success" ? "✅ " : modalKind === "error" ? "❌ " : "⚠️ "}
                 {modalTitle}
               </div>
@@ -339,28 +324,31 @@ export default function RegisterPage() {
                 onClick={closeModal}
                 style={{
                   border: "none",
-                  background: "transparent",
-                  fontSize: 20,
+                  background: "#f1f5f9",
+                  borderRadius: 10,
+                  width: 32,
+                  height: 32,
+                  fontSize: 14,
+                  fontWeight: "bold",
                   cursor: "pointer",
-                  lineHeight: 1,
-                  padding: 6,
-                  color: "#333",
+                  color: "#64748b",
+                  transition: "background 0.2s",
                 }}
-                aria-label="Закрыть"
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ padding: 16, color: "#333", whiteSpace: "pre-line", lineHeight: 1.5 }}>
+            <div style={{ padding: "24px", color: "#334155", whiteSpace: "pre-line", lineHeight: 1.6, fontWeight: 500 }}>
               {modalBody}
             </div>
 
-            <div style={{ padding: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <div style={{ padding: "16px 24px", background: "#f8fafc", display: "flex", gap: 12, justifyContent: "flex-end" }}>
               {modalKind === "error" || modalKind === "warning" ? (
                 <button
                   type="button"
                   className="btn btn-captcha-reload"
+                  style={{ width: "auto", margin: 0, padding: "12px 16px" }}
                   onClick={() => {
                     resetCaptchaHard();
                     closeModal();
@@ -370,7 +358,12 @@ export default function RegisterPage() {
                 </button>
               ) : null}
 
-              <button type="button" className="btn btn-primary" onClick={closeModal}>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ width: "auto", margin: 0, padding: "12px 24px" }}
+                onClick={closeModal}
+              >
                 Ок
               </button>
             </div>
@@ -380,17 +373,23 @@ export default function RegisterPage() {
 
       <div className="register-container">
         <div className="register-card">
-          <h2>Регистрация в Edu Keys</h2>
+          
+          <div className="brand">
+            <div className="brand-mark">EK</div>
+            <div>
+              <div className="brand-title">Edu Keys</div>
+              <div className="brand-subtitle">Регистрация аккаунта</div>
+            </div>
+          </div>
 
-          {showTopBanner ? <div className={bannerClass}>{bannerText}</div> : null}
+          {showTopBanner ? <div className={`banner ${bannerType}`}>{bannerText}</div> : null}
 
           <div className="info-box">
-            ✅ <strong>Подтверждение email обязательно!</strong> Без подтверждения вход в систему
-            невозможен.
+            ✅ <strong>Подтверждение email обязательно!</strong> Без подтверждения вход в систему невозможен.
           </div>
 
           {!siteKey ? (
-            <div className="error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div>
+            <div className="banner error-message">❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY не задан</div>
           ) : null}
 
           <div className="form-group">
@@ -416,7 +415,7 @@ export default function RegisterPage() {
           <div className="form-group">
             <label htmlFor="region">Область проживания:</label>
             <select id="region" value={region} onChange={(e) => setRegion(e.target.value)}>
-              <option value="">-- Выберите область --</option>
+              <option value="" disabled>-- Выберите область --</option>
               <option value="Белгородская">Белгородская область</option>
               <option value="Курская">Курская область</option>
               <option value="Тамбовская">Тамбовская область</option>
@@ -430,6 +429,7 @@ export default function RegisterPage() {
             <label htmlFor="email">Email:</label>
             <input
               id="email"
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="example@gmail.com"
@@ -440,6 +440,7 @@ export default function RegisterPage() {
             <label htmlFor="confirmEmail">Подтверждение email:</label>
             <input
               id="confirmEmail"
+              type="email"
               value={confirmEmail}
               onChange={(e) => setConfirmEmail(e.target.value)}
               placeholder="example@gmail.com"
@@ -457,29 +458,30 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div className="email-validation">
+          <div className="validation-box">
             {validationRow(formatValid, !!email.trim(), "Правильный формат email")}
             {validationRow(matchValid, !!confirmEmail.trim(), "Email адреса совпадают")}
             {validationRow(passwordValid, !!password, "Пароль не менее 6 символов")}
             {validationRow(domainValid, !!email.trim(), "Почтовый домен не является временным")}
             {validationRow(phoneValid, false, "Телефон заполнен")}
             {validationRow(regionValid, false, "Область выбрана")}
+            {validationRow(nameValid, false, "ФИО заполнено корректно")}
           </div>
 
           {siteKey ? (
             <>
-              <TurnstileWidget
-                siteKey={siteKey}
-                action="register"
-                reloadNonce={reloadNonce}
-                onToken={(t) => setCaptchaToken(t)}
-              />
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                <TurnstileWidget
+                  siteKey={siteKey}
+                  action="register"
+                  reloadNonce={reloadNonce}
+                  onToken={(t) => setCaptchaToken(t)}
+                />
+              </div>
 
               {!captchaToken ? (
-                <div className="rate-limit" style={{ marginTop: 10 }}>
-                  🧩 <strong>Если вы не видите капчу</strong> — нажмите{" "}
-                  <strong>«Перезагрузить капчу»</strong>.
-                  <br />
+                <div className="rate-limit">
+                   <strong>Если вы не видите капчу</strong> — нажмите <strong>«Перезагрузить капчу»</strong>.<br />
                   Если не помогло: отключите VPN/прокси и обновите страницу.
                 </div>
               ) : null}
@@ -512,18 +514,15 @@ export default function RegisterPage() {
               rel="noreferrer"
             >
               положением о персональных данных
-            </a>
-            .
+            </a>.
           </div>
 
           <div className="link">
-            <p>
-              Уже есть аккаунт? <a href="/login">Войти в систему</a>
-            </p>
+            Уже есть аккаунт? <a href="/login">Войти в систему</a>
           </div>
 
           {registered ? (
-            <div className="existing-account-help">
+            <div className="info-box" style={{ marginTop: '24px' }}>
               <strong>📧 Что делать дальше?</strong>
               <br />• Проверьте папку "Входящие" и "Спам" в вашей почте
               <br />• Нажмите на ссылку подтверждения в письме
