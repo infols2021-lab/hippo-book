@@ -132,7 +132,6 @@ export async function POST(req: NextRequest) {
 
       if (Array.isArray(fetchedMaterials)) {
         for (const m of fetchedMaterials) {
-          // Игнорируем секретные материалы (их нельзя купить)
           if (m.is_secret) continue;
 
           const rawTabTitle = (m as any).project_tabs?.title || null;

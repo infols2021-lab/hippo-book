@@ -65,6 +65,7 @@ export type GatehouseRequestsPageData = {
 export type AggregatedPendingSummary = {
   totalPrice: number;
   materialIds: string[];
+  uniqueMaterialIds: string[];
   materialCounts: Record<string, number>;
   pendingCount: number;
 };
@@ -151,28 +152,45 @@ export function normalizeGatehouseRequest(row: any): GatehousePurchaseRequest {
 
 /**
  * Агрегирует все необработанные (pending) заявки пользователя:
- * суммирует их общую стоимость и подсчитывает количество повторов каждого материала.
+ * с группировкой повторяющихся материалов и исключения дедуплицированных сумм.
  */
 export function aggregatePendingRequests(
-  requests: Array<{ is_processed?: boolean | null; total_price?: number | null; material_ids?: string[] | null }>
+  requests: Array<{ is_processed?: boolean | null; total_price?: number | null; material_ids?: string[] | null }>,
+  materialPrices?: Record<string, number>,
+  ownedMaterialIds?: string[] | Set<string>
 ): AggregatedPendingSummary {
   const pending = requests.filter((r) => !r.is_processed);
-  let totalPrice = 0;
+  const ownedSet = new Set(ownedMaterialIds ? Array.from(ownedMaterialIds) : []);
   const allMaterialIds: string[] = [];
   const materialCounts: Record<string, number> = {};
+  const uniqueMaterialSet = new Set<string>();
 
   for (const req of pending) {
-    totalPrice += Number(req.total_price) || 0;
     const ids = normalizeArray(req.material_ids);
     for (const id of ids) {
       allMaterialIds.push(id);
+      uniqueMaterialSet.add(id);
       materialCounts[id] = (materialCounts[id] || 0) + 1;
+    }
+  }
+
+  let totalPrice = 0;
+  if (materialPrices) {
+    for (const id of uniqueMaterialSet) {
+      if (!ownedSet.has(id)) {
+        totalPrice += materialPrices[id] ?? 0;
+      }
+    }
+  } else {
+    for (const req of pending) {
+      totalPrice += Number(req.total_price) || 0;
     }
   }
 
   return {
     totalPrice,
     materialIds: allMaterialIds,
+    uniqueMaterialIds: Array.from(uniqueMaterialSet),
     materialCounts,
     pendingCount: pending.length,
   };

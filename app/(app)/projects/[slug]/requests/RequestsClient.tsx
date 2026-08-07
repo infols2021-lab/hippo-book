@@ -167,9 +167,16 @@ export default function RequestsClient({
   const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
   const [qrLoading, setQrLoading] = useState(true);
   const [qrError, setQrError] = useState(false);
+  const [qrFallback, setQrFallback] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
+  const primaryQrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
+  const fallbackQrUrl = useMemo(() => {
+    const text = encodeURIComponent(`https://ek-school.ru/pay?amount=${paymentTotalAmount}`);
+    return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${text}`;
+  }, [paymentTotalAmount]);
+
+  const activeQrUrl = qrFallback ? fallbackQrUrl : primaryQrUrl;
 
   useEffect(() => {
     let alive = true;
@@ -299,40 +306,119 @@ export default function RequestsClient({
     return materials.filter((m) => set.has(m.id));
   }, [materials, selectedMaterialIds]);
 
-  const totalPrice = useMemo(() => {
-    return selectedMaterialsList.reduce((sum, item) => sum + item.price, 0);
-  }, [selectedMaterialsList]);
-
   const pendingRequests = useMemo(() => {
     return requests.filter((r) => !r.is_processed);
   }, [requests]);
 
+  // ДЕДУПЛИКАЦИЯ И РАСЧЕТ ДЛЯ ПОКАЗАТЬ QR (ВСЕ НЕОБРАБОТАННЫЕ ЗАЯВКИ)
   const aggregatedPendingSummary = useMemo(() => {
-    let sum = 0;
-    const itemsMap = new Map<string, { title: string; count: number; unitPrice: number }>();
+    const itemsMap = new Map<
+      string,
+      {
+        id: string;
+        title: string;
+        count: number;
+        unitPrice: number;
+        isIssued: boolean;
+      }
+    >();
 
     for (const req of pendingRequests) {
-      const reqPrice = getRequestPrice(req);
-      sum += reqPrice;
-
       const ids = toStringArray(req.material_ids);
       for (const id of ids) {
         const mat = materials.find((m) => m.id === id);
         const title = mat?.title || "Учебный материал";
-        const unitPrice = mat?.price || 1000;
+        const unitPrice = mat?.price ?? 1000;
+        const isIssued = ownedMaterialSet.has(id);
 
-        const current = itemsMap.get(id) ?? { title, count: 0, unitPrice };
+        const current = itemsMap.get(id) ?? {
+          id,
+          title,
+          count: 0,
+          unitPrice,
+          isIssued,
+        };
         current.count += 1;
+        if (isIssued) current.isIssued = true;
         itemsMap.set(id, current);
       }
     }
 
+    let sum = 0;
+    const items = Array.from(itemsMap.values()).map((item) => {
+      let effectivePrice = 0;
+      let badgeText = "";
+
+      if (item.isIssued) {
+        effectivePrice = 0;
+        badgeText = "уже выдан";
+      } else {
+        effectivePrice = item.unitPrice; // Цена берется 1 раз, вне зависимости от кол-ва
+        if (item.count > 1) {
+          badgeText = `(${item.count} шт.) (уже есть в другой заявке)`;
+        }
+      }
+
+      sum += effectivePrice;
+
+      return {
+        ...item,
+        effectivePrice,
+        badgeText,
+      };
+    });
+
     return {
       totalPrice: sum,
-      items: Array.from(itemsMap.values()),
+      items,
       count: pendingRequests.length,
     };
-  }, [pendingRequests, materials]);
+  }, [pendingRequests, materials, ownedMaterialSet]);
+
+  // СОСТАВ И СУММА ТОЛЬКО ТЕКУЩЕЙ ОФОРМЛЯЕМОЙ ЗАЯВКИ (ШАГ 2)
+  const singleRequestReceipt = useMemo(() => {
+    const otherPendingRequests = pendingRequests.filter((r) => r.id !== editingId);
+    const otherPendingMaterialIds = new Set<string>();
+    for (const r of otherPendingRequests) {
+      for (const id of toStringArray(r.material_ids)) {
+        otherPendingMaterialIds.add(id);
+      }
+    }
+
+    let sum = 0;
+    const items = selectedMaterialsList.map((m) => {
+      const isIssued = ownedMaterialSet.has(m.id);
+      const isInOtherPending = otherPendingMaterialIds.has(m.id);
+
+      let effectivePrice = m.price;
+      let badgeText = "";
+
+      if (isIssued) {
+        effectivePrice = 0;
+        badgeText = "уже выдан";
+      } else if (isInOtherPending) {
+        effectivePrice = 0;
+        badgeText = "(уже есть в другой заявке)";
+      }
+
+      sum += effectivePrice;
+
+      return {
+        ...m,
+        effectivePrice,
+        badgeText,
+        isIssued,
+        isInOtherPending,
+      };
+    });
+
+    return {
+      items,
+      totalPrice: sum,
+    };
+  }, [selectedMaterialsList, pendingRequests, editingId, ownedMaterialSet]);
+
+  const totalPrice = singleRequestReceipt.totalPrice;
 
   function showNotification(text: string, type: "success" | "error" | "info" = "success") {
     setNotif({ type, text });
@@ -344,12 +430,14 @@ export default function RequestsClient({
     setPaymentTotalAmount(finalAmount);
     setQrLoading(true);
     setQrError(false);
+    setQrFallback(false);
     setQrSeed(Date.now());
     setPaymentModalOpen(true);
   }
 
   function resetQrStateAndRefresh() {
     setQrError(false);
+    setQrFallback(false);
     setQrLoading(true);
     setQrSeed(Date.now());
   }
@@ -719,7 +807,7 @@ export default function RequestsClient({
               </div>
             </div>
           ) : (
-            /* ================= ШАГ 2: ИТОГОВЫЙ ЧЕК ================= */
+            /* ================= ШАГ 2: ИТОГОВЫЙ ЧЕК ТЕКУЩЕЙ ЗАЯВКИ ================= */
             <div>
               <div className="receipt-box">
                 <div
@@ -730,20 +818,27 @@ export default function RequestsClient({
                     fontSize: "14px",
                   }}
                 >
-                  Ваш состав заказа:
+                  Состав текущей заявки:
                 </div>
 
-                {selectedMaterialsList.map((m) => (
+                {singleRequestReceipt.items.map((m) => (
                   <div key={m.id} className="receipt-item">
-                    <span>{m.title}</span>
-                    <span>{formatPrice(m.price)}</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span>{m.title}</span>
+                      {m.badgeText && (
+                        <span className={`summary-item-badge ${m.isIssued ? "badge-issued" : "badge-in-other"}`}>
+                          {m.badgeText}
+                        </span>
+                      )}
+                    </div>
+                    <span>{formatPrice(m.effectivePrice)}</span>
                   </div>
                 ))}
 
                 <div className="receipt-total">
-                  <span>Итого к оплате:</span>
+                  <span>Итого к оплате по этой заявке:</span>
                   <span style={{ color: "var(--project-primary)" }}>
-                    {formatPrice(totalPrice)}
+                    {formatPrice(singleRequestReceipt.totalPrice)}
                   </span>
                 </div>
               </div>
@@ -776,7 +871,7 @@ export default function RequestsClient({
         </form>
       </Modal>
 
-      {/* МОДАЛКА ОПЛАТЫ */}
+      {/* МОДАЛКА ОПЛАТЫ И QR-КОДА */}
       <Modal
         open={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
@@ -791,14 +886,20 @@ export default function RequestsClient({
           {aggregatedPendingSummary.items.length > 0 && (
             <div className="summary-items-list" style={{ marginBottom: 12 }}>
               <div style={{ fontSize: "12px", fontWeight: 700, opacity: 0.8, marginBottom: 6 }}>
-                Заказываемые материалы ({aggregatedPendingSummary.count} заявка/заявок):
+                Заказываемые материалы из необработанных заявок ({aggregatedPendingSummary.count} заявка/заявок):
               </div>
-              {aggregatedPendingSummary.items.map((item, idx) => (
-                <div key={idx} className="summary-item" style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 600, padding: "4px 0" }}>
-                  <span className="summary-item-title">{item.title}</span>
-                  <span className="summary-item-badge" style={{ fontWeight: 700, color: "var(--project-primary)" }}>
-                    {item.count > 1 ? `x${item.count} • ` : ""}
-                    {item.unitPrice * item.count} ₽
+              {aggregatedPendingSummary.items.map((item) => (
+                <div key={item.id} className="summary-item">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span className="summary-item-title">{item.title}</span>
+                    {item.badgeText && (
+                      <span className={`summary-item-badge ${item.isIssued ? "badge-issued" : "badge-in-other"}`}>
+                        {item.badgeText}
+                      </span>
+                    )}
+                  </div>
+                  <span className="summary-item-badge-price">
+                    {formatPrice(item.effectivePrice)}
                   </span>
                 </div>
               ))}
@@ -821,7 +922,7 @@ export default function RequestsClient({
               <strong>Отсканируйте QR-код</strong> в вашем банковском приложении.
             </li>
             <li>
-              Сумма к оплате (все неоплаченные заявки):{" "}
+              Сумма к оплате (за все необработанные материалы):{" "}
               <strong style={{ fontSize: "17px", color: "var(--project-primary)" }}>
                 {paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "0 руб."}
               </strong>
@@ -861,7 +962,9 @@ export default function RequestsClient({
         <div className="payment-qr" style={{ display: "flex", justifyContent: "center", background: "#fff", padding: 16, borderRadius: 16, marginBottom: 20 }}>
           {qrLoading && !qrError ? (
             <div className="qr-loader" role="status" style={{ textAlign: "center", padding: 20 }}>
-              <div className="qr-loader-text" style={{ fontSize: 13, fontWeight: 700, color: "#333" }}>Загружаем QR-код...</div>
+              <div className="qr-loader-text" style={{ fontSize: 13, fontWeight: 700, color: "#333" }}>
+                Загружаем QR-код...
+              </div>
             </div>
           ) : null}
 
@@ -881,8 +984,8 @@ export default function RequestsClient({
           ) : null}
 
           <img
-            key={qrUrl}
-            src={qrUrl}
+            key={activeQrUrl}
+            src={activeQrUrl}
             alt="QR-код для оплаты"
             className="qr-img"
             onLoad={() => {
@@ -890,8 +993,12 @@ export default function RequestsClient({
               setQrError(false);
             }}
             onError={() => {
-              setQrLoading(false);
-              setQrError(true);
+              if (!qrFallback) {
+                setQrFallback(true);
+              } else {
+                setQrLoading(false);
+                setQrError(true);
+              }
             }}
             style={{
               display: qrLoading || qrError ? "none" : "block",
@@ -950,7 +1057,7 @@ export default function RequestsClient({
       {/* ОСНОВНОЙ ИНТЕРФЕЙС */}
       <div className="container">
         
-        {/* МОБИЛЬНАЯ ШАПКА С НАЗВАНИЕМ И БУРГЕРОМ */}
+        {/* МОБИЛЬНАЯ ШАПКА */}
         <div className="mobile-header-bar">
           <div className="mobile-header-left">
             <div className="brand-mark">{brandMark}</div>
@@ -1034,7 +1141,7 @@ export default function RequestsClient({
             </div>
           ) : (
             <>
-              {/* ДЕСКТОПНАЯ ТАБЛИЦА (для ПК) */}
+              {/* ДЕСКТОПНАЯ ТАБЛИЦА */}
               <div className="requests-table-wrapper">
                 <table className="requests-table">
                   <thead>
@@ -1110,7 +1217,7 @@ export default function RequestsClient({
                 </table>
               </div>
 
-              {/* МОБИЛЬНЫЕ КАРТОЧКИ (для смартфонов <= 768px) */}
+              {/* МОБИЛЬНЫЕ КАРТОЧКИ */}
               <div className="requests-cards-mobile">
                 {requests.map((r) => {
                   const locked = r.is_processed;

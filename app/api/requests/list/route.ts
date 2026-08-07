@@ -25,6 +25,8 @@ const REQUEST_SELECT = `
   target_levels,
   textbook_types,
   material_kinds,
+  material_ids,
+  total_price,
   email,
   full_name,
   contact_phone,
@@ -64,7 +66,6 @@ function normalizeBranchFilter(value: unknown): BranchFilter {
     return "olympiad";
   }
 
-  // Динамические ветки (slug)
   return raw;
 }
 
@@ -123,6 +124,8 @@ function normalizeRequestRow(row: any) {
 
     textbook_types: toStringArray(row?.textbook_types),
     material_kinds: toStringArray(row?.material_kinds),
+    material_ids: toStringArray(row?.material_ids),
+    total_price: typeof row?.total_price === "number" ? row.total_price : null,
 
     email: String(row?.email ?? ""),
     full_name: String(row?.full_name ?? ""),

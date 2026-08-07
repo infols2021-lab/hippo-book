@@ -25,6 +25,8 @@ export type SelectedMaterialItem = {
   material_kind?: string;
   tab_title?: string;
   count?: number;
+  is_issued?: boolean;
+  badge_text?: string;
 };
 
 export type NormalizedRequest = {
@@ -175,12 +177,15 @@ export function formatTargetForSheet(
 }
 
 /**
- * Превращает список выбранных материалов в понятную строку с группировкой повторяющихся товаров и указанием таба.
+ * Превращает список выбранных материалов в понятную строку с группировкой повторяющихся товаров и указанием статуса.
  */
 export function formatMaterialTitlesForSheet(items: (SelectedMaterialItem | string)[]): string {
   if (!Array.isArray(items) || items.length === 0) return "—";
 
-  const grouped = new Map<string, { title: string; count: number; unitPrice: number; tabTitle?: string }>();
+  const grouped = new Map<
+    string,
+    { title: string; count: number; unitPrice: number; tabTitle?: string; isIssued?: boolean }
+  >();
 
   for (const item of items) {
     if (typeof item === "string") {
@@ -196,8 +201,10 @@ export function formatMaterialTitlesForSheet(items: (SelectedMaterialItem | stri
         count: 0,
         unitPrice: item.price || 0,
         tabTitle: item.tab_title,
+        isIssued: item.is_issued,
       };
       current.count += item.count || 1;
+      if (item.is_issued) current.isIssued = true;
       grouped.set(key, current);
     }
   }
@@ -206,7 +213,12 @@ export function formatMaterialTitlesForSheet(items: (SelectedMaterialItem | stri
     .map((g) => {
       const tabStr = g.tabTitle ? ` (${g.tabTitle})` : "";
       const countStr = g.count > 1 ? ` (x${g.count})` : "";
-      const priceStr = g.unitPrice > 0 ? ` (${g.unitPrice * g.count} ₽)` : "";
+      let priceStr = "";
+      if (g.isIssued) {
+        priceStr = " (уже выдан)";
+      } else if (g.unitPrice > 0) {
+        priceStr = ` (${g.unitPrice} ₽)`;
+      }
       return `${g.title}${tabStr}${countStr}${priceStr}`;
     })
     .join(", ");
