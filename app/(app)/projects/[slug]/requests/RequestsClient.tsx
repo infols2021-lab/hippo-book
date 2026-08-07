@@ -182,6 +182,44 @@ export default function RequestsClient({
 
   const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
 
+  // Надежный предзагрузчик QR-кода, решающий проблему бесконечной загрузки
+  useEffect(() => {
+    if (!paymentModalOpen) return;
+    let alive = true;
+
+    setQrLoading(true);
+    setQrError(false);
+
+    const img = new window.Image();
+    img.onload = () => {
+      if (alive) {
+        setQrLoading(false);
+        setQrError(false);
+      }
+    };
+    img.onerror = () => {
+      if (alive) {
+        setQrLoading(false);
+        setQrError(true);
+      }
+    };
+    img.src = qrUrl;
+
+    if (img.complete) {
+      if (img.naturalWidth > 0) {
+        setQrLoading(false);
+        setQrError(false);
+      } else {
+        setQrLoading(false);
+        setQrError(true);
+      }
+    }
+
+    return () => {
+      alive = false;
+    };
+  }, [qrUrl, paymentModalOpen]);
+
   useEffect(() => {
     let alive = true;
     async function loadMaterials() {
@@ -973,16 +1011,16 @@ export default function RequestsClient({
           </button>
         </div>
 
-        <div className="payment-qr" style={{ display: "flex", justifyContent: "center", background: "#fff", padding: 16, borderRadius: 16, marginBottom: 20 }}>
-          {qrLoading && !qrError ? (
+        <div className="payment-qr" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 180, background: "#fff", padding: 16, borderRadius: 16, marginBottom: 20, position: "relative" }}>
+          {qrLoading && !qrError && (
             <div className="qr-loader" role="status" style={{ textAlign: "center", padding: 20 }}>
               <div className="qr-loader-text" style={{ fontSize: 13, fontWeight: 700, color: "#333" }}>
                 Загружаем QR-код...
               </div>
             </div>
-          ) : null}
+          )}
 
-          {qrError ? (
+          {qrError && (
             <div className="qr-error" role="alert" style={{ textAlign: "center", padding: 20 }}>
               <div style={{ fontWeight: 800, marginBottom: 6, color: "#d32f2f" }}>
                 Не удалось загрузить QR-код
@@ -995,7 +1033,7 @@ export default function RequestsClient({
                 Попробовать снова
               </button>
             </div>
-          ) : null}
+          )}
 
           <img
             key={qrUrl}
@@ -1010,11 +1048,11 @@ export default function RequestsClient({
               setQrLoading(false);
               setQrError(true);
             }}
-            style={{
-              display: qrLoading || qrError ? "none" : "block",
-              maxWidth: 220,
-              height: "auto",
-            }}
+            style={
+              qrLoading || qrError
+                ? { position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }
+                : { maxWidth: 220, height: "auto", display: "block" }
+            }
           />
         </div>
 
