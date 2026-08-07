@@ -1,3 +1,4 @@
+// app/(app)/projects/[slug]/profile/ProfileClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -30,7 +31,7 @@ export type Stats = {
 };
 
 export type MaterialProgressItem = {
-  kind: "textbook" | "crossword";
+  kind: "textbook" | "crossword" | string;
   id: string;
   title: string;
   completed: number;
@@ -188,7 +189,7 @@ export default function ProfileClient({
   const [progressLoading, setProgressLoading] = useState<boolean>(!statsProp && !progressProp);
   const [progressError, setProgressError] = useState<string | null>(null);
 
-  // Категории материалов и аккордеон завершенных
+  // Категории материалов (динамические) и аккордеон завершенных
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [completedExpanded, setCompletedExpanded] = useState<boolean>(false);
 
@@ -356,7 +357,28 @@ export default function ProfileClient({
     }
   }
 
-  // Фильтрация и разделение материалов на Активные / Завершенные
+  // 🔄 Автоматическое вычисление ВСЕХ динамических категорий из пришедших материалов
+  const dynamicCategories = useMemo(() => {
+    if (!materialsProgress) return [];
+    const map = new Map<string, string>(); // id -> display label
+
+    materialsProgress.forEach((item) => {
+      if (item.tabTitle && item.tabTitle.trim()) {
+        const id = item.tabTitle.toLowerCase().trim();
+        if (!map.has(id)) {
+          map.set(id, item.tabTitle.trim());
+        }
+      } else if (item.kind === "textbook") {
+        if (!map.has("textbook")) map.set("textbook", "Учебники");
+      } else if (item.kind === "crossword") {
+        if (!map.has("crossword")) map.set("crossword", "Кроссворды");
+      }
+    });
+
+    return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
+  }, [materialsProgress]);
+
+  // Фильтрация материалов по выбранной динамической категории
   const { filteredActive, filteredCompleted } = useMemo(() => {
     if (!materialsProgress) return { filteredActive: [], filteredCompleted: [] };
 
@@ -364,7 +386,7 @@ export default function ProfileClient({
       if (selectedCategory === "all") return true;
       if (selectedCategory === "textbook") return m.kind === "textbook";
       if (selectedCategory === "crossword") return m.kind === "crossword";
-      return m.tabTitle?.toLowerCase() === selectedCategory.toLowerCase();
+      return m.tabTitle?.toLowerCase().trim() === selectedCategory.toLowerCase().trim();
     });
 
     return {
@@ -489,7 +511,7 @@ export default function ProfileClient({
               </button>
               {profile.is_admin && (
                 <Link className="sheet-item" href="/admin" onClick={() => setMobileMenuOpen(false)}>
-                Панель управления
+                  Панель управления
                 </Link>
               )}
               <Link className="sheet-item" href="/portal" onClick={() => setMobileMenuOpen(false)}>
@@ -505,7 +527,7 @@ export default function ProfileClient({
 
       <div className="profile-container">
         
-        {/* 📱 1. МОБИЛЬНАЯ ШАПКА (видна только <= 768px) */}
+        {/* 📱 1. МОБИЛЬНАЯ ШАПКА */}
         <div className="mobile-header-bar">
           <div className="mobile-header-left">
             <div className="mobile-avatar" onClick={openRewards}>
@@ -516,7 +538,11 @@ export default function ProfileClient({
               )}
             </div>
             <div className="mobile-user-info">
-              <div className="mobile-user-name">{nameLabel(profile.full_name)}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span className="skills-wordmark">skilLS</span>
+                <span style={{ fontSize: "12px", opacity: 0.4 }}>•</span>
+                <span className="mobile-user-name">{nameLabel(profile.full_name)}</span>
+              </div>
               {features?.streaks && (
                 <button type="button" className="mobile-streak-pill" onClick={openRewards}>
                   🔥 {streakData?.currentStreak ?? 0} дн. серия
@@ -529,58 +555,61 @@ export default function ProfileClient({
           </button>
         </div>
 
-        {/* 🖥️ 2. ДЕСКТОПНАЯ ШАПКА (видна только > 768px) */}
+        {/* 🖥️ 2. ДЕСКТОПНАЯ ШАПКА */}
         <div className="profile-topbar">
-          <div className="brand-switcher-wrapper">
-            <button 
-              type="button" 
-              className={`brand brand-interactive ${switcherOpen ? "open" : ""}`}
-              onClick={() => setSwitcherOpen(!switcherOpen)}
-            >
-              <div className="brand-mark">{brandMark}</div>
-              <div className="brand-text-wrapper">
-                <div className="brand-title">{projectName}</div>
-                <div className="brand-subtitle">Профиль ученика</div>
-              </div>
-              <div className="switcher-chevron">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </div>
-            </button>
-
-            {switcherOpen && (
-              <>
-                <div className="switcher-overlay" onClick={() => setSwitcherOpen(false)} />
-                <div className="project-switcher-menu">
-                  <div className="switcher-header">Сменить направление</div>
-                  <div className="switcher-list">
-                    {availableProjects.map((p) => {
-                      const isActive = p.slug === projectSlug;
-                      const dotColor = p.theme?.primaryColor || p.theme_color || "#6366f1";
-                      
-                      return (
-                        <Link
-                          key={p.id}
-                          href={`/projects/${p.slug}/profile`}
-                          className={`project-switcher-item ${isActive ? "active" : ""}`}
-                          onClick={() => setSwitcherOpen(false)}
-                        >
-                          <div className="switcher-dot" style={{ backgroundColor: dotColor }} />
-                          <div className="switcher-item-name">{p.name}</div>
-                          {isActive && <div className="switcher-item-check">✓</div>}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                  <div className="switcher-footer">
-                    <Link href="/portal" className="switcher-portal-link">
-                      ← На главный портал
-                    </Link>
-                  </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+            <span className="skills-wordmark">skilLS</span>
+            <div className="brand-switcher-wrapper">
+              <button 
+                type="button" 
+                className={`brand brand-interactive ${switcherOpen ? "open" : ""}`}
+                onClick={() => setSwitcherOpen(!switcherOpen)}
+              >
+                <div className="brand-mark">{brandMark}</div>
+                <div className="brand-text-wrapper">
+                  <div className="brand-title">{projectName}</div>
+                  <div className="brand-subtitle">Профиль ученика</div>
                 </div>
-              </>
-            )}
+                <div className="switcher-chevron">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+              </button>
+
+              {switcherOpen && (
+                <>
+                  <div className="switcher-overlay" onClick={() => setSwitcherOpen(false)} />
+                  <div className="project-switcher-menu">
+                    <div className="switcher-header">Сменить направление</div>
+                    <div className="switcher-list">
+                      {availableProjects.map((p) => {
+                        const isActive = p.slug === projectSlug;
+                        const dotColor = p.theme?.primaryColor || p.theme_color || "#6366f1";
+                        
+                        return (
+                          <Link
+                            key={p.id}
+                            href={`/projects/${p.slug}/profile`}
+                            className={`project-switcher-item ${isActive ? "active" : ""}`}
+                            onClick={() => setSwitcherOpen(false)}
+                          >
+                            <div className="switcher-dot" style={{ backgroundColor: dotColor }} />
+                            <div className="switcher-item-name">{p.name}</div>
+                            {isActive && <div className="switcher-item-check">✓</div>}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                    <div className="switcher-footer">
+                      <Link href="/portal" className="switcher-portal-link">
+                        ← На главный портал
+                      </Link>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="top-actions">
@@ -616,7 +645,7 @@ export default function ProfileClient({
         {/* ── СЕТКА ПРОФИЛЯ ── */}
         <div className="profile-grid">
           
-          {/* 🖥️ ЛЕВАЯ КОЛОНКА (Сайдбар только на ПК) */}
+          {/* 🖥️ ЛЕВАЯ КОЛОНКА (Сайдбар) */}
           <aside className="profile-panel profile-sidebar">
             <div
               className="profile-avatar-wrapper"
@@ -627,7 +656,7 @@ export default function ProfileClient({
               {streakData?.equippedAvatarUrl ? (
                 <img src={streakData.equippedAvatarUrl} alt="Маскот" className="profile-avatar-img" />
               ) : (
-                <span style={{ fontSize: "48px" }}></span>
+                <span style={{ fontSize: "48px" }}>🎭</span>
               )}
             </div>
 
@@ -722,7 +751,7 @@ export default function ProfileClient({
               </div>
             </div>
 
-            {/* 📱 МОБИЛЬНАЯ КОМПАКТНАЯ СТАТИСТИКА (4 плашки в ряд как на скрине) */}
+            {/* 📱 МОБИЛЬНАЯ КОМПАКТНАЯ СТАТИСТИКА (4 плашки) */}
             <div className="mobile-stats-row">
               <div className="mobile-stat-card">
                 <div className="mobile-stat-val">{stats ? `${stats.successRate}%` : "0%"}</div>
@@ -742,26 +771,26 @@ export default function ProfileClient({
               </div>
             </div>
 
-            {/* 📱 МОБИЛЬНЫЕ ТАБЫ-ФИЛЬТРЫ (Как на скрине: Все, Учебники, Кроссворды) */}
-            <div className="mobile-category-bar no-scrollbar">
+            {/* 🔄 ЕДИНЫЕ ДИНАМИЧЕСКИЕ ТАБЫ-ФИЛЬТРЫ (ПК + МОБИЛКА) */}
+            <div className="category-filter-bar no-scrollbar">
               <button 
-                className={`mobile-cat-pill ${selectedCategory === "all" ? "active" : ""}`}
+                type="button"
+                className={`cat-pill ${selectedCategory === "all" ? "active" : ""}`}
                 onClick={() => setSelectedCategory("all")}
               >
                 Все
               </button>
-              <button 
-                className={`mobile-cat-pill ${selectedCategory === "textbook" ? "active" : ""}`}
-                onClick={() => setSelectedCategory("textbook")}
-              >
-                Учебники
-              </button>
-              <button 
-                className={`mobile-cat-pill ${selectedCategory === "crossword" ? "active" : ""}`}
-                onClick={() => setSelectedCategory("crossword")}
-              >
-                Кроссворды
-              </button>
+
+              {dynamicCategories.map((cat) => (
+                <button 
+                  key={cat.id}
+                  type="button"
+                  className={`cat-pill ${selectedCategory === cat.id ? "active" : ""}`}
+                  onClick={() => setSelectedCategory(cat.id)}
+                >
+                  {cat.label}
+                </button>
+              ))}
             </div>
 
             {progressLoading && (
@@ -797,36 +826,47 @@ export default function ProfileClient({
               </div>
             ) : (
               <>
-                {/* АКТИВНЫЕ МАТЕРИАЛЫ */}
-                <div className="progress-list">
-                  {filteredActive.map((m) => (
-                    <Link key={`${m.kind}-${m.id}`} href={m.href} className="progress-row" style={{ textDecoration: "none" }}>
-                      <div className="progress-left">
-                        <div className="progress-type">
-                          {m.tabTitle ? m.tabTitle.toUpperCase() : m.kind === "textbook" ? "УЧЕБНИКИ" : "КРОССВОРДЫ"}
-                        </div>
-                        <div className="progress-title">{m.title}</div>
-                        <div className="progress-sub">
-                          {m.kind === "textbook"
-                            ? `${m.completed} из ${m.total} заданий выполнено`
-                            : `${m.completed} из ${m.total} слов отгадано`}
-                          {m.total === 0 ? " (нет заданий)" : ""}
-                        </div>
-                      </div>
-                      <div className="progress-right">
-                        <div className="progress-bar">
-                          <div className="progress-fill" style={{ width: `${m.progressPercent}%` }} />
-                        </div>
-                        <div className="progress-percent">{m.progressPercent}%</div>
-                      </div>
-                    </Link>
-                  ))}
+                {/* 🔒 АКТИВНЫЕ МАТЕРИАЛЫ С ФИКСИРОВАННОЙ ВЫСОТОЙ (3 материала ~ 290px) И СКРОЛЛОМ */}
+                <div className="progress-list-scrollable no-scrollbar">
+                  {filteredActive.length === 0 ? (
+                    <div style={{ padding: "20px", textAlign: "center", fontWeight: 700, opacity: 0.6, fontSize: "14px" }}>
+                      {filteredCompleted.length > 0
+                        ? "Все материалы в этом разделе уже пройдены!"
+                        : "В выбранной категории нет активных материалов"}
+                    </div>
+                  ) : (
+                    <div className="progress-list">
+                      {filteredActive.map((m) => (
+                        <Link key={`${m.kind}-${m.id}`} href={m.href} className="progress-row" style={{ textDecoration: "none" }}>
+                          <div className="progress-left">
+                            <div className="progress-type">
+                              {m.tabTitle ? m.tabTitle.toUpperCase() : m.kind === "textbook" ? "УЧЕБНИКИ" : "КРОССВОРДЫ"}
+                            </div>
+                            <div className="progress-title">{m.title}</div>
+                            <div className="progress-sub">
+                              {m.kind === "textbook"
+                                ? `${m.completed} из ${m.total} заданий выполнено`
+                                : `${m.completed} из ${m.total} слов отгадано`}
+                              {m.total === 0 ? " (нет заданий)" : ""}
+                            </div>
+                          </div>
+                          <div className="progress-right">
+                            <div className="progress-bar">
+                              <div className="progress-fill" style={{ width: `${m.progressPercent}%` }} />
+                            </div>
+                            <div className="progress-percent">{m.progressPercent}%</div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {/* 📱 СВОРАЧИВАЕМЫЙ АККОРДЕОН ДЛЯ ЗАВЕРШЕННЫХ (100%) МАТЕРИАЛОВ */}
+                {/* 📱/🖥️ СВОРАЧИВАЕМЫЙ АККОРДЕОН ДЛЯ ЗАВЕРШЕННЫХ (100%) МАТЕРИАЛОВ */}
                 {filteredCompleted.length > 0 && (
                   <div className="completed-accordion">
                     <button 
+                      type="button"
                       className="accordion-trigger"
                       onClick={() => setCompletedExpanded(!completedExpanded)}
                     >
@@ -845,7 +885,7 @@ export default function ProfileClient({
                               <div className="progress-title">{m.title}</div>
                             </div>
                             <div className="progress-right">
-                              <div className="progress-percent">100%</div>
+                              <div className="progress-percent" style={{ color: "#10b981" }}>100%</div>
                             </div>
                           </Link>
                         ))}
