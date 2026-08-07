@@ -39,6 +39,14 @@ type PurchaseRequest = {
   total_price?: number | null;
 };
 
+type PaymentDisplayItem = {
+  id: string;
+  title: string;
+  effectivePrice: number;
+  badgeText?: string;
+  isIssued?: boolean;
+};
+
 type Props = {
   project: Project;
   levels: ProjectLevel[];
@@ -164,6 +172,9 @@ export default function RequestsClient({
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
 
   const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
+  const [paymentModalItems, setPaymentModalItems] = useState<PaymentDisplayItem[]>([]);
+  const [paymentModalSubtitle, setPaymentModalSubtitle] = useState<string>("");
+
   const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
   const [qrLoading, setQrLoading] = useState(true);
   const [qrError, setQrError] = useState(false);
@@ -353,7 +364,7 @@ export default function RequestsClient({
         effectivePrice = 0;
         badgeText = "уже выдан";
       } else {
-        effectivePrice = item.unitPrice; // Цена берется 1 раз, вне зависимости от кол-ва
+        effectivePrice = item.unitPrice;
         if (item.count > 1) {
           badgeText = `(${item.count} шт.) (уже есть в другой заявке)`;
         }
@@ -362,9 +373,11 @@ export default function RequestsClient({
       sum += effectivePrice;
 
       return {
-        ...item,
+        id: item.id,
+        title: item.title,
         effectivePrice,
         badgeText,
+        isIssued: item.isIssued,
       };
     });
 
@@ -404,7 +417,8 @@ export default function RequestsClient({
       sum += effectivePrice;
 
       return {
-        ...m,
+        id: m.id,
+        title: m.title,
         effectivePrice,
         badgeText,
         isIssued,
@@ -425,9 +439,14 @@ export default function RequestsClient({
     setTimeout(() => setNotif(null), 4000);
   }
 
-  function openPaymentModal(amount: number) {
-    const finalAmount = amount > 0 ? amount : aggregatedPendingSummary.totalPrice;
-    setPaymentTotalAmount(finalAmount);
+  function openPaymentModal(
+    amount: number,
+    displayItems: PaymentDisplayItem[],
+    subtitle: string
+  ) {
+    setPaymentTotalAmount(amount);
+    setPaymentModalItems(displayItems);
+    setPaymentModalSubtitle(subtitle);
     setQrLoading(true);
     setQrError(false);
     setQrFallback(false);
@@ -518,7 +537,11 @@ export default function RequestsClient({
       if (!res.ok || !json?.ok) throw new Error(json?.error || `HTTP ${res.status}`);
 
       setRequestModalOpen(false);
-      openPaymentModal(totalPrice);
+      openPaymentModal(
+        singleRequestReceipt.totalPrice,
+        singleRequestReceipt.items,
+        "Материалы в созданной заявке:"
+      );
       showNotification(editingId ? "Заявка успешно обновлена" : "Заявка успешно создана");
       router.refresh();
     } catch (e: any) {
@@ -883,12 +906,12 @@ export default function RequestsClient({
             Инструкция по оплате
           </h4>
 
-          {aggregatedPendingSummary.items.length > 0 && (
+          {paymentModalItems.length > 0 && (
             <div className="summary-items-list" style={{ marginBottom: 12 }}>
               <div style={{ fontSize: "12px", fontWeight: 700, opacity: 0.8, marginBottom: 6 }}>
-                Заказываемые материалы из необработанных заявок ({aggregatedPendingSummary.count} заявка/заявок):
+                {paymentModalSubtitle}
               </div>
-              {aggregatedPendingSummary.items.map((item) => (
+              {paymentModalItems.map((item) => (
                 <div key={item.id} className="summary-item">
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     <span className="summary-item-title">{item.title}</span>
@@ -922,7 +945,7 @@ export default function RequestsClient({
               <strong>Отсканируйте QR-код</strong> в вашем банковском приложении.
             </li>
             <li>
-              Сумма к оплате (за все необработанные материалы):{" "}
+              Сумма к оплате:{" "}
               <strong style={{ fontSize: "17px", color: "var(--project-primary)" }}>
                 {paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "0 руб."}
               </strong>
@@ -1124,7 +1147,11 @@ export default function RequestsClient({
                   showNotification("У вас нет ожидающих оплаты заявок.", "info");
                   return;
                 }
-                openPaymentModal(aggregatedPendingSummary.totalPrice);
+                openPaymentModal(
+                  aggregatedPendingSummary.totalPrice,
+                  aggregatedPendingSummary.items,
+                  `Заказываемые материалы из неоплаченных заявок (${aggregatedPendingSummary.count}):`
+                );
               }}
             >
               Оплатить заявку (QR)
