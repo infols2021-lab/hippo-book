@@ -178,16 +178,9 @@ export default function RequestsClient({
   const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
   const [qrLoading, setQrLoading] = useState(true);
   const [qrError, setQrError] = useState(false);
-  const [qrFallback, setQrFallback] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const primaryQrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
-  const fallbackQrUrl = useMemo(() => {
-    const text = encodeURIComponent(`https://ek-school.ru/pay?amount=${paymentTotalAmount}`);
-    return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${text}`;
-  }, [paymentTotalAmount]);
-
-  const activeQrUrl = qrFallback ? fallbackQrUrl : primaryQrUrl;
+  const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
 
   useEffect(() => {
     let alive = true;
@@ -449,14 +442,12 @@ export default function RequestsClient({
     setPaymentModalSubtitle(subtitle);
     setQrLoading(true);
     setQrError(false);
-    setQrFallback(false);
     setQrSeed(Date.now());
     setPaymentModalOpen(true);
   }
 
   function resetQrStateAndRefresh() {
     setQrError(false);
-    setQrFallback(false);
     setQrLoading(true);
     setQrSeed(Date.now());
   }
@@ -1007,8 +998,8 @@ export default function RequestsClient({
           ) : null}
 
           <img
-            key={activeQrUrl}
-            src={activeQrUrl}
+            key={qrUrl}
+            src={qrUrl}
             alt="QR-код для оплаты"
             className="qr-img"
             onLoad={() => {
@@ -1016,12 +1007,8 @@ export default function RequestsClient({
               setQrError(false);
             }}
             onError={() => {
-              if (!qrFallback) {
-                setQrFallback(true);
-              } else {
-                setQrLoading(false);
-                setQrError(true);
-              }
+              setQrLoading(false);
+              setQrError(true);
             }}
             style={{
               display: qrLoading || qrError ? "none" : "block",
