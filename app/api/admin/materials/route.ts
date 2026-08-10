@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
 
   const branch_type = searchParams.get("branch_type");
   const material_kind = searchParams.get("material_kind");
+  const is_demo = searchParams.get("is_demo");
   const includeCounts = searchParams.get("include_counts") !== "false";
 
   try {
@@ -24,7 +25,10 @@ export async function GET(req: NextRequest) {
       .order("order_index", { ascending: true })
       .order("created_at", { ascending: false });
 
-    if (branch_type) {
+    // Если запрошен демо-материал
+    if (is_demo === "true") {
+      query = query.eq("is_demo", true);
+    } else if (branch_type) {
       query = query.eq("branch_type", String(branch_type).trim());
     }
 
@@ -85,11 +89,13 @@ export async function POST(req: NextRequest) {
   }
 
   const rawBranchType = String(body.branch_type || body.branch || body.project_slug || "general").trim();
+  const isDemo = Boolean(body.is_demo);
 
   const payload = {
     ...normalizeMaterialInput(body, user.id),
     branch_type: rawBranchType,
     is_secret: typeof body.is_secret === "boolean" ? body.is_secret : Boolean(body.isSecret),
+    is_demo: isDemo,
   };
 
   if (!payload.title) {
@@ -97,6 +103,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Если новый материал помечается как единственное Демо - снимаем флаг со всех остальных
+    if (isDemo) {
+      await supabase.from("materials").update({ is_demo: false }).eq("is_demo", true);
+    }
+
     const { data, error } = await supabase
       .from("materials")
       .insert(payload)

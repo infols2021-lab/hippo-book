@@ -17,7 +17,7 @@ type AssignmentRow = {
   created_at?: string | null;
 };
 
-// Универсальный тип материала, поддерживающий и новые проекты, и легаси
+// Универсальный тип материала, поддерживающий и новые проекты, и легаси, и демо
 type MaterialOption = {
   id: string;
   title: string;
@@ -26,6 +26,7 @@ type MaterialOption = {
   material_kind?: string;
   project_id?: string;
   project_tab_id?: string;
+  is_demo?: boolean;
 };
 
 type Props = {
@@ -69,7 +70,7 @@ export default function AssignmentsTab({ onChanged }: Props) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<AssignmentRow | null>(null);
 
-  const isLegacy = selectedProjectId.startsWith("legacy_");
+  const isLegacy = selectedProjectId.startsWith("legacy_") || selectedProjectId === "global_demo";
 
   // ЗАГРУЗКА СПИСКА ПРОЕКТОВ (ВЕТОК)
   useEffect(() => {
@@ -94,7 +95,7 @@ export default function AssignmentsTab({ onChanged }: Props) {
     }
   }, [selectedProjectId, isLegacy]);
 
-  // ЗАГРУЗКА МАТЕРИАЛОВ ПРИ ВЫБОРЕ ТАБА (ИЛИ ЛЕГАСИ ПРОЕКТА)
+  // ЗАГРУЗКА МАТЕРИАЛОВ ПРИ ВЫБОРЕ ТАБА, ЛЕГАСИ ИЛИ ДЕМО-ПРОЕКТА
   useEffect(() => {
     async function loadMats() {
       if (!selectedProjectId) {
@@ -106,7 +107,23 @@ export default function AssignmentsTab({ onChanged }: Props) {
       setErr(null);
 
       try {
-        if (selectedProjectId === "legacy_olympiad") {
+        if (selectedProjectId === "global_demo") {
+          // Загрузка единственного Демо-материала
+          const res = await fetch("/api/admin/materials?is_demo=true", { cache: "no-store" });
+          const json = await res.json();
+          const demoMats = (json.materials || []).map((x: any) => ({
+            ...x,
+            branch_type: "demo",
+            kind: "material",
+            id: String(x.id),
+            title: `🎯 [DEMO] ${x.title}`
+          }));
+          setMaterials(demoMats);
+          if (demoMats.length > 0) {
+            setSelectedMaterial(demoMats[0]);
+          }
+        }
+        else if (selectedProjectId === "legacy_olympiad") {
           const [tRes, cRes] = await Promise.all([
             fetch("/api/admin/textbooks", { cache: "no-store" }),
             fetch("/api/admin/crosswords", { cache: "no-store" })
@@ -130,11 +147,12 @@ export default function AssignmentsTab({ onChanged }: Props) {
           const json = await res.json();
           const projMats = (json.materials || []).map((x: any) => ({
             ...x,
-            branch_type: "project", // Флаг новой системы
+            branch_type: "project",
             kind: "material",
             project_id: selectedProjectId,
             project_tab_id: selectedTabId,
-            id: String(x.id)
+            id: String(x.id),
+            title: x.is_demo ? `🎯 [DEMO] ${x.title}` : x.title
           }));
           setMaterials(projMats);
         } 
@@ -149,7 +167,9 @@ export default function AssignmentsTab({ onChanged }: Props) {
     }
 
     loadMats();
-    setSelectedMaterial(null);
+    if (selectedProjectId !== "global_demo") {
+      setSelectedMaterial(null);
+    }
   }, [selectedProjectId, selectedTabId]);
 
   // ЗАГРУЗКА ЗАДАНИЙ ПРИ ВЫБОРЕ МАТЕРИАЛА
@@ -164,8 +184,10 @@ export default function AssignmentsTab({ onChanged }: Props) {
     try {
       const qs = new URLSearchParams();
       
-      // Логика построения фильтра для легаси и новых проектов
-      if (material.branch_type === "gatehouse") {
+      // Фильтры загрузки заданий
+      if (material.branch_type === "demo" || selectedProjectId === "global_demo") {
+        qs.set("material_id", material.id);
+      } else if (material.branch_type === "gatehouse") {
         qs.set("branch_type", "gatehouse");
         qs.set("kind", "material");
         qs.set("id", material.id);
@@ -175,7 +197,6 @@ export default function AssignmentsTab({ onChanged }: Props) {
         qs.set("kind", material.kind);
         qs.set("id", material.id);
       } else {
-        // Логика для новых динамических проектов
         qs.set("project_id", material.project_id || "");
         qs.set("project_tab_id", material.project_tab_id || "");
         qs.set("material_id", material.id);
@@ -236,7 +257,7 @@ export default function AssignmentsTab({ onChanged }: Props) {
       <div className="admin-section-head mb-4">
         <div>
           <h2 className="text-2xl font-bold">📝 Управление заданиями</h2>
-          <p className="text-gray-500 text-sm">Один движок заданий используется для всех веток и проектов.</p>
+          <p className="text-gray-500 text-sm">Один движок заданий используется для всех веток, проектов и демо-материала.</p>
         </div>
       </div>
 
@@ -250,6 +271,9 @@ export default function AssignmentsTab({ onChanged }: Props) {
             className="w-full border-2 rounded-xl px-4 py-2.5 outline-none bg-white font-bold"
           >
             <option value="">-- Выберите ветку --</option>
+            <optgroup label="🎯 Публичные промо-материалы">
+              <option value="global_demo">🎯 Единственный Демо-материал</option>
+            </optgroup>
             <optgroup label="Новые динамические проекты">
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </optgroup>
@@ -268,7 +292,7 @@ export default function AssignmentsTab({ onChanged }: Props) {
             disabled={isLegacy || !selectedProjectId} 
             className="w-full border-2 rounded-xl px-4 py-2.5 outline-none bg-white font-bold disabled:opacity-50 disabled:bg-gray-100"
           >
-            <option value="">{isLegacy ? "Не требуется для легаси" : "-- Выберите раздел --"}</option>
+            <option value="">{selectedProjectId === "global_demo" ? "Не требуется для Демо" : isLegacy ? "Не требуется для легаси" : "-- Выберите раздел --"}</option>
             {tabs.map(t => <option key={t.id} value={t.id}>{t.icon} {t.title}</option>)}
           </select>
         </div>

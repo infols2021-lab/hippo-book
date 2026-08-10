@@ -57,8 +57,8 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
 
   if (!material) notFound();
 
-  // 3. Проверка доступа
-  let hasAccess = material.is_available;
+  // 3. Проверка доступа (если материал бесплатный, доступен всем или является Демо)
+  let hasAccess = Boolean(material.is_available || material.is_demo);
   if (!hasAccess) {
     const { data: access } = await supabase
       .from("material_access")
@@ -69,7 +69,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
     if (access) hasAccess = true;
   }
 
-  // 4. Получаем список заданий (убрано description, добавлено assignment_type)
+  // 4. Получаем список заданий
   const { data: assignmentsData } = await supabase
     .from("assignments")
     .select("id, title, order_index, assignment_type")
@@ -97,7 +97,6 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const coverUrl = toStorageProxyUrl(material.cover_image_url);
 
-  // Передаем всё в клиентский компонент!
   return (
     <MaterialClient 
       slug={slug}

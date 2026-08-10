@@ -393,7 +393,7 @@ export default function LoginPage() {
                   <div className="step-body">
                     <h5>Проверьте все папки</h5>
                     <p>
-                      Откройте ваш почтовый ящик. Если во «Входящих» пусто, не пугайтесь — обязательно загляните в папки <strong>«Спам»</strong> and <strong>«Промоакции»</strong>. Фильтры почты иногда путают автоматические письма.
+                      Откройте ваш почтовый ящик. Если во «Входящих» пусто, не пугайтесь — обязательно загляните в папки <strong>«Спам»</strong> и <strong>«Промоакции»</strong>. Фильтры почты иногда путают автоматические письма.
                     </p>
                   </div>
                 </div>
@@ -583,6 +583,28 @@ export default function LoginPage() {
           <button className="btn student" onClick={() => void doLogin(false)} disabled={busy}>
             Войти как ученик
           </button>
+
+          {/* Кнопка прямого перехода в Демо-режим без регистрации */}
+          <Link 
+            href="/demo" 
+            style={{
+              marginTop: "12px",
+              display: "block",
+              width: "100%",
+              padding: "12px",
+              borderRadius: "12px",
+              background: "linear-gradient(135deg, #10b981, #059669)",
+              color: "#ffffff",
+              fontWeight: 900,
+              fontSize: "14px",
+              textDecoration: "none",
+              textAlign: "center",
+              boxShadow: "0 4px 14px rgba(16, 185, 129, 0.25)",
+              transition: "transform 0.15s ease"
+            }}
+          >
+            🎯 Пройти демо-задание
+          </Link>
 
           <div className="link">
             <p>

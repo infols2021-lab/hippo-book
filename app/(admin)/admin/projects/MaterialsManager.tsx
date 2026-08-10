@@ -92,6 +92,7 @@ export default function MaterialsManager() {
       branch_type: branchType,
       price: Number(editingMaterial.price) || 1000,
       is_secret: Boolean(editingMaterial.is_secret),
+      is_demo: Boolean(editingMaterial.is_demo),
       project_tab_id: selectedTabId === "none" || !selectedTabId ? null : selectedTabId,
       class_levels: levelCodes,
       target_levels: levelCodes,
@@ -179,6 +180,7 @@ export default function MaterialsManager() {
       ...material,
       target_levels: currentLevels,
       class_levels: currentLevels,
+      is_demo: Boolean(material.is_demo),
     });
   };
 
@@ -222,6 +224,7 @@ export default function MaterialsManager() {
             is_active: true, 
             is_available: false, 
             is_secret: false,
+            is_demo: false,
             order_index: 0,
             material_kind: "material",
           })}
@@ -366,6 +369,15 @@ export default function MaterialsManager() {
               />
               🔒 Секретный материал (is_secret)
             </label>
+            <label className="flex items-center gap-2 cursor-pointer font-bold text-emerald-700">
+              <input 
+                type="checkbox" 
+                className="w-5 h-5 rounded text-emerald-600 focus:ring-emerald-500" 
+                checked={Boolean(editingMaterial.is_demo)} 
+                onChange={e => setEditingMaterial({...editingMaterial, is_demo: e.target.checked})} 
+              />
+              🎯 Демо-материал (is_demo — единственный на систему)
+            </label>
           </div>
 
           <div className="flex gap-4">
@@ -422,6 +434,11 @@ export default function MaterialsManager() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span>{mat.title}</span>
+                            {mat.is_demo && (
+                              <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                🎯 DEMO
+                              </span>
+                            )}
                             {mat.is_secret && (
                               <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">
                                 ★ Секретный
