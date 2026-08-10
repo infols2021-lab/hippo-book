@@ -49,6 +49,7 @@ type Props = {
   source?: string;
   sourceId?: string;
   projectSlug: string;
+  guestMode?: boolean;
 };
 
 function normalizeQuestions(qs: unknown): QuestionAny[] {
@@ -75,7 +76,6 @@ function getAssignmentMaterialLevels(assignment: AssignmentData | null): string[
   return normalizeStringArray(material?.target_levels);
 }
 
-// Вспомогательный хелпер поиска кастомного сообщения из админки
 function getFeedbackMessage(score: number, ranges?: any[]): string {
   if (Array.isArray(ranges) && ranges.length > 0) {
     const match = ranges.find(
@@ -90,7 +90,7 @@ function getFeedbackMessage(score: number, ranges?: any[]): string {
   return "Попробуйте пройти задание ещё раз для лучшего результата.";
 }
 
-export default function AssignmentClient({ assignmentId, source, sourceId, projectSlug }: Props) {
+export default function AssignmentClient({ assignmentId, source, sourceId, projectSlug, guestMode = false }: Props) {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -113,6 +113,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [modalSrc, setModalSrc] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [showCtaModal, setShowCtaModal] = useState(false);
   const saveBusyRef = useRef(false);
 
   useEffect(() => {
@@ -175,18 +176,21 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
   }, [isGatehouse]);
 
   const back = useMemo(() => {
+    if (guestMode) {
+      return { href: "/login", headerLabel: "На страницу входа", actionLabel: "На страницу входа" };
+    }
     const s = String(source ?? "").trim().toLowerCase();
     const id = String(sourceId ?? "").trim();
     const basePath = `/projects/${projectSlug}/materials`;
 
     if (s === "textbook" && id) {
-      return { href: `${basePath}/${encodeURIComponent(id)}`, headerLabel: "← Назад к материалу", actionLabel: "Вернуться к материалу" };
+      return { href: `${basePath}/${encodeURIComponent(id)}`, headerLabel: "Назад к материалу", actionLabel: "Вернуться к материалу" };
     }
     if (s === "crossword" && id) {
-      return { href: `${basePath}/${encodeURIComponent(id)}`, headerLabel: "← Назад к кроссворду", actionLabel: "Вернуться к кроссворду" };
+      return { href: `${basePath}/${encodeURIComponent(id)}`, headerLabel: "Назад к кроссворду", actionLabel: "Вернуться к кроссворду" };
     }
-    return { href: basePath, headerLabel: "← К материалам", actionLabel: "К материалам" };
-  }, [source, sourceId, projectSlug]);
+    return { href: basePath, headerLabel: "К материалам", actionLabel: "К материалам" };
+  }, [source, sourceId, projectSlug, guestMode]);
 
   async function load() {
     try {
@@ -213,14 +217,23 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
         setQuestions(normalizeQuestions(data?.content?.questions));
       }
 
-      setPreviousProgress(json.progress);
-
-      if (json.progress?.is_completed) {
-        setAnswers(json.progress.answers ?? {});
-        setShowChoice(true);
-      } else {
-        setAnswers({});
+      if (guestMode) {
+        try {
+          const savedAnswers = localStorage.getItem("demo_answers");
+          if (savedAnswers) setAnswers(JSON.parse(savedAnswers));
+        } catch (e) {}
+        setPreviousProgress(null);
         setShowChoice(false);
+      } else {
+        setPreviousProgress(json.progress);
+
+        if (json.progress?.is_completed) {
+          setAnswers(json.progress.answers ?? {});
+          setShowChoice(true);
+        } else {
+          setAnswers({});
+          setShowChoice(false);
+        }
       }
 
       setIsViewMode(false);
@@ -252,7 +265,15 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
 
   function setAnswerForQuestion(qIndex: number, value: any) {
     const qId = questions[qIndex]?.id || qIndex;
-    setAnswers((prev: any) => ({ ...prev, [qId]: value }));
+    setAnswers((prev: any) => {
+      const next = { ...prev, [qId]: value };
+      if (guestMode) {
+        try {
+          localStorage.setItem("demo_answers", JSON.stringify(next));
+        } catch (e) {}
+      }
+      return next;
+    });
   }
 
   function getAnswerForQuestion(qIndex: number) {
@@ -289,6 +310,13 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
   }
 
   async function finishInformational() {
+    if (guestMode) {
+      setCompletedScreen(true);
+      setShowCtaModal(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     if (saveBusyRef.current) return;
     saveBusyRef.current = true;
     setIsSaving(true);
@@ -326,6 +354,15 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
   }
 
   async function saveProgressAndShowResults(clientStats: FinalStats, review: ReviewItem[]) {
+    if (guestMode) {
+      setFinalStats(clientStats);
+      setReviewItems(review);
+      setCompletedScreen(true);
+      setShowCtaModal(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     if (saveBusyRef.current) return;
     saveBusyRef.current = true;
     setIsSaving(true);
@@ -385,7 +422,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
 
     const v = validateAllAnswered(questions, answers);
     if (!v.ok) {
-      alert(`❌ Заполните вопрос №${v.index + 1}`);
+      alert(`Заполните вопрос №${v.index + 1}`);
       setCurrentIndex(v.index);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -470,13 +507,13 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
 
             {previousProgress?.is_completed && !showChoice && !completedScreen && (
               <button className="mode-switch-button" onClick={switchMode}>
-                ↶ Сменить режим
+                Сменить режим
               </button>
             )}
           </div>
 
           <div className="assignment-badge" style={{ background: theme.primary }}>
-            {assignmentMode === "informational" ? "GUIDE" : theme.badge}
+            {guestMode ? "DEMO MODE" : assignmentMode === "informational" ? "GUIDE" : theme.badge}
           </div>
         </div>
       </header>
@@ -512,7 +549,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
               <span className="score-label">Ваш балл</span>
             </div>
 
-            {/* Вывод кастомного текста из админки в зависимости от набранного % */}
             <p 
               className="card-subtitle" 
               style={{ 
@@ -577,8 +613,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
 
         {completedScreen && assignmentMode === "informational" && (
           <div className="premium-card animate-in" style={{ background: theme.cardBg, textAlign: "center", padding: "60px 20px" }}>
-            <div style={{ fontSize: "72px", marginBottom: "24px" }}>🎉</div>
-            <h2 className="card-title" style={{ fontSize: "28px" }}>Материал успешно изучен!</h2>
+            <h2 className="card-title" style={{ fontSize: "28px" }}>Материал успешно изучен</h2>
             <p className="card-subtitle" style={{ fontSize: "16px", marginTop: "12px" }}>
               Вы ознакомились со всеми файлами и правилами из этого раздела. 
             </p>
@@ -620,7 +655,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
                                 setCurrentIndex(i);
                                 window.scrollTo({ top: 0, behavior: "smooth" });
                               }}
-                              title={`Вопрос ${i + 1}${answered ? " ✓" : ""}`}
+                              title={`Вопрос ${i + 1}${answered ? " (заполнено)" : ""}`}
                               style={{
                                 width: dotSize,
                                 height: dotSize,
@@ -771,6 +806,38 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
           </div>
         )}
       </main>
+
+      {guestMode && showCtaModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white border border-gray-200 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl space-y-6">
+            <h2 className="text-2xl font-black text-gray-900">Демо-задание пройдено</h2>
+            <p className="text-gray-600 text-sm leading-relaxed">
+              Зарегистрируйтесь, чтобы получить полный доступ ко всем курсам, сохранять историю и отслеживать свой прогресс.
+            </p>
+
+            <div className="flex flex-col gap-3 pt-2">
+              <button
+                onClick={() => router.push("/register")}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3.5 rounded-xl transition-all shadow-lg"
+              >
+                Зарегистрироваться
+              </button>
+              <button
+                onClick={() => router.push("/login")}
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3.5 rounded-xl transition-all"
+              >
+                Войти в аккаунт
+              </button>
+              <button
+                onClick={() => setShowCtaModal(false)}
+                className="text-xs font-bold text-gray-500 hover:text-gray-700 mt-2"
+              >
+                Посмотреть результаты
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ImageModal open={imageModalOpen} src={modalSrc} onClose={closeImage} />
     </div>

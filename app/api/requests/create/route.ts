@@ -1,4 +1,3 @@
-// app/api/requests/create/route.ts
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
@@ -91,7 +90,6 @@ export async function POST(req: NextRequest) {
     let sheetName = null;
     let projectName = null;
 
-    // 1. Поиск проекта (включая имя для Google Sheets)
     const { data: projectInfo } = await supabase
       .from("projects")
       .select("id, sheet_name, name")
@@ -104,7 +102,6 @@ export async function POST(req: NextRequest) {
       projectName = projectInfo.name;
     }
 
-    // 2. Поиск выбранных материалов по всем источникам (исключая секретные is_secret = true)
     let selectedMaterials: SelectedMaterialItem[] = [];
     let calculatedTotalPrice = 0;
 
@@ -116,7 +113,7 @@ export async function POST(req: NextRequest) {
       ] = await Promise.all([
         supabase
           .from("materials")
-          .select("id, title, price, material_kind, is_secret, project_tabs(title)")
+          .select("id, title, price, material_kind, is_secret, is_demo, project_tabs(title)")
           .in("id", normalized.material_ids),
         supabase
           .from("textbooks")
@@ -132,7 +129,7 @@ export async function POST(req: NextRequest) {
 
       if (Array.isArray(fetchedMaterials)) {
         for (const m of fetchedMaterials) {
-          if (m.is_secret) continue;
+          if (m.is_secret || m.is_demo) continue;
 
           const rawTabTitle = (m as any).project_tabs?.title || null;
           itemsMap.set(String(m.id), {
@@ -191,7 +188,6 @@ export async function POST(req: NextRequest) {
     const materialKinds =
       normalized.material_kinds.length > 0 ? normalized.material_kinds : extractedKinds;
 
-    // 3. Формирование записи для базы данных
     const payload: Record<string, any> = {
       user_id: user.id,
       request_number,
@@ -226,7 +222,6 @@ export async function POST(req: NextRequest) {
 
     const row = insertedRow as any;
 
-    // 4. Подготовка столбцов для Google Таблицы
     const sheetValues = buildSheetValues(
       row.request_number || "",
       row.created_at || "",

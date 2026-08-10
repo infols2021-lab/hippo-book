@@ -9,7 +9,6 @@ type PageProps = {
   params: Promise<{ slug: string; materialId: string }>;
 };
 
-// Функция для получения прямой ссылки на картинку
 function toStorageProxyUrl(raw: unknown) {
   if (typeof raw !== "string") return "";
   const value = raw.trim();
@@ -38,7 +37,6 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
 
   if (!user) redirect("/login");
 
-  // 1. Получаем проект
   const { data: project } = await supabase
     .from("projects")
     .select("id, name, is_active, theme_color, theme")
@@ -47,7 +45,6 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
 
   if (!project || !project.is_active) notFound();
 
-  // 2. Получаем сам материал
   const { data: material } = await supabase
     .from("materials")
     .select("*")
@@ -57,7 +54,6 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
 
   if (!material) notFound();
 
-  // 3. Проверка доступа (если материал бесплатный, доступен всем или является Демо)
   let hasAccess = Boolean(material.is_available || material.is_demo);
   if (!hasAccess) {
     const { data: access } = await supabase
@@ -69,7 +65,6 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
     if (access) hasAccess = true;
   }
 
-  // 4. Получаем список заданий
   const { data: assignmentsData } = await supabase
     .from("assignments")
     .select("id, title, order_index, assignment_type")
@@ -79,7 +74,6 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
   const assignments = assignmentsData || [];
   const assignmentIds = assignments.map(a => a.id);
 
-  // 5. Прогресс
   let completedIds: string[] = [];
   if (assignmentIds.length > 0) {
     const { data: progressRes } = await supabase

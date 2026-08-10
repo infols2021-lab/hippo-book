@@ -17,7 +17,6 @@ type AssignmentRow = {
   created_at?: string | null;
 };
 
-// Универсальный тип материала, поддерживающий и новые проекты, и легаси, и демо
 type MaterialOption = {
   id: string;
   title: string;
@@ -39,11 +38,11 @@ function guessTypeLabel(a: AssignmentRow) {
 
   const types = new Set(qs.map((q: any) => String(q?.type || "")));
 
-  if (types.has("crossword")) return "🧩 Кроссворд";
-  if (types.has("sentence")) return "📝 Предложение";
-  if (types.has("fill")) return "✍️ Ввод";
+  if (types.has("crossword")) return "Кроссворд";
+  if (types.has("sentence")) return "Предложение";
+  if (types.has("fill")) return "Ввод";
 
-  return "📝 Тест";
+  return "Тест";
 }
 
 function questionsCount(a: AssignmentRow) {
@@ -52,7 +51,6 @@ function questionsCount(a: AssignmentRow) {
 }
 
 export default function AssignmentsTab({ onChanged }: Props) {
-  // 1. Стейты для селектов
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   
@@ -62,7 +60,6 @@ export default function AssignmentsTab({ onChanged }: Props) {
   const [materials, setMaterials] = useState<MaterialOption[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialOption | null>(null);
 
-  // 2. Стейты для данных
   const [rows, setRows] = useState<AssignmentRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -72,14 +69,12 @@ export default function AssignmentsTab({ onChanged }: Props) {
 
   const isLegacy = selectedProjectId.startsWith("legacy_") || selectedProjectId === "global_demo";
 
-  // ЗАГРУЗКА СПИСКА ПРОЕКТОВ (ВЕТОК)
   useEffect(() => {
     fetch("/api/admin/projects")
       .then(r => r.json())
       .then(d => setProjects(d.projects || d.data || []));
   }, []);
 
-  // ЗАГРУЗКА ТАБОВ ПРИ ВЫБОРЕ РЕАЛЬНОГО ПРОЕКТА
   useEffect(() => {
     setSelectedTabId("");
     setSelectedMaterial(null);
@@ -95,7 +90,6 @@ export default function AssignmentsTab({ onChanged }: Props) {
     }
   }, [selectedProjectId, isLegacy]);
 
-  // ЗАГРУЗКА МАТЕРИАЛОВ ПРИ ВЫБОРЕ ТАБА, ЛЕГАСИ ИЛИ ДЕМО-ПРОЕКТА
   useEffect(() => {
     async function loadMats() {
       if (!selectedProjectId) {
@@ -108,7 +102,6 @@ export default function AssignmentsTab({ onChanged }: Props) {
 
       try {
         if (selectedProjectId === "global_demo") {
-          // Загрузка единственного Демо-материала
           const res = await fetch("/api/admin/materials?is_demo=true", { cache: "no-store" });
           const json = await res.json();
           const demoMats = (json.materials || []).map((x: any) => ({
@@ -116,7 +109,7 @@ export default function AssignmentsTab({ onChanged }: Props) {
             branch_type: "demo",
             kind: "material",
             id: String(x.id),
-            title: `🎯 [DEMO] ${x.title}`
+            title: `[DEMO] ${x.title}`
           }));
           setMaterials(demoMats);
           if (demoMats.length > 0) {
@@ -142,7 +135,6 @@ export default function AssignmentsTab({ onChanged }: Props) {
           setMaterials(ga);
         } 
         else if (selectedTabId) {
-          // Загрузка материалов для нового проекта и таба
           const res = await fetch(`/api/admin/projects/${selectedProjectId}/materials?tab_id=${selectedTabId}`, { cache: "no-store" });
           const json = await res.json();
           const projMats = (json.materials || []).map((x: any) => ({
@@ -152,7 +144,7 @@ export default function AssignmentsTab({ onChanged }: Props) {
             project_id: selectedProjectId,
             project_tab_id: selectedTabId,
             id: String(x.id),
-            title: x.is_demo ? `🎯 [DEMO] ${x.title}` : x.title
+            title: x.is_demo ? `[DEMO] ${x.title}` : x.title
           }));
           setMaterials(projMats);
         } 
@@ -172,7 +164,6 @@ export default function AssignmentsTab({ onChanged }: Props) {
     }
   }, [selectedProjectId, selectedTabId]);
 
-  // ЗАГРУЗКА ЗАДАНИЙ ПРИ ВЫБОРЕ МАТЕРИАЛА
   const loadAssignments = async (material: MaterialOption | null) => {
     if (!material) {
       setRows([]);
@@ -184,7 +175,6 @@ export default function AssignmentsTab({ onChanged }: Props) {
     try {
       const qs = new URLSearchParams();
       
-      // Фильтры загрузки заданий
       if (material.branch_type === "demo" || selectedProjectId === "global_demo") {
         qs.set("material_id", material.id);
       } else if (material.branch_type === "gatehouse") {
@@ -218,7 +208,6 @@ export default function AssignmentsTab({ onChanged }: Props) {
     loadAssignments(selectedMaterial);
   }, [selectedMaterial]);
 
-  // ДЕЙСТВИЯ (Удаление, Создание, Сохранение)
   async function removeAssignment(a: AssignmentRow) {
     const ok = window.confirm(`Удалить задание "${a.title}"?`);
     if (!ok) return;
@@ -227,7 +216,7 @@ export default function AssignmentsTab({ onChanged }: Props) {
     const json = await res.json().catch(() => null);
 
     if (!res.ok || !json?.ok) {
-      alert(`❌ Ошибка удаления: ${json?.error || `HTTP ${res.status}`}`);
+      alert(`Ошибка удаления: ${json?.error || `HTTP ${res.status}`}`);
       return;
     }
 
@@ -256,12 +245,11 @@ export default function AssignmentsTab({ onChanged }: Props) {
     <div className="card space-y-6">
       <div className="admin-section-head mb-4">
         <div>
-          <h2 className="text-2xl font-bold">📝 Управление заданиями</h2>
+          <h2 className="text-2xl font-bold">Управление заданиями</h2>
           <p className="text-gray-500 text-sm">Один движок заданий используется для всех веток, проектов и демо-материала.</p>
         </div>
       </div>
 
-      {/* ПАНЕЛЬ ФИЛЬТРОВ И СЕЛЕКТОВ */}
       <div className="flex gap-4 p-5 bg-gray-50 rounded-2xl border flex-wrap items-end">
         <div className="flex-1 min-w-[200px]">
           <label className="block text-xs font-bold text-gray-500 uppercase mb-2">1. Проект (Ветка)</label>
@@ -271,15 +259,15 @@ export default function AssignmentsTab({ onChanged }: Props) {
             className="w-full border-2 rounded-xl px-4 py-2.5 outline-none bg-white font-bold"
           >
             <option value="">-- Выберите ветку --</option>
-            <optgroup label="🎯 Публичные промо-материалы">
-              <option value="global_demo">🎯 Единственный Демо-материал</option>
+            <optgroup label="Публичные промо-материалы">
+              <option value="global_demo">Единственный Демо-материал</option>
             </optgroup>
             <optgroup label="Новые динамические проекты">
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </optgroup>
             <optgroup label="Легаси (старая структура)">
-              <option value="legacy_olympiad">🏆 Олимпиада (Учебники и Кроссворды)</option>
-              <option value="legacy_gatehouse">🎓 Экзамены Gatehouse Awards</option>
+              <option value="legacy_olympiad">Олимпиада (Учебники и Кроссворды)</option>
+              <option value="legacy_gatehouse">Экзамены Gatehouse Awards</option>
             </optgroup>
           </select>
         </div>
@@ -293,7 +281,7 @@ export default function AssignmentsTab({ onChanged }: Props) {
             className="w-full border-2 rounded-xl px-4 py-2.5 outline-none bg-white font-bold disabled:opacity-50 disabled:bg-gray-100"
           >
             <option value="">{selectedProjectId === "global_demo" ? "Не требуется для Демо" : isLegacy ? "Не требуется для легаси" : "-- Выберите раздел --"}</option>
-            {tabs.map(t => <option key={t.id} value={t.id}>{t.icon} {t.title}</option>)}
+            {tabs.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
           </select>
         </div>
 
@@ -311,10 +299,10 @@ export default function AssignmentsTab({ onChanged }: Props) {
             <option value="">-- Выберите материал --</option>
             {selectedProjectId === "legacy_olympiad" ? (
               <>
-                <optgroup label="📚 Учебники">
+                <optgroup label="Учебники">
                   {materials.filter(m => m.kind === "textbook").map(m => <option key={`tb-${m.id}`} value={m.id}>{m.title}</option>)}
                 </optgroup>
-                <optgroup label="🧩 Кроссворды">
+                <optgroup label="Кроссворды">
                   {materials.filter(m => m.kind === "crossword").map(m => <option key={`cw-${m.id}`} value={m.id}>{m.title}</option>)}
                 </optgroup>
               </>
@@ -330,14 +318,13 @@ export default function AssignmentsTab({ onChanged }: Props) {
           disabled={!selectedMaterial} 
           type="button"
         >
-          ➕ Создать задание
+          Создать задание
         </button>
       </div>
 
       {loading && <LoadingBlock text="Загрузка данных..." />}
       {err && <ErrorBox message={err} />}
 
-      {/* РЕДАКТОР ЗАДАНИЙ */}
       {editorOpen && selectedMaterial && (
         <div className="mt-6 border-t pt-6">
           <AssignmentEditor
@@ -352,7 +339,6 @@ export default function AssignmentsTab({ onChanged }: Props) {
         </div>
       )}
 
-      {/* ТАБЛИЦА ЗАДАНИЙ */}
       {!loading && !err && !editorOpen && (
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden mt-6">
           <table className="w-full text-left text-sm">
@@ -383,10 +369,10 @@ export default function AssignmentsTab({ onChanged }: Props) {
                     <td className="p-4">{questionsCount(a)} шт.</td>
                     <td className="p-4 text-right space-x-2">
                       <button className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1.5 rounded-lg font-bold transition-colors" onClick={() => openEdit(a)} type="button">
-                        ✏️ Изменить
+                        Изменить
                       </button>
                       <button className="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold transition-colors" onClick={() => void removeAssignment(a)} type="button">
-                        🗑️ Удалить
+                        Удалить
                       </button>
                     </td>
                   </tr>

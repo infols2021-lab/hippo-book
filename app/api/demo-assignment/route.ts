@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const supabase = await createSupabaseServerClient();
 
-    // 1. Ищем единственный активный демо-материал
+    // 1. Получаем единственный активный демо-материал
     const { data: material, error: matError } = await supabase
       .from("materials")
       .select("*")
@@ -21,7 +21,7 @@ export async function GET() {
       return fail("Демо-материал не найден", 404, "NOT_FOUND");
     }
 
-    // 2. Загружаем все задания, привязанные к демо-материалу
+    // 2. Получаем все задания для этого демо-материала
     const { data: assignments, error: assignError } = await supabase
       .from("assignments")
       .select("*")

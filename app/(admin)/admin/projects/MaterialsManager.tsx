@@ -115,7 +115,7 @@ export default function MaterialsManager() {
       const mData = await mRes.json();
       setMaterials(mData.materials || []);
     } catch (err: any) {
-      alert("❌ Ошибка: " + err.message);
+      alert("Ошибка: " + err.message);
     }
   };
 
@@ -137,7 +137,7 @@ export default function MaterialsManager() {
       const mData = await mRes.json();
       setMaterials(mData.materials || []);
     } catch (err: any) {
-      alert("❌ Ошибка удаления: " + err.message);
+      alert("Ошибка удаления: " + err.message);
     }
   };
 
@@ -162,7 +162,7 @@ export default function MaterialsManager() {
       const directUrl = json.publicUrl || json.url || json.imageUrl;
       setEditingMaterial({ ...editingMaterial, cover_image_url: directUrl });
     } catch (e: any) {
-      alert("❌ Ошибка загрузки обложки: " + e.message);
+      alert("Ошибка загрузки обложки: " + e.message);
     } finally {
       setUploadingCover(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -208,7 +208,7 @@ export default function MaterialsManager() {
             className="w-full border-2 rounded-xl px-4 py-2.5 outline-none bg-gray-50 font-bold disabled:opacity-50"
           >
             <option value="">-- Сначала таб --</option>
-            {tabs.map(t => <option key={t.id} value={t.id}>{t.icon || ""} {t.title}</option>)}
+            {tabs.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
           </select>
         </div>
 
@@ -251,7 +251,7 @@ export default function MaterialsManager() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold mb-1">Цена (₽)</label>
+              <label className="block text-sm font-bold mb-1">Цена (руб.)</label>
               <input 
                 required 
                 type="number" 
@@ -290,7 +290,7 @@ export default function MaterialsManager() {
                     disabled={uploadingCover} 
                     className="bg-gray-100 hover:bg-gray-200 border-2 text-gray-700 px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-colors"
                   >
-                    {uploadingCover ? "⌛ Загрузка..." : "📁 Загрузить файл"}
+                    {uploadingCover ? "Загрузка..." : "Загрузить файл"}
                   </button>
                 </div>
                 {editingMaterial.cover_image_url && (
@@ -316,7 +316,7 @@ export default function MaterialsManager() {
             <label className="block text-sm font-bold mb-2">Уровни доступа (Классы)</label>
             <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-xl border">
               {levels.length === 0 ? (
-                <span className="text-red-500 text-sm font-bold">⚠️ Добавьте уровни в настройках проекта</span>
+                <span className="text-red-500 text-sm font-bold">Добавьте уровни в настройках проекта</span>
               ) : (
                 levels.map(lvl => {
                   const isChecked = (editingMaterial.target_levels || []).includes(lvl.code);
@@ -367,7 +367,7 @@ export default function MaterialsManager() {
                 checked={Boolean(editingMaterial.is_secret)} 
                 onChange={e => setEditingMaterial({...editingMaterial, is_secret: e.target.checked})} 
               />
-              🔒 Секретный материал (is_secret)
+              Секретный материал (is_secret)
             </label>
             <label className="flex items-center gap-2 cursor-pointer font-bold text-emerald-700">
               <input 
@@ -376,7 +376,7 @@ export default function MaterialsManager() {
                 checked={Boolean(editingMaterial.is_demo)} 
                 onChange={e => setEditingMaterial({...editingMaterial, is_demo: e.target.checked})} 
               />
-              🎯 Демо-материал (is_demo — единственный на систему)
+              Демо-материал (is_demo — единственный на систему)
             </label>
           </div>
 
@@ -429,19 +429,19 @@ export default function MaterialsManager() {
                         {mat.cover_image_url ? (
                           <img src={mat.cover_image_url} alt="" className="w-12 h-12 object-cover rounded-lg shadow-sm border" />
                         ) : (
-                          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl shadow-sm border">📄</div>
+                          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-400 font-bold shadow-sm border">DOC</div>
                         )}
                         <div>
                           <div className="flex items-center gap-2">
                             <span>{mat.title}</span>
                             {mat.is_demo && (
                               <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">
-                                🎯 DEMO
+                                DEMO
                               </span>
                             )}
                             {mat.is_secret && (
                               <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">
-                                ★ Секретный
+                                Секретный
                               </span>
                             )}
                           </div>
@@ -458,7 +458,7 @@ export default function MaterialsManager() {
                         </div>
                       </td>
                       <td className="p-4 text-center text-sm font-bold text-gray-800">
-                        {mat.price ?? 1000} ₽
+                        {mat.price ?? 1000} руб.
                       </td>
                       <td className="p-4 text-center text-sm font-bold">
                         {mat.is_available ? <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg">Всем</span> : <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-lg">По заявке</span>}
@@ -476,7 +476,7 @@ export default function MaterialsManager() {
                             className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg font-bold transition-colors" 
                             title="Удалить"
                           >
-                            🗑️
+                            Удалить
                           </button>
                         </div>
                       </td>

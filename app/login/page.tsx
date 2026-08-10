@@ -85,7 +85,7 @@ export default function LoginPage() {
   function showNetworkBanner(extra?: string) {
     setNetworkIssue(true);
     const base =
-      "🌐 Не удалось подключиться к серверу входа.\n" +
+      "Не удалось подключиться к серверу входа.\n" +
       "Проверьте интернет-соединение и попробуйте обновить страницу.\n" +
       "Если проблема повторяется — попробуйте открыть сайт позже.";
     showBanner("error", extra ? `${base}\n\nДетали: ${extra}` : base);
@@ -96,15 +96,15 @@ export default function LoginPage() {
 
     if (msgParam === "confirmed") {
       setNetworkIssue(false);
-      showBanner("success", "✅ Email успешно подтвержден! Теперь вы можете войти в систему.");
+      showBanner("success", "Email успешно подтвержден! Теперь вы можете войти в систему.");
     } else if (msgParam === "check_email") {
       setNetworkIssue(false);
-      showBanner("warning", "📧 Проверьте вашу почту для подтверждения регистрации.");
+      showBanner("warning", "Проверьте вашу почту для подтверждения регистрации.");
     } else if (msgParam === "email_exists") {
       setNetworkIssue(false);
       showBanner(
         "error",
-        "❌ Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.",
+        "Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.",
       );
     }
   }, [msgParam]);
@@ -166,11 +166,11 @@ export default function LoginPage() {
 
       showBanner(
         "success",
-        payload?.message || json?.message || "📧 Письмо с подтверждением отправлено повторно. Проверьте почту.",
+        payload?.message || json?.message || "Письмо с подтверждением отправлено повторно. Проверьте почту.",
       );
     } catch (e: any) {
       if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
-      else showBanner("error", "❌ Не удалось отправить письмо: " + (e?.message || String(e)));
+      else showBanner("error", "Не удалось отправить письмо: " + (e?.message || String(e)));
     }
   }
 
@@ -193,7 +193,7 @@ export default function LoginPage() {
 
     try {
       setBusy(true);
-      showBanner("warning", "🔐 Проверяем данные...");
+      showBanner("warning", "Проверяем данные...");
 
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -222,18 +222,18 @@ export default function LoginPage() {
         }
 
         if (code === "EMAIL_NOT_CONFIRMED" || msg.toLowerCase().includes("email не подтверж")) {
-          showBanner("error", "❌ Email не подтвержден. Проверьте вашу почту и подтвердите регистрацию.");
+          showBanner("error", "Email не подтвержден. Проверьте вашу почту и подтвердите регистрацию.");
 
           const resend = window.confirm("Отправить письмо с подтверждением повторно?");
           if (resend) {
             await resendConfirmation(e);
           }
         } else if (code === "INVALID_CREDENTIALS") {
-          showBanner("error", "❌ Неверный email или пароль. Если вы забыли пароль, воспользуйтесь восстановлением.");
+          showBanner("error", "Неверный email или пароль. Если вы забыли пароль, воспользуйтесь восстановлением.");
         } else if (code === "RATE_LIMIT") {
-          showBanner("error", "⚠️ Слишком много попыток. Попробуйте через несколько минут.");
+          showBanner("error", "Слишком много попыток. Попробуйте через несколько минут.");
         } else if (code === "USER_NOT_FOUND") {
-          showBanner("error", "❌ Пользователь с таким email не найден. Проверьте email или зарегистрируйтесь.");
+          showBanner("error", "Пользователь с таким email не найден. Проверьте email или зарегистрируйтесь.");
         } else {
           showBanner("error", msg);
         }
@@ -246,7 +246,7 @@ export default function LoginPage() {
       window.location.href = redirectTo;
     } catch (err: any) {
       if (looksLikeNetworkError(err)) showNetworkBanner(String(err?.message || err));
-      else showBanner("error", "❌ Неожиданная ошибка: " + (err?.message || String(err)));
+      else showBanner("error", "Неожиданная ошибка: " + (err?.message || String(err)));
       setBusy(false);
     }
   }
@@ -306,10 +306,10 @@ export default function LoginPage() {
     return (
       <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button className="btn student" type="button" onClick={() => window.location.reload()}>
-          🔄 Обновить страницу
+          Обновить страницу
         </button>
         <Link className="btn info" href="/info">
-          📄 Информация
+          Информация
         </Link>
       </div>
     );
@@ -320,7 +320,7 @@ export default function LoginPage() {
 
     return (
       <div className="existing-account-help">
-        <strong>🎉 Отлично! Ваш аккаунт активирован.</strong>
+        <strong>Отлично! Ваш аккаунт активирован.</strong>
         <br />
         Теперь вы можете войти в систему используя ваш email и пароль.
       </div>
@@ -413,7 +413,7 @@ export default function LoginPage() {
 
           <div className={"help-tab-content " + (activeTab === "rules" ? "active" : "")}>
             <div className="help-html-inner rules-tab-bg">
-              <h4 className="rules-main-title">правила</h4>
+              <h4 className="rules-main-title">Правила</h4>
               
               <div className="help-rules-grid">
                 <div className="rule-card">
@@ -441,11 +441,6 @@ export default function LoginPage() {
                     Помните, главное — это ваше развитие. Этот учебник — ваш инструмент. 
                     Используйте его по максимуму!
                   </p>
-                  <div className="trophy-vector">
-                    <svg viewBox="0 0 24 24" width="64" height="64" fill="#f59e0b">
-                      <path d="M18 2H6v2H2v5c0 2.21 1.79 4 4 4h2c.75 2.15 2.6 3.71 4.88 3.97V19H7v2h10v-2h-4.12v-2.03C15.16 16.71 17 15.15 17.75 13h2.25c2.21 0 4-1.79 4-4V4h-4V2zM4 6h2v5c-1.1 0-2-.9-2-2V6zm16 3c0 1.1-.9 2-2 2V6h2v3z"/>
-                    </svg>
-                  </div>
                 </div>
               </div>
             </div>
@@ -453,7 +448,6 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Мини-модалка технической поддержки */}
       <div
         className="help-modal"
         style={{ display: supportOpen ? "flex" : "none" }}
@@ -575,7 +569,7 @@ export default function LoginPage() {
                 tabIndex={-1}
                 title={showPassword ? "Скрыть пароль" : "Показать пароль"}
               >
-                {showPassword ? "👁️‍🗨️" : "👁️"}
+                {showPassword ? "Скрыть" : "Показать"}
               </button>
             </div>
           </div>
@@ -584,7 +578,6 @@ export default function LoginPage() {
             Войти как ученик
           </button>
 
-          {/* Кнопка прямого перехода в Демо-режим без регистрации */}
           <Link 
             href="/demo" 
             style={{
@@ -603,7 +596,7 @@ export default function LoginPage() {
               transition: "transform 0.15s ease"
             }}
           >
-            🎯 Пройти демо-задание
+            Пройти демо-задание
           </Link>
 
           <div className="link">
@@ -624,7 +617,6 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* Кнопка техподдержки, расположенная под всеми кнопками */}
             <button
               className="btn support"
               onClick={openSupport}

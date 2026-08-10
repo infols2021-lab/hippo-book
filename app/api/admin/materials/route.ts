@@ -25,7 +25,6 @@ export async function GET(req: NextRequest) {
       .order("order_index", { ascending: true })
       .order("created_at", { ascending: false });
 
-    // Если запрошен демо-материал
     if (is_demo === "true") {
       query = query.eq("is_demo", true);
     } else if (branch_type) {
@@ -51,7 +50,7 @@ export async function GET(req: NextRequest) {
       .select("id, material_id, textbook_id, crossword_id");
 
     if (countError) {
-      console.error("🔴 [ADMIN GET MATERIALS] Ошибка подсчета заданий:", countError.message);
+      console.error("[ADMIN GET MATERIALS] Ошибка подсчета заданий:", countError.message);
       return ok({ materials });
     }
 
@@ -70,7 +69,7 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error: any) {
-    console.error("🔴 [ADMIN GET MATERIALS] Серверная ошибка:", error);
+    console.error("[ADMIN GET MATERIALS] Серверная ошибка:", error);
     return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
 }
@@ -103,7 +102,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Если новый материал помечается как единственное Демо - снимаем флаг со всех остальных
     if (isDemo) {
       await supabase.from("materials").update({ is_demo: false }).eq("is_demo", true);
     }
@@ -115,13 +113,13 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      console.error("🔴 [ADMIN POST MATERIAL] Ошибка БД:", error.message, error.details);
+      console.error("[ADMIN POST MATERIAL] Ошибка БД:", error.message, error.details);
       return fail(error.message, 500, "DB_ERROR");
     }
 
     return ok({ material: data });
   } catch (error: any) {
-    console.error("🔴 [ADMIN POST MATERIAL] Серверная ошибка:", error);
+    console.error("[ADMIN POST MATERIAL] Серверная ошибка:", error);
     return fail(error?.message || "Server error", 500, "SERVER_ERROR");
   }
 }
