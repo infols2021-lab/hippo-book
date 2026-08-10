@@ -359,7 +359,80 @@ export async function PATCH(req: NextRequest) {
           }
 
           granted = grantedLabels;
+
+          // ======================================================================
+          // 🚀 ЛОГИКА РЕФЕРАЛЬНОЙ ПРОГРАММЫ
+          // ======================================================================
+          // Проверяем: заявка только что была обработана (а не просто обновилась)
+          const isNewlyProcessed = is_processed && r.is_processed !== true;
+          
+          if (isNewlyProcessed && grantsToStore.length > 0) {
+            try {
+              // 1. Ищем, есть ли у покупателя активный рефовод
+              const { data: refLink } = await supabase
+                .from("user_referrals")
+                .select("referrer_id")
+                .eq("referred_id", r.user_id)
+                .maybeSingle();
+
+              if (refLink?.referrer_id) {
+                const referrerId = refLink.referrer_id;
+                
+                // 2. Получаем текущую статистику рефовода
+                const { data: refProfile } = await supabase
+                  .from("profiles")
+                  .select("referral_materials_purchased")
+                  .eq("id", referrerId)
+                  .maybeSingle();
+
+                // 3. Плюсуем количество выданных материалов в заявке
+                const addedMaterialsCount = grantsToStore.length;
+                const newCount = (refProfile?.referral_materials_purchased || 0) + addedMaterialsCount;
+
+                // 4. Обновляем счетчик
+                await supabase
+                  .from("profiles")
+                  .update({ referral_materials_purchased: newCount })
+                  .eq("id", referrerId);
+
+                // 5. Проверяем дорожку наград (referral_config)
+                const { data: milestones } = await supabase
+                  .from("referral_config")
+                  .select("reward_id")
+                  .lte("purchases_required", newCount);
+
+                if (milestones && milestones.length > 0) {
+                  // Исключаем те награды, которые рефовод УЖЕ получил за рефералку
+                  const { data: existingInventory } = await supabase
+                    .from("user_inventory")
+                    .select("reward_id")
+                    .eq("user_id", referrerId)
+                    .eq("source", "referral");
+
+                  const existingIds = new Set(existingInventory?.map((i: any) => i.reward_id) || []);
+
+                  const newRewardsToInsert = milestones
+                    .filter((m: any) => m.reward_id && !existingIds.has(m.reward_id))
+                    .map((m: any) => ({
+                      user_id: referrerId,
+                      reward_id: m.reward_id,
+                      source: "referral"
+                    }));
+
+                  // 6. Выдаем новые награды
+                  if (newRewardsToInsert.length > 0) {
+                    await supabase.from("user_inventory").insert(newRewardsToInsert);
+                  }
+                }
+              }
+            } catch (refErr) {
+              console.error("[Requests Route] Ошибка начисления реферальных наград:", refErr);
+            }
+          }
+          // ======================================================================
+
         } else {
+          // Снятие статуса "Обработано" (unprocess)
           const targets = await getTargetsForUnprocess(supabase, r);
 
           for (const rawTarget of targets) {

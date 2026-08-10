@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import RewardsModal from "@/components/rewards/RewardsModal";
+import { createClient } from "@supabase/supabase-js";
 
 export type NavItem =
   | { kind: "link"; href: string; label: React.ReactNode; className?: string }
@@ -29,6 +30,36 @@ export default function AppHeader({
   ],
 }: Props) {
   const [isRewardsOpen, setIsRewardsOpen] = useState(false);
+  const [isTeacher, setIsTeacher] = useState(false);
+
+  // Проверка роли пользователя (Скрытно проверяем, учитель это или админ)
+  useEffect(() => {
+    async function checkRole() {
+      try {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        if (!url || !key) return;
+
+        const supabase = createClient(url, key);
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("role, is_admin")
+            .eq("id", session.user.id)
+            .single();
+
+          if (data?.role === "teacher" || data?.is_admin === true) {
+            setIsTeacher(true);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to check user role:", err);
+      }
+    }
+    checkRole();
+  }, []);
 
   return (
     <>
@@ -78,6 +109,21 @@ export default function AppHeader({
             className="flex items-center gap-2 sm:gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar"
             style={{ WebkitOverflowScrolling: "touch" }}
           >
+            {/* Кнопка "Ученики" рендерится первой и ТОЛЬКО для учителей/админов */}
+            {isTeacher && (
+              <Link
+                href="/teachers"
+                className="whitespace-nowrap flex-shrink-0 btn ghost"
+                style={{ 
+                  color: "var(--project-primary)", 
+                  borderColor: "color-mix(in srgb, var(--project-primary) 30%, transparent)",
+                  backgroundColor: "color-mix(in srgb, var(--project-primary) 10%, transparent)",
+                }}
+              >
+                👨‍🏫 Мои ученики
+              </Link>
+            )}
+
             {nav.map((item, idx) => {
               if (item.kind === "link") {
                 return (

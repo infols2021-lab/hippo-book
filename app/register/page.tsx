@@ -22,7 +22,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState(""); // Изменили с confirmEmail на confirmPassword
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const [reloadNonce, setReloadNonce] = useState(0);
@@ -116,6 +116,13 @@ export default function RegisterPage() {
       setBusy(true);
       showBanner("warning", "🔄 Создаем ваш аккаунт...");
 
+      // Извлекаем ID пригласившего из URL (реферальная система)
+      let refId: string | undefined = undefined;
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        refId = urlParams.get("ref") || undefined;
+      }
+
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -126,6 +133,7 @@ export default function RegisterPage() {
           email: email.trim().toLowerCase(),
           password,
           captchaToken,
+          ref: refId, // Передаем реферальный код на бэкенд
         }),
       });
 

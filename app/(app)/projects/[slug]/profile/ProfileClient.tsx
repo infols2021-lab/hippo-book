@@ -8,6 +8,7 @@ import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import Modal from "@/components/Modal";
 import RewardsModal from "@/components/rewards/RewardsModal";
 import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal";
+import ReferralTrack, { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTrack";
 
 import "./profile.css";
 
@@ -189,6 +190,10 @@ export default function ProfileClient({
   const [progressLoading, setProgressLoading] = useState<boolean>(!statsProp && !progressProp);
   const [progressError, setProgressError] = useState<string | null>(null);
 
+  // Реферальная система
+  const [refData, setRefData] = useState<{ link: string; stats: ReferralStats; track: ReferralMilestone[] } | null>(null);
+  const [refLoading, setRefLoading] = useState(true);
+
   // Категории материалов (динамические) и аккордеон завершенных
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [completedExpanded, setCompletedExpanded] = useState<boolean>(false);
@@ -240,6 +245,22 @@ export default function ProfileClient({
 
   useEffect(() => {
     void fetchStreakData();
+    
+    // Загрузка реферальных данных
+    fetch('/api/profile/referrals', { cache: "no-store" })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          setRefData({
+            link: data.data.referral_link,
+            stats: data.data.stats,
+            track: data.data.track
+          });
+        }
+      })
+      .catch(err => console.error("Ошибка загрузки рефералки:", err))
+      .finally(() => setRefLoading(false));
+
   }, []);
 
   useEffect(() => {
@@ -771,6 +792,25 @@ export default function ProfileClient({
               </div>
             </div>
 
+            {/* РЕФЕРАЛЬНАЯ ПРОГРАММА */}
+            <div className="section-title desktop-stats-title" style={{ marginTop: "32px" }}>
+              Реферальная <b>программа</b>
+            </div>
+            
+            {refLoading ? (
+              <div style={{ color: "var(--project-muted)", marginBottom: 32, fontWeight: 600 }}>Загрузка программы...</div>
+            ) : refData && refData.track && refData.track.length > 0 ? (
+              <ReferralTrack link={refData.link} stats={refData.stats} track={refData.track} />
+            ) : (
+              <div style={{ 
+                background: "#f8fafc", padding: "20px", borderRadius: "20px", 
+                border: "1px dashed #cbd5e1", color: "#64748b", fontWeight: 600,
+                textAlign: "center", marginBottom: "32px"
+              }}>
+                Реферальная программа временно недоступна.
+              </div>
+            )}
+
             {/* 🔄 ЕДИНЫЕ ДИНАМИЧЕСКИЕ ТАБЫ-ФИЛЬТРЫ (ПК + МОБИЛКА) */}
             <div className="category-filter-bar no-scrollbar">
               <button 
@@ -826,7 +866,7 @@ export default function ProfileClient({
               </div>
             ) : (
               <>
-                {/* 🔒 АКТИВНЫЕ МАТЕРИАЛЫ С ФИКСИРОВАННОЙ ВЫСОТОЙ (3 материала ~ 290px) И СКРОЛЛОМ */}
+                {/* 🔒 АКТИВНЫЕ МАТЕРИАЛЫ С ФИКСИРОВАННОЙ ВЫСОТОЙ И СКРОЛЛОМ */}
                 <div className="progress-list-scrollable no-scrollbar">
                   {filteredActive.length === 0 ? (
                     <div style={{ padding: "20px", textAlign: "center", fontWeight: 700, opacity: 0.6, fontSize: "14px" }}>

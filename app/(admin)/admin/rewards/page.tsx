@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import RewardsCatalogManager from "./RewardsCatalogManager";
 import StreakConfigManager from "./StreakConfigManager";
 import PromocodeManager from "./PromocodeManager";
+import ReferralConfigManager from "./ReferralConfigManager";
 
-type TabType = "catalog" | "streaks" | "promocodes";
+type TabType = "catalog" | "streaks" | "promocodes" | "referrals";
 
 export default function AdminRewardsPage() {
   const router = useRouter();
@@ -14,7 +15,6 @@ export default function AdminRewardsPage() {
 
   return (
     <div className="admin-container">
-      {/* Верхняя шапка в стиле главной админки */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div>
@@ -22,7 +22,7 @@ export default function AdminRewardsPage() {
               <span>🎭</span> Центр Наград и Маскота
             </h1>
             <div className="small-muted" style={{ marginTop: 4 }}>
-              Управление предметами гардероба, титулами, настройка серии входа и промокодов.
+              Управление предметами, титулами, настройка серии входов, промокодов и реферальной программы.
             </div>
           </div>
 
@@ -44,7 +44,6 @@ export default function AdminRewardsPage() {
           </div>
         </div>
 
-        {/* Переключатель табов */}
         <div style={{ display: "flex", gap: 8, marginTop: 18, flexWrap: "wrap" }}>
           <button
             type="button"
@@ -66,6 +65,15 @@ export default function AdminRewardsPage() {
 
           <button
             type="button"
+            onClick={() => setActiveTab("referrals")}
+            className={`btn ${activeTab === "referrals" ? "" : "ghost"}`}
+            style={{ borderRadius: 14, fontWeight: 900 }}
+          >
+            🤝 Реферальная система
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("promocodes")}
             className={`btn ${activeTab === "promocodes" ? "" : "ghost"}`}
             style={{ borderRadius: 14, fontWeight: 900 }}
@@ -75,10 +83,10 @@ export default function AdminRewardsPage() {
         </div>
       </div>
 
-      {/* Контент активного таба */}
       <div className="card">
         {activeTab === "catalog" && <RewardsCatalogManager />}
         {activeTab === "streaks" && <StreakConfigManager />}
+        {activeTab === "referrals" && <ReferralConfigManager />}
         {activeTab === "promocodes" && <PromocodeManager />}
       </div>
     </div>

@@ -30,6 +30,7 @@ export async function POST(req: Request) {
           email?: string;
           password?: string;
           captchaToken?: string;
+          ref?: string; // ПРИНИМАЕМ РЕФЕРАЛЬНЫЙ КОД (ID пригласившего)
         }
       | null;
 
@@ -41,6 +42,7 @@ export async function POST(req: Request) {
     const email = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "");
     const captchaToken = String(body.captchaToken ?? "");
+    const refId = String(body.ref ?? "").trim(); // Достаем рефовода
 
     const remoteIp = getRemoteIp(req) ?? undefined;
 
@@ -154,26 +156,57 @@ export async function POST(req: Request) {
 
       if (pErr) {
         console.error("[register] Profile creation failed, rolling back user:", pErr);
-
         await admin.auth.admin.deleteUser(userId).catch((delErr) => {
           console.error("[register] Rollback user deletion failed:", delErr);
         });
-
         return fail(
           "Не удалось создать профиль пользователя. Попробуйте еще раз.",
           500,
           "PROFILE_CREATE_FAILED",
         );
       }
+
+      // ======================================================================
+      // 6. ОБРАБОТКА РЕФЕРАЛЬНОЙ СИСТЕМЫ 
+      // ======================================================================
+      if (refId && refId !== userId) {
+        try {
+          // Проверяем, существует ли рефовод
+          const { data: refUser } = await admin
+            .from("profiles")
+            .select("id, referrals_count")
+            .eq("id", refId)
+            .maybeSingle();
+
+          if (refUser) {
+            // Создаем связь
+            await admin.from("user_referrals").insert({
+              referrer_id: refId,
+              referred_id: userId,
+              is_teacher_student: false, // по умолчанию обычная рефералка
+              status: "active",
+            });
+
+            // Увеличиваем счетчик приглашенных у рефовода
+            await admin
+              .from("profiles")
+              .update({ referrals_count: (refUser.referrals_count || 0) + 1 })
+              .eq("id", refId);
+          }
+        } catch (refErr) {
+          console.error("[register] Ошибка сохранения реферальной связи:", refErr);
+          // Не откатываем регистрацию, просто логируем ошибку рефералки
+        }
+      }
+      // ======================================================================
+
     } catch (e) {
       console.error("[register] Profile upsert exception, rolling back user:", e);
-
       if (admin && userId) {
         await admin.auth.admin.deleteUser(userId).catch((delErr) => {
           console.error("[register] Rollback user deletion failed:", delErr);
         });
       }
-
       return fail(
         "Ошибка при сохранении данных профиля. Попробуйте заново.",
         500,
