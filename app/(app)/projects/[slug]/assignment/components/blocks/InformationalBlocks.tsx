@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import DOMPurify from "isomorphic-dompurify";
 import type {
   HeroBlock, TextSectionBlock, AlertBlock,
   VideoBlock, CardsGridBlock, AccordionBlock, DownloadsBlock
@@ -104,10 +105,9 @@ export function TextSectionView({ data }: { data: TextSectionBlock["data"] }) {
           {data.title}
         </h2>
       )}
-      {/* whiteSpace: "pre-wrap" убран — с dangerouslySetInnerHTML даёт двойные переносы */}
       <div
         style={{ fontSize: "16px", color: "#374151", lineHeight: 1.75, maxWidth: "720px" }}
-        dangerouslySetInnerHTML={{ __html: data.content }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(data.content) }}
       />
     </div>
   );
@@ -129,10 +129,9 @@ export function AlertView({ data }: { data: AlertBlock["data"] }) {
       {data.icon && (
         <div style={{ fontSize: "20px", flexShrink: 0, marginTop: "2px" }}>{data.icon}</div>
       )}
-      {/* Алерт тоже через dangerouslySetInnerHTML — на случай если захочешь HTML внутри */}
       <div
         style={{ fontSize: "14px", lineHeight: 1.65, color: styles.text, fontWeight: 500 }}
-        dangerouslySetInnerHTML={{ __html: data.content }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(data.content) }}
       />
     </div>
   );
@@ -197,7 +196,7 @@ export function CardsGridView({ data }: { data: CardsGridBlock["data"] }) {
             {item.content && (
               <div
                 style={{ fontSize: "14px", color: "#475569", lineHeight: 1.6, margin: 0 }}
-                dangerouslySetInnerHTML={{ __html: item.content }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content) }}
               />
             )}
           </div>
@@ -260,10 +259,9 @@ export function AccordionView({ data }: { data: AccordionBlock["data"] }) {
             </div>
 
             {isOpen && (
-              // ✅ ФИКС: dangerouslySetInnerHTML вместо {item.content} — иначе HTML-теги рендерятся как текст
               <div
                 style={{ borderTop: "1.5px solid #e5e7eb", padding: "20px", fontSize: "14.5px", color: "#374151", lineHeight: 1.75 }}
-                dangerouslySetInnerHTML={{ __html: item.content }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content) }}
               />
             )}
           </div>

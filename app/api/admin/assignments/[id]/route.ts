@@ -129,13 +129,19 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   const title = String(body?.title ?? "").trim();
   const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
-  const content = body?.content;
   
   // Добавляем обработку типа задания
   const assignment_type = body?.assignment_type === "intro" ? "intro" : "test";
 
   if (!title) return fail("title required", 400, "VALIDATION");
-  if (!content || typeof content !== "object") return fail("content required", 400, "VALIDATION");
+  
+  // ЖЕСТКАЯ ВАЛИДАЦИЯ JSON: Проверяем, что content это реальный объект/массив, а не примитив
+  if (!body?.content || typeof body.content !== "object") {
+    return fail("content required and must be a valid JSON object or array", 400, "VALIDATION");
+  }
+  
+  // ГЛУБОКАЯ ОЧИСТКА: Избавляемся от потенциального Prototype Pollution и невалидных ссылок
+  const safeContent = JSON.parse(JSON.stringify(body.content));
 
   const mat = pickMaterial(body);
   if (mat.error) return fail(mat.error, 400, "VALIDATION");
@@ -143,8 +149,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const payload: any = {
     title,
     order_index,
-    content,
-    assignment_type, // Сохраняем тип
+    content: safeContent, // Используем очищенный контент
+    assignment_type, 
 
     branch_type: mat.branch_type,
     material_id: mat.material_id,

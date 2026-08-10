@@ -53,7 +53,9 @@ function formatTime(sec: number): string {
 
 function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const isMounted = useRef(false);
+  
+  // Флаг для защиты от обновления стейта в размонтированном компоненте
+  const isMounted = useRef(true);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -67,16 +69,25 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
 
   const finalUrl = useMemo(() => getImageUrl(url), [url]);
 
+  // Контроль жизненного цикла
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   // Инициализация громкости после mount
   useEffect(() => {
+    if (!isMounted.current) return;
     const v = getInitialVolume();
     setVolume(v);
     if (audioRef.current) audioRef.current.volume = v;
-    isMounted.current = true;
   }, []);
 
   // Сброс при смене трека
   useEffect(() => {
+    if (!isMounted.current) return;
     setIsPlaying(false);
     setProgress(0);
     setCurrentTime(0);
@@ -95,9 +106,11 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
   // Синхронизация с другими плеерами через window event
   useEffect(() => {
     function onVolumeSync(e: Event) {
+      if (!isMounted.current) return; // Защита от утечки
       const v = (e as CustomEvent).detail?.volume;
       if (typeof v === "number" && Number.isFinite(v)) setVolume(v);
     }
+    
     window.addEventListener(VOLUME_EVENT, onVolumeSync);
     return () => window.removeEventListener(VOLUME_EVENT, onVolumeSync);
   }, []);
@@ -108,21 +121,34 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
     if (!audio) return;
 
     const onTimeUpdate = () => {
+      if (!isMounted.current) return;
       setCurrentTime(audio.currentTime);
       setProgress(
         audio.duration > 0 ? (audio.currentTime / audio.duration) * 100 : 0
       );
     };
+    
     const onLoaded = () => {
+      if (!isMounted.current) return;
       setDuration(audio.duration);
       setLoading(false);
     };
-    const onEnded = () => setIsPlaying(false);
+    
+    const onEnded = () => {
+      if (!isMounted.current) return;
+      setIsPlaying(false);
+    };
+    
     const onError = () => {
+      if (!isMounted.current) return;
       setAudioError(true);
       setLoading(false);
     };
-    const onCanPlay = () => setLoading(false);
+    
+    const onCanPlay = () => {
+      if (!isMounted.current) return;
+      setLoading(false);
+    };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("loadedmetadata", onLoaded);
@@ -140,22 +166,25 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
   }, []);
 
   const togglePlay = () => {
-    if (!audioRef.current || audioError) return;
+    if (!audioRef.current || audioError || !isMounted.current) return;
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().catch(() => setAudioError(true));
+      audioRef.current.play().catch(() => {
+        if (isMounted.current) setAudioError(true);
+      });
       setIsPlaying(true);
     }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!audioRef.current || audioError || !duration) return;
+    if (!audioRef.current || audioError || !duration || !isMounted.current) return;
     audioRef.current.currentTime = (Number(e.target.value) / 100) * duration;
   };
 
   const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isMounted.current) return;
     const v = Number(e.target.value) / 100;
     setVolume(v);
     broadcastVolume(v);
@@ -319,6 +348,8 @@ function ZoomableImage({
   name?: string;
   onZoom?: (imageUrl: string) => void;
 }) {
+  const isMounted = useRef(true);
+
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -332,10 +363,19 @@ function ZoomableImage({
     return `${base}${base.includes("?") ? "&" : "?"}retry=${retryCount}`;
   }, [url, retryCount]);
 
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   // Сброс состояния и установка таймаута при изменении URL
   useEffect(() => {
     // Очищаем предыдущий таймаут
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+    if (!isMounted.current) return;
 
     // Сбрасываем состояние загрузки
     setIsLoading(true);
@@ -344,8 +384,7 @@ function ZoomableImage({
 
     // Устанавливаем таймаут на 15 секунд
     timeoutRef.current = setTimeout(() => {
-      // Используем ref для проверки, а не state (решаем проблему стейл-клоужера)
-      if (loadingRef.current) {
+      if (loadingRef.current && isMounted.current) {
         setHasError(true);
         setIsLoading(false);
       }
@@ -359,22 +398,28 @@ function ZoomableImage({
   const handleLoad = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     loadingRef.current = false;
-    setIsLoading(false);
+    if (isMounted.current) {
+      setIsLoading(false);
+    }
   }, []);
 
   const handleError = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     loadingRef.current = false;
-    setHasError(true);
-    setIsLoading(false);
+    if (isMounted.current) {
+      setHasError(true);
+      setIsLoading(false);
+    }
   }, []);
 
   const handleRetry = useCallback(() => {
-    setRetryCount((c) => c + 1);
+    if (isMounted.current) {
+      setRetryCount((c) => c + 1);
+    }
   }, []);
 
   const handleClick = () => {
-    if (!isLoading && !hasError && onZoom) {
+    if (!isLoading && !hasError && onZoom && isMounted.current) {
       onZoom(finalUrl);
     }
   };

@@ -12,6 +12,9 @@ type Props = {
   maxMB?: number;
 };
 
+// Белый список разрешенных бакетов для Yandex Storage
+const ALLOWED_BUCKETS = ["question-images", "hippo-book-audio", "assignments", "materials", "public"];
+
 // ==========================================
 // УТИЛИТЫ ДЛЯ ЗАГРУЗКИ
 // ==========================================
@@ -30,6 +33,11 @@ function cacheBustUrl(url: string) {
 }
 
 async function uploadImageThroughApi(file: File, bucket: string, folder: string): Promise<string> {
+  // Базовая клиентская защита от подмены бакета
+  if (!ALLOWED_BUCKETS.includes(bucket)) {
+    throw new Error("Недопустимый бакет для загрузки файлов");
+  }
+
   const formData = new FormData();
   formData.append("file", file);
   formData.append("bucket", bucket);
@@ -90,14 +98,13 @@ export default function ImageUpload({
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<number>(0);
   const [previewUrl, setPreviewUrl] = useState<string>(value || "");
-  const [error, setError] = useState<string | null>(null); // Локальный стейт ошибок вместо alert()
+  const [error, setError] = useState<string | null>(null); 
 
   useEffect(() => {
     setPreviewUrl(value || "");
     setError(null);
   }, [value]);
 
-  // Очистка локальных URL при размонтировании компонента (борьба с утечками памяти)
   useEffect(() => {
     return () => {
       if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
@@ -127,7 +134,6 @@ export default function ImageUpload({
       return;
     }
 
-    // Создаем локальное превью и запоминаем его для последующей очистки
     if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
     const objectUrl = URL.createObjectURL(file);
     localUrlRef.current = objectUrl;
@@ -144,7 +150,6 @@ export default function ImageUpload({
       onChange(finalUrl);
       setPreviewUrl(finalUrl);
       
-      // Очищаем локальный URL, так как сервер вернул настоящий
       URL.revokeObjectURL(objectUrl);
       localUrlRef.current = null;
 
@@ -165,7 +170,6 @@ export default function ImageUpload({
     <div className="form-group">
       <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>{label}</label>
 
-      {/* Вывод ошибки загрузки */}
       {error && (
         <div style={{ padding: "8px 12px", background: "#fee", color: "red", borderRadius: 8, marginBottom: 12, fontSize: 14 }}>
           ❌ Ошибка загрузки: {error}

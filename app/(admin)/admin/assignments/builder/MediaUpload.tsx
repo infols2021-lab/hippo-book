@@ -12,11 +12,18 @@ type Props = {
   label?: string;
 };
 
+// Белый список разрешенных бакетов для Yandex Storage
+const ALLOWED_BUCKETS = ["question-images", "hippo-book-audio", "assignments", "materials", "public"];
+
 // ==========================================
 // УТИЛИТА ДЛЯ ЗАГРУЗКИ (Изолированная логика)
 // ==========================================
 
 async function uploadMediaFile(file: File, targetBucket: string) {
+  if (!ALLOWED_BUCKETS.includes(targetBucket)) {
+    throw new Error("Недопустимый бакет для загрузки файлов");
+  }
+
   const formData = new FormData();
   formData.append("bucket", targetBucket);
   formData.append("folder", "assignments");
@@ -40,7 +47,6 @@ async function uploadMediaFile(file: File, targetBucket: string) {
     throw new Error(String((data as any).error || `Ошибка загрузки (${response.status})`));
   }
 
-  // Извлекаем данные загруженного файла (поддержка старого и нового формата ответа)
   const filesArray = (data as any).files;
   const fileData = Array.isArray(filesArray) && filesArray.length > 0
     ? filesArray[0]
@@ -78,7 +84,6 @@ export default function MediaUpload({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Ref-флаг защиты от race condition при двойном клике
   const uploadingRef = useRef(false);
 
   async function handleFiles(files: FileList | File[]) {
@@ -129,7 +134,7 @@ export default function MediaUpload({
           message = err;
         }
         setUploadError(message);
-        break; // Останавливаемся при первой ошибке, чтобы не спамить загрузками
+        break; 
       }
     }
 
@@ -153,7 +158,6 @@ export default function MediaUpload({
         {label}
       </label>
 
-      {/* ---- Зона перетаскивания / выбора ---- */}
       <div
         style={{
           border: `2px dashed ${dragOver ? "#007bff" : "rgba(0,0,0,0.15)"}`,
@@ -181,7 +185,6 @@ export default function MediaUpload({
       >
         {uploading ? (
           <div style={{ color: "#007bff", fontWeight: 500, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-            {/* Встроенный SVG спиннер (работает без <style jsx>) */}
             <svg width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke="#007bff">
               <g fill="none" fillRule="evenodd">
                 <g transform="translate(1 1)" strokeWidth="2.5">
@@ -214,7 +217,6 @@ export default function MediaUpload({
         />
       </div>
 
-      {/* ---- Ошибка загрузки ---- */}
       {uploadError && (
         <div style={{ marginTop: "8px", padding: "10px 14px", background: "#fff5f5", color: "#c62828", border: "1px solid #ffcdd2", borderRadius: "8px", fontSize: "13px", fontWeight: 500, lineHeight: 1.4 }}>
           ⚠️ {uploadError}
@@ -229,7 +231,6 @@ export default function MediaUpload({
         </div>
       )}
 
-      {/* ---- Список прикреплённых файлов ---- */}
       {value.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginTop: "16px" }}>
           {value.map((m) => (

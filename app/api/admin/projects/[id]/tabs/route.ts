@@ -1,6 +1,5 @@
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
-// Убедись, что этот импорт существует в твоем проекте. Если нет — просто удали его и вызовы invalidateProjectsCache()
 import { invalidateProjectsCache } from "@/lib/projects/loader"; 
 
 export const runtime = "nodejs";
@@ -24,6 +23,11 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
+// Проверка на то, что это чистый JSON объект (не массив и не null)
+function isPlainObject(v: unknown): boolean {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
 function cleanObject<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const out: Partial<T> = {};
   for (const [key, value] of Object.entries(obj)) {
@@ -32,7 +36,6 @@ function cleanObject<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return out;
 }
 
-/** Проверка, что проект существует. */
 async function projectExists(supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createSupabaseServerClient>>, id: string) {
   const { data, error } = await supabase.from("projects").select("id").eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
@@ -106,6 +109,10 @@ export async function POST(
     return fail("Поле title обязательно", 400, "MISSING_TITLE");
   }
 
+  // ЗАЩИТА: Строгая проверка на объект и глубокая очистка
+  const safeFeatures = isPlainObject(body.features) ? JSON.parse(JSON.stringify(body.features)) : {};
+  const safeUiTexts = isPlainObject(body.ui_texts) ? JSON.parse(JSON.stringify(body.ui_texts)) : {};
+
   const payload = cleanObject({
     project_id: projectId,
     slug,
@@ -116,8 +123,8 @@ export async function POST(
     order_index: typeof body.order_index === "number" ? body.order_index : 0,
     is_active: typeof body.is_active === "boolean" ? body.is_active : true,
     is_hidden: typeof body.is_hidden === "boolean" ? body.is_hidden : false,
-    features: body.features ?? {},
-    ui_texts: body.ui_texts ?? {},
+    features: safeFeatures, // Очищенные данные
+    ui_texts: safeUiTexts,  // Очищенные данные
   });
 
   if (isNonEmptyString(body.id)) {

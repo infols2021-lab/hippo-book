@@ -2,7 +2,6 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
 import type { NextRequest } from "next/server";
 
-// Гибкий тип для поддержки и старой, и новой архитектуры
 type MatPick = {
   branch_type?: string;
   kind?: string;
@@ -12,13 +11,12 @@ type MatPick = {
   error?: string;
 };
 
-// Больше не форсируем жесткие типы, доверяем фронтенду, но оставляем фолбэк
 function normalizeBranchType(value: unknown): string {
   const v = String(value ?? "").trim().toLowerCase();
   if (v === "gatehouse" || v === "ga" || v === "ga_exam" || v === "exam" || v === "gatehouse_awards") {
     return "gatehouse";
   }
-  return v || "olympiad"; // Если передали кастомную ветку - сохраним её, иначе olympiad
+  return v || "olympiad"; 
 }
 
 function pickMaterial(body: any): MatPick {
@@ -28,7 +26,6 @@ function pickMaterial(body: any): MatPick {
   const textbook_id = body?.textbook_id ? String(body.textbook_id).trim() : "";
   const crossword_id = body?.crossword_id ? String(body.crossword_id).trim() : "";
 
-  // 1. НОВАЯ АРХИТЕКТУРА: Если явно передан material_id или kind === "material"
   if (material_id && (!kind || kind === "material")) {
     return {
       branch_type,
@@ -39,7 +36,6 @@ function pickMaterial(body: any): MatPick {
     };
   }
 
-  // 2. ЛЕГАСИ: Учебники
   if (kind === "textbook" || textbook_id) {
     return {
       branch_type,
@@ -50,7 +46,6 @@ function pickMaterial(body: any): MatPick {
     };
   }
 
-  // 3. ЛЕГАСИ: Кроссворды
   if (kind === "crossword" || crossword_id) {
     return {
       branch_type,
@@ -61,7 +56,6 @@ function pickMaterial(body: any): MatPick {
     };
   }
 
-  // Фоллбэк: если есть хоть какой-то ID, считаем его material_id
   const anyId = material_id || textbook_id || crossword_id;
   if (anyId) {
     return {
@@ -82,14 +76,10 @@ export async function GET(req: NextRequest) {
 
   const { supabase } = auth;
 
-  // Фронтенд может передавать ID материала как `id` или `material_id`. Читаем любой доступный.
   const id = String(req.nextUrl.searchParams.get("id") || req.nextUrl.searchParams.get("material_id") || "").trim();
 
   if (!id) return ok({ assignments: [] });
 
-  // ❗️ ИДЕАЛЬНОЕ РЕШЕНИЕ: Ищем задания, у которых этот ID совпадает с ЛЮБЫМ из полей привязки.
-  // Это автоматически покрывает и старые олимпиады (textbook_id), и новые табы (material_id),
-  // игнорируя жесткие привязки к branch_type.
   const { data, error } = await supabase
     .from("assignments")
     .select("*")
@@ -120,13 +110,15 @@ export async function POST(req: NextRequest) {
 
   const title = String(body?.title ?? "").trim();
   const order_index = Number.isFinite(Number(body?.order_index)) ? Number(body.order_index) : 0;
-  const content = body?.content;
-  
-  // Получаем тип задания, по умолчанию test
   const assignment_type = body?.assignment_type === "intro" ? "intro" : "test";
 
   if (!title) return fail("title required", 400, "VALIDATION");
-  if (!content || typeof content !== "object") return fail("content required", 400, "VALIDATION");
+  
+  // ЖЕСТКАЯ ВАЛИДАЦИЯ И ОЧИСТКА
+  if (!body?.content || typeof body.content !== "object") {
+    return fail("content required and must be a valid JSON object or array", 400, "VALIDATION");
+  }
+  const safeContent = JSON.parse(JSON.stringify(body.content));
 
   const mat = pickMaterial(body);
   if (mat.error) return fail(mat.error, 400, "VALIDATION");
@@ -134,7 +126,7 @@ export async function POST(req: NextRequest) {
   const payload: any = {
     title,
     order_index,
-    content,
+    content: safeContent, // Используем очищенный контент
     assignment_type,
     created_by: user.id,
 
@@ -144,7 +136,6 @@ export async function POST(req: NextRequest) {
     crossword_id: mat.crossword_id,
   };
 
-  // Если фронтенд передает project_tab_id, бережно его сохраняем
   if (body?.project_tab_id) {
     payload.project_tab_id = body.project_tab_id;
   }

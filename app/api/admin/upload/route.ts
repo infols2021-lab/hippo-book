@@ -17,8 +17,21 @@ export const dynamic = "force-dynamic";
 // Увеличиваем таймаут для Vercel (до 60 секунд), чтобы успевали загружаться тяжелые файлы.
 export const maxDuration = 60;
 
-// Берем лимит из .env или ставим 100 МБ по умолчанию (вместо жестких 20 МБ)
+// Берем лимит из .env или ставим 100 МБ по умолчанию
 const MAX_FILE_SIZE_BYTES = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE) || 100 * 1024 * 1024;
+
+// ==========================================
+// ЖЕЛЕЗОБЕТОННЫЙ БЕЛЫЙ СПИСОК БАКЕТОВ
+// ==========================================
+// Серверная защита от записи в произвольные/системные директории.
+const ALLOWED_BUCKETS = [
+  "question-images",
+  "hippo-book-audio",
+  "assignments",
+  "materials",
+  "public",
+  "media"
+];
 
 function noStoreInit(): ResponseInit {
   return { headers: { "cache-control": "no-store, max-age=0" } };
@@ -113,6 +126,16 @@ export async function POST(req: Request) {
 
   if (!bucket) {
     return fail("Не указан bucket для загрузки", 400, "MISSING_BUCKET", noStoreInit());
+  }
+
+  // БЛОКИРУЕМ ЗАПИСЬ, ЕСЛИ БАКЕТ НЕ В БЕЛОМ СПИСКЕ
+  if (!ALLOWED_BUCKETS.includes(bucket)) {
+    return fail(
+      "Ошибка доступа: попытка загрузки в неразрешенный бакет", 
+      403, 
+      "FORBIDDEN_BUCKET", 
+      noStoreInit()
+    );
   }
 
   const validFiles: typeof files = [];
