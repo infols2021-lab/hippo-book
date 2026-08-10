@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * - Если задание привязано к унифицированному material_id -> проверяет material_access
  * - Если к textbook_id (легаси) -> проверяет textbook_access
  * - Если к crossword_id (легаси) -> проверяет crossword_access
- * Если доступ открыт для всех (is_available = true) – пропускает.
+ * Если доступ открыт для всех (is_available = true) или материал демо (is_demo = true) – пропускает.
  */
 export async function assertOlympiadAssignmentAccess(
   supabase: SupabaseClient,
@@ -22,7 +22,7 @@ export async function assertOlympiadAssignmentAccess(
   if (materialId) {
     const { data: material, error: materialError } = await supabase
       .from("materials")
-      .select("id, is_active, is_available")
+      .select("id, is_active, is_available, is_demo")
       .eq("id", materialId)
       .maybeSingle();
 
@@ -31,7 +31,7 @@ export async function assertOlympiadAssignmentAccess(
       throw Object.assign(new Error("Material not found or inactive"), { status: 404 });
     }
 
-    if (material.is_available) return; // открыто для всех
+    if (material.is_available || material.is_demo) return; // открыто для всех / демо
 
     const { data: access, error: accessError } = await supabase
       .from("material_access")
@@ -128,7 +128,7 @@ export async function assertGatehouseAssignmentAccess(
 
   const { data: material, error: materialError } = await supabase
     .from("materials")
-    .select("id, is_active, is_available")
+    .select("id, is_active, is_available, is_demo")
     .eq("id", materialId)
     .maybeSingle();
 
@@ -137,7 +137,7 @@ export async function assertGatehouseAssignmentAccess(
     throw Object.assign(new Error("Material not found or inactive"), { status: 404 });
   }
 
-  if (material.is_available) return;
+  if (material.is_available || material.is_demo) return; // открыто для всех / демо
 
   const { data: access, error: accessError } = await supabase
     .from("material_access")

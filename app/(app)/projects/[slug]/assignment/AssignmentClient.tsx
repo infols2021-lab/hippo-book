@@ -90,6 +90,17 @@ function getFeedbackMessage(score: number, ranges?: any[]): string {
   return "Попробуйте пройти задание ещё раз для лучшего результата.";
 }
 
+// Отмечает демо-задание как пройденное в localStorage — читается на странице
+// списка демо-материала (app/demo/DemoMaterialClient.tsx) для прогресс-бара.
+function markDemoCompleted(assignmentId: string) {
+  try {
+    const raw = localStorage.getItem("demo_completed");
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed[assignmentId] = true;
+    localStorage.setItem("demo_completed", JSON.stringify(parsed));
+  } catch (e) {}
+}
+
 export default function AssignmentClient({ assignmentId, source, sourceId, projectSlug, guestMode = false }: Props) {
   const router = useRouter();
 
@@ -311,6 +322,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
 
   async function finishInformational() {
     if (guestMode) {
+      markDemoCompleted(assignmentId);
       setCompletedScreen(true);
       setShowCtaModal(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -355,6 +367,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
 
   async function saveProgressAndShowResults(clientStats: FinalStats, review: ReviewItem[]) {
     if (guestMode) {
+      markDemoCompleted(assignmentId);
       setFinalStats(clientStats);
       setReviewItems(review);
       setCompletedScreen(true);

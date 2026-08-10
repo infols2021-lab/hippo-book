@@ -226,7 +226,10 @@ export default function RequestsClient({
       setMaterialsLoading(true);
       try {
         if (!tabs || tabs.length === 0) {
-          const res = await fetch(`/api/projects/${project.slug}/materials`, { cache: "no-store" });
+          // purchasable=true — просим API не отдавать демо-материалы: их нельзя купить.
+          const res = await fetch(`/api/projects/${project.slug}/materials?purchasable=true`, {
+            cache: "no-store",
+          });
           const { json } = await safeReadJson(res);
           if (alive && res.ok && json?.ok && Array.isArray(json.materials)) {
             const list: MaterialItem[] = json.materials.map((m: any) => ({
@@ -245,9 +248,11 @@ export default function RequestsClient({
         }
 
         const tabPromises = tabs.map(async (tab) => {
-          const res = await fetch(`/api/projects/${project.slug}/materials?tab=${tab.slug}`, {
-            cache: "no-store",
-          });
+          // purchasable=true — то же самое: демо не должно попадать в витрину заявок.
+          const res = await fetch(
+            `/api/projects/${project.slug}/materials?tab=${tab.slug}&purchasable=true`,
+            { cache: "no-store" }
+          );
           const { json } = await safeReadJson(res);
           if (res.ok && json?.ok && Array.isArray(json.materials)) {
             return json.materials.map((m: any) => ({

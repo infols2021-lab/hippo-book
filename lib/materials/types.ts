@@ -22,6 +22,7 @@ export type MaterialDbRow = {
   cover_image_url: string | null;
   is_active: boolean;
   is_available: boolean;
+  is_demo: boolean;
   order_index: number;
   price: number;
   class_levels: string[];
@@ -96,6 +97,7 @@ export type MaterialCreateInput = {
   description?: string | null;
   cover_image_url?: string | null;
   is_available?: boolean;
+  is_demo?: boolean;
   order_index?: number;
   price?: number;
   class_levels?: string[];

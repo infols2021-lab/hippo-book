@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     // 2. Получаем материалы, привязанные к проекту (через табы)
     let materialsQuery = supabase
       .from("materials")
-      .select("id, title, material_kind, is_available, project_tab_id")
+      .select("id, title, material_kind, is_available, is_demo, project_tab_id")
       .eq("is_active", true);
 
     if (projectId) {
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       }
 
       const tabIds = tabs?.map((t: { id: string }) => t.id) || [];
-      
+
       // Заполняем карту соответствия названий
       if (tabs) {
         tabs.forEach((t: { id: string; title: string }) => {
@@ -83,11 +83,24 @@ export async function GET(req: NextRequest) {
         });
       }
 
+      // Демо-материалы — сквозные, поэтому в фильтр по табам конкретного проекта
+      // их не включаем условием "или": добираем отдельным запросом ниже.
       materialsQuery = materialsQuery.in("project_tab_id", tabIds);
     }
 
-    const { data: materials, error: matErr } = await materialsQuery;
+    const [{ data: materials, error: matErr }, { data: demoMaterials, error: demoMatErr }] =
+      await Promise.all([
+        materialsQuery,
+        // Демо-материалы должны попадать в прогресс независимо от того, в каком проекте/табе они созданы.
+        supabase
+          .from("materials")
+          .select("id, title, material_kind, is_available, is_demo, project_tab_id")
+          .eq("is_active", true)
+          .eq("is_demo", true),
+      ]);
+
     if (matErr) throw matErr;
+    if (demoMatErr) throw demoMatErr;
 
     // Получаем реальные доступы пользователя к материалам
     const { data: accessData, error: accessErr } = await supabase
@@ -99,9 +112,17 @@ export async function GET(req: NextRequest) {
 
     const grantedMaterialIds = new Set(accessData?.map((a) => a.material_id) || []);
 
-    // Оставляем ТОЛЬКО те материалы, которые публичны (is_available) или выданы пользователю
-    const accessibleMaterials = (materials || []).filter(
-      (m) => m.is_available || grantedMaterialIds.has(m.id)
+    // Объединяем обычные материалы проекта и сквозные демо-материалы, без дублей
+    const materialsById = new Map<string, any>();
+    for (const m of materials || []) materialsById.set(m.id, m);
+    for (const m of demoMaterials || []) {
+      if (!materialsById.has(m.id)) materialsById.set(m.id, m);
+    }
+
+    // Оставляем ТОЛЬКО те материалы, которые публичны (is_available), демо (is_demo)
+    // или выданы пользователю
+    const accessibleMaterials = Array.from(materialsById.values()).filter(
+      (m) => m.is_available || m.is_demo || grantedMaterialIds.has(m.id)
     );
 
     // 3. Получаем прогресс пользователя по всем заданиям
@@ -120,7 +141,7 @@ export async function GET(req: NextRequest) {
     // 4. Для каждого ДОСТУПНОГО материала получаем список заданий и считаем прогресс
     const materialsProgress = await Promise.all(
       accessibleMaterials.map(async (m) => {
-        
+
         // Считаем задания с учетом старой и новой архитектуры
         const { data: assignments } = await supabase
           .from("assignments")

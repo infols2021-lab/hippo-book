@@ -2,14 +2,16 @@
 // Универсальный слой запроса материалов по табу проекта (project_tab_id).
 // Поддерживает как единую таблицу materials, так и легаси-таблицы textbooks/crosswords.
 // Включает фильтрацию секретных материалов (is_secret).
+// Демо-материалы (is_demo = true) — сквозные: подмешиваются в КАЖДЫЙ таб/проект
+// независимо от того, в каком табе они физически созданы, и всегда доступны.
 
 import "server-only";
 
-import type { DataAuthContext } from "@/lib/data/auth";
 import type {
   MaterialDbRow,
   MaterialWithProgress,
 } from "@/lib/materials/types";
+import type { DataAuthContext } from "@/lib/data/auth";
 import type { BranchType } from "@/lib/branches/types";
 import type {
   ProjectSlug,
@@ -115,6 +117,7 @@ function normalizeProjectMaterial(row: any): ExtendedMaterialDbRow {
     cover_image_url: typeof row?.cover_image_url === "string" ? row.cover_image_url : null,
     is_active: typeof row?.is_active === "boolean" ? row.is_active : true,
     is_available: typeof row?.is_available === "boolean" ? row.is_available : false,
+    is_demo: Boolean(row?.is_demo),
     is_secret: Boolean(row?.is_secret),
     order_index: typeof row?.order_index === "number" ? row.order_index : 0,
     price: normalizePrice(row?.price),
@@ -143,6 +146,8 @@ function normalizeTextbookToMaterial(row: any): ExtendedMaterialDbRow {
     cover_image_url: typeof row?.cover_image_url === "string" ? row.cover_image_url : null,
     is_active: typeof row?.is_active === "boolean" ? row.is_active : true,
     is_available: typeof row?.is_available === "boolean" ? row.is_available : false,
+    // Легаси-таблица textbooks не имеет колонки is_demo — демо-режим для неё не поддерживается.
+    is_demo: false,
     is_secret: Boolean(row?.is_secret),
     order_index: typeof row?.order_index === "number" ? row.order_index : 0,
     price: normalizePrice(row?.price),
@@ -168,6 +173,8 @@ function normalizeCrosswordToMaterial(row: any): ExtendedMaterialDbRow {
     cover_image_url: typeof row?.cover_image_url === "string" ? row.cover_image_url : null,
     is_active: typeof row?.is_active === "boolean" ? row.is_active : true,
     is_available: typeof row?.is_available === "boolean" ? row.is_available : false,
+    // Легаси-таблица crosswords не имеет колонки is_demo.
+    is_demo: false,
     is_secret: Boolean(row?.is_secret),
     order_index: typeof row?.order_index === "number" ? row.order_index : 0,
     price: normalizePrice(row?.price),
@@ -208,7 +215,10 @@ function buildMaterialsWithProgress(params: {
   const result: MaterialWithProgress[] = [];
 
   for (const material of params.materials) {
-    const hasAccess = Boolean(material.is_available || params.accessIds.has(material.id));
+    // Демо-материал всегда доступен, наравне с is_available и выданным material_access.
+    const hasAccess = Boolean(
+      material.is_available || material.is_demo || params.accessIds.has(material.id),
+    );
 
     // КЛЮЧЕВАЯ ЛОГИКА СЕКРЕТНЫХ МАТЕРИАЛОВ:
     // Если материал секретный и у ученика НЕТ доступа к нему, скрываем его полностью
@@ -275,6 +285,14 @@ export async function loadProjectMaterialsData(
       .eq("material_kind", tab.materialKind);
   }
 
+  // Демо-материалы — сквозные. Тянем их ОТДЕЛЬНЫМ запросом, без привязки к table/branch/tab,
+  // чтобы они попадали в любой таб любого проекта, независимо от того, где физически созданы.
+  const demoMaterialsQuery = supabase
+    .from("materials")
+    .select("*")
+    .eq("is_active", true)
+    .eq("is_demo", true);
+
   // Легаси-запросы запрашиваем ТОЛЬКО если у таба нет собственного project_tab_id
   const isOlympiad = projectSlug === "olympiad" || !projectSlug;
   const shouldFetchTextbooks = !tab.id && isOlympiad && (!tab.materialKind || tab.materialKind === "textbook");
@@ -282,6 +300,7 @@ export async function loadProjectMaterialsData(
 
   const [
     { data: materialRows, error: materialsError },
+    { data: demoMaterialRows, error: demoMaterialsError },
     { data: textbookRows, error: textbooksError },
     { data: crosswordRows, error: crosswordsError },
     { data: progressRows, error: progressError },
@@ -290,6 +309,7 @@ export async function loadProjectMaterialsData(
     { data: cwAccessRows, error: cwAccessError },
   ] = await Promise.all([
     materialsQuery,
+    demoMaterialsQuery,
     shouldFetchTextbooks
       ? supabase.from("textbooks").select("*").eq("is_active", true).order("order_index", { ascending: true })
       : Promise.resolve({ data: [], error: null }),
@@ -315,6 +335,16 @@ export async function loadProjectMaterialsData(
     for (const r of materialRows) {
       const item = normalizeProjectMaterial(r);
       materialsMap.set(item.id, item);
+    }
+  }
+
+  // Подмешиваем демо-материалы во ВСЕ табы/проекты (если ещё не попали через обычный запрос выше).
+  if (Array.isArray(demoMaterialRows)) {
+    for (const r of demoMaterialRows) {
+      const item = normalizeProjectMaterial(r);
+      if (!materialsMap.has(item.id)) {
+        materialsMap.set(item.id, item);
+      }
     }
   }
 
@@ -359,6 +389,7 @@ export async function loadProjectMaterialsData(
 
   const error =
     materialsError?.message ||
+    demoMaterialsError?.message ||
     textbooksError?.message ||
     crosswordsError?.message ||
     assignmentsError?.message ||
@@ -453,16 +484,30 @@ export async function loadProjectMaterialPageData(
   const { data: mData } = await materialQuery.maybeSingle();
   if (mData) {
     materialRow = mData;
-  } else if (!tab.id && (projectSlug === "olympiad" || !projectSlug)) {
-    const { data: tbData } = await supabase.from("textbooks").select("*").eq("id", id).eq("is_active", true).maybeSingle();
-    if (tbData) {
-      materialRow = tbData;
-      materialSource = "textbooks";
-    } else {
-      const { data: cwData } = await supabase.from("crosswords").select("*").eq("id", id).eq("is_active", true).maybeSingle();
-      if (cwData) {
-        materialRow = cwData;
-        materialSource = "crosswords";
+  } else {
+    // Материал не нашёлся в этом табе напрямую — проверяем, не демо-материал ли это
+    // (он мог быть создан в другом табе, но должен открываться отовсюду).
+    const { data: demoData } = await supabase
+      .from("materials")
+      .select("*")
+      .eq("id", id)
+      .eq("is_active", true)
+      .eq("is_demo", true)
+      .maybeSingle();
+
+    if (demoData) {
+      materialRow = demoData;
+    } else if (!tab.id && (projectSlug === "olympiad" || !projectSlug)) {
+      const { data: tbData } = await supabase.from("textbooks").select("*").eq("id", id).eq("is_active", true).maybeSingle();
+      if (tbData) {
+        materialRow = tbData;
+        materialSource = "textbooks";
+      } else {
+        const { data: cwData } = await supabase.from("crosswords").select("*").eq("id", id).eq("is_active", true).maybeSingle();
+        if (cwData) {
+          materialRow = cwData;
+          materialSource = "crosswords";
+        }
       }
     }
   }
@@ -500,7 +545,9 @@ export async function loadProjectMaterialPageData(
       .eq("user_id", user.id),
   ]);
 
-  const hasAccess = Boolean(material.is_available || accessRow || tbAccessRow || cwAccessRow);
+  const hasAccess = Boolean(
+    material.is_available || material.is_demo || accessRow || tbAccessRow || cwAccessRow,
+  );
 
   // Если материал секретный и у пользователя НЕТ доступа — отклоняем запрос
   if (material.is_secret && !hasAccess) {

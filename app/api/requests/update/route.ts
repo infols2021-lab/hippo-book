@@ -121,7 +121,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Выборка материалов из всех таблиц (materials, textbooks, crosswords) с подгрузкой табов
+    // 2. Выборка материалов из всех таблиц (materials, textbooks, crosswords) с подгрузкой табов.
+    // Тянем is_secret/is_demo, чтобы отфильтровать то, что нельзя выбрать в заявку.
     let selectedMaterials: SelectedMaterialItem[] = [];
     let calculatedTotalPrice = 0;
 
@@ -133,22 +134,26 @@ export async function POST(req: NextRequest) {
       ] = await Promise.all([
         supabase
           .from("materials")
-          .select("id, title, price, material_kind, project_tabs(title)")
+          .select("id, title, price, material_kind, is_secret, is_demo, project_tabs(title)")
           .in("id", normalized.material_ids),
         supabase
           .from("textbooks")
-          .select("id, title, price")
+          .select("id, title, price, is_secret")
           .in("id", normalized.material_ids),
         supabase
           .from("crosswords")
-          .select("id, title, price")
+          .select("id, title, price, is_secret")
           .in("id", normalized.material_ids),
       ]);
 
       const itemsMap = new Map<string, SelectedMaterialItem>();
 
+      // Демо-материалы (is_demo) и секретные (is_secret) исключаем из заявки —
+      // даже если они пришли в теле запроса (например, через редактирование старой заявки).
       if (Array.isArray(fetchedMaterials)) {
         for (const m of fetchedMaterials) {
+          if (m.is_secret || m.is_demo) continue;
+
           const rawTabTitle = (m as any).project_tabs?.title || null;
           itemsMap.set(String(m.id), {
             id: String(m.id),
@@ -162,6 +167,8 @@ export async function POST(req: NextRequest) {
 
       if (Array.isArray(fetchedTextbooks)) {
         for (const m of fetchedTextbooks) {
+          if (m.is_secret) continue;
+
           if (!itemsMap.has(String(m.id))) {
             itemsMap.set(String(m.id), {
               id: String(m.id),
@@ -176,6 +183,8 @@ export async function POST(req: NextRequest) {
 
       if (Array.isArray(fetchedCrosswords)) {
         for (const m of fetchedCrosswords) {
+          if (m.is_secret) continue;
+
           if (!itemsMap.has(String(m.id))) {
             itemsMap.set(String(m.id), {
               id: String(m.id),
@@ -193,6 +202,9 @@ export async function POST(req: NextRequest) {
     }
 
     const totalPrice = calculatedTotalPrice > 0 ? calculatedTotalPrice : (normalized.total_price || 0);
+    // Важно: сохраняем ТОЛЬКО отфильтрованные id (без demo/secret), а не сырые normalized.material_ids —
+    // иначе демо-материал можно было бы протащить в заявку через update, минуя фильтр в create.
+    const validMaterialIds = selectedMaterials.map((m) => m.id);
 
     const extractedKinds = Array.from(
       new Set(selectedMaterials.map((m) => m.material_kind).filter(Boolean))
@@ -210,7 +222,7 @@ export async function POST(req: NextRequest) {
       target_levels: normalized.target_levels.length > 0 ? normalized.target_levels : null,
       textbook_types: normalized.textbook_types.length > 0 ? normalized.textbook_types : materialKinds,
       material_kinds: materialKinds,
-      material_ids: normalized.material_ids,
+      material_ids: validMaterialIds,
       total_price: totalPrice,
       email: normalized.email,
       full_name: normalized.full_name,

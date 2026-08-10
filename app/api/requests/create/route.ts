@@ -127,6 +127,8 @@ export async function POST(req: NextRequest) {
 
       const itemsMap = new Map<string, SelectedMaterialItem>();
 
+      // Демо-материалы (is_demo) и секретные (is_secret) в заявку не попадают —
+      // их нельзя купить: демо и так бесплатно доступен всем, а секретные выдаются вручную.
       if (Array.isArray(fetchedMaterials)) {
         for (const m of fetchedMaterials) {
           if (m.is_secret || m.is_demo) continue;

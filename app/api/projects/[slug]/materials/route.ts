@@ -22,6 +22,7 @@ function toPublicMaterialDTO(material: MaterialWithProgress) {
     order_index: material.order_index,
     price: material.price,
     is_available: material.is_available,
+    is_demo: Boolean((material as any).is_demo),
     is_secret: Boolean((material as any).is_secret),
     hasAccess: material.hasAccess,
     progress: material.progress,
@@ -42,6 +43,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
 
   const tabSlug = searchParams.get("tab");
   const levelCode = searchParams.get("level");
+  // Каталог заявок передаёт этот флаг явно: демо-материалы нельзя купить,
+  // поэтому их нужно полностью убрать из выдачи для витрины заявок.
+  const purchasableOnly = searchParams.get("purchasable") === "true";
 
   // 2. Получение конфига проекта
   const project = await getProjectBySlug(slug);
@@ -88,22 +92,25 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
     }
   }
 
-  // 5. Защита от фантомных легаси-материалов и ФИЛЬТРАЦИЯ СЕКРЕТНЫХ
+  // 5. Защита от фантомных легаси-материалов и ФИЛЬТРАЦИЯ СЕКРЕТНЫХ / ПОКУПАЕМЫХ
   let materials = rawMaterials.filter((m) => {
+    const isDemo = Boolean((m as any).is_demo);
     const hasValidTab = m.project_tab_id ? activeTabIds.has(m.project_tab_id) : false;
     const isProjectDirect = (m as any).project_id === project.id;
 
-    if (!hasValidTab && !isProjectDirect) {
+    // Демо-материалы сквозные: пропускаем проверку "принадлежит ли табу этого проекта",
+    // они физически могут жить в табе другого проекта и это ок.
+    if (!isDemo && !hasValidTab && !isProjectDirect) {
       return false;
-    }
-
-    const titleLower = String(m.title || "").toLowerCase();
-    if (titleLower.includes("чебупеля") || titleLower.includes("демо")) {
-      if (!hasValidTab) return false;
     }
 
     // Секретные материалы видны ученику ТОЛЬКО после получения доступа (hasAccess === true)
     if ((m as any).is_secret && !m.hasAccess) {
+      return false;
+    }
+
+    // Для витрины заявок демо-материалы исключаются полностью — их нельзя купить.
+    if (isDemo && purchasableOnly) {
       return false;
     }
 
