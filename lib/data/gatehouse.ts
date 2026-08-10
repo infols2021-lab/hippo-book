@@ -111,6 +111,9 @@ export function normalizeGatehouseMaterial(row: any): MaterialDbRow {
     cover_image_url: typeof row?.cover_image_url === "string" ? row.cover_image_url : null,
     is_active: typeof row?.is_active === "boolean" ? row.is_active : true,
     is_available: typeof row?.is_available === "boolean" ? row.is_available : false,
+    // Легаси-ветка Gatehouse не поддерживает демо-режим — материалы отсюда
+    // никогда не должны попадать в единственный системный демо-слот.
+    is_demo: typeof row?.is_demo === "boolean" ? row.is_demo : false,
     order_index: typeof row?.order_index === "number" ? row.order_index : 0,
     price: typeof row?.price === "number" && row.price >= 0 ? row.price : 1000,
     class_levels: normalizeArray(row?.class_levels),
