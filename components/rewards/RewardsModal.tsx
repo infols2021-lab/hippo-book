@@ -69,6 +69,7 @@ export default function RewardsModal({
   const [redeeming, setRedeeming] = useState(false);
 
   const [promoHistory, setPromoHistory] = useState<UserPromocodeHistoryItem[]>([]);
+  const [selectedHistoryLog, setSelectedHistoryLog] = useState<UserPromocodeHistoryItem | null>(null);
 
   const [unboxModalOpen, setUnboxModalOpen] = useState(false);
   const [unboxedItems, setUnboxedItems] = useState<UnboxedRewardItem[]>([]);
@@ -695,39 +696,45 @@ export default function RewardsModal({
                           Вы пока не активировали ни одного промокода
                         </div>
                       ) : (
-                        <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                        <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
                           {promoHistory.map((item) => (
                             <div
                               key={item.id}
-                              className="border rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs transition-all"
+                              onClick={() => setSelectedHistoryLog(item)}
+                              className="border rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs transition-all cursor-pointer hover:scale-[1.01]"
                               style={{
                                 backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
                                 borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
                               }}
                             >
-                              <div className="flex items-center gap-2.5">
-                                <span
-                                  className="font-mono font-black px-2.5 py-1 rounded-xl text-xs uppercase tracking-wider"
-                                  style={{
-                                    backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
-                                    color: "var(--project-primary, #0ea5e9)",
-                                    border: "1px solid color-mix(in srgb, var(--project-primary, #0ea5e9) 30%, transparent)",
-                                  }}
-                                >
-                                  {item.code}
-                                </span>
-                                <span className="text-[11px] font-medium opacity-50 whitespace-nowrap">
-                                  {new Date(item.redeemed_at).toLocaleDateString("ru-RU", {
-                                    day: "2-digit",
-                                    month: "2-digit",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
+                              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between">
+                                <div className="flex items-center gap-2.5">
+                                  <span
+                                    className="font-mono font-black px-2.5 py-1 rounded-xl text-xs uppercase tracking-wider"
+                                    style={{
+                                      backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+                                      color: "var(--project-primary, #0ea5e9)",
+                                      border: "1px solid color-mix(in srgb, var(--project-primary, #0ea5e9) 30%, transparent)",
+                                    }}
+                                  >
+                                    {item.code}
+                                  </span>
+                                  <span className="text-[11px] font-medium opacity-50 whitespace-nowrap">
+                                    {new Date(item.redeemed_at).toLocaleDateString("ru-RU", {
+                                      day: "2-digit",
+                                      month: "2-digit",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="sm:hidden opacity-40">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                </div>
                               </div>
 
-                              <div className="flex flex-wrap gap-1.5 justify-start sm:justify-end">
+                              <div className="flex flex-wrap gap-1.5 justify-start sm:justify-end pr-2 sm:pr-0">
                                 {item.granted_reward_titles?.map((title, idx) => (
                                   <span
                                     key={idx}
@@ -746,7 +753,7 @@ export default function RewardsModal({
                                 ))}
                                 {item.physical_prize && (
                                   <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                                    Приз: {item.physical_prize.title}
+                                    Приз: {(item.physical_prize as any).title}
                                   </span>
                                 )}
                                 {!item.granted_reward_titles?.length &&
@@ -769,6 +776,88 @@ export default function RewardsModal({
           </div>
         </div>
       </div>
+
+      {/* Детали истории промокода */}
+      {selectedHistoryLog && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
+          onClick={() => setSelectedHistoryLog(null)}
+        >
+          <div
+            className="rounded-[32px] max-w-md w-full p-6 text-center space-y-6 shadow-2xl relative overflow-hidden border transition-all"
+            style={{
+              backgroundColor: "var(--project-card-bg, #ffffff)",
+              color: "var(--project-text, #0f172a)",
+              borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute -top-12 -left-12 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-25" style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }} />
+            <div className="absolute -bottom-12 -right-12 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-25" style={{ backgroundColor: "var(--project-secondary, #38bdf8)" }} />
+
+            <h2 className="text-xl font-black uppercase tracking-wider">Детали награды</h2>
+            
+            <div className="text-xs font-bold px-3 py-1.5 rounded-xl inline-block mx-auto" style={{ backgroundColor: "color-mix(in srgb, var(--project-text) 5%, transparent)" }}>
+              {new Date(selectedHistoryLog.redeemed_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+            </div>
+
+            <div className="space-y-3 text-left max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+              {/* Промокод */}
+              <div className="p-4 rounded-2xl border" style={{ backgroundColor: "color-mix(in srgb, var(--project-primary) 5%, transparent)", borderColor: "color-mix(in srgb, var(--project-primary) 15%, transparent)" }}>
+                <div className="text-[10px] font-black uppercase tracking-wider mb-1" style={{ color: "var(--project-primary)" }}>Активированный код</div>
+                <div className="font-mono font-black text-lg" style={{ color: "var(--project-primary)" }}>{selectedHistoryLog.code}</div>
+              </div>
+
+              {/* Награды маскота */}
+              {selectedHistoryLog.granted_reward_titles && selectedHistoryLog.granted_reward_titles.length > 0 && (
+                <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 dark:bg-purple-900/10 dark:border-purple-800/30">
+                  <div className="text-[10px] font-black text-purple-500 uppercase tracking-wider mb-1">Предметы и титулы</div>
+                  <div className="font-bold text-purple-900 dark:text-purple-300 text-sm">🎽 {selectedHistoryLog.granted_reward_titles.join(", ")}</div>
+                </div>
+              )}
+
+              {/* Материалы */}
+              {selectedHistoryLog.granted_material_titles && selectedHistoryLog.granted_material_titles.length > 0 && (
+                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 dark:bg-blue-900/10 dark:border-blue-800/30">
+                  <div className="text-[10px] font-black text-blue-500 uppercase tracking-wider mb-1">Открытые материалы</div>
+                  <div className="font-bold text-blue-900 dark:text-blue-300 text-sm">📚 {selectedHistoryLog.granted_material_titles.join(", ")}</div>
+                </div>
+              )}
+
+              {/* Физический приз */}
+              {selectedHistoryLog.physical_prize && (
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 dark:bg-amber-900/10 dark:border-amber-800/30 text-center flex flex-col items-center">
+                  <div className="text-[10px] font-black text-amber-500 uppercase tracking-wider mb-3 w-full text-left">Особый приз</div>
+                  {(selectedHistoryLog.physical_prize as any).image_url && (
+                    <img src={(selectedHistoryLog.physical_prize as any).image_url} alt="" className="h-24 object-contain mb-3 drop-shadow-md rounded-xl" />
+                  )}
+                  <div className="font-black text-amber-900 dark:text-amber-300 text-base mb-1">🧸 {(selectedHistoryLog.physical_prize as any).title}</div>
+                  {(selectedHistoryLog.physical_prize as any).text && (
+                    <div className="text-xs font-medium text-amber-800/80 dark:text-amber-200/80 mb-4 px-2">{(selectedHistoryLog.physical_prize as any).text}</div>
+                  )}
+                  {(selectedHistoryLog.physical_prize as any).link_url && (
+                    <a href={(selectedHistoryLog.physical_prize as any).link_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-black uppercase tracking-wider rounded-xl text-xs transition-all shadow-md hover:shadow-lg active:scale-[0.98]">
+                      🔗 Перейти по ссылке
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Если ничего нет */}
+              {!selectedHistoryLog.granted_reward_titles?.length && !selectedHistoryLog.granted_material_titles?.length && !selectedHistoryLog.physical_prize && (
+                 <div className="p-4 text-center opacity-50 font-bold text-sm">
+                   Награды отсутствуют (возможно, просто открыт доступ)
+                 </div>
+              )}
+            </div>
+
+            <button onClick={() => setSelectedHistoryLog(null)} className="w-full py-3.5 font-black text-xs uppercase tracking-wider rounded-2xl transition-all hover:brightness-95" style={{ backgroundColor: "color-mix(in srgb, var(--project-text) 6%, transparent)" }}>
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Модалка демонстрации выданных предметов */}
       {unboxModalOpen && (

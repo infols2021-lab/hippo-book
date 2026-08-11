@@ -58,8 +58,9 @@ export async function GET() {
 
     let rewardMap: Record<string, string> = {};
     if (allRewardIds.size > 0) {
+      // ИСПРАВЛЕНИЕ: rewards_catalog -> rewards согласно схеме БД
       const { data: rewards } = await supabase
-        .from("rewards_catalog")
+        .from("rewards")
         .select("id, title")
         .in("id", Array.from(allRewardIds));
 

@@ -3,9 +3,14 @@
 import React from "react";
 import type { CustomPhysicalPrize } from "@/lib/rewards/types";
 
+// Расширяем локальный интерфейс на случай, если в types.ts еще нет link_url
+interface ExtendedPhysicalPrize extends CustomPhysicalPrize {
+  link_url?: string;
+}
+
 interface PhysicalPrizeModalProps {
   isOpen: boolean;
-  prize: CustomPhysicalPrize;
+  prize: ExtendedPhysicalPrize;
   onClose: () => void;
 }
 
@@ -70,16 +75,38 @@ export default function PhysicalPrizeModal({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full py-3.5 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105"
-          style={{
-            backgroundColor: "var(--project-primary, #0ea5e9)",
-          }}
-        >
-          Замечательно!
-        </button>
+        {/* Кнопки действий */}
+        <div className="space-y-3 mt-4">
+          {prize.link_url && (
+            <a
+              href={prize.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-full py-3.5 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105"
+              style={{
+                backgroundColor: "var(--project-primary, #0ea5e9)",
+              }}
+            >
+              Перейти по ссылке
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className={`w-full py-3.5 font-black text-xs uppercase tracking-wider rounded-2xl transition-all ${
+              prize.link_url
+                ? "bg-gray-100 text-gray-500 hover:bg-gray-200 shadow-sm"
+                : "text-white shadow-lg hover:brightness-105"
+            }`}
+            style={
+              !prize.link_url
+                ? { backgroundColor: "var(--project-primary, #0ea5e9)" }
+                : {}
+            }
+          >
+            {prize.link_url ? "Закрыть" : "Замечательно!"}
+          </button>
+        </div>
       </div>
     </div>
   );

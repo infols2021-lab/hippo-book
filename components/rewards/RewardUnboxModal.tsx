@@ -9,6 +9,7 @@ export interface UnboxedRewardItem {
   type: RewardType | string;
   description?: string | null;
   asset_url?: string | null;
+  link_url?: string | null; // Поддержка скрытых ссылок
   meta?: RewardMeta;
 }
 
@@ -150,18 +151,49 @@ export default function RewardUnboxModal({
           </div>
         </div>
 
-        {/* Кнопка действия */}
-        <button
-          type="button"
-          onClick={handleNext}
-          className="w-full py-4 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105 active:scale-[0.99]"
-          style={{
-            backgroundColor: "var(--project-primary, #0ea5e9)",
-            boxShadow: "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
-          }}
-        >
-          {isLast ? "Забрать награду" : "Далее"}
-        </button>
+        {/* Кнопки действия */}
+        <div className="space-y-3 w-full">
+          {currentItem.link_url && (
+            <a
+              href={currentItem.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-full py-4 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105 active:scale-[0.99]"
+              style={{
+                backgroundColor: "var(--project-primary, #0ea5e9)",
+                boxShadow: "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
+              }}
+            >
+              Перейти по ссылке
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={handleNext}
+            className={`w-full py-4 font-black text-xs uppercase tracking-wider rounded-2xl transition-all ${
+              currentItem.link_url
+                ? "shadow-sm hover:brightness-95"
+                : "text-white shadow-lg hover:brightness-105 active:scale-[0.99]"
+            }`}
+            style={{
+              backgroundColor: currentItem.link_url
+                ? "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)"
+                : "var(--project-primary, #0ea5e9)",
+              boxShadow: currentItem.link_url
+                ? "none"
+                : "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
+              color: currentItem.link_url ? "inherit" : "#ffffff",
+            }}
+          >
+            {currentItem.link_url && !isLast
+              ? "Далее"
+              : currentItem.link_url && isLast
+              ? "Закрыть"
+              : isLast
+              ? "Забрать награду"
+              : "Далее"}
+          </button>
+        </div>
       </div>
     </div>
   );

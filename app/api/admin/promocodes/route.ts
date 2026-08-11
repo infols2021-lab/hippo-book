@@ -1,4 +1,3 @@
-// app/api/admin/promocodes/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -92,6 +91,7 @@ export async function GET() {
             bundle_reward_titles: bundleRewardTitles,
             bundle_material_titles: bundleMaterialTitles,
             physical_title: bundle.custom_physical?.title || null,
+            physical_link_url: bundle.custom_physical?.link_url || null,
             redeemed_at: r.redeemed_at,
           };
         })
@@ -165,6 +165,7 @@ export async function POST(request: Request) {
         title: String(bundle.custom_physical.title || "").trim(),
         text: String(bundle.custom_physical.text || "").trim(),
         image_url: bundle.custom_physical.image_url ? String(bundle.custom_physical.image_url).trim() : null,
+        link_url: bundle.custom_physical.link_url ? String(bundle.custom_physical.link_url).trim() : null,
       } : null,
     };
 

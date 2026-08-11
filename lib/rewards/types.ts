@@ -77,6 +77,7 @@ export type CustomPhysicalPrize = {
   title: string;
   text: string;
   image_url?: string | null;
+  link_url?: string | null; // <-- ДОБАВЛЕНО ПОЛЕ ДЛЯ ССЫЛКИ
 };
 
 export type PromocodeRewardsBundle = {

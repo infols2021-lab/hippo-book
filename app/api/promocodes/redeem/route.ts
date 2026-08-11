@@ -1,4 +1,3 @@
-// app/api/promocodes/redeem/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redeemPromocode } from "@/lib/rewards/data";

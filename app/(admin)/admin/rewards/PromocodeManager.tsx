@@ -33,6 +33,9 @@ export default function PromocodeManager() {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  // Стейт для красивого просмотра логов
+  const [selectedLog, setSelectedLog] = useState<any | null>(null);
+
   // Drag and Drop
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -60,6 +63,7 @@ export default function PromocodeManager() {
   const [physicalTitle, setPhysicalTitle] = useState("");
   const [physicalText, setPhysicalText] = useState("");
   const [physicalImageUrl, setPhysicalImageUrl] = useState("");
+  const [physicalLinkUrl, setPhysicalLinkUrl] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -161,11 +165,14 @@ export default function PromocodeManager() {
         setPhysicalTitle(phys.title || "");
         setPhysicalText(phys.text || "");
         setPhysicalImageUrl(phys.image_url || "");
+        // Игнорируем ошибку TS через as any
+        setPhysicalLinkUrl((phys as any).link_url || "");
       } else {
         setHasPhysicalPrize(false);
         setPhysicalTitle("");
         setPhysicalText("");
         setPhysicalImageUrl("");
+        setPhysicalLinkUrl("");
       }
     } else {
       setFormId(undefined);
@@ -182,6 +189,7 @@ export default function PromocodeManager() {
       setPhysicalTitle("");
       setPhysicalText("");
       setPhysicalImageUrl("");
+      setPhysicalLinkUrl("");
     }
     setIsModalOpen(true);
   };
@@ -277,6 +285,7 @@ export default function PromocodeManager() {
               title: physicalTitle,
               text: physicalText,
               image_url: physicalImageUrl || null,
+              link_url: physicalLinkUrl || null,
             }
           : null,
       },
@@ -564,7 +573,7 @@ export default function PromocodeManager() {
                       onChange={(e) => setHasPhysicalPrize(e.target.checked)}
                       className="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
                     />
-                    <span>🧸 Добавить физический подарок</span>
+                    <span>🧸 Добавить физический подарок / Ссылку</span>
                   </label>
 
                   {hasPhysicalPrize && (
@@ -584,6 +593,14 @@ export default function PromocodeManager() {
                         placeholder="Инструкция для ученика"
                         value={physicalText}
                         onChange={(e) => setPhysicalText(e.target.value)}
+                        className="w-full bg-white border-2 border-amber-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
+                      />
+                      
+                      <input
+                        type="url"
+                        placeholder="Ссылка (URL), например: https://t.me/skebobingg"
+                        value={physicalLinkUrl}
+                        onChange={(e) => setPhysicalLinkUrl(e.target.value)}
                         className="w-full bg-white border-2 border-amber-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
                       />
 
@@ -674,6 +691,59 @@ export default function PromocodeManager() {
             </form>
           </div>
         </div>
+      </div>
+    </div>
+  ) : null;
+
+  const logModalElement = selectedLog && mounted ? (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200" style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}>
+      <div className="bg-white rounded-[32px] max-w-md w-full p-6 text-center space-y-5 shadow-2xl relative border border-gray-100" onClick={(e) => e.stopPropagation()}>
+         <h2 className="text-xl font-black text-gray-900">Детали активации</h2>
+         <div className="text-xs font-bold text-gray-500 bg-gray-100 py-1.5 px-3 rounded-lg inline-block mx-auto">
+           {new Date(selectedLog.redeemed_at).toLocaleString("ru-RU")}
+         </div>
+         
+         <div className="space-y-3 text-left max-h-[60vh] overflow-y-auto pr-2">
+           <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
+             <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Промокод</div>
+             <div className="font-mono font-black text-emerald-600 text-base">{selectedLog.promocode_code}</div>
+             <div className="text-xs font-bold text-gray-600 mt-2">Активировал: {selectedLog.user_full_name}</div>
+           </div>
+
+           {selectedLog.bundle_reward_titles?.length > 0 && (
+             <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
+               <div className="text-[10px] font-black text-purple-400 uppercase tracking-wider mb-1">Предметы маскота</div>
+               <div className="font-bold text-purple-900 text-sm">🎽 {selectedLog.bundle_reward_titles.join(", ")}</div>
+             </div>
+           )}
+
+           {(selectedLog.bundle_material_titles?.length > 0 || selectedLog.chosen_material_titles?.length > 0) && (
+             <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+               <div className="text-[10px] font-black text-blue-400 uppercase tracking-wider mb-1">Полученные материалы</div>
+               {selectedLog.bundle_material_titles?.length > 0 && (
+                 <div className="font-bold text-blue-900 text-sm mb-1">📚 {selectedLog.bundle_material_titles.join(", ")}</div>
+               )}
+               {selectedLog.chosen_material_titles?.length > 0 && (
+                 <div className="font-bold text-blue-700 text-sm">🎓 Выбор ученика: {selectedLog.chosen_material_titles.join(", ")}</div>
+               )}
+             </div>
+           )}
+
+           {selectedLog.physical_title && (
+             <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+               <div className="text-[10px] font-black text-amber-500 uppercase tracking-wider mb-1">Физический приз</div>
+               <div className="font-black text-amber-900 text-base mb-3">🧸 {selectedLog.physical_title}</div>
+               {selectedLog.physical_link_url && (
+                 <a href={selectedLog.physical_link_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition-all shadow-sm hover:shadow">
+                   🔗 Перейти по ссылке
+                 </a>
+               )}
+             </div>
+           )}
+         </div>
+         <button onClick={() => setSelectedLog(null)} className="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-all">
+           Закрыть детали
+         </button>
       </div>
     </div>
   ) : null;
@@ -883,7 +953,11 @@ export default function PromocodeManager() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {redemptions.map((log: any) => (
-                    <tr key={log.id} className="hover:bg-gray-50/80 transition-colors">
+                    <tr 
+                      key={log.id} 
+                      className="hover:bg-gray-50/80 transition-colors cursor-pointer"
+                      onClick={() => setSelectedLog(log)}
+                    >
                       <td className="p-3 font-mono font-bold text-gray-500 whitespace-nowrap">
                         {new Date(log.redeemed_at).toLocaleString("ru-RU")}
                       </td>
@@ -928,6 +1002,7 @@ export default function PromocodeManager() {
       )}
 
       {modalElement && createPortal(modalElement, document.body)}
+      {logModalElement && createPortal(logModalElement, document.body)}
     </div>
   );
 }
