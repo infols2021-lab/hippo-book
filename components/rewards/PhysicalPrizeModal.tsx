@@ -3,14 +3,9 @@
 import React from "react";
 import type { CustomPhysicalPrize } from "@/lib/rewards/types";
 
-// Расширяем локальный интерфейс на случай, если в types.ts еще нет link_url
-interface ExtendedPhysicalPrize extends CustomPhysicalPrize {
-  link_url?: string;
-}
-
 interface PhysicalPrizeModalProps {
   isOpen: boolean;
-  prize: ExtendedPhysicalPrize;
+  prize: CustomPhysicalPrize;
   onClose: () => void;
 }
 
