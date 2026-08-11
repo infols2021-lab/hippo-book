@@ -58,11 +58,16 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("referral_materials_purchased")
+      .select("referral_materials_purchased, claimed_referral_milestones")
       .eq("id", userId)
       .single();
 
     const purchasedCount = profile?.referral_materials_purchased || 0;
+    const claimedMilestones = profile?.claimed_referral_milestones || [];
+
+    if (claimedMilestones.includes(milestoneId)) {
+      return fail("Этап уже получен", 400, "ALREADY_CLAIMED");
+    }
 
     const { data: milestone } = await supabase
       .from("referral_config")
@@ -70,25 +75,8 @@ export async function POST(req: NextRequest) {
       .eq("id", milestoneId)
       .single();
 
-    if (!milestone) {
-      return fail("Этап не найден", 404, "NOT_FOUND");
-    }
-
-    if (purchasedCount < milestone.purchases_required) {
-      return fail("Вы еще не достигли этого этапа", 403, "FORBIDDEN");
-    }
-
-    const { data: existingClaim } = await supabase
-      .from("user_inventory")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("reward_id", milestoneId)
-      .eq("source", "referral_choice")
-      .maybeSingle();
-
-    if (existingClaim) {
-      return fail("Выбор для этого этапа уже сделан", 400, "ALREADY_CLAIMED");
-    }
+    if (!milestone) return fail("Этап не найден", 404, "NOT_FOUND");
+    if (purchasedCount < milestone.purchases_required) return fail("Вы еще не достигли этого этапа", 403, "FORBIDDEN");
 
     const bundle = milestone.rewards_bundle || {};
     const choiceCount = Number(bundle.choice_count) || 0;
@@ -100,17 +88,57 @@ export async function POST(req: NextRequest) {
 
     const admin = getSupabaseAdminClient();
     const grantedItems: any[] = [];
+    
+    if (Array.isArray(bundle.rewards) && bundle.rewards.length > 0) {
+      const { data: rData } = await admin.from("rewards").select("*").in("id", bundle.rewards);
+      for (const rid of bundle.rewards) {
+         await admin.from("user_inventory").upsert({
+           user_id: userId,
+           reward_id: rid,
+           source: "referral_milestone"
+         }, { onConflict: "user_id,reward_id" });
+         
+         const rInfo = rData?.find(r => r.id === rid);
+         if (rInfo) {
+            grantedItems.push({
+               id: rInfo.id,
+               title: rInfo.title,
+               type: rInfo.type,
+               description: "Награда за приглашение друзей",
+               asset_url: rInfo.asset_url
+            });
+         }
+      }
+    }
+
+    const allMatsToFetch = [...(bundle.materials || []), ...chosenMaterialIds];
+    const materialsMap = await fetchMaterialsByIds(admin, allMatsToFetch);
+
+    if (Array.isArray(bundle.materials) && bundle.materials.length > 0) {
+      for (const mid of bundle.materials) {
+        await admin.from("material_access").upsert({
+          user_id: userId,
+          material_id: mid,
+          granted_by: userId
+        }, { onConflict: "user_id,material_id" });
+        
+        const mat = materialsMap.get(mid);
+        grantedItems.push({
+          id: mid,
+          title: mat?.title || "Материал",
+          type: "material",
+          description: "Награда за приглашение друзей",
+          asset_url: mat?.cover_image_url || null
+        });
+      }
+    }
 
     if (chosenMaterialIds.length > 0) {
-      const materialsMap = await fetchMaterialsByIds(admin, chosenMaterialIds);
-      
       for (const mid of chosenMaterialIds) {
         const mat = materialsMap.get(mid);
-        if (!mat) {
-          return fail(`Материал ${mid} не найден`, 404, "NOT_FOUND");
-        }
+        if (!mat) return fail(`Материал ${mid} не найден`, 404, "NOT_FOUND");
         if (maxPrice > 0 && Number(mat.price || 0) > maxPrice) {
-          return fail(`Материал "${mat.title}" превышает лимит цены для этого этапа`, 400, "PRICE_LIMIT");
+          return fail(`Материал "${mat.title}" превышает лимит цены`, 400, "PRICE_LIMIT");
         }
       }
 
@@ -126,22 +154,25 @@ export async function POST(req: NextRequest) {
           id: mid,
           title: mat?.title || "Материал",
           type: "material",
-          description: "Получено по реферальной программе",
-          asset_url: mat?.cover_image_url || null,
-          meta: {}
+          description: "Выбранная награда",
+          asset_url: mat?.cover_image_url || null
         });
       }
     }
 
-    await admin.from("user_inventory").insert({
-      user_id: userId,
-      reward_id: milestoneId,
-      source: "referral_choice"
-    });
+    await admin.from("profiles").update({
+      claimed_referral_milestones: [...claimedMilestones, milestoneId]
+    }).eq("id", userId);
+
+    let physicalPrize = null;
+    if (bundle.has_physical) {
+      physicalPrize = { title: "Физический подарок за приглашения" };
+    }
 
     return ok({
       success: true,
-      grantedRewards: grantedItems
+      grantedRewards: grantedItems,
+      physicalPrize
     });
   } catch (e: any) {
     return fail(e.message, 500, "SERVER_ERROR");

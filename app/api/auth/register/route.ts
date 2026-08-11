@@ -175,43 +175,13 @@ export async function POST(req: Request) {
               referred_id: userId,
               is_teacher_student: false,
               status: "active",
-              welcome_bonus_granted: true
+              welcome_bonus_granted: false
             });
 
             await admin
               .from("profiles")
               .update({ referrals_count: (refUser.referrals_count || 0) + 1 })
               .eq("id", refId);
-
-            const { data: settings } = await admin
-              .from("referral_settings")
-              .select("welcome_bundle")
-              .eq("id", 1)
-              .single();
-
-            if (settings?.welcome_bundle) {
-              const bundle = settings.welcome_bundle;
-              
-              if (Array.isArray(bundle.rewards) && bundle.rewards.length > 0) {
-                for (const rid of bundle.rewards) {
-                  await admin.from("user_inventory").upsert({
-                    user_id: userId,
-                    reward_id: rid,
-                    source: "referral_welcome"
-                  }, { onConflict: "user_id,reward_id" });
-                }
-              }
-
-              if (Array.isArray(bundle.materials) && bundle.materials.length > 0) {
-                for (const mid of bundle.materials) {
-                  await admin.from("material_access").upsert({
-                    user_id: userId,
-                    material_id: mid,
-                    granted_by: refId
-                  }, { onConflict: "user_id,material_id" });
-                }
-              }
-            }
           }
         } catch (refErr) {
           console.error("[register] Ошибка сохранения реферальной связи:", refErr);

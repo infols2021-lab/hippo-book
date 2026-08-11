@@ -377,44 +377,12 @@ export async function PATCH(req: NextRequest) {
                     .from("profiles")
                     .update({ referral_materials_purchased: newCount })
                     .eq("id", referrerId);
-
-                  const { data: milestones } = await supabase
-                    .from("referral_config")
-                    .select("id, purchases_required, rewards_bundle")
-                    .gt("purchases_required", oldCount)
-                    .lte("purchases_required", newCount);
-
-                  if (milestones && milestones.length > 0) {
-                    for (const m of milestones) {
-                      const bundle = m.rewards_bundle || {};
-                      
-                      if (Array.isArray(bundle.rewards) && bundle.rewards.length > 0) {
-                        for (const rid of bundle.rewards) {
-                           const { error: invErr } = await supabase.from("user_inventory").upsert({
-                             user_id: referrerId,
-                             reward_id: rid,
-                             source: "referral"
-                           }, { onConflict: "user_id,reward_id" });
-                           if (invErr) console.warn("Failed to insert inventory for ref:", invErr.message);
-                        }
-                      }
-
-                      if (Array.isArray(bundle.materials) && bundle.materials.length > 0) {
-                        for (const mid of bundle.materials) {
-                           const { error: matErr } = await supabase.from("material_access").upsert({
-                             user_id: referrerId,
-                             material_id: mid,
-                             granted_by: user.id
-                           }, { onConflict: "user_id,material_id" });
-                           if (matErr) console.warn("Failed to grant material to ref:", matErr.message);
-                        }
-                      }
-                    }
-                  }
+                    
+                  // Автоматическая выдача наград убрана. Ученик сам нажимает "Забрать" в профиле.
                 }
               }
             } catch (refErr) {
-              console.error("[Requests Route] Ошибка начисления реферальных наград:", refErr);
+              console.error("[Requests Route] Ошибка обновления прогресса рефовода:", refErr);
             }
           }
 

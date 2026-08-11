@@ -7,7 +7,7 @@ import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import Modal from "@/components/Modal";
 import RewardsModal from "@/components/rewards/RewardsModal";
 import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal";
-import ReferralTrack, { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTrack";
+import { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTimeline";
 
 import "./profile.css";
 
