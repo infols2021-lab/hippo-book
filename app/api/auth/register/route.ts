@@ -30,7 +30,7 @@ export async function POST(req: Request) {
           email?: string;
           password?: string;
           captchaToken?: string;
-          ref?: string; // ПРИНИМАЕМ РЕФЕРАЛЬНЫЙ КОД (ID пригласившего)
+          ref?: string;
         }
       | null;
 
@@ -42,11 +42,10 @@ export async function POST(req: Request) {
     const email = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "");
     const captchaToken = String(body.captchaToken ?? "");
-    const refId = String(body.ref ?? "").trim(); // Достаем рефовода
+    const refId = String(body.ref ?? "").trim();
 
     const remoteIp = getRemoteIp(req) ?? undefined;
 
-    // 1. Проверка капчи
     const captcha = await verifyTurnstileToken({
       token: captchaToken,
       expectedAction: "register",
@@ -57,7 +56,6 @@ export async function POST(req: Request) {
       return fail("Капча не пройдена. Перезагрузите и попробуйте снова.", 400, captcha.code);
     }
 
-    // 2. Валидация полей через модуль domains.ts
     if (!fullName || fullName.length < 3) return fail("Введите ФИО", 400, "VALIDATION");
     if (!phone) return fail("Введите телефон", 400, "VALIDATION");
     if (!region) return fail("Выберите область", 400, "VALIDATION");
@@ -70,7 +68,6 @@ export async function POST(req: Request) {
       return fail("Пароль должен быть не менее 6 символов", 400, "VALIDATION");
     }
 
-    // 3. Предварительная проверка существования профиля
     let admin = null;
     try {
       admin = getSupabaseAdminClient();
@@ -82,7 +79,7 @@ export async function POST(req: Request) {
 
       if (existing?.id) {
         return fail(
-          "Аккаунт с таким email уже существует. Нажмите «Войти» или «Забыли пароль?»",
+          "Аккаунт с таким email уже существует. Нажмите Войти или Забыли пароль?",
           400,
           "USER_EXISTS",
         );
@@ -102,7 +99,6 @@ export async function POST(req: Request) {
     const origin = getPublicOrigin(req);
     const redirectTo = origin ? `${origin}/login?message=confirmed` : undefined;
 
-    // 4. Регистрация в Supabase Auth
     const { data, error } = await supabaseAnon.auth.signUp({
       email,
       password,
@@ -123,7 +119,7 @@ export async function POST(req: Request) {
         code === "user_already_exists"
       ) {
         return fail(
-          "Аккаунт с таким email уже существует. Нажмите «Войти» или «Забыли пароль?»",
+          "Аккаунт с таким email уже существует. Нажмите Войти или Забыли пароль?",
           400,
           "USER_EXISTS",
         );
@@ -139,7 +135,6 @@ export async function POST(req: Request) {
     const userId = data.user?.id;
     if (!userId) return fail("Не удалось создать пользователя", 500, "NO_USER");
 
-    // 5. Запись профиля в таблицу `profiles` с откатом (Rollback) при ошибке
     try {
       if (!admin) admin = getSupabaseAdminClient();
 
@@ -166,12 +161,8 @@ export async function POST(req: Request) {
         );
       }
 
-      // ======================================================================
-      // 6. ОБРАБОТКА РЕФЕРАЛЬНОЙ СИСТЕМЫ 
-      // ======================================================================
       if (refId && refId !== userId) {
         try {
-          // Проверяем, существует ли рефовод
           const { data: refUser } = await admin
             .from("profiles")
             .select("id, referrals_count")
@@ -179,26 +170,53 @@ export async function POST(req: Request) {
             .maybeSingle();
 
           if (refUser) {
-            // Создаем связь
             await admin.from("user_referrals").insert({
               referrer_id: refId,
               referred_id: userId,
-              is_teacher_student: false, // по умолчанию обычная рефералка
+              is_teacher_student: false,
               status: "active",
+              welcome_bonus_granted: true
             });
 
-            // Увеличиваем счетчик приглашенных у рефовода
             await admin
               .from("profiles")
               .update({ referrals_count: (refUser.referrals_count || 0) + 1 })
               .eq("id", refId);
+
+            const { data: settings } = await admin
+              .from("referral_settings")
+              .select("welcome_bundle")
+              .eq("id", 1)
+              .single();
+
+            if (settings?.welcome_bundle) {
+              const bundle = settings.welcome_bundle;
+              
+              if (Array.isArray(bundle.rewards) && bundle.rewards.length > 0) {
+                for (const rid of bundle.rewards) {
+                  await admin.from("user_inventory").upsert({
+                    user_id: userId,
+                    reward_id: rid,
+                    source: "referral_welcome"
+                  }, { onConflict: "user_id,reward_id" });
+                }
+              }
+
+              if (Array.isArray(bundle.materials) && bundle.materials.length > 0) {
+                for (const mid of bundle.materials) {
+                  await admin.from("material_access").upsert({
+                    user_id: userId,
+                    material_id: mid,
+                    granted_by: refId
+                  }, { onConflict: "user_id,material_id" });
+                }
+              }
+            }
           }
         } catch (refErr) {
           console.error("[register] Ошибка сохранения реферальной связи:", refErr);
-          // Не откатываем регистрацию, просто логируем ошибку рефералки
         }
       }
-      // ======================================================================
 
     } catch (e) {
       console.error("[register] Profile upsert exception, rolling back user:", e);
@@ -216,7 +234,7 @@ export async function POST(req: Request) {
 
     return ok({
       message:
-        "✅ Регистрация принята!\n\n📧 Мы отправили письмо на вашу почту. Откройте письмо и подтвердите email.\nБез подтверждения вход невозможен.",
+        "Регистрация принята.\n\nМы отправили письмо на вашу почту. Откройте письмо и подтвердите email.\nБез подтверждения вход невозможен.",
     });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });

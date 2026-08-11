@@ -1,4 +1,3 @@
-// app/api/admin/requests/route.ts
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
@@ -185,10 +184,6 @@ async function fetchMaterialsByIds(supabase: any, materialIds: string[]) {
   return map;
 }
 
-// ----------------------------------------------------------------------------
-// GET: список заявок
-// ----------------------------------------------------------------------------
-
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
@@ -283,10 +278,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ----------------------------------------------------------------------------
-// PATCH: обработка заявок (process / unprocess)
-// ----------------------------------------------------------------------------
-
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
@@ -355,69 +346,68 @@ export async function PATCH(req: NextRequest) {
 
           granted = grantedLabels;
 
-          // ======================================================================
-          // 🚀 ЛОГИКА РЕФЕРАЛЬНОЙ ПРОГРАММЫ (БАНДЛЫ)
-          // ======================================================================
           const isNewlyProcessed = is_processed && r.is_processed !== true;
           
           if (isNewlyProcessed && grantsToStore.length > 0) {
             try {
               const { data: refLink } = await supabase
                 .from("user_referrals")
-                .select("referrer_id")
+                .select("referrer_id, created_at")
                 .eq("referred_id", r.user_id)
+                .eq("status", "active")
                 .maybeSingle();
 
               if (refLink?.referrer_id) {
                 const referrerId = refLink.referrer_id;
-                
-                const { data: refProfile } = await supabase
-                  .from("profiles")
-                  .select("referral_materials_purchased")
-                  .eq("id", referrerId)
-                  .maybeSingle();
+                const requestDate = new Date(r.created_at || 0);
+                const linkDate = new Date(refLink.created_at || 0);
 
-                const oldCount = refProfile?.referral_materials_purchased || 0;
-                const addedMaterialsCount = grantsToStore.length;
-                const newCount = oldCount + addedMaterialsCount;
+                if (requestDate >= linkDate) {
+                  const { data: refProfile } = await supabase
+                    .from("profiles")
+                    .select("referral_materials_purchased")
+                    .eq("id", referrerId)
+                    .maybeSingle();
 
-                await supabase
-                  .from("profiles")
-                  .update({ referral_materials_purchased: newCount })
-                  .eq("id", referrerId);
+                  const oldCount = refProfile?.referral_materials_purchased || 0;
+                  const addedMaterialsCount = grantsToStore.length;
+                  const newCount = oldCount + addedMaterialsCount;
 
-                // Ищем этапы, которые мы только что перешагнули
-                const { data: milestones } = await supabase
-                  .from("referral_config")
-                  .select("id, purchases_required, rewards_bundle")
-                  .gt("purchases_required", oldCount)
-                  .lte("purchases_required", newCount);
+                  await supabase
+                    .from("profiles")
+                    .update({ referral_materials_purchased: newCount })
+                    .eq("id", referrerId);
 
-                if (milestones && milestones.length > 0) {
-                  for (const m of milestones) {
-                    const bundle = m.rewards_bundle || {};
-                    
-                    // 1. Выдаем награды из гардероба
-                    if (Array.isArray(bundle.rewards) && bundle.rewards.length > 0) {
-                      for (const rid of bundle.rewards) {
-                         const { error: invErr } = await supabase.from("user_inventory").upsert({
-                           user_id: referrerId,
-                           reward_id: rid,
-                           source: "referral"
-                         }, { onConflict: "user_id,reward_id" });
-                         if (invErr) console.warn("Failed to insert inventory for ref:", invErr.message);
+                  const { data: milestones } = await supabase
+                    .from("referral_config")
+                    .select("id, purchases_required, rewards_bundle")
+                    .gt("purchases_required", oldCount)
+                    .lte("purchases_required", newCount);
+
+                  if (milestones && milestones.length > 0) {
+                    for (const m of milestones) {
+                      const bundle = m.rewards_bundle || {};
+                      
+                      if (Array.isArray(bundle.rewards) && bundle.rewards.length > 0) {
+                        for (const rid of bundle.rewards) {
+                           const { error: invErr } = await supabase.from("user_inventory").upsert({
+                             user_id: referrerId,
+                             reward_id: rid,
+                             source: "referral"
+                           }, { onConflict: "user_id,reward_id" });
+                           if (invErr) console.warn("Failed to insert inventory for ref:", invErr.message);
+                        }
                       }
-                    }
 
-                    // 2. Выдаем конкретные материалы
-                    if (Array.isArray(bundle.materials) && bundle.materials.length > 0) {
-                      for (const mid of bundle.materials) {
-                         const { error: matErr } = await supabase.from("material_access").upsert({
-                           user_id: referrerId,
-                           material_id: mid,
-                           granted_by: user.id
-                         }, { onConflict: "user_id,material_id" });
-                         if (matErr) console.warn("Failed to grant material to ref:", matErr.message);
+                      if (Array.isArray(bundle.materials) && bundle.materials.length > 0) {
+                        for (const mid of bundle.materials) {
+                           const { error: matErr } = await supabase.from("material_access").upsert({
+                             user_id: referrerId,
+                             material_id: mid,
+                             granted_by: user.id
+                           }, { onConflict: "user_id,material_id" });
+                           if (matErr) console.warn("Failed to grant material to ref:", matErr.message);
+                        }
                       }
                     }
                   }
@@ -427,10 +417,8 @@ export async function PATCH(req: NextRequest) {
               console.error("[Requests Route] Ошибка начисления реферальных наград:", refErr);
             }
           }
-          // ======================================================================
 
         } else {
-          // Снятие статуса "Обработано" (unprocess)
           const targets = await getTargetsForUnprocess(supabase, r);
 
           for (const rawTarget of targets) {

@@ -1,4 +1,3 @@
-// app/(app)/projects/[slug]/profile/ProfileClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -11,10 +10,6 @@ import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal"
 import ReferralTrack, { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTrack";
 
 import "./profile.css";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TYPES
-// ─────────────────────────────────────────────────────────────────────────────
 
 type ProfileData = {
   full_name: string;
@@ -94,10 +89,6 @@ type Props = {
 
 type RewardsTabType = "wardrobe" | "streaks" | "promocode" | "referrals";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-
 function regionLabel(region: string) {
   return region?.trim() ? region : "Не указана";
 }
@@ -151,10 +142,6 @@ function normalizeUiErrorMessage(error: unknown, fallback = "Произошла 
   return msg;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN COMPONENT
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function ProfileClient({
   projectName,
   projectSlug,
@@ -184,7 +171,6 @@ export default function ProfileClient({
   const [editRegion, setEditRegion] = useState(profile.region ?? "");
   const [saving, setSaving] = useState(false);
 
-  // Умное управление Центром наград
   const [rewardsModalOpen, setRewardsModalOpen] = useState(false);
   const [rewardsInitialTab, setRewardsInitialTab] = useState<RewardsTabType>("wardrobe");
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
@@ -194,11 +180,9 @@ export default function ProfileClient({
   const [progressLoading, setProgressLoading] = useState<boolean>(!statsProp && !progressProp);
   const [progressError, setProgressError] = useState<string | null>(null);
 
-  // Реферальная система
   const [refData, setRefData] = useState<{ link: string; stats: ReferralStats; track: ReferralMilestone[] } | null>(null);
   const [refLoading, setRefLoading] = useState(true);
 
-  // Категории материалов (динамические) и аккордеон завершенных
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [completedExpanded, setCompletedExpanded] = useState<boolean>(false);
 
@@ -571,7 +555,7 @@ export default function ProfileClient({
             </div>
           </div>
           <button className="mobile-burger-btn" onClick={() => setMobileMenuOpen(true)} aria-label="Открыть меню">
-            ☰
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
         </div>
 
@@ -615,7 +599,9 @@ export default function ProfileClient({
                           >
                             <div className="switcher-dot" style={{ backgroundColor: dotColor }} />
                             <div className="switcher-item-name">{p.name}</div>
-                            {isActive && <div className="switcher-item-check">✓</div>}
+                            {isActive && <div className="switcher-item-check">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </div>}
                           </Link>
                         );
                       })}
@@ -930,7 +916,9 @@ export default function ProfileClient({
                       onClick={() => setCompletedExpanded(!completedExpanded)}
                     >
                       <span>Завершено ({filteredCompleted.length})</span>
-                      <span className={`accordion-chevron ${completedExpanded ? "open" : ""}`}>▼</span>
+                      <span className={`accordion-chevron ${completedExpanded ? "open" : ""}`}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                      </span>
                     </button>
 
                     {completedExpanded && (

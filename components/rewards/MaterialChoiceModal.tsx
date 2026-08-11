@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 interface MaterialItem {
   id: string;
   title: string;
+  price?: number;
   is_secret?: boolean;
   kind?: "textbook" | "crossword" | string;
   hasAccess?: boolean;
@@ -44,7 +45,10 @@ export interface MaterialChoiceSuccessResult {
 
 interface MaterialChoiceModalProps {
   isOpen: boolean;
-  promocodeCode: string;
+  mode?: "promocode" | "referral";
+  promocodeCode?: string;
+  referralMilestoneId?: string;
+  maxPrice?: number;
   requiredChoiceCount: number;
   onClose: () => void;
   onSuccess: (result: MaterialChoiceSuccessResult) => void;
@@ -52,7 +56,10 @@ interface MaterialChoiceModalProps {
 
 export default function MaterialChoiceModal({
   isOpen,
-  promocodeCode,
+  mode = "promocode",
+  promocodeCode = "",
+  referralMilestoneId = "",
+  maxPrice = 0,
   requiredChoiceCount,
   onClose,
   onSuccess,
@@ -182,15 +189,28 @@ export default function MaterialChoiceModal({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const res = await fetch("/api/promocodes/redeem", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: promocodeCode,
-          chosenMaterialIds: skipChoice ? [] : selectedMaterialIds,
-          allowSkipIfAllUnlocked: skipChoice,
-        }),
-      });
+      let res;
+
+      if (mode === "referral") {
+        res = await fetch("/api/profile/referrals/choice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            milestoneId: referralMilestoneId,
+            chosenMaterialIds: skipChoice ? [] : selectedMaterialIds,
+          }),
+        });
+      } else {
+        res = await fetch("/api/promocodes/redeem", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: promocodeCode,
+            chosenMaterialIds: skipChoice ? [] : selectedMaterialIds,
+            allowSkipIfAllUnlocked: skipChoice,
+          }),
+        });
+      }
 
       const data = await res.json().catch(() => null);
 
@@ -259,7 +279,12 @@ export default function MaterialChoiceModal({
       selectedLevelFilter === "all" ||
       levels.some((l) => l.toLowerCase() === selectedLevelFilter.toLowerCase());
 
-    return matchTab && matchLevel;
+    const matchPrice =
+      mode === "referral" && maxPrice > 0
+        ? (m.price || 0) <= maxPrice
+        : true;
+
+    return matchTab && matchLevel && matchPrice;
   });
 
   const lockedMaterials = materials.filter((m) => !isAlreadyUnlocked(m));
@@ -278,14 +303,13 @@ export default function MaterialChoiceModal({
           borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
         }}
       >
-        {/* Шапка модалки */}
         <div
           className="flex justify-between items-start border-b pb-4"
           style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
         >
           <div>
             <h3 className="text-lg font-black uppercase tracking-wider">
-              Выбор материалов по промокоду
+              {mode === "referral" ? "Выбор материалов за этап" : "Выбор материалов по промокоду"}
             </h3>
             <p className="text-xs font-medium opacity-60 mt-1">
               Выберите {requiredChoiceCount} материал(а) для получения доступа:
@@ -305,11 +329,10 @@ export default function MaterialChoiceModal({
 
         {cannotFulfillChoice && (
           <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-800 font-bold text-center">
-            🎉 У вас уже открыто большинство или все материалы этого раздела! Вы можете пропустить выбор материалов и получить остальные призы из промокода.
+            У вас уже открыто большинство или все материалы этого раздела. Вы можете пропустить выбор материалов и получить остальные призы.
           </div>
         )}
 
-        {/* Выбор проекта */}
         {projects.length > 1 && (
           <div
             className="flex gap-2 border-b pb-3 overflow-x-auto"
@@ -343,7 +366,6 @@ export default function MaterialChoiceModal({
           </div>
         )}
 
-        {/* Фильтры */}
         <div className="space-y-3">
           <div className="flex gap-2 flex-wrap">
             <button
@@ -409,7 +431,6 @@ export default function MaterialChoiceModal({
           )}
         </div>
 
-        {/* Список материалов (сетка с верным выравниванием) */}
         <div className="max-h-72 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 pr-1 items-start">
           {loading ? (
             <div className="col-span-full text-center py-12 text-xs font-bold uppercase tracking-wider opacity-60">
@@ -455,7 +476,7 @@ export default function MaterialChoiceModal({
                         />
                       ) : (
                         <span className="text-xl">
-                          {m.kind === "crossword" ? "🧩" : "📚"}
+                          {m.kind === "crossword" ? "C" : "M"}
                         </span>
                       )}
                     </div>
@@ -467,12 +488,12 @@ export default function MaterialChoiceModal({
                       <div className="flex items-center gap-2 mt-1">
                         {m.is_secret && (
                           <span className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">
-                            ★ Секретный
+                            Секретный
                           </span>
                         )}
                         {unlocked && (
                           <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
-                            ✓ Доступ есть
+                            Доступ есть
                           </span>
                         )}
                       </div>
@@ -491,7 +512,7 @@ export default function MaterialChoiceModal({
                       color: isSelected ? "#ffffff" : "var(--project-text, #0f172a)",
                     }}
                   >
-                    {unlocked ? "✓" : isSelected ? "✓" : "+"}
+                    {unlocked ? "V" : isSelected ? "V" : "+"}
                   </div>
                 </div>
               );
@@ -505,7 +526,6 @@ export default function MaterialChoiceModal({
           </div>
         )}
 
-        {/* Кнопки */}
         <div
           className="flex justify-end gap-3 pt-3 border-t"
           style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
@@ -525,7 +545,7 @@ export default function MaterialChoiceModal({
               disabled={submitting}
               className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-md"
             >
-              {submitting ? "Сохранение..." : "Пропустить выбор материалов"}
+              {submitting ? "Сохранение..." : "Пропустить выбор"}
             </button>
           ) : (
             <button
