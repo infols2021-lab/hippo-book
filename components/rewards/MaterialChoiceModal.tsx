@@ -192,7 +192,8 @@ export default function MaterialChoiceModal({
       let res;
 
       if (mode === "referral") {
-        res = await fetch("/api/profile/referrals/choice", {
+        // ИСПРАВЛЕНО: Правильный роут для сохранения реферального этапа
+        res = await fetch("/api/profile/referrals/claim-milestone", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -291,249 +292,218 @@ export default function MaterialChoiceModal({
   const cannotFulfillChoice = materials.length > 0 && lockedMaterials.length < requiredChoiceCount;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
-      style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200 bg-black/60 backdrop-blur-sm">
       <div
-        className="rounded-[32px] max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-hidden relative border transition-all"
-        style={{
-          backgroundColor: "var(--project-card-bg, #ffffff)",
-          color: "var(--project-text, #0f172a)",
-          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
-        }}
+        className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative border border-slate-100 flex flex-col max-h-[90vh]"
       >
-        <div
-          className="flex justify-between items-start border-b pb-4"
-          style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
-        >
+        {/* Шапка модалки */}
+        <div className="flex justify-between items-start border-b border-slate-100 pb-5 shrink-0">
           <div>
-            <h3 className="text-lg font-black uppercase tracking-wider">
+            <h3 className="text-lg sm:text-xl font-black uppercase tracking-wider text-slate-800">
               {mode === "referral" ? "Выбор материалов за этап" : "Выбор материалов по промокоду"}
             </h3>
-            <p className="text-xs font-medium opacity-60 mt-1">
+            <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1.5">
               Выберите {requiredChoiceCount} материал(а) для получения доступа:
             </p>
           </div>
-          <div
-            className="font-mono text-xs font-black px-3 py-1.5 border rounded-xl uppercase tracking-wider"
-            style={{
-              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
-              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
-              color: "var(--project-primary, #0ea5e9)",
-            }}
-          >
-            Выбрано: {selectedMaterialIds.length} / {requiredChoiceCount}
+          <div className="font-mono text-xs sm:text-sm font-black px-4 py-2 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl uppercase tracking-wider shrink-0 ml-4">
+            {selectedMaterialIds.length} / {requiredChoiceCount}
           </div>
         </div>
 
         {cannotFulfillChoice && (
-          <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-800 font-bold text-center">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs sm:text-sm text-amber-800 font-bold text-center shrink-0 shadow-sm">
             У вас уже открыто большинство или все материалы этого раздела. Вы можете пропустить выбор материалов и получить остальные призы.
           </div>
         )}
 
-        {projects.length > 1 && (
-          <div
-            className="flex gap-2 border-b pb-3 overflow-x-auto"
-            style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
-          >
-            {projects.map((p) => {
-              const active = isProjectSelected(p);
+        {/* Скроллируемая область фильтров и материалов */}
+        <div className="overflow-y-auto pr-2 space-y-5 min-h-[50vh]">
+          
+          {/* Выбор проекта */}
+          {projects.length > 1 && (
+            <div className="flex gap-2 border-b border-slate-100 pb-3 overflow-x-auto no-scrollbar shrink-0">
+              {projects.map((p) => {
+                const active = isProjectSelected(p);
+                return (
+                  <button
+                    key={p.id || p.slug}
+                    type="button"
+                    onClick={() => {
+                      if (!active) void selectProject(p);
+                    }}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border whitespace-nowrap ${
+                      active 
+                        ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20" 
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {p.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-              return (
-                <button
-                  key={p.id || p.slug}
-                  type="button"
-                  onClick={() => {
-                    if (!active) void selectProject(p);
-                  }}
-                  className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border"
-                  style={{
-                    backgroundColor: active
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "#f1f5f9",
-                    borderColor: active
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "#cbd5e1",
-                    color: active ? "#ffffff" : "var(--project-text, #0f172a)",
-                  }}
-                >
-                  {p.name}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="space-y-3">
-          <div className="flex gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setActiveTabSlug("all")}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border"
-              style={{
-                backgroundColor: activeTabSlug === "all" ? "var(--project-primary, #0ea5e9)" : "#f1f5f9",
-                borderColor: activeTabSlug === "all" ? "var(--project-primary, #0ea5e9)" : "#cbd5e1",
-                color: activeTabSlug === "all" ? "#ffffff" : "var(--project-text, #0f172a)",
-              }}
-            >
-              Все категории
-            </button>
-            {projectTabs.map((tab) => (
-              <button
-                key={tab.id || tab.slug}
-                type="button"
-                onClick={() => setActiveTabSlug(tab.slug)}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border"
-                style={{
-                  backgroundColor: activeTabSlug === tab.slug ? "var(--project-primary, #0ea5e9)" : "#f1f5f9",
-                  borderColor: activeTabSlug === tab.slug ? "var(--project-primary, #0ea5e9)" : "#cbd5e1",
-                  color: activeTabSlug === tab.slug ? "#ffffff" : "var(--project-text, #0f172a)",
-                }}
-              >
-                {tab.icon ? `${tab.icon} ` : ""}
-                {tab.title}
-              </button>
-            ))}
-          </div>
-
-          {availableLevels.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+          {/* Фильтры */}
+          <div className="space-y-3 shrink-0">
+            <div className="flex gap-2 flex-wrap">
               <button
                 type="button"
-                onClick={() => setSelectedLevelCode("all")}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all"
-                style={{
-                  backgroundColor: selectedLevelFilter === "all" ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent)" : "#f8fafc",
-                  borderColor: selectedLevelFilter === "all" ? "var(--project-primary, #0ea5e9)" : "#cbd5e1",
-                  color: "var(--project-text, #0f172a)",
-                }}
+                onClick={() => setActiveTabSlug("all")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                  activeTabSlug === "all"
+                    ? "bg-slate-800 border-slate-800 text-white"
+                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
               >
-                Все уровни
+                Все категории
               </button>
-              {availableLevels.map((lvl) => (
+              {projectTabs.map((tab) => (
                 <button
-                  key={lvl}
+                  key={tab.id || tab.slug}
                   type="button"
-                  onClick={() => setSelectedLevelCode(lvl)}
-                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all"
-                  style={{
-                    backgroundColor: selectedLevelFilter === lvl ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 20%, transparent)" : "#f8fafc",
-                    borderColor: selectedLevelFilter === lvl ? "var(--project-primary, #0ea5e9)" : "#cbd5e1",
-                    color: "var(--project-text, #0f172a)",
-                  }}
+                  onClick={() => setActiveTabSlug(tab.slug)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                    activeTabSlug === tab.slug
+                      ? "bg-slate-800 border-slate-800 text-white"
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
                 >
-                  {lvl}
+                  {tab.title}
                 </button>
               ))}
             </div>
-          )}
-        </div>
 
-        <div className="max-h-72 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 pr-1 items-start">
-          {loading ? (
-            <div className="col-span-full text-center py-12 text-xs font-bold uppercase tracking-wider opacity-60">
-              Загрузка каталога материалов...
-            </div>
-          ) : filteredMaterials.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-xs font-bold uppercase tracking-wider opacity-60">
-              Материалы не найдены
-            </div>
-          ) : (
-            filteredMaterials.map((m) => {
-              const unlocked = isAlreadyUnlocked(m);
-              const isSelected = selectedMaterialIds.includes(m.id);
-
-              return (
-                <div
-                  key={m.id}
-                  onClick={() => handleToggleMaterial(m)}
-                  className="p-3.5 rounded-2xl border flex items-center justify-between transition-all"
-                  style={{
-                    backgroundColor: unlocked
-                      ? "#f8fafc"
-                      : isSelected
-                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, #ffffff)"
-                      : "#ffffff",
-                    borderColor: isSelected
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "#e2e8f0",
-                    opacity: unlocked ? 0.6 : 1,
-                    cursor: unlocked ? "not-allowed" : "pointer",
-                  }}
+            {availableLevels.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedLevelCode("all")}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
+                    selectedLevelFilter === "all"
+                      ? "bg-blue-50 border-blue-200 text-blue-700"
+                      : "bg-transparent border-slate-200 text-slate-500 hover:border-slate-300"
+                  }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                  Все уровни
+                </button>
+                {availableLevels.map((lvl) => (
+                  <button
+                    key={lvl}
+                    type="button"
+                    onClick={() => setSelectedLevelCode(lvl)}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
+                      selectedLevelFilter === lvl
+                        ? "bg-blue-50 border-blue-200 text-blue-700"
+                        : "bg-transparent border-slate-200 text-slate-500 hover:border-slate-300"
+                    }`}
+                  >
+                    {lvl}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Список материалов */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start pb-4">
+            {loading ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-16 opacity-50">
+                <div className="w-8 h-8 border-4 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-4"></div>
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-600">Загрузка каталога...</div>
+              </div>
+            ) : filteredMaterials.length === 0 ? (
+              <div className="col-span-full text-center py-16 text-sm font-bold text-slate-400 bg-slate-50 rounded-2xl border border-slate-100">
+                Материалы не найдены
+              </div>
+            ) : (
+              filteredMaterials.map((m) => {
+                const unlocked = isAlreadyUnlocked(m);
+                const isSelected = selectedMaterialIds.includes(m.id);
+
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => handleToggleMaterial(m)}
+                    className={`p-4 rounded-2xl border flex items-center justify-between transition-all duration-200 ${
+                      unlocked
+                        ? "bg-slate-50 border-slate-100 opacity-60 cursor-not-allowed grayscale-[0.5]"
+                        : isSelected
+                        ? "bg-blue-50 border-blue-400 cursor-pointer shadow-sm shadow-blue-500/10"
+                        : "bg-white border-slate-200 cursor-pointer hover:border-blue-300 hover:shadow-sm"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 pr-2">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden shrink-0 border border-slate-100 bg-slate-100 text-slate-400">
+                        {m.cover_image_url ? (
+                          <img
+                            src={m.cover_image_url}
+                            alt=""
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          m.kind === "crossword" ? (
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                          ) : (
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                          )
+                        )}
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="font-extrabold text-xs sm:text-sm truncate text-slate-800">
+                          {m.title}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          {m.is_secret && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded border border-amber-200">
+                              Секретный
+                            </span>
+                          )}
+                          {unlocked && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded border border-slate-300">
+                              Доступ есть
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 border bg-slate-100"
-                      style={{ borderColor: "#e2e8f0" }}
+                      className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                        isSelected
+                          ? "bg-blue-600 border-blue-600 text-white"
+                          : unlocked
+                          ? "bg-slate-200 border-slate-300 text-slate-400"
+                          : "bg-white border-slate-300 text-transparent hover:border-blue-400"
+                      }`}
                     >
-                      {m.cover_image_url ? (
-                        <img
-                          src={m.cover_image_url}
-                          alt=""
-                          className="w-full h-full object-contain"
-                        />
+                      {(isSelected || unlocked) ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                       ) : (
-                        <span className="text-xl">
-                          {m.kind === "crossword" ? "C" : "M"}
-                        </span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                       )}
                     </div>
-
-                    <div className="min-w-0">
-                      <div className="font-extrabold text-xs truncate" style={{ color: "var(--project-text, #0f172a)" }}>
-                        {m.title}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        {m.is_secret && (
-                          <span className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">
-                            Секретный
-                          </span>
-                        )}
-                        {unlocked && (
-                          <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
-                            Доступ есть
-                          </span>
-                        )}
-                      </div>
-                    </div>
                   </div>
-
-                  <div
-                    className="w-7 h-7 rounded-xl border flex items-center justify-center flex-shrink-0 font-bold text-xs transition-colors"
-                    style={{
-                      backgroundColor: isSelected
-                        ? "var(--project-primary, #0ea5e9)"
-                        : "transparent",
-                      borderColor: isSelected
-                        ? "var(--project-primary, #0ea5e9)"
-                        : "#cbd5e1",
-                      color: isSelected ? "#ffffff" : "var(--project-text, #0f172a)",
-                    }}
-                  >
-                    {unlocked ? "V" : isSelected ? "V" : "+"}
-                  </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
 
         {submitError && (
-          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-600 text-center font-bold">
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 text-center font-bold shrink-0">
             {submitError}
           </div>
         )}
 
-        <div
-          className="flex justify-end gap-3 pt-3 border-t"
-          style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
-        >
+        {/* Кнопки футера */}
+        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-5 border-t border-slate-100 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border font-bold text-xs uppercase tracking-wider rounded-xl transition-colors bg-slate-100 hover:bg-slate-200 text-slate-700"
+            className="px-6 py-3 border border-slate-200 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors bg-white hover:bg-slate-50 text-slate-600 w-full sm:w-auto"
           >
             Отмена
           </button>
@@ -543,7 +513,7 @@ export default function MaterialChoiceModal({
               type="button"
               onClick={() => handleSubmitChoice(true)}
               disabled={submitting}
-              className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-md"
+              className="px-6 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-md w-full sm:w-auto"
             >
               {submitting ? "Сохранение..." : "Пропустить выбор"}
             </button>
@@ -552,12 +522,16 @@ export default function MaterialChoiceModal({
               type="button"
               onClick={() => handleSubmitChoice(false)}
               disabled={submitting || selectedMaterialIds.length < requiredChoiceCount}
-              className="px-5 py-2 text-white font-black text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-md"
-              style={{
-                backgroundColor: "var(--project-primary, #0ea5e9)",
-              }}
+              className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl disabled:opacity-50 transition-all shadow-md shadow-blue-500/20 w-full sm:w-auto flex items-center justify-center gap-2"
             >
-              {submitting ? "Сохранение..." : "Подтвердить выбор"}
+              {submitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Сохранение...
+                </>
+              ) : (
+                "Подтвердить выбор"
+              )}
             </button>
           )}
         </div>
