@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Какая ты собачка? — Квиз от Юки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #1F3B2C;
+    --bg-deep: #16291D;
+    --paper: #FFFDF7;
+    --paper-dim: #F3EFDF;
+    --ink: #1F3B2C;
+    --ink-soft: #4B5D50;
+    --cream: #F4EFE1;
+    --amber: #F4A300;
+    --amber-deep: #C97F00;
+    --coral: #FF6F59;
+
+    --c-brave: #E4572E;
+    --c-brave-soft: #FBD9C9;
+    --c-pedant: #3E6259;
+    --c-pedant-soft: #D9E6DE;
+    --c-ear: #4A7A96;
+    --c-ear-soft: #D9E9F2;
+    --c-creator: #9C6ADE;
+    --c-creator-soft: #E9DDFB;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--cream);
+    font-family: 'Nunito Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  body{
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(244,163,0,0.10), transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(255,111,89,0.10), transparent 45%);
+  }
+  h1,h2,h3, .display { font-family: 'Baloo 2', sans-serif; }
+
+  .wrap{
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 32px 20px 64px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- Paw trail progress ---------- */
+  .trail{
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .paw{
+    width: 22px; height: 22px;
+    opacity: 0.25;
+    transform: scale(0.85);
+    transition: all 0.35s ease;
+  }
+  .paw.done{ opacity: 1; transform: scale(1) rotate(-8deg); }
+  .paw svg{ width:100%; height:100%; fill: var(--amber); }
+  .paw.pending svg{ fill: var(--cream); }
+
+  /* ---------- Screens ---------- */
+  .screen{ display: none; flex: 1; flex-direction: column; }
+  .screen.active{ display: flex; }
+
+  /* ---------- Intro ---------- */
+  .intro{ text-align: center; padding-top: 20px; }
+  .yuki-badge{
+    width: 96px; height: 96px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    background: var(--paper);
+    display:flex; align-items:center; justify-content:center;
+    overflow: hidden;
+    font-size: 46px;
+    box-shadow: 0 0 0 6px rgba(244,163,0,0.18), 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .yuki-badge img{
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .eyebrow{
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--amber);
+    margin-bottom: 10px;
+  }
+  .intro h1{
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1.15;
+    margin: 0 0 14px;
+  }
+  .intro p{
+    color: var(--paper-dim);
+    font-size: 16px;
+    line-height: 1.6;
+    max-width: 440px;
+    margin: 0 auto 32px;
+  }
+
+  .btn{
+    font-family: 'Baloo 2', sans-serif;
+    font-weight: 700;
+    font-size: 17px;
+    border: none;
+    border-radius: 999px;
+    padding: 16px 36px;
+    cursor: pointer;
+    background: var(--amber);
+    color: var(--bg-deep);
+    box-shadow: 0 6px 0 var(--amber-deep);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .btn:active{
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 var(--amber-deep);
+  }
+  .btn.ghost{
+    background: transparent;
+    color: var(--cream);
+    box-shadow: none;
+    border: 2px solid rgba(244,239,225,0.35);
+    padding: 14px 32px;
+  }
+  .btn.ghost:active{ transform: translateY(2px); }
+
+  /* ---------- Question card ---------- */
+  .qcard{
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 24px;
+    padding: 32px 26px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  }
+  .q-index{
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--coral);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 10px;
+  }
+  .q-text{
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.35;
+    margin: 0 0 24px;
+  }
+  .options{
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .opt{
+    text-align: left;
+    background: var(--paper-dim);
+    border: 2px solid transparent;
+    border-radius: 16px;
+    padding: 16px 18px;
+    font-family: 'Nunito Sans', sans-serif;
+    font-size: 15.5px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .opt:hover{ border-color: var(--amber); background: #FBF1D8; }
+  .opt:active{ transform: scale(0.98); }
+
+  /* ---------- Result ---------- */
+  .result{ text-align: center; padding-top: 4px; }
+  .tag{
+    position: relative;
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 28px;
+    padding: 40px 26px 30px;
+    margin: 0 auto 26px;
+    max-width: 420px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+  }
+  .tag::before{
+    content: "";
+    position: absolute;
+    top: -12px; left: 50%;
+    transform: translateX(-50%);
+    width: 24px; height: 24px;
+    background: var(--bg-deep);
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 4px var(--paper);
+  }
+  .tag-emoji{
+    width: 96px; height: 96px;
+    border-radius: 50%;
+    margin: 0 auto 18px;
+    display:flex; align-items:center; justify-content:center;
+    overflow: hidden;
+    font-size: 50px;
+  }
+  .tag-emoji img{
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .tag-eyebrow{
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+  }
+  .tag h2{
+    font-size: 28px;
+    margin: 0 0 14px;
+  }
+  .tag p{
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    margin: 0 0 18px;
+    text-align: left;
+  }
+  .stat-row{
+    display:flex;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .stat{
+    flex:1;
+    background: var(--paper-dim);
+    border-radius: 14px;
+    padding: 12px;
+    text-align: left;
+  }
+  .stat .label{
+    font-size: 10.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .stat .val{ font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .tip{
+    background: rgba(244,163,0,0.12);
+    border: 1.5px dashed var(--amber-deep);
+    border-radius: 14px;
+    padding: 14px 16px;
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .tip b{ color: var(--amber-deep); }
+
+  .secret-note{
+    max-width: 440px;
+    margin: 6px auto 26px;
+    font-size: 13.5px;
+    color: var(--paper-dim);
+    line-height: 1.6;
+  }
+  .actions{ display:flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+  @media (max-width: 420px){
+    .intro h1{ font-size: 28px; }
+    .q-text{ font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="trail" id="trail"></div>
+
+  <!-- INTRO -->
+  <div class="screen active" id="screen-intro">
+    <div class="intro">
+      <div class="yuki-badge" id="yuki-badge">🐕</div>
+      <div class="eyebrow">Секретный материал · только для новеньких</div>
+      <h1>Юки хочет узнать,<br>какая ты собачка</h1>
+      <p>6 быстрых вопросов без правильных и неправильных ответов. В конце — твой архетип, суперсила и один секретный лайфхак по учёбе от Юки.</p>
+      <button class="btn" onclick="startQuiz()">Начать · 1 минута</button>
+    </div>
+  </div>
+
+  <!-- QUESTIONS -->
+  <div class="screen" id="screen-quiz">
+    <div class="qcard">
+      <div class="q-index" id="q-index">Вопрос 1 из 6</div>
+      <div class="q-text" id="q-text"></div>
+      <div class="options" id="q-options"></div>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div class="screen" id="screen-result">
+    <div class="result">
+      <div class="tag" id="tag">
+        <div class="tag-emoji" id="tag-emoji"></div>
+        <div class="tag-eyebrow" id="tag-eyebrow"></div>
+        <h2 id="tag-name"></h2>
+        <p id="tag-desc"></p>
+        <div class="stat-row">
+          <div class="stat">
+            <div class="label">Суперсила</div>
+            <div class="val" id="tag-power"></div>
+          </div>
+          <div class="stat">
+            <div class="label">Слабость</div>
+            <div class="val" id="tag-weak"></div>
+          </div>
+        </div>
+        <div class="tip" id="tag-tip"></div>
+      </div>
+      <p class="secret-note">Сделай скриншот этой карточки и покажи преподавателю или сохрани себе — это твой секретный материал от Юки 🐾</p>
+      <div class="actions">
+        <button class="btn" onclick="restartQuiz()">Пройти ещё раз</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/*
+  КАРТИНКИ:
+  Положи файлы собачек в папку public/images/ вашего Next.js проекта.
+  Файлы должны называться ровно так:
+    public/images/yuki.png
+    public/images/brave.png
+    public/images/pedant.png
+    public/images/ear.png
+    public/images/creator.png
+  Если файла нет — автоматически покажется эмодзи-заглушка.
+*/
+const IMG_BASE = "/images/";
+
+const questions = [
+  {
+    text: "Тебе дали новое слово. Что делаешь первым делом?",
+    options: [
+      { t: "Пробую сразу использовать в разговоре", k: "brave" },
+      { t: "Смотрю правило и транскрипцию", k: "pedant" },
+      { t: "Ищу, где оно звучит — песня, видео", k: "ear" },
+      { t: "Придумываю картинку или ассоциацию", k: "creator" },
+    ]
+  },
+  {
+    text: "Как ты готовишься к тесту?",
+    options: [
+      { t: "В последний момент, но с огоньком", k: "brave" },
+      { t: "Составляю план заранее и иду по пунктам", k: "pedant" },
+      { t: "Слушаю тематические подкасты и видео", k: "ear" },
+      { t: "Рисую схемы, делаю карточки с картинками", k: "creator" },
+    ]
+  },
+  {
+    text: "Что больше всего бесит на уроке?",
+    options: [
+      { t: "Когда долго объясняют — хочу уже пробовать", k: "brave" },
+      { t: "Когда не дают точных правил", k: "pedant" },
+      { t: "Когда мало живой речи, много текста", k: "ear" },
+      { t: "Когда скучно и нет ничего творческого", k: "creator" },
+    ]
+  },
+  {
+    text: "Твоя реакция, если не знаешь ответ?",
+    options: [
+      { t: "Отвечаю наугад — потом разберёмся", k: "brave" },
+      { t: "Молчу, пока не буду уверен", k: "pedant" },
+      { t: "Пытаюсь угадать по звучанию", k: "ear" },
+      { t: "Ищу похожее слово или образ в голове", k: "creator" },
+    ]
+  },
+  {
+    text: "Какой формат домашки нравится больше?",
+    options: [
+      { t: "Практические задания, диалоги", k: "brave" },
+      { t: "Упражнения на грамматику", k: "pedant" },
+      { t: "Аудирование, видео с субтитрами", k: "ear" },
+      { t: "Творческие задания — истории, комиксы", k: "creator" },
+    ]
+  },
+  {
+    text: "Что говорят о тебе друзья или одноклассники?",
+    options: [
+      { t: "Смелый, не боится выглядеть глупо", k: "brave" },
+      { t: "Внимательный к деталям, перфекционист", k: "pedant" },
+      { t: "Всегда с наушниками, что-то слушает", k: "ear" },
+      { t: "Выдумщик, у него на всё есть история", k: "creator" },
+    ]
+  },
+];
+
+const archetypes = {
+  brave: {
+    emoji: "🏃", file: "brave.png",
+    name: "Смелый",
+    color: "var(--c-brave)", soft: "var(--c-brave-soft)",
+    desc: "Ты не ждёшь идеального момента — пробуешь сразу, ошибаешься, поправляешься и идёшь дальше. Такой подход даёт больше живой практики, чем у половины отличников.",
+    power: "Скорость и смелость — не боишься говорить",
+    weak: "Иногда торопишься и теряешь точность",
+    tip: "Проговаривай ответ вслух перед тем как написать — так меньше опечаток на скорости."
+  },
+  pedant: {
+    emoji: "📚", file: "pedant.png",
+    name: "Педант",
+    color: "var(--c-pedant)", soft: "var(--c-pedant-soft)",
+    desc: "Правила, структура, порядок — твоя стихия. Ты редко делаешь глупые ошибки, потому что всегда проверяешь себя дважды.",
+    power: "Грамматика и точность на высоте",
+    weak: "Долго решаешься ответить, если не уверен на 100%",
+    tip: "Дай себе 10 секунд на ответ без перепроверки — интуиция часто права."
+  },
+  ear: {
+    emoji: "🎧", file: "ear.png",
+    name: "Слухач",
+    color: "var(--c-ear)", soft: "var(--c-ear-soft)",
+    desc: "Ты учишь язык через звук — подкасты, песни, диалоги. Речь на слух воспринимаешь легче, чем текст на бумаге.",
+    power: "Произношение и восприятие речи",
+    weak: "Письмо и спеллинг иногда хромают",
+    tip: "После прослушивания сразу запиши 3 новых слова — закрепится намного быстрее."
+  },
+  creator: {
+    emoji: "🎨", file: "creator.png",
+    name: "Творец",
+    color: "var(--c-creator)", soft: "var(--c-creator-soft)",
+    desc: "Истории, мемы и образы — вот как ты запоминаешь язык. Скучная зубрёжка не твоё, зато то, что ты выучил через ассоциацию, не забывается.",
+    power: "Запоминает слова через образы надолго",
+    weak: "Иногда путается в формальных правилах",
+    tip: "Придумывай мем или картинку на каждое новое слово — твой метод и есть лайфхак."
+  }
+};
+
+let current = 0;
+let answers = [];
+
+(function initYukiBadge(){
+  const badge = document.getElementById('yuki-badge');
+  const img = new Image();
+  img.onload = () => { badge.innerHTML = ''; badge.appendChild(img); };
+  img.onerror = () => {};
+  img.src = IMG_BASE + "yuki.png";
+  img.alt = "Юки";
+})();
+
+function buildTrail(){
+  const trail = document.getElementById('trail');
+  trail.innerHTML = '';
+  for(let i=0;i<questions.length;i++){
+    const p = document.createElement('div');
+    p.className = 'paw pending';
+    p.id = 'paw-'+i;
+    p.innerHTML = pawSVG();
+    trail.appendChild(p);
+  }
+}
+function pawSVG(){
+  return `<svg viewBox="0 0 64 64"><path d="M20 8c-5 0-8 5-8 10s3 9 8 9 8-4 8-9-3-10-8-10zm24 0c-5 0-8 5-8 10s3 9 8 9 8-4 8-9-3-10-8-10zM8 30c-4 0-7 4-7 8s3 7 7 7 7-3 7-7-3-8-7-8zm48 0c-4 0-7 4-7 8s3 7 7 7 7-3 7-7-3-8-7-8zM32 26c-9 0-17 8-17 17 0 6 4 11 10 11 4 0 5-2 7-2s3 2 7 2c6 0 10-5 10-11 0-9-8-17-17-17z"/></svg>`;
+}
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function startQuiz(){
+  current = 0;
+  answers = [];
+  buildTrail();
+  showScreen('screen-quiz');
+  renderQuestion();
+}
+
+function renderQuestion(){
+  const q = questions[current];
+  document.getElementById('q-index').textContent = `Вопрос ${current+1} из ${questions.length}`;
+  document.getElementById('q-text').textContent = q.text;
+  const optsWrap = document.getElementById('q-options');
+  optsWrap.innerHTML = '';
+  q.options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.textContent = opt.t;
+    btn.onclick = () => selectAnswer(opt.k);
+    optsWrap.appendChild(btn);
+  });
+}
+
+function selectAnswer(k){
+  answers.push(k);
+  const paw = document.getElementById('paw-'+current);
+  paw.classList.remove('pending');
+  paw.classList.add('done');
+  current++;
+  if(current < questions.length){
+    renderQuestion();
+  } else {
+    showResult();
+  }
+}
+
+function showResult(){
+  const counts = {};
+  answers.forEach(k => counts[k] = (counts[k]||0)+1);
+  let best = 'brave', max = -1;
+  for(const k in counts){
+    if(counts[k] > max){ max = counts[k]; best = k; }
+  }
+  const a = archetypes[best];
+
+  const emojiWrap = document.getElementById('tag-emoji');
+  emojiWrap.style.background = a.soft;
+  emojiWrap.textContent = a.emoji;
+  
+  const img = new Image();
+  img.onload = () => { emojiWrap.innerHTML = ''; emojiWrap.appendChild(img); };
+  img.onerror = () => {};
+  img.src = IMG_BASE + a.file;
+  img.alt = a.name;
+
+  document.getElementById('tag-eyebrow').textContent = 'Ты — ' + a.name.toLowerCase() + ' пёс';
+  document.getElementById('tag-eyebrow').style.color = a.color;
+  document.getElementById('tag-name').textContent = a.name;
+  document.getElementById('tag-name').style.color = a.color;
+  document.getElementById('tag-desc').textContent = a.desc;
+  document.getElementById('tag-power').textContent = a.power;
+  document.getElementById('tag-weak').textContent = a.weak;
+  document.getElementById('tag-tip').innerHTML = '<b>Совет от Юки:</b> ' + a.tip;
+
+  showScreen('screen-result');
+}
+
+function restartQuiz(){
+  startQuiz();
+}
+</script>
+</body>
+</html>
