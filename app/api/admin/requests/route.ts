@@ -117,10 +117,6 @@ function applyCursor(q: any, cursorCreatedAt: string) {
   return q.lt("created_at", d.toISOString());
 }
 
-/**
- * Подтягивает подробную информацию о материалах из всех таблиц (materials, textbooks, crosswords)
- * с учётом названия таба проекта.
- */
 async function fetchMaterialsByIds(supabase: any, materialIds: string[]) {
   if (!materialIds || materialIds.length === 0) return new Map();
 
@@ -252,7 +248,6 @@ export async function GET(req: NextRequest) {
       sheet_name: r.projects?.sheet_name || null,
     }));
 
-    // Подтягивание информации о материалах по material_ids для всей страницы заявок
     const allMaterialIds: string[] = [];
     for (const r of rows) {
       const ids = toStringArray(r.material_ids);
@@ -361,14 +356,12 @@ export async function PATCH(req: NextRequest) {
           granted = grantedLabels;
 
           // ======================================================================
-          // 🚀 ЛОГИКА РЕФЕРАЛЬНОЙ ПРОГРАММЫ
+          // 🚀 ЛОГИКА РЕФЕРАЛЬНОЙ ПРОГРАММЫ (БАНДЛЫ)
           // ======================================================================
-          // Проверяем: заявка только что была обработана (а не просто обновилась)
           const isNewlyProcessed = is_processed && r.is_processed !== true;
           
           if (isNewlyProcessed && grantsToStore.length > 0) {
             try {
-              // 1. Ищем, есть ли у покупателя активный рефовод
               const { data: refLink } = await supabase
                 .from("user_referrals")
                 .select("referrer_id")
@@ -378,50 +371,55 @@ export async function PATCH(req: NextRequest) {
               if (refLink?.referrer_id) {
                 const referrerId = refLink.referrer_id;
                 
-                // 2. Получаем текущую статистику рефовода
                 const { data: refProfile } = await supabase
                   .from("profiles")
                   .select("referral_materials_purchased")
                   .eq("id", referrerId)
                   .maybeSingle();
 
-                // 3. Плюсуем количество выданных материалов в заявке
+                const oldCount = refProfile?.referral_materials_purchased || 0;
                 const addedMaterialsCount = grantsToStore.length;
-                const newCount = (refProfile?.referral_materials_purchased || 0) + addedMaterialsCount;
+                const newCount = oldCount + addedMaterialsCount;
 
-                // 4. Обновляем счетчик
                 await supabase
                   .from("profiles")
                   .update({ referral_materials_purchased: newCount })
                   .eq("id", referrerId);
 
-                // 5. Проверяем дорожку наград (referral_config)
+                // Ищем этапы, которые мы только что перешагнули
                 const { data: milestones } = await supabase
                   .from("referral_config")
-                  .select("reward_id")
+                  .select("id, purchases_required, rewards_bundle")
+                  .gt("purchases_required", oldCount)
                   .lte("purchases_required", newCount);
 
                 if (milestones && milestones.length > 0) {
-                  // Исключаем те награды, которые рефовод УЖЕ получил за рефералку
-                  const { data: existingInventory } = await supabase
-                    .from("user_inventory")
-                    .select("reward_id")
-                    .eq("user_id", referrerId)
-                    .eq("source", "referral");
+                  for (const m of milestones) {
+                    const bundle = m.rewards_bundle || {};
+                    
+                    // 1. Выдаем награды из гардероба
+                    if (Array.isArray(bundle.rewards) && bundle.rewards.length > 0) {
+                      for (const rid of bundle.rewards) {
+                         const { error: invErr } = await supabase.from("user_inventory").upsert({
+                           user_id: referrerId,
+                           reward_id: rid,
+                           source: "referral"
+                         }, { onConflict: "user_id,reward_id" });
+                         if (invErr) console.warn("Failed to insert inventory for ref:", invErr.message);
+                      }
+                    }
 
-                  const existingIds = new Set(existingInventory?.map((i: any) => i.reward_id) || []);
-
-                  const newRewardsToInsert = milestones
-                    .filter((m: any) => m.reward_id && !existingIds.has(m.reward_id))
-                    .map((m: any) => ({
-                      user_id: referrerId,
-                      reward_id: m.reward_id,
-                      source: "referral"
-                    }));
-
-                  // 6. Выдаем новые награды
-                  if (newRewardsToInsert.length > 0) {
-                    await supabase.from("user_inventory").insert(newRewardsToInsert);
+                    // 2. Выдаем конкретные материалы
+                    if (Array.isArray(bundle.materials) && bundle.materials.length > 0) {
+                      for (const mid of bundle.materials) {
+                         const { error: matErr } = await supabase.from("material_access").upsert({
+                           user_id: referrerId,
+                           material_id: mid,
+                           granted_by: user.id
+                         }, { onConflict: "user_id,material_id" });
+                         if (matErr) console.warn("Failed to grant material to ref:", matErr.message);
+                      }
+                    }
                   }
                 }
               }

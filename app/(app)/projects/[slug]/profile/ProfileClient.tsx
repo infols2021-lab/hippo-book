@@ -8,7 +8,6 @@ import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import Modal from "@/components/Modal";
 import RewardsModal from "@/components/rewards/RewardsModal";
 import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal";
-import ReferralTrack, { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTrack";
 
 import "./profile.css";
 
@@ -91,6 +90,8 @@ type Props = {
   streak?: StreakData | null;
   equippedTitleLabel?: string | null;
 };
+
+type RewardsTabType = "wardrobe" | "streaks" | "promocode" | "referrals";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -182,17 +183,15 @@ export default function ProfileClient({
   const [editRegion, setEditRegion] = useState(profile.region ?? "");
   const [saving, setSaving] = useState(false);
 
+  // Умное управление Центром наград
   const [rewardsModalOpen, setRewardsModalOpen] = useState(false);
+  const [rewardsInitialTab, setRewardsInitialTab] = useState<RewardsTabType>("wardrobe");
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
   const [stats, setStats] = useState<Stats | null>(statsProp ?? null);
   const [materialsProgress, setMaterialsProgress] = useState<MaterialProgressItem[] | null>(progressProp ?? null);
   const [progressLoading, setProgressLoading] = useState<boolean>(!statsProp && !progressProp);
   const [progressError, setProgressError] = useState<string | null>(null);
-
-  // Реферальная система
-  const [refData, setRefData] = useState<{ link: string; stats: ReferralStats; track: ReferralMilestone[] } | null>(null);
-  const [refLoading, setRefLoading] = useState(true);
 
   // Категории материалов (динамические) и аккордеон завершенных
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -245,22 +244,6 @@ export default function ProfileClient({
 
   useEffect(() => {
     void fetchStreakData();
-    
-    // Загрузка реферальных данных
-    fetch('/api/profile/referrals', { cache: "no-store" })
-      .then(res => res.json())
-      .then(data => {
-        if (data.ok) {
-          setRefData({
-            link: data.data.referral_link,
-            stats: data.data.stats,
-            track: data.data.track
-          });
-        }
-      })
-      .catch(err => console.error("Ошибка загрузки рефералки:", err))
-      .finally(() => setRefLoading(false));
-
   }, []);
 
   useEffect(() => {
@@ -320,7 +303,9 @@ export default function ProfileClient({
     void loadProgress();
   }, [statsProp, progressProp, projectSlug]);
 
-  function openRewards() {
+  // Универсальная открывашка Центра Наград
+  function openRewards(tab: RewardsTabType = "wardrobe") {
+    setRewardsInitialTab(tab);
     setRewardsModalOpen(true);
   }
 
@@ -495,6 +480,7 @@ export default function ProfileClient({
       {rewardsModalOpen && (
         <RewardsModal
           isOpen={rewardsModalOpen}
+          initialTab={rewardsInitialTab}
           onClose={() => {
             setRewardsModalOpen(false);
             void fetchStreakData();
@@ -518,7 +504,7 @@ export default function ProfileClient({
             <div className="sheet-handle" />
             <div className="sheet-title">Меню профиля</div>
             <div className="sheet-menu-list">
-              <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openRewards(); }}>
+              <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openRewards("wardrobe"); }}>
                 Награды и маскот
               </button>
               <Link className="sheet-item" href={`/projects/${projectSlug}/materials`} onClick={() => setMobileMenuOpen(false)}>
@@ -551,7 +537,7 @@ export default function ProfileClient({
         {/* 📱 1. МОБИЛЬНАЯ ШАПКА */}
         <div className="mobile-header-bar">
           <div className="mobile-header-left">
-            <div className="mobile-avatar" onClick={openRewards}>
+            <div className="mobile-avatar" onClick={() => openRewards("wardrobe")}>
               {streakData?.equippedAvatarUrl ? (
                 <img src={streakData.equippedAvatarUrl} alt="Аватар" />
               ) : (
@@ -565,7 +551,7 @@ export default function ProfileClient({
                 <span className="mobile-user-name">{nameLabel(profile.full_name)}</span>
               </div>
               {features?.streaks && (
-                <button type="button" className="mobile-streak-pill" onClick={openRewards}>
+                <button type="button" className="mobile-streak-pill" onClick={() => openRewards("streaks")}>
                   🔥 {streakData?.currentStreak ?? 0} дн. серия
                 </button>
               )}
@@ -638,7 +624,7 @@ export default function ProfileClient({
               <button
                 type="button"
                 className="streak-chip"
-                onClick={openRewards}
+                onClick={() => openRewards("streaks")}
                 title="Открыть Центр Наград"
               >
                 <span className="streak-chip-icon" aria-hidden="true">🔥</span>
@@ -650,7 +636,7 @@ export default function ProfileClient({
               </button>
             )}
 
-            <button type="button" className="nav-pill" onClick={openRewards}>
+            <button type="button" className="nav-pill" onClick={() => openRewards("wardrobe")}>
               Награды
             </button>
 
@@ -670,7 +656,7 @@ export default function ProfileClient({
           <aside className="profile-panel profile-sidebar">
             <div
               className="profile-avatar-wrapper"
-              onClick={openRewards}
+              onClick={() => openRewards("wardrobe")}
               style={{ cursor: "pointer" }}
               title="Открыть гардероб Маскота"
             >
@@ -688,7 +674,7 @@ export default function ProfileClient({
               <button
                 type="button"
                 className="profile-title-slot"
-                onClick={openRewards}
+                onClick={() => openRewards("wardrobe")}
                 title="Сменить титул в гардеробе"
                 style={{ cursor: "pointer", border: "none", marginBottom: "24px" }}
               >
@@ -710,13 +696,13 @@ export default function ProfileClient({
 
             {features?.streaks && (
               <div className="details-list" style={{ width: "100%", marginBottom: "24px" }}>
-                <div className="detail-item" style={{ cursor: "pointer" }} onClick={openRewards}>
+                <div className="detail-item" style={{ cursor: "pointer" }} onClick={() => openRewards("streaks")}>
                   <span className="detail-label">Текущая серия</span>
                   <span className="detail-value" style={{ color: "var(--project-primary)" }}>
                     {streakLoading ? "…" : `${streakData?.currentStreak ?? 0} дн.`}
                   </span>
                 </div>
-                <div className="detail-item" style={{ cursor: "pointer" }} onClick={openRewards}>
+                <div className="detail-item" style={{ cursor: "pointer" }} onClick={() => openRewards("streaks")}>
                   <span className="detail-label">Рекорд</span>
                   <span className="detail-value">{streakLoading ? "…" : `${streakData?.longestStreak ?? 0} дн.`}</span>
                 </div>
@@ -792,24 +778,47 @@ export default function ProfileClient({
               </div>
             </div>
 
-            {/* РЕФЕРАЛЬНАЯ ПРОГРАММА */}
-            <div className="section-title desktop-stats-title" style={{ marginTop: "32px" }}>
-              Реферальная <b>программа</b>
-            </div>
-            
-            {refLoading ? (
-              <div style={{ color: "var(--project-muted)", marginBottom: 32, fontWeight: 600 }}>Загрузка программы...</div>
-            ) : refData && refData.track && refData.track.length > 0 ? (
-              <ReferralTrack link={refData.link} stats={refData.stats} track={refData.track} />
-            ) : (
-              <div style={{ 
-                background: "#f8fafc", padding: "20px", borderRadius: "20px", 
-                border: "1px dashed #cbd5e1", color: "#64748b", fontWeight: 600,
-                textAlign: "center", marginBottom: "32px"
-              }}>
-                Реферальная программа временно недоступна.
+            {/* 🤝 БАННЕР РЕФЕРАЛЬНОЙ ПРОГРАММЫ (Заменили громоздкий трек на кликабельный смарт-баннер) */}
+            <div 
+              className="referral-promo-banner" 
+              onClick={() => openRewards("referrals")}
+              style={{
+                background: "linear-gradient(135deg, var(--project-primary) 0%, #818cf8 100%)",
+                borderRadius: "24px",
+                padding: "24px",
+                color: "#fff",
+                cursor: "pointer",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "16px",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginTop: "32px",
+                marginBottom: "32px",
+                boxShadow: "0 10px 25px color-mix(in srgb, var(--project-primary) 30%, transparent)",
+                transition: "transform 0.2s, box-shadow 0.2s"
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
+              onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
+            >
+              <div>
+                <h3 style={{ margin: "0 0 8px 0", fontSize: "20px", fontWeight: 900 }}>🤝 Пригласи друга</h3>
+                <p style={{ margin: 0, fontSize: "14px", opacity: 0.9, fontWeight: 500, maxWidth: "420px", lineHeight: 1.5 }}>
+                  Делись ссылкой, зови друзей на платформу и получай эксклюзивные титулы, вещи для маскота и бесплатные материалы!
+                </p>
               </div>
-            )}
+              <div style={{
+                background: "rgba(255,255,255,0.2)",
+                padding: "10px 20px",
+                borderRadius: "14px",
+                fontWeight: 800,
+                fontSize: "14px",
+                backdropFilter: "blur(10px)",
+                whiteSpace: "nowrap"
+              }}>
+                Открыть панель →
+              </div>
+            </div>
 
             {/* 🔄 ЕДИНЫЕ ДИНАМИЧЕСКИЕ ТАБЫ-ФИЛЬТРЫ (ПК + МОБИЛКА) */}
             <div className="category-filter-bar no-scrollbar">

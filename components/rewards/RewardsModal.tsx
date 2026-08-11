@@ -8,6 +8,7 @@ import MaterialChoiceModal, {
 } from "./MaterialChoiceModal";
 import PhysicalPrizeModal from "./PhysicalPrizeModal";
 import RewardUnboxModal, { UnboxedRewardItem } from "./RewardUnboxModal";
+import ReferralTab from "./ReferralTab";
 
 import type {
   MascotSettings,
@@ -19,7 +20,7 @@ import type {
   UserPromocodeHistoryItem,
 } from "@/lib/rewards/types";
 
-export type RewardsTabType = "wardrobe" | "streaks" | "promocode" | "timeline";
+export type RewardsTabType = "wardrobe" | "streaks" | "promocode" | "timeline" | "referrals";
 
 export interface RewardsModalProps {
   isOpen?: boolean;
@@ -38,13 +39,13 @@ export default function RewardsModal({
 }: RewardsModalProps) {
   const showModal = Boolean(isOpen ?? open);
 
-  const normalizeTab = (tab?: RewardsTabType): "wardrobe" | "streaks" | "promocode" => {
+  const normalizeTab = (tab?: RewardsTabType): "wardrobe" | "streaks" | "promocode" | "referrals" => {
     const raw = tab || initialTab || defaultTab;
     if (raw === "timeline") return "streaks";
-    return raw === "promocode" || raw === "streaks" ? raw : "wardrobe";
+    return raw === "promocode" || raw === "streaks" || raw === "referrals" ? raw : "wardrobe";
   };
 
-  const [activeTab, setActiveTab] = useState<"wardrobe" | "streaks" | "promocode">(
+  const [activeTab, setActiveTab] = useState<"wardrobe" | "streaks" | "promocode" | "referrals">(
     () => normalizeTab(initialTab || defaultTab)
   );
 
@@ -375,6 +376,20 @@ export default function RewardsModal({
               >
                 Серия ({streakStats.currentStreak} дн.)
               </button>
+              
+              <button
+                type="button"
+                onClick={() => setActiveTab("referrals")}
+                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
+                style={{
+                  backgroundColor:
+                    activeTab === "referrals" ? "var(--project-primary, #0ea5e9)" : "transparent",
+                  color: activeTab === "referrals" ? "#ffffff" : "var(--project-text, #0f172a)",
+                }}
+              >
+                Рефералка
+              </button>
+
               <button
                 type="button"
                 onClick={() => setActiveTab("promocode")}
@@ -604,7 +619,10 @@ export default function RewardsModal({
                   />
                 )}
 
-                {/* Вкладка 3: ПРОМОКОД */}
+                {/* Вкладка 3: РЕФЕРАЛКА */}
+                {activeTab === "referrals" && <ReferralTab />}
+
+                {/* Вкладка 4: ПРОМОКОД */}
                 {activeTab === "promocode" && (
                   <div className="max-w-xl mx-auto py-2 sm:py-4 space-y-6">
                     <div className="text-center space-y-1.5">
