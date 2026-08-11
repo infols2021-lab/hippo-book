@@ -34,20 +34,35 @@ export default function ReferralTimeline({ link, stats, track, onClaimMilestone 
   };
 
   return (
-    <div className="w-full">
-      {/* Шапка со статистикой и ссылкой */}
-      <div className="flex flex-col md:flex-row gap-4 mb-12">
-        <div className="flex-1 bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-sm">
+    <div className="w-full max-w-full overflow-hidden">
+      
+      {/* СТАТИСТИКА И ССЫЛКА (Без горизонтального скролла) */}
+      <div className="flex flex-col gap-4 mb-12 w-full">
+        
+        {/* Статистика вынесена наверх */}
+        <div className="grid grid-cols-2 gap-4 w-full">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 flex flex-col items-center justify-center shadow-sm">
+            <div className="font-black text-4xl text-slate-800">{stats.count}</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2">Друзей</div>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 flex flex-col items-center justify-center shadow-sm">
+            <div className="font-black text-4xl" style={{ color: "var(--project-primary, #0ea5e9)" }}>{stats.materials_purchased}</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2">Покупок</div>
+          </div>
+        </div>
+
+        {/* Ссылка на всю ширину с обрезкой текста */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-sm w-full min-w-0">
           <div className="text-xs font-black uppercase tracking-wider text-slate-500 mb-3">
             Твоя личная ссылка
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-medium text-slate-700 truncate select-all">
+          <div className="flex flex-col sm:flex-row gap-3 w-full min-w-0">
+            <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-medium text-slate-700 truncate select-all min-w-0 overflow-hidden">
               {link}
             </div>
             <button
               onClick={handleCopy}
-              className="px-6 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all border flex items-center justify-center gap-2"
+              className="shrink-0 px-6 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all border flex items-center justify-center gap-2"
               style={{
                 backgroundColor: copied ? "#10b981" : "var(--project-primary, #0ea5e9)",
                 borderColor: copied ? "#10b981" : "var(--project-primary, #0ea5e9)",
@@ -66,17 +81,6 @@ export default function ReferralTimeline({ link, stats, track, onClaimMilestone 
                 </>
               )}
             </button>
-          </div>
-        </div>
-
-        <div className="flex gap-4">
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 flex flex-col items-center justify-center flex-1 md:min-w-[120px] shadow-sm">
-            <div className="font-black text-4xl text-slate-800">{stats.count}</div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2">Друзей</div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 flex flex-col items-center justify-center flex-1 md:min-w-[120px] shadow-sm">
-            <div className="font-black text-4xl" style={{ color: "var(--project-primary, #0ea5e9)" }}>{stats.materials_purchased}</div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2">Покупок</div>
           </div>
         </div>
       </div>
@@ -131,7 +135,7 @@ export default function ReferralTimeline({ link, stats, track, onClaimMilestone 
                 <button
                   disabled={!isUnlocked || isClaimed}
                   onClick={() => onClaimMilestone(m)}
-                  className={`w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all ${
+                  className={`w-full sm:w-auto shrink-0 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all ${
                     isClaimed 
                       ? "bg-emerald-50 text-emerald-600 border border-emerald-200" 
                       : isUnlocked 
