@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = authData.user.id;
+    const admin = getSupabaseAdminClient();
 
     const { data: profile, error: profileErr } = await supabase
       .from("profiles")
@@ -27,7 +28,8 @@ export async function GET(req: NextRequest) {
 
     const materialsPurchased = profile?.referral_materials_purchased || 0;
 
-    const { data: refLink } = await supabase
+    // Используем admin клиент для обхода RLS и получения имени пригласившего
+    const { data: refLink } = await admin
       .from("user_referrals")
       .select("referrer_id, profiles!user_referrals_referrer_id_fkey(full_name)")
       .eq("referred_id", userId)
@@ -143,7 +145,11 @@ export async function POST(req: NextRequest) {
       return fail("Взаимные приглашения запрещены", 400, "VALIDATION");
     }
 
-    const { data: refUser } = await supabase
+    // Инициализируем admin клиент ДО запроса к профилям
+    const admin = getSupabaseAdminClient();
+
+    // Ищем профиль друга через admin клиент (обход RLS)
+    const { data: refUser } = await admin
       .from("profiles")
       .select("id, referrals_count")
       .eq("id", refId)
@@ -152,8 +158,6 @@ export async function POST(req: NextRequest) {
     if (!refUser) {
       return fail("Пользователь с таким кодом не найден", 404, "NOT_FOUND");
     }
-
-    const admin = getSupabaseAdminClient();
 
     await admin.from("user_referrals").insert({
       referrer_id: refId,
