@@ -192,7 +192,6 @@ export default function MaterialChoiceModal({
       let res;
 
       if (mode === "referral") {
-        // ИСПРАВЛЕНО: Правильный роут для сохранения реферального этапа
         res = await fetch("/api/profile/referrals/claim-milestone", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -216,21 +215,7 @@ export default function MaterialChoiceModal({
       const data = await res.json().catch(() => null);
 
       if (res.ok && data && (data.ok || data.success)) {
-        const chosenMaterials = materials.filter((m) =>
-          selectedMaterialIds.includes(m.id)
-        );
-
-        const materialItems: MaterialChoiceUnboxItem[] = chosenMaterials.map((m) => ({
-          id: m.id,
-          title: m.title,
-          type: "material",
-          description:
-            m.kind === "crossword"
-              ? "Открыт доступ к кроссворду"
-              : "Открыт доступ к материалу",
-          asset_url: m.cover_image_url || null,
-        }));
-
+        // Убрали "отсебятину" фронтенда. Берем только то, что реально выдал и подтвердил сервер.
         const rewardItems: MaterialChoiceUnboxItem[] = Array.isArray(data.grantedRewards)
           ? data.grantedRewards.map((r: any) => ({
               id: r.id,
@@ -243,7 +228,7 @@ export default function MaterialChoiceModal({
           : [];
 
         onSuccess({
-          unboxItems: [...materialItems, ...rewardItems],
+          unboxItems: rewardItems,
           physicalPrize: data.physicalPrize || null,
         });
         onClose();
@@ -270,6 +255,7 @@ export default function MaterialChoiceModal({
 
   const activeTab = projectTabs.find((t) => t.slug === activeTabSlug) || null;
 
+  // Фильтруем материалы, которые подходят под вкладку, уровень и ЦЕНУ (maxPrice)
   const filteredMaterials = materials.filter((m) => {
     const matchTab =
       activeTabSlug === "all" ||
@@ -288,8 +274,16 @@ export default function MaterialChoiceModal({
     return matchTab && matchLevel && matchPrice;
   });
 
-  const lockedMaterials = materials.filter((m) => !isAlreadyUnlocked(m));
-  const cannotFulfillChoice = materials.length > 0 && lockedMaterials.length < requiredChoiceCount;
+  // Логика умного скипа: считаем только те материалы, которые подходят по цене (доступны)
+  const availableForChoiceByPrice = materials.filter((m) => {
+    if (mode === "referral" && maxPrice > 0) {
+      return (m.price || 0) <= maxPrice;
+    }
+    return true;
+  });
+
+  const lockedMaterials = availableForChoiceByPrice.filter((m) => !isAlreadyUnlocked(m));
+  const cannotFulfillChoice = availableForChoiceByPrice.length > 0 && lockedMaterials.length < requiredChoiceCount;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200 bg-black/60 backdrop-blur-sm">
@@ -313,7 +307,7 @@ export default function MaterialChoiceModal({
 
         {cannotFulfillChoice && (
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs sm:text-sm text-amber-800 font-bold text-center shrink-0 shadow-sm">
-            У вас уже открыто большинство или все материалы этого раздела. Вы можете пропустить выбор материалов и получить остальные призы.
+            У вас уже открыто большинство или все доступные материалы. Вы можете пропустить выбор и получить остальные призы.
           </div>
         )}
 
