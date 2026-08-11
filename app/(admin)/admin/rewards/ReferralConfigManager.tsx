@@ -39,7 +39,7 @@ export default function ReferralConfigManager() {
     try {
       const [catRes, matRes, confRes] = await Promise.all([
         fetch("/api/admin/rewards"),
-        fetch("/api/admin/materials"), // предполагаем, что у тебя есть роут для получения материалов
+        fetch("/api/admin/materials"), // Получаем список материалов
         fetch("/api/admin/rewards/referral-config"),
       ]);
 
@@ -48,7 +48,7 @@ export default function ReferralConfigManager() {
       const confData = await confRes.json();
 
       setCatalog(catData.rewards || []);
-      setMaterials(matData.materials || matData.items || []); // Поддержка разных форматов ответа
+      setMaterials(matData.materials || matData.items || []); 
       
       const sortedMilestones = (confData.milestones || []).map((m: any) => ({
         ...m,
@@ -86,7 +86,9 @@ export default function ReferralConfigManager() {
   }
 
   function updateMilestone(id: string, updates: Partial<ReferralMilestone>) {
-    setMilestones(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    setMilestones(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m).sort(
+      (a, b) => a.purchases_required - b.purchases_required
+    ));
   }
 
   function updateBundle(id: string, bundleUpdates: Partial<RewardsBundle>) {
@@ -101,6 +103,7 @@ export default function ReferralConfigManager() {
     setError(null);
     setSuccessMsg(null);
 
+    // Валидация дубликатов этапов
     const counts = new Set();
     for (const m of milestones) {
       if (counts.has(m.purchases_required)) {
@@ -236,18 +239,21 @@ export default function ReferralConfigManager() {
 
       {/* ПАНЕЛЬ НАСТРОЙКИ НАЧИНКИ (Как в промокодах) */}
       {activeMilestone && (
-        <div style={{ marginTop: 24, padding: 20, background: "#fff", borderRadius: 16, border: "2px solid #3b82f6", boxShadow: "0 10px 25px rgba(59, 130, 246, 0.15)" }}>
-          <h3 style={{ margin: "0 0 16px 0", color: "#1e3a8a" }}>Настройка награды для {activeMilestone.purchases_required} покупок</h3>
+        <div style={{ marginTop: 24, padding: 24, background: "#fff", borderRadius: 16, border: "2px solid #3b82f6", boxShadow: "0 10px 25px rgba(59, 130, 246, 0.15)" }}>
+          <h3 style={{ margin: "0 0 20px 0", color: "#1e3a8a", fontSize: 18, fontWeight: 900 }}>
+            Конструктор этапа ({activeMilestone.purchases_required} покупок)
+          </h3>
           
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             {/* Каталог наград */}
-            <div>
-              <label style={{ fontWeight: 700, display: "block", marginBottom: 8 }}>🎭 Награды из каталога ({activeMilestone.rewards_bundle.rewards.length} выбр.)</label>
-              <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #cbd5e1", borderRadius: 8, padding: 8, background: "#f8fafc" }}>
-                {catalog.map(r => (
-                  <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: 6, cursor: "pointer" }}>
+            <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+              <label style={{ fontWeight: 800, display: "block", marginBottom: 12, color: "#334155" }}>🎭 Награды из каталога ({activeMilestone.rewards_bundle.rewards.length} выбр.)</label>
+              <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #cbd5e1", borderRadius: 8, padding: 8, background: "#fff" }}>
+                {catalog.length === 0 ? <div className="small-muted">Каталог пуст</div> : catalog.map(r => (
+                  <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, cursor: "pointer", borderBottom: "1px solid #f1f5f9" }}>
                     <input 
                       type="checkbox" 
+                      style={{ width: 16, height: 16 }}
                       checked={activeMilestone.rewards_bundle.rewards.includes(r.id)}
                       onChange={(e) => {
                         const newArr = e.target.checked 
@@ -256,21 +262,22 @@ export default function ReferralConfigManager() {
                         updateBundle(activeMilestone.id, { rewards: newArr });
                       }}
                     />
-                    <span style={{ fontSize: 13, color: "#64748b" }}>[{r.type}]</span>
-                    <span style={{ fontWeight: 600 }}>{r.title}</span>
+                    <span style={{ fontSize: 12, color: "#64748b", background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>{r.type}</span>
+                    <span style={{ fontWeight: 600, color: "#1e293b" }}>{r.title}</span>
                   </label>
                 ))}
               </div>
             </div>
 
             {/* Конкретные материалы */}
-            <div>
-              <label style={{ fontWeight: 700, display: "block", marginBottom: 8 }}>📚 Конкретные материалы ({activeMilestone.rewards_bundle.materials.length} выбр.)</label>
-              <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #cbd5e1", borderRadius: 8, padding: 8, background: "#f8fafc" }}>
+            <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+              <label style={{ fontWeight: 800, display: "block", marginBottom: 12, color: "#334155" }}>📚 Конкретные материалы ({activeMilestone.rewards_bundle.materials.length} выбр.)</label>
+              <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #cbd5e1", borderRadius: 8, padding: 8, background: "#fff" }}>
                 {materials.length === 0 ? <div className="small-muted">Нет материалов в базе</div> : materials.map(m => (
-                  <label key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: 6, cursor: "pointer" }}>
+                  <label key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, cursor: "pointer", borderBottom: "1px solid #f1f5f9" }}>
                     <input 
                       type="checkbox" 
+                      style={{ width: 16, height: 16 }}
                       checked={activeMilestone.rewards_bundle.materials.includes(m.id)}
                       onChange={(e) => {
                         const newArr = e.target.checked 
@@ -279,34 +286,62 @@ export default function ReferralConfigManager() {
                         updateBundle(activeMilestone.id, { materials: newArr });
                       }}
                     />
-                    <span style={{ fontWeight: 600 }}>{m.title || m.name}</span>
+                    <span style={{ fontWeight: 600, color: "#1e293b" }}>{m.title || m.name}</span>
                   </label>
                 ))}
               </div>
             </div>
 
             {/* Сколько выбрать САМ */}
-            <div>
-              <label style={{ fontWeight: 700, display: "block", marginBottom: 8 }}>🎓 Сколько материалов ученик выбирает САМ (0 - выдается всё выбранное выше)</label>
+            <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+              <label style={{ fontWeight: 800, display: "block", marginBottom: 8, color: "#334155" }}>🎓 Лимит выбора учеником</label>
+              <div style={{ fontSize: 13, color: "#64748b", marginBottom: 12 }}>
+                Если указать число (например, 1), ученик сможет выбрать только одну награду из предложенных материалов. Если 0 — выдается всё.
+              </div>
               <input 
                 type="number" 
                 className="input" 
                 min="0"
+                style={{ maxWidth: 200, fontWeight: 800 }}
                 value={activeMilestone.rewards_bundle.choice_count}
                 onChange={(e) => updateBundle(activeMilestone.id, { choice_count: parseInt(e.target.value) || 0 })}
               />
             </div>
 
             {/* Физический подарок */}
-            <label style={{ display: "flex", alignItems: "center", gap: 10, background: "#fffbeb", padding: 16, borderRadius: 12, border: "1px solid #fde68a", cursor: "pointer" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 12, background: "#fffbeb", padding: "16px 20px", borderRadius: 12, border: "2px solid #fde68a", cursor: "pointer", transition: "background 0.2s" }}>
               <input 
                 type="checkbox" 
-                style={{ width: 18, height: 18 }}
+                style={{ width: 20, height: 20, accentColor: "#d97706" }}
                 checked={activeMilestone.rewards_bundle.has_physical}
                 onChange={(e) => updateBundle(activeMilestone.id, { has_physical: e.target.checked })}
               />
-              <span style={{ fontWeight: 800, color: "#92400e" }}>🧸 Добавить физический подарок</span>
+              <span style={{ fontWeight: 900, color: "#92400e", fontSize: 16 }}>🧸 Добавить физический подарок</span>
             </label>
+
+            {/* Кнопка "Свернуть / Готово" */}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+              <button 
+                type="button" 
+                onClick={() => setEditingMilestoneId(null)}
+                style={{
+                  background: "#10b981",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "12px",
+                  padding: "12px 24px",
+                  fontWeight: 800,
+                  fontSize: "15px",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(16,185,129,0.25)",
+                  transition: "transform 0.2s, box-shadow 0.2s"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-2px)"}
+                onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
+              >
+                ✅ Готово (Свернуть этап)
+              </button>
+            </div>
 
           </div>
         </div>
