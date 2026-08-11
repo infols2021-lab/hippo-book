@@ -1,3 +1,4 @@
+// components/rewards/ReferralTab.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -19,7 +20,7 @@ export default function ReferralTab() {
       .then(res => res.json())
       .then(json => {
         if (!json.ok) throw new Error(json.error || "Ошибка загрузки данных");
-        setData(json.data);
+        setData(json);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -44,7 +45,14 @@ export default function ReferralTab() {
   if (!data || !data.track || data.track.length === 0) {
     return (
       <div className="flex flex-col h-full items-center justify-center opacity-60 p-6 text-center">
-        <div className="text-4xl mb-4">🤝</div>
+        <div className="mb-4 text-slate-400">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5c-1.2 0-2.12.8-2.5 1.9"></path>
+            <path d="M8.5 7.5A3.5 3.5 0 1 1 12 11a3.5 3.5 0 0 1-3.5-3.5z"></path>
+            <path d="M20 8v6"></path>
+            <path d="M23 11h-6"></path>
+          </svg>
+        </div>
         <div className="font-bold text-sm uppercase tracking-wider mb-2">
           Программа недоступна
         </div>
@@ -62,7 +70,7 @@ export default function ReferralTab() {
           Пригласи друга
         </h3>
         <p className="text-xs font-medium opacity-60">
-          Делись персональной ссылкой! Когда твои друзья будут покупать материалы, ты будешь получать награды и титулы.
+          Делись персональной ссылкой. Когда твои друзья будут покупать материалы, ты будешь получать награды и титулы.
         </p>
       </div>
 

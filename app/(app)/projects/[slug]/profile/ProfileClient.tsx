@@ -8,6 +8,7 @@ import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import Modal from "@/components/Modal";
 import RewardsModal from "@/components/rewards/RewardsModal";
 import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal";
+import ReferralTrack, { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTrack";
 
 import "./profile.css";
 
@@ -193,6 +194,10 @@ export default function ProfileClient({
   const [progressLoading, setProgressLoading] = useState<boolean>(!statsProp && !progressProp);
   const [progressError, setProgressError] = useState<string | null>(null);
 
+  // Реферальная система
+  const [refData, setRefData] = useState<{ link: string; stats: ReferralStats; track: ReferralMilestone[] } | null>(null);
+  const [refLoading, setRefLoading] = useState(true);
+
   // Категории материалов (динамические) и аккордеон завершенных
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [completedExpanded, setCompletedExpanded] = useState<boolean>(false);
@@ -244,6 +249,21 @@ export default function ProfileClient({
 
   useEffect(() => {
     void fetchStreakData();
+    
+    fetch('/api/profile/referrals', { cache: "no-store" })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          setRefData({
+            link: data.referral_link,
+            stats: data.stats,
+            track: data.track
+          });
+        }
+      })
+      .catch(err => console.error("Ошибка загрузки рефералки:", err))
+      .finally(() => setRefLoading(false));
+
   }, []);
 
   useEffect(() => {
@@ -303,7 +323,6 @@ export default function ProfileClient({
     void loadProgress();
   }, [statsProp, progressProp, projectSlug]);
 
-  // Универсальная открывашка Центра Наград
   function openRewards(tab: RewardsTabType = "wardrobe") {
     setRewardsInitialTab(tab);
     setRewardsModalOpen(true);
@@ -363,10 +382,9 @@ export default function ProfileClient({
     }
   }
 
-  // 🔄 Автоматическое вычисление ВСЕХ динамических категорий из пришедших материалов
   const dynamicCategories = useMemo(() => {
     if (!materialsProgress) return [];
-    const map = new Map<string, string>(); // id -> display label
+    const map = new Map<string, string>(); 
 
     materialsProgress.forEach((item) => {
       if (item.tabTitle && item.tabTitle.trim()) {
@@ -384,7 +402,6 @@ export default function ProfileClient({
     return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
   }, [materialsProgress]);
 
-  // Фильтрация материалов по выбранной динамической категории
   const { filteredActive, filteredCompleted } = useMemo(() => {
     if (!materialsProgress) return { filteredActive: [], filteredCompleted: [] };
 
@@ -432,7 +449,6 @@ export default function ProfileClient({
         </div>
       )}
 
-      {/* Модалка редактирования личных данных */}
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Редактирование профиля" maxWidth={520}>
         <form
           onSubmit={(e) => {
@@ -476,7 +492,6 @@ export default function ProfileClient({
         </form>
       </Modal>
 
-      {/* ЦЕНТР НАГРАД */}
       {rewardsModalOpen && (
         <RewardsModal
           isOpen={rewardsModalOpen}
@@ -488,7 +503,6 @@ export default function ProfileClient({
         />
       )}
 
-      {/* 🏅 ТОП-20 ЛИДЕРБОРД */}
       {leaderboardOpen && (
         <StreakLeaderboardModal
           isOpen={leaderboardOpen}
@@ -496,7 +510,6 @@ export default function ProfileClient({
         />
       )}
 
-      {/* 📱 ВЫЕЗЖАЮЩЕЕ СНИЗУ МОБИЛЬНОЕ МЕНЮ (BOTTOM SHEET) */}
       {mobileMenuOpen && (
         <>
           <div className="mobile-bottom-sheet-overlay" onClick={() => setMobileMenuOpen(false)} />
@@ -505,7 +518,7 @@ export default function ProfileClient({
             <div className="sheet-title">Меню профиля</div>
             <div className="sheet-menu-list">
               <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openRewards("wardrobe"); }}>
-                Награды и маскот
+                Награды и гардероб
               </button>
               <Link className="sheet-item" href={`/projects/${projectSlug}/materials`} onClick={() => setMobileMenuOpen(false)}>
                 Все материалы
@@ -534,14 +547,13 @@ export default function ProfileClient({
 
       <div className="profile-container">
         
-        {/* 📱 1. МОБИЛЬНАЯ ШАПКА */}
         <div className="mobile-header-bar">
           <div className="mobile-header-left">
             <div className="mobile-avatar" onClick={() => openRewards("wardrobe")}>
               {streakData?.equippedAvatarUrl ? (
                 <img src={streakData.equippedAvatarUrl} alt="Аватар" />
               ) : (
-                <span>🎭</span>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
               )}
             </div>
             <div className="mobile-user-info">
@@ -552,7 +564,8 @@ export default function ProfileClient({
               </div>
               {features?.streaks && (
                 <button type="button" className="mobile-streak-pill" onClick={() => openRewards("streaks")}>
-                  🔥 {streakData?.currentStreak ?? 0} дн. серия
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', marginRight: '4px' }}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg> 
+                  {streakData?.currentStreak ?? 0} дн. серия
                 </button>
               )}
             </div>
@@ -562,7 +575,6 @@ export default function ProfileClient({
           </button>
         </div>
 
-        {/* 🖥️ 2. ДЕСКТОПНАЯ ШАПКА */}
         <div className="profile-topbar">
           <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
             <span className="skills-wordmark">skilLS</span>
@@ -627,7 +639,9 @@ export default function ProfileClient({
                 onClick={() => openRewards("streaks")}
                 title="Открыть Центр Наград"
               >
-                <span className="streak-chip-icon" aria-hidden="true">🔥</span>
+                <span className="streak-chip-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>
+                </span>
                 <span className="streak-chip-main">
                   <span className="streak-chip-value">{streakLoading ? "…" : streakData?.currentStreak ?? 0}</span>
                   <span className="streak-chip-unit">дн.</span>
@@ -649,21 +663,19 @@ export default function ProfileClient({
           </div>
         </div>
 
-        {/* ── СЕТКА ПРОФИЛЯ ── */}
         <div className="profile-grid">
           
-          {/* 🖥️ ЛЕВАЯ КОЛОНКА (Сайдбар) */}
           <aside className="profile-panel profile-sidebar">
             <div
               className="profile-avatar-wrapper"
               onClick={() => openRewards("wardrobe")}
-              style={{ cursor: "pointer" }}
+              style={{ cursor: "pointer", display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               title="Открыть гардероб Маскота"
             >
               {streakData?.equippedAvatarUrl ? (
                 <img src={streakData.equippedAvatarUrl} alt="Маскот" className="profile-avatar-img" />
               ) : (
-                <span style={{ fontSize: "48px" }}>🎭</span>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
               )}
             </div>
 
@@ -678,7 +690,9 @@ export default function ProfileClient({
                 title="Сменить титул в гардеробе"
                 style={{ cursor: "pointer", border: "none", marginBottom: "24px" }}
               >
-                <span className="profile-title-slot-icon">🏷️</span>
+                <span className="profile-title-slot-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                </span>
                 <span className="profile-title-slot-text">{titleText}</span>
               </button>
             )}
@@ -728,10 +742,8 @@ export default function ProfileClient({
             </div>
           </aside>
 
-          {/* ПРАВАЯ КОЛОНКА (Статистика и Материалы) */}
           <main className="profile-panel">
             
-            {/* 🖥️ ДЕСКТОП СТАТИСТИКА */}
             <div className="section-title desktop-stats-title">
               Статистика <b>материалов</b>
             </div>
@@ -758,7 +770,6 @@ export default function ProfileClient({
               </div>
             </div>
 
-            {/* 📱 МОБИЛЬНАЯ КОМПАКТНАЯ СТАТИСТИКА (4 плашки) */}
             <div className="mobile-stats-row">
               <div className="mobile-stat-card">
                 <div className="mobile-stat-val">{stats ? `${stats.successRate}%` : "0%"}</div>
@@ -778,7 +789,6 @@ export default function ProfileClient({
               </div>
             </div>
 
-            {/* 🤝 БАННЕР РЕФЕРАЛЬНОЙ ПРОГРАММЫ (Заменили громоздкий трек на кликабельный смарт-баннер) */}
             <div 
               className="referral-promo-banner" 
               onClick={() => openRewards("referrals")}
@@ -802,9 +812,12 @@ export default function ProfileClient({
               onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
             >
               <div>
-                <h3 style={{ margin: "0 0 8px 0", fontSize: "20px", fontWeight: 900 }}>🤝 Пригласи друга</h3>
+                <h3 style={{ margin: "0 0 8px 0", fontSize: "20px", fontWeight: 900, display: "flex", alignItems: "center", gap: "8px" }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5c-1.2 0-2.12.8-2.5 1.9"></path><path d="M8.5 7.5A3.5 3.5 0 1 1 12 11a3.5 3.5 0 0 1-3.5-3.5z"></path><path d="M20 8v6"></path><path d="M23 11h-6"></path></svg>
+                  Пригласи друга
+                </h3>
                 <p style={{ margin: 0, fontSize: "14px", opacity: 0.9, fontWeight: 500, maxWidth: "420px", lineHeight: 1.5 }}>
-                  Делись ссылкой, зови друзей на платформу и получай эксклюзивные титулы, вещи для маскота и бесплатные материалы!
+                  Делись ссылкой, зови друзей на платформу и получай эксклюзивные титулы, вещи для маскота и бесплатные материалы.
                 </p>
               </div>
               <div style={{
@@ -820,7 +833,6 @@ export default function ProfileClient({
               </div>
             </div>
 
-            {/* 🔄 ЕДИНЫЕ ДИНАМИЧЕСКИЕ ТАБЫ-ФИЛЬТРЫ (ПК + МОБИЛКА) */}
             <div className="category-filter-bar no-scrollbar">
               <button 
                 type="button"
@@ -875,7 +887,6 @@ export default function ProfileClient({
               </div>
             ) : (
               <>
-                {/* 🔒 АКТИВНЫЕ МАТЕРИАЛЫ С ФИКСИРОВАННОЙ ВЫСОТОЙ И СКРОЛЛОМ */}
                 <div className="progress-list-scrollable no-scrollbar">
                   {filteredActive.length === 0 ? (
                     <div style={{ padding: "20px", textAlign: "center", fontWeight: 700, opacity: 0.6, fontSize: "14px" }}>
@@ -911,7 +922,6 @@ export default function ProfileClient({
                   )}
                 </div>
 
-                {/* 📱/🖥️ СВОРАЧИВАЕМЫЙ АККОРДЕОН ДЛЯ ЗАВЕРШЕННЫХ (100%) МАТЕРИАЛОВ */}
                 {filteredCompleted.length > 0 && (
                   <div className="completed-accordion">
                     <button 
