@@ -173,14 +173,18 @@ export default function RequestsClient({
   useEffect(() => {
     if (stage === "profile_requests_gate") {
       advanceTour("requests_info");
-      return;
     }
-    if (stage === "requests_info" || stage === "requests_return_gate") {
-      const timer = setTimeout(() => dispatchTourPageReady(), 150);
-      return () => clearTimeout(timer);
-    }
-    dispatchTourPageReady();
   }, [stage, advanceTour]);
+
+  useEffect(() => {
+    if (stage !== "requests_info" && stage !== "requests_return_gate") return;
+    const timer = window.setTimeout(() => dispatchTourPageReady(), 200);
+    return () => window.clearTimeout(timer);
+  }, [stage]);
+
+  useEffect(() => {
+    dispatchTourPageReady();
+  }, []);
 
   const [modalStep, setModalStep] = useState<1 | 2>(1);
 
@@ -1102,8 +1106,12 @@ export default function RequestsClient({
               </Link>
               <Link
                 className="sheet-item"
+                data-tour="materials-link"
                 href={`/projects/${project.slug}/materials`}
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={() => {
+                  if (stage === "requests_info") advanceTour("materials_overview");
+                  setMobileMenuOpen(false);
+                }}
               >
                 Материалы
               </Link>

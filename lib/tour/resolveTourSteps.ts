@@ -29,8 +29,15 @@ function withMobileMenuTarget(step: CustomTourStep, stage: TourStage): CustomTou
   };
 }
 
-function mobileBurgerIntro(stage: TourStage | "materials_overview_return"): CustomTourStep {
-  const copy: Partial<Record<TourStage | "materials_overview_return", { title: string; content: string }>> = {
+type BurgerIntroKey = TourStage | "materials_overview_return" | "requests_info_menu";
+
+function mobileBurgerIntro(stage: BurgerIntroKey): CustomTourStep {
+  const copy: Partial<Record<BurgerIntroKey, { title: string; content: string }>> = {
+    requests_info_menu: {
+      title: "Меню навигации",
+      content:
+        "Раздел «Материалы» — в меню ☰ справа вверху. Нажмите на кнопку меню, чтобы открыть его.",
+    },
     profile_requests_gate: {
       title: "Меню профиля",
       content:
@@ -67,7 +74,13 @@ function mobileBurgerIntro(stage: TourStage | "materials_overview_return"): Cust
     target: burgerTarget,
     title: text.title,
     content: text.content,
-    mascotImage: pickMascotImage(stage === "materials_overview_return" ? "materials_overview_return" : stage),
+    mascotImage: pickMascotImage(
+      stage === "materials_overview_return"
+        ? "materials_overview_return"
+        : stage === "requests_info_menu"
+        ? "requests_info_menu"
+        : stage
+    ),
     skipBeacon: true,
     hideNextButton: true,
     waitForBurgerClick: true,
@@ -349,10 +362,12 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
     return [
       {
         ...base[0],
+        title: "Страница заявок",
         placement: "center",
         skipScroll: true,
+        hideNextButton: false,
         content:
-          "Вы выбираете материалы, создаёте заявку и получаете QR для оплаты. После подтверждения администратором доступ откроется автоматически. Сейчас создавать заявку не нужно.",
+          "Здесь вы оформляете доступ к материалам: выбираете нужные разделы, получаете QR для оплаты, а после проверки администратором доступ открывается автоматически.",
       },
       {
         ...base[1],
@@ -360,7 +375,20 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
         skipScroll: true,
         hideNextButton: false,
         blockTargetInteraction: true,
-        primaryLabel: "Понятно",
+        primaryLabel: "Далее",
+      },
+      mobileBurgerIntro("requests_info_menu"),
+      {
+        target: visibleMobileMenuTarget('[data-tour="materials-link"]'),
+        title: "Раздел «Материалы»",
+        content:
+          "Нажмите «Материалы», чтобы перейти к учебным разделам и посмотреть, как устроен каталог.",
+        mascotImage: pickMascotImage("materials_gate"),
+        skipBeacon: true,
+        requiresMobileMenu: true,
+        hideNextButton: true,
+        blockTargetInteraction: false,
+        placement: "top",
       },
     ];
   }

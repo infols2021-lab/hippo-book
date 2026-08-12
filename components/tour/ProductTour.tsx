@@ -30,11 +30,10 @@ const Joyride = dynamic(
   { ssr: false }
 );
 
-const MAX_TARGET_RETRIES = 16;
+const MAX_TARGET_RETRIES = 8;
 const TARGET_RETRY_DELAY_MS = 400;
 const DOM_SETTLE_MS = 350;
 const MOBILE_MENU_SETTLE_MS = 500;
-const STUCK_RETRY_DELAY_MS = 1800;
 
 /** Joyride шлёт FINISHED при setRun(false) — не путать с завершением пользователем. */
 const abortTourRunRef = { current: false };
@@ -97,6 +96,16 @@ export default function ProductTour() {
 
     return () => clearTimeout(timer);
   }, [stepIndex, stage, steps]);
+
+  useEffect(() => {
+    if (stage !== "requests_info" || stepIndex !== 1) return;
+    const timer = setTimeout(() => {
+      document
+        .querySelector<HTMLElement>('[data-tour="create-request-btn"]')
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [stage, stepIndex]);
 
   const clearRetryTimer = useCallback(() => {
     if (retryTimerRef.current) {
@@ -260,7 +269,8 @@ export default function ProductTour() {
     const currentStageSteps = getResolvedTourSteps(stageRef.current, isMobileViewport());
 
     if (type === EVENTS.TARGET_NOT_FOUND) {
-      const failedStep = currentStageSteps[index ?? stepIndex] as CustomTourStep | undefined;
+      const failedIndex = index ?? stepIndexRef.current;
+      const failedStep = currentStageSteps[failedIndex] as CustomTourStep | undefined;
 
       stopTourRun();
       if (failedStep?.requiresMobileMenu) {
@@ -272,18 +282,26 @@ export default function ProductTour() {
 
       targetRetryCount.current += 1;
 
-      if (isTourStageActiveOnPath(stageRef.current, pathnameRef.current)) {
-        const delay =
-          targetRetryCount.current <= MAX_TARGET_RETRIES
-            ? TARGET_RETRY_DELAY_MS
-            : STUCK_RETRY_DELAY_MS;
-
-        if (targetRetryCount.current > MAX_TARGET_RETRIES) {
-          targetRetryCount.current = 0;
-        }
-
-        scheduleRun(delay);
+      if (!isTourStageActiveOnPath(stageRef.current, pathnameRef.current)) {
+        return;
       }
+
+      if (targetRetryCount.current > MAX_TARGET_RETRIES) {
+        targetRetryCount.current = 0;
+        const nextIndex = failedIndex + 1;
+        if (nextIndex < currentStageSteps.length) {
+          setStepIndex(nextIndex);
+          stepIndexRef.current = nextIndex;
+          saveTourProgress(stageRef.current, nextIndex, pathnameRef.current);
+          prepareStepEnvironment(nextIndex, currentStageSteps as CustomTourStep[]);
+          scheduleRun(MOBILE_MENU_SETTLE_MS);
+        } else {
+          releaseTourUi();
+        }
+        return;
+      }
+
+      scheduleRun(TARGET_RETRY_DELAY_MS);
     }
 
     if (type === EVENTS.STEP_AFTER) {
