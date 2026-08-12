@@ -1,8 +1,7 @@
 // components/tour/TourSteps.ts
 import { Step } from "react-joyride";
+import { TourStage } from "@/lib/tour/tourConfig";
 
-// Расширяем стандартный тип шага, явно указывая свойства,
-// на которые ругается TypeScript
 export interface CustomTourStep extends Step {
   mascotImage?: string;
   skipBeacon?: boolean;
@@ -11,65 +10,101 @@ export interface CustomTourStep extends Step {
   hideNextButton?: boolean;
 }
 
-export const TOUR_STEPS: CustomTourStep[] = [
-  {
-    target: "body",
-    placement: "center",
-    title: "Обновление образовательной платформы",
-    content: "Интерфейс системы был значительно переработан и дополнен новым функционалом. Данный краткий тур поможет ознакомиться с изменениями и быстрее сориентироваться в навигации.",
-    mascotImage: "/images/tour/uki1.webp",
-    skipBeacon: true,
-  },
-  {
-    target: "#tour-materials",
-    title: "Учебные материалы и прогресс",
-    content: "В этом разделе собран основной образовательный контент: уроки, задания и экзамены. Здесь же отображается актуальная статистика прохождения и текущие результаты обучения.",
-    mascotImage: "/images/tour/uki2.webp",
-    skipBeacon: true,
-  },
-  {
-    target: "#tour-requests",
-    title: "Каталог заявок",
-    content: "Раздел запросов теперь работает по принципу каталога. Через него осуществляется подача заявок на получение доступа к новым учебникам, пробным тестам и дополнительным материалам.",
-    mascotImage: "/images/tour/uki3.webp",
-    skipBeacon: true,
-  },
-  {
-    target: "#tour-rewards-btn",
-    title: "Новая система мотивации",
-    content: "Полностью переработана система достижений. Для продолжения обзора и знакомства с новым функционалом необходимо кликнуть на подсвеченную кнопку «Центр наград».",
-    mascotImage: "/images/tour/uki4.webp",
-    blockTargetInteraction: false, // false = клики проходят сквозь спотлайт (было spotlightClicks: true)
-    overlayClickAction: false, // клик по оверлею не закрывает шаг (было disableOverlayClose: true)
-    hideNextButton: true, // кнопка "Далее" скрыта, так как ожидается клик по мишени
-    skipBeacon: true,
-  },
-  {
-    target: "#tour-wardrobe",
-    title: "Кастомизация и Гардероб",
-    content: "За успехи в обучении выдаются предметы инвентаря. В данной вкладке можно менять внешний вид маскота, использовать новые фоны, ауры и применять заработанные титулы.",
-    mascotImage: "/images/tour/uki5.webp",
-    skipBeacon: true,
-  },
-  {
-    target: "#tour-streaks",
-    title: "Ежедневная активность",
-    content: "Регулярные занятия поощряются дополнительно. Непрерывное выполнение заданий формирует серию. Достижение определенных этапов серии открывает уникальные предметы. Важно: пропуск дня обнуляет текущий прогресс.",
-    mascotImage: "/images/tour/uki6.webp",
-    skipBeacon: true,
-  },
-  {
-    target: "#tour-promos",
-    title: "Промокоды и приглашения",
-    content: "В этих вкладках доступна активация специальных кодов для получения бонусов. Также здесь сгенерирована персональная ссылка: приглашение новых пользователей позволяет расширить доступ к скрытым материалам платформы.",
-    mascotImage: "/images/tour/uki7.webp",
-    skipBeacon: true,
-  },
-  {
-    target: "#tour-help-btn",
-    title: "Завершение обзора",
-    content: "Базовое обучение окончено. Если в будущем потребуется освежить информацию о работе платформы, достаточно нажать на иконку знака вопроса в верхнем меню для повторного запуска данной инструкции.",
-    mascotImage: "/images/tour/uki8.webp",
-    skipBeacon: true,
-  },
-];
+// Группируем шаги строго по стадиям из конфига
+export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
+  portal_intro: [
+    {
+      target: "body",
+      placement: "center",
+      title: "Добро пожаловать!",
+      content: "Теперь на платформе есть новые направления обучения, и в будущем их станет больше! Важно: ваши данные профиля, награды и стрики остаются едиными для всех направлений, чтобы вы не путались в материалах.",
+      mascotImage: "/images/tour/dog1.webp",
+      skipBeacon: true,
+    }
+  ],
+  direction_gate: [
+    {
+      target: ".portal-card", // Целимся в первую карточку направления (добавь className "portal-card" в PortalCard.tsx, если его нет)
+      title: "Выбор направления",
+      content: "Для продолжения обучения выберите любое направление. Нажмите на карточку, чтобы войти внутрь.",
+      mascotImage: "/images/tour/dog2.webp",
+      skipBeacon: true,
+      hideNextButton: true, // Прячем "Далее", заставляем кликнуть по самой карточке
+      blockTargetInteraction: false,
+    }
+  ],
+  profile_overview: [
+    {
+      target: "#tour-requests-link", // Повесь этот ID на ссылку "Заявки" в ProfileClient
+      title: "Профиль и Заявки",
+      content: "Это ваш единый профиль. Здесь отображается ваша статистика и прогресс. А через меню «Заявки» можно получать доступ к новым материалам. Нажмите на «Заявки», чтобы посмотреть.",
+      mascotImage: "/images/tour/dog3.webp",
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+    }
+  ],
+  requests_info: [
+    {
+      target: "#tour-create-request-btn", // ID на кнопку "+ Создать заявку" в RequestsClient
+      title: "Как создаются заявки",
+      content: "Здесь вы можете запрашивать доступ к нужным материалам. Сейчас создавать заявку необязательно! Просто ознакомьтесь с разделом и вернитесь назад в профиль.",
+      mascotImage: "/images/tour/dog4.webp",
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+    }
+  ],
+  materials_gate: [
+    {
+      target: "#tour-materials-link", // ID на кнопку/ссылку "Материалы" в ProfileClient
+      title: "Ваши материалы",
+      content: "В этом разделе хранятся все ваши уроки и задания по текущему направлению. Нажмите на кнопку «Материалы», чтобы зайти туда.",
+      mascotImage: "/images/tour/dog5.webp",
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+    }
+  ],
+  rewards_gate: [
+    {
+      target: "#tour-rewards-btn", // ID кнопки наград в AppHeader
+      title: "Центр наград",
+      content: "Самое интересное! Здесь хранится ваш инвентарь и бонусы. Нажмите на кнопку наград, чтобы открыть меню.",
+      mascotImage: "/images/tour/dog6.webp",
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+    }
+  ],
+  rewards_tour: [
+    {
+      target: "#tour-wardrobe",
+      title: "Гардероб",
+      content: "Здесь вы можете менять внешний вид маскота, использовать новые фоны, ауры и примерять заработанные титулы.",
+      mascotImage: "/images/tour/dog7.webp",
+      skipBeacon: true,
+    },
+    {
+      target: "#tour-streaks",
+      title: "Ваши стрики",
+      content: "Занимайтесь регулярно! Непрерывное выполнение заданий формирует серию, за которую выдаются уникальные предметы.",
+      mascotImage: "/images/tour/dog8.webp",
+      skipBeacon: true,
+    },
+    {
+      target: "#tour-referral", // Не забудь добавить этот ID на вкладку рефералки в модалке!
+      title: "Реферальная система",
+      content: "Приглашайте друзей по вашей уникальной ссылке и получайте бонусы за каждого нового пользователя платформы.",
+      mascotImage: "/images/tour/dog9.webp",
+      skipBeacon: true,
+    },
+    {
+      target: "#tour-promos",
+      title: "Промокоды",
+      content: "Активируйте секретные коды для получения подарков. На этом наш тур окончен! Желаем успехов в обучении!",
+      mascotImage: "/images/tour/dog10.webp",
+      skipBeacon: true,
+    }
+  ]
+};

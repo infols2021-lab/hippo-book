@@ -8,7 +8,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// Добавлено поле has_seen_tour
 const PROFILE_SELECT = `
   id,
   email,
@@ -17,7 +16,8 @@ const PROFILE_SELECT = `
   region,
   completed_assignments_count,
   ga_completed_assignments_count,
-  has_seen_tour
+  has_seen_tour,
+  tour_stage
 `;
 
 function noStoreInit(): ResponseInit {
@@ -69,7 +69,6 @@ export async function PATCH(req: NextRequest) {
   }
 
   const input = body as Record<string, unknown>;
-  // Расширен тип для поддержки boolean значений
   const updatePayload: Record<string, string | null | boolean> = {};
 
   if (hasOwn(input, "full_name")) {
@@ -106,9 +105,13 @@ export async function PATCH(req: NextRequest) {
     updatePayload.region = region || null;
   }
 
-  // Логика обновления статуса онбординга
+  // Обновление состояния тура
   if (hasOwn(input, "has_seen_tour")) {
     updatePayload.has_seen_tour = Boolean(input.has_seen_tour);
+  }
+  
+  if (hasOwn(input, "tour_stage")) {
+    updatePayload.tour_stage = String(input.tour_stage);
   }
 
   if (Object.keys(updatePayload).length === 0) {

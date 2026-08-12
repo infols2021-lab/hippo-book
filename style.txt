@@ -17443,6 +17443,221 @@ export async function GET() {
 }
 </file>
 
+<file path="app/api/streaks/route.ts">
+// app/api/streaks/route.ts
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { claimStreakReward, getStreakPath } from "@/lib/rewards/data";
+
+function calculateTierCode(streak: number): string {
+  if (streak >= 100) return "legendary";
+  if (streak >= 50) return "diamond";
+  if (streak >= 30) return "platinum";
+  if (streak >= 14) return "gold";
+  if (streak >= 7) return "silver";
+  if (streak >= 3) return "bronze";
+  return "none";
+}
+
+export async function GET() {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Необходима авторизация" },
+        { status: 401 }
+      );
+    }
+
+    const adminSupabase = getSupabaseAdminClient();
+
+    // 1. Запрашиваем данные из user_streaks и profiles
+    const [{ data: userStreakRow }, { data: profileRow }] = await Promise.all([
+      adminSupabase
+        .from("user_streaks")
+        .select("current_streak, longest_streak, last_completed_date")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      adminSupabase
+        .from("profiles")
+        .select("selected_streak_title_code")
+        .eq("id", user.id)
+        .maybeSingle(),
+    ]);
+
+    // 2. Проверяем выполнение за сегодня
+    const todayStr = new Date().toISOString().split("T")[0];
+    const { data: todayDay } = await adminSupabase
+      .from("user_streak_days")
+      .select("activity_date")
+      .eq("user_id", user.id)
+      .eq("activity_date", todayStr)
+      .maybeSingle();
+
+    const isCompletedToday = Boolean(
+      todayDay || userStreakRow?.last_completed_date === todayStr
+    );
+
+    // 3. Запрашиваем дорожку наград
+    let path: any[] = [];
+    let pathStats: any = null;
+
+    try {
+      const streakPathRes = await getStreakPath(supabase, user.id);
+      path = streakPathRes?.path || [];
+      pathStats = streakPathRes?.stats || null;
+    } catch (e) {
+      console.warn("Фоновое предупреждение при получении дорожки наград:", e);
+    }
+
+    const currentStreak = Number(
+      userStreakRow?.current_streak ?? pathStats?.currentStreak ?? 0
+    );
+    const longestStreak = Number(
+      userStreakRow?.longest_streak ?? pathStats?.maxStreak ?? currentStreak
+    );
+    const completedToday = isCompletedToday || Boolean(pathStats?.completedToday);
+
+    const stats = {
+      currentStreak,
+      maxStreak: longestStreak,
+      longestStreak,
+      completedToday,
+      lastCompletedAt: userStreakRow?.last_completed_date || pathStats?.lastCompletedAt || null,
+    };
+
+    // 4. Экипировка маскота / титулы
+    let equippedTitleLabel: string | null = null;
+    let equippedAvatarUrl: string | null = null;
+
+    const { data: mascot } = await adminSupabase
+      .from("mascot_settings")
+      .select("equipped_title_id, equipped_base_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (mascot?.equipped_title_id) {
+      const { data: rewardTitle } = await adminSupabase
+        .from("rewards")
+        .select("title")
+        .eq("id", mascot.equipped_title_id)
+        .maybeSingle();
+
+      if (rewardTitle?.title) {
+        equippedTitleLabel = rewardTitle.title;
+      }
+    }
+
+    if (!equippedTitleLabel && profileRow?.selected_streak_title_code) {
+      const { data: titleCatalog } = await adminSupabase
+        .from("streak_title_catalog")
+        .select("label")
+        .eq("code", profileRow.selected_streak_title_code)
+        .maybeSingle();
+
+      if (titleCatalog?.label) {
+        equippedTitleLabel = titleCatalog.label;
+      }
+    }
+
+    if (mascot?.equipped_base_id) {
+      const { data: rewardBase } = await adminSupabase
+        .from("rewards")
+        .select("asset_url")
+        .eq("id", mascot.equipped_base_id)
+        .maybeSingle();
+
+      if (rewardBase?.asset_url) {
+        equippedAvatarUrl = rewardBase.asset_url;
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      success: true,
+      streak: {
+        currentStreak,
+        longestStreak,
+        maxStreak: longestStreak,
+        doneToday: completedToday,
+        tierCode: calculateTierCode(longestStreak),
+      },
+      equippedTitle: equippedTitleLabel ? { label: equippedTitleLabel } : null,
+      equippedAvatarUrl,
+      stats,
+      currentStreak,
+      longestStreak,
+      maxStreak: longestStreak,
+      path,
+    });
+  } catch (error: any) {
+    console.error("Ошибка при получении данных серии:", error);
+    return NextResponse.json(
+      { error: error?.message || "Внутренняя ошибка сервера" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Необходима авторизация" },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json().catch(() => null);
+    if (!body) {
+      return NextResponse.json(
+        { error: "Невалидный JSON в теле запроса" },
+        { status: 400 }
+      );
+    }
+
+    const dayNumber = Number(body.dayNumber);
+
+    if (!Number.isInteger(dayNumber) || dayNumber <= 0) {
+      return NextResponse.json(
+        { error: "Некорректный номер дня серии" },
+        { status: 400 }
+      );
+    }
+
+    const result = await claimStreakReward(supabase, user.id, dayNumber);
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      success: true,
+      reward: result.reward,
+    });
+  } catch (error: any) {
+    console.error("Ошибка при получении награды за серию:", error);
+    return NextResponse.json(
+      { error: error?.message || "Внутренняя ошибка сервера" },
+      { status: 500 }
+    );
+  }
+}
+</file>
+
 <file path="app/api/turnstile-script/route.ts">
 export const runtime = 'nodejs';
 export const revalidate = 3600; // Кешируем роут на 1 час на уровне Next.js / CDN
@@ -34238,221 +34453,6 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
-<file path="app/api/streaks/route.ts">
-// app/api/streaks/route.ts
-import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { claimStreakReward, getStreakPath } from "@/lib/rewards/data";
-
-function calculateTierCode(streak: number): string {
-  if (streak >= 100) return "legendary";
-  if (streak >= 50) return "diamond";
-  if (streak >= 30) return "platinum";
-  if (streak >= 14) return "gold";
-  if (streak >= 7) return "silver";
-  if (streak >= 3) return "bronze";
-  return "none";
-}
-
-export async function GET() {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Необходима авторизация" },
-        { status: 401 }
-      );
-    }
-
-    const adminSupabase = getSupabaseAdminClient();
-
-    // 1. Запрашиваем данные из user_streaks и profiles
-    const [{ data: userStreakRow }, { data: profileRow }] = await Promise.all([
-      adminSupabase
-        .from("user_streaks")
-        .select("current_streak, longest_streak, last_completed_date")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      adminSupabase
-        .from("profiles")
-        .select("selected_streak_title_code")
-        .eq("id", user.id)
-        .maybeSingle(),
-    ]);
-
-    // 2. Проверяем выполнение за сегодня
-    const todayStr = new Date().toISOString().split("T")[0];
-    const { data: todayDay } = await adminSupabase
-      .from("user_streak_days")
-      .select("activity_date")
-      .eq("user_id", user.id)
-      .eq("activity_date", todayStr)
-      .maybeSingle();
-
-    const isCompletedToday = Boolean(
-      todayDay || userStreakRow?.last_completed_date === todayStr
-    );
-
-    // 3. Запрашиваем дорожку наград
-    let path: any[] = [];
-    let pathStats: any = null;
-
-    try {
-      const streakPathRes = await getStreakPath(supabase, user.id);
-      path = streakPathRes?.path || [];
-      pathStats = streakPathRes?.stats || null;
-    } catch (e) {
-      console.warn("Фоновое предупреждение при получении дорожки наград:", e);
-    }
-
-    const currentStreak = Number(
-      userStreakRow?.current_streak ?? pathStats?.currentStreak ?? 0
-    );
-    const longestStreak = Number(
-      userStreakRow?.longest_streak ?? pathStats?.maxStreak ?? currentStreak
-    );
-    const completedToday = isCompletedToday || Boolean(pathStats?.completedToday);
-
-    const stats = {
-      currentStreak,
-      maxStreak: longestStreak,
-      longestStreak,
-      completedToday,
-      lastCompletedAt: userStreakRow?.last_completed_date || pathStats?.lastCompletedAt || null,
-    };
-
-    // 4. Экипировка маскота / титулы
-    let equippedTitleLabel: string | null = null;
-    let equippedAvatarUrl: string | null = null;
-
-    const { data: mascot } = await adminSupabase
-      .from("mascot_settings")
-      .select("equipped_title_id, equipped_base_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (mascot?.equipped_title_id) {
-      const { data: rewardTitle } = await adminSupabase
-        .from("rewards")
-        .select("title")
-        .eq("id", mascot.equipped_title_id)
-        .maybeSingle();
-
-      if (rewardTitle?.title) {
-        equippedTitleLabel = rewardTitle.title;
-      }
-    }
-
-    if (!equippedTitleLabel && profileRow?.selected_streak_title_code) {
-      const { data: titleCatalog } = await adminSupabase
-        .from("streak_title_catalog")
-        .select("label")
-        .eq("code", profileRow.selected_streak_title_code)
-        .maybeSingle();
-
-      if (titleCatalog?.label) {
-        equippedTitleLabel = titleCatalog.label;
-      }
-    }
-
-    if (mascot?.equipped_base_id) {
-      const { data: rewardBase } = await adminSupabase
-        .from("rewards")
-        .select("asset_url")
-        .eq("id", mascot.equipped_base_id)
-        .maybeSingle();
-
-      if (rewardBase?.asset_url) {
-        equippedAvatarUrl = rewardBase.asset_url;
-      }
-    }
-
-    return NextResponse.json({
-      ok: true,
-      success: true,
-      streak: {
-        currentStreak,
-        longestStreak,
-        maxStreak: longestStreak,
-        doneToday: completedToday,
-        tierCode: calculateTierCode(longestStreak),
-      },
-      equippedTitle: equippedTitleLabel ? { label: equippedTitleLabel } : null,
-      equippedAvatarUrl,
-      stats,
-      currentStreak,
-      longestStreak,
-      maxStreak: longestStreak,
-      path,
-    });
-  } catch (error: any) {
-    console.error("Ошибка при получении данных серии:", error);
-    return NextResponse.json(
-      { error: error?.message || "Внутренняя ошибка сервера" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Необходима авторизация" },
-        { status: 401 }
-      );
-    }
-
-    const body = await request.json().catch(() => null);
-    if (!body) {
-      return NextResponse.json(
-        { error: "Невалидный JSON в теле запроса" },
-        { status: 400 }
-      );
-    }
-
-    const dayNumber = Number(body.dayNumber);
-
-    if (!Number.isInteger(dayNumber) || dayNumber <= 0) {
-      return NextResponse.json(
-        { error: "Некорректный номер дня серии" },
-        { status: 400 }
-      );
-    }
-
-    const result = await claimStreakReward(supabase, user.id, dayNumber);
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      success: true,
-      reward: result.reward,
-    });
-  } catch (error: any) {
-    console.error("Ошибка при получении награды за серию:", error);
-    return NextResponse.json(
-      { error: error?.message || "Внутренняя ошибка сервера" },
-      { status: 500 }
-    );
-  }
-}
-</file>
-
 <file path="app/demo/DemoMaterialClient.tsx">
 "use client";
 
@@ -36457,84 +36457,6 @@ export default function CustomTooltip({
     </div>
   );
 }
-</file>
-
-<file path="components/tour/TourSteps.ts">
-// components/tour/TourSteps.ts
-import { Step } from "react-joyride";
-
-// Расширяем стандартный тип шага, явно указывая свойства, 
-// на которые ругается TypeScript
-export interface CustomTourStep extends Step {
-  mascotImage?: string;
-  disableBeacon?: boolean;
-  spotlightClicks?: boolean;
-  disableOverlayClose?: boolean;
-  hideNextButton?: boolean;
-}
-
-export const TOUR_STEPS: CustomTourStep[] = [
-  {
-    target: "body",
-    placement: "center",
-    title: "Обновление образовательной платформы",
-    content: "Интерфейс системы был значительно переработан и дополнен новым функционалом. Данный краткий тур поможет ознакомиться с изменениями и быстрее сориентироваться в навигации.",
-    mascotImage: "/images/tour/uki1.webp",
-    disableBeacon: true,
-  },
-  {
-    target: "#tour-materials",
-    title: "Учебные материалы и прогресс",
-    content: "В этом разделе собран основной образовательный контент: уроки, задания и экзамены. Здесь же отображается актуальная статистика прохождения и текущие результаты обучения.",
-    mascotImage: "/images/tour/uki2.webp",
-    disableBeacon: true,
-  },
-  {
-    target: "#tour-requests",
-    title: "Каталог заявок",
-    content: "Раздел запросов теперь работает по принципу каталога. Через него осуществляется подача заявок на получение доступа к новым учебникам, пробным тестам и дополнительным материалам.",
-    mascotImage: "/images/tour/uki3.webp",
-    disableBeacon: true,
-  },
-  {
-    target: "#tour-rewards-btn",
-    title: "Новая система мотивации",
-    content: "Полностью переработана система достижений. Для продолжения обзора и знакомства с новым функционалом необходимо кликнуть на подсвеченную кнопку «Центр наград».",
-    mascotImage: "/images/tour/uki4.webp",
-    spotlightClicks: true, // Разрешает пользователю кликнуть по подсвеченной кнопке
-    disableOverlayClose: true,
-    hideNextButton: true, // Кнопка "Далее" скрыта, так как ожидается клик по мишени
-    disableBeacon: true,
-  },
-  {
-    target: "#tour-wardrobe",
-    title: "Кастомизация и Гардероб",
-    content: "За успехи в обучении выдаются предметы инвентаря. В данной вкладке можно менять внешний вид маскота, использовать новые фоны, ауры и применять заработанные титулы.",
-    mascotImage: "/images/tour/uki5.webp",
-    disableBeacon: true,
-  },
-  {
-    target: "#tour-streaks",
-    title: "Ежедневная активность",
-    content: "Регулярные занятия поощряются дополнительно. Непрерывное выполнение заданий формирует серию. Достижение определенных этапов серии открывает уникальные предметы. Важно: пропуск дня обнуляет текущий прогресс.",
-    mascotImage: "/images/tour/uki6.webp",
-    disableBeacon: true,
-  },
-  {
-    target: "#tour-promos",
-    title: "Промокоды и приглашения",
-    content: "В этих вкладках доступна активация специальных кодов для получения бонусов. Также здесь сгенерирована персональная ссылка: приглашение новых пользователей позволяет расширить доступ к скрытым материалам платформы.",
-    mascotImage: "/images/tour/uki7.webp",
-    disableBeacon: true,
-  },
-  {
-    target: "#tour-help-btn",
-    title: "Завершение обзора",
-    content: "Базовое обучение окончено. Если в будущем потребуется освежить информацию о работе платформы, достаточно нажать на иконку знака вопроса в верхнем меню для повторного запуска данной инструкции.",
-    mascotImage: "/images/tour/uki8.webp",
-    disableBeacon: true,
-  },
-];
 </file>
 
 <file path="lib/api/auth.ts">
@@ -40463,6 +40385,259 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
 }
 </file>
 
+<file path="app/api/admin/promocodes/route.ts">
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+
+async function verifyAdmin() {
+  const userClient = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await userClient.auth.getUser();
+
+  if (authError || !user) {
+    return { user: null, error: "Необходима авторизация", adminSupabase: null };
+  }
+
+  const adminSupabase = getSupabaseAdminClient();
+
+  const { data: profile } = await adminSupabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const isAdmin = profile?.is_admin === true;
+  if (!isAdmin) {
+    return { user: null, error: "Доступ запрещен. Требуются права администратора", adminSupabase: null };
+  }
+
+  return { user, error: null, adminSupabase };
+}
+
+export async function GET() {
+  try {
+    const { error: adminErr, adminSupabase } = await verifyAdmin();
+    if (adminErr || !adminSupabase) {
+      return NextResponse.json({ error: adminErr }, { status: 403 });
+    }
+
+    const [{ data: promocodes, error: promoErr }, { data: redemptions, error: redemptionsErr }, { data: allMaterials }, { data: allRewards }] =
+      await Promise.all([
+        adminSupabase
+          .from("promocodes")
+          .select("*")
+          .order("created_at", { ascending: false }),
+        adminSupabase
+          .from("promocode_redemptions")
+          .select(`
+            id,
+            promocode_id,
+            user_id,
+            chosen_material_ids,
+            redeemed_at,
+            promocodes(code, rewards_bundle),
+            profiles:user_id(email, full_name)
+          `)
+          .order("redeemed_at", { ascending: false })
+          .limit(200),
+        adminSupabase.from("materials").select("id, title"),
+        adminSupabase.from("rewards").select("id, title, type"),
+      ]);
+
+    if (promoErr) {
+      return NextResponse.json({ error: promoErr.message }, { status: 400 });
+    }
+
+    const materialsMap = new Map((allMaterials || []).map((m: any) => [m.id, m.title]));
+    const rewardsMap = new Map((allRewards || []).map((r: any) => [r.id, `${r.title} (${r.type})`]));
+
+    const formattedRedemptions = Array.isArray(redemptions)
+      ? redemptions.map((r: any) => {
+          const chosenTitles = (r.chosen_material_ids || []).map(
+            (id: string) => materialsMap.get(id) || id
+          );
+
+          const bundle = r.promocodes?.rewards_bundle || {};
+          const bundleRewardTitles = (bundle.reward_ids || []).map(
+            (id: string) => rewardsMap.get(id) || id
+          );
+          const bundleMaterialTitles = (bundle.specific_material_ids || []).map(
+            (id: string) => materialsMap.get(id) || id
+          );
+
+          return {
+            id: r.id,
+            promocode_id: r.promocode_id,
+            promocode_code: r.promocodes?.code || "—",
+            user_id: r.user_id,
+            user_email: r.profiles?.email || "—",
+            user_full_name: r.profiles?.full_name || "Ученик",
+            chosen_material_titles: chosenTitles,
+            bundle_reward_titles: bundleRewardTitles,
+            bundle_material_titles: bundleMaterialTitles,
+            physical_title: bundle.custom_physical?.title || null,
+            physical_link_url: bundle.custom_physical?.link_url || null,
+            redeemed_at: r.redeemed_at,
+          };
+        })
+      : [];
+
+    return NextResponse.json({
+      promocodes: promocodes || [],
+      redemptions: formattedRedemptions,
+      error: redemptionsErr?.message || null,
+    });
+  } catch (error: any) {
+    console.error("Ошибка при получении промокодов и логов:", error);
+    return NextResponse.json(
+      { error: error?.message || "Внутренняя ошибка сервера" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const { error: adminErr, adminSupabase } = await verifyAdmin();
+    if (adminErr || !adminSupabase) {
+      return NextResponse.json({ error: adminErr }, { status: 403 });
+    }
+
+    const body = await request.json().catch(() => null);
+    if (!body) {
+      return NextResponse.json({ error: "Невалидный JSON" }, { status: 400 });
+    }
+
+    const {
+      id,
+      code,
+      is_active,
+      max_uses,
+      expires_at,
+      rewards_bundle,
+    } = body;
+
+    const normalizedCode = String(code || "").trim().toUpperCase();
+    if (!normalizedCode) {
+      return NextResponse.json(
+        { error: "Укажите значение промокода" },
+        { status: 400 }
+      );
+    }
+
+    let parsedMaxUses: number | null = null;
+    if (max_uses !== null && max_uses !== undefined && max_uses !== "") {
+      const num = Number(max_uses);
+      if (Number.isInteger(num) && num > 0) {
+        parsedMaxUses = num;
+      }
+    }
+
+    let parsedExpiresAt: string | null = null;
+    if (expires_at) {
+      const date = new Date(expires_at);
+      if (!isNaN(date.getTime())) {
+        parsedExpiresAt = date.toISOString();
+      }
+    }
+
+    const bundle = rewards_bundle && typeof rewards_bundle === "object" ? rewards_bundle : {};
+    const sanitizedBundle = {
+      reward_ids: Array.isArray(bundle.reward_ids) ? bundle.reward_ids.map(String) : [],
+      specific_material_ids: Array.isArray(bundle.specific_material_ids) ? bundle.specific_material_ids.map(String) : [],
+      material_choice_count: Math.max(0, Number(bundle.material_choice_count || 0)),
+      custom_physical: bundle.custom_physical && typeof bundle.custom_physical === "object" ? {
+        title: String(bundle.custom_physical.title || "").trim(),
+        text: String(bundle.custom_physical.text || "").trim(),
+        image_url: bundle.custom_physical.image_url ? String(bundle.custom_physical.image_url).trim() : null,
+        link_url: bundle.custom_physical.link_url ? String(bundle.custom_physical.link_url).trim() : null,
+      } : null,
+    };
+
+    const payload: Record<string, any> = {
+      code: normalizedCode,
+      is_active: typeof is_active === "boolean" ? is_active : true,
+      max_uses: parsedMaxUses,
+      expires_at: parsedExpiresAt,
+      rewards_bundle: sanitizedBundle,
+    };
+
+    if (id) {
+      payload.id = id;
+    }
+
+    const { data, error } = await adminSupabase
+      .from("promocodes")
+      .upsert(payload, { onConflict: "id" })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: "Промокод с таким названием уже существует" },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, promocode: data });
+  } catch (error: any) {
+    console.error("Ошибка при сохранении промокода:", error);
+    return NextResponse.json(
+      { error: error?.message || "Внутренняя ошибка сервера" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { error: adminErr, adminSupabase } = await verifyAdmin();
+    if (adminErr || !adminSupabase) {
+      return NextResponse.json({ error: adminErr }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    const clearLogs = searchParams.get("clearLogs");
+
+    if (clearLogs === "true") {
+      const { error } = await adminSupabase
+        .from("promocode_redemptions")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: "Укажите id промокода" }, { status: 400 });
+    }
+
+    const { error } = await adminSupabase.from("promocodes").delete().eq("id", id);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Ошибка при удалении промокода/логов:", error);
+    return NextResponse.json(
+      { error: error?.message || "Внутренняя ошибка сервера" },
+      { status: 500 }
+    );
+  }
+}
+</file>
+
 <file path="app/api/admin/rewards/referral-config/route.ts">
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -41589,115 +41764,82 @@ export default function PhysicalPrizeModal({
 }
 </file>
 
-<file path="components/tour/ProductTour.tsx">
-// components/tour/ProductTour.tsx
-"use client";
+<file path="components/tour/TourSteps.ts">
+// components/tour/TourSteps.ts
+import { Step } from "react-joyride";
 
-import React, { useState, useEffect } from "react";
-import dynamic from "next/dynamic";
-import { STATUS, EVENTS, ACTIONS } from "react-joyride";
-
-// 1. Стандартный импорт без SSR
-const JoyrideDynamic = dynamic(() => import("react-joyride"), { ssr: false });
-
-// 2. Ультимативный фикс: жестко приводим компонент к any.
-// Это навсегда убьет ошибку TS2769 (IntrinsicAttributes),
-// так как TypeScript перестанет проверять пропсы (steps, run и т.д.)
-const Joyride = JoyrideDynamic as any;
-
-import CustomTooltip from "./CustomTooltip";
-import { TOUR_STEPS } from "./TourSteps";
-
-interface ProductTourProps {
-  initialRun?: boolean; 
+// Расширяем стандартный тип шага, явно указывая свойства,
+// на которые ругается TypeScript
+export interface CustomTourStep extends Step {
+  mascotImage?: string;
+  skipBeacon?: boolean;
+  blockTargetInteraction?: boolean;
+  overlayClickAction?: false | "close" | "next" | "replay";
+  hideNextButton?: boolean;
 }
 
-export default function ProductTour({ initialRun = false }: ProductTourProps) {
-  const [run, setRun] = useState(initialRun);
-  const [stepIndex, setStepIndex] = useState(0);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Слушатель для запуска тура вручную
-  useEffect(() => {
-    const startTour = () => {
-      setStepIndex(0);
-      setRun(true);
-    };
-    
-    window.addEventListener("start-product-tour", startTour);
-    return () => window.removeEventListener("start-product-tour", startTour);
-  }, []);
-
-  // Хак для шага с открытием модалки наград (ждем реального клика по кнопке)
-  useEffect(() => {
-    if (!run) return;
-    
-    if (stepIndex === 3) {
-      const rewardsBtn = document.querySelector("#tour-rewards-btn");
-      
-      const handleClick = () => {
-        setTimeout(() => setStepIndex(4), 450);
-      };
-      
-      if (rewardsBtn) rewardsBtn.addEventListener("click", handleClick);
-      return () => {
-        if (rewardsBtn) rewardsBtn.removeEventListener("click", handleClick);
-      };
-    }
-  }, [stepIndex, run]);
-
-  const handleJoyrideCallback = async (data: any) => {
-    const { status, type, action, index } = data;
-
-    if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
-      if (index === 3 && action === ACTIONS.NEXT) {
-        return; 
-      }
-      setStepIndex(index + (action === ACTIONS.PREV ? -1 : 1));
-    }
-
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
-      setRun(false);
-      setStepIndex(0);
-
-      try {
-        await fetch("/api/profile/update", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ has_seen_tour: true }),
-        });
-      } catch (e) {
-        console.error("Не удалось обновить статус тура", e);
-      }
-    }
-  };
-
-  // Защита от ошибки гидратации
-  if (!isMounted) return null;
-
-  return (
-    <Joyride
-      steps={TOUR_STEPS}
-      run={run}
-      stepIndex={stepIndex}
-      callback={handleJoyrideCallback}
-      tooltipComponent={CustomTooltip} 
-      continuous={true}
-      disableOverlayClose={true} 
-      spotlightPadding={10}
-      styles={{
-        options: {
-          zIndex: 10000,
-          overlayColor: "rgba(0, 0, 0, 0.65)",
-        },
-      }}
-    />
-  );
-}
+export const TOUR_STEPS: CustomTourStep[] = [
+  {
+    target: "body",
+    placement: "center",
+    title: "Обновление образовательной платформы",
+    content: "Интерфейс системы был значительно переработан и дополнен новым функционалом. Данный краткий тур поможет ознакомиться с изменениями и быстрее сориентироваться в навигации.",
+    mascotImage: "/images/tour/uki1.webp",
+    skipBeacon: true,
+  },
+  {
+    target: "#tour-materials",
+    title: "Учебные материалы и прогресс",
+    content: "В этом разделе собран основной образовательный контент: уроки, задания и экзамены. Здесь же отображается актуальная статистика прохождения и текущие результаты обучения.",
+    mascotImage: "/images/tour/uki2.webp",
+    skipBeacon: true,
+  },
+  {
+    target: "#tour-requests",
+    title: "Каталог заявок",
+    content: "Раздел запросов теперь работает по принципу каталога. Через него осуществляется подача заявок на получение доступа к новым учебникам, пробным тестам и дополнительным материалам.",
+    mascotImage: "/images/tour/uki3.webp",
+    skipBeacon: true,
+  },
+  {
+    target: "#tour-rewards-btn",
+    title: "Новая система мотивации",
+    content: "Полностью переработана система достижений. Для продолжения обзора и знакомства с новым функционалом необходимо кликнуть на подсвеченную кнопку «Центр наград».",
+    mascotImage: "/images/tour/uki4.webp",
+    blockTargetInteraction: false, // false = клики проходят сквозь спотлайт (было spotlightClicks: true)
+    overlayClickAction: false, // клик по оверлею не закрывает шаг (было disableOverlayClose: true)
+    hideNextButton: true, // кнопка "Далее" скрыта, так как ожидается клик по мишени
+    skipBeacon: true,
+  },
+  {
+    target: "#tour-wardrobe",
+    title: "Кастомизация и Гардероб",
+    content: "За успехи в обучении выдаются предметы инвентаря. В данной вкладке можно менять внешний вид маскота, использовать новые фоны, ауры и применять заработанные титулы.",
+    mascotImage: "/images/tour/uki5.webp",
+    skipBeacon: true,
+  },
+  {
+    target: "#tour-streaks",
+    title: "Ежедневная активность",
+    content: "Регулярные занятия поощряются дополнительно. Непрерывное выполнение заданий формирует серию. Достижение определенных этапов серии открывает уникальные предметы. Важно: пропуск дня обнуляет текущий прогресс.",
+    mascotImage: "/images/tour/uki6.webp",
+    skipBeacon: true,
+  },
+  {
+    target: "#tour-promos",
+    title: "Промокоды и приглашения",
+    content: "В этих вкладках доступна активация специальных кодов для получения бонусов. Также здесь сгенерирована персональная ссылка: приглашение новых пользователей позволяет расширить доступ к скрытым материалам платформы.",
+    mascotImage: "/images/tour/uki7.webp",
+    skipBeacon: true,
+  },
+  {
+    target: "#tour-help-btn",
+    title: "Завершение обзора",
+    content: "Базовое обучение окончено. Если в будущем потребуется освежить информацию о работе платформы, достаточно нажать на иконку знака вопроса в верхнем меню для повторного запуска данной инструкции.",
+    mascotImage: "/images/tour/uki8.webp",
+    skipBeacon: true,
+  },
+];
 </file>
 
 <file path="lib/materials/types.ts">
@@ -41844,6 +41986,425 @@ export function isGatehouseMaterialKind(kind: unknown): kind is GatehouseMateria
 
 export function isKnownMaterialKind(kind: unknown): kind is OlympiadMaterialKind | GatehouseMaterialKind {
   return isOlympiadMaterialKind(kind) || isGatehouseMaterialKind(kind);
+}
+</file>
+
+<file path="lib/rewards/data.ts">
+// lib/rewards/data.ts
+// Серверный слой работы с базой данных Supabase: Маскот, Стрики и Промокоды.
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import type {
+  MascotSettings,
+  RewardItem,
+  RewardType,
+  StreakConfigItem,
+  StreakLeaderboardEntry,
+  StreakStats,
+  UserInventoryItem,
+  PromocodeRedeemResult,
+  PromocodeRewardsBundle,
+} from "./types";
+
+// ---------------------------------------------------------------------------
+// 1. МАСКОТ И НАСТРОЙКИ ЭКИПИРОВКИ
+// ---------------------------------------------------------------------------
+
+export async function getMascotSettings(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<MascotSettings> {
+  const { data: rawSettings } = await supabase
+    .from("mascot_settings")
+    .select(
+      `
+      user_id,
+      equipped_base_id,
+      equipped_hat_id,
+      equipped_aura_id,
+      equipped_emotion_id,
+      equipped_title_id,
+      updated_at,
+      equipped_base:rewards!mascot_settings_equipped_base_id_fkey(*),
+      equipped_hat:rewards!mascot_settings_equipped_hat_id_fkey(*),
+      equipped_aura:rewards!mascot_settings_equipped_aura_id_fkey(*),
+      equipped_emotion:rewards!mascot_settings_equipped_emotion_id_fkey(*),
+      equipped_title:rewards!mascot_settings_equipped_title_id_fkey(*)
+    `
+    )
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!rawSettings) {
+    return {
+      user_id: userId,
+      equipped_base_id: null,
+      equipped_hat_id: null,
+      equipped_aura_id: null,
+      equipped_emotion_id: null,
+      equipped_title_id: null,
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  return rawSettings as unknown as MascotSettings;
+}
+
+export async function equipMascotItem(
+  supabase: SupabaseClient,
+  userId: string,
+  category: RewardType,
+  rewardId: string | null
+): Promise<{ success: boolean; error?: string }> {
+  if (rewardId) {
+    const { data: hasItem } = await supabase
+      .from("user_inventory")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("reward_id", rewardId)
+      .maybeSingle();
+
+    if (!hasItem) {
+      return { success: false, error: "У вас нет этой награды в инвентаре." };
+    }
+  }
+
+  const columnMap: Record<RewardType, string> = {
+    base: "equipped_base_id",
+    hat: "equipped_hat_id",
+    aura: "equipped_aura_id",
+    emotion: "equipped_emotion_id",
+    title: "equipped_title_id",
+  };
+
+  const targetColumn = columnMap[category];
+  if (!targetColumn) {
+    return { success: false, error: "Неверная категория элемента." };
+  }
+
+  const payload = {
+    user_id: userId,
+    [targetColumn]: rewardId,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from("mascot_settings")
+    .upsert(payload, { onConflict: "user_id" });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// 2. ИНВЕНТАРЬ ПОЛЬЗОВАТЕЛЯ
+// ---------------------------------------------------------------------------
+
+export async function getUserInventory(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<UserInventoryItem[]> {
+  const { data, error } = await supabase
+    .from("user_inventory")
+    .select("*, reward:rewards(*)")
+    .eq("user_id", userId)
+    .order("unlocked_at", { ascending: false });
+
+  if (error || !Array.isArray(data)) return [];
+  return data as unknown as UserInventoryItem[];
+}
+
+// ---------------------------------------------------------------------------
+// 3. ДОРОЖКА СЕРИИ (СТРИКИ) И ЛИДЕРБОРД
+// ---------------------------------------------------------------------------
+
+export async function getStreakPath(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<{
+  stats: StreakStats;
+  path: StreakConfigItem[];
+}> {
+  const adminSupabase = getSupabaseAdminClient();
+
+  const [{ data: streakRow }, { data: streakConfig }, { data: inventory }] =
+    await Promise.all([
+      adminSupabase
+        .from("user_streaks")
+        .select("current_streak, longest_streak, last_completed_date")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      adminSupabase
+        .from("streak_config")
+        .select("day_number, reward_id, created_at, reward:rewards(*)")
+        .order("day_number", { ascending: true }),
+      adminSupabase
+        .from("user_inventory")
+        .select("reward_id")
+        .eq("user_id", userId)
+        .eq("source", "streak"),
+    ]);
+
+  const currentStreak = Number(streakRow?.current_streak || 0);
+  const maxStreak = Number(streakRow?.longest_streak ?? currentStreak);
+  const lastCompletedAt = streakRow?.last_completed_date
+    ? String(streakRow.last_completed_date)
+    : null;
+
+  let completedToday = false;
+  if (lastCompletedAt) {
+    const lastDate = lastCompletedAt.split("T")[0];
+    const todayDate = new Date().toISOString().split("T")[0];
+    completedToday = lastDate === todayDate;
+  }
+
+  const claimedRewardIds = new Set(
+    Array.isArray(inventory) ? inventory.map((item) => item.reward_id) : []
+  );
+
+  const path: StreakConfigItem[] = Array.isArray(streakConfig)
+    ? streakConfig.map((item: any) => {
+        const isClaimed = claimedRewardIds.has(item.reward_id);
+        const isAvailable = maxStreak >= item.day_number && !isClaimed;
+        return {
+          ...item,
+          is_claimed: isClaimed,
+          is_available: isAvailable,
+        };
+      })
+    : [];
+
+  return {
+    stats: {
+      currentStreak,
+      maxStreak,
+      completedToday,
+      lastCompletedAt,
+    },
+    path,
+  };
+}
+
+export async function getStreakLeaderboard(
+  supabase: SupabaseClient,
+  currentUserId?: string
+): Promise<StreakLeaderboardEntry[]> {
+  const adminSupabase = getSupabaseAdminClient();
+
+  const { data, error } = await adminSupabase
+    .from("user_streaks")
+    .select("user_id, current_streak, longest_streak")
+    .or("current_streak.gt.0,longest_streak.gt.0")
+    .order("longest_streak", { ascending: false })
+    .order("current_streak", { ascending: false })
+    .limit(20);
+
+  if (error || !Array.isArray(data)) return [];
+
+  return data.map((row: any, index: number) => {
+    const current = Number(row.current_streak || 0);
+    const max = Number(row.longest_streak ?? current);
+
+    return {
+      rank: index + 1,
+      user_id: row.user_id,
+      current_streak: current,
+      max_streak: max,
+      is_current_user: row.user_id === currentUserId,
+    };
+  });
+}
+
+export async function claimStreakReward(
+  supabase: SupabaseClient,
+  userId: string,
+  dayNumber: number
+): Promise<{ success: boolean; reward?: RewardItem; error?: string }> {
+  const adminSupabase = getSupabaseAdminClient();
+
+  const { data: streakRow } = await adminSupabase
+    .from("user_streaks")
+    .select("current_streak, longest_streak")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const maxStreak = Number(
+    streakRow?.longest_streak ?? streakRow?.current_streak ?? 0
+  );
+
+  if (maxStreak < dayNumber) {
+    return { success: false, error: "Вы ещё не достигли этого рекорда серии." };
+  }
+
+  const { data: streakConfig } = await adminSupabase
+    .from("streak_config")
+    .select("reward_id, reward:rewards(*)")
+    .eq("day_number", dayNumber)
+    .maybeSingle();
+
+  if (!streakConfig || !streakConfig.reward_id) {
+    return { success: false, error: "Награда для этого дня не настроена." };
+  }
+
+  const rewardId = streakConfig.reward_id;
+
+  const { error: insertError } = await adminSupabase.from("user_inventory").insert({
+    user_id: userId,
+    reward_id: rewardId,
+    source: "streak",
+  });
+
+  if (insertError) {
+    if (insertError.code === "23505") {
+      return { success: false, error: "Награда за этот день уже получена." };
+    }
+    return { success: false, error: insertError.message };
+  }
+
+  return {
+    success: true,
+    reward: streakConfig.reward as unknown as RewardItem,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 4. ПРОМОКОДЫ И АКТИВАЦИЯ
+// ---------------------------------------------------------------------------
+
+export async function redeemPromocode(
+  supabase: SupabaseClient,
+  userId: string,
+  rawCode: string,
+  chosenMaterialIds: string[] = [],
+  allowSkipIfAllUnlocked: boolean = false
+): Promise<PromocodeRedeemResult> {
+  const code = String(rawCode || "").trim().toUpperCase();
+  if (!code) return { success: false, error: "Введите промокод." };
+
+  const adminSupabase = getSupabaseAdminClient();
+
+  const { data: promo, error: promoError } = await adminSupabase
+    .from("promocodes")
+    .select("*")
+    .eq("code", code)
+    .maybeSingle();
+
+  if (promoError || !promo) {
+    return { success: false, error: "Промокод не найден." };
+  }
+
+  if (!promo.is_active) {
+    return { success: false, error: "Промокод деактивирован." };
+  }
+
+  if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
+    return { success: false, error: "Срок действия промокода истёк." };
+  }
+
+  if (promo.max_uses !== null && promo.current_uses >= promo.max_uses) {
+    return { success: false, error: "Лимит активаций промокода исчерпан." };
+  }
+
+  const { data: existingRedemption } = await adminSupabase
+    .from("promocode_redemptions")
+    .select("id")
+    .eq("promocode_id", promo.id)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingRedemption) {
+    return { success: false, error: "Вы уже активировали этот промокод." };
+  }
+
+  const bundle: PromocodeRewardsBundle = promo.rewards_bundle || {};
+  const requiredChoiceCount = Number(bundle.material_choice_count || 0);
+
+  if (
+    requiredChoiceCount > 0 &&
+    chosenMaterialIds.length < requiredChoiceCount &&
+    !allowSkipIfAllUnlocked
+  ) {
+    return {
+      success: true,
+      requiresMaterialChoice: true,
+      remainingMaterialChoices: requiredChoiceCount - chosenMaterialIds.length,
+      physicalPrize: bundle.custom_physical || null,
+    };
+  }
+
+  const grantedRewards: RewardItem[] = [];
+
+  if (Array.isArray(bundle.reward_ids) && bundle.reward_ids.length > 0) {
+    const inventoryRows = bundle.reward_ids.map((rewardId) => ({
+      user_id: userId,
+      reward_id: rewardId,
+      source: "promocode" as const,
+    }));
+
+    await adminSupabase
+      .from("user_inventory")
+      .upsert(inventoryRows, { onConflict: "user_id,reward_id" });
+
+    const { data: rewardsData } = await adminSupabase
+      .from("rewards")
+      .select("*")
+      .in("id", bundle.reward_ids);
+
+    if (Array.isArray(rewardsData)) {
+      grantedRewards.push(...(rewardsData as unknown as RewardItem[]));
+    }
+  }
+
+  const allMaterialIdsToGrant = [
+    ...(bundle.specific_material_ids || []),
+    ...chosenMaterialIds,
+  ].filter(Boolean);
+
+  if (allMaterialIdsToGrant.length > 0) {
+    const accessRows = allMaterialIdsToGrant.map((mId) => ({
+      user_id: userId,
+      material_id: mId,
+    }));
+
+    await adminSupabase
+      .from("material_access")
+      .upsert(accessRows, { onConflict: "user_id,material_id" });
+  }
+
+  const { error: rpcError } = await adminSupabase.rpc("increment_promocode_uses", {
+    promo_id: promo.id,
+  });
+
+  if (rpcError) {
+    await adminSupabase
+      .from("promocodes")
+      .update({ current_uses: (promo.current_uses || 0) + 1 })
+      .eq("id", promo.id);
+  }
+
+  const { error: redemptionInsertError } = await adminSupabase
+    .from("promocode_redemptions")
+    .insert({
+      promocode_id: promo.id,
+      user_id: userId,
+      chosen_material_ids: chosenMaterialIds,
+    });
+
+  if (redemptionInsertError) {
+    console.error("Ошибка сохранения записи об активации промокода:", redemptionInsertError);
+  }
+
+  return {
+    success: true,
+    requiresMaterialChoice: false,
+    grantedRewards,
+    physicalPrize: bundle.custom_physical || null,
+    grantedMaterialIds: allMaterialIdsToGrant,
+  };
 }
 </file>
 
@@ -42060,259 +42621,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       </div>
     </>
   );
-}
-</file>
-
-<file path="app/api/admin/promocodes/route.ts">
-import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-
-async function verifyAdmin() {
-  const userClient = await createSupabaseServerClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await userClient.auth.getUser();
-
-  if (authError || !user) {
-    return { user: null, error: "Необходима авторизация", adminSupabase: null };
-  }
-
-  const adminSupabase = getSupabaseAdminClient();
-
-  const { data: profile } = await adminSupabase
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const isAdmin = profile?.is_admin === true;
-  if (!isAdmin) {
-    return { user: null, error: "Доступ запрещен. Требуются права администратора", adminSupabase: null };
-  }
-
-  return { user, error: null, adminSupabase };
-}
-
-export async function GET() {
-  try {
-    const { error: adminErr, adminSupabase } = await verifyAdmin();
-    if (adminErr || !adminSupabase) {
-      return NextResponse.json({ error: adminErr }, { status: 403 });
-    }
-
-    const [{ data: promocodes, error: promoErr }, { data: redemptions, error: redemptionsErr }, { data: allMaterials }, { data: allRewards }] =
-      await Promise.all([
-        adminSupabase
-          .from("promocodes")
-          .select("*")
-          .order("created_at", { ascending: false }),
-        adminSupabase
-          .from("promocode_redemptions")
-          .select(`
-            id,
-            promocode_id,
-            user_id,
-            chosen_material_ids,
-            redeemed_at,
-            promocodes(code, rewards_bundle),
-            profiles:user_id(email, full_name)
-          `)
-          .order("redeemed_at", { ascending: false })
-          .limit(200),
-        adminSupabase.from("materials").select("id, title"),
-        adminSupabase.from("rewards").select("id, title, type"),
-      ]);
-
-    if (promoErr) {
-      return NextResponse.json({ error: promoErr.message }, { status: 400 });
-    }
-
-    const materialsMap = new Map((allMaterials || []).map((m: any) => [m.id, m.title]));
-    const rewardsMap = new Map((allRewards || []).map((r: any) => [r.id, `${r.title} (${r.type})`]));
-
-    const formattedRedemptions = Array.isArray(redemptions)
-      ? redemptions.map((r: any) => {
-          const chosenTitles = (r.chosen_material_ids || []).map(
-            (id: string) => materialsMap.get(id) || id
-          );
-
-          const bundle = r.promocodes?.rewards_bundle || {};
-          const bundleRewardTitles = (bundle.reward_ids || []).map(
-            (id: string) => rewardsMap.get(id) || id
-          );
-          const bundleMaterialTitles = (bundle.specific_material_ids || []).map(
-            (id: string) => materialsMap.get(id) || id
-          );
-
-          return {
-            id: r.id,
-            promocode_id: r.promocode_id,
-            promocode_code: r.promocodes?.code || "—",
-            user_id: r.user_id,
-            user_email: r.profiles?.email || "—",
-            user_full_name: r.profiles?.full_name || "Ученик",
-            chosen_material_titles: chosenTitles,
-            bundle_reward_titles: bundleRewardTitles,
-            bundle_material_titles: bundleMaterialTitles,
-            physical_title: bundle.custom_physical?.title || null,
-            physical_link_url: bundle.custom_physical?.link_url || null,
-            redeemed_at: r.redeemed_at,
-          };
-        })
-      : [];
-
-    return NextResponse.json({
-      promocodes: promocodes || [],
-      redemptions: formattedRedemptions,
-      error: redemptionsErr?.message || null,
-    });
-  } catch (error: any) {
-    console.error("Ошибка при получении промокодов и логов:", error);
-    return NextResponse.json(
-      { error: error?.message || "Внутренняя ошибка сервера" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const { error: adminErr, adminSupabase } = await verifyAdmin();
-    if (adminErr || !adminSupabase) {
-      return NextResponse.json({ error: adminErr }, { status: 403 });
-    }
-
-    const body = await request.json().catch(() => null);
-    if (!body) {
-      return NextResponse.json({ error: "Невалидный JSON" }, { status: 400 });
-    }
-
-    const {
-      id,
-      code,
-      is_active,
-      max_uses,
-      expires_at,
-      rewards_bundle,
-    } = body;
-
-    const normalizedCode = String(code || "").trim().toUpperCase();
-    if (!normalizedCode) {
-      return NextResponse.json(
-        { error: "Укажите значение промокода" },
-        { status: 400 }
-      );
-    }
-
-    let parsedMaxUses: number | null = null;
-    if (max_uses !== null && max_uses !== undefined && max_uses !== "") {
-      const num = Number(max_uses);
-      if (Number.isInteger(num) && num > 0) {
-        parsedMaxUses = num;
-      }
-    }
-
-    let parsedExpiresAt: string | null = null;
-    if (expires_at) {
-      const date = new Date(expires_at);
-      if (!isNaN(date.getTime())) {
-        parsedExpiresAt = date.toISOString();
-      }
-    }
-
-    const bundle = rewards_bundle && typeof rewards_bundle === "object" ? rewards_bundle : {};
-    const sanitizedBundle = {
-      reward_ids: Array.isArray(bundle.reward_ids) ? bundle.reward_ids.map(String) : [],
-      specific_material_ids: Array.isArray(bundle.specific_material_ids) ? bundle.specific_material_ids.map(String) : [],
-      material_choice_count: Math.max(0, Number(bundle.material_choice_count || 0)),
-      custom_physical: bundle.custom_physical && typeof bundle.custom_physical === "object" ? {
-        title: String(bundle.custom_physical.title || "").trim(),
-        text: String(bundle.custom_physical.text || "").trim(),
-        image_url: bundle.custom_physical.image_url ? String(bundle.custom_physical.image_url).trim() : null,
-        link_url: bundle.custom_physical.link_url ? String(bundle.custom_physical.link_url).trim() : null,
-      } : null,
-    };
-
-    const payload: Record<string, any> = {
-      code: normalizedCode,
-      is_active: typeof is_active === "boolean" ? is_active : true,
-      max_uses: parsedMaxUses,
-      expires_at: parsedExpiresAt,
-      rewards_bundle: sanitizedBundle,
-    };
-
-    if (id) {
-      payload.id = id;
-    }
-
-    const { data, error } = await adminSupabase
-      .from("promocodes")
-      .upsert(payload, { onConflict: "id" })
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === "23505") {
-        return NextResponse.json(
-          { error: "Промокод с таким названием уже существует" },
-          { status: 400 }
-        );
-      }
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json({ success: true, promocode: data });
-  } catch (error: any) {
-    console.error("Ошибка при сохранении промокода:", error);
-    return NextResponse.json(
-      { error: error?.message || "Внутренняя ошибка сервера" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(request: Request) {
-  try {
-    const { error: adminErr, adminSupabase } = await verifyAdmin();
-    if (adminErr || !adminSupabase) {
-      return NextResponse.json({ error: adminErr }, { status: 403 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    const clearLogs = searchParams.get("clearLogs");
-
-    if (clearLogs === "true") {
-      const { error } = await adminSupabase
-        .from("promocode_redemptions")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000");
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
-      }
-      return NextResponse.json({ success: true });
-    }
-
-    if (!id) {
-      return NextResponse.json({ error: "Укажите id промокода" }, { status: 400 });
-    }
-
-    const { error } = await adminSupabase.from("promocodes").delete().eq("id", id);
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error("Ошибка при удалении промокода/логов:", error);
-    return NextResponse.json(
-      { error: error?.message || "Внутренняя ошибка сервера" },
-      { status: 500 }
-    );
-  }
 }
 </file>
 
@@ -44030,6 +44338,115 @@ export default function RewardUnboxModal({
 }
 </file>
 
+<file path="components/tour/ProductTour.tsx">
+// components/tour/ProductTour.tsx
+"use client";
+
+import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
+import { ACTIONS, EVENTS, STATUS } from "react-joyride";
+import type { EventData, Controls } from "react-joyride";
+
+import CustomTooltip from "./CustomTooltip";
+import { TOUR_STEPS } from "./TourSteps";
+
+// В V3 Joyride — именованный экспорт (не default), поэтому достаём его вручную
+const Joyride = dynamic(
+  () => import("react-joyride").then((mod) => mod.Joyride),
+  { ssr: false }
+);
+
+interface ProductTourProps {
+  initialRun?: boolean;
+}
+
+export default function ProductTour({ initialRun = false }: ProductTourProps) {
+  const [run, setRun] = useState(initialRun);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Слушатель для запуска тура вручную
+  useEffect(() => {
+    const startTour = () => {
+      setStepIndex(0);
+      setRun(true);
+    };
+
+    window.addEventListener("start-product-tour", startTour);
+    return () => window.removeEventListener("start-product-tour", startTour);
+  }, []);
+
+  // Хак для шага с открытием модалки наград (ждем реального клика по кнопке)
+  useEffect(() => {
+    if (!run) return;
+
+    if (stepIndex === 3) {
+      const rewardsBtn = document.querySelector("#tour-rewards-btn");
+
+      const handleClick = () => {
+        setTimeout(() => setStepIndex(4), 450);
+      };
+
+      if (rewardsBtn) rewardsBtn.addEventListener("click", handleClick);
+      return () => {
+        if (rewardsBtn) rewardsBtn.removeEventListener("click", handleClick);
+      };
+    }
+  }, [stepIndex, run]);
+
+  // В V3: callback -> onEvent, теперь принимает (data, controls)
+  const handleJoyrideEvent = async (data: EventData, _controls: Controls) => {
+    const { status, type, action, index } = data;
+
+    if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
+      if (index === 3 && action === ACTIONS.NEXT) {
+        return;
+      }
+      setStepIndex(index + (action === ACTIONS.PREV ? -1 : 1));
+    }
+
+    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+      setRun(false);
+      setStepIndex(0);
+
+      try {
+        await fetch("/api/profile/update", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ has_seen_tour: true }),
+        });
+      } catch (e) {
+        console.error("Не удалось обновить статус тура", e);
+      }
+    }
+  };
+
+  // Защита от ошибки гидратации
+  if (!isMounted) return null;
+
+  return (
+    <Joyride
+      steps={TOUR_STEPS}
+      run={run}
+      stepIndex={stepIndex}
+      onEvent={handleJoyrideEvent}
+      tooltipComponent={CustomTooltip}
+      continuous={true}
+      options={{
+        zIndex: 10000,
+        overlayColor: "rgba(0, 0, 0, 0.65)",
+        overlayClickAction: false, // было disableOverlayClose={true}
+        spotlightPadding: 10, // было spotlightPadding={10}
+      }}
+    />
+  );
+}
+</file>
+
 <file path="components/AppHeader.tsx">
 "use client";
 
@@ -44221,425 +44638,6 @@ export default function AppHeader({
       )}
     </>
   );
-}
-</file>
-
-<file path="lib/rewards/data.ts">
-// lib/rewards/data.ts
-// Серверный слой работы с базой данных Supabase: Маскот, Стрики и Промокоды.
-
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import type {
-  MascotSettings,
-  RewardItem,
-  RewardType,
-  StreakConfigItem,
-  StreakLeaderboardEntry,
-  StreakStats,
-  UserInventoryItem,
-  PromocodeRedeemResult,
-  PromocodeRewardsBundle,
-} from "./types";
-
-// ---------------------------------------------------------------------------
-// 1. МАСКОТ И НАСТРОЙКИ ЭКИПИРОВКИ
-// ---------------------------------------------------------------------------
-
-export async function getMascotSettings(
-  supabase: SupabaseClient,
-  userId: string
-): Promise<MascotSettings> {
-  const { data: rawSettings } = await supabase
-    .from("mascot_settings")
-    .select(
-      `
-      user_id,
-      equipped_base_id,
-      equipped_hat_id,
-      equipped_aura_id,
-      equipped_emotion_id,
-      equipped_title_id,
-      updated_at,
-      equipped_base:rewards!mascot_settings_equipped_base_id_fkey(*),
-      equipped_hat:rewards!mascot_settings_equipped_hat_id_fkey(*),
-      equipped_aura:rewards!mascot_settings_equipped_aura_id_fkey(*),
-      equipped_emotion:rewards!mascot_settings_equipped_emotion_id_fkey(*),
-      equipped_title:rewards!mascot_settings_equipped_title_id_fkey(*)
-    `
-    )
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (!rawSettings) {
-    return {
-      user_id: userId,
-      equipped_base_id: null,
-      equipped_hat_id: null,
-      equipped_aura_id: null,
-      equipped_emotion_id: null,
-      equipped_title_id: null,
-      updated_at: new Date().toISOString(),
-    };
-  }
-
-  return rawSettings as unknown as MascotSettings;
-}
-
-export async function equipMascotItem(
-  supabase: SupabaseClient,
-  userId: string,
-  category: RewardType,
-  rewardId: string | null
-): Promise<{ success: boolean; error?: string }> {
-  if (rewardId) {
-    const { data: hasItem } = await supabase
-      .from("user_inventory")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("reward_id", rewardId)
-      .maybeSingle();
-
-    if (!hasItem) {
-      return { success: false, error: "У вас нет этой награды в инвентаре." };
-    }
-  }
-
-  const columnMap: Record<RewardType, string> = {
-    base: "equipped_base_id",
-    hat: "equipped_hat_id",
-    aura: "equipped_aura_id",
-    emotion: "equipped_emotion_id",
-    title: "equipped_title_id",
-  };
-
-  const targetColumn = columnMap[category];
-  if (!targetColumn) {
-    return { success: false, error: "Неверная категория элемента." };
-  }
-
-  const payload = {
-    user_id: userId,
-    [targetColumn]: rewardId,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { error } = await supabase
-    .from("mascot_settings")
-    .upsert(payload, { onConflict: "user_id" });
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
-
-  return { success: true };
-}
-
-// ---------------------------------------------------------------------------
-// 2. ИНВЕНТАРЬ ПОЛЬЗОВАТЕЛЯ
-// ---------------------------------------------------------------------------
-
-export async function getUserInventory(
-  supabase: SupabaseClient,
-  userId: string
-): Promise<UserInventoryItem[]> {
-  const { data, error } = await supabase
-    .from("user_inventory")
-    .select("*, reward:rewards(*)")
-    .eq("user_id", userId)
-    .order("unlocked_at", { ascending: false });
-
-  if (error || !Array.isArray(data)) return [];
-  return data as unknown as UserInventoryItem[];
-}
-
-// ---------------------------------------------------------------------------
-// 3. ДОРОЖКА СЕРИИ (СТРИКИ) И ЛИДЕРБОРД
-// ---------------------------------------------------------------------------
-
-export async function getStreakPath(
-  supabase: SupabaseClient,
-  userId: string
-): Promise<{
-  stats: StreakStats;
-  path: StreakConfigItem[];
-}> {
-  const adminSupabase = getSupabaseAdminClient();
-
-  const [{ data: streakRow }, { data: streakConfig }, { data: inventory }] =
-    await Promise.all([
-      adminSupabase
-        .from("user_streaks")
-        .select("current_streak, longest_streak, last_completed_date")
-        .eq("user_id", userId)
-        .maybeSingle(),
-      adminSupabase
-        .from("streak_config")
-        .select("day_number, reward_id, created_at, reward:rewards(*)")
-        .order("day_number", { ascending: true }),
-      adminSupabase
-        .from("user_inventory")
-        .select("reward_id")
-        .eq("user_id", userId)
-        .eq("source", "streak"),
-    ]);
-
-  const currentStreak = Number(streakRow?.current_streak || 0);
-  const maxStreak = Number(streakRow?.longest_streak ?? currentStreak);
-  const lastCompletedAt = streakRow?.last_completed_date
-    ? String(streakRow.last_completed_date)
-    : null;
-
-  let completedToday = false;
-  if (lastCompletedAt) {
-    const lastDate = lastCompletedAt.split("T")[0];
-    const todayDate = new Date().toISOString().split("T")[0];
-    completedToday = lastDate === todayDate;
-  }
-
-  const claimedRewardIds = new Set(
-    Array.isArray(inventory) ? inventory.map((item) => item.reward_id) : []
-  );
-
-  const path: StreakConfigItem[] = Array.isArray(streakConfig)
-    ? streakConfig.map((item: any) => {
-        const isClaimed = claimedRewardIds.has(item.reward_id);
-        const isAvailable = maxStreak >= item.day_number && !isClaimed;
-        return {
-          ...item,
-          is_claimed: isClaimed,
-          is_available: isAvailable,
-        };
-      })
-    : [];
-
-  return {
-    stats: {
-      currentStreak,
-      maxStreak,
-      completedToday,
-      lastCompletedAt,
-    },
-    path,
-  };
-}
-
-export async function getStreakLeaderboard(
-  supabase: SupabaseClient,
-  currentUserId?: string
-): Promise<StreakLeaderboardEntry[]> {
-  const adminSupabase = getSupabaseAdminClient();
-
-  const { data, error } = await adminSupabase
-    .from("user_streaks")
-    .select("user_id, current_streak, longest_streak")
-    .or("current_streak.gt.0,longest_streak.gt.0")
-    .order("longest_streak", { ascending: false })
-    .order("current_streak", { ascending: false })
-    .limit(20);
-
-  if (error || !Array.isArray(data)) return [];
-
-  return data.map((row: any, index: number) => {
-    const current = Number(row.current_streak || 0);
-    const max = Number(row.longest_streak ?? current);
-
-    return {
-      rank: index + 1,
-      user_id: row.user_id,
-      current_streak: current,
-      max_streak: max,
-      is_current_user: row.user_id === currentUserId,
-    };
-  });
-}
-
-export async function claimStreakReward(
-  supabase: SupabaseClient,
-  userId: string,
-  dayNumber: number
-): Promise<{ success: boolean; reward?: RewardItem; error?: string }> {
-  const adminSupabase = getSupabaseAdminClient();
-
-  const { data: streakRow } = await adminSupabase
-    .from("user_streaks")
-    .select("current_streak, longest_streak")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  const maxStreak = Number(
-    streakRow?.longest_streak ?? streakRow?.current_streak ?? 0
-  );
-
-  if (maxStreak < dayNumber) {
-    return { success: false, error: "Вы ещё не достигли этого рекорда серии." };
-  }
-
-  const { data: streakConfig } = await adminSupabase
-    .from("streak_config")
-    .select("reward_id, reward:rewards(*)")
-    .eq("day_number", dayNumber)
-    .maybeSingle();
-
-  if (!streakConfig || !streakConfig.reward_id) {
-    return { success: false, error: "Награда для этого дня не настроена." };
-  }
-
-  const rewardId = streakConfig.reward_id;
-
-  const { error: insertError } = await adminSupabase.from("user_inventory").insert({
-    user_id: userId,
-    reward_id: rewardId,
-    source: "streak",
-  });
-
-  if (insertError) {
-    if (insertError.code === "23505") {
-      return { success: false, error: "Награда за этот день уже получена." };
-    }
-    return { success: false, error: insertError.message };
-  }
-
-  return {
-    success: true,
-    reward: streakConfig.reward as unknown as RewardItem,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// 4. ПРОМОКОДЫ И АКТИВАЦИЯ
-// ---------------------------------------------------------------------------
-
-export async function redeemPromocode(
-  supabase: SupabaseClient,
-  userId: string,
-  rawCode: string,
-  chosenMaterialIds: string[] = [],
-  allowSkipIfAllUnlocked: boolean = false
-): Promise<PromocodeRedeemResult> {
-  const code = String(rawCode || "").trim().toUpperCase();
-  if (!code) return { success: false, error: "Введите промокод." };
-
-  const adminSupabase = getSupabaseAdminClient();
-
-  const { data: promo, error: promoError } = await adminSupabase
-    .from("promocodes")
-    .select("*")
-    .eq("code", code)
-    .maybeSingle();
-
-  if (promoError || !promo) {
-    return { success: false, error: "Промокод не найден." };
-  }
-
-  if (!promo.is_active) {
-    return { success: false, error: "Промокод деактивирован." };
-  }
-
-  if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
-    return { success: false, error: "Срок действия промокода истёк." };
-  }
-
-  if (promo.max_uses !== null && promo.current_uses >= promo.max_uses) {
-    return { success: false, error: "Лимит активаций промокода исчерпан." };
-  }
-
-  const { data: existingRedemption } = await adminSupabase
-    .from("promocode_redemptions")
-    .select("id")
-    .eq("promocode_id", promo.id)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (existingRedemption) {
-    return { success: false, error: "Вы уже активировали этот промокод." };
-  }
-
-  const bundle: PromocodeRewardsBundle = promo.rewards_bundle || {};
-  const requiredChoiceCount = Number(bundle.material_choice_count || 0);
-
-  if (
-    requiredChoiceCount > 0 &&
-    chosenMaterialIds.length < requiredChoiceCount &&
-    !allowSkipIfAllUnlocked
-  ) {
-    return {
-      success: true,
-      requiresMaterialChoice: true,
-      remainingMaterialChoices: requiredChoiceCount - chosenMaterialIds.length,
-      physicalPrize: bundle.custom_physical || null,
-    };
-  }
-
-  const grantedRewards: RewardItem[] = [];
-
-  if (Array.isArray(bundle.reward_ids) && bundle.reward_ids.length > 0) {
-    const inventoryRows = bundle.reward_ids.map((rewardId) => ({
-      user_id: userId,
-      reward_id: rewardId,
-      source: "promocode" as const,
-    }));
-
-    await adminSupabase
-      .from("user_inventory")
-      .upsert(inventoryRows, { onConflict: "user_id,reward_id" });
-
-    const { data: rewardsData } = await adminSupabase
-      .from("rewards")
-      .select("*")
-      .in("id", bundle.reward_ids);
-
-    if (Array.isArray(rewardsData)) {
-      grantedRewards.push(...(rewardsData as unknown as RewardItem[]));
-    }
-  }
-
-  const allMaterialIdsToGrant = [
-    ...(bundle.specific_material_ids || []),
-    ...chosenMaterialIds,
-  ].filter(Boolean);
-
-  if (allMaterialIdsToGrant.length > 0) {
-    const accessRows = allMaterialIdsToGrant.map((mId) => ({
-      user_id: userId,
-      material_id: mId,
-    }));
-
-    await adminSupabase
-      .from("material_access")
-      .upsert(accessRows, { onConflict: "user_id,material_id" });
-  }
-
-  const { error: rpcError } = await adminSupabase.rpc("increment_promocode_uses", {
-    promo_id: promo.id,
-  });
-
-  if (rpcError) {
-    await adminSupabase
-      .from("promocodes")
-      .update({ current_uses: (promo.current_uses || 0) + 1 })
-      .eq("id", promo.id);
-  }
-
-  const { error: redemptionInsertError } = await adminSupabase
-    .from("promocode_redemptions")
-    .insert({
-      promocode_id: promo.id,
-      user_id: userId,
-      chosen_material_ids: chosenMaterialIds,
-    });
-
-  if (redemptionInsertError) {
-    console.error("Ошибка сохранения записи об активации промокода:", redemptionInsertError);
-  }
-
-  return {
-    success: true,
-    requiresMaterialChoice: false,
-    grantedRewards,
-    physicalPrize: bundle.custom_physical || null,
-    grantedMaterialIds: allMaterialIdsToGrant,
-  };
 }
 </file>
 
@@ -49591,40 +49589,6 @@ export default async function PricingPage({
 }
 </file>
 
-<file path="app/layout.tsx">
-// app/layout.tsx
-import "./globals.css";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "hipposha_book",
-  description: "hipposha_book",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <html 
-      lang="ru" 
-      className="h-full bg-[var(--p-page-bg,#0b0f19)] m-0 p-0 font-sans"
-    >
-      <head>
-        <link rel="stylesheet" href="/styles/base.css" />
-        
-        {/* Железобетонное подключение шрифта Inter */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-      </head>
-      <body className="min-h-full m-0 p-0 flex flex-col bg-[var(--p-page-bg,#0b0f19)] text-white antialiased">
-        {children}
-      </body>
-    </html>
-  );
-}
-</file>
-
 <file path="components/rewards/ReferralTimeline.tsx">
 "use client";
 
@@ -49905,6 +49869,40 @@ html, body {
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.2); border-radius: 10px; }
+</file>
+
+<file path="app/layout.tsx">
+// app/layout.tsx
+import "./globals.css";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "hipposha_book",
+  description: "hipposha_book",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html 
+      lang="ru" 
+      className="h-full bg-[var(--p-page-bg,#0b0f19)] m-0 p-0 font-sans"
+    >
+      <head>
+        <link rel="stylesheet" href="/styles/base.css" />
+        
+        {/* Железобетонное подключение шрифта Inter */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+      </head>
+      <body className="min-h-full m-0 p-0 flex flex-col bg-[var(--p-page-bg,#0b0f19)] text-white antialiased">
+        {children}
+      </body>
+    </html>
+  );
+}
 </file>
 
 <file path="components/rewards/MaterialChoiceModal.tsx">

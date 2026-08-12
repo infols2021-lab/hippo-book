@@ -1,3 +1,4 @@
+// app/(app)/projects/[slug]/profile/ProfileClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -8,6 +9,7 @@ import Modal from "@/components/Modal";
 import RewardsModal from "@/components/rewards/RewardsModal";
 import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal";
 import { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTimeline";
+import { useTour } from "@/components/tour/TourProvider";
 
 import "./profile.css";
 
@@ -156,6 +158,7 @@ export default function ProfileClient({
   equippedTitleLabel = null,
 }: Props) {
   const router = useRouter();
+  const { stage, advanceTour } = useTour();
   const backgroundProxyUrl = useMemo(() => toStorageProxyUrl(backgroundUrl), [backgroundUrl]);
 
   const [profile, setProfile] = useState<ProfileData>(initialProfile);
@@ -196,6 +199,13 @@ export default function ProfileClient({
     }
   );
   const [streakLoading, setStreakLoading] = useState<boolean>(!streakProp);
+
+  // Fallback: если пользователь вернулся из заявок через кнопку браузера "Назад"
+  useEffect(() => {
+    if (stage === "requests_info") {
+      advanceTour("materials_gate");
+    }
+  }, [stage, advanceTour]);
 
   function showNotification(text: string, type: "success" | "error" = "success") {
     setNotif({ type, text });
@@ -310,6 +320,10 @@ export default function ProfileClient({
   function openRewards(tab: RewardsTabType = "wardrobe") {
     setRewardsInitialTab(tab);
     setRewardsModalOpen(true);
+    // Двигаем тур, если ждали клика по Наградам
+    if (stage === "rewards_gate") {
+      advanceTour("rewards_tour");
+    }
   }
 
   function openEdit() {
@@ -504,13 +518,24 @@ export default function ProfileClient({
               <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openRewards("wardrobe"); }}>
                 Награды и гардероб
               </button>
-              <Link className="sheet-item" href={`/projects/${projectSlug}/materials`} onClick={() => setMobileMenuOpen(false)}>
+              <Link 
+                className="sheet-item" 
+                href={`/projects/${projectSlug}/materials`} 
+                onClick={() => {
+                  if (stage === "materials_gate") advanceTour("rewards_gate");
+                  setMobileMenuOpen(false);
+                }}
+              >
                 Все материалы
               </Link>
               <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openEdit(); }}>
                 Редактировать профиль
               </button>
-              <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); router.push(`/projects/${projectSlug}/requests`); }}>
+              <button className="sheet-item" onClick={() => { 
+                if (stage === "profile_overview") advanceTour("requests_info");
+                setMobileMenuOpen(false); 
+                router.push(`/projects/${projectSlug}/requests`); 
+              }}>
                 Заявки на покупку
               </button>
               {profile.is_admin && (
@@ -636,11 +661,23 @@ export default function ProfileClient({
               </button>
             )}
 
-            <button type="button" className="nav-pill" onClick={() => openRewards("wardrobe")}>
+            <button 
+              id="tour-rewards-btn"
+              type="button" 
+              className="nav-pill" 
+              onClick={() => openRewards("wardrobe")}
+            >
               Награды
             </button>
 
-            <Link className="nav-pill" href={`/projects/${projectSlug}/materials`}>
+            <Link 
+              id="tour-materials-link"
+              className="nav-pill" 
+              href={`/projects/${projectSlug}/materials`}
+              onClick={() => {
+                if (stage === "materials_gate") advanceTour("rewards_gate");
+              }}
+            >
               Материалы
             </Link>
             <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}>
@@ -714,8 +751,12 @@ export default function ProfileClient({
                 Редактировать профиль
               </button>
               <button
+                id="tour-requests-link"
                 className="btn secondary"
-                onClick={() => router.push(`/projects/${projectSlug}/requests`)}
+                onClick={() => {
+                  if (stage === "profile_overview") advanceTour("requests_info");
+                  router.push(`/projects/${projectSlug}/requests`);
+                }}
                 type="button"
               >
                 Заявки на покупку

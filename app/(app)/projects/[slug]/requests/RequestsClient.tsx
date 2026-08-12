@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import { useRouter } from "next/navigation";
+import { useTour } from "@/components/tour/TourProvider";
 
 import "./requests.css";
 
@@ -147,6 +148,8 @@ export default function RequestsClient({
   ownedMaterialIds = [],
 }: Props) {
   const router = useRouter();
+  const { stage, advanceTour } = useTour();
+  
   const [requests, setRequests] = useState<PurchaseRequest[]>(() =>
     initialRequests.map(normalizeRequestRow)
   );
@@ -182,7 +185,6 @@ export default function RequestsClient({
 
   const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
 
-  // Надежный предзагрузчик QR-кода, решающий проблему бесконечной загрузки
   useEffect(() => {
     if (!paymentModalOpen) return;
     let alive = true;
@@ -226,7 +228,6 @@ export default function RequestsClient({
       setMaterialsLoading(true);
       try {
         if (!tabs || tabs.length === 0) {
-          // purchasable=true — просим API не отдавать демо-материалы: их нельзя купить.
           const res = await fetch(`/api/projects/${project.slug}/materials?purchasable=true`, {
             cache: "no-store",
           });
@@ -248,7 +249,6 @@ export default function RequestsClient({
         }
 
         const tabPromises = tabs.map(async (tab) => {
-          // purchasable=true — то же самое: демо не должно попадать в витрину заявок.
           const res = await fetch(
             `/api/projects/${project.slug}/materials?tab=${tab.slug}&purchasable=true`,
             { cache: "no-store" }
@@ -357,7 +357,6 @@ export default function RequestsClient({
     return requests.filter((r) => !r.is_processed);
   }, [requests]);
 
-  // ДЕДУПЛИКАЦИЯ И РАСЧЕТ ДЛЯ ПОКАЗАТЬ QR (ВСЕ НЕОБРАБОТАННЫЕ ЗАЯВКИ)
   const aggregatedPendingSummary = useMemo(() => {
     const itemsMap = new Map<
       string,
@@ -424,7 +423,6 @@ export default function RequestsClient({
     };
   }, [pendingRequests, materials, ownedMaterialSet]);
 
-  // СОСТАВ И СУММА ТОЛЬКО ТЕКУЩЕЙ ОФОРМЛЯЕМОЙ ЗАЯВКИ (ШАГ 2)
   const singleRequestReceipt = useMemo(() => {
     const otherPendingRequests = pendingRequests.filter((r) => r.id !== editingId);
     const otherPendingMaterialIds = new Set<string>();
@@ -632,7 +630,6 @@ export default function RequestsClient({
         }
       `}</style>
 
-      {/* Уведомления */}
       {notif && (
         <div
           style={{
@@ -682,7 +679,6 @@ export default function RequestsClient({
         </div>
       )}
 
-      {/* МОДАЛКА СОЗДАНИЯ / РЕДАКТИРОВАНИЯ ЗАЯВКИ */}
       <Modal
         open={requestModalOpen}
         onClose={() => setRequestModalOpen(false)}
@@ -710,7 +706,6 @@ export default function RequestsClient({
           }}
         >
           {modalStep === 1 ? (
-            /* ================= ШАГ 1: ВИТРИНА КАРТОЧЕК ================= */
             <div>
               <div className="form-group">
                 <label>Номер заявки:</label>
@@ -722,7 +717,6 @@ export default function RequestsClient({
                 />
               </div>
 
-              {/* Фильтр по уровням проекта */}
               {levels && levels.length > 0 && (
                 <div className="level-filter-container">
                   <div className="level-filter-title">Уровень / Класс:</div>
@@ -748,7 +742,6 @@ export default function RequestsClient({
                 </div>
               )}
 
-              {/* Табы разделов */}
               <div className="vitrine-tabs no-scrollbar">
                 <button
                   type="button"
@@ -769,7 +762,6 @@ export default function RequestsClient({
                 ))}
               </div>
 
-              {/* Сетка материалов */}
               {materialsLoading ? (
                 <div style={{ textAlign: "center", padding: "30px", fontWeight: 700 }}>
                   Загружаем доступные материалы...
@@ -831,7 +823,6 @@ export default function RequestsClient({
                 </div>
               )}
 
-              {/* Итог снизу */}
               <div className="cart-summary-bar">
                 <div>
                   <span style={{ fontSize: "13px", opacity: 0.8 }}>Выбрано товаров: </span>
@@ -864,7 +855,6 @@ export default function RequestsClient({
               </div>
             </div>
           ) : (
-            /* ================= ШАГ 2: ИТОГОВЫЙ ЧЕК ТЕКУЩЕЙ ЗАЯВКИ ================= */
             <div>
               <div className="receipt-box">
                 <div
@@ -928,7 +918,6 @@ export default function RequestsClient({
         </form>
       </Modal>
 
-      {/* МОДАЛКА ОПЛАТЫ И QR-КОДА */}
       <Modal
         open={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
@@ -1073,7 +1062,6 @@ export default function RequestsClient({
         </div>
       </Modal>
 
-      {/* МОБИЛЬНОЕ ВЫЕЗЖАЮЩЕЕ МЕНЮ (BOTTOM SHEET) */}
       {mobileMenuOpen && (
         <>
           <div className="mobile-bottom-sheet-overlay" onClick={() => setMobileMenuOpen(false)} />
@@ -1084,7 +1072,10 @@ export default function RequestsClient({
               <Link
                 className="sheet-item"
                 href={`/projects/${project.slug}/profile`}
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={() => {
+                  if (stage === "requests_info") advanceTour("materials_gate");
+                  setMobileMenuOpen(false);
+                }}
               >
                 Профиль
               </Link>
@@ -1107,10 +1098,8 @@ export default function RequestsClient({
         </>
       )}
 
-      {/* ОСНОВНОЙ ИНТЕРФЕЙС */}
       <div className="container">
         
-        {/* МОБИЛЬНАЯ ШАПКА */}
         <div className="mobile-header-bar">
           <div className="mobile-header-left">
             <div className="brand-mark">{brandMark}</div>
@@ -1129,7 +1118,6 @@ export default function RequestsClient({
           </button>
         </div>
 
-        {/* ДЕСКТОПНАЯ ШАПКА */}
         <div className="profile-topbar">
           <div className="brand">
             <div className="brand-mark">{brandMark}</div>
@@ -1139,7 +1127,13 @@ export default function RequestsClient({
             </div>
           </div>
           <div className="top-actions">
-            <Link className="nav-pill" href={`/projects/${project.slug}/profile`}>
+            <Link 
+              className="nav-pill" 
+              href={`/projects/${project.slug}/profile`}
+              onClick={() => {
+                if (stage === "requests_info") advanceTour("materials_gate");
+              }}
+            >
               Профиль
             </Link>
             <Link className="nav-pill" href={`/projects/${project.slug}/materials`}>
@@ -1166,7 +1160,13 @@ export default function RequestsClient({
           </div>
 
           <div className="requests-actions" style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
-            <button className="btn" onClick={openCreate} type="button" disabled={busy}>
+            <button 
+              id="tour-create-request-btn"
+              className="btn" 
+              onClick={openCreate} 
+              type="button" 
+              disabled={busy}
+            >
               + Создать новую заявку
             </button>
             <button
@@ -1192,13 +1192,17 @@ export default function RequestsClient({
             <div className="empty-state" style={{ textAlign: "center", padding: "40px 0" }}>
               <h3>Заявок пока нет</h3>
               <p style={{ opacity: 0.7, marginBottom: 16 }}>Создайте свою первую заявку на покупку доступа к учебным материалам</p>
-              <button className="btn" onClick={openCreate} type="button" disabled={busy}>
+              <button 
+                className="btn" 
+                onClick={openCreate} 
+                type="button" 
+                disabled={busy}
+              >
                 + Создать заявку
               </button>
             </div>
           ) : (
             <>
-              {/* ДЕСКТОПНАЯ ТАБЛИЦА */}
               <div className="requests-table-wrapper">
                 <table className="requests-table">
                   <thead>
@@ -1274,7 +1278,6 @@ export default function RequestsClient({
                 </table>
               </div>
 
-              {/* МОБИЛЬНЫЕ КАРТОЧКИ */}
               <div className="requests-cards-mobile">
                 {requests.map((r) => {
                   const locked = r.is_processed;

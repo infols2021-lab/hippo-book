@@ -1,3 +1,4 @@
+// lib/data/profile.ts
 import "server-only";
 
 import type { DataAuthContext, DataAuthProfile } from "@/lib/data/auth";
@@ -57,7 +58,6 @@ function normalizeRecentAssignment(row: any): ProfileRecentAssignment {
 export async function loadProfileStreakSnapshot(ctx: DataAuthContext): Promise<ProfileStreakSnapshot | null> {
   const { supabase, user } = ctx;
 
-  // 1. Попытка вызова RPC
   try {
     const { data: rpcData, error: rpcError } = await supabase.rpc("get_my_streak_snapshot");
 
@@ -68,7 +68,6 @@ export async function loadProfileStreakSnapshot(ctx: DataAuthContext): Promise<P
     console.warn("RPC get_my_streak_snapshot не сработал, переходим на прямое чтение user_streaks:", e);
   }
 
-  // 2. Фолбэк: прямое чтение таблицы user_streaks
   const { data: streakRow } = await supabase
     .from("user_streaks")
     .select("current_streak, longest_streak, last_completed_date")
@@ -198,7 +197,9 @@ export async function updateOwnProfile(
       region,
       is_admin,
       completed_assignments_count,
-      ga_completed_assignments_count
+      ga_completed_assignments_count,
+      has_seen_tour,
+      tour_stage
     `,
     )
     .single();

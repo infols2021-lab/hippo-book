@@ -86,6 +86,25 @@ export default function RewardsModal({
     prize: CustomPhysicalPrize | null;
   }>({ isOpen: false, prize: null });
 
+  // Перехватываем сигналы от ProductTour для переключения вкладок
+  useEffect(() => {
+    const handleTourTab = (e: CustomEvent | Event) => {
+      const tab = (e as CustomEvent).detail;
+      const tabMap: Record<string, "wardrobe" | "streaks" | "referrals" | "promocode"> = {
+        "wardrobe": "wardrobe",
+        "streaks": "streaks",
+        "referral": "referrals",
+        "promos": "promocode"
+      };
+      if (tabMap[tab]) {
+        setActiveTab(tabMap[tab]);
+      }
+    };
+    
+    window.addEventListener("tour:show-reward-tab", handleTourTab);
+    return () => window.removeEventListener("tour:show-reward-tab", handleTourTab);
+  }, []);
+
   useEffect(() => {
     if (showModal) {
       setActiveTab(normalizeTab(initialTab || defaultTab));
@@ -311,10 +330,8 @@ export default function RewardsModal({
             borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
           }}
         >
-          {/* Индикатор для свайпа на мобильных */}
           <div className="w-10 h-1 rounded-full mx-auto sm:hidden mt-2 -mb-2" style={{ backgroundColor: "color-mix(in srgb, var(--project-text) 20%, transparent)" }} />
 
-          {/* Шапка модалки */}
           <div
             className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-6 border-b gap-3"
             style={{
@@ -345,7 +362,6 @@ export default function RewardsModal({
               </button>
             </div>
 
-            {/* Табы */}
             <div
               className="flex gap-1 p-1 rounded-2xl border overflow-x-auto no-scrollbar w-full sm:w-auto"
               style={{
@@ -354,7 +370,7 @@ export default function RewardsModal({
               }}
             >
               <button
-                id="tour-wardrobe" // МИШЕНЬ ОНБОРДИНГА
+                id="tour-wardrobe"
                 type="button"
                 onClick={() => setActiveTab("wardrobe")}
                 className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
@@ -367,7 +383,7 @@ export default function RewardsModal({
                 Гардероб
               </button>
               <button
-                id="tour-streaks" // МИШЕНЬ ОНБОРДИНГА
+                id="tour-streaks"
                 type="button"
                 onClick={() => setActiveTab("streaks")}
                 className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
@@ -381,6 +397,7 @@ export default function RewardsModal({
               </button>
               
               <button
+                id="tour-referral"
                 type="button"
                 onClick={() => setActiveTab("referrals")}
                 className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
@@ -394,7 +411,7 @@ export default function RewardsModal({
               </button>
 
               <button
-                id="tour-promos" // МИШЕНЬ ОНБОРДИНГА
+                id="tour-promos"
                 type="button"
                 onClick={() => setActiveTab("promocode")}
                 className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
@@ -422,7 +439,6 @@ export default function RewardsModal({
             </button>
           </div>
 
-          {/* Контент модалки */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             {loading ? (
               <div className="h-full flex items-center justify-center font-bold text-xs sm:text-sm uppercase tracking-wider opacity-60">
@@ -430,7 +446,6 @@ export default function RewardsModal({
               </div>
             ) : (
               <>
-                {/* Вкладка 1: ГАРДЕРОБ */}
                 {activeTab === "wardrobe" && (
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 h-full">
                     <div
@@ -614,7 +629,6 @@ export default function RewardsModal({
                   </div>
                 )}
 
-                {/* Вкладка 2: ДОРОЖКА СЕРИИ */}
                 {activeTab === "streaks" && (
                   <StreakTimeline
                     stats={streakStats}
@@ -623,10 +637,8 @@ export default function RewardsModal({
                   />
                 )}
 
-                {/* Вкладка 3: РЕФЕРАЛКА */}
                 {activeTab === "referrals" && <ReferralTab />}
 
-                {/* Вкладка 4: ПРОМОКОД */}
                 {activeTab === "promocode" && (
                   <div className="max-w-xl mx-auto py-2 sm:py-4 space-y-6">
                     <div className="text-center space-y-1.5">
@@ -693,7 +705,6 @@ export default function RewardsModal({
                       </button>
                     </form>
 
-                    {/* История активированных промокодов */}
                     <div
                       className="border-t pt-6"
                       style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
@@ -811,7 +822,6 @@ export default function RewardsModal({
         </div>
       </div>
 
-      {/* Детали истории промокода */}
       {selectedHistoryLog && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200"
@@ -837,13 +847,11 @@ export default function RewardsModal({
             </div>
 
             <div className="space-y-3 text-left max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-              {/* Промокод */}
               <div className="p-4 rounded-2xl border" style={{ backgroundColor: "color-mix(in srgb, var(--project-primary) 5%, transparent)", borderColor: "color-mix(in srgb, var(--project-primary) 15%, transparent)" }}>
                 <div className="text-[10px] font-black uppercase tracking-wider mb-1" style={{ color: "var(--project-primary)" }}>Активированный код</div>
                 <div className="font-mono font-black text-lg" style={{ color: "var(--project-primary)" }}>{selectedHistoryLog.code}</div>
               </div>
 
-              {/* Награды маскота */}
               {selectedHistoryLog.granted_reward_titles && selectedHistoryLog.granted_reward_titles.length > 0 && (
                 <div 
                   className="p-4 rounded-2xl border"
@@ -857,7 +865,6 @@ export default function RewardsModal({
                 </div>
               )}
 
-              {/* Материалы */}
               {selectedHistoryLog.granted_material_titles && selectedHistoryLog.granted_material_titles.length > 0 && (
                 <div 
                   className="p-4 rounded-2xl border"
@@ -871,7 +878,6 @@ export default function RewardsModal({
                 </div>
               )}
 
-              {/* Физический приз */}
               {selectedHistoryLog.physical_prize && (
                 <div 
                   className="p-4 rounded-2xl border text-center flex flex-col items-center"
@@ -896,7 +902,6 @@ export default function RewardsModal({
                 </div>
               )}
 
-              {/* Если ничего нет */}
               {!selectedHistoryLog.granted_reward_titles?.length && !selectedHistoryLog.granted_material_titles?.length && !selectedHistoryLog.physical_prize && (
                  <div className="p-4 text-center opacity-50 font-bold text-sm">
                    Награды отсутствуют (возможно, просто открыт доступ)
@@ -911,7 +916,6 @@ export default function RewardsModal({
         </div>
       )}
 
-      {/* Модалка демонстрации выданных предметов */}
       {unboxModalOpen && (
         <RewardUnboxModal
           isOpen={unboxModalOpen}
@@ -923,7 +927,6 @@ export default function RewardsModal({
         />
       )}
 
-      {/* Выбор материала по промокоду */}
       {materialChoiceState.isOpen && (
         <MaterialChoiceModal
           isOpen={materialChoiceState.isOpen}
@@ -936,7 +939,6 @@ export default function RewardsModal({
         />
       )}
 
-      {/* Физический приз */}
       {physicalPrizeState.isOpen && physicalPrizeState.prize && (
         <PhysicalPrizeModal
           isOpen={physicalPrizeState.isOpen}

@@ -15,13 +15,17 @@ export default function CustomTooltip({
   tooltipProps,
   isLastStep,
 }: TooltipRenderProps) {
-  // Приводим базовый шаг к нашему расширенному типу для доступа к mascotImage
   const customStep = step as CustomTourStep;
+
+  // Определяем, центрирован ли тултип (для первого шага на портале)
+  // ВАЖНО: `placement` находится в `step`, а не в `tooltipProps`
+  const isCentered = step.placement === "center";
 
   return (
     <div
       {...tooltipProps}
-      className="relative flex flex-col sm:flex-row gap-2 sm:gap-6 p-5 sm:p-7 rounded-[32px] border shadow-2xl max-w-lg w-full animate-in fade-in zoom-in-95 duration-300"
+      // Жестко ограничиваем ширину, чтобы не вылезало за экран на мобилках
+      className={`relative flex flex-col ${isCentered ? 'sm:flex-col items-center text-center' : 'sm:flex-row'} gap-4 sm:gap-6 p-5 sm:p-7 rounded-[32px] border shadow-2xl w-[calc(100vw-24px)] max-w-lg animate-in fade-in zoom-in-95 duration-300`}
       style={{
         backgroundColor: "var(--project-card-bg, #ffffff)",
         borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
@@ -31,13 +35,17 @@ export default function CustomTooltip({
     >
       {/* Изображение маскота */}
       {customStep.mascotImage && (
-        <div className="flex-shrink-0 flex justify-center sm:justify-start -mt-20 sm:-mt-10 sm:-ml-16 pointer-events-none drop-shadow-xl z-10">
-          <div className="relative w-36 h-36 sm:w-48 sm:h-48">
+        <div className={`flex-shrink-0 flex justify-center pointer-events-none drop-shadow-xl z-10 ${
+          isCentered 
+            ? "-mt-16 sm:-mt-20" // Если по центру, маскот торчит сверху
+            : "-mt-16 sm:-mt-10 sm:-ml-12" // Если сбоку, маскот торчит слева-сверху
+        }`}>
+          <div className="relative w-32 h-32 sm:w-40 sm:h-40">
             <Image
               src={customStep.mascotImage}
-              alt="Mascot"
+              alt="Mascot Guide"
               fill
-              priority={true} // Ключевой флаг для моментальной отрисовки
+              priority={true}
               className="object-contain"
             />
           </div>
@@ -45,12 +53,21 @@ export default function CustomTooltip({
       )}
 
       {/* Контентная часть */}
-      <div className="flex-1 flex flex-col justify-center mt-2 sm:mt-0">
+      <div className="flex-1 flex flex-col justify-center w-full">
         {step.title && (
-          <h3 className="text-base sm:text-lg font-black uppercase tracking-wider mb-2.5">
-            {step.title}
-          </h3>
+          <div className="mb-2">
+            <span 
+              className="inline-block text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md mb-1.5"
+              style={{ backgroundColor: "color-mix(in srgb, var(--project-primary) 15%, transparent)", color: "var(--project-primary)" }}
+            >
+              Инструктаж
+            </span>
+            <h3 className="text-base sm:text-lg font-black tracking-tight leading-tight">
+              {step.title}
+            </h3>
+          </div>
         )}
+        
         <div
           className="text-sm font-medium leading-relaxed mb-6"
           style={{ color: "color-mix(in srgb, var(--project-text) 75%, transparent)" }}
@@ -60,7 +77,7 @@ export default function CustomTooltip({
 
         {/* Панель кнопок */}
         <div 
-          className="flex items-center justify-between mt-auto pt-4 border-t" 
+          className="flex items-center justify-between mt-auto pt-4 border-t w-full" 
           style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
         >
           <button
@@ -68,11 +85,11 @@ export default function CustomTooltip({
             className="text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-colors hover:opacity-70 px-2 py-2"
             style={{ color: "color-mix(in srgb, var(--project-text) 50%, transparent)" }}
           >
-            Пропустить
+            Закрыть тур
           </button>
 
           <div className="flex items-center gap-2">
-            {index > 0 && (
+            {index > 0 && !isCentered && (
               <button
                 {...backProps}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border hover:brightness-95"
@@ -85,7 +102,7 @@ export default function CustomTooltip({
               </button>
             )}
             
-            {/* Скрываем кнопку "Далее", если шаг требует клика по самой мишени */}
+            {/* Если шаг требует реального клика по элементу, скрываем кнопку "Далее" */}
             {!customStep.hideNextButton && (
               <button
                 {...primaryProps}

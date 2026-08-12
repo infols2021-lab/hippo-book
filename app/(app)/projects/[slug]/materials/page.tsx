@@ -6,6 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import { getProjectBySlug } from "@/lib/projects/loader";
 import { loadProjectMaterialsData } from "@/lib/data/materials";
 import type { MaterialWithProgress } from "@/lib/materials/types";
+import { MaterialsTourTrigger } from "@/components/tour/MaterialsTourTrigger";
 
 import "./materials.css";
 
@@ -154,6 +155,8 @@ export default async function ProjectMaterialsPage({
 
   return (
     <div className="materials-page">
+      <MaterialsTourTrigger />
+      
       <div className="materials-container">
         <AppHeader
           nav={[
