@@ -171,14 +171,16 @@ export default function RequestsClient({
   );
 
   useEffect(() => {
-    dispatchTourPageReady();
-  }, []);
-
-  useEffect(() => {
-    if (stage === "requests_info" || stage === "requests_return_gate") {
-      dispatchTourPageReady();
+    if (stage === "profile_requests_gate") {
+      advanceTour("requests_info");
+      return;
     }
-  }, [stage]);
+    if (stage === "requests_info" || stage === "requests_return_gate") {
+      const timer = setTimeout(() => dispatchTourPageReady(), 150);
+      return () => clearTimeout(timer);
+    }
+    dispatchTourPageReady();
+  }, [stage, advanceTour]);
 
   const [modalStep, setModalStep] = useState<1 | 2>(1);
 

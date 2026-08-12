@@ -109,6 +109,33 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       mascotImage: pickMascotImage("profile_stats"),
       skipBeacon: true,
     },
+    {
+      target: visibleTourTarget('[data-tour="profile-avatar"]'),
+      title: "Аватар маскота",
+      content:
+        "Это ваш персональный маскот. Нажмите на аватар, чтобы открыть гардероб и настроить внешний вид.",
+      mascotImage: pickMascotImage("profile_avatar"),
+      skipBeacon: true,
+      placement: "right",
+    },
+    {
+      target: visibleTourTarget('[data-tour="profile-title"]'),
+      title: "Титул",
+      content:
+        "Титул — особый знак отличия. Его можно получить за стрики, рефералов или промокоды и сменить в гардеробе.",
+      mascotImage: pickMascotImage("profile_title"),
+      skipBeacon: true,
+      placement: "right",
+    },
+    {
+      target: visibleTourTarget('[data-tour="profile-details"]'),
+      title: "Данные профиля",
+      content:
+        "Под аватаром — ваши контактные данные: телефон и регион. Их можно изменить через «Редактировать профиль».",
+      mascotImage: pickMascotImage("profile_details"),
+      skipBeacon: true,
+      placement: "right",
+    },
   ],
   profile_requests_gate: [
     {
@@ -291,17 +318,55 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
           "Вверху профиля — компактная статистика: общий прогресс, материалы, решённые и доступные задания по направлению.",
         placement: "bottom",
       },
+      {
+        ...base[1],
+        target: visibleTourTarget('[data-tour="profile-avatar"]'),
+        title: "Аватар",
+        content:
+          "Нажмите на аватар в шапке — откроется гардероб, где можно менять внешность маскота.",
+        placement: "bottom",
+      },
+      {
+        ...base[2],
+        target: visibleTourTarget('[data-tour="profile-title"]'),
+        title: "Титул",
+        content:
+          "Титул показывает ваши достижения. Получайте новые за стрики и приглашения друзей.",
+        placement: "bottom",
+      },
+      {
+        ...base[3],
+        target: visibleTourTarget('[data-tour="profile-details"]'),
+        title: "О профиле",
+        content:
+          "Здесь отображаются имя и контакты. Редактировать их можно через меню ☰.",
+        placement: "bottom",
+      },
+    ];
+  }
+
+  if (stage === "requests_info") {
+    return [
+      {
+        ...base[0],
+        placement: "center",
+        skipScroll: true,
+        content:
+          "Вы выбираете материалы, создаёте заявку и получаете QR для оплаты. После подтверждения администратором доступ откроется автоматически. Сейчас создавать заявку не нужно.",
+      },
+      {
+        ...base[1],
+        placement: "top",
+        skipScroll: true,
+        hideNextButton: false,
+        blockTargetInteraction: true,
+        primaryLabel: "Понятно",
+      },
     ];
   }
 
   if (isMobileMenuGateStage(stage) && base.length === 1) {
     return [mobileBurgerIntro(stage), withMobileMenuTarget(base[0], stage)];
-  }
-
-  if (stage === "requests_info") {
-    return base.map((step, i) =>
-      i === 1 ? { ...step, placement: "top" as const } : step
-    );
   }
 
   if (stage === "materials_overview" && base.length > 1) {

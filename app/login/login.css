@@ -91,7 +91,7 @@
 .brand-title { font-size: 22px; font-weight: 800; line-height: 1.1; color: #1e293b; letter-spacing: -0.5px; }
 .brand-subtitle { font-size: 13px; font-weight: 600; color: rgba(30, 41, 59, 0.6); margin-top: 4px; }
 
-.login-card h2 { text-align: center; font-size: 20px; font-weight: 800; color: #1e293b; margin: 10px 0 24px 0; letter-spacing: -0.3px; }
+.login-card h2, .login-card .step-title { text-align: center; font-size: 20px; font-weight: 800; color: #1e293b; margin: 10px 0 24px 0; letter-spacing: -0.3px; }
 
 /* ===== Form ===== */
 .form-group { margin-bottom: 18px; text-align: left; }
@@ -253,15 +253,33 @@
 }
 
 @media (max-width: 480px) {
-  .page-login { padding: 16px; }
-  .login-card { padding: 24px 20px; border-radius: 24px; }
-  .brand-title { font-size: 19px; }
-  .brand-mark { width: 48px; height: 48px; font-size: 18px; }
-  .btn { padding: 14px 16px; }
-  .bottom-actions { flex-direction: column; gap: 10px; }
+  .page-login {
+    padding: 16px;
+    overflow: auto;
+    align-content: flex-start;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  .login-container { max-width: 100%; }
+  .login-card {
+    padding: 24px 20px;
+    border-radius: 28px;
+    min-height: auto;
+  }
+  .brand-title { font-size: 20px; }
+  .brand-mark { width: 48px; height: 48px; font-size: 18px; border-radius: 14px; }
+  .login-card h2, .login-card .step-title { font-size: 16px; margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { font-size: 11px; margin-bottom: 6px; }
+  .login-card input { padding: 14px 16px; border-radius: 16px; font-size: 15px; }
+  .btn { padding: 14px 16px; border-radius: 16px; font-size: 15px; margin-top: 10px; }
+  .link { margin-top: 20px; font-size: 13px; }
+  .link p { margin: 10px 0; }
+  .bottom-actions { flex-direction: column; gap: 10px; margin-top: 16px; }
   .btn.info, .btn.help { width: 100%; }
   .help-modal-content { max-height: 90vh; border-radius: 24px; }
-  .help-modal-tabs { flex-direction: column; }
+  .help-modal-tabs { flex-direction: row; }
   .help-tab { padding: 12px; font-size: 12px; }
   .help-html-inner { padding: 16px 12px; }
+  .error, .success, .warning { font-size: 13px; padding: 12px 14px; margin: 12px 0; }
 }

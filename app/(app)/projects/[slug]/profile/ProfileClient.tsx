@@ -604,18 +604,33 @@ export default function ProfileClient({
         
         <div className="mobile-header-bar">
           <div className="mobile-header-left">
-            <div className="mobile-avatar" onClick={() => openRewards("wardrobe")}>
+            <div className="mobile-avatar" data-tour="profile-avatar" onClick={() => openRewards("wardrobe")}>
               {streakData?.equippedAvatarUrl ? (
                 <img src={streakData.equippedAvatarUrl} alt="Аватар" />
               ) : (
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
               )}
             </div>
-            <div className="mobile-user-info">
+            <div className="mobile-user-info" data-tour="profile-details">
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <span className="skills-wordmark">skilLS</span>
                 <span style={{ fontSize: "12px", opacity: 0.4 }}>•</span>
                 <span className="mobile-user-name">{nameLabel(profile.full_name)}</span>
+              </div>
+              {features?.titles && (
+                <button
+                  type="button"
+                  className="mobile-title-pill"
+                  data-tour="profile-title"
+                  onClick={() => openRewards("wardrobe")}
+                >
+                  «{titleText}»
+                </button>
+              )}
+              <div className="mobile-profile-meta">
+                <span>{phoneLabel(profile.contact_phone)}</span>
+                <span className="mobile-meta-dot">•</span>
+                <span>{regionLabel(profile.region)}</span>
               </div>
               {features?.streaks && (
                 <button type="button" className="mobile-streak-pill" onClick={() => openRewards("streaks")}>
@@ -758,6 +773,7 @@ export default function ProfileClient({
           <aside className="profile-panel profile-sidebar">
             <div
               className="profile-avatar-wrapper"
+              data-tour="profile-avatar"
               onClick={() => openRewards("wardrobe")}
               style={{ cursor: "pointer", display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               title="Открыть гардероб Маскота"
@@ -776,6 +792,7 @@ export default function ProfileClient({
               <button
                 type="button"
                 className="profile-title-slot"
+                data-tour="profile-title"
                 onClick={() => openRewards("wardrobe")}
                 title="Сменить титул в гардеробе"
                 style={{ cursor: "pointer", border: "none", marginBottom: "24px" }}
@@ -787,7 +804,7 @@ export default function ProfileClient({
               </button>
             )}
 
-            <div className="details-list" style={{ width: "100%", marginBottom: "16px" }}>
+            <div className="details-list" data-tour="profile-details" style={{ width: "100%", marginBottom: "16px" }}>
               <div className="detail-item">
                 <span className="detail-label">Телефон</span>
                 <span className="detail-value">{phoneLabel(profile.contact_phone)}</span>

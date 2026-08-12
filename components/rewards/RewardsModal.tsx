@@ -526,6 +526,8 @@ export default function RewardsModal({
                         className={`flex-1 overflow-y-auto pr-1 ${
                           wardrobeCategory === "title"
                             ? "flex flex-col gap-2.5"
+                            : wardrobeCategory === "base"
+                            ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-2.5"
                             : "grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3"
                         }`}
                       >
@@ -548,6 +550,66 @@ export default function RewardsModal({
                           filteredInventory.map((item) => {
                             if (!item.reward) return null;
                             const equipped = isItemEquipped(item.reward.id);
+
+                            if (wardrobeCategory === "base") {
+                              return (
+                                <div
+                                  key={item.id}
+                                  onClick={() =>
+                                    handleEquip(wardrobeCategory, equipped ? null : item.reward!.id)
+                                  }
+                                  className="border rounded-xl p-2 sm:p-2.5 flex flex-col items-center gap-1.5 cursor-pointer transition-all"
+                                  style={{
+                                    backgroundColor: equipped
+                                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
+                                      : "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+                                    borderColor: equipped
+                                      ? "var(--project-primary, #0ea5e9)"
+                                      : "var(--glass-border, rgba(15,23,42,0.08))",
+                                  }}
+                                >
+                                  <div
+                                    className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0"
+                                    style={{
+                                      background:
+                                        "linear-gradient(145deg, color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent), color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent))",
+                                      border: equipped
+                                        ? "2px solid var(--project-primary, #0ea5e9)"
+                                        : "1px solid var(--glass-border, rgba(15,23,42,0.1))",
+                                    }}
+                                  >
+                                    {item.reward.asset_url ? (
+                                      <img
+                                        src={item.reward.asset_url}
+                                        alt=""
+                                        className="w-[85%] h-[85%] object-contain drop-shadow-sm"
+                                      />
+                                    ) : (
+                                      <span className="text-[9px] font-bold opacity-40">N/A</span>
+                                    )}
+                                    {equipped && (
+                                      <span
+                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black"
+                                        style={{
+                                          backgroundColor: "var(--project-primary, #0ea5e9)",
+                                          color: "#ffffff",
+                                        }}
+                                      >
+                                        ✓
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-center w-full min-w-0">
+                                    <div className="font-bold text-[10px] sm:text-[11px] truncate leading-tight">
+                                      {item.reward.title}
+                                    </div>
+                                    <div className="text-[9px] font-semibold uppercase tracking-wider opacity-50 mt-0.5">
+                                      {equipped ? "Надето" : "База"}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
 
                             if (wardrobeCategory === "title") {
                               return (

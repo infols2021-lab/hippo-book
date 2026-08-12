@@ -171,42 +171,23 @@ export default function ResetPage() {
   return (
     <div className="page-reset">
       {modalOpen ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="reset-modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeModal();
-          }}
-        >
-          <div className="reset-modal">
-            <div className="reset-modal-header">
-              <div className="reset-modal-title">
+        <div className="modal-notice-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="modal-notice">
+            <div className="modal-notice-head">
+              <div style={{ fontWeight: 800, fontSize: 18, color: "#1e293b" }}>
+                {modalKind === "success" ? "🎉 " : modalKind === "error" ? "❌ " : "⚠️ "}
                 {modalTitle}
               </div>
-              <button type="button" className="reset-modal-close" onClick={closeModal} aria-label="Закрыть">
-                ✕
-              </button>
+              <button type="button" onClick={closeModal} className="modal-notice-x">✕</button>
             </div>
-
-            <div className="reset-modal-body">{modalBody}</div>
-
-            <div className="reset-modal-actions">
+            <div className="modal-notice-body">{modalBody}</div>
+            <div className="modal-notice-actions">
               {modalKind === "error" || modalKind === "warning" ? (
-                <button
-                  type="button"
-                  className="btn btn-captcha-reload"
-                  style={{ width: "auto", margin: 0 }}
-                  onClick={() => {
-                    resetCaptchaHard();
-                    closeModal();
-                  }}
-                >
+                <button type="button" className="btn btn-secondary" onClick={() => { resetCaptchaHard(); closeModal(); }}>
                   Перезагрузить капчу
                 </button>
               ) : null}
-
-              <button type="button" className="btn btn-primary" style={{ width: "auto", margin: 0 }} onClick={closeModal}>
+              <button type="button" className="btn btn-primary" onClick={closeModal} style={{ width: "auto", marginTop: 0 }}>
                 Ок
               </button>
             </div>
@@ -224,6 +205,12 @@ export default function ResetPage() {
               <div className="brand-subtitle">Восстановление пароля</div>
             </div>
           </div>
+
+          <div className="progress-bar">
+            <div className="progress-step" />
+          </div>
+
+          <h2 className="step-title">Шаг 1. Введите email</h2>
 
           {showTopBanner ? (
             <div className="banner warning" style={{ whiteSpace: "pre-line" }}>

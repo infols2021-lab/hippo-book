@@ -513,14 +513,14 @@ export default function LoginPage() {
       <div className="login-container">
         <div className="login-card">
           <div className="brand">
-            <div className="brand-mark">HH</div>
+            <div className="brand-mark">EK</div>
             <div>
-              <div className="brand-title">SkilLS</div>
+              <div className="brand-title">skilLS</div>
               <div className="brand-subtitle">Образовательная платформа</div>
             </div>
           </div>
 
-          <h2>Вход в аккаунт</h2>
+          <h2 className="step-title">Вход в аккаунт</h2>
 
           <div className="loading" style={{ display: busy ? "block" : "none" }}>
             <div className="spinner" />
