@@ -3,10 +3,16 @@ import { Step } from "react-joyride";
 import { TourStage } from "@/lib/tour/tourConfig";
 
 export interface CustomTourStep extends Step {
+  // Настоящие поле — путь к картинке маскота в тултипе (наше расширение, не часть react-joyride)
   mascotImage?: string;
+  // Ниже поля уже являются штатными Options react-joyride v3 (можно задавать прямо на шаге —
+  // см. https://react-joyride.com/docs/step#per-step-options). Продублированы тут только чтобы
+  // TypeScript явно видел их в автодополнении для CustomTourStep.
   skipBeacon?: boolean;
-  blockTargetInteraction?: boolean;
+  blockTargetInteraction?: boolean; // true = блокирует клики по подсвеченному элементу. Default: false (клики проходят)
   overlayClickAction?: false | "close" | "next" | "replay";
+  // hideNextButton — НАШЕ кастомное поле, используется только в CustomTooltip.tsx,
+  // react-joyride о нём не знает.
   hideNextButton?: boolean;
 }
 
@@ -24,13 +30,16 @@ export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
   ],
   direction_gate: [
     {
-      target: ".portal-card", // Целимся в первую карточку направления (добавь className "portal-card" в PortalCard.tsx, если его нет)
+      // ВАЖНО: класс .portal-card должен реально висеть на карточке в PortalCard.tsx,
+      // иначе Joyride не находит таргет (TARGET_NOT_FOUND) и рисует оверлей без "дырки" —
+      // экран блюрится, кликнуть невозможно. См. фикс в PortalCard.tsx.
+      target: ".portal-card",
       title: "Выбор направления",
       content: "Для продолжения обучения выберите любое направление. Нажмите на карточку, чтобы войти внутрь.",
       mascotImage: "/images/tour/dog2.webp",
       skipBeacon: true,
       hideNextButton: true, // Прячем "Далее", заставляем кликнуть по самой карточке
-      blockTargetInteraction: false,
+      blockTargetInteraction: false, // клик по карточке должен доходить до нее — не блокируем
     }
   ],
   profile_overview: [

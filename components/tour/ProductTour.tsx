@@ -1,7 +1,7 @@
 // components/tour/ProductTour.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { ACTIONS, EVENTS, STATUS } from "react-joyride";
@@ -17,13 +17,21 @@ const Joyride = dynamic(
   { ssr: false }
 );
 
+// Сколько раз пробуем перезапуститься, если таргет не найден на странице,
+// прежде чем сдаться и не долбить бесконечным setTimeout/спиннером.
+const MAX_TARGET_RETRIES = 5;
+const TARGET_RETRY_DELAY_MS = 1000;
+
 export default function ProductTour() {
   const { stage, advanceTour } = useTour();
   const pathname = usePathname();
-  
+
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
+
+  // Счетчик неудачных попыток найти таргет — сбрасывается при смене стадии/роута
+  const targetRetryCount = useRef(0);
 
   useEffect(() => setIsMounted(true), []);
 
@@ -33,9 +41,15 @@ export default function ProductTour() {
       setRun(false);
       return;
     }
+    targetRetryCount.current = 0;
     setStepIndex(0);
     setRun(true);
   }, [stage]);
+
+  // Сброс счетчика ретраев при смене роута
+  useEffect(() => {
+    targetRetryCount.current = 0;
+  }, [pathname]);
 
   // Восстановление тура при смене роута (если тур ждал перехода на нужную страницу)
   useEffect(() => {
@@ -59,20 +73,34 @@ export default function ProductTour() {
   const handleJoyrideEvent = (data: EventData, _controls: Controls) => {
     const { status, type, action, index } = data;
 
-    // Элемента нет на текущей странице (или еще не отрендерился)
+    // Элемента нет на текущей странице (или еще не отрендерился, или таргет-селектор битый)
     if (type === EVENTS.TARGET_NOT_FOUND) {
-      setRun(false); 
-      // Пытаемся перезапуститься через секунду (вдруг страница еще грузится)
-      setTimeout(() => { if (stage !== "finished") setRun(true); }, 1000);
+      setRun(false);
+
+      targetRetryCount.current += 1;
+
+      // Ограничиваем число ретраев, иначе при отсутствующем/переименованном
+      // селекторе получаем вечный мигающий цикл run=false -> run=true -> ...
+      if (targetRetryCount.current <= MAX_TARGET_RETRIES) {
+        setTimeout(() => {
+          if (stage !== "finished") setRun(true);
+        }, TARGET_RETRY_DELAY_MS);
+      } else {
+        console.warn(
+          `[ProductTour] Target not found for stage "${stage}" after ${MAX_TARGET_RETRIES} attempts. Stopping retries — check the target selector in TourSteps.ts.`
+        );
+      }
     }
 
     if (type === EVENTS.STEP_AFTER) {
+      targetRetryCount.current = 0;
+
       const currentStageSteps = TOUR_STEPS[stage] || [];
       const isLastStep = index === currentStageSteps.length - 1;
 
       if (action === ACTIONS.NEXT || action === ACTIONS.PREV) {
         const nextIndex = index + (action === ACTIONS.PREV ? -1 : 1);
-        
+
         if (isLastStep && action === ACTIONS.NEXT) {
           // Конец текущей стадии
           const config = TOUR_STAGES[stage];
@@ -114,7 +142,7 @@ export default function ProductTour() {
       options={{
         zIndex: 10000,
         overlayColor: "rgba(0, 0, 0, 0.65)",
-        overlayClickAction: false,
+        overlayClickAction: false, // клик по темному фону вокруг спота ничего не делает (валидная опция v3)
         spotlightPadding: 10,
       }}
     />

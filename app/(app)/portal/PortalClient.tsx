@@ -133,9 +133,14 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
               `}
             >
               {projects.map((project, index) => (
+                // Таргет для тура (стадия direction_gate) — className "portal-card"
+                // висит на самой карточке внутри <PortalCard />, не на этом враппере.
+                // ID тут раньше не использовался туром (в TourSteps.ts нет
+                // #tour-materials/#tour-requests), поэтому убран, чтобы не сбивать
+                // с толку — реальные ID для profile/materials/requests стадий
+                // находятся в других компонентах, см. чек-лист ниже.
                 <div
                   key={project.id}
-                  id={index === 0 ? "tour-materials" : index === 1 ? "tour-requests" : undefined} // МИШЕНИ ОНБОРДИНГА
                   className="shrink-0 w-full snap-center snap-always md:w-auto md:shrink"
                 >
                   <PortalCard project={project} index={index} />
