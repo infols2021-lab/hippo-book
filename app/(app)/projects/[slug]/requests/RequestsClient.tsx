@@ -1160,8 +1160,8 @@ export default function RequestsClient({
           </div>
 
           <div className="requests-actions" style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
-            <button 
-              id="tour-create-request-btn"
+            <button
+              data-tour="create-request-btn"
               className="btn" 
               onClick={openCreate} 
               type="button" 

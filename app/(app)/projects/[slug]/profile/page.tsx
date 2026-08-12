@@ -2,6 +2,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import ProfileClient from "./ProfileClient";
+import { ProfileTourTrigger } from "@/components/tour/ProfileTourTrigger";
 
 // Отключаем кэш, чтобы настройки профиля и темы всегда были свежими
 export const revalidate = 0;
@@ -70,15 +71,18 @@ export default async function ProjectProfilePage({
 
   // 6. Передаём всё в клиентский компонент профиля
   return (
-    <ProfileClient
-      projectName={project.name}
-      projectSlug={project.slug}
-      availableProjects={activeProjects || []}
-      features={features}
-      userId={user.id}
-      userEmail={user.email || ""}
-      initialProfile={initialProfile}
-      backgroundUrl={backgroundUrl}
-    />
+    <>
+      <ProfileTourTrigger />
+      <ProfileClient
+        projectName={project.name}
+        projectSlug={project.slug}
+        availableProjects={activeProjects || []}
+        features={features}
+        userId={user.id}
+        userEmail={user.email || ""}
+        initialProfile={initialProfile}
+        backgroundUrl={backgroundUrl}
+      />
+    </>
   );
 }

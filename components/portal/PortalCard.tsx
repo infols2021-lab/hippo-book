@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ProjectConfig } from "@/app/(app)/portal/PortalClient";
+import { useTour } from "@/components/tour/TourProvider";
 
 type PortalCardProps = {
   project: ProjectConfig;
@@ -9,15 +10,20 @@ type PortalCardProps = {
 };
 
 export default function PortalCard({ project, index }: PortalCardProps) {
+  const { stage, advanceTour } = useTour();
   const pColor = project.theme?.primaryColor || "#3b82f6";
   
-  // Определяем стиль карточки: четные (0, 2) светлые, нечетные (1, 3) темные.
   const isLight = index % 2 === 0;
 
   return (
     <Link
       href={`/projects/${project.slug}`}
-      className={`group relative flex flex-col p-8 sm:p-10 rounded-[40px] overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl ${
+      onClick={() => {
+        if (stage === "direction_gate") {
+          advanceTour("profile_overview");
+        }
+      }}
+      className={`portal-card group relative flex flex-col p-8 sm:p-10 rounded-[40px] overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl ${
         isLight 
           ? 'bg-gradient-to-br from-white/95 to-[#e0f2fe]/95 shadow-[0_0_40px_rgba(255,255,255,0.1)] border border-white/60' 
           : 'bg-gradient-to-br from-[#1e1b4b]/95 to-[#0f172a]/95 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/10'

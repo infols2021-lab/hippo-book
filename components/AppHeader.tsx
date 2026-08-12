@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import RewardsModal from "@/components/rewards/RewardsModal";
 import { createClient } from "@supabase/supabase-js";
+import { useTour } from "@/components/tour/TourProvider";
 
 export type NavItem =
   | { kind: "link"; href: string; label: React.ReactNode; className?: string }
@@ -29,8 +30,16 @@ export default function AppHeader({
     { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
   ],
 }: Props) {
+  const { stage, advanceTour } = useTour();
   const [isRewardsOpen, setIsRewardsOpen] = useState(false);
   const [isTeacher, setIsTeacher] = useState(false);
+
+  const openRewards = useCallback(() => {
+    if (stage === "rewards_gate") {
+      advanceTour("rewards_tour");
+    }
+    setIsRewardsOpen(true);
+  }, [stage, advanceTour]);
 
   // Проверка роли пользователя (Скрытно проверяем, учитель это или админ)
   useEffect(() => {
@@ -156,9 +165,9 @@ export default function AppHeader({
                 return (
                   <button
                     key={`rewards-${idx}`}
-                    id="tour-rewards-btn" // МИШЕНЬ ОНБОРДИНГА
+                    data-tour="rewards-btn"
                     type="button"
-                    onClick={() => setIsRewardsOpen(true)}
+                    onClick={openRewards}
                     className={`whitespace-nowrap flex-shrink-0 ${item.className || "btn ghost"}`}
                   >
                     {item.label || "🎭 Награды"}

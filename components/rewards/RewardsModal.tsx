@@ -371,6 +371,7 @@ export default function RewardsModal({
             >
               <button
                 id="tour-wardrobe"
+                data-tour="wardrobe-tab"
                 type="button"
                 onClick={() => setActiveTab("wardrobe")}
                 className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
@@ -384,6 +385,7 @@ export default function RewardsModal({
               </button>
               <button
                 id="tour-streaks"
+                data-tour="streaks-tab"
                 type="button"
                 onClick={() => setActiveTab("streaks")}
                 className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
@@ -398,6 +400,7 @@ export default function RewardsModal({
               
               <button
                 id="tour-referral"
+                data-tour="referral-tab"
                 type="button"
                 onClick={() => setActiveTab("referrals")}
                 className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
@@ -412,6 +415,7 @@ export default function RewardsModal({
 
               <button
                 id="tour-promos"
+                data-tour="promos-tab"
                 type="button"
                 onClick={() => setActiveTab("promocode")}
                 className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"

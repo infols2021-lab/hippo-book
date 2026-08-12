@@ -1,7 +1,7 @@
 // components/tour/TourProvider.tsx
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { TourStage } from "@/lib/tour/tourConfig";
 
 type TourContextType = {
@@ -12,10 +12,21 @@ type TourContextType = {
 
 const TourContext = createContext<TourContextType | null>(null);
 
-export function TourProvider({ 
-  children, 
-  initialStage 
-}: { 
+function persistTourStage(newStage: TourStage) {
+  fetch("/api/profile/update", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tour_stage: newStage,
+      has_seen_tour: newStage === "finished",
+    }),
+  }).catch(console.error);
+}
+
+export function TourProvider({
+  children,
+  initialStage,
+}: {
   children: React.ReactNode;
   initialStage: TourStage;
 }) {
@@ -23,22 +34,20 @@ export function TourProvider({
 
   const setStage = useCallback((newStage: TourStage) => {
     setStageState(newStage);
-    
-    // Тихое сохранение прогресса в БД при каждой смене стадии
-    if (newStage !== initialStage) {
-      fetch("/api/profile/update", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          tour_stage: newStage, 
-          has_seen_tour: newStage === "finished" 
-        }),
-      }).catch(console.error);
-    }
-  }, [initialStage]);
+    persistTourStage(newStage);
+  }, []);
 
-  const advanceTour = useCallback((nextStage: TourStage) => {
-    setStage(nextStage);
+  const advanceTour = useCallback(
+    (nextStage: TourStage) => {
+      setStage(nextStage);
+    },
+    [setStage]
+  );
+
+  useEffect(() => {
+    const restartTour = () => setStage("portal_intro");
+    window.addEventListener("start-product-tour", restartTour);
+    return () => window.removeEventListener("start-product-tour", restartTour);
   }, [setStage]);
 
   return (

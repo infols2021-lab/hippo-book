@@ -26,3 +26,23 @@ export const TOUR_STAGES: Record<TourStage, StageConfig> = {
   rewards_tour: { id: "rewards_tour", type: "advanceOnNext", nextStage: "finished" },
   finished: { id: "finished", type: "advanceOnAction" },
 };
+
+/** Тур запускается только на странице, где есть DOM-таргет текущей стадии. */
+export function isTourStageActiveOnPath(stage: TourStage, pathname: string): boolean {
+  switch (stage) {
+    case "portal_intro":
+    case "direction_gate":
+      return pathname === "/portal";
+    case "profile_overview":
+    case "materials_gate":
+      return /^\/projects\/[^/]+\/profile\/?$/.test(pathname);
+    case "requests_info":
+      return /^\/projects\/[^/]+\/requests\/?$/.test(pathname);
+    case "rewards_gate":
+      return /^\/projects\/[^/]+\/(profile|materials|requests)\/?$/.test(pathname);
+    case "rewards_tour":
+      return true;
+    default:
+      return false;
+  }
+}

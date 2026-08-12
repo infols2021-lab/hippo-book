@@ -1,7 +1,7 @@
 // components/tour/ProductTour.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { ACTIONS, EVENTS, STATUS } from "react-joyride";
@@ -10,17 +10,16 @@ import type { EventData, Controls } from "react-joyride";
 import CustomTooltip from "./CustomTooltip";
 import { TOUR_STEPS } from "./TourSteps";
 import { useTour } from "./TourProvider";
-import { TOUR_STAGES } from "@/lib/tour/tourConfig";
+import { TOUR_STAGES, isTourStageActiveOnPath } from "@/lib/tour/tourConfig";
 
 const Joyride = dynamic(
   () => import("react-joyride").then((mod) => mod.Joyride),
   { ssr: false }
 );
 
-// Сколько раз пробуем перезапуститься, если таргет не найден на странице,
-// прежде чем сдаться и не долбить бесконечным setTimeout/спиннером.
-const MAX_TARGET_RETRIES = 5;
-const TARGET_RETRY_DELAY_MS = 1000;
+const MAX_TARGET_RETRIES = 8;
+const TARGET_RETRY_DELAY_MS = 400;
+const DOM_SETTLE_MS = 350;
 
 export default function ProductTour() {
   const { stage, advanceTour } = useTour();
@@ -30,36 +29,59 @@ export default function ProductTour() {
   const [stepIndex, setStepIndex] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
 
-  // Счетчик неудачных попыток найти таргет — сбрасывается при смене стадии/роута
   const targetRetryCount = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stageRef = useRef(stage);
+  stageRef.current = stage;
 
   useEffect(() => setIsMounted(true), []);
 
-  // Синхронизация запуска тура со стадией
+  const clearRetryTimer = useCallback(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleRun = useCallback(
+    (delay = DOM_SETTLE_MS) => {
+      clearRetryTimer();
+      retryTimerRef.current = setTimeout(() => {
+        retryTimerRef.current = null;
+        if (
+          stageRef.current !== "finished" &&
+          isTourStageActiveOnPath(stageRef.current, pathname)
+        ) {
+          setRun(true);
+        }
+      }, delay);
+    },
+    [clearRetryTimer, pathname]
+  );
+
+  // Запуск / пауза при смене стадии или роута
   useEffect(() => {
+    clearRetryTimer();
+    targetRetryCount.current = 0;
+
     if (stage === "finished") {
       setRun(false);
       return;
     }
-    targetRetryCount.current = 0;
+
     setStepIndex(0);
-    setRun(true);
-  }, [stage]);
 
-  // Сброс счетчика ретраев при смене роута
-  useEffect(() => {
-    targetRetryCount.current = 0;
-  }, [pathname]);
-
-  // Восстановление тура при смене роута (если тур ждал перехода на нужную страницу)
-  useEffect(() => {
-    if (stage !== "finished" && !run) {
-      const t = setTimeout(() => setRun(true), 600); // Даем DOM отрендериться
-      return () => clearTimeout(t);
+    if (isTourStageActiveOnPath(stage, pathname)) {
+      setRun(false);
+      scheduleRun();
+    } else {
+      setRun(false);
     }
-  }, [pathname, stage, run]);
 
-  // Интеграция с модалкой наград: шлем события для переключения вкладок
+    return clearRetryTimer;
+  }, [stage, pathname, clearRetryTimer, scheduleRun]);
+
+  // Переключение вкладок в модалке наград
   useEffect(() => {
     if (stage === "rewards_tour" && run) {
       const tabMap = ["wardrobe", "streaks", "referral", "promos"];
@@ -73,21 +95,18 @@ export default function ProductTour() {
   const handleJoyrideEvent = (data: EventData, _controls: Controls) => {
     const { status, type, action, index } = data;
 
-    // Элемента нет на текущей странице (или еще не отрендерился, или таргет-селектор битый)
     if (type === EVENTS.TARGET_NOT_FOUND) {
       setRun(false);
-
       targetRetryCount.current += 1;
 
-      // Ограничиваем число ретраев, иначе при отсутствующем/переименованном
-      // селекторе получаем вечный мигающий цикл run=false -> run=true -> ...
-      if (targetRetryCount.current <= MAX_TARGET_RETRIES) {
-        setTimeout(() => {
-          if (stage !== "finished") setRun(true);
-        }, TARGET_RETRY_DELAY_MS);
-      } else {
+      if (
+        targetRetryCount.current <= MAX_TARGET_RETRIES &&
+        isTourStageActiveOnPath(stageRef.current, pathname)
+      ) {
+        scheduleRun(TARGET_RETRY_DELAY_MS);
+      } else if (targetRetryCount.current > MAX_TARGET_RETRIES) {
         console.warn(
-          `[ProductTour] Target not found for stage "${stage}" after ${MAX_TARGET_RETRIES} attempts. Stopping retries — check the target selector in TourSteps.ts.`
+          `[ProductTour] Target not found for stage "${stageRef.current}" after ${MAX_TARGET_RETRIES} attempts.`
         );
       }
     }
@@ -95,31 +114,30 @@ export default function ProductTour() {
     if (type === EVENTS.STEP_AFTER) {
       targetRetryCount.current = 0;
 
-      const currentStageSteps = TOUR_STEPS[stage] || [];
+      const currentStageSteps = TOUR_STEPS[stageRef.current] || [];
       const isLastStep = index === currentStageSteps.length - 1;
 
       if (action === ACTIONS.NEXT || action === ACTIONS.PREV) {
         const nextIndex = index + (action === ACTIONS.PREV ? -1 : 1);
 
         if (isLastStep && action === ACTIONS.NEXT) {
-          // Конец текущей стадии
-          const config = TOUR_STAGES[stage];
+          const config = TOUR_STAGES[stageRef.current];
           if (config.type === "advanceOnNext" && config.nextStage) {
-            advanceTour(config.nextStage); // Автоматом переходим на следующую
+            advanceTour(config.nextStage);
           } else {
-            setRun(false); // Ждем действия пользователя (клик/переход)
+            setRun(false);
           }
         } else {
-          setStepIndex(nextIndex); // Листаем шаги внутри одной стадии
+          setStepIndex(nextIndex);
         }
       }
     }
 
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
-      const config = TOUR_STAGES[stage];
+      const config = TOUR_STAGES[stageRef.current];
       if (config && config.type === "advanceOnNext" && config.nextStage) {
         advanceTour(config.nextStage);
-      } else if (stage === "rewards_tour") {
+      } else if (stageRef.current === "rewards_tour") {
         advanceTour("finished");
       } else {
         setRun(false);
@@ -142,8 +160,10 @@ export default function ProductTour() {
       options={{
         zIndex: 10000,
         overlayColor: "rgba(0, 0, 0, 0.65)",
-        overlayClickAction: false, // клик по темному фону вокруг спота ничего не делает (валидная опция v3)
+        overlayClickAction: false,
         spotlightPadding: 10,
+        targetWaitTimeout: 2500,
+        scrollDuration: 200,
       }}
     />
   );

@@ -207,6 +207,17 @@ export default function ProfileClient({
     }
   }, [stage, advanceTour]);
 
+  // На мобилке открываем меню, чтобы tour-таргеты были видимы
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    if (!isMobile) return;
+
+    if (stage === "profile_overview" || stage === "materials_gate" || stage === "rewards_gate") {
+      setMobileMenuOpen(true);
+    }
+  }, [stage]);
+
   function showNotification(text: string, type: "success" | "error" = "success") {
     setNotif({ type, text });
     setTimeout(() => setNotif(null), 3500);
@@ -515,12 +526,20 @@ export default function ProfileClient({
             <div className="sheet-handle" />
             <div className="sheet-title">Меню профиля</div>
             <div className="sheet-menu-list">
-              <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openRewards("wardrobe"); }}>
+              <button
+                className="sheet-item"
+                data-tour="rewards-btn"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  openRewards("wardrobe");
+                }}
+              >
                 Награды и гардероб
               </button>
-              <Link 
-                className="sheet-item" 
-                href={`/projects/${projectSlug}/materials`} 
+              <Link
+                className="sheet-item"
+                data-tour="materials-link"
+                href={`/projects/${projectSlug}/materials`}
                 onClick={() => {
                   if (stage === "materials_gate") advanceTour("rewards_gate");
                   setMobileMenuOpen(false);
@@ -531,11 +550,15 @@ export default function ProfileClient({
               <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openEdit(); }}>
                 Редактировать профиль
               </button>
-              <button className="sheet-item" onClick={() => { 
-                if (stage === "profile_overview") advanceTour("requests_info");
-                setMobileMenuOpen(false); 
-                router.push(`/projects/${projectSlug}/requests`); 
-              }}>
+              <button
+                className="sheet-item"
+                data-tour="requests-link"
+                onClick={() => {
+                  if (stage === "profile_overview") advanceTour("requests_info");
+                  setMobileMenuOpen(false);
+                  router.push(`/projects/${projectSlug}/requests`);
+                }}
+              >
                 Заявки на покупку
               </button>
               {profile.is_admin && (
@@ -661,18 +684,18 @@ export default function ProfileClient({
               </button>
             )}
 
-            <button 
-              id="tour-rewards-btn"
-              type="button" 
-              className="nav-pill" 
+            <button
+              data-tour="rewards-btn"
+              type="button"
+              className="nav-pill"
               onClick={() => openRewards("wardrobe")}
             >
               Награды
             </button>
 
-            <Link 
-              id="tour-materials-link"
-              className="nav-pill" 
+            <Link
+              data-tour="materials-link"
+              className="nav-pill"
               href={`/projects/${projectSlug}/materials`}
               onClick={() => {
                 if (stage === "materials_gate") advanceTour("rewards_gate");
@@ -751,7 +774,7 @@ export default function ProfileClient({
                 Редактировать профиль
               </button>
               <button
-                id="tour-requests-link"
+                data-tour="requests-link"
                 className="btn secondary"
                 onClick={() => {
                   if (stage === "profile_overview") advanceTour("requests_info");
