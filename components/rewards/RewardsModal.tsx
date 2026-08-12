@@ -312,7 +312,7 @@ export default function RewardsModal({
           }}
         >
           {/* Индикатор для свайпа на мобильных */}
-          <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto sm:hidden mt-2 -mb-2" />
+          <div className="w-10 h-1 rounded-full mx-auto sm:hidden mt-2 -mb-2" style={{ backgroundColor: "color-mix(in srgb, var(--project-text) 20%, transparent)" }} />
 
           {/* Шапка модалки */}
           <div
@@ -652,13 +652,27 @@ export default function RewardsModal({
                       </div>
 
                       {promoError && (
-                        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-600 text-center font-bold">
+                        <div 
+                          className="p-3 border rounded-xl text-xs text-center font-bold"
+                          style={{ 
+                            backgroundColor: "color-mix(in srgb, #ef4444 10%, transparent)",
+                            color: "#ef4444",
+                            borderColor: "color-mix(in srgb, #ef4444 30%, transparent)"
+                          }}
+                        >
                           {promoError}
                         </div>
                       )}
 
                       {promoSuccessMsg && (
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-600 text-center font-bold">
+                        <div 
+                          className="p-3 border rounded-xl text-xs text-center font-bold"
+                          style={{ 
+                            backgroundColor: "color-mix(in srgb, #10b981 10%, transparent)",
+                            color: "#10b981",
+                            borderColor: "color-mix(in srgb, #10b981 30%, transparent)"
+                          }}
+                        >
                           {promoSuccessMsg}
                         </div>
                       )}
@@ -710,11 +724,11 @@ export default function RewardsModal({
                               <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between">
                                 <div className="flex items-center gap-2.5">
                                   <span
-                                    className="font-mono font-black px-2.5 py-1 rounded-xl text-xs uppercase tracking-wider"
+                                    className="font-mono font-black px-2.5 py-1 rounded-xl text-xs uppercase tracking-wider border"
                                     style={{
                                       backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
                                       color: "var(--project-primary, #0ea5e9)",
-                                      border: "1px solid color-mix(in srgb, var(--project-primary, #0ea5e9) 30%, transparent)",
+                                      borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 30%, transparent)",
                                     }}
                                   >
                                     {item.code}
@@ -738,7 +752,12 @@ export default function RewardsModal({
                                 {item.granted_reward_titles?.map((title, idx) => (
                                   <span
                                     key={idx}
-                                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-purple-500/10 text-purple-600 border border-purple-500/20"
+                                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold border"
+                                    style={{
+                                      backgroundColor: "color-mix(in srgb, var(--project-secondary, var(--project-primary)) 10%, transparent)",
+                                      color: "var(--project-secondary, var(--project-primary))",
+                                      borderColor: "color-mix(in srgb, var(--project-secondary, var(--project-primary)) 20%, transparent)"
+                                    }}
                                   >
                                     Предмет: {title}
                                   </span>
@@ -746,13 +765,25 @@ export default function RewardsModal({
                                 {item.granted_material_titles?.map((title, idx) => (
                                   <span
                                     key={idx}
-                                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20"
+                                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold border"
+                                    style={{
+                                      backgroundColor: "color-mix(in srgb, var(--project-primary) 10%, transparent)",
+                                      color: "var(--project-primary)",
+                                      borderColor: "color-mix(in srgb, var(--project-primary) 20%, transparent)"
+                                    }}
                                   >
                                     Материал: {title}
                                   </span>
                                 ))}
                                 {item.physical_prize && (
-                                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                                  <span 
+                                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold border"
+                                    style={{
+                                      backgroundColor: "color-mix(in srgb, #f59e0b 10%, transparent)",
+                                      color: "#d97706",
+                                      borderColor: "color-mix(in srgb, #f59e0b 20%, transparent)"
+                                    }}
+                                  >
                                     Приз: {(item.physical_prize as any).title}
                                   </span>
                                 )}
@@ -811,33 +842,51 @@ export default function RewardsModal({
 
               {/* Награды маскота */}
               {selectedHistoryLog.granted_reward_titles && selectedHistoryLog.granted_reward_titles.length > 0 && (
-                <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 dark:bg-purple-900/10 dark:border-purple-800/30">
-                  <div className="text-[10px] font-black text-purple-500 uppercase tracking-wider mb-1">Предметы и титулы</div>
-                  <div className="font-bold text-purple-900 dark:text-purple-300 text-sm">🎽 {selectedHistoryLog.granted_reward_titles.join(", ")}</div>
+                <div 
+                  className="p-4 rounded-2xl border"
+                  style={{
+                    backgroundColor: "color-mix(in srgb, var(--project-secondary, var(--project-primary)) 8%, transparent)",
+                    borderColor: "color-mix(in srgb, var(--project-secondary, var(--project-primary)) 20%, transparent)"
+                  }}
+                >
+                  <div className="text-[10px] font-black uppercase tracking-wider mb-1" style={{ color: "var(--project-secondary, var(--project-primary))" }}>Предметы и титулы</div>
+                  <div className="font-bold text-sm" style={{ color: "var(--project-text)" }}>🎽 {selectedHistoryLog.granted_reward_titles.join(", ")}</div>
                 </div>
               )}
 
               {/* Материалы */}
               {selectedHistoryLog.granted_material_titles && selectedHistoryLog.granted_material_titles.length > 0 && (
-                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 dark:bg-blue-900/10 dark:border-blue-800/30">
-                  <div className="text-[10px] font-black text-blue-500 uppercase tracking-wider mb-1">Открытые материалы</div>
-                  <div className="font-bold text-blue-900 dark:text-blue-300 text-sm">📚 {selectedHistoryLog.granted_material_titles.join(", ")}</div>
+                <div 
+                  className="p-4 rounded-2xl border"
+                  style={{
+                    backgroundColor: "color-mix(in srgb, var(--project-primary) 8%, transparent)",
+                    borderColor: "color-mix(in srgb, var(--project-primary) 20%, transparent)"
+                  }}
+                >
+                  <div className="text-[10px] font-black uppercase tracking-wider mb-1" style={{ color: "var(--project-primary)" }}>Открытые материалы</div>
+                  <div className="font-bold text-sm" style={{ color: "var(--project-text)" }}>📚 {selectedHistoryLog.granted_material_titles.join(", ")}</div>
                 </div>
               )}
 
               {/* Физический приз */}
               {selectedHistoryLog.physical_prize && (
-                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 dark:bg-amber-900/10 dark:border-amber-800/30 text-center flex flex-col items-center">
-                  <div className="text-[10px] font-black text-amber-500 uppercase tracking-wider mb-3 w-full text-left">Особый приз</div>
+                <div 
+                  className="p-4 rounded-2xl border text-center flex flex-col items-center"
+                  style={{
+                    backgroundColor: "color-mix(in srgb, #f59e0b 8%, transparent)",
+                    borderColor: "color-mix(in srgb, #f59e0b 20%, transparent)"
+                  }}
+                >
+                  <div className="text-[10px] font-black uppercase tracking-wider mb-3 w-full text-left" style={{ color: "#f59e0b" }}>Особый приз</div>
                   {(selectedHistoryLog.physical_prize as any).image_url && (
                     <img src={(selectedHistoryLog.physical_prize as any).image_url} alt="" className="h-24 object-contain mb-3 drop-shadow-md rounded-xl" />
                   )}
-                  <div className="font-black text-amber-900 dark:text-amber-300 text-base mb-1">🧸 {(selectedHistoryLog.physical_prize as any).title}</div>
+                  <div className="font-black text-base mb-1" style={{ color: "var(--project-text)" }}>🧸 {(selectedHistoryLog.physical_prize as any).title}</div>
                   {(selectedHistoryLog.physical_prize as any).text && (
-                    <div className="text-xs font-medium text-amber-800/80 dark:text-amber-200/80 mb-4 px-2">{(selectedHistoryLog.physical_prize as any).text}</div>
+                    <div className="text-xs font-medium mb-4 px-2" style={{ color: "color-mix(in srgb, var(--project-text) 70%, transparent)" }}>{(selectedHistoryLog.physical_prize as any).text}</div>
                   )}
                   {(selectedHistoryLog.physical_prize as any).link_url && (
-                    <a href={(selectedHistoryLog.physical_prize as any).link_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-black uppercase tracking-wider rounded-xl text-xs transition-all shadow-md hover:shadow-lg active:scale-[0.98]">
+                    <a href={(selectedHistoryLog.physical_prize as any).link_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center w-full py-3 text-white font-black uppercase tracking-wider rounded-xl text-xs transition-all shadow-md hover:shadow-lg active:scale-[0.98]" style={{ backgroundColor: "#f59e0b" }}>
                       🔗 Перейти по ссылке
                     </a>
                   )}

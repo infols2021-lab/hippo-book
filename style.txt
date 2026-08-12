@@ -40198,6 +40198,176 @@ export async function GET() {
 }
 </file>
 
+<file path="components/rewards/StreakLeaderboardModal.tsx">
+"use client";
+
+import React, { useState, useEffect } from "react";
+import type { StreakLeaderboardEntry } from "@/lib/rewards/types";
+
+interface StreakLeaderboardModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function StreakLeaderboardModal({
+  isOpen,
+  onClose,
+}: StreakLeaderboardModalProps) {
+  const [leaderboard, setLeaderboard] = useState<StreakLeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (isOpen) {
+      void loadLeaderboard();
+    }
+  }, [isOpen]);
+
+  const loadLeaderboard = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/streaks/leaderboard");
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data)
+          ? data
+          : data.leaderboard || data.data || data.items || [];
+        setLeaderboard(list);
+      }
+    } catch (e) {
+      console.error("Ошибка при загрузке лидерборда:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
+    >
+      <div
+        className="rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative border transition-all"
+        style={{
+          backgroundColor: "var(--project-card-bg, #ffffff)",
+          color: "var(--project-text, #0f172a)",
+          borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
+        }}
+      >
+        {/* Шапка модалки */}
+        <div
+          className="flex items-center justify-between pb-3 border-b"
+          style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🏆</span>
+            <h3 className="text-lg font-black uppercase tracking-wider">
+              Топ по сериям
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 opacity-60 hover:opacity-100 rounded-xl transition-colors font-bold"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Анонимность */}
+        <div
+          className="p-3.5 rounded-2xl text-xs font-medium border"
+          style={{
+            backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)",
+            borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
+            color: "var(--project-primary, #0ea5e9)",
+          }}
+        >
+          Здесь нет имён — только место в рейтинге, текущая серия и максимальный рекорд.
+        </div>
+
+        {/* Заголовок списка */}
+        <div className="text-xs font-extrabold uppercase tracking-wider opacity-60">
+          Топ 20 по максимальной серии
+        </div>
+
+        {/* Список участников */}
+        <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+          {loading ? (
+            <div className="text-center py-8 text-xs font-bold uppercase tracking-wider opacity-60">
+              Загрузка рейтинга...
+            </div>
+          ) : leaderboard.length === 0 ? (
+            <div className="text-center py-8 text-xs font-bold uppercase tracking-wider opacity-60">
+              Рейтинг пока пуст
+            </div>
+          ) : (
+            leaderboard.map((item, idx) => {
+              const current = item.current_streak ?? (item as any).currentStreak ?? 0;
+              const max = item.max_streak ?? (item as any).longest_streak ?? (item as any).maxStreak ?? 0;
+              const rank = item.rank ?? idx + 1;
+
+              return (
+                <div
+                  key={item.user_id || idx}
+                  className="p-3.5 rounded-2xl border flex items-center justify-between transition-all"
+                  style={{
+                    backgroundColor: item.is_current_user
+                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 15%, transparent)"
+                      : "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
+                    borderColor: item.is_current_user
+                      ? "var(--project-primary, #0ea5e9)"
+                      : "var(--glass-border, rgba(15,23,42,0.08))",
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`font-black text-sm min-w-[32px] ${
+                        rank === 1
+                          ? "text-amber-500"
+                          : rank === 2
+                          ? "text-slate-400"
+                          : rank === 3
+                          ? "text-amber-700"
+                          : "opacity-60"
+                      }`}
+                    >
+                      {item.is_current_user ? "Вы " : ""}#{rank}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-xs font-semibold">
+                    <div>
+                      Текущая:{" "}
+                      <span
+                        className="font-bold"
+                        style={{ color: "var(--project-primary, #0ea5e9)" }}
+                      >
+                        {current}
+                      </span>
+                    </div>
+                    <div>
+                      Максимум:{" "}
+                      <span
+                        className="font-bold"
+                        style={{ color: "var(--project-primary, #0ea5e9)" }}
+                      >
+                        {max}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="components/AppHeader.tsx">
 "use client";
 
@@ -42559,48 +42729,23 @@ export default function MascotViewer({
 }
 </file>
 
-<file path="components/rewards/StreakLeaderboardModal.tsx">
+<file path="components/rewards/PhysicalPrizeModal.tsx">
 "use client";
 
-import React, { useState, useEffect } from "react";
-import type { StreakLeaderboardEntry } from "@/lib/rewards/types";
+import React from "react";
+import type { CustomPhysicalPrize } from "@/lib/rewards/types";
 
-interface StreakLeaderboardModalProps {
+interface PhysicalPrizeModalProps {
   isOpen: boolean;
+  prize: CustomPhysicalPrize;
   onClose: () => void;
 }
 
-export default function StreakLeaderboardModal({
+export default function PhysicalPrizeModal({
   isOpen,
+  prize,
   onClose,
-}: StreakLeaderboardModalProps) {
-  const [leaderboard, setLeaderboard] = useState<StreakLeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (isOpen) {
-      void loadLeaderboard();
-    }
-  }, [isOpen]);
-
-  const loadLeaderboard = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/streaks/leaderboard");
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data)
-          ? data
-          : data.leaderboard || data.data || data.items || [];
-        setLeaderboard(list);
-      }
-    } catch (e) {
-      console.error("Ошибка при загрузке лидерборда:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+}: PhysicalPrizeModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -42609,119 +42754,288 @@ export default function StreakLeaderboardModal({
       style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
     >
       <div
-        className="rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative border transition-all"
+        className="rounded-[32px] max-w-md w-full p-6 text-center space-y-6 shadow-2xl relative overflow-hidden border transition-all"
         style={{
           backgroundColor: "var(--project-card-bg, #ffffff)",
           color: "var(--project-text, #0f172a)",
-          borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
+          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
         }}
       >
-        {/* Шапка модалки */}
+        {/* Декоративное свечение */}
         <div
-          className="flex items-center justify-between pb-3 border-b"
-          style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🏆</span>
-            <h3 className="text-lg font-black uppercase tracking-wider">
-              Топ по сериям
-            </h3>
+          className="absolute -top-12 -left-12 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-25"
+          style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
+        />
+        <div
+          className="absolute -bottom-12 -right-12 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-25"
+          style={{ backgroundColor: "var(--project-secondary, #38bdf8)" }}
+        />
+
+        <div className="text-5xl animate-bounce">🎉</div>
+
+        <div className="space-y-2">
+          <h2
+            className="text-xl font-black"
+            style={{ color: "var(--project-primary, #0ea5e9)" }}
+          >
+            {prize.title || "Вы выиграли подарок!"}
+          </h2>
+          <p className="text-xs font-medium opacity-80 leading-relaxed">
+            {prize.text}
+          </p>
+        </div>
+
+        {/* Картинка приза */}
+        {prize.image_url && (
+          <div
+            className="w-full h-44 rounded-2xl overflow-hidden flex items-center justify-center p-2 border"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
+              borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
+            }}
+          >
+            <img
+              src={prize.image_url}
+              alt={prize.title}
+              className="max-h-full max-w-full object-contain"
+            />
           </div>
+        )}
+
+        {/* Кнопки действий */}
+        <div className="space-y-3 mt-4">
+          {prize.link_url && (
+            <a
+              href={prize.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-full py-3.5 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105"
+              style={{
+                backgroundColor: "var(--project-primary, #0ea5e9)",
+              }}
+            >
+              Перейти по ссылке
+            </a>
+          )}
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 opacity-60 hover:opacity-100 rounded-xl transition-colors font-bold"
+            className={`w-full py-3.5 font-black text-xs uppercase tracking-wider rounded-2xl transition-all ${
+              prize.link_url
+                ? "bg-gray-100 text-gray-500 hover:bg-gray-200 shadow-sm"
+                : "text-white shadow-lg hover:brightness-105"
+            }`}
+            style={
+              !prize.link_url
+                ? { backgroundColor: "var(--project-primary, #0ea5e9)" }
+                : {}
+            }
           >
-            ✕
+            {prize.link_url ? "Закрыть" : "Замечательно!"}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+</file>
 
-        {/* Анонимность */}
+<file path="components/rewards/RewardUnboxModal.tsx">
+"use client";
+
+import React from "react";
+import type { RewardType, RewardMeta } from "@/lib/rewards/types";
+
+export interface UnboxedRewardItem {
+  id: string;
+  title: string;
+  type: RewardType | string;
+  description?: string | null;
+  asset_url?: string | null;
+  link_url?: string | null; // Поддержка скрытых ссылок
+  meta?: RewardMeta;
+}
+
+interface RewardUnboxModalProps {
+  isOpen: boolean;
+  items: UnboxedRewardItem[];
+  onClose: () => void;
+}
+
+export default function RewardUnboxModal({
+  isOpen,
+  items,
+  onClose,
+}: RewardUnboxModalProps) {
+  const [currentIndex, setCurrentIndex] = React.useState(0);
+
+  if (!isOpen || !items || items.length === 0) return null;
+
+  const currentItem = items[currentIndex] || items[0];
+  const isLast = currentIndex >= items.length - 1;
+
+  const handleNext = () => {
+    if (isLast) {
+      setCurrentIndex(0);
+      onClose();
+    } else {
+      setCurrentIndex((prev) => prev + 1);
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case "hat":
+        return "Головной убор";
+      case "aura":
+        return "Аура маскота";
+      case "emotion":
+        return "Эмоция маскота";
+      case "base":
+        return "База маскота";
+      case "title":
+        return "Титул профиля";
+      default:
+        return "Награда";
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.82)" }}
+    >
+      <div
+        className="rounded-t-[32px] sm:rounded-[32px] max-w-md w-full p-6 sm:p-8 text-center space-y-6 shadow-2xl relative overflow-hidden border transition-all"
+        style={{
+          backgroundColor: "var(--project-card-bg, #ffffff)",
+          color: "var(--project-text, #0f172a)",
+          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
+          boxShadow: "var(--glass-shadow, 0 20px 50px rgba(0,0,0,0.3))",
+        }}
+      >
+        {/* Мобильный индикатор перетаскивания */}
+        <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto sm:hidden -mt-2 mb-2" />
+
+        {/* Фоновый размытый блик темы */}
         <div
-          className="p-3.5 rounded-2xl text-xs font-medium border"
+          className="absolute -top-16 -left-16 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-25"
+          style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
+        />
+        <div
+          className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-25"
+          style={{ backgroundColor: "var(--project-secondary, #38bdf8)" }}
+        />
+
+        {/* Шапка шагов */}
+        <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-60">
+          <span>Новая награда</span>
+          {items.length > 1 && (
+            <span>
+              {currentIndex + 1} из {items.length}
+            </span>
+          )}
+        </div>
+
+        {/* Карточка самой награды */}
+        <div
+          className="p-6 rounded-2xl border flex flex-col items-center justify-center space-y-4"
           style={{
-            backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)",
-            borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
-            color: "var(--project-primary, #0ea5e9)",
+            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
+            borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
           }}
         >
-          Здесь нет имён — только место в рейтинге, текущая серия и максимальный рекорд.
-        </div>
+          <span
+            className="text-[11px] font-black px-3.5 py-1 rounded-full border uppercase tracking-wider"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+              color: "var(--project-primary, #0ea5e9)",
+              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
+            }}
+          >
+            {getTypeLabel(currentItem.type)}
+          </span>
 
-        {/* Заголовок списка */}
-        <div className="text-xs font-extrabold uppercase tracking-wider opacity-60">
-          Топ 20 по максимальной серии
-        </div>
-
-        {/* Список участников */}
-        <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-          {loading ? (
-            <div className="text-center py-8 text-xs font-bold uppercase tracking-wider opacity-60">
-              Загрузка рейтинга...
+          {/* Титул или Изображение */}
+          {currentItem.type === "title" ? (
+            <div className="py-4">
+              <span
+                className="font-black text-base sm:text-lg px-5 py-2 rounded-2xl border inline-block shadow-sm uppercase tracking-wider"
+                style={{
+                  borderColor: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
+                  color: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
+                  backgroundColor: `${currentItem.meta?.color || "var(--project-primary, #0ea5e9)"}18`,
+                }}
+              >
+                «{currentItem.title}»
+              </span>
             </div>
-          ) : leaderboard.length === 0 ? (
-            <div className="text-center py-8 text-xs font-bold uppercase tracking-wider opacity-60">
-              Рейтинг пока пуст
+          ) : currentItem.asset_url ? (
+            <div className="w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center py-2">
+              <img
+                src={currentItem.asset_url}
+                alt={currentItem.title}
+                className="max-h-full max-w-full object-contain filter drop-shadow-md"
+              />
             </div>
           ) : (
-            leaderboard.map((item, idx) => {
-              const current = item.current_streak ?? (item as any).currentStreak ?? 0;
-              const max = item.max_streak ?? (item as any).longest_streak ?? (item as any).maxStreak ?? 0;
-              const rank = item.rank ?? idx + 1;
-
-              return (
-                <div
-                  key={item.user_id || idx}
-                  className="p-3.5 rounded-2xl border flex items-center justify-between transition-all"
-                  style={{
-                    backgroundColor: item.is_current_user
-                      ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 15%, transparent)"
-                      : "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-                    borderColor: item.is_current_user
-                      ? "var(--project-primary, #0ea5e9)"
-                      : "var(--glass-border, rgba(15,23,42,0.08))",
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`font-black text-sm min-w-[32px] ${
-                        rank === 1
-                          ? "text-amber-500"
-                          : rank === 2
-                          ? "text-slate-400"
-                          : rank === 3
-                          ? "text-amber-700"
-                          : "opacity-60"
-                      }`}
-                    >
-                      {item.is_current_user ? "Вы " : ""}#{rank}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-4 text-xs font-semibold">
-                    <div>
-                      Текущая:{" "}
-                      <span
-                        className="font-bold"
-                        style={{ color: "var(--project-primary, #0ea5e9)" }}
-                      >
-                        {current}
-                      </span>
-                    </div>
-                    <div>
-                      Максимум:{" "}
-                      <span
-                        className="font-bold"
-                        style={{ color: "var(--project-primary, #0ea5e9)" }}
-                      >
-                        {max}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+            <div className="py-4 font-black text-xs uppercase tracking-widest opacity-40">
+              Разблокировано
+            </div>
           )}
+
+          <div className="space-y-1">
+            <h3 className="text-lg sm:text-xl font-black">{currentItem.title}</h3>
+            {currentItem.description && (
+              <p className="text-xs font-medium opacity-70 leading-relaxed">
+                {currentItem.description}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Кнопки действия */}
+        <div className="space-y-3 w-full">
+          {currentItem.link_url && (
+            <a
+              href={currentItem.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-full py-4 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105 active:scale-[0.99]"
+              style={{
+                backgroundColor: "var(--project-primary, #0ea5e9)",
+                boxShadow: "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
+              }}
+            >
+              Перейти по ссылке
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={handleNext}
+            className={`w-full py-4 font-black text-xs uppercase tracking-wider rounded-2xl transition-all ${
+              currentItem.link_url
+                ? "shadow-sm hover:brightness-95"
+                : "text-white shadow-lg hover:brightness-105 active:scale-[0.99]"
+            }`}
+            style={{
+              backgroundColor: currentItem.link_url
+                ? "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)"
+                : "var(--project-primary, #0ea5e9)",
+              boxShadow: currentItem.link_url
+                ? "none"
+                : "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
+              color: currentItem.link_url ? "inherit" : "#ffffff",
+            }}
+          >
+            {currentItem.link_url && !isLast
+              ? "Далее"
+              : currentItem.link_url && isLast
+              ? "Закрыть"
+              : isLast
+              ? "Забрать награду"
+              : "Далее"}
+          </button>
         </div>
       </div>
     </div>
@@ -46498,117 +46812,6 @@ export default function RegisterPage() {
 }
 </file>
 
-<file path="components/rewards/PhysicalPrizeModal.tsx">
-"use client";
-
-import React from "react";
-import type { CustomPhysicalPrize } from "@/lib/rewards/types";
-
-interface PhysicalPrizeModalProps {
-  isOpen: boolean;
-  prize: CustomPhysicalPrize;
-  onClose: () => void;
-}
-
-export default function PhysicalPrizeModal({
-  isOpen,
-  prize,
-  onClose,
-}: PhysicalPrizeModalProps) {
-  if (!isOpen) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
-      style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
-    >
-      <div
-        className="rounded-[32px] max-w-md w-full p-6 text-center space-y-6 shadow-2xl relative overflow-hidden border transition-all"
-        style={{
-          backgroundColor: "var(--project-card-bg, #ffffff)",
-          color: "var(--project-text, #0f172a)",
-          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
-        }}
-      >
-        {/* Декоративное свечение */}
-        <div
-          className="absolute -top-12 -left-12 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-25"
-          style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
-        />
-        <div
-          className="absolute -bottom-12 -right-12 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-25"
-          style={{ backgroundColor: "var(--project-secondary, #38bdf8)" }}
-        />
-
-        <div className="text-5xl animate-bounce">🎉</div>
-
-        <div className="space-y-2">
-          <h2
-            className="text-xl font-black"
-            style={{ color: "var(--project-primary, #0ea5e9)" }}
-          >
-            {prize.title || "Вы выиграли подарок!"}
-          </h2>
-          <p className="text-xs font-medium opacity-80 leading-relaxed">
-            {prize.text}
-          </p>
-        </div>
-
-        {/* Картинка приза */}
-        {prize.image_url && (
-          <div
-            className="w-full h-44 rounded-2xl overflow-hidden flex items-center justify-center p-2 border"
-            style={{
-              backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-              borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
-            }}
-          >
-            <img
-              src={prize.image_url}
-              alt={prize.title}
-              className="max-h-full max-w-full object-contain"
-            />
-          </div>
-        )}
-
-        {/* Кнопки действий */}
-        <div className="space-y-3 mt-4">
-          {prize.link_url && (
-            <a
-              href={prize.link_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center w-full py-3.5 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105"
-              style={{
-                backgroundColor: "var(--project-primary, #0ea5e9)",
-              }}
-            >
-              Перейти по ссылке
-            </a>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className={`w-full py-3.5 font-black text-xs uppercase tracking-wider rounded-2xl transition-all ${
-              prize.link_url
-                ? "bg-gray-100 text-gray-500 hover:bg-gray-200 shadow-sm"
-                : "text-white shadow-lg hover:brightness-105"
-            }`}
-            style={
-              !prize.link_url
-                ? { backgroundColor: "var(--project-primary, #0ea5e9)" }
-                : {}
-            }
-          >
-            {prize.link_url ? "Закрыть" : "Замечательно!"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="components/rewards/ReferralTimeline.tsx">
 "use client";
 
@@ -46768,204 +46971,449 @@ export default function ReferralTimeline({ link, stats, track, onClaimMilestone 
 }
 </file>
 
-<file path="components/rewards/RewardUnboxModal.tsx">
+<file path="components/rewards/StreakTimeline.tsx">
 "use client";
 
-import React from "react";
-import type { RewardType, RewardMeta } from "@/lib/rewards/types";
+import React, { useState } from "react";
+import type { StreakConfigItem, StreakStats } from "@/lib/rewards/types";
+import StreakLeaderboardModal from "./StreakLeaderboardModal";
 
-export interface UnboxedRewardItem {
-  id: string;
-  title: string;
-  type: RewardType | string;
-  description?: string | null;
-  asset_url?: string | null;
-  link_url?: string | null; // Поддержка скрытых ссылок
-  meta?: RewardMeta;
+interface StreakTimelineProps {
+  stats: StreakStats;
+  path: StreakConfigItem[];
+  onClaimReward: (dayNumber: number) => Promise<void>;
 }
 
-interface RewardUnboxModalProps {
-  isOpen: boolean;
-  items: UnboxedRewardItem[];
-  onClose: () => void;
-}
+export default function StreakTimeline({
+  stats,
+  path = [],
+  onClaimReward,
+}: StreakTimelineProps) {
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [claimingDay, setClaimingDay] = useState<number | null>(null);
 
-export default function RewardUnboxModal({
-  isOpen,
-  items,
-  onClose,
-}: RewardUnboxModalProps) {
-  const [currentIndex, setCurrentIndex] = React.useState(0);
+  const currentStreak = stats?.currentStreak ?? 0;
+  const maxStreak = stats?.maxStreak ?? (stats as any)?.longestStreak ?? currentStreak;
+  const completedToday = Boolean(stats?.completedToday);
 
-  if (!isOpen || !items || items.length === 0) return null;
-
-  const currentItem = items[currentIndex] || items[0];
-  const isLast = currentIndex >= items.length - 1;
-
-  const handleNext = () => {
-    if (isLast) {
-      setCurrentIndex(0);
-      onClose();
-    } else {
-      setCurrentIndex((prev) => prev + 1);
+  const handleClaim = async (dayNumber: number) => {
+    setClaimingDay(dayNumber);
+    try {
+      await onClaimReward(dayNumber);
+    } finally {
+      setClaimingDay(null);
     }
   };
 
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case "hat":
-        return "Головной убор";
-      case "aura":
-        return "Аура маскота";
-      case "emotion":
-        return "Эмоция маскота";
-      case "base":
-        return "База маскота";
-      case "title":
-        return "Титул профиля";
-      default:
-        return "Награда";
-    }
-  };
+  const nextUpcomingReward = path.find((item) => !item.is_claimed);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
-      style={{ backgroundColor: "rgba(0, 0, 0, 0.82)" }}
-    >
-      <div
-        className="rounded-t-[32px] sm:rounded-[32px] max-w-md w-full p-6 sm:p-8 text-center space-y-6 shadow-2xl relative overflow-hidden border transition-all"
-        style={{
-          backgroundColor: "var(--project-card-bg, #ffffff)",
-          color: "var(--project-text, #0f172a)",
-          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
-          boxShadow: "var(--glass-shadow, 0 20px 50px rgba(0,0,0,0.3))",
-        }}
-      >
-        {/* Мобильный индикатор перетаскивания */}
-        <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto sm:hidden -mt-2 mb-2" />
-
-        {/* Фоновый размытый блик темы */}
+    <div className="space-y-5 sm:space-y-6 max-w-4xl mx-auto py-2">
+      {/* 1. ВЕРХНИЕ КАРТОЧКИ СТАТИСТИКИ */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Текущая серия */}
         <div
-          className="absolute -top-16 -left-16 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-25"
-          style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
-        />
-        <div
-          className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-25"
-          style={{ backgroundColor: "var(--project-secondary, #38bdf8)" }}
-        />
-
-        {/* Шапка шагов */}
-        <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-60">
-          <span>Новая награда</span>
-          {items.length > 1 && (
-            <span>
-              {currentIndex + 1} из {items.length}
-            </span>
-          )}
-        </div>
-
-        {/* Карточка самой награды */}
-        <div
-          className="p-6 rounded-2xl border flex flex-col items-center justify-center space-y-4"
+          className="border rounded-2xl p-4 flex items-center justify-between shadow-sm transition-all"
           style={{
             backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-            borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
+            borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
           }}
         >
-          <span
-            className="text-[11px] font-black px-3.5 py-1 rounded-full border uppercase tracking-wider"
+          <div>
+            <div
+              className="text-[10px] font-black uppercase tracking-wider mb-1"
+              style={{ color: "var(--project-primary, #0ea5e9)" }}
+            >
+              Серия
+            </div>
+            <div className="text-xl sm:text-2xl font-black">{currentStreak} дн.</div>
+            <div
+              className="text-xs font-medium mt-0.5"
+              style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
+            >
+              Текущая серия
+            </div>
+          </div>
+          <div
+            className="px-3 py-1 text-[11px] font-bold rounded-lg uppercase tracking-wider border"
             style={{
-              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
-              color: "var(--project-primary, #0ea5e9)",
-              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
+              backgroundColor: currentStreak > 0 || completedToday
+                ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)"
+                : "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
+              borderColor: currentStreak > 0 || completedToday
+                ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)"
+                : "var(--glass-border, rgba(15,23,42,0.1))",
+              color: currentStreak > 0 || completedToday
+                ? "var(--project-primary, #0ea5e9)"
+                : "color-mix(in srgb, var(--project-text, #0f172a) 50%, transparent)",
             }}
           >
-            {getTypeLabel(currentItem.type)}
-          </span>
-
-          {/* Титул или Изображение */}
-          {currentItem.type === "title" ? (
-            <div className="py-4">
-              <span
-                className="font-black text-base sm:text-lg px-5 py-2 rounded-2xl border inline-block shadow-sm uppercase tracking-wider"
-                style={{
-                  borderColor: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
-                  color: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
-                  backgroundColor: `${currentItem.meta?.color || "var(--project-primary, #0ea5e9)"}18`,
-                }}
-              >
-                «{currentItem.title}»
-              </span>
-            </div>
-          ) : currentItem.asset_url ? (
-            <div className="w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center py-2">
-              <img
-                src={currentItem.asset_url}
-                alt={currentItem.title}
-                className="max-h-full max-w-full object-contain filter drop-shadow-md"
-              />
-            </div>
-          ) : (
-            <div className="py-4 font-black text-xs uppercase tracking-widest opacity-40">
-              Разблокировано
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <h3 className="text-lg sm:text-xl font-black">{currentItem.title}</h3>
-            {currentItem.description && (
-              <p className="text-xs font-medium opacity-70 leading-relaxed">
-                {currentItem.description}
-              </p>
-            )}
+            {currentStreak > 0 || completedToday ? "Активна" : "Не активна"}
           </div>
         </div>
 
-        {/* Кнопки действия */}
-        <div className="space-y-3 w-full">
-          {currentItem.link_url && (
-            <a
-              href={currentItem.link_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center w-full py-4 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105 active:scale-[0.99]"
-              style={{
-                backgroundColor: "var(--project-primary, #0ea5e9)",
-                boxShadow: "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
-              }}
+        {/* Рекорд */}
+        <div
+          onClick={() => setIsLeaderboardOpen(true)}
+          className="border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all shadow-sm group hover:-translate-y-0.5"
+          style={{
+            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
+            borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+          }}
+        >
+          <div>
+            <div
+              className="text-[10px] font-black uppercase tracking-wider mb-1"
+              style={{ color: "var(--project-primary, #0ea5e9)" }}
             >
-              Перейти по ссылке
-            </a>
-          )}
-          <button
-            type="button"
-            onClick={handleNext}
-            className={`w-full py-4 font-black text-xs uppercase tracking-wider rounded-2xl transition-all ${
-              currentItem.link_url
-                ? "shadow-sm hover:brightness-95"
-                : "text-white shadow-lg hover:brightness-105 active:scale-[0.99]"
-            }`}
+              Рекорд
+            </div>
+            <div className="text-xl sm:text-2xl font-black">{maxStreak} дн.</div>
+            <div
+              className="text-xs font-medium mt-0.5"
+              style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
+            >
+              Максимум за всё время
+            </div>
+          </div>
+          <span
+            className="text-[11px] font-extrabold uppercase tracking-wider border px-3 py-2 rounded-xl transition-all"
             style={{
-              backgroundColor: currentItem.link_url
-                ? "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)"
-                : "var(--project-primary, #0ea5e9)",
-              boxShadow: currentItem.link_url
-                ? "none"
-                : "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
-              color: currentItem.link_url ? "inherit" : "#ffffff",
+              backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 5%, transparent)",
+              borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+              color: "var(--project-primary, #0ea5e9)",
             }}
           >
-            {currentItem.link_url && !isLast
-              ? "Далее"
-              : currentItem.link_url && isLast
-              ? "Закрыть"
-              : isLast
-              ? "Забрать награду"
-              : "Далее"}
-          </button>
+            Топ-20
+          </span>
+        </div>
+
+        {/* Статус за сегодня */}
+        <div
+          className="border rounded-2xl p-4 flex items-center justify-between shadow-sm"
+          style={{
+            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
+            borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+          }}
+        >
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-wider mb-1 opacity-60">
+              Статус дня
+            </div>
+            <div
+              className={`text-base sm:text-lg font-black uppercase tracking-wider ${
+                completedToday ? "text-emerald-600" : "text-rose-500"
+              }`}
+            >
+              {completedToday ? "Засчитано" : "Не засчитано"}
+            </div>
+            <div
+              className="text-xs font-medium mt-0.5"
+              style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
+            >
+              {completedToday ? "Задание выполнено" : "Сделайте задание сегодня"}
+            </div>
+          </div>
+          <div
+            className={`w-3.5 h-3.5 rounded-full ${
+              completedToday ? "bg-emerald-500 shadow-md shadow-emerald-500/50" : "bg-rose-500"
+            }`}
+          />
         </div>
       </div>
+
+      {/* 2. БАННЕР СЛЕДУЮЩЕЙ НАГРАДЫ */}
+      <div
+        className="border rounded-2xl p-4 sm:p-5 shadow-sm"
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
+          borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+        }}
+      >
+        <h4 className="text-[10px] font-black uppercase tracking-wider opacity-60 mb-2 sm:mb-3">
+          Следующая награда
+        </h4>
+        {nextUpcomingReward ? (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="text-sm sm:text-base font-black uppercase tracking-wider">
+                {nextUpcomingReward.reward?.title || "Награда"} — День{" "}
+                {nextUpcomingReward.day_number}
+              </div>
+              <div
+                className="text-xs font-medium mt-1"
+                style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
+              >
+                Осталось дней рекорда:{" "}
+                <span className="font-bold">
+                  {Math.max(0, nextUpcomingReward.day_number - maxStreak)}
+                </span>
+              </div>
+            </div>
+
+            {(nextUpcomingReward.is_available || maxStreak >= nextUpcomingReward.day_number) && (
+              <button
+                type="button"
+                onClick={() => handleClaim(nextUpcomingReward.day_number)}
+                disabled={claimingDay === nextUpcomingReward.day_number}
+                className="w-full sm:w-auto px-5 py-3 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md disabled:opacity-50 transition-all flex-shrink-0"
+                style={{
+                  backgroundColor: "var(--project-primary, #0ea5e9)",
+                }}
+              >
+                {claimingDay === nextUpcomingReward.day_number
+                  ? "Получение..."
+                  : "Забрать награду"}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div
+            className="text-xs font-black uppercase tracking-wider"
+            style={{ color: "var(--project-primary, #0ea5e9)" }}
+          >
+            Все награды в текущей дорожке уже разблокированы
+          </div>
+        )}
+      </div>
+
+      {/* 3. ТАЙМЛАЙН / ДОРОЖКА НАГРАД */}
+      <div
+        className="border rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative shadow-sm"
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
+          borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+        }}
+      >
+        <div className="text-center mb-6 sm:mb-8">
+          <h3 className="text-base sm:text-lg font-black uppercase tracking-wider">
+            Дорожка наград
+          </h3>
+          <p
+            className="text-xs font-medium mt-1"
+            style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
+          >
+            Титулы слева • Предметы и иконки справа
+          </p>
+        </div>
+
+        {path.length === 0 ? (
+          <div className="text-center py-12 opacity-60 text-xs font-bold uppercase tracking-wider">
+            Дорожка наград пока не настроена
+          </div>
+        ) : (
+          <div className="relative py-4">
+            <div
+              className="absolute left-1/2 top-0 bottom-0 w-0.5 -translate-x-1/2 z-0"
+              style={{ backgroundColor: "var(--glass-border, rgba(15,23,42,0.12))" }}
+            />
+
+            <div className="space-y-6 sm:space-y-8 relative z-10">
+              {path.map((item) => {
+                const isTitle = item.reward?.type === "title";
+                const isClaimed = item.is_claimed;
+                const isAvailable =
+                  (item.is_available || maxStreak >= item.day_number) && !isClaimed;
+
+                return (
+                  <div
+                    key={item.day_number}
+                    className="grid grid-cols-2 gap-2 sm:gap-4 items-center relative"
+                  >
+                    {/* МЕТКА ДНЯ */}
+                    <div className="absolute left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
+                      <div
+                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 font-black text-[11px] sm:text-xs flex items-center justify-center uppercase tracking-wider transition-all"
+                        style={{
+                          backgroundColor: isClaimed
+                            ? "#10b981"
+                            : isAvailable
+                            ? "var(--project-primary, #0ea5e9)"
+                            : "var(--project-card-bg, #ffffff)",
+                          borderColor: isClaimed
+                            ? "#10b981"
+                            : isAvailable
+                            ? "var(--project-primary, #0ea5e9)"
+                            : "var(--glass-border, rgba(15,23,42,0.2))",
+                          color: isClaimed || isAvailable ? "#ffffff" : "var(--project-text, #0f172a)",
+                        }}
+                      >
+                        {item.day_number}d
+                      </div>
+                    </div>
+
+                    {/* ТИТУЛЫ (ЛЕВО) */}
+                    <div className="pr-3 sm:pr-6">
+                      {isTitle && (
+                        <div
+                          className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all shadow-sm"
+                          style={{
+                            backgroundColor: isClaimed
+                              ? "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)"
+                              : "var(--project-card-bg, #ffffff)",
+                            borderColor: isAvailable
+                              ? "var(--project-primary, #0ea5e9)"
+                              : "var(--glass-border, rgba(15,23,42,0.1))",
+                            opacity: isClaimed ? 0.7 : 1,
+                          }}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span
+                              className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded border tracking-wider"
+                              style={{
+                                backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+                                borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
+                                color: "var(--project-primary, #0ea5e9)",
+                              }}
+                            >
+                              Титул
+                            </span>
+                            <span
+                              className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded ${
+                                isClaimed
+                                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                                  : isAvailable
+                                  ? "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                                  : "opacity-50"
+                              }`}
+                            >
+                              {isClaimed
+                                ? "Открыт"
+                                : isAvailable
+                                ? "Доступен"
+                                : "Закрыт"}
+                            </span>
+                          </div>
+
+                          <div className="font-bold text-xs sm:text-sm mb-1 truncate">
+                            «{item.reward?.title}»
+                          </div>
+                          {item.reward?.description && (
+                            <p
+                              className="text-[11px] font-medium line-clamp-2"
+                              style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
+                            >
+                              {item.reward.description}
+                            </p>
+                          )}
+
+                          {isAvailable && (
+                            <button
+                              type="button"
+                              onClick={() => handleClaim(item.day_number)}
+                              disabled={claimingDay === item.day_number}
+                              className="mt-2.5 w-full py-1.5 sm:py-2 text-white font-black text-[11px] sm:text-xs uppercase tracking-wider rounded-xl transition-all shadow-md disabled:opacity-50"
+                              style={{
+                                backgroundColor: "var(--project-primary, #0ea5e9)",
+                              }}
+                            >
+                              {claimingDay === item.day_number
+                                ? "Забор..."
+                                : "Забрать титул"}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ПРЕДМЕТЫ (ПРАВО) */}
+                    <div className="pl-3 sm:pl-6">
+                      {!isTitle && (
+                        <div
+                          className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all shadow-sm"
+                          style={{
+                            backgroundColor: isClaimed
+                              ? "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)"
+                              : "var(--project-card-bg, #ffffff)",
+                            borderColor: isAvailable
+                              ? "var(--project-primary, #0ea5e9)"
+                              : "var(--glass-border, rgba(15,23,42,0.1))",
+                            opacity: isClaimed ? 0.7 : 1,
+                          }}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span
+                              className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded border tracking-wider"
+                              style={{
+                                backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+                                borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
+                                color: "var(--project-primary, #0ea5e9)",
+                              }}
+                            >
+                              Предмет
+                            </span>
+                            <span
+                              className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded ${
+                                isClaimed
+                                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                                  : isAvailable
+                                  ? "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                                  : "opacity-50"
+                              }`}
+                            >
+                              {isClaimed
+                                ? "Открыт"
+                                : isAvailable
+                                ? "Доступен"
+                                : "Закрыт"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 sm:gap-3 my-1.5">
+                            {item.reward?.asset_url ? (
+                              <img
+                                src={item.reward.asset_url}
+                                alt=""
+                                className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                              />
+                            ) : (
+                              <div
+                                className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center text-[10px] font-bold opacity-50"
+                                style={{ backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)" }}
+                              >
+                                N/A
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-bold text-xs sm:text-sm truncate">
+                                {item.reward?.title || "Награда"}
+                              </div>
+                              <div className="text-[9px] sm:text-[10px] uppercase font-black tracking-wider opacity-60">
+                                {item.reward?.type || "предмет"}
+                              </div>
+                            </div>
+                          </div>
+
+                          {isAvailable && (
+                            <button
+                              type="button"
+                              onClick={() => handleClaim(item.day_number)}
+                              disabled={claimingDay === item.day_number}
+                              className="mt-2 w-full py-1.5 sm:py-2 text-white font-black text-[11px] sm:text-xs uppercase tracking-wider rounded-xl transition-all shadow-md disabled:opacity-50"
+                              style={{
+                                backgroundColor: "var(--project-primary, #0ea5e9)",
+                              }}
+                            >
+                              {claimingDay === item.day_number
+                                ? "Забор..."
+                                : "Забрать награду"}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <StreakLeaderboardModal
+        isOpen={isLeaderboardOpen}
+        onClose={() => setIsLeaderboardOpen(false)}
+      />
     </div>
   );
 }
@@ -48784,454 +49232,6 @@ export default function ReferralTab() {
           onSuccess={handleChoiceSuccess}
         />
       )}
-    </div>
-  );
-}
-</file>
-
-<file path="components/rewards/StreakTimeline.tsx">
-"use client";
-
-import React, { useState } from "react";
-import type { StreakConfigItem, StreakStats } from "@/lib/rewards/types";
-import StreakLeaderboardModal from "./StreakLeaderboardModal";
-
-interface StreakTimelineProps {
-  stats: StreakStats;
-  path: StreakConfigItem[];
-  onClaimReward: (dayNumber: number) => Promise<void>;
-}
-
-export default function StreakTimeline({
-  stats,
-  path = [],
-  onClaimReward,
-}: StreakTimelineProps) {
-  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
-  const [claimingDay, setClaimingDay] = useState<number | null>(null);
-
-  const currentStreak = stats?.currentStreak ?? 0;
-  const maxStreak = stats?.maxStreak ?? (stats as any)?.longestStreak ?? currentStreak;
-  const completedToday = Boolean(stats?.completedToday);
-
-  const handleClaim = async (dayNumber: number) => {
-    setClaimingDay(dayNumber);
-    try {
-      await onClaimReward(dayNumber);
-    } finally {
-      setClaimingDay(null);
-    }
-  };
-
-  const nextUpcomingReward = path.find((item) => !item.is_claimed);
-
-  return (
-    <div className="space-y-5 sm:space-y-6 max-w-4xl mx-auto py-2">
-      {/* 1. ВЕРХНИЕ КАРТОЧКИ СТАТИСТИКИ */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Текущая серия */}
-        <div
-          className="border rounded-2xl p-4 flex items-center justify-between shadow-sm transition-all"
-          style={{
-            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-            borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
-          }}
-        >
-          <div>
-            <div
-              className="text-[10px] font-black uppercase tracking-wider mb-1"
-              style={{ color: "var(--project-primary, #0ea5e9)" }}
-            >
-              Серия
-            </div>
-            <div className="text-xl sm:text-2xl font-black">{currentStreak} дн.</div>
-            <div
-              className="text-xs font-medium mt-0.5"
-              style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
-            >
-              Текущая серия
-            </div>
-          </div>
-          <div
-            className="px-3 py-1 text-[11px] font-bold rounded-lg uppercase tracking-wider border"
-            style={{
-              backgroundColor: currentStreak > 0 || completedToday
-                ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)"
-                : "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
-              borderColor: currentStreak > 0 || completedToday
-                ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)"
-                : "var(--glass-border, rgba(15,23,42,0.1))",
-              color: currentStreak > 0 || completedToday
-                ? "var(--project-primary, #0ea5e9)"
-                : "color-mix(in srgb, var(--project-text, #0f172a) 50%, transparent)",
-            }}
-          >
-            {currentStreak > 0 || completedToday ? "Активна" : "Не активна"}
-          </div>
-        </div>
-
-        {/* Рекорд */}
-        <div
-          onClick={() => setIsLeaderboardOpen(true)}
-          className="border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all shadow-sm group hover:-translate-y-0.5"
-          style={{
-            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-            borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
-          }}
-        >
-          <div>
-            <div
-              className="text-[10px] font-black uppercase tracking-wider mb-1"
-              style={{ color: "var(--project-primary, #0ea5e9)" }}
-            >
-              Рекорд
-            </div>
-            <div className="text-xl sm:text-2xl font-black">{maxStreak} дн.</div>
-            <div
-              className="text-xs font-medium mt-0.5"
-              style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
-            >
-              Максимум за всё время
-            </div>
-          </div>
-          <span
-            className="text-[11px] font-extrabold uppercase tracking-wider border px-3 py-2 rounded-xl transition-all"
-            style={{
-              backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 5%, transparent)",
-              borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
-              color: "var(--project-primary, #0ea5e9)",
-            }}
-          >
-            Топ-20
-          </span>
-        </div>
-
-        {/* Статус за сегодня */}
-        <div
-          className="border rounded-2xl p-4 flex items-center justify-between shadow-sm"
-          style={{
-            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-            borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
-          }}
-        >
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-wider mb-1 opacity-60">
-              Статус дня
-            </div>
-            <div
-              className={`text-base sm:text-lg font-black uppercase tracking-wider ${
-                completedToday ? "text-emerald-600" : "text-rose-500"
-              }`}
-            >
-              {completedToday ? "Засчитано" : "Не засчитано"}
-            </div>
-            <div
-              className="text-xs font-medium mt-0.5"
-              style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
-            >
-              {completedToday ? "Задание выполнено" : "Сделайте задание сегодня"}
-            </div>
-          </div>
-          <div
-            className={`w-3.5 h-3.5 rounded-full ${
-              completedToday ? "bg-emerald-500 shadow-md shadow-emerald-500/50" : "bg-rose-500"
-            }`}
-          />
-        </div>
-      </div>
-
-      {/* 2. БАННЕР СЛЕДУЮЩЕЙ НАГРАДЫ */}
-      <div
-        className="border rounded-2xl p-4 sm:p-5 shadow-sm"
-        style={{
-          backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-          borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
-        }}
-      >
-        <h4 className="text-[10px] font-black uppercase tracking-wider opacity-60 mb-2 sm:mb-3">
-          Следующая награда
-        </h4>
-        {nextUpcomingReward ? (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="text-sm sm:text-base font-black uppercase tracking-wider">
-                {nextUpcomingReward.reward?.title || "Награда"} — День{" "}
-                {nextUpcomingReward.day_number}
-              </div>
-              <div
-                className="text-xs font-medium mt-1"
-                style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
-              >
-                Осталось дней рекорда:{" "}
-                <span className="font-bold">
-                  {Math.max(0, nextUpcomingReward.day_number - maxStreak)}
-                </span>
-              </div>
-            </div>
-
-            {(nextUpcomingReward.is_available || maxStreak >= nextUpcomingReward.day_number) && (
-              <button
-                type="button"
-                onClick={() => handleClaim(nextUpcomingReward.day_number)}
-                disabled={claimingDay === nextUpcomingReward.day_number}
-                className="w-full sm:w-auto px-5 py-3 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md disabled:opacity-50 transition-all flex-shrink-0"
-                style={{
-                  backgroundColor: "var(--project-primary, #0ea5e9)",
-                }}
-              >
-                {claimingDay === nextUpcomingReward.day_number
-                  ? "Получение..."
-                  : "Забрать награду"}
-              </button>
-            )}
-          </div>
-        ) : (
-          <div
-            className="text-xs font-black uppercase tracking-wider"
-            style={{ color: "var(--project-primary, #0ea5e9)" }}
-          >
-            Все награды в текущей дорожке уже разблокированы
-          </div>
-        )}
-      </div>
-
-      {/* 3. ТАЙМЛАЙН / ДОРОЖКА НАГРАД */}
-      <div
-        className="border rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative shadow-sm"
-        style={{
-          backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
-          borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
-        }}
-      >
-        <div className="text-center mb-6 sm:mb-8">
-          <h3 className="text-base sm:text-lg font-black uppercase tracking-wider">
-            Дорожка наград
-          </h3>
-          <p
-            className="text-xs font-medium mt-1"
-            style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
-          >
-            Титулы слева • Предметы и иконки справа
-          </p>
-        </div>
-
-        {path.length === 0 ? (
-          <div className="text-center py-12 opacity-60 text-xs font-bold uppercase tracking-wider">
-            Дорожка наград пока не настроена
-          </div>
-        ) : (
-          <div className="relative py-4">
-            <div
-              className="absolute left-1/2 top-0 bottom-0 w-0.5 -translate-x-1/2 z-0"
-              style={{ backgroundColor: "var(--glass-border, rgba(15,23,42,0.12))" }}
-            />
-
-            <div className="space-y-6 sm:space-y-8 relative z-10">
-              {path.map((item) => {
-                const isTitle = item.reward?.type === "title";
-                const isClaimed = item.is_claimed;
-                const isAvailable =
-                  (item.is_available || maxStreak >= item.day_number) && !isClaimed;
-
-                return (
-                  <div
-                    key={item.day_number}
-                    className="grid grid-cols-2 gap-2 sm:gap-4 items-center relative"
-                  >
-                    {/* МЕТКА ДНЯ */}
-                    <div className="absolute left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
-                      <div
-                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 font-black text-[11px] sm:text-xs flex items-center justify-center uppercase tracking-wider transition-all"
-                        style={{
-                          backgroundColor: isClaimed
-                            ? "#10b981"
-                            : isAvailable
-                            ? "var(--project-primary, #0ea5e9)"
-                            : "var(--project-card-bg, #ffffff)",
-                          borderColor: isClaimed
-                            ? "#10b981"
-                            : isAvailable
-                            ? "var(--project-primary, #0ea5e9)"
-                            : "var(--glass-border, rgba(15,23,42,0.2))",
-                          color: isClaimed || isAvailable ? "#ffffff" : "var(--project-text, #0f172a)",
-                        }}
-                      >
-                        {item.day_number}d
-                      </div>
-                    </div>
-
-                    {/* ТИТУЛЫ (ЛЕВО) */}
-                    <div className="pr-3 sm:pr-6">
-                      {isTitle && (
-                        <div
-                          className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all shadow-sm"
-                          style={{
-                            backgroundColor: isClaimed
-                              ? "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)"
-                              : "var(--project-card-bg, #ffffff)",
-                            borderColor: isAvailable
-                              ? "var(--project-primary, #0ea5e9)"
-                              : "var(--glass-border, rgba(15,23,42,0.1))",
-                            opacity: isClaimed ? 0.7 : 1,
-                          }}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span
-                              className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded border tracking-wider"
-                              style={{
-                                backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
-                                borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
-                                color: "var(--project-primary, #0ea5e9)",
-                              }}
-                            >
-                              Титул
-                            </span>
-                            <span
-                              className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded ${
-                                isClaimed
-                                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                                  : isAvailable
-                                  ? "bg-amber-500/10 text-amber-600 border border-amber-500/20"
-                                  : "opacity-50"
-                              }`}
-                            >
-                              {isClaimed
-                                ? "Открыт"
-                                : isAvailable
-                                ? "Доступен"
-                                : "Закрыт"}
-                            </span>
-                          </div>
-
-                          <div className="font-bold text-xs sm:text-sm mb-1 truncate">
-                            «{item.reward?.title}»
-                          </div>
-                          {item.reward?.description && (
-                            <p
-                              className="text-[11px] font-medium line-clamp-2"
-                              style={{ color: "color-mix(in srgb, var(--project-text, #0f172a) 60%, transparent)" }}
-                            >
-                              {item.reward.description}
-                            </p>
-                          )}
-
-                          {isAvailable && (
-                            <button
-                              type="button"
-                              onClick={() => handleClaim(item.day_number)}
-                              disabled={claimingDay === item.day_number}
-                              className="mt-2.5 w-full py-1.5 sm:py-2 text-white font-black text-[11px] sm:text-xs uppercase tracking-wider rounded-xl transition-all shadow-md disabled:opacity-50"
-                              style={{
-                                backgroundColor: "var(--project-primary, #0ea5e9)",
-                              }}
-                            >
-                              {claimingDay === item.day_number
-                                ? "Забор..."
-                                : "Забрать титул"}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* ПРЕДМЕТЫ (ПРАВО) */}
-                    <div className="pl-3 sm:pl-6">
-                      {!isTitle && (
-                        <div
-                          className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all shadow-sm"
-                          style={{
-                            backgroundColor: isClaimed
-                              ? "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)"
-                              : "var(--project-card-bg, #ffffff)",
-                            borderColor: isAvailable
-                              ? "var(--project-primary, #0ea5e9)"
-                              : "var(--glass-border, rgba(15,23,42,0.1))",
-                            opacity: isClaimed ? 0.7 : 1,
-                          }}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span
-                              className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded border tracking-wider"
-                              style={{
-                                backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
-                                borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
-                                color: "var(--project-primary, #0ea5e9)",
-                              }}
-                            >
-                              Предмет
-                            </span>
-                            <span
-                              className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded ${
-                                isClaimed
-                                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                                  : isAvailable
-                                  ? "bg-amber-500/10 text-amber-600 border border-amber-500/20"
-                                  : "opacity-50"
-                              }`}
-                            >
-                              {isClaimed
-                                ? "Открыт"
-                                : isAvailable
-                                ? "Доступен"
-                                : "Закрыт"}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2 sm:gap-3 my-1.5">
-                            {item.reward?.asset_url ? (
-                              <img
-                                src={item.reward.asset_url}
-                                alt=""
-                                className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
-                              />
-                            ) : (
-                              <div
-                                className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center text-[10px] font-bold opacity-50"
-                                style={{ backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)" }}
-                              >
-                                N/A
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <div className="font-bold text-xs sm:text-sm truncate">
-                                {item.reward?.title || "Награда"}
-                              </div>
-                              <div className="text-[9px] sm:text-[10px] uppercase font-black tracking-wider opacity-60">
-                                {item.reward?.type || "предмет"}
-                              </div>
-                            </div>
-                          </div>
-
-                          {isAvailable && (
-                            <button
-                              type="button"
-                              onClick={() => handleClaim(item.day_number)}
-                              disabled={claimingDay === item.day_number}
-                              className="mt-2 w-full py-1.5 sm:py-2 text-white font-black text-[11px] sm:text-xs uppercase tracking-wider rounded-xl transition-all shadow-md disabled:opacity-50"
-                              style={{
-                                backgroundColor: "var(--project-primary, #0ea5e9)",
-                              }}
-                            >
-                              {claimingDay === item.day_number
-                                ? "Забор..."
-                                : "Забрать награду"}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <StreakLeaderboardModal
-        isOpen={isLeaderboardOpen}
-        onClose={() => setIsLeaderboardOpen(false)}
-      />
     </div>
   );
 }

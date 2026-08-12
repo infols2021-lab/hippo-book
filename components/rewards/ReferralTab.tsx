@@ -147,8 +147,16 @@ export default function ReferralTab() {
   if (loading) {
     return (
       <div className="flex flex-col h-[50vh] items-center justify-center opacity-50">
-        <div className="w-8 h-8 border-4 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-4"></div>
-        <div className="font-bold text-xs uppercase tracking-wider text-slate-600">Загрузка программы...</div>
+        <div 
+          className="w-8 h-8 border-4 rounded-full animate-spin mb-4"
+          style={{ 
+            borderColor: "color-mix(in srgb, var(--project-primary) 30%, transparent)",
+            borderTopColor: "var(--project-primary)"
+          }}
+        ></div>
+        <div className="font-bold text-xs uppercase tracking-wider" style={{ color: "var(--project-text)" }}>
+          Загрузка программы...
+        </div>
       </div>
     );
   }
@@ -164,7 +172,7 @@ export default function ReferralTab() {
   if (!data || !data.track || data.track.length === 0) {
     return (
       <div className="flex flex-col h-[60vh] items-center justify-center opacity-60 p-6 text-center">
-        <div className="mb-4 text-slate-300">
+        <div className="mb-4" style={{ color: "color-mix(in srgb, var(--project-text) 30%, transparent)" }}>
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M16 21v-2a4 4 0 0 0-4-4H5c-1.2 0-2.12.8-2.5 1.9"></path>
             <path d="M8.5 7.5A3.5 3.5 0 1 1 12 11a3.5 3.5 0 0 1-3.5-3.5z"></path>
@@ -172,10 +180,10 @@ export default function ReferralTab() {
             <path d="M23 11h-6"></path>
           </svg>
         </div>
-        <div className="font-black text-base uppercase tracking-wider mb-2 text-slate-700">
+        <div className="font-black text-base uppercase tracking-wider mb-2" style={{ color: "var(--project-text)" }}>
           Программа недоступна
         </div>
-        <div className="text-sm font-medium max-w-xs mx-auto text-slate-500">
+        <div className="text-sm font-medium max-w-xs mx-auto" style={{ color: "color-mix(in srgb, var(--project-text) 60%, transparent)" }}>
           Администратор пока не добавил ни одной награды в реферальную дорожку.
         </div>
       </div>
@@ -186,26 +194,56 @@ export default function ReferralTab() {
     <div className="max-w-4xl mx-auto py-4 sm:py-6">
       
       {/* Блок "Кто вас пригласил" с кнопкой забрать */}
-      <div className="mb-10 p-6 sm:p-8 bg-white border border-slate-200 rounded-[28px] shadow-sm">
-        <h4 className="font-black text-base uppercase tracking-wider text-slate-800 mb-5 flex items-center gap-2">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="M16 21v-2a4 4 0 0 0-4-4H5c-1.2 0-2.12.8-2.5 1.9"></path><path d="M8.5 7.5A3.5 3.5 0 1 1 12 11a3.5 3.5 0 0 1-3.5-3.5z"></path></svg>
+      <div 
+        className="mb-10 p-6 sm:p-8 rounded-[28px] shadow-sm border transition-all"
+        style={{
+          backgroundColor: "var(--project-card-bg, #ffffff)",
+          borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
+        }}
+      >
+        <h4 
+          className="font-black text-base uppercase tracking-wider mb-5 flex items-center gap-2"
+          style={{ color: "var(--project-text)" }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5c-1.2 0-2.12.8-2.5 1.9"></path>
+            <path d="M8.5 7.5A3.5 3.5 0 1 1 12 11a3.5 3.5 0 0 1-3.5-3.5z"></path>
+          </svg>
           Кто вас пригласил?
         </h4>
         
         {data.inviter ? (
-          <div className="text-sm font-medium text-slate-600 bg-slate-50 p-5 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div 
+            className="text-sm font-medium p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--project-text) 3%, transparent)",
+              borderColor: "var(--glass-border)",
+              color: "color-mix(in srgb, var(--project-text) 80%, transparent)"
+            }}
+          >
             <div className="flex flex-wrap items-center gap-2">
-              Вас пригласил(а): <span className="font-black text-slate-900 text-base">{data.inviter.name}</span>
+              Вас пригласил(а): <span className="font-black text-base" style={{ color: "var(--project-text)" }}>{data.inviter.name}</span>
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 bg-white text-slate-500 rounded-lg border border-slate-200 shrink-0 shadow-sm">
+              <div 
+                className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-lg border shrink-0 shadow-sm"
+                style={{
+                  backgroundColor: "var(--project-card-bg)",
+                  color: "color-mix(in srgb, var(--project-text) 60%, transparent)",
+                  borderColor: "var(--glass-border)"
+                }}
+              >
                 Привязан
               </div>
               {data.welcome_bonus_available && (
                 <button 
                   onClick={handleClaimWelcome} 
                   disabled={submitting}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-blue-700 transition-all disabled:opacity-50 shadow-md shadow-blue-500/20"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 shadow-md"
+                  style={{
+                    backgroundColor: "var(--project-primary)",
+                    color: "#ffffff"
+                  }}
                 >
                   Забрать бонус
                 </button>
@@ -214,7 +252,7 @@ export default function ReferralTab() {
           </div>
         ) : (
           <div>
-            <p className="text-sm text-slate-500 font-medium mb-5">
+            <p className="text-sm font-medium mb-5" style={{ color: "color-mix(in srgb, var(--project-text) 60%, transparent)" }}>
               Если у вас есть код друга или реферальная ссылка, введите ее здесь, чтобы получить приветственный бонус.
             </p>
             <form onSubmit={handleApplyCode} className="flex flex-col sm:flex-row gap-3">
@@ -223,20 +261,36 @@ export default function ReferralTab() {
                 placeholder="Вставьте ссылку или код"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
-                className="flex-1 px-5 py-3.5 rounded-xl border border-slate-300 font-medium text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                className="flex-1 px-5 py-3.5 rounded-xl border font-medium text-sm focus:outline-none transition-all"
+                style={{
+                  backgroundColor: "color-mix(in srgb, var(--project-text) 2%, transparent)",
+                  borderColor: "var(--glass-border)",
+                  color: "var(--project-text)"
+                }}
                 disabled={submitting}
               />
               <button
                 type="submit"
                 disabled={submitting || !inviteCode.trim()}
-                className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-50 shadow-md shadow-blue-500/20 whitespace-nowrap"
+                className="px-8 py-3.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50 shadow-md whitespace-nowrap"
+                style={{
+                  backgroundColor: "var(--project-primary)",
+                  color: "#ffffff"
+                }}
               >
                 {submitting ? "Проверка..." : "Применить код"}
               </button>
             </form>
             
             {submitMessage && (
-              <div className={`mt-4 text-sm font-bold px-4 py-3 rounded-xl border ${submitMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+              <div 
+                className="mt-4 text-sm font-bold px-4 py-3 rounded-xl border"
+                style={{
+                  backgroundColor: submitMessage.type === 'success' ? "color-mix(in srgb, #10b981 10%, transparent)" : "color-mix(in srgb, #ef4444 10%, transparent)",
+                  color: submitMessage.type === 'success' ? "#059669" : "#dc2626",
+                  borderColor: submitMessage.type === 'success' ? "color-mix(in srgb, #10b981 20%, transparent)" : "color-mix(in srgb, #ef4444 20%, transparent)",
+                }}
+              >
                 {submitMessage.text}
               </div>
             )}
@@ -245,10 +299,10 @@ export default function ReferralTab() {
       </div>
 
       <div className="text-center space-y-2 mb-8 pt-6">
-        <h3 className="text-xl sm:text-2xl font-black uppercase tracking-wider text-slate-800">
+        <h3 className="text-xl sm:text-2xl font-black uppercase tracking-wider" style={{ color: "var(--project-text)" }}>
           Пригласи друга
         </h3>
-        <p className="text-sm font-medium text-slate-500 max-w-2xl mx-auto leading-relaxed">
+        <p className="text-sm font-medium max-w-2xl mx-auto leading-relaxed" style={{ color: "color-mix(in srgb, var(--project-text) 60%, transparent)" }}>
           Ниже изображена карта, по которой вы сможете понять, за какое количество проданных материалов по реферальной ссылке вы сможете получить награду.
         </p>
       </div>

@@ -72,7 +72,10 @@ export default function RewardUnboxModal({
         }}
       >
         {/* Мобильный индикатор перетаскивания */}
-        <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto sm:hidden -mt-2 mb-2" />
+        <div 
+          className="w-10 h-1 rounded-full mx-auto sm:hidden -mt-2 mb-2" 
+          style={{ backgroundColor: "color-mix(in srgb, var(--project-text) 20%, transparent)" }}
+        />
 
         {/* Фоновый размытый блик темы */}
         <div
@@ -85,7 +88,10 @@ export default function RewardUnboxModal({
         />
 
         {/* Шапка шагов */}
-        <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-60">
+        <div 
+          className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-60"
+          style={{ color: "var(--project-text)" }}
+        >
           <span>Новая награда</span>
           {items.length > 1 && (
             <span>
@@ -136,15 +142,23 @@ export default function RewardUnboxModal({
               />
             </div>
           ) : (
-            <div className="py-4 font-black text-xs uppercase tracking-widest opacity-40">
+            <div 
+              className="py-4 font-black text-xs uppercase tracking-widest opacity-40"
+              style={{ color: "var(--project-text)" }}
+            >
               Разблокировано
             </div>
           )}
 
           <div className="space-y-1">
-            <h3 className="text-lg sm:text-xl font-black">{currentItem.title}</h3>
+            <h3 className="text-lg sm:text-xl font-black" style={{ color: "var(--project-text)" }}>
+              {currentItem.title}
+            </h3>
             {currentItem.description && (
-              <p className="text-xs font-medium opacity-70 leading-relaxed">
+              <p 
+                className="text-xs font-medium opacity-70 leading-relaxed"
+                style={{ color: "var(--project-text)" }}
+              >
                 {currentItem.description}
               </p>
             )}
