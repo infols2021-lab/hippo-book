@@ -763,3 +763,12 @@
     to { transform: translateY(0); }
   }
 }
+
+/* Bottom sheet поверх оверлея тура, чтобы подсветка и клики по пунктам меню работали */
+body.tour-sheet-active .mobile-bottom-sheet-overlay {
+  z-index: 10001 !important;
+}
+
+body.tour-sheet-active .mobile-bottom-sheet {
+  z-index: 10002 !important;
+}

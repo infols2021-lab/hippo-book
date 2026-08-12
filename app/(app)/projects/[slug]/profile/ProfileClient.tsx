@@ -10,6 +10,7 @@ import RewardsModal from "@/components/rewards/RewardsModal";
 import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal";
 import { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTimeline";
 import { useTour } from "@/components/tour/TourProvider";
+import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
 
 import "./profile.css";
 
@@ -207,20 +208,10 @@ export default function ProfileClient({
     }
   }, [stage, advanceTour]);
 
-  // На мобилке открываем меню, чтобы tour-таргеты были видимы
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const isMobile = window.matchMedia("(max-width: 768px)").matches;
-    if (!isMobile) return;
-
-    if (
-      stage === "profile_requests_gate" ||
-      stage === "materials_gate" ||
-      stage === "rewards_gate"
-    ) {
-      setMobileMenuOpen(true);
-    }
-  }, [stage]);
+  const { handleOverlayClick: handleTourOverlayClick } = useTourMobileMenu(
+    mobileMenuOpen,
+    setMobileMenuOpen
+  );
 
   function showNotification(text: string, type: "success" | "error" = "success") {
     setNotif({ type, text });
@@ -525,7 +516,7 @@ export default function ProfileClient({
 
       {mobileMenuOpen && (
         <>
-          <div className="mobile-bottom-sheet-overlay" onClick={() => setMobileMenuOpen(false)} />
+          <div className="mobile-bottom-sheet-overlay" onClick={handleTourOverlayClick} />
           <div className="mobile-bottom-sheet">
             <div className="sheet-handle" />
             <div className="sheet-title">Меню профиля</div>
@@ -577,6 +568,17 @@ export default function ProfileClient({
               >
                 Главный портал
               </Link>
+              <button
+                type="button"
+                className="sheet-item"
+                data-tour="tour-help-btn"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  window.dispatchEvent(new Event("start-product-tour"));
+                }}
+              >
+                ? Помощь по платформе
+              </button>
               <button className="sheet-item sheet-item--danger" onClick={() => void logout()}>
                 Выйти
               </button>
@@ -610,7 +612,13 @@ export default function ProfileClient({
               )}
             </div>
           </div>
-          <button className="mobile-burger-btn" onClick={() => setMobileMenuOpen(true)} aria-label="Открыть меню">
+          <button
+            type="button"
+            className="mobile-burger-btn"
+            data-tour="mobile-burger-btn"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Открыть меню"
+          >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
         </div>

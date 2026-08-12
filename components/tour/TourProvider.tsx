@@ -8,6 +8,7 @@ type TourContextType = {
   stage: TourStage;
   advanceTour: (nextStage: TourStage) => void;
   setStage: (stage: TourStage) => void;
+  finishTour: () => void;
 };
 
 const TourContext = createContext<TourContextType | null>(null);
@@ -44,6 +45,10 @@ export function TourProvider({
     [setStage]
   );
 
+  const finishTour = useCallback(() => {
+    setStage("finished");
+  }, [setStage]);
+
   useEffect(() => {
     const restartTour = () => setStage("profile_stats");
     window.addEventListener("start-product-tour", restartTour);
@@ -51,7 +56,7 @@ export function TourProvider({
   }, [setStage]);
 
   return (
-    <TourContext.Provider value={{ stage, advanceTour, setStage }}>
+    <TourContext.Provider value={{ stage, advanceTour, setStage, finishTour }}>
       {children}
     </TourContext.Provider>
   );

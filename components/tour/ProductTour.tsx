@@ -1,16 +1,23 @@
 // components/tour/ProductTour.tsx
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { ACTIONS, EVENTS, STATUS } from "react-joyride";
 import type { EventData, Controls } from "react-joyride";
 
 import CustomTooltip from "./CustomTooltip";
-import { TOUR_STEPS } from "./TourSteps";
+import type { CustomTourStep } from "./TourSteps";
 import { useTour } from "./TourProvider";
 import { TOUR_STAGES, isTourStageActiveOnPath } from "@/lib/tour/tourConfig";
+import { resolveTourSteps } from "@/lib/tour/resolveTourSteps";
+import {
+  dispatchCloseMobileMenu,
+  dispatchOpenMobileMenu,
+  isMobileViewport,
+  setTourSheetActive,
+} from "@/lib/tour/tourMobile";
 
 const Joyride = dynamic(
   () => import("react-joyride").then((mod) => mod.Joyride),
@@ -22,19 +29,33 @@ const TARGET_RETRY_DELAY_MS = 400;
 const DOM_SETTLE_MS = 350;
 
 export default function ProductTour() {
-  const { stage, advanceTour } = useTour();
+  const { stage, advanceTour, finishTour } = useTour();
   const pathname = usePathname();
 
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const targetRetryCount = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stageRef = useRef(stage);
   stageRef.current = stage;
 
+  const steps = useMemo(
+    () => resolveTourSteps(stage, isMobile),
+    [stage, isMobile]
+  );
+
   useEffect(() => setIsMounted(true), []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   const clearRetryTimer = useCallback(() => {
     if (retryTimerRef.current) {
@@ -59,29 +80,66 @@ export default function ProductTour() {
     [clearRetryTimer, pathname]
   );
 
-  // Запуск / пауза при смене стадии или роута
+  const prepareStepEnvironment = useCallback(
+    (index: number, stepList: CustomTourStep[]) => {
+      const step = stepList[index];
+      if (!step) {
+        setTourSheetActive(false);
+        dispatchCloseMobileMenu();
+        return;
+      }
+
+      if (step.requiresMobileMenu) {
+        setTourSheetActive(true);
+        dispatchOpenMobileMenu();
+      } else {
+        setTourSheetActive(false);
+        dispatchCloseMobileMenu();
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     clearRetryTimer();
     targetRetryCount.current = 0;
+    setStepIndex(0);
 
     if (stage === "finished") {
       setRun(false);
+      setTourSheetActive(false);
+      dispatchCloseMobileMenu();
       return;
     }
 
-    setStepIndex(0);
-
     if (isTourStageActiveOnPath(stage, pathname)) {
       setRun(false);
+      prepareStepEnvironment(0, steps);
       scheduleRun();
     } else {
       setRun(false);
+      setTourSheetActive(false);
     }
 
     return clearRetryTimer;
-  }, [stage, pathname, clearRetryTimer, scheduleRun]);
+  }, [stage, pathname, clearRetryTimer, scheduleRun, prepareStepEnvironment, steps]);
 
-  // Переключение вкладок в модалке наград
+  useEffect(() => {
+    if (!run || stage === "finished") return;
+    prepareStepEnvironment(stepIndex, steps);
+    if (steps[stepIndex]?.requiresMobileMenu) {
+      setRun(false);
+      scheduleRun(450);
+    }
+  }, [stepIndex, run, stage, steps, prepareStepEnvironment, scheduleRun]);
+
+  useEffect(() => {
+    return () => {
+      setTourSheetActive(false);
+      dispatchCloseMobileMenu();
+    };
+  }, []);
+
   useEffect(() => {
     if (stage === "rewards_tour" && run) {
       const tabMap = ["wardrobe", "streaks", "referral", "promos"];
@@ -93,7 +151,8 @@ export default function ProductTour() {
   }, [stepIndex, stage, run]);
 
   const handleJoyrideEvent = (data: EventData, _controls: Controls) => {
-    const { status, type, action, index } = data;
+    const { status, type, action, index, step } = data;
+    const currentStageSteps = resolveTourSteps(stageRef.current, isMobileViewport());
 
     if (type === EVENTS.TARGET_NOT_FOUND) {
       setRun(false);
@@ -114,11 +173,16 @@ export default function ProductTour() {
     if (type === EVENTS.STEP_AFTER) {
       targetRetryCount.current = 0;
 
-      const currentStageSteps = TOUR_STEPS[stageRef.current] || [];
       const isLastStep = index === currentStageSteps.length - 1;
+      const customStep = step as CustomTourStep;
 
       if (action === ACTIONS.NEXT || action === ACTIONS.PREV) {
         const nextIndex = index + (action === ACTIONS.PREV ? -1 : 1);
+
+        if (customStep.openMobileMenuOnNext && action === ACTIONS.NEXT) {
+          dispatchOpenMobileMenu();
+          setTourSheetActive(true);
+        }
 
         if (isLastStep && action === ACTIONS.NEXT) {
           const config = TOUR_STAGES[stageRef.current];
@@ -135,7 +199,9 @@ export default function ProductTour() {
       }
     }
 
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+    if (status === STATUS.FINISHED) {
+      setTourSheetActive(false);
+      dispatchCloseMobileMenu();
       const config = TOUR_STAGES[stageRef.current];
       if (config && config.type === "advanceOnNext" && config.nextStage) {
         advanceTour(config.nextStage);
@@ -145,15 +211,24 @@ export default function ProductTour() {
         setRun(false);
       }
     }
+
+    if (status === STATUS.SKIPPED) {
+      setRun(false);
+      setTourSheetActive(false);
+      dispatchCloseMobileMenu();
+      finishTour();
+    }
   };
 
-  if (!isMounted || stage === "finished" || !TOUR_STEPS[stage]) {
+  if (!isMounted || stage === "finished" || !steps.length) {
     return null;
   }
 
+  const joyrideWidth = isMobile ? 340 : 380;
+
   return (
     <Joyride
-      steps={TOUR_STEPS[stage]!}
+      steps={steps}
       run={run}
       stepIndex={stepIndex}
       onEvent={handleJoyrideEvent}
@@ -163,10 +238,10 @@ export default function ProductTour() {
         zIndex: 10000,
         overlayColor: "rgba(0, 0, 0, 0.65)",
         overlayClickAction: false,
-        spotlightPadding: 10,
-        targetWaitTimeout: 2500,
-        width: 380,
-        scrollOffset: 80,
+        spotlightPadding: isMobile ? 6 : 10,
+        targetWaitTimeout: 3000,
+        width: joyrideWidth,
+        scrollOffset: isMobile ? 100 : 80,
       }}
     />
   );

@@ -6,8 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import { useRouter } from "next/navigation";
 import { useTour } from "@/components/tour/TourProvider";
+import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
 
 import "./requests.css";
+import "../profile/profile.css";
 
 type ProjectLevel = { id: string; code: string; label: string; price?: number | null };
 type ProjectTab = { id: string; slug: string; title: string; icon: string | null };
@@ -161,6 +163,11 @@ export default function RequestsClient({
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const { handleOverlayClick: handleTourOverlayClick } = useTourMobileMenu(
+    mobileMenuOpen,
+    setMobileMenuOpen
+  );
 
   const [modalStep, setModalStep] = useState<1 | 2>(1);
 
@@ -1064,7 +1071,7 @@ export default function RequestsClient({
 
       {mobileMenuOpen && (
         <>
-          <div className="mobile-bottom-sheet-overlay" onClick={() => setMobileMenuOpen(false)} />
+          <div className="mobile-bottom-sheet-overlay" onClick={handleTourOverlayClick} />
           <div className="mobile-bottom-sheet">
             <div className="sheet-handle" />
             <div className="sheet-title">Навигация</div>
@@ -1112,6 +1119,7 @@ export default function RequestsClient({
           <button
             type="button"
             className="mobile-burger-btn"
+            data-tour="mobile-burger-btn"
             onClick={() => setMobileMenuOpen(true)}
             aria-label="Открыть меню"
           >

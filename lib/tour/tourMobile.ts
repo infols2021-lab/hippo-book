@@ -1,0 +1,34 @@
+import type { TourStage } from "@/lib/tour/tourConfig";
+
+export const TOUR_MOBILE_MENU_OPEN = "tour:open-mobile-menu";
+export const TOUR_MOBILE_MENU_CLOSE = "tour:close-mobile-menu";
+export const TOUR_SHEET_ACTIVE_CLASS = "tour-sheet-active";
+
+export function isMobileViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 768px)").matches;
+}
+
+/** Стадии, где на мобилке цель — пункт в bottom sheet после бургера. */
+export const MOBILE_MENU_GATE_STAGES: TourStage[] = [
+  "profile_requests_gate",
+  "materials_gate",
+  "rewards_gate",
+  "requests_return_gate",
+];
+
+export function isMobileMenuGateStage(stage: TourStage): boolean {
+  return MOBILE_MENU_GATE_STAGES.includes(stage);
+}
+
+export function dispatchOpenMobileMenu() {
+  window.dispatchEvent(new Event(TOUR_MOBILE_MENU_OPEN));
+}
+
+export function dispatchCloseMobileMenu() {
+  window.dispatchEvent(new Event(TOUR_MOBILE_MENU_CLOSE));
+}
+
+export function setTourSheetActive(active: boolean) {
+  document.body.classList.toggle(TOUR_SHEET_ACTIVE_CLASS, active);
+}
