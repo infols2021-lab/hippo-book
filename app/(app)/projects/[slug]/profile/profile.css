@@ -8,6 +8,8 @@
   padding-bottom: 60px;
   letter-spacing: 0.01em;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 .profile-container {
@@ -16,6 +18,8 @@
   margin: 24px auto 40px;
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 /* Typography helpers */
@@ -376,8 +380,11 @@
   overflow-x: auto;
   padding-bottom: 6px;
   margin-bottom: 16px;
+  max-width: 100%;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.category-filter-bar::-webkit-scrollbar { display: none; }
 
 .cat-pill {
   padding: 8px 18px;
@@ -545,6 +552,33 @@
   .profile-container {
     width: 92%;
     margin: 12px auto 30px;
+    max-width: 100%;
+  }
+
+  .profile-panel {
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  .mobile-header-bar {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .mobile-header-left {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .mobile-user-info {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .skills-wordmark {
+    font-size: 18px;
+    flex-shrink: 0;
   }
 
   /* Скрываем громоздкую десктопную шапку и левый сайдбар */
@@ -678,9 +712,21 @@
 
   .mobile-stats-row {
     display: grid !important;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
     margin-bottom: 16px;
+  }
+
+  @media (max-width: 380px) {
+    .mobile-stats-row {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .mobile-stat-val {
+      font-size: 16px;
+    }
+    .mobile-stat-lbl {
+      font-size: 9px;
+    }
   }
 
   .mobile-stat-card {
@@ -710,6 +756,15 @@
   .progress-row {
     padding: 14px 16px;
     border-radius: 18px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .referral-promo-banner {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
   }
 
   .progress-title {

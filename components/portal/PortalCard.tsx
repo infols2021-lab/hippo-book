@@ -8,21 +8,64 @@ type PortalCardProps = {
   project: ProjectConfig;
   index: number;
   compact?: boolean;
+  /** Мобильная «пилюля» — горизонтальная карточка в вертикальном списке */
+  pill?: boolean;
 };
 
-export default function PortalCard({ project, index, compact = false }: PortalCardProps) {
+export default function PortalCard({ project, index, compact = false, pill = false }: PortalCardProps) {
   const { stage, advanceTour } = useTour();
   const pColor = project.theme?.primaryColor || "#3b82f6";
   const isLight = index % 2 === 0;
 
+  const handleClick = () => {
+    if (stage === "direction_gate") {
+      advanceTour("profile_stats");
+    }
+  };
+
+  if (pill) {
+    return (
+      <Link
+        href={`/projects/${project.slug}`}
+        onClick={handleClick}
+        data-tour="direction-card"
+        className="group relative flex items-center gap-3 w-full px-4 py-3.5 rounded-[20px] border transition-all duration-300 active:scale-[0.98] overflow-hidden"
+        style={{
+          background: `linear-gradient(135deg, color-mix(in srgb, ${pColor} 18%, #0f172a) 0%, color-mix(in srgb, ${pColor} 8%, #0b0f19) 100%)`,
+          borderColor: `color-mix(in srgb, ${pColor} 35%, transparent)`,
+          boxShadow: `0 8px 24px -8px color-mix(in srgb, ${pColor} 45%, transparent)`,
+        }}
+      >
+        <div
+          className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white/20"
+          style={{ backgroundColor: pColor }}
+        />
+        <div className="flex-1 min-w-0 text-left">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-white/45 mb-0.5 truncate">
+            {project.slug}
+          </div>
+          <div className="text-[15px] font-black text-white leading-tight truncate">{project.name}</div>
+          {project.description ? (
+            <div className="text-[11px] text-white/55 font-medium truncate mt-0.5">{project.description}</div>
+          ) : null}
+        </div>
+        <div
+          data-tour="portal-card-cta"
+          className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold"
+          style={{
+            background: `linear-gradient(135deg, ${pColor}, color-mix(in srgb, ${pColor} 70%, #000))`,
+          }}
+        >
+          →
+        </div>
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={`/projects/${project.slug}`}
-      onClick={() => {
-        if (stage === "direction_gate") {
-          advanceTour("profile_stats");
-        }
-      }}
+      onClick={handleClick}
       data-tour="direction-card"
       className={`group relative flex flex-col h-full overflow-hidden transition-all duration-500 ${
         compact

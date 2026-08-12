@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { CustomPhysicalPrize } from "@/lib/rewards/types";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 interface PhysicalPrizeModalProps {
   isOpen: boolean;
@@ -14,11 +15,13 @@ export default function PhysicalPrizeModal({
   prize,
   onClose,
 }: PhysicalPrizeModalProps) {
+  useBodyScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden overscroll-none animate-in fade-in duration-200"
       style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
     >
       <div

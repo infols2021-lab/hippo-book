@@ -283,9 +283,9 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
     const swipeStep: CustomTourStep = {
       target: "body",
       placement: "center",
-      title: "Листайте направления",
+      title: "Список направлений",
       content:
-        "Свайпайте карточки влево-вправо или нажимайте точки под ними — так можно посмотреть все направления.",
+        "Прокрутите список вниз, чтобы увидеть все направления. Нажмите на нужное — и перейдёте в профиль ветки.",
       mascotImage: pickMascotImage("direction_gate_swipe"),
       skipBeacon: true,
       skipScroll: true,

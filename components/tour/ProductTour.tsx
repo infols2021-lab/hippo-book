@@ -36,6 +36,13 @@ const DOM_SETTLE_MS = 350;
 const MOBILE_MENU_SETTLE_MS = 500;
 const STUCK_RETRY_DELAY_MS = 1800;
 
+/** Joyride шлёт FINISHED при setRun(false) — не путать с завершением пользователем. */
+const abortTourRunRef = { current: false };
+
+export function markTourRunAbort() {
+  abortTourRunRef.current = true;
+}
+
 export default function ProductTour() {
   const { stage, advanceTour, finishTour } = useTour();
   const pathname = usePathname();
@@ -107,12 +114,18 @@ export default function ProductTour() {
           stageRef.current !== "finished" &&
           isTourStageActiveOnPath(stageRef.current, pathnameRef.current)
         ) {
+          abortTourRunRef.current = false;
           setRun(true);
         }
       }, delay);
     },
     [clearRetryTimer]
   );
+
+  const stopTourRun = useCallback(() => {
+    markTourRunAbort();
+    setRun(false);
+  }, []);
 
   const prepareStepEnvironment = useCallback(
     (index: number, stepList: CustomTourStep[]) => {
@@ -142,13 +155,13 @@ export default function ProductTour() {
     handledStepAdvanceRef.current = null;
 
     if (stage === "finished") {
-      setRun(false);
+      stopTourRun();
       releaseTourUi();
       return;
     }
 
     if (!steps.length) {
-      setRun(false);
+      stopTourRun();
       releaseTourUi();
       return;
     }
@@ -160,7 +173,7 @@ export default function ProductTour() {
       setStepIndex(resumeIndex);
       stepIndexRef.current = resumeIndex;
       saveTourProgress(stage, resumeIndex, pathname);
-      setRun(false);
+      stopTourRun();
       prepareStepEnvironment(resumeIndex, steps as CustomTourStep[]);
       scheduleRun();
 
@@ -170,12 +183,12 @@ export default function ProductTour() {
         });
       }
     } else {
-      setRun(false);
+      stopTourRun();
       releaseTourUi();
     }
 
     return clearRetryTimer;
-  }, [stage, pathname, clearRetryTimer, scheduleRun, prepareStepEnvironment, steps]);
+  }, [stage, pathname, clearRetryTimer, scheduleRun, prepareStepEnvironment, steps, stopTourRun]);
 
   useEffect(() => {
     if (stage === "finished" || !steps.length) return;
@@ -193,7 +206,7 @@ export default function ProductTour() {
       if (!current?.waitForBurgerClick) return;
 
       targetRetryCount.current = 0;
-      setRun(false);
+      stopTourRun();
       setTourSheetActive(true);
       clearRetryTimer();
 
@@ -211,7 +224,7 @@ export default function ProductTour() {
 
     window.addEventListener(TOUR_BURGER_CLICKED, onBurgerClick);
     return () => window.removeEventListener(TOUR_BURGER_CLICKED, onBurgerClick);
-  }, [clearRetryTimer, scheduleRun]);
+  }, [clearRetryTimer, scheduleRun, stopTourRun]);
 
   useEffect(() => {
     const onPageReady = () => {
@@ -249,7 +262,7 @@ export default function ProductTour() {
     if (type === EVENTS.TARGET_NOT_FOUND) {
       const failedStep = currentStageSteps[index ?? stepIndex] as CustomTourStep | undefined;
 
-      setRun(false);
+      stopTourRun();
       if (failedStep?.requiresMobileMenu) {
         setTourSheetActive(true);
         dispatchCloseMobileMenu();
@@ -299,7 +312,7 @@ export default function ProductTour() {
             handledStepAdvanceRef.current = stageRef.current;
             advanceTour(config.nextStage);
           } else {
-            setRun(false);
+            stopTourRun();
             releaseTourUi();
           }
           } else {
@@ -307,7 +320,7 @@ export default function ProductTour() {
             saveTourProgress(stageRef.current, nextIndex, pathnameRef.current);
             const nextStep = currentStageSteps[nextIndex] as CustomTourStep | undefined;
             if (nextStep?.requiresMobileMenu) {
-              setRun(false);
+              stopTourRun();
               scheduleRun(MOBILE_MENU_SETTLE_MS);
             }
           }
@@ -316,26 +329,29 @@ export default function ProductTour() {
 
     if (status === STATUS.FINISHED) {
       releaseTourUi();
-      setRun(false);
+      stopTourRun();
 
       const finishedStage = stageRef.current;
-      const config = TOUR_STAGES[finishedStage];
+
+      if (abortTourRunRef.current) {
+        abortTourRunRef.current = false;
+        return;
+      }
 
       if (handledStepAdvanceRef.current === finishedStage) {
         handledStepAdvanceRef.current = null;
         return;
       }
 
-      if (config?.nextStage) {
-        advanceTour(config.nextStage);
-      } else if (finishedStage === "rewards_tour") {
+      // Переход стадии только через STEP_AFTER (клик «Далее»), не при abort/FINISHED
+      if (finishedStage === "rewards_tour") {
         advanceTour("finished");
       }
       handledStepAdvanceRef.current = null;
     }
 
     if (status === STATUS.SKIPPED) {
-      setRun(false);
+      stopTourRun();
       releaseTourUi();
       finishTour();
     }

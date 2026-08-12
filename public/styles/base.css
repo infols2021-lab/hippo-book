@@ -49,9 +49,11 @@ button, input, optgroup, select, textarea { font-family: inherit; font-style: in
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(15, 23, 42, 0.6); /* Красивое темное затенение сзади */
+  background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .modal-panel {
@@ -96,7 +98,7 @@ button, input, optgroup, select, textarea { font-family: inherit; font-style: in
   transition: all 0.2s ease;
 }
 .modal-close:hover { background: color-mix(in srgb, var(--project-text) 12%, transparent); }
-.modal-body { padding: 24px; overflow-y: auto; flex: 1; color: var(--project-text); }
+.modal-body { padding: 24px; overflow-y: auto; flex: 1; color: var(--project-text); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 
 /* ===== ИНПУТЫ ===== */
 .form-group { margin-bottom: 16px; }

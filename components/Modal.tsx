@@ -2,6 +2,7 @@
 
 import React, { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 type Props = {
   open: boolean;
@@ -12,10 +13,6 @@ type Props = {
   closeOnOverlayClick?: boolean;
   closeOnEsc?: boolean;
 };
-
-function getScrollbarWidth() {
-  return Math.max(0, window.innerWidth - document.documentElement.clientWidth);
-}
 
 export default function Modal({
   open,
@@ -30,26 +27,11 @@ export default function Modal({
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
+  useBodyScrollLock(open);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const body = document.body;
-    const prevOverflow = body.style.overflow;
-    const prevPaddingRight = body.style.paddingRight;
-    const sbw = getScrollbarWidth();
-
-    body.style.overflow = "hidden";
-    if (sbw > 0) body.style.paddingRight = `${sbw}px`;
-
-    return () => {
-      body.style.overflow = prevOverflow;
-      body.style.paddingRight = prevPaddingRight;
-    };
-  }, [open]);
 
   useEffect(() => {
     if (!open || !closeOnEsc) return;

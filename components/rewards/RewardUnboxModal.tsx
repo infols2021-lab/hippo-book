@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { RewardType, RewardMeta } from "@/lib/rewards/types";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 export interface UnboxedRewardItem {
   id: string;
@@ -25,8 +26,10 @@ export default function RewardUnboxModal({
   onClose,
 }: RewardUnboxModalProps) {
   const [currentIndex, setCurrentIndex] = React.useState(0);
+  const visible = isOpen && items && items.length > 0;
+  useBodyScrollLock(visible);
 
-  if (!isOpen || !items || items.length === 0) return null;
+  if (!visible) return null;
 
   const currentItem = items[currentIndex] || items[0];
   const isLast = currentIndex >= items.length - 1;
@@ -59,7 +62,7 @@ export default function RewardUnboxModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden overscroll-none animate-in fade-in duration-200"
       style={{ backgroundColor: "rgba(0, 0, 0, 0.82)" }}
     >
       <div

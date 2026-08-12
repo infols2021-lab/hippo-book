@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import MascotViewer from "../mascot/MascotViewer";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import StreakTimeline from "./StreakTimeline";
 import MaterialChoiceModal, {
   MaterialChoiceSuccessResult,
@@ -38,6 +39,7 @@ export default function RewardsModal({
   initialTab,
 }: RewardsModalProps) {
   const showModal = Boolean(isOpen ?? open);
+  useBodyScrollLock(showModal);
 
   const normalizeTab = (tab?: RewardsTabType): "wardrobe" | "streaks" | "promocode" | "referrals" => {
     const raw = tab || initialTab || defaultTab;
@@ -339,7 +341,7 @@ export default function RewardsModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 overflow-y-auto"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 overflow-hidden overscroll-none"
         style={{ backgroundColor: "rgba(0,0,0,0.8)" }}
       >
         <div
@@ -463,7 +465,7 @@ export default function RewardsModal({
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
             {loading ? (
               <div className="h-full flex items-center justify-center font-bold text-xs sm:text-sm uppercase tracking-wider opacity-60">
                 Загрузка данных...
@@ -910,7 +912,7 @@ export default function RewardsModal({
 
       {selectedHistoryLog && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-hidden overscroll-none animate-in fade-in duration-200"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
           onClick={() => setSelectedHistoryLog(null)}
         >

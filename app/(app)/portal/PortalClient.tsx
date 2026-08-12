@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import PortalCard from "@/components/portal/PortalCard";
 import LogoutButton from "@/components/LogoutButton";
@@ -31,12 +31,10 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
   const { stage } = useTour();
   const displayName = userName || userEmail || "Ученик";
 
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
 
   const portalTourMobile = isMobile && isPortalTourStage(stage);
-  const activeProject = projects[activeIndex] ?? projects[0];
+  const activeProject = projects[0];
   const activeColor = activeProject?.theme?.primaryColor || "#3b82f6";
 
   useEffect(() => {
@@ -50,34 +48,6 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
   }, []);
-
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track || projects.length <= 1) return;
-
-    let ticking = false;
-    const onScroll = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        const cardWidth = track.clientWidth;
-        if (cardWidth > 0) {
-          const idx = Math.round(track.scrollLeft / cardWidth);
-          setActiveIndex(Math.min(Math.max(idx, 0), projects.length - 1));
-        }
-        ticking = false;
-      });
-    };
-
-    track.addEventListener("scroll", onScroll, { passive: true });
-    return () => track.removeEventListener("scroll", onScroll);
-  }, [projects.length]);
-
-  const scrollToIndex = (index: number) => {
-    const track = trackRef.current;
-    if (!track) return;
-    track.scrollTo({ left: track.clientWidth * index, behavior: "smooth" });
-  };
 
   return (
     <main
@@ -209,23 +179,23 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
 
         {projects.length > 0 ? (
           <div className={`flex flex-col min-h-0 ${portalTourMobile ? "flex-1 gap-2" : "flex-1 md:min-h-0"}`}>
+            {/* Мобилка: вертикальный список «пилюль» */}
             <div
-              ref={trackRef}
               data-tour="portal-carousel-track"
               data-project-count={projects.length}
+              className={`md:hidden flex flex-col gap-2.5 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                portalTourMobile ? "pb-1" : "pb-2"
+              }`}
+            >
+              {projects.map((project, index) => (
+                <PortalCard key={project.id} project={project} index={index} pill />
+              ))}
+            </div>
+
+            {/* Десктоп: сетка карточек (без изменений) */}
+            <div
               className={`
-                items-stretch min-h-0 flex-1
-                flex md:grid gap-5 md:gap-6
-                overflow-x-auto md:overflow-visible
-                snap-x snap-mandatory md:snap-none
-                [-webkit-overflow-scrolling:touch]
-                [scrollbar-width:none]
-                [&::-webkit-scrollbar]:hidden
-                ${
-                  portalTourMobile
-                    ? "flex-1 -mx-1 px-1"
-                    : "md:flex-none -mx-4 px-4 md:mx-0 md:px-0"
-                }
+                hidden md:grid items-stretch min-h-0 flex-1 gap-5 md:gap-6
                 ${
                   projects.length === 1
                     ? "md:grid-cols-1 md:max-w-2xl md:mx-auto"
@@ -236,37 +206,17 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
               `}
             >
               {projects.map((project, index) => (
-                <div
-                  key={project.id}
-                  data-portal-card-slide
-                  className={`shrink-0 w-full snap-center snap-always md:w-auto md:shrink ${
-                    portalTourMobile ? "h-full max-h-full" : "h-full"
-                  }`}
-                >
-                  <PortalCard project={project} index={index} compact={portalTourMobile} />
+                <div key={project.id} data-portal-card-slide className="h-full">
+                  <PortalCard project={project} index={index} />
                 </div>
               ))}
             </div>
 
-            {projects.length > 1 && (
+            {projects.length > 1 && !portalTourMobile && (
               <div
                 data-tour="portal-carousel-dots"
-                className={`flex md:hidden items-center justify-center gap-2 shrink-0 ${
-                  portalTourMobile ? "pt-1 pb-0.5" : "pt-4"
-                }`}
-              >
-                {projects.map((project, index) => (
-                  <button
-                    key={`dot-${project.id}`}
-                    type="button"
-                    aria-label={`Показать: ${project.name}`}
-                    onClick={() => scrollToIndex(index)}
-                    className={`h-1.5 rounded-full transition-all duration-200 ${
-                      index === activeIndex ? "w-5 bg-white" : "w-1.5 bg-white/30"
-                    }`}
-                  />
-                ))}
-              </div>
+                className="hidden"
+              />
             )}
           </div>
         ) : (

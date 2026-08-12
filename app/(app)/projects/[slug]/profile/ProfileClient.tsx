@@ -207,12 +207,16 @@ export default function ProfileClient({
     dispatchTourPageReady();
   }, []);
 
-  // Fallback: вернулись «Назад» на профиль, минуя шаг «бургер → Профиль» на странице заявок
+  // Fallback только при «Назад» в браузере — не при обычной навигации тура
   useEffect(() => {
-    if (stage === "requests_return_gate" && /\/profile\/?$/.test(pathname)) {
-      advanceTour("materials_gate");
-    }
-  }, [stage, pathname, advanceTour]);
+    const onPopState = () => {
+      if (stage === "requests_return_gate" && /\/profile\/?$/.test(window.location.pathname)) {
+        advanceTour("materials_gate");
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [stage, advanceTour]);
 
   useEffect(() => {
     if (stage === "rewards_tour") {
@@ -562,8 +566,10 @@ export default function ProfileClient({
                 className="sheet-item"
                 data-tour="requests-link"
                 onClick={() => {
-                  if (stage === "profile_requests_gate") advanceTour("requests_info");
                   setMobileMenuOpen(false);
+                  if (stage === "profile_requests_gate") {
+                    advanceTour("requests_info");
+                  }
                   router.push(`/projects/${projectSlug}/requests`);
                 }}
               >

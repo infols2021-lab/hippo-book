@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 interface MaterialItem {
   id: string;
@@ -64,6 +65,8 @@ export default function MaterialChoiceModal({
   onClose,
   onSuccess,
 }: MaterialChoiceModalProps) {
+  useBodyScrollLock(isOpen);
+
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -286,7 +289,7 @@ export default function MaterialChoiceModal({
   const cannotFulfillChoice = availableForChoiceByPrice.length > 0 && lockedMaterials.length < requiredChoiceCount;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden overscroll-none animate-in fade-in duration-200 bg-black/60 backdrop-blur-sm">
       <div
         className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative border border-slate-100 flex flex-col max-h-[90vh]"
       >
