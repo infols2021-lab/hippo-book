@@ -21,6 +21,7 @@ export default function CustomTooltip({
   const customStep = step as CustomTourStep;
   const isCentered = step.placement === "center";
   const portalTheme = Boolean(customStep.portalTheme);
+  const portalMobileDock = Boolean(customStep.portalMobileDock);
 
   const cardBg = portalTheme ? "rgba(15, 23, 42, 0.97)" : "var(--project-card-bg, #ffffff)";
   const textColor = portalTheme ? "#f8fafc" : "var(--project-text, #0f172a)";
@@ -47,7 +48,9 @@ export default function CustomTooltip({
   return (
     <div
       {...tooltipProps}
-      className="tour-tooltip flex flex-col gap-3 p-4 sm:p-5 rounded-[24px] sm:rounded-[28px] border shadow-2xl w-[min(calc(100vw-20px),380px)] max-h-[min(88dvh,520px)]"
+      className={`tour-tooltip flex flex-col gap-3 p-4 sm:p-5 rounded-[24px] sm:rounded-[28px] border shadow-2xl w-[min(calc(100vw-20px),380px)] max-h-[min(88dvh,520px)] ${
+        portalMobileDock ? "tour-tooltip--portal-mobile !w-[min(calc(100vw-16px),340px)]" : ""
+      }`}
       style={{
         backgroundColor: cardBg,
         borderColor,
@@ -115,8 +118,10 @@ export default function CustomTooltip({
         <>
           {customStep.mascotImage && (
             <div className="flex justify-center shrink-0 pt-0.5">
-              <div
-                className="relative h-[72px] w-[72px] sm:h-[80px] sm:w-[80px] rounded-full overflow-hidden shrink-0"
+          <div
+            className={`relative rounded-full overflow-hidden shrink-0 portal-mascot-wrap ${
+              portalMobileDock ? "h-[56px] w-[56px]" : "h-[72px] w-[72px] sm:h-[80px] sm:w-[80px]"
+            }`}
                 style={{
                   border: "3px solid #ffffff",
                   boxShadow:

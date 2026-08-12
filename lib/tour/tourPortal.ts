@@ -2,6 +2,14 @@ import type { TourStage } from "@/lib/tour/tourConfig";
 import { isPortalTourStage } from "@/lib/tour/tourConfig";
 
 export const PORTAL_TOUR_ACTIVE_CLASS = "portal-tour-active";
+export const PORTAL_MOBILE_TOUR_CLASS = "portal-tour-mobile";
+
+export const PORTAL_MOBILE_MQ = "(max-width: 768px)";
+
+export function isPortalMobileViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia(PORTAL_MOBILE_MQ).matches;
+}
 
 export function setPortalTourActive(active: boolean) {
   document.documentElement.classList.toggle(PORTAL_TOUR_ACTIVE_CLASS, active);

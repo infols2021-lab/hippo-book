@@ -22,6 +22,8 @@ export interface CustomTourStep extends Step {
   skipScroll?: boolean;
   /** Тултип в стиле тёмного портала. */
   portalTheme?: boolean;
+  /** Компактный док внизу экрана (мобильный портал). */
+  portalMobileDock?: boolean;
 }
 
 export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = BASE_TOUR_STEPS;

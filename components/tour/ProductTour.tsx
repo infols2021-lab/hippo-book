@@ -39,14 +39,17 @@ export default function ProductTour() {
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
 
   const targetRetryCount = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stageRef = useRef(stage);
   stageRef.current = stage;
 
-  const steps = useMemo(() => getResolvedTourSteps(stage, isMobile), [stage, isMobile]);
+  const steps = useMemo(() => {
+    if (isMobile === null) return [];
+    return getResolvedTourSteps(stage, isMobile);
+  }, [stage, isMobile]);
 
   useEffect(() => setIsMounted(true), []);
 
@@ -271,14 +274,16 @@ export default function ProductTour() {
     }
   };
 
-  if (!isMounted || stage === "finished" || !steps.length) {
+  if (!isMounted || isMobile === null || stage === "finished" || !steps.length) {
     return null;
   }
 
-  const joyrideWidth = isMobile ? 340 : 380;
+  const joyrideWidth = isMobile ? 320 : 380;
   const menuStepActive = Boolean(steps[stepIndex]?.requiresMobileMenu);
   const portalTourActive = isPortalTourStage(stage);
   const portalMobileTour = portalTourActive && isMobile;
+  const currentStep = steps[stepIndex] as CustomTourStep | undefined;
+  const portalDock = Boolean(currentStep?.portalMobileDock);
 
   return (
     <Joyride
@@ -291,13 +296,26 @@ export default function ProductTour() {
       continuous={true}
       options={{
         zIndex: menuStepActive ? 10020 : portalTourActive ? 10050 : 10000,
-        overlayColor: portalTourActive ? "rgba(0, 0, 0, 0.78)" : "rgba(0, 0, 0, 0.65)",
+        overlayColor: portalMobileTour ? "rgba(3, 7, 18, 0.82)" : portalTourActive ? "rgba(0, 0, 0, 0.78)" : "rgba(0, 0, 0, 0.65)",
         overlayClickAction: false,
-        spotlightPadding: portalMobileTour ? 8 : isMobile ? 6 : 10,
+        spotlightPadding: portalMobileTour ? 4 : isMobile ? 6 : 10,
         targetWaitTimeout: menuStepActive ? 5000 : 3000,
         width: joyrideWidth,
-        scrollOffset: portalMobileTour ? 16 : isMobile ? 100 : 80,
+        scrollOffset: portalMobileTour ? 0 : isMobile ? 100 : 80,
       }}
+      styles={
+        portalDock
+          ? {
+              tooltip: {
+                marginTop: 0,
+                marginBottom: 8,
+              },
+              tooltipContainer: {
+                textAlign: "left",
+              },
+            }
+          : undefined
+      }
     />
   );
 }

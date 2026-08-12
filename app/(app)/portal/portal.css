@@ -655,32 +655,48 @@
   }
 }
 
-/* ====== Гайд на портале (мобилка): без рывков скролла ====== */
+/* ====== Мобильный гайд на портале ====== */
 html.portal-tour-active,
 body.portal-tour-active {
   overflow: hidden !important;
   overscroll-behavior: none;
   height: 100%;
+  background: #0b0f19;
 }
 
-body.portal-tour-active main.relative.min-h-\[100dvh\] {
+body.portal-tour-active .portal-tour-mobile {
+  height: 100dvh;
   max-height: 100dvh;
+  min-height: 100dvh;
   overflow: hidden;
 }
 
-@media (max-width: 768px) {
-  body.portal-tour-active [data-tour="portal-carousel-track"] {
-    flex-grow: 0 !important;
-    max-height: 50dvh;
-    margin-bottom: 0 !important;
-  }
+body.portal-tour-active .portal-tour-mobile [data-tour="portal-shell"] {
+  height: 100%;
+  max-height: 100dvh;
+}
 
-  body.portal-tour-active [data-tour="direction-card"] {
-    min-height: min(360px, 46dvh) !important;
-  }
+body.portal-tour-active .portal-tour-mobile [data-tour="portal-carousel-track"] {
+  max-height: none;
+}
 
-  body.portal-tour-active footer {
-    opacity: 0.35;
-    pointer-events: none;
-  }
+/* Компактный информатор на портале */
+body.portal-tour-active .tour-tooltip--portal-mobile {
+  max-height: min(42dvh, 320px) !important;
+  padding: 14px 16px !important;
+  border-radius: 20px !important;
+}
+
+body.portal-tour-active .tour-tooltip--portal-mobile .portal-mascot-wrap {
+  height: 56px !important;
+  width: 56px !important;
+}
+
+/* Joyride: не даём оверлею ломать layout */
+body.portal-tour-active .react-joyride__overlay {
+  mix-blend-mode: normal;
+}
+
+body.portal-tour-active .react-joyride__spotlight {
+  border-radius: 20px !important;
 }

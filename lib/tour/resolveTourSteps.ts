@@ -235,39 +235,42 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
     return [
       {
         ...base[0],
-        target: visibleTourTarget('[data-tour="portal-hero"]'),
-        placement: "bottom",
+        target: "body",
+        placement: "center",
         skipScroll: true,
         portalTheme: true,
+        portalMobileDock: true,
         content:
-          "На платформе несколько направлений обучения — у каждого свой контент, но профиль, награды и стрики общие для всех. Ниже выберите нужное направление.",
+          "У вас один аккаунт на все направления: профиль, награды и стрики общие. Ниже выберите ветку, с которой начнёте.",
       },
     ];
   }
 
   if (stage === "direction_gate") {
     const swipeStep: CustomTourStep = {
-      target: visiblePortalCarouselHint,
-      title: "Направления обучения",
+      target: "body",
+      placement: "center",
+      title: "Листайте направления",
       content:
-        "Листайте карточки влево-вправо или нажимайте точки внизу, чтобы посмотреть все доступные направления.",
+        "Свайпайте карточки влево-вправо или нажимайте точки под ними — так можно посмотреть все направления.",
       mascotImage: pickMascotImage("direction_gate_swipe"),
       skipBeacon: true,
       skipScroll: true,
       portalTheme: true,
-      placement: "top",
+      portalMobileDock: true,
       primaryLabel: "Понятно",
       isPortalSwipeStep: true,
     };
 
     const cardStep: CustomTourStep = {
       ...base[0],
-      target: visiblePortalCard,
+      target: visibleTourTarget('[data-tour="portal-card-cta"]', '[data-tour="direction-card"]'),
       placement: "top",
       skipScroll: true,
       portalTheme: true,
+      portalMobileDock: true,
       scrollPortalCard: true,
-      content: "Нажмите на карточку направления, чтобы войти и продолжить обучение.",
+      content: "Нажмите «Перейти» на карточке, чтобы войти в выбранное направление.",
     };
 
     return [swipeStep, cardStep];

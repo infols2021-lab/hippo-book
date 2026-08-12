@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import PortalCard from "@/components/portal/PortalCard";
 import LogoutButton from "@/components/LogoutButton";
+import { useTour } from "@/components/tour/TourProvider";
+import { isPortalTourStage } from "@/lib/tour/tourConfig";
+import { PORTAL_MOBILE_MQ } from "@/lib/tour/tourPortal";
 
 export type ProjectConfig = {
   id: string;
@@ -24,10 +27,24 @@ type PortalClientProps = {
 };
 
 export default function PortalClient({ userName, userEmail, isAdmin, projects }: PortalClientProps) {
+  const { stage } = useTour();
   const displayName = userName || userEmail || "Ученик";
 
   const trackRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  const portalTourMobile = isMobile && isPortalTourStage(stage);
+  const activeProject = projects[activeIndex] ?? projects[0];
+  const activeColor = activeProject?.theme?.primaryColor || "#3b82f6";
+
+  useEffect(() => {
+    const mq = window.matchMedia(PORTAL_MOBILE_MQ);
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -58,30 +75,48 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
   };
 
   return (
-    <main className="relative min-h-[100dvh] bg-[#0b0f19] text-white overflow-x-hidden font-sans flex flex-col">
-      <div className="fixed inset-0 z-0 flex pointer-events-none">
-        {projects.length > 0 ? (
-          projects.map((p) => {
-            const color = p.theme?.primaryColor || "#3b82f6";
-            return (
-              <div
-                key={`bg-${p.id}`}
-                className="relative flex-1 h-full border-r border-white/[0.02] last:border-r-0 overflow-hidden"
-              >
+    <main
+      className={`relative min-h-[100dvh] bg-[#0b0f19] text-white overflow-x-hidden font-sans flex flex-col ${
+        portalTourMobile ? "portal-tour-mobile" : ""
+      }`}
+    >
+      {/* Фон: на мобилке — один градиент, на десктопе — колонки по направлениям */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div
+          className="absolute inset-0 md:hidden transition-colors duration-500"
+          style={{
+            background: `linear-gradient(165deg, ${activeColor}35 0%, #0b0f19 38%, #0b0f19 100%)`,
+          }}
+        />
+        <div
+          className="absolute top-[30%] left-1/2 -translate-x-1/2 w-[320px] h-[320px] rounded-full blur-[100px] mix-blend-screen opacity-25 md:hidden transition-colors duration-500"
+          style={{ backgroundColor: activeColor }}
+        />
+
+        <div className="hidden md:flex absolute inset-0">
+          {projects.length > 0 ? (
+            projects.map((p) => {
+              const color = p.theme?.primaryColor || "#3b82f6";
+              return (
                 <div
-                  className="absolute inset-0 opacity-20"
-                  style={{ background: `linear-gradient(180deg, ${color}40 0%, transparent 100%)` }}
-                />
-                <div
-                  className="absolute top-[40%] left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full blur-[120px] mix-blend-screen opacity-30"
-                  style={{ backgroundColor: color }}
-                />
-              </div>
-            );
-          })
-        ) : (
-          <div className="flex-1 h-full bg-[#0b0f19]" />
-        )}
+                  key={`bg-${p.id}`}
+                  className="relative flex-1 h-full border-r border-white/[0.02] last:border-r-0 overflow-hidden"
+                >
+                  <div
+                    className="absolute inset-0 opacity-20"
+                    style={{ background: `linear-gradient(180deg, ${color}40 0%, transparent 100%)` }}
+                  />
+                  <div
+                    className="absolute top-[40%] left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full blur-[120px] mix-blend-screen opacity-30"
+                    style={{ backgroundColor: color }}
+                  />
+                </div>
+              );
+            })
+          ) : (
+            <div className="flex-1 h-full bg-[#0b0f19]" />
+          )}
+        </div>
       </div>
 
       <div
@@ -92,54 +127,100 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
         }}
       />
 
-      <section className="relative z-10 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col flex-grow min-h-0">
+      <section
+        data-tour="portal-shell"
+        className={`relative z-10 w-full max-w-[1400px] mx-auto flex flex-col flex-1 min-h-0 ${
+          portalTourMobile
+            ? "px-3 pt-4 pb-3 gap-3"
+            : "px-4 sm:px-6 py-8 sm:py-12"
+        }`}
+      >
         <header
           data-tour="portal-hero"
-          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 sm:mb-12 animate-in slide-in-from-top-8 duration-700"
+          className={`flex flex-col md:flex-row md:items-end justify-between ${
+            portalTourMobile ? "gap-3 mb-0 shrink-0" : "gap-6 mb-8 sm:mb-12"
+          } animate-in slide-in-from-top-8 duration-700`}
         >
-          <div className="max-w-3xl">
-            <p className="text-xs font-bold tracking-[0.2em] text-white/50 uppercase mb-3 sm:mb-4">
+          <div className={portalTourMobile ? "max-w-full" : "max-w-3xl"}>
+            <p
+              className={`font-bold tracking-[0.2em] text-white/50 uppercase ${
+                portalTourMobile ? "text-[10px] mb-1.5" : "text-xs mb-3 sm:mb-4"
+              }`}
+            >
               Выберите направление
             </p>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-white mb-4 sm:mb-6 leading-[1.1]">
-              Добро пожаловать, <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70">
-                {displayName}
-              </span>
+            <h1
+              className={`font-black tracking-tight text-white leading-[1.1] ${
+                portalTourMobile
+                  ? "text-[1.65rem] mb-1.5"
+                  : "text-4xl sm:text-5xl md:text-6xl mb-4 sm:mb-6"
+              }`}
+            >
+              {portalTourMobile ? (
+                <>
+                  Привет,{" "}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70">
+                    {displayName}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Добро пожаловать, <br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70">
+                    {displayName}
+                  </span>
+                </>
+              )}
             </h1>
-            <p className="text-base sm:text-lg text-white/60 font-medium">
-              Один аккаунт, {projects.length} пространства: выберите нужную ветку для продолжения работы.
+            <p
+              className={`text-white/60 font-medium ${
+                portalTourMobile ? "text-xs leading-snug" : "text-base sm:text-lg"
+              }`}
+            >
+              {portalTourMobile
+                ? `${projects.length} направления — выберите ветку ниже`
+                : `Один аккаунт, ${projects.length} пространства: выберите нужную ветку для продолжения работы.`}
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className={`flex items-center gap-2 shrink-0 ${portalTourMobile ? "flex-wrap" : "gap-3"}`}>
             {isAdmin && (
               <Link
                 href="/admin"
-                className="px-5 sm:px-6 py-2.5 bg-transparent border border-white/20 hover:bg-white/10 text-white rounded-full font-bold transition-all text-sm backdrop-blur-md"
+                className={`bg-transparent border border-white/20 hover:bg-white/10 text-white rounded-full font-bold transition-all backdrop-blur-md ${
+                  portalTourMobile ? "px-3.5 py-1.5 text-xs" : "px-5 sm:px-6 py-2.5 text-sm"
+                }`}
               >
                 Админка
               </Link>
             )}
-            <LogoutButton className="px-5 sm:px-6 py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-full font-bold transition-all text-sm backdrop-blur-md" />
+            <LogoutButton
+              className={`bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-full font-bold transition-all backdrop-blur-md ${
+                portalTourMobile ? "px-3.5 py-1.5 text-xs" : "px-5 sm:px-6 py-2.5 text-sm"
+              }`}
+            />
           </div>
         </header>
 
         {projects.length > 0 ? (
-          <>
+          <div className={`flex flex-col min-h-0 ${portalTourMobile ? "flex-1 gap-2" : "flex-grow"}`}>
             <div
               ref={trackRef}
               data-tour="portal-carousel-track"
               data-project-count={projects.length}
               className={`
-                flex-grow items-stretch
+                items-stretch min-h-0
                 flex md:grid gap-5 md:gap-6
                 overflow-x-auto md:overflow-visible
                 snap-x snap-mandatory md:snap-none
-                -mx-4 px-4 md:mx-0 md:px-0
                 [-webkit-overflow-scrolling:touch]
                 [scrollbar-width:none]
                 [&::-webkit-scrollbar]:hidden
+                ${
+                  portalTourMobile
+                    ? "flex-1 -mx-1 px-1"
+                    : "flex-grow -mx-4 px-4 md:mx-0 md:px-0"
+                }
                 ${
                   projects.length === 1
                     ? "md:grid-cols-1 md:max-w-2xl md:mx-auto"
@@ -153,9 +234,11 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
                 <div
                   key={project.id}
                   data-portal-card-slide
-                  className="shrink-0 w-full snap-center snap-always md:w-auto md:shrink h-full"
+                  className={`shrink-0 w-full snap-center snap-always md:w-auto md:shrink ${
+                    portalTourMobile ? "h-full max-h-full" : "h-full"
+                  }`}
                 >
-                  <PortalCard project={project} index={index} />
+                  <PortalCard project={project} index={index} compact={portalTourMobile} />
                 </div>
               ))}
             </div>
@@ -163,7 +246,9 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
             {projects.length > 1 && (
               <div
                 data-tour="portal-carousel-dots"
-                className="flex md:hidden items-center justify-center gap-2 pt-4"
+                className={`flex md:hidden items-center justify-center gap-2 shrink-0 ${
+                  portalTourMobile ? "pt-1 pb-0.5" : "pt-4"
+                }`}
               >
                 {projects.map((project, index) => (
                   <button
@@ -178,7 +263,7 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
                 ))}
               </div>
             )}
-          </>
+          </div>
         ) : (
           <div className="col-span-full flex flex-col items-center justify-center p-10 sm:p-16 rounded-3xl bg-white/5 border-2 border-dashed border-white/10 backdrop-blur-md">
             <div className="text-6xl mb-4">📭</div>
@@ -189,11 +274,13 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
           </div>
         )}
 
-        <footer className="mt-8 sm:mt-12 flex flex-col sm:flex-row justify-center items-center py-4 sm:py-6 bg-black/20 rounded-3xl sm:rounded-full border border-white/5 backdrop-blur-sm mx-auto px-6 sm:px-8 w-fit gap-2 sm:gap-3 text-xs text-white/40 font-medium text-center animate-in fade-in duration-1000">
-          <span>Профильные данные общие для всех разделов</span>
-          <span className="hidden sm:block w-1.5 h-1.5 rounded-full bg-white/20" />
-          <span>Прогресс и материалы разделяются отдельно</span>
-        </footer>
+        {!portalTourMobile && (
+          <footer className="mt-8 sm:mt-12 flex flex-col sm:flex-row justify-center items-center py-4 sm:py-6 bg-black/20 rounded-3xl sm:rounded-full border border-white/5 backdrop-blur-sm mx-auto px-6 sm:px-8 w-fit gap-2 sm:gap-3 text-xs text-white/40 font-medium text-center animate-in fade-in duration-1000">
+            <span>Профильные данные общие для всех разделов</span>
+            <span className="hidden sm:block w-1.5 h-1.5 rounded-full bg-white/20" />
+            <span>Прогресс и материалы разделяются отдельно</span>
+          </footer>
+        )}
       </section>
     </main>
   );

@@ -7,9 +7,10 @@ import { useTour } from "@/components/tour/TourProvider";
 type PortalCardProps = {
   project: ProjectConfig;
   index: number;
+  compact?: boolean;
 };
 
-export default function PortalCard({ project, index }: PortalCardProps) {
+export default function PortalCard({ project, index, compact = false }: PortalCardProps) {
   const { stage, advanceTour } = useTour();
   const pColor = project.theme?.primaryColor || "#3b82f6";
   const isLight = index % 2 === 0;
@@ -23,21 +24,29 @@ export default function PortalCard({ project, index }: PortalCardProps) {
         }
       }}
       data-tour="direction-card"
-      className={`group relative flex flex-col h-full min-h-[min(420px,52dvh)] sm:min-h-[520px] p-8 sm:p-10 rounded-[40px] overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl ${
+      className={`group relative flex flex-col h-full overflow-hidden transition-all duration-500 ${
+        compact
+          ? "min-h-0 p-5 rounded-[28px] hover:shadow-xl"
+          : "min-h-[min(420px,52dvh)] sm:min-h-[520px] p-8 sm:p-10 rounded-[40px] hover:-translate-y-2 hover:shadow-2xl"
+      } ${
         isLight
           ? "bg-gradient-to-br from-white/95 to-[#e0f2fe]/95 shadow-[0_0_40px_rgba(255,255,255,0.1)] border border-white/60"
           : "bg-gradient-to-br from-[#1e1b4b]/95 to-[#0f172a]/95 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/10"
       } backdrop-blur-xl`}
     >
       <div
-        className="absolute -top-32 -right-32 w-64 h-64 rounded-full blur-[80px] opacity-40 group-hover:opacity-70 transition-opacity duration-700 pointer-events-none"
+        className={`absolute rounded-full blur-[80px] opacity-40 group-hover:opacity-70 transition-opacity duration-700 pointer-events-none ${
+          compact ? "-top-20 -right-20 w-40 h-40" : "-top-32 -right-32 w-64 h-64"
+        }`}
         style={{ backgroundColor: pColor }}
       />
 
-      <div className="relative z-10 flex flex-col h-full">
-        <div className="mb-6">
+      <div className="relative z-10 flex flex-col h-full min-h-0">
+        <div className={compact ? "mb-3" : "mb-6"}>
           <span
-            className={`inline-block px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.15em] border ${
+            className={`inline-block rounded-full font-black uppercase tracking-[0.15em] border ${
+              compact ? "px-3 py-1 text-[9px]" : "px-4 py-1.5 text-[10px]"
+            } ${
               isLight ? "bg-white/50 border-black/10 text-black/60" : "bg-black/40 border-white/10 text-white/60"
             }`}
           >
@@ -46,38 +55,47 @@ export default function PortalCard({ project, index }: PortalCardProps) {
         </div>
 
         <p
-          className={`text-xs font-bold uppercase tracking-widest mb-2 ${
-            isLight ? "text-black/40" : "text-white/40"
-          }`}
+          className={`font-bold uppercase tracking-widest ${
+            compact ? "text-[10px] mb-1" : "text-xs mb-2"
+          } ${isLight ? "text-black/40" : "text-white/40"}`}
         >
           Текущая платформа
         </p>
         <h2
-          className={`text-4xl sm:text-5xl md:text-6xl font-black tracking-tight mb-6 leading-none ${
-            isLight ? "text-[#0c4a6e]" : "text-white"
-          }`}
+          className={`font-black tracking-tight leading-none ${
+            compact ? "text-[1.75rem] mb-3" : "text-4xl sm:text-5xl md:text-6xl mb-6"
+          } ${isLight ? "text-[#0c4a6e]" : "text-white"}`}
         >
           {project.name}
         </h2>
 
         <p
-          className={`text-sm md:text-base font-medium leading-relaxed max-w-xs ${
-            isLight ? "text-slate-600" : "text-slate-300"
-          }`}
+          className={`font-medium leading-relaxed ${
+            compact ? "text-xs line-clamp-2 max-w-none" : "text-sm md:text-base max-w-xs"
+          } ${isLight ? "text-slate-600" : "text-slate-300"}`}
         >
           {project.description || "Учебники, кроссворды, задания, прогресс и аналитика."}
         </p>
 
-        <div className="mt-auto pt-16">
+        <div className={`mt-auto ${compact ? "pt-4" : "pt-16"}`}>
           <div
-            className="inline-flex items-center gap-3 px-6 py-3 rounded-full font-bold text-white shadow-lg transition-transform group-hover:scale-105"
+            data-tour="portal-card-cta"
+            className={`inline-flex items-center gap-2 rounded-full font-bold text-white shadow-lg transition-transform group-hover:scale-105 ${
+              compact ? "px-4 py-2.5 text-sm" : "px-6 py-3 gap-3"
+            }`}
             style={{
               background: `linear-gradient(135deg, ${pColor}, ${pColor}dd)`,
               boxShadow: `0 10px 30px ${pColor}40`,
             }}
           >
             Перейти
-            <span className="bg-white/20 rounded-full w-6 h-6 flex items-center justify-center text-xs">→</span>
+            <span
+              className={`bg-white/20 rounded-full flex items-center justify-center text-xs ${
+                compact ? "w-5 h-5" : "w-6 h-6"
+              }`}
+            >
+              →
+            </span>
           </div>
         </div>
       </div>
