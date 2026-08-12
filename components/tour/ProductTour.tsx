@@ -18,6 +18,7 @@ import {
   setTourSheetActive,
   TOUR_BURGER_CLICKED,
   TOUR_PAGE_READY,
+  TOUR_REWARDS_MODAL_READY,
 } from "@/lib/tour/tourMobile";
 import { isPortalTourStage } from "@/lib/tour/tourConfig";
 import { scrollPortalCardIntoView, setPortalTourActive } from "@/lib/tour/tourPortal";
@@ -31,6 +32,7 @@ const Joyride = dynamic(
 );
 
 const MAX_TARGET_RETRIES = 8;
+const MAX_REWARDS_TARGET_RETRIES = 24;
 const TARGET_RETRY_DELAY_MS = 400;
 const DOM_SETTLE_MS = 350;
 const MOBILE_MENU_SETTLE_MS = 500;
@@ -53,6 +55,7 @@ export default function ProductTour() {
 
   const targetRetryCount = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rewardsModalReadyRef = useRef(false);
   const handledStepAdvanceRef = useRef<string | null>(null);
   const pathnameRef = useRef(pathname);
   const stageRef = useRef(stage);
@@ -131,6 +134,33 @@ export default function ProductTour() {
     [clearRetryTimer]
   );
 
+  const scheduleRewardsTourRun = useCallback(
+    (delay = DOM_SETTLE_MS) => {
+      clearRetryTimer();
+      retryTimerRef.current = setTimeout(() => {
+        retryTimerRef.current = null;
+        if (
+          stageRef.current !== "rewards_tour" ||
+          !isTourStageActiveOnPath("rewards_tour", pathnameRef.current)
+        ) {
+          return;
+        }
+
+        if (!rewardsModalReadyRef.current) {
+          scheduleRewardsTourRun(180);
+          return;
+        }
+
+        const tabMap = ["wardrobe", "streaks", "referral", "promos"] as const;
+        const currentTab = tabMap[stepIndexRef.current] ?? "wardrobe";
+        window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: currentTab }));
+        abortTourRunRef.current = false;
+        setRun(true);
+      }, delay);
+    },
+    [clearRetryTimer]
+  );
+
   const stopTourRun = useCallback(() => {
     markTourRunAbort();
     setRun(false);
@@ -184,12 +214,12 @@ export default function ProductTour() {
       saveTourProgress(stage, resumeIndex, pathname);
       stopTourRun();
       prepareStepEnvironment(resumeIndex, steps as CustomTourStep[]);
-      scheduleRun();
 
       if (stage === "rewards_tour") {
-        requestAnimationFrame(() => {
-          window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: "wardrobe" }));
-        });
+        rewardsModalReadyRef.current = false;
+        scheduleRewardsTourRun();
+      } else {
+        scheduleRun();
       }
     } else {
       stopTourRun();
@@ -197,7 +227,7 @@ export default function ProductTour() {
     }
 
     return clearRetryTimer;
-  }, [stage, pathname, clearRetryTimer, scheduleRun, prepareStepEnvironment, steps, stopTourRun]);
+  }, [stage, pathname, clearRetryTimer, scheduleRun, scheduleRewardsTourRun, prepareStepEnvironment, steps, stopTourRun]);
 
   useEffect(() => {
     if (stage === "finished" || !steps.length) return;
@@ -242,13 +272,32 @@ export default function ProductTour() {
         isTourStageActiveOnPath(stageRef.current, pathnameRef.current)
       ) {
         targetRetryCount.current = 0;
-        scheduleRun(120);
+        if (stageRef.current === "rewards_tour") {
+          scheduleRewardsTourRun(120);
+        } else {
+          scheduleRun(120);
+        }
+      }
+    };
+
+    const onRewardsModalReady = () => {
+      rewardsModalReadyRef.current = true;
+      if (
+        stageRef.current === "rewards_tour" &&
+        isTourStageActiveOnPath("rewards_tour", pathnameRef.current)
+      ) {
+        targetRetryCount.current = 0;
+        scheduleRewardsTourRun(120);
       }
     };
 
     window.addEventListener(TOUR_PAGE_READY, onPageReady);
-    return () => window.removeEventListener(TOUR_PAGE_READY, onPageReady);
-  }, [scheduleRun]);
+    window.addEventListener(TOUR_REWARDS_MODAL_READY, onRewardsModalReady);
+    return () => {
+      window.removeEventListener(TOUR_PAGE_READY, onPageReady);
+      window.removeEventListener(TOUR_REWARDS_MODAL_READY, onRewardsModalReady);
+    };
+  }, [scheduleRun, scheduleRewardsTourRun]);
 
   useEffect(() => {
     return () => {
@@ -286,7 +335,13 @@ export default function ProductTour() {
         return;
       }
 
-      if (targetRetryCount.current > MAX_TARGET_RETRIES) {
+      if (targetRetryCount.current > (stageRef.current === "rewards_tour" ? MAX_REWARDS_TARGET_RETRIES : MAX_TARGET_RETRIES)) {
+        if (stageRef.current === "rewards_tour") {
+          targetRetryCount.current = 0;
+          scheduleRewardsTourRun(TARGET_RETRY_DELAY_MS);
+          return;
+        }
+
         targetRetryCount.current = 0;
         const nextIndex = failedIndex + 1;
         if (nextIndex < currentStageSteps.length) {
@@ -301,7 +356,11 @@ export default function ProductTour() {
         return;
       }
 
-      scheduleRun(TARGET_RETRY_DELAY_MS);
+      if (stageRef.current === "rewards_tour") {
+        scheduleRewardsTourRun(TARGET_RETRY_DELAY_MS);
+      } else {
+        scheduleRun(TARGET_RETRY_DELAY_MS);
+      }
     }
 
     if (type === EVENTS.STEP_AFTER) {

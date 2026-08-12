@@ -12,6 +12,7 @@ import { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralT
 import { useTour } from "@/components/tour/TourProvider";
 import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
 import { dispatchBurgerClicked, dispatchTourPageReady } from "@/lib/tour/tourMobile";
+import { saveTourProgress } from "@/lib/tour/tourPersistence";
 
 import "./profile.css";
 
@@ -342,9 +343,10 @@ export default function ProfileClient({
   }, [statsProp, progressProp, projectSlug]);
 
   function openRewards(tab: RewardsTabType = "wardrobe") {
-    setRewardsInitialTab(tab);
+    setRewardsInitialTab(stage === "rewards_gate" ? "wardrobe" : tab);
     setRewardsModalOpen(true);
     if (stage === "rewards_gate") {
+      saveTourProgress("rewards_tour", 0, window.location.pathname);
       advanceTour("rewards_tour");
     }
   }

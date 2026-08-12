@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import MascotViewer from "../mascot/MascotViewer";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { dispatchTourRewardsModalReady } from "@/lib/tour/tourMobile";
 import StreakTimeline from "./StreakTimeline";
 import MaterialChoiceModal, {
   MaterialChoiceSuccessResult,
@@ -112,7 +113,7 @@ export default function RewardsModal({
               : '[data-tour="promos-tab"]';
           document.querySelector<HTMLElement>(selector)?.scrollIntoView({
             block: "nearest",
-            inline: "center",
+            inline: mapped === "wardrobe" ? "start" : "nearest",
           });
         });
       }
@@ -127,6 +128,12 @@ export default function RewardsModal({
       void loadData();
     }
   }, [showModal]);
+
+  useEffect(() => {
+    if (showModal && !loading) {
+      requestAnimationFrame(() => dispatchTourRewardsModalReady());
+    }
+  }, [showModal, loading]);
 
   useEffect(() => {
     if (showModal) {
@@ -345,7 +352,7 @@ export default function RewardsModal({
         style={{ backgroundColor: "rgba(0,0,0,0.8)" }}
       >
         <div
-          className="rounded-t-[32px] sm:rounded-[32px] max-w-4xl w-full h-[90vh] sm:h-[88vh] flex flex-col shadow-2xl overflow-hidden relative border transition-all"
+          className="rounded-t-[32px] sm:rounded-[32px] w-full max-w-[min(56rem,100vw)] h-[90vh] sm:h-[88vh] flex flex-col shadow-2xl overflow-hidden relative border transition-all"
           style={{
             backgroundColor: "var(--project-card-bg, #ffffff)",
             color: "var(--project-text, #0f172a)",
@@ -361,13 +368,13 @@ export default function RewardsModal({
               backgroundColor: "var(--project-card-bg, #ffffff)",
             }}
           >
-            <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
-              <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto min-w-0">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <div
-                  className="w-3 h-3 rounded-full"
+                  className="w-3 h-3 rounded-full flex-shrink-0"
                   style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
                 />
-                <h2 className="text-base sm:text-xl font-black tracking-wide uppercase">Центр наград</h2>
+                <h2 className="text-base sm:text-xl font-black tracking-wide uppercase truncate">Центр наград</h2>
               </div>
 
               <button
@@ -385,7 +392,7 @@ export default function RewardsModal({
             </div>
 
             <div
-              className="flex gap-1 p-1 rounded-2xl border overflow-x-auto no-scrollbar w-full sm:w-auto"
+              className="flex gap-1 p-1 rounded-2xl border overflow-x-auto no-scrollbar w-full sm:w-auto min-w-0 max-w-full flex-shrink"
               style={{
                 backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
                 borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
