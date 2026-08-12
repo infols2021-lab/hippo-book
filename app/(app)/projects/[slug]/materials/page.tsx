@@ -1,28 +1,14 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
 import { rewriteSupabasePublicStorageUrl } from "@/lib/storage/publicUrl";
-import AppHeader from "@/components/AppHeader";
 import { getProjectBySlug } from "@/lib/projects/loader";
 import { loadProjectMaterialsData } from "@/lib/data/materials";
 import type { MaterialWithProgress } from "@/lib/materials/types";
+import MaterialsClient from "./MaterialsClient";
 
 import "./materials.css";
 
 export const revalidate = 0;
-
-function materialsNav(slug: string) {
-  return [
-    {
-      kind: "link" as const,
-      href: `/projects/${slug}/profile`,
-      label: "Профиль",
-      className: "btn ghost",
-      tourId: "profile-link",
-    },
-    { kind: "logout" as const, label: "Выйти", className: "btn secondary" },
-  ];
-}
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -39,10 +25,7 @@ function toStorageProxyUrl(raw: unknown): string {
   return rewriteSupabasePublicStorageUrl(value);
 }
 
-export default async function ProjectMaterialsPage({
-  params,
-  searchParams,
-}: PageProps) {
+export default async function ProjectMaterialsPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
   const { tab: activeTabSlug } = await searchParams;
 
@@ -64,8 +47,7 @@ export default async function ProjectMaterialsPage({
     console.error("Ошибка загрузки профиля:", profileError.message);
     return (
       <div className="materials-page">
-        <div className="materials-container">
-          <AppHeader nav={materialsNav(slug)} />
+        <div className="materials-container materials-container--state">
           <div className="materials-empty card">
             <p>⚠️ Не удалось загрузить профиль</p>
             <p className="materials-subtitle">{profileError.message}</p>
@@ -82,8 +64,7 @@ export default async function ProjectMaterialsPage({
   if (tabs.length === 0) {
     return (
       <div className="materials-page">
-        <div className="materials-container">
-          <AppHeader nav={materialsNav(slug)} />
+        <div className="materials-container materials-container--state">
           <div className="materials-empty card">
             <p>📭 В этом проекте пока нет разделов</p>
             <p className="materials-subtitle">Обратитесь к администратору</p>
@@ -108,8 +89,7 @@ export default async function ProjectMaterialsPage({
     console.error("Ошибка загрузки материалов:", materialsResult.error);
     return (
       <div className="materials-page">
-        <div className="materials-container">
-          <AppHeader nav={materialsNav(slug)} />
+        <div className="materials-container materials-container--state">
           <div className="materials-empty card">
             <p>⚠️ Не удалось загрузить материалы</p>
             <p className="materials-subtitle">{materialsResult.error}</p>
@@ -132,133 +112,17 @@ export default async function ProjectMaterialsPage({
     }
   }
 
+  const markText = project.slug.slice(0, 2).toUpperCase();
+
   return (
-    <div className="materials-page">
-      <div className="materials-container">
-        <AppHeader nav={materialsNav(slug)} />
-
-        {tabs.length > 0 && (
-          <div className="materials-tabs" role="tablist" aria-label="Материалы">
-            {tabs.map((tab) => {
-              const isActive = tab.slug === activeTab.slug;
-              return (
-                <Link
-                  key={tab.id}
-                  href={`/projects/${slug}/materials?tab=${tab.slug}`}
-                  className={`material-tab ${isActive ? "active" : ""}`}
-                  role="tab"
-                  aria-selected={isActive}
-                >
-                  {tab.icon || ""} {tab.title}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="materials-section active">
-          <div className="materials-panel">
-            <h3 className="materials-title">{activeTab.title}</h3>
-            <p className="materials-subtitle">
-              Выберите материал для изучения и выполнения заданий
-            </p>
-
-            {materials.length > 0 ? (
-              <div className="materials-grid">
-                {availableMats.map((m) => {
-                  const coverUrl = toStorageProxyUrl(m.cover_image_url);
-                  const isSecret = (m as any).is_secret === true;
-
-                  return (
-                    <Link
-                      key={m.id}
-                      href={`/projects/${slug}/materials/${m.id}`}
-                      className={`material-card ${
-                        isSecret ? "secret-unlocked" : ""
-                      }`}
-                    >
-                      <div className="material-cover">
-                        {coverUrl ? (
-                          <img
-                            src={coverUrl}
-                            alt={m.title || "Обложка"}
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        ) : (
-                          <div className="material-cover-placeholder">
-                            {isSecret ? "🎁" : "📄"}
-                          </div>
-                        )}
-                        {isSecret && (
-                          <span className="absolute top-2 right-2 bg-amber-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-md shadow">
-                            ★ Секретный
-                          </span>
-                        )}
-                      </div>
-                      <div className="material-title">
-                        {m.title || "Без названия"}
-                      </div>
-                      <div className="material-description">
-                        {m.description || "Материалы и задания для выполнения"}
-                      </div>
-
-                      <div className="progress-bar">
-                        <div
-                          className="progress-fill"
-                          style={{ width: `${m.progress}%` }}
-                        />
-                      </div>
-                      <div className="material-stats">
-                        <span>
-                          {m.completedAssignments}/{m.totalAssignments} заданий
-                        </span>
-                        <span className="pct">{m.progress}%</span>
-                      </div>
-                    </Link>
-                  );
-                })}
-
-                {lockedMats.map((m) => {
-                  const coverUrl = toStorageProxyUrl(m.cover_image_url);
-                  return (
-                    <div key={m.id} className="material-card locked">
-                      <div className="material-cover">
-                        {coverUrl ? (
-                          <img
-                            src={coverUrl}
-                            alt={m.title || "Обложка"}
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        ) : (
-                          <div className="material-cover-placeholder">📄</div>
-                        )}
-                      </div>
-                      <div className="material-title">
-                        {m.title || "Без названия"}
-                      </div>
-                      <div className="material-description">
-                        {m.description || "Материал временно недоступен"}
-                      </div>
-                      <div className="locked-overlay">
-                        <span className="locked-badge">🔒 Недоступен</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="materials-empty card">
-                <p>📭 В этом разделе пока пусто</p>
-                <p className="materials-subtitle" style={{ margin: 0 }}>
-                  Ожидайте, когда администратор загрузит сюда материалы.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    <MaterialsClient
+      slug={slug}
+      projectName={project.name}
+      markText={markText}
+      tabs={tabs.map((t) => ({ id: t.id, slug: t.slug, title: t.title, icon: t.icon }))}
+      activeTab={{ id: activeTab.id, slug: activeTab.slug, title: activeTab.title, icon: activeTab.icon }}
+      availableMats={availableMats}
+      lockedMats={lockedMats}
+    />
   );
 }

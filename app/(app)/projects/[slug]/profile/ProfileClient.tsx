@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import Modal from "@/components/Modal";
@@ -11,6 +11,7 @@ import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal"
 import { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTimeline";
 import { useTour } from "@/components/tour/TourProvider";
 import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
+import { dispatchBurgerClicked } from "@/lib/tour/tourMobile";
 
 import "./profile.css";
 
@@ -159,6 +160,7 @@ export default function ProfileClient({
   equippedTitleLabel = null,
 }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
   const { stage, advanceTour } = useTour();
   const backgroundProxyUrl = useMemo(() => toStorageProxyUrl(backgroundUrl), [backgroundUrl]);
 
@@ -201,12 +203,20 @@ export default function ProfileClient({
   );
   const [streakLoading, setStreakLoading] = useState<boolean>(!streakProp);
 
-  // Fallback: если пользователь вернулся из заявок через кнопку браузера «Назад»
+  // Fallback: вернулись «Назад» на профиль, минуя шаг «бургер → Профиль» на странице заявок
   useEffect(() => {
-    if (stage === "requests_return_gate") {
+    if (stage === "requests_return_gate" && /\/profile\/?$/.test(pathname)) {
       advanceTour("materials_gate");
     }
-  }, [stage, advanceTour]);
+  }, [stage, pathname, advanceTour]);
+
+  useEffect(() => {
+    if (stage === "rewards_tour") {
+      setRewardsInitialTab("wardrobe");
+      setRewardsModalOpen(true);
+      window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: "wardrobe" }));
+    }
+  }, [stage]);
 
   const { handleOverlayClick: handleTourOverlayClick } = useTourMobileMenu(
     mobileMenuOpen,
@@ -326,7 +336,6 @@ export default function ProfileClient({
   function openRewards(tab: RewardsTabType = "wardrobe") {
     setRewardsInitialTab(tab);
     setRewardsModalOpen(true);
-    // Двигаем тур, если ждали клика по Наградам
     if (stage === "rewards_gate") {
       advanceTour("rewards_tour");
     }
@@ -616,8 +625,13 @@ export default function ProfileClient({
             type="button"
             className="mobile-burger-btn"
             data-tour="mobile-burger-btn"
-            onClick={() => setMobileMenuOpen(true)}
+            onClick={() => {
+              const opening = !mobileMenuOpen;
+              setMobileMenuOpen(opening);
+              if (opening) dispatchBurgerClicked();
+            }}
             aria-label="Открыть меню"
+            aria-expanded={mobileMenuOpen}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>

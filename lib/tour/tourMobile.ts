@@ -2,6 +2,8 @@ import type { TourStage } from "@/lib/tour/tourConfig";
 
 export const TOUR_MOBILE_MENU_OPEN = "tour:open-mobile-menu";
 export const TOUR_MOBILE_MENU_CLOSE = "tour:close-mobile-menu";
+export const TOUR_BURGER_CLICKED = "tour:burger-clicked";
+export const TOUR_PAGE_READY = "tour:page-ready";
 export const TOUR_SHEET_ACTIVE_CLASS = "tour-sheet-active";
 
 export function isMobileViewport(): boolean {
@@ -27,6 +29,14 @@ export function dispatchOpenMobileMenu() {
 
 export function dispatchCloseMobileMenu() {
   window.dispatchEvent(new Event(TOUR_MOBILE_MENU_CLOSE));
+}
+
+export function dispatchBurgerClicked() {
+  window.dispatchEvent(new Event(TOUR_BURGER_CLICKED));
+}
+
+export function dispatchTourPageReady() {
+  window.dispatchEvent(new Event(TOUR_PAGE_READY));
 }
 
 export function setTourSheetActive(active: boolean) {

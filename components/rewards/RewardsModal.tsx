@@ -91,24 +91,44 @@ export default function RewardsModal({
     const handleTourTab = (e: CustomEvent | Event) => {
       const tab = (e as CustomEvent).detail;
       const tabMap: Record<string, "wardrobe" | "streaks" | "referrals" | "promocode"> = {
-        "wardrobe": "wardrobe",
-        "streaks": "streaks",
-        "referral": "referrals",
-        "promos": "promocode"
+        wardrobe: "wardrobe",
+        streaks: "streaks",
+        referral: "referrals",
+        promos: "promocode",
       };
-      if (tabMap[tab]) {
-        setActiveTab(tabMap[tab]);
+      const mapped = tabMap[tab as string];
+      if (mapped) {
+        setActiveTab(mapped);
+        requestAnimationFrame(() => {
+          const selector =
+            mapped === "wardrobe"
+              ? '[data-tour="wardrobe-tab"]'
+              : mapped === "streaks"
+              ? '[data-tour="streaks-tab"]'
+              : mapped === "referrals"
+              ? '[data-tour="referral-tab"]'
+              : '[data-tour="promos-tab"]';
+          document.querySelector<HTMLElement>(selector)?.scrollIntoView({
+            block: "nearest",
+            inline: "center",
+          });
+        });
       }
     };
-    
+
     window.addEventListener("tour:show-reward-tab", handleTourTab);
     return () => window.removeEventListener("tour:show-reward-tab", handleTourTab);
   }, []);
 
   useEffect(() => {
     if (showModal) {
-      setActiveTab(normalizeTab(initialTab || defaultTab));
       void loadData();
+    }
+  }, [showModal]);
+
+  useEffect(() => {
+    if (showModal) {
+      setActiveTab(normalizeTab(initialTab || defaultTab));
     }
   }, [showModal, initialTab, defaultTab]);
 

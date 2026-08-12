@@ -10,8 +10,10 @@ export interface CustomTourStep extends Step {
   overlayClickAction?: false | "close" | "next" | "replay";
   hideNextButton?: boolean;
   primaryLabel?: string;
-  /** После «Далее» открыть мобильное меню. */
+  /** После «Далее» открыть мобильное меню. @deprecated — используйте waitForBurgerClick */
   openMobileMenuOnNext?: boolean;
+  /** Ждём нажатия на ☰, без кнопки в тултипе. */
+  waitForBurgerClick?: boolean;
   /** Шаг подсвечивает пункт в уже открытом bottom sheet. */
   requiresMobileMenu?: boolean;
   /** Шаг «листайте карусель» на портале (пропускается при одном направлении). */

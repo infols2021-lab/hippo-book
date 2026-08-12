@@ -27,7 +27,7 @@ export default function PortalCard({ project, index, compact = false }: PortalCa
       className={`group relative flex flex-col h-full overflow-hidden transition-all duration-500 ${
         compact
           ? "min-h-0 p-5 rounded-[28px] hover:shadow-xl"
-          : "min-h-[min(420px,52dvh)] sm:min-h-[520px] p-8 sm:p-10 rounded-[40px] hover:-translate-y-2 hover:shadow-2xl"
+          : "min-h-[400px] md:min-h-[460px] p-8 sm:p-10 rounded-[40px] hover:-translate-y-2 hover:shadow-2xl"
       } ${
         isLight
           ? "bg-gradient-to-br from-white/95 to-[#e0f2fe]/95 shadow-[0_0_40px_rgba(255,255,255,0.1)] border border-white/60"

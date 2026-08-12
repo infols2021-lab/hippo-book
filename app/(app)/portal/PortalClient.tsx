@@ -76,7 +76,7 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
 
   return (
     <main
-      className={`relative min-h-[100dvh] bg-[#0b0f19] text-white overflow-x-hidden font-sans flex flex-col ${
+      className={`relative min-h-[100dvh] bg-[#0b0f19] text-white overflow-x-hidden md:overflow-y-auto font-sans flex flex-col ${
         portalTourMobile ? "portal-tour-mobile" : ""
       }`}
     >
@@ -129,10 +129,10 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
 
       <section
         data-tour="portal-shell"
-        className={`relative z-10 w-full max-w-[1400px] mx-auto flex flex-col flex-1 min-h-0 ${
+        className={`relative z-10 w-full max-w-[1400px] mx-auto flex flex-col flex-1 ${
           portalTourMobile
-            ? "px-3 pt-4 pb-3 gap-3"
-            : "px-4 sm:px-6 py-8 sm:py-12"
+            ? "px-3 pt-4 pb-3 gap-3 min-h-0"
+            : "px-4 sm:px-6 py-8 sm:py-10 pb-12 gap-6 min-h-0"
         }`}
       >
         <header
@@ -203,13 +203,13 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
         </header>
 
         {projects.length > 0 ? (
-          <div className={`flex flex-col min-h-0 ${portalTourMobile ? "flex-1 gap-2" : "flex-grow"}`}>
+          <div className={`flex flex-col min-h-0 ${portalTourMobile ? "flex-1 gap-2" : "flex-1 md:min-h-0"}`}>
             <div
               ref={trackRef}
               data-tour="portal-carousel-track"
               data-project-count={projects.length}
               className={`
-                items-stretch min-h-0
+                items-stretch min-h-0 flex-1
                 flex md:grid gap-5 md:gap-6
                 overflow-x-auto md:overflow-visible
                 snap-x snap-mandatory md:snap-none
@@ -219,7 +219,7 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
                 ${
                   portalTourMobile
                     ? "flex-1 -mx-1 px-1"
-                    : "flex-grow -mx-4 px-4 md:mx-0 md:px-0"
+                    : "md:flex-none -mx-4 px-4 md:mx-0 md:px-0"
                 }
                 ${
                   projects.length === 1
@@ -275,7 +275,7 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
         )}
 
         {!portalTourMobile && (
-          <footer className="mt-8 sm:mt-12 flex flex-col sm:flex-row justify-center items-center py-4 sm:py-6 bg-black/20 rounded-3xl sm:rounded-full border border-white/5 backdrop-blur-sm mx-auto px-6 sm:px-8 w-fit gap-2 sm:gap-3 text-xs text-white/40 font-medium text-center animate-in fade-in duration-1000">
+          <footer className="mt-6 shrink-0 flex flex-col sm:flex-row justify-center items-center py-4 sm:py-6 bg-black/20 rounded-3xl sm:rounded-full border border-white/5 backdrop-blur-sm mx-auto px-6 sm:px-8 w-fit gap-2 sm:gap-3 text-xs text-white/40 font-medium text-center animate-in fade-in duration-1000">
             <span>Профильные данные общие для всех разделов</span>
             <span className="hidden sm:block w-1.5 h-1.5 rounded-full bg-white/20" />
             <span>Прогресс и материалы разделяются отдельно</span>

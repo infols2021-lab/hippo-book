@@ -14,9 +14,10 @@ import { TOUR_STAGES, isTourStageActiveOnPath } from "@/lib/tour/tourConfig";
 import { getResolvedTourSteps } from "@/lib/tour/resolveTourSteps";
 import {
   dispatchCloseMobileMenu,
-  dispatchOpenMobileMenu,
   isMobileViewport,
   setTourSheetActive,
+  TOUR_BURGER_CLICKED,
+  TOUR_PAGE_READY,
 } from "@/lib/tour/tourMobile";
 import { isPortalTourStage } from "@/lib/tour/tourConfig";
 import { scrollPortalCardIntoView, setPortalTourActive } from "@/lib/tour/tourPortal";
@@ -43,8 +44,12 @@ export default function ProductTour() {
 
   const targetRetryCount = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pathnameRef = useRef(pathname);
   const stageRef = useRef(stage);
+  const stepIndexRef = useRef(stepIndex);
+  pathnameRef.current = pathname;
   stageRef.current = stage;
+  stepIndexRef.current = stepIndex;
 
   const steps = useMemo(() => {
     if (isMobile === null) return [];
@@ -96,13 +101,13 @@ export default function ProductTour() {
         retryTimerRef.current = null;
         if (
           stageRef.current !== "finished" &&
-          isTourStageActiveOnPath(stageRef.current, pathname)
+          isTourStageActiveOnPath(stageRef.current, pathnameRef.current)
         ) {
           setRun(true);
         }
       }, delay);
     },
-    [clearRetryTimer, pathname]
+    [clearRetryTimer]
   );
 
   const prepareStepEnvironment = useCallback(
@@ -116,7 +121,9 @@ export default function ProductTour() {
 
       if (step.requiresMobileMenu) {
         setTourSheetActive(true);
-        dispatchOpenMobileMenu();
+      } else if (step.waitForBurgerClick) {
+        setTourSheetActive(false);
+        dispatchCloseMobileMenu();
       } else {
         setTourSheetActive(false);
         dispatchCloseMobileMenu();
@@ -142,6 +149,12 @@ export default function ProductTour() {
       setRun(false);
       prepareStepEnvironment(0, steps);
       scheduleRun();
+
+      if (stage === "rewards_tour") {
+        requestAnimationFrame(() => {
+          window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: "wardrobe" }));
+        });
+      }
     } else {
       setRun(false);
       setTourSheetActive(false);
@@ -151,13 +164,46 @@ export default function ProductTour() {
   }, [stage, pathname, clearRetryTimer, scheduleRun, prepareStepEnvironment, steps]);
 
   useEffect(() => {
-    if (stage === "finished") return;
-    const step = steps[stepIndex];
-    if (step?.requiresMobileMenu) {
+    const onBurgerClick = () => {
+      const mobile = isMobileViewport();
+      const currentSteps = getResolvedTourSteps(stageRef.current, mobile);
+      const idx = stepIndexRef.current;
+      const current = currentSteps[idx] as CustomTourStep | undefined;
+      if (!current?.waitForBurgerClick) return;
+
+      targetRetryCount.current = 0;
+      setRun(false);
       setTourSheetActive(true);
-      dispatchOpenMobileMenu();
-    }
-  }, [stepIndex, stage, steps]);
+      clearRetryTimer();
+
+      retryTimerRef.current = setTimeout(() => {
+        retryTimerRef.current = null;
+        const nextIndex = idx + 1;
+        if (nextIndex < currentSteps.length) {
+          setStepIndex(nextIndex);
+          scheduleRun(MOBILE_MENU_SETTLE_MS);
+        }
+      }, 420);
+    };
+
+    window.addEventListener(TOUR_BURGER_CLICKED, onBurgerClick);
+    return () => window.removeEventListener(TOUR_BURGER_CLICKED, onBurgerClick);
+  }, [clearRetryTimer, scheduleRun]);
+
+  useEffect(() => {
+    const onPageReady = () => {
+      if (
+        stageRef.current !== "finished" &&
+        isTourStageActiveOnPath(stageRef.current, pathnameRef.current)
+      ) {
+        targetRetryCount.current = 0;
+        scheduleRun(120);
+      }
+    };
+
+    window.addEventListener(TOUR_PAGE_READY, onPageReady);
+    return () => window.removeEventListener(TOUR_PAGE_READY, onPageReady);
+  }, [scheduleRun]);
 
   useEffect(() => {
     return () => {
@@ -168,13 +214,11 @@ export default function ProductTour() {
   }, []);
 
   useEffect(() => {
-    if (stage === "rewards_tour" && run) {
-      const tabMap = ["wardrobe", "streaks", "referral", "promos"];
-      const currentTab = tabMap[stepIndex];
-      if (currentTab) {
-        window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: currentTab }));
-      }
-    }
+    if (stage !== "rewards_tour" || !run) return;
+
+    const tabMap = ["wardrobe", "streaks", "referral", "promos"] as const;
+    const currentTab = tabMap[stepIndex] ?? "wardrobe";
+    window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: currentTab }));
   }, [stepIndex, stage, run]);
 
   const handleJoyrideEvent = (data: EventData, _controls: Controls) => {
@@ -184,7 +228,6 @@ export default function ProductTour() {
     if (type === EVENTS.TARGET_NOT_FOUND) {
       const failedStep = currentStageSteps[index ?? stepIndex] as CustomTourStep | undefined;
       if (failedStep?.requiresMobileMenu) {
-        dispatchOpenMobileMenu();
         setTourSheetActive(true);
       }
 
@@ -193,7 +236,7 @@ export default function ProductTour() {
 
       if (
         targetRetryCount.current <= MAX_TARGET_RETRIES &&
-        isTourStageActiveOnPath(stageRef.current, pathname)
+        isTourStageActiveOnPath(stageRef.current, pathnameRef.current)
       ) {
         scheduleRun(TARGET_RETRY_DELAY_MS);
       } else if (targetRetryCount.current > MAX_TARGET_RETRIES) {
@@ -209,31 +252,18 @@ export default function ProductTour() {
       const isLastStep = index === currentStageSteps.length - 1;
       const customStep = step as CustomTourStep;
 
-      if (action === ACTIONS.NEXT || action === ACTIONS.PREV) {
-        const nextIndex = index + (action === ACTIONS.PREV ? -1 : 1);
+        if (action === ACTIONS.NEXT || action === ACTIONS.PREV) {
+          const nextIndex = index + (action === ACTIONS.PREV ? -1 : 1);
 
-        if (customStep.openMobileMenuOnNext && action === ACTIONS.NEXT) {
-          setRun(false);
-          dispatchOpenMobileMenu();
-          setTourSheetActive(true);
-          clearRetryTimer();
-          retryTimerRef.current = setTimeout(() => {
-            retryTimerRef.current = null;
-            setStepIndex(nextIndex);
-            scheduleRun(MOBILE_MENU_SETTLE_MS);
-          }, MOBILE_MENU_SETTLE_MS);
-          return;
-        }
-
-        if (action === ACTIONS.PREV) {
-          const prevStep = currentStageSteps[nextIndex];
-          if (!prevStep?.requiresMobileMenu) {
-            setTourSheetActive(false);
-            dispatchCloseMobileMenu();
+          if (action === ACTIONS.PREV) {
+            const prevStep = currentStageSteps[nextIndex];
+            if (!prevStep?.requiresMobileMenu) {
+              setTourSheetActive(false);
+              dispatchCloseMobileMenu();
+            }
           }
-        }
 
-        if (isLastStep && action === ACTIONS.NEXT) {
+          if (isLastStep && action === ACTIONS.NEXT) {
           const config = TOUR_STAGES[stageRef.current];
           if (config.type === "advanceOnNext" && config.nextStage) {
             advanceTour(config.nextStage);
@@ -242,13 +272,14 @@ export default function ProductTour() {
           } else {
             setRun(false);
           }
-        } else {
-          setStepIndex(nextIndex);
-          if (currentStageSteps[nextIndex]?.requiresMobileMenu) {
-            setRun(false);
-            scheduleRun(MOBILE_MENU_SETTLE_MS);
+          } else {
+            setStepIndex(nextIndex);
+            const nextStep = currentStageSteps[nextIndex] as CustomTourStep | undefined;
+            if (nextStep?.requiresMobileMenu) {
+              setRun(false);
+              scheduleRun(MOBILE_MENU_SETTLE_MS);
+            }
           }
-        }
       }
     }
 
@@ -256,7 +287,7 @@ export default function ProductTour() {
       setTourSheetActive(false);
       dispatchCloseMobileMenu();
       const config = TOUR_STAGES[stageRef.current];
-      if (config && config.type === "advanceOnNext" && config.nextStage) {
+      if (config?.nextStage) {
         advanceTour(config.nextStage);
       } else if (stageRef.current === "rewards_tour") {
         advanceTour("finished");

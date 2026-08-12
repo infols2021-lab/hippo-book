@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import { useRouter } from "next/navigation";
 import { useTour } from "@/components/tour/TourProvider";
 import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
+import { dispatchBurgerClicked, dispatchTourPageReady } from "@/lib/tour/tourMobile";
 
 import "./requests.css";
 import "../profile/profile.css";
@@ -168,6 +169,12 @@ export default function RequestsClient({
     mobileMenuOpen,
     setMobileMenuOpen
   );
+
+  useEffect(() => {
+    if (stage === "requests_info" || stage === "requests_return_gate") {
+      dispatchTourPageReady();
+    }
+  }, [stage]);
 
   const [modalStep, setModalStep] = useState<1 | 2>(1);
 
@@ -1120,8 +1127,13 @@ export default function RequestsClient({
             type="button"
             className="mobile-burger-btn"
             data-tour="mobile-burger-btn"
-            onClick={() => setMobileMenuOpen(true)}
+            onClick={() => {
+              const opening = !mobileMenuOpen;
+              setMobileMenuOpen(opening);
+              if (opening) dispatchBurgerClicked();
+            }}
             aria-label="Открыть меню"
+            aria-expanded={mobileMenuOpen}
           >
             ☰
           </button>

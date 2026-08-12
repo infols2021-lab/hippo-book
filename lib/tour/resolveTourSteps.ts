@@ -1,6 +1,6 @@
 import type { TourStage } from "@/lib/tour/tourConfig";
 import { pickMascotImage } from "@/lib/tour/mascotImages";
-import { visiblePortalCard, visiblePortalCarouselHint, visibleTourTarget, visibleMobileMenuTarget } from "@/lib/tour/tourTargets";
+import { visiblePortalCard, visibleTourTarget, visibleMobileMenuTarget } from "@/lib/tour/tourTargets";
 import type { CustomTourStep } from "@/components/tour/TourSteps";
 import { isMobileViewport, isMobileMenuGateStage } from "@/lib/tour/tourMobile";
 import { getPortalProjectCount } from "@/lib/tour/tourPortal";
@@ -29,43 +29,49 @@ function withMobileMenuTarget(step: CustomTourStep, stage: TourStage): CustomTou
   };
 }
 
-function mobileBurgerIntro(stage: TourStage): CustomTourStep {
-  const copy: Partial<Record<TourStage, { title: string; content: string }>> = {
+function mobileBurgerIntro(stage: TourStage | "materials_overview_return"): CustomTourStep {
+  const copy: Partial<Record<TourStage | "materials_overview_return", { title: string; content: string }>> = {
     profile_requests_gate: {
       title: "Меню профиля",
       content:
-        "На телефоне «Заявки на покупку», материалы и награды — в меню ☰ справа вверху. Нажмите «Открыть меню», чтобы продолжить.",
+        "На телефоне «Заявки на покупку» — в меню ☰ справа вверху. Нажмите на кнопку меню, чтобы открыть его.",
     },
     materials_gate: {
       title: "Меню профиля",
       content:
-        "Раздел «Материалы» на телефоне находится в меню ☰. Нажмите «Открыть меню», чтобы продолжить.",
+        "Раздел «Материалы» на телефоне — в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
     },
     rewards_gate: {
       title: "Меню профиля",
       content:
-        "Центр наград на телефоне — в меню ☰. Нажмите «Открыть меню», чтобы продолжить.",
+        "Центр наград на телефоне — в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
     },
     requests_return_gate: {
       title: "Меню навигации",
       content:
-        "На телефоне кнопка «Профиль» — в меню ☰. Нажмите «Открыть меню», чтобы вернуться в профиль.",
+        "Кнопка «Профиль» — в меню ☰. Нажмите на кнопку меню, чтобы открыть навигацию.",
+    },
+    materials_overview_return: {
+      title: "Меню",
+      content:
+        "Чтобы вернуться в профиль, откройте меню ☰ в правом верхнем углу.",
     },
   };
 
-  const text = copy[stage] ?? {
+  const text = copy[stage] ?? copy.materials_overview_return ?? {
     title: "Меню",
-    content: "Откройте меню ☰, чтобы продолжить.",
+    content: "Нажмите ☰ в правом верхнем углу, чтобы открыть меню.",
   };
 
   return {
     target: burgerTarget,
     title: text.title,
     content: text.content,
-    mascotImage: pickMascotImage(stage),
+    mascotImage: pickMascotImage(stage === "materials_overview_return" ? "materials_overview_return" : stage),
     skipBeacon: true,
-    primaryLabel: "Открыть меню",
-    openMobileMenuOnNext: true,
+    hideNextButton: true,
+    waitForBurgerClick: true,
+    blockTargetInteraction: false,
     placement: "bottom",
   };
 }
@@ -300,11 +306,20 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
 
   if (stage === "materials_overview" && base.length > 1) {
     return [
-      base[0],
+      {
+        ...base[0],
+        placement: "center",
+        skipScroll: true,
+      },
+      mobileBurgerIntro("materials_overview_return"),
       {
         ...base[1],
-        content: "Нажмите «Профиль» в шапке страницы, чтобы вернуться и узнать про награды.",
-        placement: "bottom",
+        target: visibleMobileMenuTarget('[data-tour="profile-link"]'),
+        requiresMobileMenu: true,
+        hideNextButton: true,
+        blockTargetInteraction: false,
+        content: "Нажмите «Профиль», чтобы вернуться и узнать про награды.",
+        placement: "top",
       },
     ];
   }

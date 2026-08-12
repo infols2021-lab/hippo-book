@@ -143,6 +143,7 @@
 
 /* Cover */
 .material-cover {
+  position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: 14px;
@@ -283,14 +284,99 @@
 
 /* Mobile */
 @media (max-width: 768px) {
-  .materials-container { width: 100%; padding: 0 12px; }
-  .materials-grid { 
-    grid-template-columns: 1fr; 
-    gap: 16px; 
-    max-height: calc(100vh - 270px);
-    padding-right: 4px;
+  .materials-page {
+    padding: 0 0 24px;
   }
-  .materials-tabs { padding: 6px; gap: 4px; border-radius: 16px; }
-  .material-tab { padding: 10px 16px; font-size: 13px; border-radius: 12px; }
-  .materials-panel { padding: 16px; border-radius: 20px; }
+
+  .materials-container {
+    width: 92%;
+    margin: 12px auto 0;
+    padding: 0;
+  }
+
+  .materials-container .mobile-header-bar .brand-mark {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    font-weight: 900;
+    font-size: 14px;
+    background: var(--project-primary);
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .materials-container .mobile-streak-pill {
+    pointer-events: none;
+  }
+
+  .materials-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    max-height: none;
+    min-height: 0;
+    padding-right: 0;
+    overflow: visible;
+  }
+
+  .materials-tabs {
+    padding: 6px;
+    gap: 4px;
+    border-radius: 16px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .materials-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .material-tab {
+    padding: 10px 14px;
+    font-size: 13px;
+    border-radius: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .materials-panel {
+    padding: 16px;
+    border-radius: 20px;
+    margin-top: 0;
+  }
+
+  .material-card {
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .material-title {
+    font-size: 15px;
+  }
+
+  .material-description {
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+
+  .material-secret-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #f59e0b;
+    color: #0f172a;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+}
+
+@media (min-width: 769px) {
+  .materials-container .mobile-header-bar {
+    display: none;
+  }
 }
