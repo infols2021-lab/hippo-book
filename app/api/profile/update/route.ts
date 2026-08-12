@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// ⚠️ is_admin убран из ответа — это чувствительное поле
+// Добавлено поле has_seen_tour
 const PROFILE_SELECT = `
   id,
   email,
@@ -16,7 +16,8 @@ const PROFILE_SELECT = `
   contact_phone,
   region,
   completed_assignments_count,
-  ga_completed_assignments_count
+  ga_completed_assignments_count,
+  has_seen_tour
 `;
 
 function noStoreInit(): ResponseInit {
@@ -68,7 +69,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   const input = body as Record<string, unknown>;
-  const updatePayload: Record<string, string | null> = {};
+  // Расширен тип для поддержки boolean значений
+  const updatePayload: Record<string, string | null | boolean> = {};
 
   if (hasOwn(input, "full_name")) {
     const fullName = normalizeName(input.full_name);
@@ -104,6 +106,11 @@ export async function PATCH(req: NextRequest) {
     updatePayload.region = region || null;
   }
 
+  // Логика обновления статуса онбординга
+  if (hasOwn(input, "has_seen_tour")) {
+    updatePayload.has_seen_tour = Boolean(input.has_seen_tour);
+  }
+
   if (Object.keys(updatePayload).length === 0) {
     return fail("No fields to update", 400, "VALIDATION", noStoreInit());
   }
@@ -122,7 +129,6 @@ export async function PATCH(req: NextRequest) {
 
     revalidateUserData(user.id);
 
-    // ✅ is_admin уже не возвращается
     return ok(
       {
         profile: data,

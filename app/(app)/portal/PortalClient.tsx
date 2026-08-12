@@ -135,6 +135,7 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
               {projects.map((project, index) => (
                 <div
                   key={project.id}
+                  id={index === 0 ? "tour-materials" : index === 1 ? "tour-requests" : undefined} // МИШЕНИ ОНБОРДИНГА
                   className="shrink-0 w-full snap-center snap-always md:w-auto md:shrink"
                 >
                   <PortalCard project={project} index={index} />

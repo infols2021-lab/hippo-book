@@ -1,5 +1,7 @@
+// app/(app)/layout.tsx
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import ProductTour from "@/components/tour/ProductTour";
 
 export default async function AppLayout({
   children,
@@ -8,6 +10,7 @@ export default async function AppLayout({
 }) {
   let connectionError = false;
   let hasUser = false;
+  let needsTour = false; // Флаг для запуска тура
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -29,6 +32,20 @@ export default async function AppLayout({
       }
     } else {
       hasUser = Boolean(data.user);
+      
+      // Если юзер авторизован, проверяем проходил ли он обучение
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("has_seen_tour")
+          .eq("id", data.user.id)
+          .single();
+
+        // Запускаем тур, только если поле строго равно false
+        if (profile && profile.has_seen_tour === false) {
+          needsTour = true;
+        }
+      }
     }
   } catch {
     connectionError = true;
@@ -69,5 +86,11 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {/* Рендерим тур глобально для всего портала */}
+      <ProductTour initialRun={needsTour} />
+    </>
+  );
 }

@@ -109,6 +109,21 @@ export default function AppHeader({
             className="flex items-center gap-2 sm:gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar"
             style={{ WebkitOverflowScrolling: "touch" }}
           >
+            {/* Кнопка перезапуска онбординга */}
+            <button
+              id="tour-help-btn"
+              type="button"
+              onClick={() => window.dispatchEvent(new Event("start-product-tour"))}
+              className="whitespace-nowrap flex-shrink-0 btn ghost px-3"
+              style={{
+                color: "var(--project-text)",
+                backgroundColor: "color-mix(in srgb, var(--project-text) 5%, transparent)",
+              }}
+              title="Запустить обучение по платформе"
+            >
+              ❓ Помощь
+            </button>
+
             {/* Кнопка "Ученики" рендерится первой и ТОЛЬКО для учителей/админов */}
             {isTeacher && (
               <Link
@@ -141,6 +156,7 @@ export default function AppHeader({
                 return (
                   <button
                     key={`rewards-${idx}`}
+                    id="tour-rewards-btn" // МИШЕНЬ ОНБОРДИНГА
                     type="button"
                     onClick={() => setIsRewardsOpen(true)}
                     className={`whitespace-nowrap flex-shrink-0 ${item.className || "btn ghost"}`}
