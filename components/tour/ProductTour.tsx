@@ -3,28 +3,25 @@
 
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { STATUS, EVENTS, ACTIONS } from "react-joyride";
-
-// 1. Правильный фикс для TypeScript и Next.js.
-// Просто кастуем сам import к any, не трогая внутренности модуля.
-// Это убьет ошибку React #306 (белый экран).
-const Joyride = dynamic(
-  () => import("react-joyride") as any,
-  { ssr: false }
-) as any;
+import { ACTIONS, EVENTS, STATUS } from "react-joyride";
+import type { EventData, Controls } from "react-joyride";
 
 import CustomTooltip from "./CustomTooltip";
 import { TOUR_STEPS } from "./TourSteps";
 
+// В V3 Joyride — именованный экспорт (не default), поэтому достаём его вручную
+const Joyride = dynamic(
+  () => import("react-joyride").then((mod) => mod.Joyride),
+  { ssr: false }
+);
+
 interface ProductTourProps {
-  initialRun?: boolean; 
+  initialRun?: boolean;
 }
 
 export default function ProductTour({ initialRun = false }: ProductTourProps) {
   const [run, setRun] = useState(initialRun);
   const [stepIndex, setStepIndex] = useState(0);
-  
-  // 2. Защита от ошибки гидратации (React error #418)
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -37,22 +34,22 @@ export default function ProductTour({ initialRun = false }: ProductTourProps) {
       setStepIndex(0);
       setRun(true);
     };
-    
+
     window.addEventListener("start-product-tour", startTour);
     return () => window.removeEventListener("start-product-tour", startTour);
   }, []);
 
-  // Хак для шага с открытием модалки наград (ждем реального клика)
+  // Хак для шага с открытием модалки наград (ждем реального клика по кнопке)
   useEffect(() => {
     if (!run) return;
-    
+
     if (stepIndex === 3) {
       const rewardsBtn = document.querySelector("#tour-rewards-btn");
-      
+
       const handleClick = () => {
         setTimeout(() => setStepIndex(4), 450);
       };
-      
+
       if (rewardsBtn) rewardsBtn.addEventListener("click", handleClick);
       return () => {
         if (rewardsBtn) rewardsBtn.removeEventListener("click", handleClick);
@@ -60,12 +57,13 @@ export default function ProductTour({ initialRun = false }: ProductTourProps) {
     }
   }, [stepIndex, run]);
 
-  const handleJoyrideCallback = async (data: any) => {
+  // В V3: callback -> onEvent, теперь принимает (data, controls)
+  const handleJoyrideEvent = async (data: EventData, _controls: Controls) => {
     const { status, type, action, index } = data;
 
     if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
       if (index === 3 && action === ACTIONS.NEXT) {
-        return; 
+        return;
       }
       setStepIndex(index + (action === ACTIONS.PREV ? -1 : 1));
     }
@@ -86,8 +84,7 @@ export default function ProductTour({ initialRun = false }: ProductTourProps) {
     }
   };
 
-  // 3. Отдаем пустоту, пока клиент не смонтирован. 
-  // Это 100% защита от несовпадения HTML сервера и браузера
+  // Защита от ошибки гидратации
   if (!isMounted) return null;
 
   return (
@@ -95,16 +92,14 @@ export default function ProductTour({ initialRun = false }: ProductTourProps) {
       steps={TOUR_STEPS}
       run={run}
       stepIndex={stepIndex}
-      callback={handleJoyrideCallback}
-      tooltipComponent={CustomTooltip} 
+      onEvent={handleJoyrideEvent}
+      tooltipComponent={CustomTooltip}
       continuous={true}
-      disableOverlayClose={true} 
-      spotlightPadding={10}
-      styles={{
-        options: {
-          zIndex: 10000,
-          overlayColor: "rgba(0, 0, 0, 0.65)", 
-        },
+      options={{
+        zIndex: 10000,
+        overlayColor: "rgba(0, 0, 0, 0.65)",
+        overlayClickAction: false, // было disableOverlayClose={true}
+        spotlightPadding: 10, // было spotlightPadding={10}
       }}
     />
   );
