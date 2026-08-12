@@ -37,7 +37,7 @@ export function visibleTourTarget(...selectors: string[]): () => HTMLElement | n
 
 /** Карточка направления на портале (snap-карусель на мобилке). */
 export function visiblePortalCard(): HTMLElement | null {
-  const cards = document.querySelectorAll<HTMLElement>(".portal-card");
+  const cards = document.querySelectorAll<HTMLElement>('[data-tour="direction-card"]');
   for (const card of cards) {
     if (isTourElementVisible(card) && isInViewport(card)) {
       return card;
