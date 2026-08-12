@@ -9,7 +9,7 @@ export function ProfileTourTrigger() {
 
   useEffect(() => {
     if (stage === "direction_gate") {
-      advanceTour("profile_overview");
+      advanceTour("profile_stats");
     }
   }, [stage, advanceTour]);
 

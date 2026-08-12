@@ -202,8 +202,14 @@ export default function ProfileClient({
 
   // Fallback: если пользователь вернулся из заявок через кнопку браузера "Назад"
   useEffect(() => {
-    if (stage === "requests_info") {
+    if (stage === "requests_return_gate") {
       advanceTour("materials_gate");
+    }
+  }, [stage, advanceTour]);
+
+  useEffect(() => {
+    if (stage === "materials_overview") {
+      advanceTour("rewards_gate");
     }
   }, [stage, advanceTour]);
 
@@ -213,7 +219,11 @@ export default function ProfileClient({
     const isMobile = window.matchMedia("(max-width: 768px)").matches;
     if (!isMobile) return;
 
-    if (stage === "profile_overview" || stage === "materials_gate" || stage === "rewards_gate") {
+    if (
+      stage === "profile_requests_gate" ||
+      stage === "materials_gate" ||
+      stage === "rewards_gate"
+    ) {
       setMobileMenuOpen(true);
     }
   }, [stage]);
@@ -541,7 +551,7 @@ export default function ProfileClient({
                 data-tour="materials-link"
                 href={`/projects/${projectSlug}/materials`}
                 onClick={() => {
-                  if (stage === "materials_gate") advanceTour("rewards_gate");
+                  if (stage === "materials_gate") advanceTour("materials_overview");
                   setMobileMenuOpen(false);
                 }}
               >
@@ -554,7 +564,7 @@ export default function ProfileClient({
                 className="sheet-item"
                 data-tour="requests-link"
                 onClick={() => {
-                  if (stage === "profile_overview") advanceTour("requests_info");
+                  if (stage === "profile_requests_gate") advanceTour("requests_info");
                   setMobileMenuOpen(false);
                   router.push(`/projects/${projectSlug}/requests`);
                 }}
@@ -566,7 +576,11 @@ export default function ProfileClient({
                   Панель управления
                 </Link>
               )}
-              <Link className="sheet-item" href="/portal" onClick={() => setMobileMenuOpen(false)}>
+              <Link
+                className="sheet-item"
+                href="/portal"
+                onClick={() => setMobileMenuOpen(false)}
+              >
                 Главный портал
               </Link>
               <button className="sheet-item sheet-item--danger" onClick={() => void logout()}>
@@ -685,6 +699,16 @@ export default function ProfileClient({
             )}
 
             <button
+              type="button"
+              className="tour-help-btn"
+              title="Помощь по платформе"
+              aria-label="Помощь по платформе"
+              onClick={() => window.dispatchEvent(new Event("start-product-tour"))}
+            >
+              ?
+            </button>
+
+            <button
               data-tour="rewards-btn"
               type="button"
               className="nav-pill"
@@ -698,7 +722,7 @@ export default function ProfileClient({
               className="nav-pill"
               href={`/projects/${projectSlug}/materials`}
               onClick={() => {
-                if (stage === "materials_gate") advanceTour("rewards_gate");
+                if (stage === "materials_gate") advanceTour("materials_overview");
               }}
             >
               Материалы
@@ -777,7 +801,7 @@ export default function ProfileClient({
                 data-tour="requests-link"
                 className="btn secondary"
                 onClick={() => {
-                  if (stage === "profile_overview") advanceTour("requests_info");
+                  if (stage === "profile_requests_gate") advanceTour("requests_info");
                   router.push(`/projects/${projectSlug}/requests`);
                 }}
                 type="button"
@@ -797,7 +821,7 @@ export default function ProfileClient({
             <div className="section-title desktop-stats-title">
               Статистика <b>материалов</b>
             </div>
-            <div className="stats-grid">
+            <div className="stats-grid" data-tour="profile-stats">
               <div className="stat-card">
                 <div className="stat-value">{stats?.totalMaterials ?? "—"}</div>
                 <div className="stat-label">Доступно материалов</div>
@@ -820,7 +844,7 @@ export default function ProfileClient({
               </div>
             </div>
 
-            <div className="mobile-stats-row">
+            <div className="mobile-stats-row" data-tour="profile-stats">
               <div className="mobile-stat-card">
                 <div className="mobile-stat-val">{stats ? `${stats.successRate}%` : "0%"}</div>
                 <div className="mobile-stat-lbl">прогресс</div>

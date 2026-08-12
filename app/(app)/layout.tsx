@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TourProvider } from "@/components/tour/TourProvider";
 import ProductTour from "@/components/tour/ProductTour";
-import { TourStage } from "@/lib/tour/tourConfig";
+import { TourStage, normalizeTourStage } from "@/lib/tour/tourConfig";
 
 export default async function AppLayout({
   children,
@@ -43,8 +43,9 @@ export default async function AppLayout({
           .single();
 
         if (profile) {
-          if (profile.tour_stage && profile.tour_stage !== "finished") {
-            initialTourStage = profile.tour_stage as TourStage;
+          const normalized = normalizeTourStage(profile.tour_stage);
+          if (normalized && normalized !== "finished") {
+            initialTourStage = normalized;
           } else if (profile.has_seen_tour === false) {
             initialTourStage = "portal_intro";
           }

@@ -178,7 +178,49 @@
   font-family: inherit;
 }
 
-/* ====== ДЕСКТОП: сетка карточек (как было) ====== */
+/* Сетка карточек: 1 / 2 / 3 колонки на десктопе */
+.portal-split--1 {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 560px;
+  margin-inline: auto;
+  width: 100%;
+}
+
+.portal-split--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.portal-split--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.portal-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  border-radius: 32px;
+  border: 2px dashed rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.portal-empty h3 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 900;
+  color: #fff;
+}
+
+.portal-empty p {
+  margin: 0;
+  max-width: 420px;
+  line-height: 1.5;
+}
+
 .portal-split {
   flex: 1;
   display: grid;

@@ -1,6 +1,7 @@
 // components/tour/TourSteps.ts
 import { Step } from "react-joyride";
 import { TourStage } from "@/lib/tour/tourConfig";
+import { pickMascotImage } from "@/lib/tour/mascotImages";
 import { visiblePortalCard, visibleTourTarget } from "@/lib/tour/tourTargets";
 
 export interface CustomTourStep extends Step {
@@ -9,6 +10,7 @@ export interface CustomTourStep extends Step {
   blockTargetInteraction?: boolean;
   overlayClickAction?: false | "close" | "next" | "replay";
   hideNextButton?: boolean;
+  primaryLabel?: string;
 }
 
 export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
@@ -18,30 +20,39 @@ export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       placement: "center",
       title: "Добро пожаловать!",
       content:
-        "Теперь на платформе есть новые направления обучения, и в будущем их станет больше! Важно: ваши данные профиля, награды и стрики остаются едиными для всех направлений, чтобы вы не путались в материалах.",
-      mascotImage: "/images/tour/dog1.webp",
+        "На платформе несколько направлений обучения — у каждого свой контент, но профиль, награды и стрики общие для всех.",
+      mascotImage: pickMascotImage("portal_intro"),
       skipBeacon: true,
     },
   ],
   direction_gate: [
     {
       target: visiblePortalCard,
-      title: "Выбор направления",
-      content:
-        "Для продолжения обучения выберите любое направление. Нажмите на карточку, чтобы войти внутрь.",
-      mascotImage: "/images/tour/dog2.webp",
+      title: "Выберите направление",
+      content: "Чтобы продолжить, выберите любую карточку направления и нажмите на неё.",
+      mascotImage: pickMascotImage("direction_gate"),
       skipBeacon: true,
       hideNextButton: true,
       blockTargetInteraction: false,
     },
   ],
-  profile_overview: [
+  profile_stats: [
+    {
+      target: visibleTourTarget('[data-tour="profile-stats"]'),
+      title: "Статистика материалов",
+      content:
+        "Здесь видно, сколько материалов доступно, что уже пройдено, общий прогресс и количество решённых заданий по текущему направлению.",
+      mascotImage: pickMascotImage("profile_stats"),
+      skipBeacon: true,
+    },
+  ],
+  profile_requests_gate: [
     {
       target: visibleTourTarget('[data-tour="requests-link"]'),
-      title: "Профиль и Заявки",
+      title: "Заявки на покупку",
       content:
-        "Это ваш единый профиль. Здесь отображается ваша статистика и прогресс. А через меню «Заявки» можно получать доступ к новым материалам. Нажмите на «Заявки», чтобы посмотреть.",
-      mascotImage: "/images/tour/dog3.webp",
+        "Нужен доступ к новым материалам? Через заявки можно запросить открытие нужных разделов. Нажмите «Заявки на покупку», чтобы посмотреть, как это работает.",
+      mascotImage: pickMascotImage("profile_requests_gate"),
       skipBeacon: true,
       hideNextButton: true,
       blockTargetInteraction: false,
@@ -49,11 +60,31 @@ export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
   ],
   requests_info: [
     {
-      target: visibleTourTarget('[data-tour="create-request-btn"]'),
-      title: "Как создаются заявки",
+      target: "body",
+      placement: "center",
+      title: "Как проходит заявка",
       content:
-        "Здесь вы можете запрашивать доступ к нужным материалам. Сейчас создавать заявку необязательно! Просто ознакомьтесь с разделом и вернитесь назад в профиль.",
-      mascotImage: "/images/tour/dog4.webp",
+        "Вы выбираете материалы, создаёте заявку и получаете QR для оплаты. После подтверждения администратором доступ открывается автоматически. Сейчас создавать заявку не нужно — просто запомните, где находится кнопка «+ Создать заявку».",
+      mascotImage: pickMascotImage("requests_info_text"),
+      skipBeacon: true,
+    },
+    {
+      target: visibleTourTarget('[data-tour="create-request-btn"]'),
+      title: "Кнопка создания",
+      content: "Именно здесь в будущем вы будете создавать новые заявки. Сейчас на неё нажимать не нужно.",
+      mascotImage: pickMascotImage("requests_info_btn"),
+      skipBeacon: true,
+      hideNextButton: false,
+      blockTargetInteraction: true,
+      primaryLabel: "Понятно",
+    },
+  ],
+  requests_return_gate: [
+    {
+      target: visibleTourTarget('[data-tour="profile-link"]'),
+      title: "Вернитесь в профиль",
+      content: "Отлично! Теперь нажмите «Профиль», чтобы вернуться и узнать про раздел материалов.",
+      mascotImage: pickMascotImage("requests_return_gate"),
       skipBeacon: true,
       hideNextButton: true,
       blockTargetInteraction: false,
@@ -62,10 +93,30 @@ export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
   materials_gate: [
     {
       target: visibleTourTarget('[data-tour="materials-link"]'),
+      title: "Раздел «Материалы»",
+      content:
+        "Все учебники, задания и прогресс по текущему направлению хранятся в разделе «Материалы». Нажмите на кнопку, чтобы заглянуть туда.",
+      mascotImage: pickMascotImage("materials_gate"),
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+    },
+  ],
+  materials_overview: [
+    {
+      target: "body",
+      placement: "center",
       title: "Ваши материалы",
       content:
-        "В этом разделе хранятся все ваши уроки и задания по текущему направлению. Нажмите на кнопку «Материалы», чтобы зайти туда.",
-      mascotImage: "/images/tour/dog5.webp",
+        "Здесь собраны все доступные разделы и карточки материалов. Можно отслеживать прогресс и переходить к заданиям. Когда будете готовы — вернитесь в профиль.",
+      mascotImage: pickMascotImage("materials_overview"),
+      skipBeacon: true,
+    },
+    {
+      target: visibleTourTarget('[data-tour="profile-link"]'),
+      title: "Обратно в профиль",
+      content: "Нажмите «Профиль», чтобы вернуться и узнать про награды.",
+      mascotImage: pickMascotImage("materials_overview_return"),
       skipBeacon: true,
       hideNextButton: true,
       blockTargetInteraction: false,
@@ -76,8 +127,8 @@ export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="rewards-btn"]'),
       title: "Центр наград",
       content:
-        "Самое интересное! Здесь хранится ваш инвентарь и бонусы. Нажмите на кнопку наград, чтобы открыть меню.",
-      mascotImage: "/images/tour/dog6.webp",
+        "Здесь ваш гардероб маскота, стрики, рефералка и промокоды. Нажмите «Награды», чтобы открыть центр наград.",
+      mascotImage: pickMascotImage("rewards_gate"),
       skipBeacon: true,
       hideNextButton: true,
       blockTargetInteraction: false,
@@ -87,33 +138,29 @@ export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
     {
       target: visibleTourTarget('[data-tour="wardrobe-tab"]'),
       title: "Гардероб",
-      content:
-        "Здесь вы можете менять внешний вид маскота, использовать новые фоны, ауры и примерять заработанные титулы.",
-      mascotImage: "/images/tour/dog7.webp",
+      content: "Меняйте внешний вид маскота: фоны, ауры, титулы и другие предметы из инвентаря.",
+      mascotImage: pickMascotImage("rewards_wardrobe"),
       skipBeacon: true,
     },
     {
       target: visibleTourTarget('[data-tour="streaks-tab"]'),
       title: "Ваши стрики",
-      content:
-        "Занимайтесь регулярно! Непрерывное выполнение заданий формирует серию, за которую выдаются уникальные предметы.",
-      mascotImage: "/images/tour/dog8.webp",
+      content: "Занимайтесь регулярно — серия дней приносит уникальные награды.",
+      mascotImage: pickMascotImage("rewards_streaks"),
       skipBeacon: true,
     },
     {
       target: visibleTourTarget('[data-tour="referral-tab"]'),
       title: "Реферальная система",
-      content:
-        "Приглашайте друзей по вашей уникальной ссылке и получайте бонусы за каждого нового пользователя платформы.",
-      mascotImage: "/images/tour/dog9.webp",
+      content: "Приглашайте друзей по своей ссылке и получайте бонусы за каждого нового ученика.",
+      mascotImage: pickMascotImage("rewards_referral"),
       skipBeacon: true,
     },
     {
       target: visibleTourTarget('[data-tour="promos-tab"]'),
       title: "Промокоды",
-      content:
-        "Активируйте секретные коды для получения подарков. На этом наш тур окончен! Желаем успехов в обучении!",
-      mascotImage: "/images/tour/dog10.webp",
+      content: "Активируйте секретные коды для подарков. На этом обучение по платформе завершено!",
+      mascotImage: pickMascotImage("rewards_promos"),
       skipBeacon: true,
     },
   ],

@@ -504,6 +504,28 @@
   justify-content: center;
 }
 
+.tour-help-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--project-text) 6%, transparent);
+  color: var(--project-text);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.tour-help-btn:hover {
+  transform: scale(1.05);
+  background: color-mix(in srgb, var(--project-primary) 12%, transparent);
+}
+
 /* Элементы, которые нужны ТОЛЬКО для мобилки по умолчанию скрыты */
 .mobile-header-bar,
 .mobile-bottom-sheet-overlay,

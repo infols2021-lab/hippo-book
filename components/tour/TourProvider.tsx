@@ -45,7 +45,7 @@ export function TourProvider({
   );
 
   useEffect(() => {
-    const restartTour = () => setStage("portal_intro");
+    const restartTour = () => setStage("profile_stats");
     window.addEventListener("start-product-tour", restartTour);
     return () => window.removeEventListener("start-product-tour", restartTour);
   }, [setStage]);

@@ -11,6 +11,19 @@ import "./materials.css";
 
 export const revalidate = 0;
 
+function materialsNav(slug: string) {
+  return [
+    {
+      kind: "link" as const,
+      href: `/projects/${slug}/profile`,
+      label: "Профиль",
+      className: "btn ghost",
+      tourId: "profile-link",
+    },
+    { kind: "logout" as const, label: "Выйти", className: "btn secondary" },
+  ];
+}
+
 type PageProps = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ tab?: string }>;
@@ -52,18 +65,7 @@ export default async function ProjectMaterialsPage({
     return (
       <div className="materials-page">
         <div className="materials-container">
-          <AppHeader
-            nav={[
-              {
-                kind: "link",
-                href: `/projects/${slug}/profile`,
-                label: "Профиль",
-                className: "btn ghost",
-              },
-              { kind: "rewards", label: "🎭 Награды", className: "btn ghost" },
-              { kind: "logout", label: "Выйти", className: "btn secondary" },
-            ]}
-          />
+          <AppHeader nav={materialsNav(slug)} />
           <div className="materials-empty card">
             <p>⚠️ Не удалось загрузить профиль</p>
             <p className="materials-subtitle">{profileError.message}</p>
@@ -81,18 +83,7 @@ export default async function ProjectMaterialsPage({
     return (
       <div className="materials-page">
         <div className="materials-container">
-          <AppHeader
-            nav={[
-              {
-                kind: "link",
-                href: `/projects/${slug}/profile`,
-                label: "Профиль",
-                className: "btn ghost",
-              },
-              { kind: "rewards", label: "🎭 Награды", className: "btn ghost" },
-              { kind: "logout", label: "Выйти", className: "btn secondary" },
-            ]}
-          />
+          <AppHeader nav={materialsNav(slug)} />
           <div className="materials-empty card">
             <p>📭 В этом проекте пока нет разделов</p>
             <p className="materials-subtitle">Обратитесь к администратору</p>
@@ -118,18 +109,7 @@ export default async function ProjectMaterialsPage({
     return (
       <div className="materials-page">
         <div className="materials-container">
-          <AppHeader
-            nav={[
-              {
-                kind: "link",
-                href: `/projects/${slug}/profile`,
-                label: "Профиль",
-                className: "btn ghost",
-              },
-              { kind: "rewards", label: "🎭 Награды", className: "btn ghost" },
-              { kind: "logout", label: "Выйти", className: "btn secondary" },
-            ]}
-          />
+          <AppHeader nav={materialsNav(slug)} />
           <div className="materials-empty card">
             <p>⚠️ Не удалось загрузить материалы</p>
             <p className="materials-subtitle">{materialsResult.error}</p>
@@ -155,18 +135,7 @@ export default async function ProjectMaterialsPage({
   return (
     <div className="materials-page">
       <div className="materials-container">
-        <AppHeader
-          nav={[
-            {
-              kind: "link",
-              href: `/projects/${slug}/profile`,
-              label: "Профиль",
-              className: "btn ghost",
-            },
-            { kind: "rewards", label: "🎭 Награды", className: "btn ghost" },
-            { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
-          ]}
-        />
+        <AppHeader nav={materialsNav(slug)} />
 
         {tabs.length > 0 && (
           <div className="materials-tabs" role="tablist" aria-label="Материалы">

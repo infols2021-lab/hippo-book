@@ -1071,9 +1071,10 @@ export default function RequestsClient({
             <div className="sheet-menu-list">
               <Link
                 className="sheet-item"
+                data-tour="profile-link"
                 href={`/projects/${project.slug}/profile`}
                 onClick={() => {
-                  if (stage === "requests_info") advanceTour("materials_gate");
+                  if (stage === "requests_return_gate") advanceTour("materials_gate");
                   setMobileMenuOpen(false);
                 }}
               >
@@ -1127,11 +1128,12 @@ export default function RequestsClient({
             </div>
           </div>
           <div className="top-actions">
-            <Link 
-              className="nav-pill" 
+            <Link
+              data-tour="profile-link"
+              className="nav-pill"
               href={`/projects/${project.slug}/profile`}
               onClick={() => {
-                if (stage === "requests_info") advanceTour("materials_gate");
+                if (stage === "requests_return_gate") advanceTour("materials_gate");
               }}
             >
               Профиль

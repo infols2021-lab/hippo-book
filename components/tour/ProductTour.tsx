@@ -124,6 +124,8 @@ export default function ProductTour() {
           const config = TOUR_STAGES[stageRef.current];
           if (config.type === "advanceOnNext" && config.nextStage) {
             advanceTour(config.nextStage);
+          } else if (config.nextStage) {
+            advanceTour(config.nextStage);
           } else {
             setRun(false);
           }
@@ -163,7 +165,8 @@ export default function ProductTour() {
         overlayClickAction: false,
         spotlightPadding: 10,
         targetWaitTimeout: 2500,
-        scrollDuration: 200,
+        width: 380,
+        scrollOffset: 80,
       }}
     />
   );
