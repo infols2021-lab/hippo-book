@@ -22,16 +22,19 @@ import {
 import { isPortalTourStage } from "@/lib/tour/tourConfig";
 import { scrollPortalCardIntoView, setPortalTourActive } from "@/lib/tour/tourPortal";
 import { visiblePortalCard } from "@/lib/tour/tourTargets";
+import { saveTourProgress } from "@/lib/tour/tourPersistence";
+import { getInitialTourStepIndex, releaseTourUi } from "@/lib/tour/tourRecovery";
 
 const Joyride = dynamic(
   () => import("react-joyride").then((mod) => mod.Joyride),
   { ssr: false }
 );
 
-const MAX_TARGET_RETRIES = 12;
+const MAX_TARGET_RETRIES = 16;
 const TARGET_RETRY_DELAY_MS = 400;
 const DOM_SETTLE_MS = 350;
 const MOBILE_MENU_SETTLE_MS = 500;
+const STUCK_RETRY_DELAY_MS = 1800;
 
 export default function ProductTour() {
   const { stage, advanceTour, finishTour } = useTour();
@@ -44,6 +47,7 @@ export default function ProductTour() {
 
   const targetRetryCount = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handledStepAdvanceRef = useRef<string | null>(null);
   const pathnameRef = useRef(pathname);
   const stageRef = useRef(stage);
   const stepIndexRef = useRef(stepIndex);
@@ -135,19 +139,29 @@ export default function ProductTour() {
   useEffect(() => {
     clearRetryTimer();
     targetRetryCount.current = 0;
-    setStepIndex(0);
+    handledStepAdvanceRef.current = null;
 
     if (stage === "finished") {
       setRun(false);
-      setTourSheetActive(false);
-      setPortalTourActive(false);
-      dispatchCloseMobileMenu();
+      releaseTourUi();
       return;
     }
 
-    if (isTourStageActiveOnPath(stage, pathname)) {
+    if (!steps.length) {
       setRun(false);
-      prepareStepEnvironment(0, steps);
+      releaseTourUi();
+      return;
+    }
+
+    const activeOnPath = isTourStageActiveOnPath(stage, pathname);
+
+    if (activeOnPath) {
+      const resumeIndex = getInitialTourStepIndex(stage, pathname, steps as CustomTourStep[]);
+      setStepIndex(resumeIndex);
+      stepIndexRef.current = resumeIndex;
+      saveTourProgress(stage, resumeIndex, pathname);
+      setRun(false);
+      prepareStepEnvironment(resumeIndex, steps as CustomTourStep[]);
       scheduleRun();
 
       if (stage === "rewards_tour") {
@@ -157,11 +171,18 @@ export default function ProductTour() {
       }
     } else {
       setRun(false);
-      setTourSheetActive(false);
+      releaseTourUi();
     }
 
     return clearRetryTimer;
   }, [stage, pathname, clearRetryTimer, scheduleRun, prepareStepEnvironment, steps]);
+
+  useEffect(() => {
+    if (stage === "finished" || !steps.length) return;
+    if (!isTourStageActiveOnPath(stage, pathname)) return;
+
+    prepareStepEnvironment(stepIndex, steps as CustomTourStep[]);
+  }, [stage, stepIndex, pathname, steps, prepareStepEnvironment]);
 
   useEffect(() => {
     const onBurgerClick = () => {
@@ -181,6 +202,8 @@ export default function ProductTour() {
         const nextIndex = idx + 1;
         if (nextIndex < currentSteps.length) {
           setStepIndex(nextIndex);
+          stepIndexRef.current = nextIndex;
+          saveTourProgress(stageRef.current, nextIndex, pathnameRef.current);
           scheduleRun(MOBILE_MENU_SETTLE_MS);
         }
       }, 420);
@@ -207,9 +230,7 @@ export default function ProductTour() {
 
   useEffect(() => {
     return () => {
-      setTourSheetActive(false);
-      setPortalTourActive(false);
-      dispatchCloseMobileMenu();
+      releaseTourUi();
     };
   }, []);
 
@@ -227,22 +248,28 @@ export default function ProductTour() {
 
     if (type === EVENTS.TARGET_NOT_FOUND) {
       const failedStep = currentStageSteps[index ?? stepIndex] as CustomTourStep | undefined;
-      if (failedStep?.requiresMobileMenu) {
-        setTourSheetActive(true);
-      }
 
       setRun(false);
+      if (failedStep?.requiresMobileMenu) {
+        setTourSheetActive(true);
+        dispatchCloseMobileMenu();
+      } else {
+        releaseTourUi();
+      }
+
       targetRetryCount.current += 1;
 
-      if (
-        targetRetryCount.current <= MAX_TARGET_RETRIES &&
-        isTourStageActiveOnPath(stageRef.current, pathnameRef.current)
-      ) {
-        scheduleRun(TARGET_RETRY_DELAY_MS);
-      } else if (targetRetryCount.current > MAX_TARGET_RETRIES) {
-        console.warn(
-          `[ProductTour] Target not found for stage "${stageRef.current}" after ${MAX_TARGET_RETRIES} attempts.`
-        );
+      if (isTourStageActiveOnPath(stageRef.current, pathnameRef.current)) {
+        const delay =
+          targetRetryCount.current <= MAX_TARGET_RETRIES
+            ? TARGET_RETRY_DELAY_MS
+            : STUCK_RETRY_DELAY_MS;
+
+        if (targetRetryCount.current > MAX_TARGET_RETRIES) {
+          targetRetryCount.current = 0;
+        }
+
+        scheduleRun(delay);
       }
     }
 
@@ -266,14 +293,18 @@ export default function ProductTour() {
           if (isLastStep && action === ACTIONS.NEXT) {
           const config = TOUR_STAGES[stageRef.current];
           if (config.type === "advanceOnNext" && config.nextStage) {
+            handledStepAdvanceRef.current = stageRef.current;
             advanceTour(config.nextStage);
           } else if (config.nextStage) {
+            handledStepAdvanceRef.current = stageRef.current;
             advanceTour(config.nextStage);
           } else {
             setRun(false);
+            releaseTourUi();
           }
           } else {
             setStepIndex(nextIndex);
+            saveTourProgress(stageRef.current, nextIndex, pathnameRef.current);
             const nextStep = currentStageSteps[nextIndex] as CustomTourStep | undefined;
             if (nextStep?.requiresMobileMenu) {
               setRun(false);
@@ -284,23 +315,28 @@ export default function ProductTour() {
     }
 
     if (status === STATUS.FINISHED) {
-      setTourSheetActive(false);
-      dispatchCloseMobileMenu();
-      const config = TOUR_STAGES[stageRef.current];
+      releaseTourUi();
+      setRun(false);
+
+      const finishedStage = stageRef.current;
+      const config = TOUR_STAGES[finishedStage];
+
+      if (handledStepAdvanceRef.current === finishedStage) {
+        handledStepAdvanceRef.current = null;
+        return;
+      }
+
       if (config?.nextStage) {
         advanceTour(config.nextStage);
-      } else if (stageRef.current === "rewards_tour") {
+      } else if (finishedStage === "rewards_tour") {
         advanceTour("finished");
-      } else {
-        setRun(false);
       }
+      handledStepAdvanceRef.current = null;
     }
 
     if (status === STATUS.SKIPPED) {
       setRun(false);
-      setTourSheetActive(false);
-      setPortalTourActive(false);
-      dispatchCloseMobileMenu();
+      releaseTourUi();
       finishTour();
     }
   };

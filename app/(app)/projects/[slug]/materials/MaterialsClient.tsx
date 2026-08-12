@@ -84,6 +84,10 @@ export default function MaterialsClient({
   };
 
   useEffect(() => {
+    dispatchTourPageReady();
+  }, []);
+
+  useEffect(() => {
     if (stage === "materials_overview") {
       dispatchTourPageReady();
     }

@@ -171,6 +171,10 @@ export default function RequestsClient({
   );
 
   useEffect(() => {
+    dispatchTourPageReady();
+  }, []);
+
+  useEffect(() => {
     if (stage === "requests_info" || stage === "requests_return_gate") {
       dispatchTourPageReady();
     }

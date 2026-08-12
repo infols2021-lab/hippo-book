@@ -11,7 +11,7 @@ import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal"
 import { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTimeline";
 import { useTour } from "@/components/tour/TourProvider";
 import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
-import { dispatchBurgerClicked } from "@/lib/tour/tourMobile";
+import { dispatchBurgerClicked, dispatchTourPageReady } from "@/lib/tour/tourMobile";
 
 import "./profile.css";
 
@@ -202,6 +202,10 @@ export default function ProfileClient({
     }
   );
   const [streakLoading, setStreakLoading] = useState<boolean>(!streakProp);
+
+  useEffect(() => {
+    dispatchTourPageReady();
+  }, []);
 
   // Fallback: вернулись «Назад» на профиль, минуя шаг «бургер → Профиль» на странице заявок
   useEffect(() => {

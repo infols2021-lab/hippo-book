@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TourProvider } from "@/components/tour/TourProvider";
 import ProductTour from "@/components/tour/ProductTour";
+import TourResumeBootstrap from "@/components/tour/TourResumeBootstrap";
 import { TourStage, normalizeTourStage } from "@/lib/tour/tourConfig";
 
 export default async function AppLayout({
@@ -79,6 +80,7 @@ export default async function AppLayout({
   return (
     <TourProvider initialStage={initialTourStage}>
       {children}
+      <TourResumeBootstrap />
       <ProductTour />
     </TourProvider>
   );

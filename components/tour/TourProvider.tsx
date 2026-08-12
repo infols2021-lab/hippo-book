@@ -3,6 +3,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { TourStage } from "@/lib/tour/tourConfig";
+import { clearTourProgress } from "@/lib/tour/tourPersistence";
 
 type TourContextType = {
   stage: TourStage;
@@ -36,6 +37,9 @@ export function TourProvider({
   const setStage = useCallback((newStage: TourStage) => {
     setStageState(newStage);
     persistTourStage(newStage);
+    if (newStage === "finished") {
+      clearTourProgress();
+    }
   }, []);
 
   const advanceTour = useCallback(
@@ -46,6 +50,7 @@ export function TourProvider({
   );
 
   const finishTour = useCallback(() => {
+    clearTourProgress();
     setStage("finished");
   }, [setStage]);
 

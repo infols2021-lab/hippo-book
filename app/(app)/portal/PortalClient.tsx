@@ -7,6 +7,7 @@ import LogoutButton from "@/components/LogoutButton";
 import { useTour } from "@/components/tour/TourProvider";
 import { isPortalTourStage } from "@/lib/tour/tourConfig";
 import { PORTAL_MOBILE_MQ } from "@/lib/tour/tourPortal";
+import { dispatchTourPageReady } from "@/lib/tour/tourMobile";
 
 export type ProjectConfig = {
   id: string;
@@ -37,6 +38,10 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
   const portalTourMobile = isMobile && isPortalTourStage(stage);
   const activeProject = projects[activeIndex] ?? projects[0];
   const activeColor = activeProject?.theme?.primaryColor || "#3b82f6";
+
+  useEffect(() => {
+    dispatchTourPageReady();
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia(PORTAL_MOBILE_MQ);
