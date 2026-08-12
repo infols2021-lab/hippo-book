@@ -200,16 +200,10 @@ export default function ProfileClient({
   );
   const [streakLoading, setStreakLoading] = useState<boolean>(!streakProp);
 
-  // Fallback: если пользователь вернулся из заявок через кнопку браузера "Назад"
+  // Fallback: если пользователь вернулся из заявок через кнопку браузера «Назад»
   useEffect(() => {
     if (stage === "requests_return_gate") {
       advanceTour("materials_gate");
-    }
-  }, [stage, advanceTour]);
-
-  useEffect(() => {
-    if (stage === "materials_overview") {
-      advanceTour("rewards_gate");
     }
   }, [stage, advanceTour]);
 

@@ -21,9 +21,7 @@ export default function CustomTooltip({
   return (
     <div
       {...tooltipProps}
-      className={`tour-tooltip relative flex flex-col ${
-        isCentered ? "items-center text-center" : "sm:flex-row"
-      } gap-3 sm:gap-4 p-4 sm:p-5 rounded-[24px] sm:rounded-[28px] border shadow-2xl w-[min(calc(100vw-20px),380px)] max-h-[min(88dvh,520px)] overflow-hidden`}
+      className="tour-tooltip flex flex-col gap-3 p-4 sm:p-5 rounded-[24px] sm:rounded-[28px] border shadow-2xl w-[min(calc(100vw-20px),380px)] max-h-[min(88dvh,520px)]"
       style={{
         backgroundColor: "var(--project-card-bg, #ffffff)",
         borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
@@ -32,26 +30,35 @@ export default function CustomTooltip({
       }}
     >
       {customStep.mascotImage && (
-        <div
-          className={`flex-shrink-0 flex justify-center pointer-events-none z-10 ${
-            isCentered ? "-mt-12 sm:-mt-14" : "-mt-10 sm:-mt-8 sm:-ml-4"
-          }`}
-        >
-          <div className="relative w-20 h-20 sm:w-24 sm:h-24">
+        <div className="flex justify-center shrink-0 pt-0.5">
+          <div
+            className="relative h-[72px] w-[72px] sm:h-[80px] sm:w-[80px] rounded-full overflow-hidden shrink-0"
+            style={{
+              border: "3px solid #ffffff",
+              boxShadow:
+                "0 0 0 1px color-mix(in srgb, var(--project-primary) 25%, transparent), 0 10px 28px rgba(15, 23, 42, 0.18)",
+              backgroundColor: "color-mix(in srgb, var(--project-primary) 10%, #ffffff)",
+            }}
+          >
             <Image
               src={customStep.mascotImage}
               alt="Маскот"
               fill
               priority
-              className="object-contain"
+              sizes="80px"
+              className="object-cover object-center"
             />
           </div>
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-h-0 w-full overflow-y-auto">
+      <div
+        className={`flex flex-1 flex-col min-h-0 overflow-y-auto w-full ${
+          isCentered ? "text-center items-center" : ""
+        }`}
+      >
         {step.title && (
-          <div className="mb-1.5">
+          <div className={`mb-1.5 w-full ${isCentered ? "text-center" : ""}`}>
             <span
               className="inline-block text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md mb-1"
               style={{
@@ -85,7 +92,7 @@ export default function CustomTooltip({
           </button>
 
           <div className="flex items-center gap-1.5">
-            {index > 0 && !isCentered && (
+            {index > 0 && (
               <button
                 {...backProps}
                 className="px-3 py-2 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all border hover:brightness-95"
