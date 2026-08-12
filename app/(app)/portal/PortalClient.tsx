@@ -93,7 +93,10 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
       />
 
       <section className="relative z-10 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col flex-grow min-h-0">
-        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 sm:mb-12 animate-in slide-in-from-top-8 duration-700">
+        <header
+          data-tour="portal-hero"
+          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 sm:mb-12 animate-in slide-in-from-top-8 duration-700"
+        >
           <div className="max-w-3xl">
             <p className="text-xs font-bold tracking-[0.2em] text-white/50 uppercase mb-3 sm:mb-4">
               Выберите направление
@@ -126,6 +129,8 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
           <>
             <div
               ref={trackRef}
+              data-tour="portal-carousel-track"
+              data-project-count={projects.length}
               className={`
                 flex-grow items-stretch
                 flex md:grid gap-5 md:gap-6
@@ -147,6 +152,7 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
               {projects.map((project, index) => (
                 <div
                   key={project.id}
+                  data-portal-card-slide
                   className="shrink-0 w-full snap-center snap-always md:w-auto md:shrink h-full"
                 >
                   <PortalCard project={project} index={index} />
@@ -155,7 +161,10 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
             </div>
 
             {projects.length > 1 && (
-              <div className="flex md:hidden items-center justify-center gap-2 pt-4">
+              <div
+                data-tour="portal-carousel-dots"
+                className="flex md:hidden items-center justify-center gap-2 pt-4"
+              >
                 {projects.map((project, index) => (
                   <button
                     key={`dot-${project.id}`}

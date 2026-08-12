@@ -20,6 +20,20 @@ export default function CustomTooltip({
   const [confirmClose, setConfirmClose] = useState(false);
   const customStep = step as CustomTourStep;
   const isCentered = step.placement === "center";
+  const portalTheme = Boolean(customStep.portalTheme);
+
+  const cardBg = portalTheme ? "rgba(15, 23, 42, 0.97)" : "var(--project-card-bg, #ffffff)";
+  const textColor = portalTheme ? "#f8fafc" : "var(--project-text, #0f172a)";
+  const mutedColor = portalTheme
+    ? "rgba(248, 250, 252, 0.72)"
+    : "color-mix(in srgb, var(--project-text) 75%, transparent)";
+  const borderColor = portalTheme
+    ? "rgba(255, 255, 255, 0.12)"
+    : "var(--glass-border, rgba(15, 23, 42, 0.12))";
+  const accent = portalTheme ? "#38bdf8" : "var(--project-primary, #0ea5e9)";
+  const subtleBg = portalTheme
+    ? "rgba(255, 255, 255, 0.08)"
+    : "color-mix(in srgb, var(--project-text) 4%, transparent)";
 
   useEffect(() => {
     setConfirmClose(false);
@@ -35,10 +49,12 @@ export default function CustomTooltip({
       {...tooltipProps}
       className="tour-tooltip flex flex-col gap-3 p-4 sm:p-5 rounded-[24px] sm:rounded-[28px] border shadow-2xl w-[min(calc(100vw-20px),380px)] max-h-[min(88dvh,520px)]"
       style={{
-        backgroundColor: "var(--project-card-bg, #ffffff)",
-        borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
-        color: "var(--project-text, #0f172a)",
-        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
+        backgroundColor: cardBg,
+        borderColor,
+        color: textColor,
+        boxShadow: portalTheme
+          ? "0 25px 60px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255,255,255,0.06)"
+          : "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       {confirmClose ? (
@@ -47,8 +63,8 @@ export default function CustomTooltip({
             <span
               className="inline-block text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md mb-1"
               style={{
-                backgroundColor: "color-mix(in srgb, var(--project-primary) 15%, transparent)",
-                color: "var(--project-primary)",
+                backgroundColor: `color-mix(in srgb, ${accent} 18%, transparent)`,
+                color: accent,
               }}
             >
               Инструктаж
@@ -60,7 +76,7 @@ export default function CustomTooltip({
 
           <p
             className="text-xs sm:text-sm font-medium leading-relaxed mb-4"
-            style={{ color: "color-mix(in srgb, var(--project-text) 75%, transparent)" }}
+            style={{ color: mutedColor }}
           >
             Вы всегда сможете вернуться к гайду: на компьютере — кнопка «?» в профиле, на
             телефоне — пункт «? Помощь по платформе» в меню ☰.
@@ -68,14 +84,14 @@ export default function CustomTooltip({
 
           <div
             className="flex items-center justify-end gap-2 mt-auto pt-3 border-t w-full shrink-0"
-            style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
+            style={{ borderColor: portalTheme ? "rgba(255,255,255,0.1)" : "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
           >
             <button
               type="button"
               className="px-3 py-2 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all border hover:brightness-95"
               style={{
-                backgroundColor: "color-mix(in srgb, var(--project-text) 4%, transparent)",
-                borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
+                backgroundColor: subtleBg,
+                borderColor,
               }}
               onClick={() => setConfirmClose(false)}
             >
@@ -85,9 +101,9 @@ export default function CustomTooltip({
               type="button"
               className="px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all shadow-md hover:brightness-110 active:scale-[0.98]"
               style={{
-                backgroundColor: "var(--project-primary, #0ea5e9)",
+                backgroundColor: accent,
                 color: "#ffffff",
-                boxShadow: "0 8px 20px -4px color-mix(in srgb, var(--project-primary) 50%, transparent)",
+                boxShadow: `0 8px 20px -4px color-mix(in srgb, ${accent} 50%, transparent)`,
               }}
               onClick={handleConfirmClose}
             >
@@ -130,8 +146,8 @@ export default function CustomTooltip({
                 <span
                   className="inline-block text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md mb-1"
                   style={{
-                    backgroundColor: "color-mix(in srgb, var(--project-primary) 15%, transparent)",
-                    color: "var(--project-primary)",
+                    backgroundColor: `color-mix(in srgb, ${accent} 18%, transparent)`,
+                    color: accent,
                   }}
                 >
                   Инструктаж
@@ -142,19 +158,19 @@ export default function CustomTooltip({
 
             <div
               className="text-xs sm:text-sm font-medium leading-relaxed mb-3"
-              style={{ color: "color-mix(in srgb, var(--project-text) 75%, transparent)" }}
+              style={{ color: mutedColor }}
             >
               {step.content}
             </div>
 
             <div
               className="flex items-center justify-between mt-auto pt-3 border-t w-full shrink-0"
-              style={{ borderColor: "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
+              style={{ borderColor: portalTheme ? "rgba(255,255,255,0.1)" : "var(--glass-border, rgba(15, 23, 42, 0.08))" }}
             >
               <button
                 type="button"
                 className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-colors hover:opacity-70 px-1 py-1.5"
-                style={{ color: "color-mix(in srgb, var(--project-text) 50%, transparent)" }}
+                style={{ color: portalTheme ? "rgba(248,250,252,0.5)" : "color-mix(in srgb, var(--project-text) 50%, transparent)" }}
                 onClick={() => setConfirmClose(true)}
               >
                 Закрыть
@@ -166,8 +182,8 @@ export default function CustomTooltip({
                     {...backProps}
                     className="px-3 py-2 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all border hover:brightness-95"
                     style={{
-                      backgroundColor: "color-mix(in srgb, var(--project-text) 4%, transparent)",
-                      borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
+                      backgroundColor: subtleBg,
+                      borderColor,
                     }}
                   >
                     Назад
@@ -179,9 +195,9 @@ export default function CustomTooltip({
                     {...primaryProps}
                     className="px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all shadow-md hover:brightness-110 active:scale-[0.98]"
                     style={{
-                      backgroundColor: "var(--project-primary, #0ea5e9)",
+                      backgroundColor: accent,
                       color: "#ffffff",
-                      boxShadow: "0 8px 20px -4px color-mix(in srgb, var(--project-primary) 50%, transparent)",
+                      boxShadow: `0 8px 20px -4px color-mix(in srgb, ${accent} 50%, transparent)`,
                     }}
                   >
                     {customStep.primaryLabel || (isLastStep ? "Завершить" : "Далее")}

@@ -11,22 +11,26 @@ import CustomTooltip from "./CustomTooltip";
 import type { CustomTourStep } from "./TourSteps";
 import { useTour } from "./TourProvider";
 import { TOUR_STAGES, isTourStageActiveOnPath } from "@/lib/tour/tourConfig";
-import { resolveTourSteps } from "@/lib/tour/resolveTourSteps";
+import { getResolvedTourSteps } from "@/lib/tour/resolveTourSteps";
 import {
   dispatchCloseMobileMenu,
   dispatchOpenMobileMenu,
   isMobileViewport,
   setTourSheetActive,
 } from "@/lib/tour/tourMobile";
+import { isPortalTourStage } from "@/lib/tour/tourConfig";
+import { scrollPortalCardIntoView, setPortalTourActive } from "@/lib/tour/tourPortal";
+import { visiblePortalCard } from "@/lib/tour/tourTargets";
 
 const Joyride = dynamic(
   () => import("react-joyride").then((mod) => mod.Joyride),
   { ssr: false }
 );
 
-const MAX_TARGET_RETRIES = 8;
+const MAX_TARGET_RETRIES = 12;
 const TARGET_RETRY_DELAY_MS = 400;
 const DOM_SETTLE_MS = 350;
+const MOBILE_MENU_SETTLE_MS = 500;
 
 export default function ProductTour() {
   const { stage, advanceTour, finishTour } = useTour();
@@ -42,10 +46,7 @@ export default function ProductTour() {
   const stageRef = useRef(stage);
   stageRef.current = stage;
 
-  const steps = useMemo(
-    () => resolveTourSteps(stage, isMobile),
-    [stage, isMobile]
-  );
+  const steps = useMemo(() => getResolvedTourSteps(stage, isMobile), [stage, isMobile]);
 
   useEffect(() => setIsMounted(true), []);
 
@@ -56,6 +57,27 @@ export default function ProductTour() {
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
   }, []);
+
+  useEffect(() => {
+    if (isPortalTourStage(stage)) {
+      setPortalTourActive(true);
+    } else {
+      setPortalTourActive(false);
+    }
+    return () => setPortalTourActive(false);
+  }, [stage]);
+
+  useEffect(() => {
+    const step = steps[stepIndex] as CustomTourStep | undefined;
+    if (!step?.scrollPortalCard) return;
+
+    const timer = setTimeout(() => {
+      const card = visiblePortalCard();
+      if (card) scrollPortalCardIntoView(card);
+    }, 360);
+
+    return () => clearTimeout(timer);
+  }, [stepIndex, stage, steps]);
 
   const clearRetryTimer = useCallback(() => {
     if (retryTimerRef.current) {
@@ -108,6 +130,7 @@ export default function ProductTour() {
     if (stage === "finished") {
       setRun(false);
       setTourSheetActive(false);
+      setPortalTourActive(false);
       dispatchCloseMobileMenu();
       return;
     }
@@ -125,17 +148,18 @@ export default function ProductTour() {
   }, [stage, pathname, clearRetryTimer, scheduleRun, prepareStepEnvironment, steps]);
 
   useEffect(() => {
-    if (!run || stage === "finished") return;
-    prepareStepEnvironment(stepIndex, steps);
-    if (steps[stepIndex]?.requiresMobileMenu) {
-      setRun(false);
-      scheduleRun(450);
+    if (stage === "finished") return;
+    const step = steps[stepIndex];
+    if (step?.requiresMobileMenu) {
+      setTourSheetActive(true);
+      dispatchOpenMobileMenu();
     }
-  }, [stepIndex, run, stage, steps, prepareStepEnvironment, scheduleRun]);
+  }, [stepIndex, stage, steps]);
 
   useEffect(() => {
     return () => {
       setTourSheetActive(false);
+      setPortalTourActive(false);
       dispatchCloseMobileMenu();
     };
   }, []);
@@ -152,9 +176,15 @@ export default function ProductTour() {
 
   const handleJoyrideEvent = (data: EventData, _controls: Controls) => {
     const { status, type, action, index, step } = data;
-    const currentStageSteps = resolveTourSteps(stageRef.current, isMobileViewport());
+    const currentStageSteps = getResolvedTourSteps(stageRef.current, isMobileViewport());
 
     if (type === EVENTS.TARGET_NOT_FOUND) {
+      const failedStep = currentStageSteps[index ?? stepIndex] as CustomTourStep | undefined;
+      if (failedStep?.requiresMobileMenu) {
+        dispatchOpenMobileMenu();
+        setTourSheetActive(true);
+      }
+
       setRun(false);
       targetRetryCount.current += 1;
 
@@ -180,8 +210,24 @@ export default function ProductTour() {
         const nextIndex = index + (action === ACTIONS.PREV ? -1 : 1);
 
         if (customStep.openMobileMenuOnNext && action === ACTIONS.NEXT) {
+          setRun(false);
           dispatchOpenMobileMenu();
           setTourSheetActive(true);
+          clearRetryTimer();
+          retryTimerRef.current = setTimeout(() => {
+            retryTimerRef.current = null;
+            setStepIndex(nextIndex);
+            scheduleRun(MOBILE_MENU_SETTLE_MS);
+          }, MOBILE_MENU_SETTLE_MS);
+          return;
+        }
+
+        if (action === ACTIONS.PREV) {
+          const prevStep = currentStageSteps[nextIndex];
+          if (!prevStep?.requiresMobileMenu) {
+            setTourSheetActive(false);
+            dispatchCloseMobileMenu();
+          }
         }
 
         if (isLastStep && action === ACTIONS.NEXT) {
@@ -195,6 +241,10 @@ export default function ProductTour() {
           }
         } else {
           setStepIndex(nextIndex);
+          if (currentStageSteps[nextIndex]?.requiresMobileMenu) {
+            setRun(false);
+            scheduleRun(MOBILE_MENU_SETTLE_MS);
+          }
         }
       }
     }
@@ -215,6 +265,7 @@ export default function ProductTour() {
     if (status === STATUS.SKIPPED) {
       setRun(false);
       setTourSheetActive(false);
+      setPortalTourActive(false);
       dispatchCloseMobileMenu();
       finishTour();
     }
@@ -225,23 +276,27 @@ export default function ProductTour() {
   }
 
   const joyrideWidth = isMobile ? 340 : 380;
+  const menuStepActive = Boolean(steps[stepIndex]?.requiresMobileMenu);
+  const portalTourActive = isPortalTourStage(stage);
+  const portalMobileTour = portalTourActive && isMobile;
 
   return (
     <Joyride
       steps={steps}
       run={run}
       stepIndex={stepIndex}
+      scrollToFirstStep={false}
       onEvent={handleJoyrideEvent}
       tooltipComponent={CustomTooltip}
       continuous={true}
       options={{
-        zIndex: 10000,
-        overlayColor: "rgba(0, 0, 0, 0.65)",
+        zIndex: menuStepActive ? 10020 : portalTourActive ? 10050 : 10000,
+        overlayColor: portalTourActive ? "rgba(0, 0, 0, 0.78)" : "rgba(0, 0, 0, 0.65)",
         overlayClickAction: false,
-        spotlightPadding: isMobile ? 6 : 10,
-        targetWaitTimeout: 3000,
+        spotlightPadding: portalMobileTour ? 8 : isMobile ? 6 : 10,
+        targetWaitTimeout: menuStepActive ? 5000 : 3000,
         width: joyrideWidth,
-        scrollOffset: isMobile ? 100 : 80,
+        scrollOffset: portalMobileTour ? 16 : isMobile ? 100 : 80,
       }}
     />
   );

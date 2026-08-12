@@ -764,11 +764,11 @@
   }
 }
 
-/* Bottom sheet поверх оверлея тура, чтобы подсветка и клики по пунктам меню работали */
+/* Bottom sheet и тур: меню видно, подсветка и тултип — поверх */
 body.tour-sheet-active .mobile-bottom-sheet-overlay {
-  z-index: 10001 !important;
+  z-index: 10004 !important;
 }
 
 body.tour-sheet-active .mobile-bottom-sheet {
-  z-index: 10002 !important;
+  z-index: 10005 !important;
 }

@@ -23,7 +23,7 @@ export default function PortalCard({ project, index }: PortalCardProps) {
         }
       }}
       data-tour="direction-card"
-      className={`group relative flex flex-col h-full min-h-[480px] sm:min-h-[520px] p-8 sm:p-10 rounded-[40px] overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl ${
+      className={`group relative flex flex-col h-full min-h-[min(420px,52dvh)] sm:min-h-[520px] p-8 sm:p-10 rounded-[40px] overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl ${
         isLight
           ? "bg-gradient-to-br from-white/95 to-[#e0f2fe]/95 shadow-[0_0_40px_rgba(255,255,255,0.1)] border border-white/60"
           : "bg-gradient-to-br from-[#1e1b4b]/95 to-[#0f172a]/95 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/10"

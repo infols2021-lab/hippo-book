@@ -1,10 +1,33 @@
 import type { TourStage } from "@/lib/tour/tourConfig";
 import { pickMascotImage } from "@/lib/tour/mascotImages";
-import { visiblePortalCard, visibleTourTarget } from "@/lib/tour/tourTargets";
+import { visiblePortalCard, visiblePortalCarouselHint, visibleTourTarget, visibleMobileMenuTarget } from "@/lib/tour/tourTargets";
 import type { CustomTourStep } from "@/components/tour/TourSteps";
 import { isMobileViewport, isMobileMenuGateStage } from "@/lib/tour/tourMobile";
+import { getPortalProjectCount } from "@/lib/tour/tourPortal";
 
 const burgerTarget = visibleTourTarget('[data-tour="mobile-burger-btn"]');
+
+const MOBILE_MENU_ITEM_SELECTOR: Partial<Record<TourStage, string>> = {
+  profile_requests_gate: '[data-tour="requests-link"]',
+  materials_gate: '[data-tour="materials-link"]',
+  rewards_gate: '[data-tour="rewards-btn"]',
+  requests_return_gate: '[data-tour="profile-link"]',
+};
+
+function mobileMenuItemTarget(stage: TourStage) {
+  const selector = MOBILE_MENU_ITEM_SELECTOR[stage];
+  if (!selector) return visibleTourTarget('[data-tour="profile-link"]');
+  return visibleMobileMenuTarget(selector);
+}
+
+function withMobileMenuTarget(step: CustomTourStep, stage: TourStage): CustomTourStep {
+  return {
+    ...step,
+    target: mobileMenuItemTarget(stage),
+    requiresMobileMenu: true,
+    placement: "top",
+  };
+}
 
 function mobileBurgerIntro(stage: TourStage): CustomTourStep {
   const copy: Partial<Record<TourStage, { title: string; content: string }>> = {
@@ -44,14 +67,6 @@ function mobileBurgerIntro(stage: TourStage): CustomTourStep {
     primaryLabel: "Открыть меню",
     openMobileMenuOnNext: true,
     placement: "bottom",
-  };
-}
-
-function withMobileMenuTarget(step: CustomTourStep): CustomTourStep {
-  return {
-    ...step,
-    requiresMobileMenu: true,
-    placement: step.placement ?? "top",
   };
 }
 
@@ -216,6 +231,48 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
 
   if (!isMobile) return base;
 
+  if (stage === "portal_intro") {
+    return [
+      {
+        ...base[0],
+        target: visibleTourTarget('[data-tour="portal-hero"]'),
+        placement: "bottom",
+        skipScroll: true,
+        portalTheme: true,
+        content:
+          "На платформе несколько направлений обучения — у каждого свой контент, но профиль, награды и стрики общие для всех. Ниже выберите нужное направление.",
+      },
+    ];
+  }
+
+  if (stage === "direction_gate") {
+    const swipeStep: CustomTourStep = {
+      target: visiblePortalCarouselHint,
+      title: "Направления обучения",
+      content:
+        "Листайте карточки влево-вправо или нажимайте точки внизу, чтобы посмотреть все доступные направления.",
+      mascotImage: pickMascotImage("direction_gate_swipe"),
+      skipBeacon: true,
+      skipScroll: true,
+      portalTheme: true,
+      placement: "top",
+      primaryLabel: "Понятно",
+      isPortalSwipeStep: true,
+    };
+
+    const cardStep: CustomTourStep = {
+      ...base[0],
+      target: visiblePortalCard,
+      placement: "top",
+      skipScroll: true,
+      portalTheme: true,
+      scrollPortalCard: true,
+      content: "Нажмите на карточку направления, чтобы войти и продолжить обучение.",
+    };
+
+    return [swipeStep, cardStep];
+  }
+
   if (stage === "profile_stats") {
     return [
       {
@@ -229,7 +286,7 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
   }
 
   if (isMobileMenuGateStage(stage) && base.length === 1) {
-    return [mobileBurgerIntro(stage), withMobileMenuTarget(base[0])];
+    return [mobileBurgerIntro(stage), withMobileMenuTarget(base[0], stage)];
   }
 
   if (stage === "requests_info") {
@@ -250,4 +307,13 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
   }
 
   return base;
+}
+
+/** Финальные шаги с учётом DOM (кол-во направлений на портале). */
+export function getResolvedTourSteps(stage: TourStage, isMobile = isMobileViewport()): CustomTourStep[] {
+  let steps = resolveTourSteps(stage, isMobile);
+  if (stage === "direction_gate" && isMobile && getPortalProjectCount() <= 1) {
+    steps = steps.filter((s) => !s.isPortalSwipeStep);
+  }
+  return steps;
 }

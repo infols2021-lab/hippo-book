@@ -14,6 +14,14 @@ export interface CustomTourStep extends Step {
   openMobileMenuOnNext?: boolean;
   /** Шаг подсвечивает пункт в уже открытом bottom sheet. */
   requiresMobileMenu?: boolean;
+  /** Шаг «листайте карусель» на портале (пропускается при одном направлении). */
+  isPortalSwipeStep?: boolean;
+  /** Перед подсветкой центрировать карточку в карусели. */
+  scrollPortalCard?: boolean;
+  /** Не скроллить страницу к таргету (react-joyride). */
+  skipScroll?: boolean;
+  /** Тултип в стиле тёмного портала. */
+  portalTheme?: boolean;
 }
 
 export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = BASE_TOUR_STEPS;

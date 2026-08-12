@@ -8,6 +8,9 @@ export function isTourElementVisible(el: HTMLElement): boolean {
   const style = window.getComputedStyle(el);
   if (style.display === "none" || style.visibility === "hidden") return false;
 
+  const opacity = Number.parseFloat(style.opacity);
+  if (!Number.isNaN(opacity) && opacity <= 0) return false;
+
   return true;
 }
 
@@ -35,6 +38,20 @@ export function visibleTourTarget(...selectors: string[]): () => HTMLElement | n
   };
 }
 
+/** Пункт в открытом мобильном bottom sheet (не десктопный дубль). */
+export function visibleMobileMenuTarget(selector: string): () => HTMLElement | null {
+  return () => {
+    const sheet = document.querySelector<HTMLElement>(".mobile-bottom-sheet");
+    if (!sheet || !isTourElementVisible(sheet)) return null;
+
+    const nodes = sheet.querySelectorAll<HTMLElement>(selector);
+    for (const node of nodes) {
+      if (isTourElementVisible(node)) return node;
+    }
+    return null;
+  };
+}
+
 /** Карточка направления на портале (snap-карусель на мобилке). */
 export function visiblePortalCard(): HTMLElement | null {
   const cards = document.querySelectorAll<HTMLElement>('[data-tour="direction-card"]');
@@ -49,4 +66,16 @@ export function visiblePortalCard(): HTMLElement | null {
     }
   }
   return null;
+}
+
+/** Точки или трек карусели портала (мобилка). */
+export function visiblePortalCarouselHint(): HTMLElement | null {
+  const dots = document.querySelectorAll<HTMLElement>('[data-tour="portal-carousel-dots"] button');
+  for (const dot of dots) {
+    if (isTourElementVisible(dot)) {
+      return dot.closest<HTMLElement>('[data-tour="portal-carousel-dots"]') ?? dot;
+    }
+  }
+
+  return document.querySelector<HTMLElement>('[data-tour="portal-carousel-track"]');
 }

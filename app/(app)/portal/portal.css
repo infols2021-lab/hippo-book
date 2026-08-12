@@ -654,3 +654,33 @@
     display: none;
   }
 }
+
+/* ====== Гайд на портале (мобилка): без рывков скролла ====== */
+html.portal-tour-active,
+body.portal-tour-active {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  height: 100%;
+}
+
+body.portal-tour-active main.relative.min-h-\[100dvh\] {
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  body.portal-tour-active [data-tour="portal-carousel-track"] {
+    flex-grow: 0 !important;
+    max-height: 50dvh;
+    margin-bottom: 0 !important;
+  }
+
+  body.portal-tour-active [data-tour="direction-card"] {
+    min-height: min(360px, 46dvh) !important;
+  }
+
+  body.portal-tour-active footer {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+}
