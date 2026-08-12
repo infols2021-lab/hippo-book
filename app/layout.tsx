@@ -1,19 +1,11 @@
 // app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 
 export const metadata: Metadata = {
   title: "hipposha_book",
   description: "hipposha_book",
 };
-
-const fontSans = Inter({
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600", "700", "800", "900"],
-  display: "swap",
-  variable: "--font-sans",
-});
 
 export default function RootLayout({
   children,
@@ -21,11 +13,17 @@ export default function RootLayout({
   return (
     <html 
       lang="ru" 
-      className={`${fontSans.variable} h-full bg-[var(--p-page-bg,#0b0f19)] m-0 p-0`}
+      // Убрали переменную шрифта, добавили стандартный font-sans
+      className="h-full bg-[var(--p-page-bg,#0b0f19)] m-0 p-0 font-sans"
     >
       <head>
         <link rel="stylesheet" href="/styles/base.css" />
         
+        {/* Железобетонное подключение шрифта Inter (решает баг Vercel) */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
         {/* Прелоадинг графики для онбординга */}
         <link rel="preload" as="image" href="/images/tour/uki1.webp" />
         <link rel="preload" as="image" href="/images/tour/uki2.webp" />
