@@ -24,12 +24,19 @@ export default async function ProjectRequestsPage({
     .eq("id", user.id)
     .single();
 
-  // 2. Получаем текущий проект
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, name, slug, is_active")
-    .eq("slug", slug)
-    .single();
+  // 2. Получаем текущий проект и все активные направления
+  const [{ data: project }, { data: activeProjects }] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("id, name, slug, is_active, theme, theme_color")
+      .eq("slug", slug)
+      .single(),
+    supabase
+      .from("projects")
+      .select("id, name, slug, theme, theme_color")
+      .eq("is_active", true)
+      .order("order_index", { ascending: true }),
+  ]);
 
   if (!project || !project.is_active) notFound();
 
@@ -83,38 +90,43 @@ export default async function ProjectRequestsPage({
   const tabTitleToId = new Map<string, string>();
   enrichedTabs.forEach((t) => tabTitleToId.set(t.title, t.id));
 
-  // 5. Фильтруем и сохраняем оригинальную историческую стоимость заявок
+  // 5. Сохраняем историческую стоимость заявок (все направления пользователя)
   const allRequests = requestsRes.data || [];
-  const projectRequests = allRequests
-    .filter((r) => r.project_id === project.id || !r.project_id)
-    .map((r) => {
-      // Если заявка уже имеет зафиксированную цену в БД (> 0) — используем её без перерасчёта!
-      if (typeof r.total_price === "number" && r.total_price > 0) {
-        return r;
-      }
+  const enrichedRequests = allRequests.map((r) => {
+    if (typeof r.total_price === "number" && r.total_price > 0) {
+      return r;
+    }
 
-      // Иначе (для легаси заявок) рассчитываем динамически
-      const rawTabs = r.material_kinds?.length ? r.material_kinds : r.textbook_types || [];
-      const calculatedPrice = rawTabs.reduce((sum: number, tabIdentifier: string) => {
-        const tabId = tabTitleToId.get(tabIdentifier) || tabIdentifier;
-        return sum + (tabPrices[tabId] || 0);
-      }, 0);
-
+    const belongsToCurrentProject = !r.project_id || r.project_id === project.id;
+    if (!belongsToCurrentProject) {
       return {
         ...r,
-        total_price: calculatedPrice > 0 ? calculatedPrice : 1000,
+        total_price: typeof r.total_price === "number" ? r.total_price : 1000,
       };
-    });
+    }
+
+    const rawTabs = r.material_kinds?.length ? r.material_kinds : r.textbook_types || [];
+    const calculatedPrice = rawTabs.reduce((sum: number, tabIdentifier: string) => {
+      const tabId = tabTitleToId.get(tabIdentifier) || tabIdentifier;
+      return sum + (tabPrices[tabId] || 0);
+    }, 0);
+
+    return {
+      ...r,
+      total_price: calculatedPrice > 0 ? calculatedPrice : 1000,
+    };
+  });
 
   return (
     <RequestsClient
       project={project}
+      availableProjects={activeProjects || []}
       levels={levelsRes.data || []}
       tabs={enrichedTabs}
       userId={user.id}
       userEmail={userProfile?.email || user.email || ""}
       userFullName={userProfile?.full_name || "Ученик"}
-      initialRequests={projectRequests}
+      initialRequests={enrichedRequests}
       ownedMaterialIds={Array.from(ownedSet)}
     />
   );

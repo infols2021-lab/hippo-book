@@ -15,6 +15,13 @@ import "../profile/profile.css";
 type ProjectLevel = { id: string; code: string; label: string; price?: number | null };
 type ProjectTab = { id: string; slug: string; title: string; icon: string | null };
 type Project = { id: string; name: string; slug: string };
+type AvailableProject = {
+  id: string;
+  name: string;
+  slug: string;
+  theme?: { primaryColor?: string; textColor?: string };
+  theme_color?: string | null;
+};
 
 type MaterialItem = {
   id: string;
@@ -53,6 +60,7 @@ type PaymentDisplayItem = {
 
 type Props = {
   project: Project;
+  availableProjects: AvailableProject[];
   levels: ProjectLevel[];
   tabs: ProjectTab[];
   userId: string;
@@ -142,8 +150,9 @@ function normalizeRequestRow(row: any): PurchaseRequest {
 
 export default function RequestsClient({
   project,
-  levels,
-  tabs,
+  availableProjects,
+  levels: initialLevels,
+  tabs: initialTabs,
   userId,
   userEmail,
   userFullName,
@@ -152,6 +161,11 @@ export default function RequestsClient({
 }: Props) {
   const router = useRouter();
   const { stage, advanceTour } = useTour();
+
+  const [activeProject, setActiveProject] = useState<Project>(project);
+  const [tabs, setTabs] = useState<ProjectTab[]>(initialTabs);
+  const [levels, setLevels] = useState<ProjectLevel[]>(initialLevels);
+  const [projectSwitching, setProjectSwitching] = useState(false);
   
   const [requests, setRequests] = useState<PurchaseRequest[]>(() =>
     initialRequests.map(normalizeRequestRow)
@@ -185,6 +199,40 @@ export default function RequestsClient({
   useEffect(() => {
     dispatchTourPageReady();
   }, []);
+
+  useEffect(() => {
+    setActiveProject(project);
+    setTabs(initialTabs);
+    setLevels(initialLevels);
+    // Сбрасываем контекст только при смене URL-направления
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.slug]);
+
+  useEffect(() => {
+    const currProject = availableProjects.find((p) => p.slug === activeProject.slug);
+    const themeColor = currProject?.theme?.primaryColor || currProject?.theme_color || "#0ea5e9";
+    const textColor = currProject?.theme?.textColor || "#0f172a";
+
+    document.body.style.setProperty("--project-primary", themeColor);
+    document.body.style.setProperty("--project-text", textColor);
+    document.body.style.setProperty("--accent2", themeColor);
+
+    return () => {
+      document.body.style.removeProperty("--project-primary");
+      document.body.style.removeProperty("--project-text");
+      document.body.style.removeProperty("--accent2");
+    };
+  }, [activeProject.slug, availableProjects]);
+
+  const projectNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of availableProjects) {
+      map.set(p.id, p.name);
+    }
+    return map;
+  }, [availableProjects]);
+
+  const showProjectSwitcher = availableProjects.length > 1;
 
   const [modalStep, setModalStep] = useState<1 | 2>(1);
 
@@ -252,7 +300,7 @@ export default function RequestsClient({
       setMaterialsLoading(true);
       try {
         if (!tabs || tabs.length === 0) {
-          const res = await fetch(`/api/projects/${project.slug}/materials?purchasable=true`, {
+          const res = await fetch(`/api/projects/${activeProject.slug}/materials?purchasable=true`, {
             cache: "no-store",
           });
           const { json } = await safeReadJson(res);
@@ -274,7 +322,7 @@ export default function RequestsClient({
 
         const tabPromises = tabs.map(async (tab) => {
           const res = await fetch(
-            `/api/projects/${project.slug}/materials?tab=${tab.slug}&purchasable=true`,
+            `/api/projects/${activeProject.slug}/materials?tab=${tab.slug}&purchasable=true`,
             { cache: "no-store" }
           );
           const { json } = await safeReadJson(res);
@@ -322,7 +370,7 @@ export default function RequestsClient({
     return () => {
       alive = false;
     };
-  }, [project.slug, tabs]);
+  }, [activeProject.slug, tabs]);
 
   useEffect(() => {
     setRequests(initialRequests.map(normalizeRequestRow));
@@ -517,6 +565,76 @@ export default function RequestsClient({
     setQrSeed(Date.now());
   }
 
+  async function switchProject(slug: string) {
+    if (slug === activeProject.slug || projectSwitching) return;
+
+    const meta = availableProjects.find((p) => p.slug === slug);
+    if (!meta) return;
+
+    setProjectSwitching(true);
+    try {
+      const res = await fetch(`/api/projects/${slug}`, { cache: "no-store" });
+      const { json } = await safeReadJson(res);
+      if (!res.ok || !json?.ok || !json.project) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+
+      const p = json.project;
+      setActiveProject({ id: meta.id, name: meta.name, slug: meta.slug });
+      setTabs(
+        (p.tabs || []).map((t: any) => ({
+          id: String(t.id),
+          slug: String(t.slug),
+          title: String(t.title),
+          icon: t.icon ?? null,
+        }))
+      );
+      setLevels(
+        (p.levels || []).map((l: any) => ({
+          id: String(l.id),
+          code: String(l.code),
+          label: String(l.label),
+          price: l.price ?? null,
+        }))
+      );
+      setActiveTabId("all");
+      setSelectedLevelCode("all");
+      if (!requestModalOpen) {
+        setSelectedMaterialIds([]);
+      }
+    } catch (e: any) {
+      showNotification("Не удалось переключить направление: " + e.message, "error");
+    } finally {
+      setProjectSwitching(false);
+    }
+  }
+
+  function renderProjectPills(inModal = false) {
+    if (!showProjectSwitcher) return null;
+
+    return (
+      <div
+        className="level-filter-container"
+        style={{ marginBottom: inModal ? 12 : 20 }}
+      >
+        <div className="level-filter-title">Направление:</div>
+        <div className="level-filter-chips no-scrollbar">
+          {availableProjects.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`btn small ${activeProject.slug === p.slug ? "" : "ghost"}`}
+              onClick={() => void switchProject(p.slug)}
+              disabled={projectSwitching || busy}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   function openCreate() {
     setEditingId(null);
     setModalStep(1);
@@ -531,11 +649,19 @@ export default function RequestsClient({
     setRequestModalOpen(true);
   }
 
-  function openEdit(r: PurchaseRequest) {
+  async function openEdit(r: PurchaseRequest) {
     if (r.is_processed) {
       showNotification("Обработанную заявку нельзя редактировать", "error");
       return;
     }
+
+    if (r.project_id) {
+      const target = availableProjects.find((p) => p.id === r.project_id);
+      if (target && target.slug !== activeProject.slug) {
+        await switchProject(target.slug);
+      }
+    }
+
     setEditingId(r.id);
     setModalStep(1);
     setRequestNumber(r.request_number);
@@ -568,8 +694,8 @@ export default function RequestsClient({
     const payload = {
       request_number: requestNumber,
       created_at: requestDateTime + ":00Z",
-      branch_type: project.slug,
-      project_id: project.id,
+      branch_type: activeProject.slug,
+      project_id: activeProject.id,
       material_ids: selectedMaterialIds,
       total_price: totalPrice,
       email: userEmail,
@@ -638,7 +764,7 @@ export default function RequestsClient({
     }
   }
 
-  const brandMark = project.name.substring(0, 2).toUpperCase() || "EK";
+  const brandMark = activeProject.name.substring(0, 2).toUpperCase() || "EK";
 
   const formatPrice = (price: number) => {
     if (price === 0) return "бесплатно";
@@ -731,6 +857,8 @@ export default function RequestsClient({
         >
           {modalStep === 1 ? (
             <div>
+              {!editingId && renderProjectPills(true)}
+
               <div className="form-group">
                 <label>Номер заявки:</label>
                 <input
@@ -1096,7 +1224,7 @@ export default function RequestsClient({
               <Link
                 className="sheet-item"
                 data-tour="profile-link"
-                href={`/projects/${project.slug}/profile`}
+                href={`/projects/${activeProject.slug}/profile`}
                 onClick={() => {
                   setMobileMenuOpen(false);
                 }}
@@ -1106,7 +1234,7 @@ export default function RequestsClient({
               <Link
                 className="sheet-item"
                 data-tour="materials-link"
-                href={`/projects/${project.slug}/materials`}
+                href={`/projects/${activeProject.slug}/materials`}
                 onClick={() => {
                   setMobileMenuOpen(false);
                 }}
@@ -1131,7 +1259,7 @@ export default function RequestsClient({
           <div className="mobile-header-left">
             <div className="brand-mark">{brandMark}</div>
             <div className="mobile-user-info">
-              <div className="mobile-user-name">{project.name}</div>
+              <div className="mobile-user-name">{activeProject.name}</div>
               <div className="mobile-streak-pill">Заявки на доступы</div>
             </div>
           </div>
@@ -1155,7 +1283,7 @@ export default function RequestsClient({
           <div className="brand">
             <div className="brand-mark">{brandMark}</div>
             <div>
-              <div className="brand-title">{project.name}</div>
+              <div className="brand-title">{activeProject.name}</div>
               <div className="brand-subtitle">Заявки на доступы</div>
             </div>
           </div>
@@ -1163,13 +1291,13 @@ export default function RequestsClient({
             <Link
               data-tour="profile-link"
               className="nav-pill"
-              href={`/projects/${project.slug}/profile`}
+              href={`/projects/${activeProject.slug}/profile`}
               onClick={() => {
               }}
             >
               Профиль
             </Link>
-            <Link className="nav-pill" href={`/projects/${project.slug}/materials`}>
+            <Link className="nav-pill" href={`/projects/${activeProject.slug}/materials`}>
               Материалы
             </Link>
             <Link className="nav-pill nav-pill--logout" href="/portal">
@@ -1182,6 +1310,8 @@ export default function RequestsClient({
           <h2 style={{ color: "var(--project-primary, #0ea5e9)", marginBottom: 20 }}>
             Мои заявки на доступы
           </h2>
+
+          {renderProjectPills()}
 
           <div className="payment-info">
             <h4 style={{ margin: "0 0 6px 0", fontSize: 15, fontWeight: 800 }}>Информация об оплате</h4>
@@ -1241,6 +1371,7 @@ export default function RequestsClient({
                   <thead>
                     <tr>
                       <th>Номер заявки</th>
+                      {showProjectSwitcher && <th>Направление</th>}
                       <th>Дата создания</th>
                       <th>Выбранные материалы</th>
                       <th>Итоговая цена</th>
@@ -1270,6 +1401,11 @@ export default function RequestsClient({
                       return (
                         <tr key={r.id}>
                           <td style={{ fontWeight: 800 }}>{r.request_number}</td>
+                          {showProjectSwitcher && (
+                            <td style={{ fontWeight: 700, opacity: 0.85 }}>
+                              {r.project_id ? projectNameById.get(r.project_id) || "—" : "—"}
+                            </td>
+                          )}
                           <td style={{ opacity: 0.8 }}>{formatDateTime(r.created_at)}</td>
                           <td>{displayMaterials}</td>
                           <td style={{ fontWeight: 800, color: "var(--project-primary)" }}>
@@ -1287,7 +1423,7 @@ export default function RequestsClient({
                               <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
                                 <button
                                   className="btn btn-small"
-                                  onClick={() => openEdit(r)}
+                                  onClick={() => void openEdit(r)}
                                   type="button"
                                   disabled={busy}
                                 >
@@ -1339,6 +1475,12 @@ export default function RequestsClient({
                         </span>
                       </div>
 
+                      {showProjectSwitcher && (
+                        <div className="request-card-project">
+                          {r.project_id ? projectNameById.get(r.project_id) || "—" : "—"}
+                        </div>
+                      )}
+
                       <div className="request-card-body">
                         <div className="request-card-materials">{displayMaterials}</div>
                         <div className="request-card-date">{formatDateTime(r.created_at)}</div>
@@ -1353,7 +1495,7 @@ export default function RequestsClient({
                             <>
                               <button
                                 className="btn btn-small"
-                                onClick={() => openEdit(r)}
+                                onClick={() => void openEdit(r)}
                                 type="button"
                                 disabled={busy}
                               >

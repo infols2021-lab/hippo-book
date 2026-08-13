@@ -117,7 +117,8 @@
 
 .materials-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(168px, 200px));
+  justify-content: start;
   gap: 12px;
   align-items: stretch;
   max-height: 380px;
@@ -478,6 +479,12 @@
     color: var(--project-text, #0f172a);
   }
 
+  .request-card-project {
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 0.75;
+  }
+
   .request-card-body {
     display: flex;
     flex-direction: column;
@@ -546,7 +553,8 @@
   }
 
   .materials-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(2, minmax(0, 168px)) !important;
+    justify-content: start !important;
     gap: 8px !important;
     max-height: 280px !important;
     overflow-y: auto !important;
