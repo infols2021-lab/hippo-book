@@ -145,6 +145,11 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
   const [isSaving, setIsSaving] = useState(false);
   const [showCtaModal, setShowCtaModal] = useState(false);
   const saveBusyRef = useRef(false);
+  const stageRef = useRef(stage);
+
+  useEffect(() => {
+    stageRef.current = stage;
+  }, [stage]);
 
   useEffect(() => {
     dispatchTourPageReady();
@@ -154,7 +159,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     if (stage === "streak_celebration") {
       dispatchTourPageReady();
     }
-  }, [stage, completedScreen]);
+  }, [stage, completedScreen, showChoice]);
 
   useEffect(() => {
     if (guestMode || stage !== "rewards_gate") return;
@@ -169,10 +174,16 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     }
   }, [loading, guestMode, stage, previousProgress, advanceTour]);
 
-  const notifyDemoAssignmentComplete = () => {
-    if (guestMode || stage !== "demo_assignment") return;
+  useEffect(() => {
+    if (loading || guestMode || stage !== "demo_assignment" || !completedScreen) return;
     advanceTour("streak_celebration");
     dispatchTourPageReady();
+  }, [loading, guestMode, stage, completedScreen, advanceTour]);
+
+  const notifyDemoAssignmentComplete = () => {
+    if (guestMode || stageRef.current !== "demo_assignment") return;
+    advanceTour("streak_celebration");
+    window.setTimeout(() => dispatchTourPageReady(), 0);
   };
 
   useEffect(() => {

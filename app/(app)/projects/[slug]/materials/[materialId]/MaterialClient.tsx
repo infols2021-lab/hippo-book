@@ -1,11 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
-import AppHeader from "@/components/AppHeader";
-import LogoutButton from "@/components/LogoutButton";
 import { useTour } from "@/components/tour/TourProvider";
-import { PORTAL_MOBILE_MQ } from "@/lib/tour/tourPortal";
 import { dispatchTourPageReady } from "@/lib/tour/tourMobile";
 
 import "../../profile/profile.css";
@@ -43,7 +40,6 @@ function assignmentHref(slug: string, assignmentId: string, material: any): stri
 export default function MaterialClient({
   slug,
   projectName,
-  markText,
   material,
   assignments,
   completedIds,
@@ -55,8 +51,6 @@ export default function MaterialClient({
   isDemoMaterial = false,
 }: Props) {
   const { stage, advanceTour } = useTour();
-  const [isMobile, setIsMobile] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     dispatchTourPageReady();
@@ -67,14 +61,6 @@ export default function MaterialClient({
       dispatchTourPageReady();
     }
   }, [stage]);
-
-  useEffect(() => {
-    const mq = window.matchMedia(PORTAL_MOBILE_MQ);
-    const sync = () => setIsMobile(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
 
   const sectionLabel =
     material?.material_kind === "crossword" ? "Задания кроссворда" : "Задания учебника";
@@ -87,8 +73,8 @@ export default function MaterialClient({
             <h2 style={{ color: "var(--project-text)", margin: "0 0 16px 0", fontWeight: 800 }}>
               У вас нет доступа к этому материалу 🔒
             </h2>
-            <Link href={`/projects/${slug}/materials`} className="btn ghost">
-              Вернуться назад
+            <Link href={`/projects/${slug}/materials`} className="material-detail-back-btn">
+              ← Назад к материалам
             </Link>
           </div>
         </div>
@@ -98,83 +84,18 @@ export default function MaterialClient({
 
   return (
     <div className="material-detail-page">
-      {isMobile ? (
-        <>
-          {mobileMenuOpen && (
-            <>
-              <div
-                className="mobile-bottom-sheet-overlay"
-                onClick={() => setMobileMenuOpen(false)}
-              />
-              <div className="mobile-bottom-sheet">
-                <div className="sheet-handle" />
-                <div className="sheet-title">Навигация</div>
-                <div className="sheet-menu-list">
-                  <Link
-                    className="sheet-item"
-                    href={`/projects/${slug}/materials`}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    К материалам
-                  </Link>
-                  <Link
-                    className="sheet-item"
-                    href={`/projects/${slug}/profile`}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Профиль
-                  </Link>
-                  <Link className="sheet-item" href="/portal" onClick={() => setMobileMenuOpen(false)}>
-                    Главный портал
-                  </Link>
-                  <LogoutButton className="sheet-item sheet-item--danger w-full text-left">
-                    Выйти
-                  </LogoutButton>
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="material-detail-container">
-            <div className="mobile-header-bar">
-              <div className="mobile-header-left">
-                <Link href={`/projects/${slug}/materials`} className="brand-mark" aria-label="К материалам">
-                  ←
-                </Link>
-                <div className="mobile-user-info">
-                  <div className="mobile-user-name">{material.title}</div>
-                  <div className="mobile-streak-pill">{projectName}</div>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="mobile-burger-btn"
-                onClick={() => setMobileMenuOpen((open) => !open)}
-                aria-label="Открыть меню"
-                aria-expanded={mobileMenuOpen}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="3" y1="12" x2="21" y2="12" />
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <line x1="3" y1="18" x2="21" y2="18" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </>
-      ) : (
-        <AppHeader
-          nav={[
-            { kind: "link", href: `/projects/${slug}/materials`, label: "К материалам", className: "btn ghost" },
-            { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn secondary" },
-          ]}
-        />
-      )}
-
       <div className="material-detail-container">
-        <Link href={`/projects/${slug}/materials`} className="material-detail-back">
+        <Link href={`/projects/${slug}/materials`} className="material-detail-back-btn">
           ← Назад к материалам
         </Link>
+
+        <div className="material-detail-topline">
+          <div className="material-detail-brand-mark">{projectName.slice(0, 2).toUpperCase()}</div>
+          <div className="material-detail-topline-text">
+            <div className="material-detail-topline-kicker">{projectName}</div>
+            <div className="material-detail-topline-title">{material.title}</div>
+          </div>
+        </div>
 
         <div className="card material-detail-hero">
           <div className="material-detail-cover">
