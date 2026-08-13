@@ -196,9 +196,9 @@
 .question-counter {
   text-align: center;
   font-size: 16px;
-  color: #666;
+  color: var(--project-text, #111827);
   margin: 15px 0;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* =========================
@@ -788,8 +788,9 @@
 }
 
 .review-subtitle {
-  font-size: 13px;
-  color: #6b7280;
+  font-size: 14px;
+  color: var(--project-text, #111827);
+  font-weight: 600;
 }
 
 .review-list {
@@ -816,16 +817,16 @@
 }
 
 .review-qnum {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
-  color: #6b7280;
+  color: var(--project-text, #374151);
   margin-bottom: 4px;
 }
 
 .review-qtext {
   font-size: 15px;
   font-weight: 750;
-  color: #111827;
+  color: var(--project-text, #111827);
   line-height: 1.35;
   white-space: pre-line;
 }
@@ -890,9 +891,9 @@
 }
 
 .review-label {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
-  color: #6b7280;
+  color: var(--project-text, #374151);
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
@@ -900,7 +901,7 @@
 .review-value {
   font-size: 14px;
   font-weight: 650;
-  color: #111827;
+  color: var(--project-text, #111827);
   background: #f9fafb;
   border: 1px solid rgba(17,24,39,0.08);
   border-radius: 12px;
@@ -922,8 +923,9 @@
 }
 
 .review-metric {
-  font-size: 12px;
-  color: #374151;
+  font-size: 14px;
+  color: var(--project-text, #111827);
+  font-weight: 600;
   background: #f9fafb;
   border: 1px solid rgba(17,24,39,0.08);
   border-radius: 999px;
@@ -944,9 +946,9 @@
   padding: 10px 12px;
   background: #f9fafb;
   border-bottom: 1px solid rgba(17,24,39,0.08);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 850;
-  color: #6b7280;
+  color: var(--project-text, #374151);
 }
 
 .review-grid-row {
@@ -970,9 +972,9 @@
 
 .review-part-user,
 .review-part-correct {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
-  color: #111827;
+  color: var(--project-text, #111827);
   word-break: break-word;
 }
 
@@ -1439,10 +1441,29 @@
 
 .assignment-badge { color: #fff; padding: 8px 16px; border-radius: 12px; font-size: 11px; font-weight: 900; letter-spacing: 1.5px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
 
+.skills-wordmark {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: var(--project-text, #0f172a);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  user-select: none;
+  display: inline-block;
+  background: linear-gradient(135deg, var(--project-primary, #0ea5e9), var(--project-text, #0f172a));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.assignment-wordmark {
+  font-size: clamp(20px, 4vw, 26px);
+  line-height: 1;
+}
+
 .premium-main { max-width: 850px; margin: 0 auto; padding: 0 20px 60px; }
 .premium-card { border-radius: 40px; padding: 40px; box-shadow: 0 30px 60px rgba(0,0,0,0.08); border: 1px solid rgba(255,255,255,0.8); }
 .card-title { font-size: 32px; font-weight: 800; margin-bottom: 16px; text-align: center; }
-.card-subtitle { text-align: center; opacity: 0.6; margin-bottom: 40px; line-height: 1.5; }
+.card-subtitle { text-align: center; color: var(--project-text, #111827); opacity: 1; margin-bottom: 40px; line-height: 1.55; font-size: 15px; font-weight: 600; }
 
 /* === ПРОГРЕСС === */
 .progress-container { margin-bottom: 30px; }
@@ -1459,7 +1480,7 @@
 .progress-dots::-webkit-scrollbar { display: none; }
 .progress-bar-bg { height: 6px; background: rgba(0,0,0,0.05); border-radius: 20px; overflow: hidden; margin-bottom: 10px; }
 .progress-fill { height: 100%; border-radius: 20px; transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
-.progress-info { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 800; opacity: 0.5; gap: 8px; }
+.progress-info { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 800; color: var(--project-text, #111827); opacity: 1; gap: 8px; }
 .view-mode-tag { color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 2px 8px; border-radius: 6px; }
 
 .question-title { font-size: 24px; font-weight: 800; line-height: 1.4; margin-bottom: 30px; color: #111827; }
@@ -1474,10 +1495,10 @@
   margin-bottom: 28px;
 }
 .materials-label, .answer-label {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
   letter-spacing: 1.2px;
-  color: #94a3b8;
+  color: var(--project-text, #111827);
   margin-bottom: 16px;
   text-transform: uppercase;
 }
@@ -1509,11 +1530,11 @@
 
 .score-circle { width: 180px; height: 180px; border: 10px solid; border-radius: 50%; margin: 0 auto 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; animation: scaleIn 0.5s ease-out; }
 .score-value { font-size: 56px; font-weight: 900; }
-.score-label { font-size: 14px; font-weight: 800; opacity: 0.4; text-transform: uppercase; margin-top: -5px; }
+.score-label { font-size: 14px; font-weight: 800; color: var(--project-text, #111827); opacity: 1; text-transform: uppercase; margin-top: -5px; }
 
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
 .stat-item { background: rgba(0,0,0,0.02); padding: 20px; border-radius: 24px; display: flex; flex-direction: column; gap: 6px; border: 1px solid rgba(0,0,0,0.02); }
-.stat-item span { font-size: 13px; opacity: 0.5; font-weight: 600; }
+.stat-item span { font-size: 14px; color: var(--project-text, #111827); font-weight: 700; opacity: 1; }
 
 .recommendation-box { background: rgba(99, 102, 241, 0.05); padding: 30px; border-radius: 30px; border: 2px solid rgba(99, 102, 241, 0.1); margin-bottom: 40px; text-align: center; }
 
@@ -1538,7 +1559,7 @@
   .progress-container { margin-bottom: 20px; }
   .progress-dots { gap: 4px; }
   .progress-bar-bg { height: 5px; }
-  .progress-info { font-size: 12px; }
+  .progress-info { font-size: 14px; }
 
   .question-title { font-size: 20px; margin-bottom: 20px; }
 
@@ -1548,7 +1569,7 @@
     margin-bottom: 18px;
   }
   .materials-label, .answer-label {
-    font-size: 11px;
+    font-size: 14px;
     margin-bottom: 10px;
   }
   .answer-block {

@@ -122,7 +122,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleDemoMaterialCard,
       title: "Демо-задание",
       content:
-        "Материал с пометкой «Демо» - учебное задание для знакомства с платформой. Откройте его, чтобы продолжить.",
+        "Откройте материал с пометкой «Демо». Остальные карточки сейчас недоступны - начните обучение именно с него.",
       mascotImage: pickMascotImage("materials_demo"),
       skipBeacon: true,
       hideNextButton: true,

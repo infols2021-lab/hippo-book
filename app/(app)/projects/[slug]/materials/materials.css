@@ -29,8 +29,9 @@
 .materials-subtitle {
   margin: 0 0 20px 0;
   font-size: 14px;
-  font-weight: 500;
-  color: color-mix(in srgb, var(--project-text) 60%, transparent);
+  font-weight: 600;
+  color: var(--project-text);
+  line-height: 1.45;
 }
 
 /* Panel (Главная подложка без размытия во время скролла) */
@@ -172,16 +173,50 @@
   left: 8px;
   background: var(--project-primary, #0ea5e9);
   color: #ffffff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 900;
-  padding: 2px 8px;
-  border-radius: 6px;
-  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 8px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--project-primary, #0ea5e9) 45%, transparent);
 }
 
 .material-card--demo {
-  border-color: color-mix(in srgb, var(--project-primary, #0ea5e9) 35%, transparent);
+  border-color: color-mix(in srgb, var(--project-primary, #0ea5e9) 45%, transparent);
+}
+
+/* Гайд: только демо-карточка активна */
+.materials-tour-demo-active .material-card:not(.material-card--demo) {
+  opacity: 0.28;
+  filter: grayscale(0.35) saturate(0.7);
+  pointer-events: none;
+  transform: scale(0.985);
+}
+
+.materials-tour-demo-active .material-card--demo {
+  position: relative;
+  z-index: 3;
+  border-width: 2px;
+  border-color: var(--project-primary, #0ea5e9);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--project-primary, #0ea5e9) 22%, transparent),
+    0 16px 40px -12px color-mix(in srgb, var(--project-primary, #0ea5e9) 55%, transparent);
+  animation: materials-demo-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes materials-demo-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--project-primary, #0ea5e9) 22%, transparent),
+      0 16px 40px -12px color-mix(in srgb, var(--project-primary, #0ea5e9) 55%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 7px color-mix(in srgb, var(--project-primary, #0ea5e9) 34%, transparent),
+      0 22px 48px -10px color-mix(in srgb, var(--project-primary, #0ea5e9) 68%, transparent);
+  }
 }
 
 .material-cover-placeholder {
@@ -198,11 +233,11 @@
 }
 
 .material-description {
-  color: color-mix(in srgb, var(--project-text) 60%, transparent);
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--project-text);
+  font-size: 14px;
+  font-weight: 600;
   margin-bottom: 16px;
-  line-height: 1.4;
+  line-height: 1.45;
   flex-grow: 1;
 }
 
@@ -228,9 +263,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  color: color-mix(in srgb, var(--project-text) 50%, transparent);
+  color: var(--project-text);
 }
 
 .material-stats .pct {

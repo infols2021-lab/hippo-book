@@ -113,6 +113,12 @@ function markDemoCompleted(assignmentId: string) {
   } catch (e) {}
 }
 
+function scrollAssignmentToTop() {
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
+
 export default function AssignmentClient({ assignmentId, source, sourceId, projectSlug, guestMode = false }: Props) {
   const router = useRouter();
   const { stage, advanceTour } = useTour();
@@ -139,10 +145,6 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
   const [isSaving, setIsSaving] = useState(false);
   const [showCtaModal, setShowCtaModal] = useState(false);
   const saveBusyRef = useRef(false);
-
-  useEffect(() => {
-    ensureMediaPreconnect();
-  }, []);
 
   useEffect(() => {
     dispatchTourPageReady();
@@ -225,6 +227,20 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
       badge: "OLYMPIAD",
     };
   }, [isGatehouse]);
+
+  useEffect(() => {
+    document.body.style.setProperty("--project-primary", theme.primary);
+    document.body.style.setProperty("--project-text", theme.text);
+    return () => {
+      document.body.style.removeProperty("--project-primary");
+      document.body.style.removeProperty("--project-text");
+    };
+  }, [theme]);
+
+  useEffect(() => {
+    if (loading || showChoice || completedScreen) return;
+    scrollAssignmentToTop();
+  }, [currentIndex, loading, showChoice, completedScreen]);
 
   const back = useMemo(() => {
     if (guestMode) {
@@ -352,7 +368,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     setShowChoice(false);
     setCurrentIndex(0);
     setCompletedScreen(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollAssignmentToTop();
   }
 
   function viewPrevious() {
@@ -360,7 +376,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     setShowChoice(false);
     setCurrentIndex(0);
     setCompletedScreen(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollAssignmentToTop();
   }
 
   function switchMode() {
@@ -370,7 +386,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     setFinalStats(null);
     setReviewItems([]);
     setGatehouseRecommendation(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollAssignmentToTop();
   }
 
   async function finishInformational() {
@@ -378,7 +394,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
       markDemoCompleted(assignmentId);
       setCompletedScreen(true);
       setShowCtaModal(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollAssignmentToTop();
       return;
     }
 
@@ -405,7 +421,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
 
       if (res.ok) {
         setCompletedScreen(true);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        scrollAssignmentToTop();
         window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
         notifyDemoAssignmentComplete();
       } else {
@@ -426,7 +442,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
       setReviewItems(review);
       setCompletedScreen(true);
       setShowCtaModal(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollAssignmentToTop();
       return;
     }
 
@@ -471,7 +487,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
         setFinalStats(finalStatsToDisplay);
         setReviewItems(review);
         setCompletedScreen(true);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        scrollAssignmentToTop();
         window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
         notifyDemoAssignmentComplete();
       } else {
@@ -492,7 +508,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     if (!v.ok) {
       alert(`Заполните вопрос №${v.index + 1}`);
       setCurrentIndex(v.index);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollAssignmentToTop();
       return;
     }
 
@@ -580,9 +596,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
             )}
           </div>
 
-          <div className="assignment-badge" style={{ background: theme.primary }}>
-            {guestMode ? "DEMO MODE" : assignmentMode === "informational" ? "GUIDE" : theme.badge}
-          </div>
+          <span className="skills-wordmark assignment-wordmark">skilLS</span>
         </div>
       </header>
 
@@ -670,7 +684,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
                 {back.actionLabel}
               </button>
               <button className="btn-premium secondary" style={{ flex: 1 }} onClick={() => {
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                scrollAssignmentToTop();
                 window.location.reload();
               }}>
                 Пройти еще раз
@@ -721,7 +735,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
                               key={i}
                               onClick={() => {
                                 setCurrentIndex(i);
-                                window.scrollTo({ top: 0, behavior: "smooth" });
+                                scrollAssignmentToTop();
                               }}
                               title={`Вопрос ${i + 1}${answered ? " (заполнено)" : ""}`}
                               style={{
@@ -758,7 +772,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
                       </div>
                       <div className="progress-info">
                         <span>Вопрос {currentIndex + 1} из {questions.length}</span>
-                        <span style={{ fontSize: "12px", opacity: 0.45 }}>
+                        <span style={{ fontSize: "14px", fontWeight: 700, color: theme.text }}>
                           {answeredCount} / {questions.length} заполнено
                         </span>
                         {isViewMode && <span className="view-mode-tag">РЕЖИМ ПРОСМОТРА</span>}
@@ -834,7 +848,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
                           disabled={currentIndex === 0 || isSaving}
                           onClick={() => {
                             setCurrentIndex((i) => i - 1);
-                            window.scrollTo({ top: 0, behavior: "smooth" });
+                            scrollAssignmentToTop();
                           }}
                           style={{ opacity: currentIndex === 0 ? 0.3 : 1 }}
                         >
@@ -848,7 +862,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
                             disabled={isSaving}
                             onClick={() => {
                               setCurrentIndex((i) => i + 1);
-                              window.scrollTo({ top: 0, behavior: "smooth" });
+                              scrollAssignmentToTop();
                             }}
                           >
                             Далее

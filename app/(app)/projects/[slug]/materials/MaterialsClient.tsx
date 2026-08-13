@@ -101,7 +101,7 @@ export default function MaterialsClient({
   const materials = [...availableMats, ...lockedMats];
 
   return (
-    <div className="materials-page">
+    <div className={`materials-page ${stage === "materials_demo" ? "materials-tour-demo-active" : ""}`}>
       <div className="materials-container">
         {isMobile ? (
           <>
