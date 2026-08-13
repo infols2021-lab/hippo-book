@@ -208,16 +208,16 @@ export default function ProfileClient({
     dispatchTourPageReady();
   }, []);
 
-  // Fallback только при «Назад» в браузере — не при обычной навигации тура
+  // Fallback при «Назад» в браузере
   useEffect(() => {
     const onPopState = () => {
-      if (stage === "requests_return_gate" && /\/profile\/?$/.test(window.location.pathname)) {
-        advanceTour("materials_gate");
+      if (stage === "tour_complete" && /\/profile\/?$/.test(window.location.pathname)) {
+        dispatchTourPageReady();
       }
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [stage, advanceTour]);
+  }, [stage]);
 
   useEffect(() => {
     if (stage === "rewards_tour") {
@@ -226,6 +226,12 @@ export default function ProfileClient({
       setRewardsInitialTab("wardrobe");
       setRewardsModalOpen(true);
       dispatchTourRewardsForceTab("wardrobe");
+    }
+    if (stage === "tour_complete") {
+      dispatchTourPageReady();
+    }
+    if (stage === "profile_requests_gate") {
+      setRewardsModalOpen(false);
     }
   }, [stage]);
 
@@ -559,7 +565,7 @@ export default function ProfileClient({
                 data-tour="materials-link"
                 href={`/projects/${projectSlug}/materials`}
                 onClick={() => {
-                  if (stage === "materials_gate") advanceTour("materials_overview");
+                  if (stage === "materials_gate") advanceTour("materials_demo");
                   setMobileMenuOpen(false);
                 }}
               >
@@ -769,7 +775,7 @@ export default function ProfileClient({
               className="nav-pill"
               href={`/projects/${projectSlug}/materials`}
               onClick={() => {
-                if (stage === "materials_gate") advanceTour("materials_overview");
+                if (stage === "materials_gate") advanceTour("materials_demo");
               }}
             >
               Материалы

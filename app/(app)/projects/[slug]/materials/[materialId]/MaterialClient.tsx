@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import LogoutButton from "@/components/LogoutButton";
+import { useTour } from "@/components/tour/TourProvider";
 import { PORTAL_MOBILE_MQ } from "@/lib/tour/tourPortal";
+import { dispatchTourPageReady } from "@/lib/tour/tourMobile";
 
 import "../../profile/profile.css";
 import "./material-detail.css";
@@ -21,6 +23,7 @@ type Props = {
   totalCount: number;
   coverUrl: string;
   hasAccess: boolean;
+  isDemoMaterial?: boolean;
 };
 
 function assignmentSource(material: any): "textbook" | "crossword" {
@@ -49,9 +52,21 @@ export default function MaterialClient({
   totalCount,
   coverUrl,
   hasAccess,
+  isDemoMaterial = false,
 }: Props) {
+  const { stage, advanceTour } = useTour();
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    dispatchTourPageReady();
+  }, []);
+
+  useEffect(() => {
+    if (stage === "demo_material") {
+      dispatchTourPageReady();
+    }
+  }, [stage]);
 
   useEffect(() => {
     const mq = window.matchMedia(PORTAL_MOBILE_MQ);
@@ -198,12 +213,19 @@ export default function MaterialClient({
             {assignments.map((a, index) => {
               const isDone = completedIds.includes(a.id);
               const assignTypeLabel = a.assignment_type === "intro" ? "ОЗНАКОМИТЕЛЬНОЕ" : "ТЕСТ";
+              const isTourDemoLink = isDemoMaterial && index === 0;
 
               return (
                 <Link
                   key={a.id}
                   href={assignmentHref(slug, a.id, material)}
                   className="material-detail-assignment"
+                  data-tour={isTourDemoLink ? "demo-assignment-link" : undefined}
+                  onClick={() => {
+                    if (stage === "demo_material" && isTourDemoLink) {
+                      advanceTour("demo_assignment");
+                    }
+                  }}
                 >
                   <div className="material-detail-assignment-main">
                     <div className="material-detail-assignment-icon">📝</div>

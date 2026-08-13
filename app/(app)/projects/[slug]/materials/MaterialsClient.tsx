@@ -79,7 +79,6 @@ export default function MaterialsClient({
   }, []);
 
   const handleProfileNav = () => {
-    if (stage === "materials_overview") advanceTour("rewards_gate");
     setMobileMenuOpen(false);
   };
 
@@ -88,7 +87,7 @@ export default function MaterialsClient({
   }, []);
 
   useEffect(() => {
-    if (stage === "materials_overview") {
+    if (stage === "materials_demo") {
       dispatchTourPageReady();
     }
   }, [stage]);
@@ -189,12 +188,19 @@ export default function MaterialsClient({
                 {availableMats.map((m) => {
                   const coverUrl = toCoverUrl(m.cover_image_url);
                   const isSecret = (m as { is_secret?: boolean }).is_secret === true;
+                  const isDemo = Boolean((m as { is_demo?: boolean }).is_demo);
 
                   return (
                     <Link
                       key={m.id}
                       href={`/projects/${slug}/materials/${m.id}`}
-                      className={`material-card ${isSecret ? "secret-unlocked" : ""}`}
+                      className={`material-card ${isSecret ? "secret-unlocked" : ""} ${isDemo ? "material-card--demo" : ""}`}
+                      data-tour={isDemo ? "demo-material-card" : undefined}
+                      onClick={() => {
+                        if (stage === "materials_demo" && isDemo) {
+                          advanceTour("demo_material");
+                        }
+                      }}
                     >
                       <div className="material-cover">
                         {coverUrl ? (
@@ -202,6 +208,7 @@ export default function MaterialsClient({
                         ) : (
                           <div className="material-cover-placeholder">{isSecret ? "🎁" : "📄"}</div>
                         )}
+                        {isDemo && <span className="material-demo-badge">Демо</span>}
                         {isSecret && (
                           <span className="material-secret-badge">★ Секретный</span>
                         )}

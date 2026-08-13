@@ -1,16 +1,19 @@
 // lib/tour/tourConfig.ts
 
 export type TourStage =
-  | "portal_intro"           // 1. Портал: вступление (единоразово)
-  | "direction_gate"         // 2. Портал: выбор направления (единоразово)
-  | "profile_stats"          // 3. Профиль: статистика материалов
-  | "profile_requests_gate"  // 4. Профиль: кнопка «Заявки»
-  | "requests_info"          // 5. Заявки: как работает (кнопку создать нельзя жать)
-  | "requests_return_gate"   // 6. Заявки: вернуться в профиль
-  | "materials_gate"         // 7. Профиль: кнопка «Материалы»
-  | "materials_overview"     // 8. Материалы: краткий обзор
+  | "portal_intro"           // 1. Портал: вступление
+  | "direction_gate"         // 2. Портал: выбор направления
+  | "profile_stats"          // 3. Профиль: краткое введение
+  | "materials_gate"         // 4. Профиль: переход в материалы
+  | "materials_demo"         // 5. Материалы: демо-материал
+  | "demo_material"          // 6. Карточка материала: демо-задание
+  | "demo_assignment"        // 7. Выполнение задания (гайд на паузе)
+  | "streak_celebration"     // 8. Засчитана серия
   | "rewards_gate"           // 9. Профиль: кнопка «Награды»
   | "rewards_tour"           // 10. Модалка наград
+  | "profile_requests_gate"  // 11. Профиль: заявки
+  | "requests_info"          // 12. Заявки: как работает
+  | "tour_complete"          // 13. Финал
   | "finished";
 
 export type StageConfig = {
@@ -22,19 +25,24 @@ export type StageConfig = {
 export const TOUR_STAGES: Record<TourStage, StageConfig> = {
   portal_intro: { id: "portal_intro", type: "advanceOnNext", nextStage: "direction_gate" },
   direction_gate: { id: "direction_gate", type: "advanceOnAction" },
-  profile_stats: { id: "profile_stats", type: "advanceOnNext", nextStage: "profile_requests_gate" },
-  profile_requests_gate: { id: "profile_requests_gate", type: "advanceOnAction" },
-  requests_info: { id: "requests_info", type: "advanceOnAction", nextStage: "requests_return_gate" },
-  requests_return_gate: { id: "requests_return_gate", type: "advanceOnAction" },
+  profile_stats: { id: "profile_stats", type: "advanceOnNext", nextStage: "materials_gate" },
   materials_gate: { id: "materials_gate", type: "advanceOnAction" },
-  materials_overview: { id: "materials_overview", type: "advanceOnAction" },
+  materials_demo: { id: "materials_demo", type: "advanceOnAction" },
+  demo_material: { id: "demo_material", type: "advanceOnAction" },
+  demo_assignment: { id: "demo_assignment", type: "advanceOnAction" },
+  streak_celebration: { id: "streak_celebration", type: "advanceOnNext", nextStage: "rewards_gate" },
   rewards_gate: { id: "rewards_gate", type: "advanceOnAction" },
-  rewards_tour: { id: "rewards_tour", type: "advanceOnNext", nextStage: "finished" },
+  rewards_tour: { id: "rewards_tour", type: "advanceOnNext", nextStage: "profile_requests_gate" },
+  profile_requests_gate: { id: "profile_requests_gate", type: "advanceOnAction" },
+  requests_info: { id: "requests_info", type: "advanceOnNext", nextStage: "tour_complete" },
+  tour_complete: { id: "tour_complete", type: "advanceOnNext", nextStage: "finished" },
   finished: { id: "finished", type: "advanceOnAction" },
 };
 
 const LEGACY_STAGE_MAP: Record<string, TourStage> = {
   profile_overview: "profile_requests_gate",
+  materials_overview: "materials_demo",
+  requests_return_gate: "profile_requests_gate",
 };
 
 export function normalizeTourStage(raw: string | null | undefined): TourStage | null {
@@ -47,6 +55,12 @@ export function isPortalTourStage(stage: TourStage): boolean {
   return stage === "portal_intro" || stage === "direction_gate";
 }
 
+const PROFILE_PATH = /^\/projects\/[^/]+\/profile\/?$/;
+const MATERIALS_PATH = /^\/projects\/[^/]+\/materials\/?$/;
+const MATERIAL_DETAIL_PATH = /^\/projects\/[^/]+\/materials\/[^/]+\/?$/;
+const ASSIGNMENT_PATH = /^\/projects\/[^/]+\/assignment\/?$/;
+const REQUESTS_PATH = /^\/projects\/[^/]+\/requests\/?$/;
+
 /** Тур запускается только на странице, где есть DOM-таргет текущей стадии. */
 export function isTourStageActiveOnPath(stage: TourStage, pathname: string): boolean {
   switch (stage) {
@@ -54,18 +68,28 @@ export function isTourStageActiveOnPath(stage: TourStage, pathname: string): boo
     case "direction_gate":
       return pathname === "/portal";
     case "profile_stats":
-    case "profile_requests_gate":
     case "materials_gate":
     case "rewards_gate":
-      return /^\/projects\/[^/]+\/profile\/?$/.test(pathname);
+    case "profile_requests_gate":
+      return PROFILE_PATH.test(pathname);
+    case "materials_demo":
+      return MATERIALS_PATH.test(pathname);
+    case "demo_material":
+      return MATERIAL_DETAIL_PATH.test(pathname);
+    case "demo_assignment":
+    case "streak_celebration":
+      return ASSIGNMENT_PATH.test(pathname);
     case "requests_info":
-    case "requests_return_gate":
-      return /^\/projects\/[^/]+\/requests\/?$/.test(pathname);
-    case "materials_overview":
-      return /^\/projects\/[^/]+\/materials\/?$/.test(pathname);
+      return REQUESTS_PATH.test(pathname);
+    case "tour_complete":
+      return PROFILE_PATH.test(pathname) || REQUESTS_PATH.test(pathname);
     case "rewards_tour":
-      return /^\/projects\/[^/]+\/profile\/?$/.test(pathname);
+      return PROFILE_PATH.test(pathname);
     default:
       return false;
   }
+}
+
+export function isTourPausedStage(stage: TourStage): boolean {
+  return stage === "demo_assignment";
 }

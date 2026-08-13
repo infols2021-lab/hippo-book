@@ -105,6 +105,7 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
       totalCount={total}
       coverUrl={coverUrl}
       hasAccess={hasAccess}
+      isDemoMaterial={Boolean(material.is_demo)}
     />
   );
 }

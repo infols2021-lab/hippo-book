@@ -177,7 +177,7 @@ export default function RequestsClient({
   }, [stage, advanceTour]);
 
   useEffect(() => {
-    if (stage !== "requests_info" && stage !== "requests_return_gate") return;
+    if (stage !== "requests_info" && stage !== "tour_complete") return;
     const timer = window.setTimeout(() => dispatchTourPageReady(), 200);
     return () => window.clearTimeout(timer);
   }, [stage]);
@@ -1098,7 +1098,6 @@ export default function RequestsClient({
                 data-tour="profile-link"
                 href={`/projects/${project.slug}/profile`}
                 onClick={() => {
-                  if (stage === "requests_return_gate") advanceTour("materials_gate");
                   setMobileMenuOpen(false);
                 }}
               >
@@ -1109,7 +1108,6 @@ export default function RequestsClient({
                 data-tour="materials-link"
                 href={`/projects/${project.slug}/materials`}
                 onClick={() => {
-                  if (stage === "requests_info") advanceTour("materials_overview");
                   setMobileMenuOpen(false);
                 }}
               >
@@ -1167,7 +1165,6 @@ export default function RequestsClient({
               className="nav-pill"
               href={`/projects/${project.slug}/profile`}
               onClick={() => {
-                if (stage === "requests_return_gate") advanceTour("materials_gate");
               }}
             >
               Профиль

@@ -33,7 +33,8 @@ import {
   type GatehouseRecommendation,
 } from "@/lib/exams/recommendLevel";
 
-import "./assignment.css";
+import { useTour } from "@/components/tour/TourProvider";
+import { dispatchTourPageReady } from "@/lib/tour/tourMobile";
 
 type ApiOk = {
   ok: true;
@@ -114,6 +115,7 @@ function markDemoCompleted(assignmentId: string) {
 
 export default function AssignmentClient({ assignmentId, source, sourceId, projectSlug, guestMode = false }: Props) {
   const router = useRouter();
+  const { stage, advanceTour } = useTour();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -141,6 +143,35 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
   useEffect(() => {
     ensureMediaPreconnect();
   }, []);
+
+  useEffect(() => {
+    dispatchTourPageReady();
+  }, []);
+
+  useEffect(() => {
+    if (stage === "streak_celebration") {
+      dispatchTourPageReady();
+    }
+  }, [stage, completedScreen]);
+
+  useEffect(() => {
+    if (guestMode || stage !== "rewards_gate") return;
+    router.push(`/projects/${projectSlug}/profile`);
+  }, [stage, guestMode, projectSlug, router]);
+
+  useEffect(() => {
+    if (loading || guestMode || stage !== "demo_assignment") return;
+    if (previousProgress?.is_completed) {
+      advanceTour("streak_celebration");
+      dispatchTourPageReady();
+    }
+  }, [loading, guestMode, stage, previousProgress, advanceTour]);
+
+  const notifyDemoAssignmentComplete = () => {
+    if (guestMode || stage !== "demo_assignment") return;
+    advanceTour("streak_celebration");
+    dispatchTourPageReady();
+  };
 
   useEffect(() => {
     if (loading || err) return;
@@ -376,6 +407,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
         setCompletedScreen(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
         window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
+        notifyDemoAssignmentComplete();
       } else {
         alert("Ошибка при сохранении результатов");
       }
@@ -441,6 +473,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
         setCompletedScreen(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
         window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
+        notifyDemoAssignmentComplete();
       } else {
         alert(json.error || "Ошибка при сохранении результатов");
       }

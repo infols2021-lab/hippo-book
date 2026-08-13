@@ -17,7 +17,6 @@ export const MOBILE_MENU_GATE_STAGES: TourStage[] = [
   "profile_requests_gate",
   "materials_gate",
   "rewards_gate",
-  "requests_return_gate",
 ];
 
 export function isMobileMenuGateStage(stage: TourStage): boolean {

@@ -57,6 +57,11 @@ export function visiblePortalDirections(): HTMLElement | null {
   return visibleTourTarget('[data-tour="portal-directions"]', '[data-tour="portal-carousel-track"]')();
 }
 
+/** Демо-материал в списке материалов. */
+export function visibleDemoMaterialCard(): HTMLElement | null {
+  return visibleTourTarget('[data-tour="demo-material-card"]')();
+}
+
 /** Карточка направления на портале (snap-карусель на мобилке). */
 export function visiblePortalCard(): HTMLElement | null {
   const cards = document.querySelectorAll<HTMLElement>('[data-tour="direction-card"]');

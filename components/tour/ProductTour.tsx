@@ -11,7 +11,7 @@ import type { EventData, Controls } from "react-joyride";
 import CustomTooltip from "./CustomTooltip";
 import type { CustomTourStep } from "./TourSteps";
 import { useTour } from "./TourProvider";
-import { TOUR_STAGES, isTourStageActiveOnPath } from "@/lib/tour/tourConfig";
+import { TOUR_STAGES, isTourStageActiveOnPath, isTourPausedStage } from "@/lib/tour/tourConfig";
 import { getResolvedTourSteps } from "@/lib/tour/resolveTourSteps";
 import {
   dispatchCloseMobileMenu,
@@ -505,7 +505,7 @@ export default function ProductTour() {
     }
   };
 
-  if (!isMounted || isMobile === null || stage === "finished" || !steps.length) {
+  if (!isMounted || isMobile === null || stage === "finished" || isTourPausedStage(stage) || !steps.length) {
     return null;
   }
 

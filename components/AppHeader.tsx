@@ -4,7 +4,6 @@ import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import React, { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { useTour } from "@/components/tour/TourProvider";
 
 export type NavItem =
   | { kind: "link"; href: string; label: React.ReactNode; className?: string; tourId?: string }
@@ -26,7 +25,6 @@ export default function AppHeader({
     { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
   ],
 }: Props) {
-  const { stage, advanceTour } = useTour();
   const [isTeacher, setIsTeacher] = useState(false);
 
   useEffect(() => {
@@ -59,10 +57,7 @@ export default function AppHeader({
     checkRole();
   }, []);
 
-  const handleProfileNav = () => {
-    if (stage === "requests_return_gate") advanceTour("materials_gate");
-    if (stage === "materials_overview") advanceTour("rewards_gate");
-  };
+  const handleProfileNav = () => {};
 
   return (
     <header

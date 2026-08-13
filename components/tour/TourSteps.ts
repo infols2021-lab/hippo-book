@@ -29,6 +29,11 @@ export interface CustomTourStep extends Step {
   portalMobileDock?: boolean;
   /** Вкладка модалки наград для синхронизации на мобилке. */
   rewardTab?: "wardrobe" | "streaks" | "referral" | "promos";
+  /** Fallback, если основной target не найден (например, демо-карточка). */
+  fallbackTarget?: "body" | string;
+  fallbackPlacement?: "center" | "top" | "bottom";
+  fallbackTitle?: string;
+  fallbackContent?: string;
 }
 
 export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = BASE_TOUR_STEPS;
