@@ -1,0 +1,75 @@
+{
+  "format": "hippo-book-roadmap",
+  "version": 1,
+  "title": "Пример roadmap-курса",
+  "description": "30 заданий, блоки, экзамены, сертификат",
+  "material": {
+    "title": "Roadmap-курс (пример)",
+    "description": "Импортируйте этот JSON через админку материала"
+  },
+  "segments": [
+    {
+      "kind": "block",
+      "id": "block-1",
+      "title": "Блок 1. Легкий старт",
+      "stars_required": 12,
+      "nodes": [
+        {
+          "id": "b1-l1",
+          "type": "lesson",
+          "title": "Урок 1",
+          "assignment": {
+            "title": "Урок 1",
+            "assignment_type": "test",
+            "content": {
+              "mode": "interactive",
+              "questions": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000001",
+                  "type": "test",
+                  "q": "Выберите яблоко",
+                  "explanation": "Нужно выбрать яблоко, потому что это фрукт из условия.",
+                  "multiple": false,
+                  "options": [
+                    { "id": "o1", "text": "Яблоко", "media": [] },
+                    { "id": "o2", "text": "Морковь", "media": [] }
+                  ],
+                  "correct": [0]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "kind": "exam",
+      "id": "exam-1",
+      "title": "Экзамен 1",
+      "node": {
+        "id": "exam-1-node",
+        "type": "exam",
+        "title": "Экзамен 1",
+        "exam": {
+          "time_limit_sec": 480,
+          "pass_percent": 80,
+          "unlimited_attempts": true
+        },
+        "assignment": {
+          "title": "Экзамен 1",
+          "assignment_type": "test",
+          "content": {
+            "mode": "interactive",
+            "questions": []
+          }
+        }
+      }
+    },
+    {
+      "kind": "certificate",
+      "id": "certificate",
+      "title": "Сертификат",
+      "enabled": true
+    }
+  ]
+}

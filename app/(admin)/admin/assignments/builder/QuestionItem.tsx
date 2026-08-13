@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import ImageUpload from "./ImageUpload";
 import MediaUpload from "./MediaUpload";
@@ -22,6 +22,8 @@ type Props = {
   total: number;
   value: Question;
   disabled?: boolean;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 
   onChange: (next: Question) => void;
   onRemove: () => void;
@@ -32,16 +34,23 @@ type Props = {
 
 function typeLabel(t: QuestionType) {
   switch (t) {
-    case "test": return "📝 Тест";
-    case "fill": return "✍️ Вписать ответ";
-    case "sentence": return "📝 Заполнить предложение";
-    case "crossword": return "🧩 Кроссворд";
-    case "complex": return "📚 Комплексный вопрос";
-    case "matching": return "🔗 Сопоставление";
-    case "imagemap": return "🗺 Карта";
-    case "reading": return "📖 Чтение + тест";
+    case "test": return "Тест";
+    case "fill": return "Вписать ответ";
+    case "sentence": return "Предложение";
+    case "crossword": return "Кроссворд";
+    case "complex": return "Комплексный";
+    case "matching": return "Сопоставление";
+    case "imagemap": return "Карта";
+    case "reading": return "Чтение";
     default: return t;
   }
+}
+
+function previewText(value: Question) {
+  const raw = String(value.q ?? "").trim();
+  if (!raw) return "Без текста";
+  const singleLine = raw.replace(/\s+/g, " ");
+  return singleLine.length > 120 ? `${singleLine.slice(0, 120)}…` : singleLine;
 }
 
 function clamp(n: number, a: number, b: number) {
@@ -63,6 +72,8 @@ export default function QuestionItem({
   total,
   value,
   disabled,
+  expanded = true,
+  onToggleExpand,
   onChange,
   onRemove,
   onMoveUp,
@@ -70,18 +81,20 @@ export default function QuestionItem({
   onTypeChange,
 }: Props) {
   const [localText, setLocalText] = useState(value.q ?? "");
+  const [localExplanation, setLocalExplanation] = useState(value.explanation ?? "");
   const [isDeleting, setIsDeleting] = useState(false);
   const questionTextRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setLocalText(value.q ?? "");
-  }, [value.q]);
+    setLocalExplanation(value.explanation ?? "");
+  }, [value.q, value.explanation]);
 
   const canUp = !disabled && index > 0;
   const canDown = !disabled && index < total - 1;
 
   const imgUrl: string = typeof value.image === "string" ? value.image : "";
-  
+
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const zoomTextRef = useRef<HTMLElement | null>(null);
@@ -89,7 +102,7 @@ export default function QuestionItem({
   const tRef = useRef({ scale: 1, tx: 0, ty: 0 });
   const dragging = useRef(false);
   const dragStart = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
-  
+
   const pinchStart = useRef<{
     d: number;
     scale: number;
@@ -105,9 +118,9 @@ export default function QuestionItem({
     if (imgRef.current) {
       const { tx, ty, scale } = tRef.current;
       imgRef.current.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
-      
+
       if (wrapRef.current) {
-         wrapRef.current.style.cursor = scale > 1 ? (dragging.current ? "grabbing" : "grab") : "default";
+        wrapRef.current.style.cursor = scale > 1 ? (dragging.current ? "grabbing" : "grab") : "default";
       }
     }
     if (zoomTextRef.current) {
@@ -155,13 +168,13 @@ export default function QuestionItem({
     const delta = -e.deltaY;
     const factor = delta > 0 ? 1.12 : 0.89;
     const origin = clientToLocal(e.clientX, e.clientY);
-    
+
     applyZoom(tRef.current.scale * factor, origin);
   }
 
   function onMouseDown(e: React.MouseEvent) {
     if (disabled || !imgUrl || tRef.current.scale <= 1) return;
-    
+
     dragging.current = true;
     dragStart.current = { x: e.clientX, y: e.clientY, tx: tRef.current.tx, ty: tRef.current.ty };
     applyTransform();
@@ -171,7 +184,7 @@ export default function QuestionItem({
     if (!dragging.current || !dragStart.current) return;
     const dx = e.clientX - dragStart.current.x;
     const dy = e.clientY - dragStart.current.y;
-    
+
     tRef.current.tx = dragStart.current.tx + dx;
     tRef.current.ty = dragStart.current.ty + dy;
     applyTransform();
@@ -210,7 +223,7 @@ export default function QuestionItem({
       e.preventDefault();
       const a = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       const b = { x: e.touches[1].clientX, y: e.touches[1].clientY };
-      
+
       const ratio = dist(a, b) / pinchStart.current.d;
       const nextScale = pinchStart.current.scale * ratio;
       const s1 = clamp(nextScale, minScale, maxScale);
@@ -238,6 +251,21 @@ export default function QuestionItem({
     if (e.touches.length === 0) endDrag();
   }
 
+  function commitQuestionText() {
+    if (localText !== value.q) {
+      onChange({ ...value, q: localText } as Question);
+    }
+  }
+
+  function commitExplanation() {
+    const next = localExplanation.trim();
+    if (next !== (value.explanation ?? "")) {
+      onChange({ ...value, explanation: next || undefined } as Question);
+    }
+  }
+
+  const collapsedSummary = useMemo(() => previewText({ ...value, q: localText }), [value, localText]);
+
   const renderSpecificEditor = () => {
     switch (value.type) {
       case "test": return <TestEditor value={value} disabled={disabled} onChange={onChange} />;
@@ -253,27 +281,35 @@ export default function QuestionItem({
   };
 
   return (
-    <div className={`subtask-item qtype-${value.type}`}>
-      {/* Шапка карточки вопроса */}
+    <div className={`subtask-item qtype-${value.type} ${expanded ? "is-expanded" : "is-collapsed"}`}>
       <div className="question-card-header">
-        <div className="question-header-left">
-          <div className="question-number-badge">
-            {index + 1}
+        <button
+          type="button"
+          className="question-collapse-toggle"
+          onClick={() => onToggleExpand?.()}
+          disabled={disabled || !onToggleExpand}
+        >
+          <div className="question-header-left">
+            <div className="question-number-badge">{index + 1}</div>
+            <div className="question-type-badge">{typeLabel(value.type)}</div>
+            {!expanded ? (
+              <div className="question-collapsed-text">{collapsedSummary}</div>
+            ) : null}
           </div>
-          <div className="question-type-badge">
-            {typeLabel(value.type)}
-          </div>
-          <QuestionTypeSwitch value={value.type} onChange={(t) => onTypeChange(t)} disabled={disabled} />
-        </div>
+          <span className="question-collapse-indicator">{expanded ? "Свернуть" : "Открыть"}</span>
+        </button>
 
         <div className="question-header-actions">
+          {expanded ? (
+            <QuestionTypeSwitch value={value.type} onChange={(t) => onTypeChange(t)} disabled={disabled} />
+          ) : null}
           <button className="btn btn-small ghost" type="button" onClick={onMoveUp} disabled={!canUp} title="Поднять выше">
             ↑
           </button>
           <button className="btn btn-small ghost" type="button" onClick={onMoveDown} disabled={!canDown} title="Опустить ниже">
             ↓
           </button>
-          
+
           {isDeleting ? (
             <div className="confirm-delete-box">
               <span>Удалить?</span>
@@ -282,168 +318,160 @@ export default function QuestionItem({
             </div>
           ) : (
             <button className="btn btn-small btn-danger ghost" type="button" onClick={() => setIsDeleting(true)} disabled={disabled}>
-              🗑️
+              Удалить
             </button>
           )}
         </div>
       </div>
 
-      <div className="question-card-body">
-        {/* Текст вопроса (кроме кроссворда) */}
-        {value.type !== "crossword" && (
-          <div className="form-group" style={{ marginBottom: 16 }}>
-            <label style={{ display: "block", marginBottom: 6, fontWeight: 700, color: "#1e293b", fontSize: 13 }}>
-              Текст вопроса:
-            </label>
-            <textarea
-              ref={questionTextRef}
-              className="question-textarea"
-              value={localText}
-              placeholder="Введите текст вопроса. Enter — новая строка. **жирный текст** — между двойными звёздочками."
-              onChange={(e) => setLocalText(e.target.value)}
-              onBlur={() => {
-                if (localText !== value.q) {
-                  onChange({ ...value, q: localText } as Question);
-                }
-              }}
-              disabled={disabled}
-            />
-            <div className="format-toolbar">
-              <button
-                type="button"
-                className="btn btn-small ghost"
-                disabled={disabled}
-                onClick={() => {
-                  const textarea = questionTextRef.current;
-                  const start = textarea?.selectionStart ?? localText.length;
-                  const end = textarea?.selectionEnd ?? localText.length;
-                  const selected = localText.slice(start, end);
-                  const wrapped = selected ? `**${selected}**` : "****";
-                  const next = localText.slice(0, start) + wrapped + localText.slice(end);
-                  setLocalText(next);
-                  requestAnimationFrame(() => {
-                    if (!textarea) return;
-                    textarea.focus();
-                    const caret = selected ? start + wrapped.length : start + 2;
-                    textarea.setSelectionRange(caret, caret);
-                  });
+      {expanded ? (
+        <div className="question-card-body">
+          {value.type !== "crossword" && (
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", marginBottom: 6, fontWeight: 700, color: "#1e293b", fontSize: 13 }}>
+                Текст вопроса
+              </label>
+              <textarea
+                ref={questionTextRef}
+                className="question-textarea"
+                value={localText}
+                placeholder="Введите текст вопроса. Enter — новая строка. **жирный текст** — между двойными звёздочками."
+                onChange={(e) => setLocalText(e.target.value)}
+                onBlur={() => {
+                  commitQuestionText();
                 }}
-              >
-                B Жирный
-              </button>
-            </div>
-            {localText.trim() && <QuestionTextPreview text={localText} />}
-            <div className="format-hint">
-              💡 В поле выше — разметка (**так**). Ниже в предпросмотре — как увидит ученик.
-            </div>
-          </div>
-        )}
-
-        {/* Общий загрузчик медиа (кроме кроссворда) */}
-        {value.type !== "crossword" && (
-          <div className="form-group" style={{ marginBottom: 16 }}>
-            {value.type !== "imagemap" && value.image && typeof value.image === "string" && (!value.media || value.media.length === 0) && (
-              <div style={{ marginBottom: 12, padding: 10, background: "#fff5f5", borderRadius: 10, border: "1px solid #fed7d7" }}>
-                <label style={{ display: "block", marginBottom: 6, fontWeight: 700, fontSize: 12, color: "#c53030" }}>
-                  Устаревшее изображение:
-                </label>
-                <img src={value.image} alt="old media" style={{ maxWidth: 200, borderRadius: 8, display: "block" }} />
-                <button 
-                  className="btn btn-small btn-danger" 
-                  style={{ marginTop: 8 }} 
-                  onClick={() => onChange({ ...value, image: "" } as Question)}
+                disabled={disabled}
+              />
+              <div className="format-toolbar">
+                <button
+                  type="button"
+                  className="btn btn-small ghost"
+                  disabled={disabled}
+                  onClick={() => {
+                    const textarea = questionTextRef.current;
+                    const start = textarea?.selectionStart ?? localText.length;
+                    const end = textarea?.selectionEnd ?? localText.length;
+                    const selected = localText.slice(start, end);
+                    const wrapped = selected ? `**${selected}**` : "****";
+                    const next = localText.slice(0, start) + wrapped + localText.slice(end);
+                    setLocalText(next);
+                    requestAnimationFrame(() => {
+                      if (!textarea) return;
+                      textarea.focus();
+                      const caret = selected ? start + wrapped.length : start + 2;
+                      textarea.setSelectionRange(caret, caret);
+                    });
+                  }}
                 >
-                  Удалить
+                  B Жирный
                 </button>
               </div>
-            )}
+              {localText.trim() && <QuestionTextPreview text={localText} />}
+            </div>
+          )}
 
-            <MediaUpload
-              value={value.media || []}
-              onChange={(nextMedia) => onChange({ ...value, media: nextMedia } as Question)}
-              disabled={disabled}
-              bucket="question-images"
-              audioBucket="hippo-book-audio"
-              label="Прикрепленные медиафайлы (Изображения, Аудио, PDF):"
-            />
-          </div>
-        )}
+          {value.type !== "crossword" && (
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", marginBottom: 6, fontWeight: 700, color: "#1e293b", fontSize: 13 }}>
+                Объяснение для разбора (необязательно)
+              </label>
+              <textarea
+                className="question-textarea"
+                value={localExplanation}
+                placeholder="Пояснение, которое увидит ученик в review после ответа."
+                onChange={(e) => setLocalExplanation(e.target.value)}
+                onBlur={commitExplanation}
+                disabled={disabled}
+                rows={3}
+              />
+            </div>
+          )}
 
-        {/* Изображение кроссворда с оптимизированным зумом */}
-        {value.type === "crossword" && (
-          <div className="form-group" style={{ marginBottom: 16 }}>
-            <label style={{ display: "block", marginBottom: 6, fontWeight: 700, color: "#1e293b", fontSize: 13 }}>
-              Изображение кроссворда (опционально):
-            </label>
-            <ImageUpload
-              value={imgUrl}
-              onChange={(nextUrl) => onChange({ ...value, image: nextUrl || "" } as Question)}
-              disabled={disabled}
-              bucket="question-images"
-              label="Загрузить изображение (можно перетаскиванием):"
-            />
-
-            {imgUrl && (
-              <div style={{ marginTop: 10 }}>
-                <div className="card" style={{ padding: 12, borderRadius: 16, background: "#f8fafc" }}>
-                  <div className="small-muted" style={{ marginBottom: 8 }}>
-                    Zoom: колесико/тачпад • телефон: pinch • двойной клик — сброс • drag при увеличении
-                  </div>
-
-                  <div
-                    ref={wrapRef}
-                    onWheel={onWheel}
-                    onMouseDown={onMouseDown}
-                    onMouseMove={onMouseMove}
-                    onMouseLeave={endDrag}
-                    onMouseUp={endDrag}
-                    onDoubleClick={() => resetZoom()}
-                    onTouchStart={onTouchStart}
-                    onTouchMove={onTouchMove}
-                    onTouchEnd={onTouchEnd}
-                    style={{
-                      width: "100%", height: 320, overflow: "hidden", borderRadius: 14,
-                      border: "1px solid #cbd5e1", background: "#f1f5f9",
-                      position: "relative", touchAction: "none", cursor: disabled ? "not-allowed" : "default"
-                    }}
+          {value.type !== "crossword" && (
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              {value.type !== "imagemap" && value.image && typeof value.image === "string" && (!value.media || value.media.length === 0) && (
+                <div style={{ marginBottom: 12, padding: 10, background: "#fff5f5", borderRadius: 10, border: "1px solid #fed7d7" }}>
+                  <label style={{ display: "block", marginBottom: 6, fontWeight: 700, fontSize: 12, color: "#c53030" }}>
+                    Устаревшее изображение
+                  </label>
+                  <img src={value.image} alt="old media" style={{ maxWidth: 200, borderRadius: 8, display: "block" }} />
+                  <button
+                    className="btn btn-small btn-danger"
+                    style={{ marginTop: 8 }}
+                    onClick={() => onChange({ ...value, image: "" } as Question)}
                   >
-                    <img
-                      ref={imgRef}
-                      src={imgUrl}
-                      alt="Кроссворд"
-                      draggable={false}
+                    Удалить
+                  </button>
+                </div>
+              )}
+
+              <MediaUpload
+                value={value.media || []}
+                onChange={(nextMedia) => onChange({ ...value, media: nextMedia } as Question)}
+                disabled={disabled}
+                bucket="question-images"
+                audioBucket="hippo-book-audio"
+                label="Прикрепленные медиафайлы"
+              />
+            </div>
+          )}
+
+          {value.type === "crossword" && (
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", marginBottom: 6, fontWeight: 700, color: "#1e293b", fontSize: 13 }}>
+                Изображение кроссворда
+              </label>
+              <ImageUpload
+                value={imgUrl}
+                onChange={(nextUrl) => onChange({ ...value, image: nextUrl || "" } as Question)}
+                disabled={disabled}
+                bucket="question-images"
+                label="Загрузить изображение"
+              />
+
+              {imgUrl && (
+                <div style={{ marginTop: 10 }}>
+                  <div className="card" style={{ padding: 12, borderRadius: 16, background: "#f8fafc" }}>
+                    <div
+                      ref={wrapRef}
+                      onWheel={onWheel}
+                      onMouseDown={onMouseDown}
+                      onMouseMove={onMouseMove}
+                      onMouseLeave={endDrag}
+                      onMouseUp={endDrag}
+                      onDoubleClick={() => resetZoom()}
+                      onTouchStart={onTouchStart}
+                      onTouchMove={onTouchMove}
+                      onTouchEnd={onTouchEnd}
                       style={{
-                        transformOrigin: "0 0", willChange: "transform", userSelect: "none",
-                        pointerEvents: "none", maxWidth: "none", maxHeight: "none",
-                        width: "auto", height: "auto", display: "block",
+                        width: "100%", height: 320, overflow: "hidden", borderRadius: 14,
+                        border: "1px solid #cbd5e1", background: "#f1f5f9",
+                        position: "relative", touchAction: "none", cursor: disabled ? "not-allowed" : "default"
                       }}
-                    />
-                    
-                    <div style={{
-                      position: "absolute", right: 10, top: 10, display: "flex", gap: 6,
-                      alignItems: "center", padding: "6px 8px", borderRadius: 12,
-                      background: "rgba(255,255,255,0.9)", border: "1px solid #cbd5e1", backdropFilter: "blur(8px)"
-                    }}>
-                      <button type="button" className="btn small ghost" disabled={disabled} onClick={() => applyZoom(tRef.current.scale * 1.15, { x: 160, y: 160 })}>＋</button>
-                      <button type="button" className="btn small ghost" disabled={disabled} onClick={() => applyZoom(tRef.current.scale * 0.87, { x: 160, y: 160 })}>－</button>
-                      <button type="button" className="btn small secondary" disabled={disabled} onClick={resetZoom}>Reset</button>
+                    >
+                      <img
+                        ref={imgRef}
+                        src={imgUrl}
+                        alt="Кроссворд"
+                        draggable={false}
+                        style={{
+                          transformOrigin: "0 0", willChange: "transform", userSelect: "none",
+                          pointerEvents: "none", maxWidth: "none", maxHeight: "none",
+                          width: "auto", height: "auto", display: "block",
+                        }}
+                      />
                     </div>
                   </div>
-
-                  <div className="small-muted" style={{ marginTop: 8 }}>
-                    Масштаб: <b ref={zoomTextRef}>100%</b>
-                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
 
-        {/* Контент специфичного редактора */}
-        <div className="question-type-content">
-          {renderSpecificEditor()}
+          <div className="question-type-content">
+            {renderSpecificEditor()}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

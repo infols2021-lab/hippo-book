@@ -5,7 +5,7 @@ export const revalidate = 0;
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ id?: string; source?: string; sourceId?: string }>;
+  searchParams: Promise<{ id?: string; source?: string; sourceId?: string; roadmapNode?: string }>;
 };
 
 function normStr(v: string | undefined) {
@@ -23,7 +23,7 @@ function normSource(v: string | undefined) {
 
 export default async function AssignmentPage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const { id, source, sourceId } = await searchParams;
+  const { id, source, sourceId, roadmapNode } = await searchParams;
 
   if (!id) {
     return <div style={{ padding: 50, textAlign: "center" }}>Ошибка: ID задания не передан</div>;
@@ -44,9 +44,10 @@ export default async function AssignmentPage({ params, searchParams }: Props) {
     <AssignmentClient
       assignmentId={id}
       projectSlug={slug}
-      source={normSource(source)}
+      source={normSource(source) ?? normStr(source)?.toLowerCase()}
       sourceId={normStr(sourceId)}
       isDemoMaterial={isDemoMaterial}
+      roadmapNodeId={normStr(roadmapNode)}
     />
   );
 }

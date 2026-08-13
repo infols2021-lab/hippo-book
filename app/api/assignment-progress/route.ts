@@ -10,6 +10,11 @@ import {
   assertGatehouseAssignmentAccess,
 } from "@/lib/assignments/access";
 
+import {
+  findRoadmapNodeByAssignmentId,
+  fetchRoadmapStructure,
+  upsertRoadmapNodeProgress,
+} from "@/lib/roadmap/data";
 import { recommendGatehouseLevel as recommendLevel } from "@/lib/exams/recommendLevel";
 
 type Body = {
@@ -274,6 +279,36 @@ export async function POST(req: Request) {
 
   const counters = await recalcCompletedCounters(supabase, user.id);
 
+  let roadmapProgress: Record<string, unknown> | null = null;
+  const materialIdForRoadmap = getMaterialId(assignment);
+  if (materialIdForRoadmap && realScore !== null && !isInformational) {
+    try {
+      const { data: roadmapMaterial } = await supabase
+        .from("materials")
+        .select("material_kind")
+        .eq("id", materialIdForRoadmap)
+        .maybeSingle();
+
+      if (roadmapMaterial?.material_kind === "roadmap") {
+        const structure = await fetchRoadmapStructure(supabase, materialIdForRoadmap);
+        const nodeMeta = findRoadmapNodeByAssignmentId(structure, body.assignmentId);
+        if (nodeMeta) {
+          roadmapProgress = await upsertRoadmapNodeProgress({
+            supabase,
+            userId: user.id,
+            materialId: materialIdForRoadmap,
+            nodeId: nodeMeta.nodeId,
+            score: realScore,
+            nodeType: nodeMeta.nodeType === "exam" ? "exam" : "lesson",
+            passPercent: nodeMeta.passPercent,
+          });
+        }
+      }
+    } catch (roadmapError) {
+      console.error("[assignment-progress] roadmap sync failed:", roadmapError);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────
   // Динамические модули
   // ─────────────────────────────────────────────────────────────
@@ -332,6 +367,7 @@ export async function POST(req: Request) {
       recommendation,
       streak,
       counters,
+      roadmap: roadmapProgress,
     },
     { status: 200 },
   );

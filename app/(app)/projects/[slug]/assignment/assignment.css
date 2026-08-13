@@ -1810,6 +1810,77 @@
   .recommendation-box { padding: 20px; border-radius: 24px; }
 }
 
+.exam-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.exam-timer-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.exam-timer-value {
+  font-size: 22px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+}
+
+.exam-timer-bar {
+  width: 120px;
+  height: 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.exam-timer-bar-fill {
+  height: 100%;
+  background: #0ea5e9;
+  transition: width 1s linear;
+}
+
+.exam-timer.is-urgent .exam-timer-value {
+  color: #dc2626;
+}
+
+.exam-timer.is-urgent .exam-timer-bar-fill {
+  background: #dc2626;
+}
+
+.roadmap-exam-result {
+  margin: 0 auto 20px;
+  max-width: 520px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.roadmap-exam-result.is-passed {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.roadmap-exam-result.is-failed {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.premium-header .header-content {
+  align-items: center;
+}
+
 @media (max-width: 480px) {
   .premium-card { padding: 18px 12px; }
   .question-title { font-size: 18px; }

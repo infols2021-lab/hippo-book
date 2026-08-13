@@ -2,6 +2,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import RoadmapImportPanel from "./RoadmapImportPanel";
+import RoadmapVisualEditor from "./RoadmapVisualEditor";
 
 export default function MaterialsManager() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -93,6 +95,7 @@ export default function MaterialsManager() {
       price: Number(editingMaterial.price) || 1000,
       is_secret: Boolean(editingMaterial.is_secret),
       is_demo: Boolean(editingMaterial.is_demo),
+      material_kind: editingMaterial.is_roadmap ? "roadmap" : (editingMaterial.material_kind || "material"),
       project_tab_id: selectedTabId === "none" || !selectedTabId ? null : selectedTabId,
       class_levels: levelCodes,
       target_levels: levelCodes,
@@ -181,6 +184,7 @@ export default function MaterialsManager() {
       target_levels: currentLevels,
       class_levels: currentLevels,
       is_demo: Boolean(material.is_demo),
+      is_roadmap: material.material_kind === "roadmap",
     });
   };
 
@@ -227,6 +231,7 @@ export default function MaterialsManager() {
             is_demo: false,
             order_index: 0,
             material_kind: "material",
+            is_roadmap: false,
           })}
           className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -378,7 +383,27 @@ export default function MaterialsManager() {
               />
               Демо-материал (is_demo — единственный на систему)
             </label>
+            <label className="flex items-center gap-2 cursor-pointer font-bold text-sky-700">
+              <input
+                type="checkbox"
+                className="w-5 h-5 rounded text-sky-600 focus:ring-sky-500"
+                checked={Boolean(editingMaterial.is_roadmap) || editingMaterial.material_kind === "roadmap"}
+                onChange={(e) => setEditingMaterial({
+                  ...editingMaterial,
+                  is_roadmap: e.target.checked,
+                  material_kind: e.target.checked ? "roadmap" : "material",
+                })}
+              />
+              Roadmap-курс (блоки, звезды, экзамены)
+            </label>
           </div>
+
+          {editingMaterial.id && (editingMaterial.is_roadmap || editingMaterial.material_kind === "roadmap") ? (
+            <>
+              <RoadmapVisualEditor materialId={editingMaterial.id} materialTitle={editingMaterial.title || "Материал"} />
+              <RoadmapImportPanel materialId={editingMaterial.id} materialTitle={editingMaterial.title || "Материал"} />
+            </>
+          ) : null}
 
           <div className="flex gap-4">
             <button type="submit" className="bg-blue-600 hover:bg-blue-700 transition-colors text-white px-6 py-2.5 rounded-xl font-bold">
@@ -442,6 +467,11 @@ export default function MaterialsManager() {
                             {mat.is_secret && (
                               <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">
                                 Секретный
+                              </span>
+                            )}
+                            {mat.material_kind === "roadmap" && (
+                              <span className="bg-sky-100 text-sky-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                ROADMAP
                               </span>
                             )}
                           </div>

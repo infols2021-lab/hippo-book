@@ -329,10 +329,11 @@ export function calcAndBuildReview(
   function processQ(q: any, a: any, idxText: string): ReviewItem {
     if (!q || typeof q !== "object") {
       statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += 1;
-      return { type: "other", questionText: `Вопрос ${idxText}`, isCorrect: false, isSkipped: true, pointsEarned: 0, pointsTotal: 1 } as ReviewItem;
+      return { type: "other", questionText: `Вопрос ${idxText}`, explanation: undefined, isCorrect: false, isSkipped: true, pointsEarned: 0, pointsTotal: 1 } as ReviewItem;
     }
 
     const questionText = String(q?.q ?? "").trim() || `Вопрос ${idxText}`;
+    const explanation = String(q?.explanation ?? "").trim() || undefined;
     const pointsTotal = getPointsTotal(q);
     const media = ensureArray(q.media).length > 0 ? ensureArray(q.media) : undefined;
 
@@ -366,7 +367,7 @@ export function calcAndBuildReview(
 
       return {
         type: q.type,
-        questionText,
+        questionText, explanation,
         isCorrect: total > 0 && earned >= total,
         isSkipped: allSkipped,
         pointsEarned: Number(earned.toFixed(2)),
@@ -407,7 +408,7 @@ export function calcAndBuildReview(
       if (!answered) {
         statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
         return {
-          type: "test", questionText, isCorrect: false, isSkipped: true,
+          type: "test", questionText, explanation, isCorrect: false, isSkipped: true,
           userLabel: isMultiple ? [] : "Не отвечено", correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
           userIndices: [], correctIndices, isMultiple, fraction: 0, pointsEarned: 0, pointsTotal, options, media,
         } as ReviewItem;
@@ -453,7 +454,7 @@ export function calcAndBuildReview(
       if (isCorrect) statsSum.correct++; else statsSum.incorrect++;
 
       return {
-        type: "test", questionText, isCorrect, isSkipped: false, userLabel: userLabels,
+        type: "test", questionText, explanation, isCorrect, isSkipped: false, userLabel: userLabels,
         correctLabel: isMultiple ? correctLabels : correctLabels[0] || "—",
         userIndices: userArrForIndices, correctIndices, fraction, isMultiple, pointsEarned, pointsTotal, options, media,
       } as ReviewItem;
@@ -473,7 +474,7 @@ export function calcAndBuildReview(
       const isSkipped = userArr.every((x) => !x.trim());
 
       const baseResult = {
-        type: q.type, questionText, pointsTotal, media,
+        type: q.type, questionText, explanation, pointsTotal, media,
         sentenceTemplate: isSentence ? String(q.sentence || "") : undefined
       };
 
@@ -531,7 +532,7 @@ export function calcAndBuildReview(
       if (!answered) {
         statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
         return {
-          type: "matching", questionText, isCorrect: false, isSkipped: true,
+          type: "matching", questionText, explanation, isCorrect: false, isSkipped: true,
           correctPairsCount: 0, totalPairsCount, userMatches: {}, correctMatches,
           rightLabels, leftLabels, pairs, pointsEarned: 0, pointsTotal, media,
         } as ReviewItem;
@@ -554,7 +555,7 @@ export function calcAndBuildReview(
       if (correctPairsCount === totalPairsCount) statsSum.correct++; else statsSum.incorrect++;
 
       return {
-        type: "matching", questionText, isCorrect: correctPairsCount === totalPairsCount, isSkipped: false,
+        type: "matching", questionText, explanation, isCorrect: correctPairsCount === totalPairsCount, isSkipped: false,
         correctPairsCount, totalPairsCount, userMatches, correctMatches,
         rightLabels, leftLabels, pairs, pointsEarned, pointsTotal, media,
       } as ReviewItem;
@@ -589,7 +590,7 @@ export function calcAndBuildReview(
       if (!answered) {
         statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
         return {
-          type: "imagemap", questionText, isCorrect: false, isSkipped: true,
+          type: "imagemap", questionText, explanation, isCorrect: false, isSkipped: true,
           correctPairsCount: 0, totalPairsCount, userMatches: {}, correctMatches,
           answerLabels, pointLabels, imageUrl: q.image || "", points: pointsArr, answers: answersArr,
           pointsEarned: 0, pointsTotal, media,
@@ -608,7 +609,7 @@ export function calcAndBuildReview(
       if (correctPairsCount === totalPairsCount) statsSum.correct++; else statsSum.incorrect++;
 
       return {
-        type: "imagemap", questionText, isCorrect: correctPairsCount === totalPairsCount, isSkipped: false,
+        type: "imagemap", questionText, explanation, isCorrect: correctPairsCount === totalPairsCount, isSkipped: false,
         correctPairsCount, totalPairsCount, userMatches, correctMatches,
         answerLabels, pointLabels, imageUrl: q.image || "", points: pointsArr, answers: answersArr,
         pointsEarned, pointsTotal, media,
@@ -670,7 +671,7 @@ export function calcAndBuildReview(
       else statsSum.skipped++;
 
       return {
-        type: "crossword", questionText, isCorrect: correctPairsCount === totalWords && totalWords > 0, isSkipped: !answered,
+        type: "crossword", questionText, explanation, isCorrect: correctPairsCount === totalWords && totalWords > 0, isSkipped: !answered,
         pointsEarned, pointsTotal, note: answered ? `Правильно слов: ${correctPairsCount} из ${totalWords}` : "Кроссворд не заполнен",
         crosswordStats: { filled: stats.filledCells, total: stats.totalActiveCells, percent: stats.percent },
         wordReview: { wrong: wrongWords, correct: correctWords },
@@ -682,7 +683,7 @@ export function calcAndBuildReview(
     statsSum.skipped++; statsSum.total++; statsSum.pointsTotal += pointsTotal;
     
     return {
-      type: "other", questionText, isCorrect: false, isSkipped: true,
+      type: "other", questionText, explanation, isCorrect: false, isSkipped: true,
       note: "Тип вопроса пока не поддержан в стандартном Review.",
       pointsEarned: 0, pointsTotal, media,
     } as ReviewItem;

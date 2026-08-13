@@ -16,6 +16,7 @@ import MediaRenderer from "./components/MediaRenderer";
 import ReviewPanel from "./components/ReviewPanel";
 import ImageModal from "./components/ImageModal";
 import BlockRenderer from "./components/BlockRenderer";
+import ExamTimer from "./components/ExamTimer";
 
 import { getImageUrl } from "@/lib/assignments/image";
 import {
@@ -58,6 +59,23 @@ type Props = {
   projectSlug: string;
   guestMode?: boolean;
   isDemoMaterial?: boolean;
+  roadmapNodeId?: string;
+};
+
+type RoadmapExamContext = {
+  node_id: string;
+  title: string;
+  exam: {
+    time_limit_sec: number;
+    pass_percent: number;
+    unlimited_attempts?: boolean;
+  };
+};
+
+type RoadmapExamProgress = {
+  best_stars: number;
+  best_score: number;
+  exam_passed: boolean;
 };
 
 function normalizeQuestions(qs: unknown): QuestionAny[] {
@@ -141,6 +159,7 @@ export default function AssignmentClient({
   projectSlug,
   guestMode = false,
   isDemoMaterial = false,
+  roadmapNodeId,
 }: Props) {
   const router = useRouter();
   const { stage, advanceTour } = useTour();
@@ -166,7 +185,12 @@ export default function AssignmentClient({
   const [modalSrc, setModalSrc] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [showCtaModal, setShowCtaModal] = useState(false);
+  const [roadmapExam, setRoadmapExam] = useState<RoadmapExamContext | null>(null);
+  const [examRemainingSec, setExamRemainingSec] = useState<number | null>(null);
+  const [examExpired, setExamExpired] = useState(false);
+  const [roadmapExamProgress, setRoadmapExamProgress] = useState<RoadmapExamProgress | null>(null);
   const saveBusyRef = useRef(false);
+  const examTimeoutSubmitRef = useRef(false);
   const stageRef = useRef(stage);
 
   useEffect(() => {
@@ -310,6 +334,9 @@ export default function AssignmentClient({
     if (s === "crossword" && id) {
       return { href: `${basePath}/${encodeURIComponent(id)}`, headerLabel: "Назад к кроссворду", actionLabel: "Вернуться к кроссворду" };
     }
+    if ((s === "materials" || s === "roadmap") && id) {
+      return { href: `${basePath}/${encodeURIComponent(id)}`, headerLabel: "Назад к курсу", actionLabel: "Вернуться к курсу" };
+    }
     return { href: basePath, headerLabel: "К материалам", actionLabel: "К материалам" };
   }, [source, sourceId, projectSlug, guestMode, assignment]);
 
@@ -378,6 +405,83 @@ export default function AssignmentClient({
     load();
   }, [assignmentId]);
 
+  useEffect(() => {
+    if (!roadmapNodeId || !sourceId || guestMode) {
+      setRoadmapExam(null);
+      setExamRemainingSec(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadExamContext() {
+      try {
+        const params = new URLSearchParams({ nodeId: roadmapNodeId! });
+        const res = await fetch(
+          `/api/roadmap/${encodeURIComponent(sourceId!)}/exam?${params.toString()}`,
+          { cache: "no-store" },
+        );
+        const json = await res.json().catch(() => null);
+        const payload = json?.data ?? json;
+
+        if (cancelled || !res.ok || json?.ok === false) {
+          setRoadmapExam(null);
+          setExamRemainingSec(null);
+          return;
+        }
+
+        const examContext = payload as RoadmapExamContext;
+        setRoadmapExam(examContext);
+        setExamRemainingSec(examContext.exam.time_limit_sec);
+        setExamExpired(false);
+        examTimeoutSubmitRef.current = false;
+      } catch {
+        if (!cancelled) {
+          setRoadmapExam(null);
+          setExamRemainingSec(null);
+        }
+      }
+    }
+
+    void loadExamContext();
+    return () => {
+      cancelled = true;
+    };
+  }, [roadmapNodeId, sourceId, guestMode]);
+
+  const examTimerActive = Boolean(
+    roadmapExam &&
+      examRemainingSec !== null &&
+      !showChoice &&
+      !completedScreen &&
+      !isViewMode &&
+      assignmentMode === "interactive" &&
+      !loading,
+  );
+
+  useEffect(() => {
+    if (!examTimerActive) return;
+
+    const timerId = window.setInterval(() => {
+      setExamRemainingSec((prev) => {
+        if (prev === null || prev <= 0) return prev;
+        if (prev <= 1) {
+          setExamExpired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timerId);
+  }, [examTimerActive]);
+
+  useEffect(() => {
+    if (!examExpired || examTimeoutSubmitRef.current || isViewMode || completedScreen || showChoice) return;
+    examTimeoutSubmitRef.current = true;
+    void finishExamTimeout();
+  }, [examExpired, isViewMode, completedScreen, showChoice]);
+
   function openImage(src: string) {
     setModalSrc(src);
     setImageModalOpen(true);
@@ -413,6 +517,11 @@ export default function AssignmentClient({
     setShowChoice(false);
     setCurrentIndex(0);
     setCompletedScreen(false);
+    setExamExpired(false);
+    examTimeoutSubmitRef.current = false;
+    if (roadmapExam) {
+      setExamRemainingSec(roadmapExam.exam.time_limit_sec);
+    }
     scrollAssignmentToTop();
   }
 
@@ -519,6 +628,10 @@ export default function AssignmentClient({
           score: resolveDisplayScore(clientStats, json.score),
         };
 
+        if (json.roadmap && roadmapExam) {
+          setRoadmapExamProgress(json.roadmap as RoadmapExamProgress);
+        }
+
         if (isGatehouse && json.recommendation) {
           setGatehouseRecommendation(json.recommendation);
         } else if (isGatehouse) {
@@ -548,8 +661,15 @@ export default function AssignmentClient({
     }
   }
 
+  async function finishExamTimeout() {
+    if (isViewMode || isSaving) return;
+    const { stats, review } = calcAndBuildReview(questions, answers);
+    await saveProgressAndShowResults(stats, review);
+  }
+
   async function finish() {
     if (isViewMode || isSaving) return;
+    if (examExpired) return;
 
     const v = validateAllAnswered(questions, answers);
     if (!v.ok) {
@@ -648,6 +768,14 @@ export default function AssignmentClient({
           </div>
 
           <span className="skills-wordmark assignment-wordmark">skilLS</span>
+
+          {roadmapExam && examRemainingSec !== null && !showChoice && !completedScreen && assignmentMode === "interactive" ? (
+            <ExamTimer
+              remainingSec={examRemainingSec}
+              totalSec={roadmapExam.exam.time_limit_sec}
+              urgent={examRemainingSec <= 60}
+            />
+          ) : null}
         </div>
       </header>
 
@@ -695,6 +823,14 @@ export default function AssignmentClient({
             >
               {getFeedbackMessage(finalStats.score, assignment?.content?.feedbackRanges)}
             </p>
+
+            {roadmapExam ? (
+              <div className={`roadmap-exam-result ${(roadmapExamProgress?.exam_passed ?? finalStats.score >= roadmapExam.exam.pass_percent) ? "is-passed" : "is-failed"}`}>
+                {(roadmapExamProgress?.exam_passed ?? finalStats.score >= roadmapExam.exam.pass_percent)
+                  ? `Экзамен сдан (порог ${roadmapExam.exam.pass_percent}%)`
+                  : `Экзамен не сдан (нужно ${roadmapExam.exam.pass_percent}%, у вас ${finalStats.score}%)`}
+              </div>
+            ) : null}
 
             {gatehouseRecommendation && (
               <div className="recommendation-box">

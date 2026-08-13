@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import MaterialClient from "./MaterialClient";
+import RoadmapMaterialView from "./RoadmapMaterialView";
 
 export const revalidate = 0;
 
@@ -91,6 +92,20 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const coverUrl = toStorageProxyUrl(material.cover_image_url);
   const markText = slug.slice(0, 2).toUpperCase();
+
+  if (material.material_kind === "roadmap") {
+    return (
+      <RoadmapMaterialView
+        slug={slug}
+        material={{
+          id: material.id,
+          title: material.title,
+          description: material.description,
+        }}
+        hasAccess={hasAccess}
+      />
+    );
+  }
 
   return (
     <MaterialClient 

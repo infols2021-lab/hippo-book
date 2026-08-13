@@ -130,8 +130,9 @@ export type QuestionType =
 export type QuestionBase = {
   id: string;
   q?: string;
-  image?: string; // Устаревшее
-  media?: MediaAttachment[]; // Новое
+  explanation?: string;
+  image?: string;
+  media?: MediaAttachment[];
 };
 
 export type TestOption = {
@@ -280,6 +281,7 @@ export type ReviewPart = {
 
 export type ReviewBase = {
   questionText: string;
+  explanation?: string;
   isCorrect: boolean;
   isSkipped: boolean;
   pointsEarned: number;

@@ -155,6 +155,7 @@ export function normalizeMaterialKind(value: unknown): string {
   if (["учебник", "textbook"].includes(lower)) return "textbook";
   if (["кроссворд", "crossword"].includes(lower)) return "crossword";
   if (["пробный тест", "пробные тесты", "mock_test", "mock-test", "mocktest"].includes(lower)) return "mock_test";
+  if (["roadmap", "road", "course", "pathway", "дорожка", "курс"].includes(lower)) return "roadmap";
 
   return lower; // Поддержка кастомных типов (например "video", "audio", "interactive")
 }

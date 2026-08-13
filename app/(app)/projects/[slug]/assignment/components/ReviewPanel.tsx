@@ -445,6 +445,26 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               className="review-question-title"
               text={r.questionText}
             />
+            {r.explanation ? (
+              <div
+                className="review-explanation"
+                style={{
+                  marginTop: 12,
+                  padding: "12px 14px",
+                  borderRadius: 12,
+                  background: "rgba(14, 165, 233, 0.08)",
+                  border: "1px solid rgba(14, 165, 233, 0.18)",
+                  color: "#0f172a",
+                  fontSize: 14,
+                  lineHeight: 1.55,
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: "#0369a1", marginBottom: 6 }}>
+                  Разбор
+                </div>
+                {r.explanation}
+              </div>
+            ) : null}
           </div>
 
           <div style={{ textAlign: "right", flexShrink: 0 }}>
