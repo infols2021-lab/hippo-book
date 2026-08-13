@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { QuestionFill } from "@/lib/assignments/types";
+import { isVariantMatch } from "@/lib/assignments/scoring";
 
 type Props = {
   question: QuestionFill;
@@ -59,11 +60,13 @@ export default function QuestionFill({ question, value = [], onChange, disabled 
         {/* Исправлено: явно указаны типы _: any, idx: number, чтобы TS не ругался */}
         {rawAnswers.map((_: any, idx: number) => {
           const uAns = String(value?.[idx] ?? "").trim();
-          const cAns = getCorrectString(idx);
-          
-          // Проверка правильности: разбиваем правильные ответы по " или " и ищем точное совпадение (без учета регистра)
-          const validOptions = cAns.toLowerCase().split(" или ");
-          const isCorrect = uAns.length > 0 && validOptions.includes(uAns.toLowerCase());
+          const variants = rawAnswers[idx];
+          const isCorrect = uAns.length > 0 && isVariantMatch(uAns, variants);
+          const cAns = (() => {
+            if (!variants) return "Ответ не найден";
+            const vArr = Array.isArray(variants) ? variants : [variants];
+            return vArr.map(extractCorrectValue).filter(Boolean).join(" или ");
+          })();
 
           return (
             <div key={idx} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>

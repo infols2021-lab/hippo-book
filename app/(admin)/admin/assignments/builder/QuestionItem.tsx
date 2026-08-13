@@ -6,6 +6,7 @@ import ImageUpload from "./ImageUpload";
 import MediaUpload from "./MediaUpload";
 import QuestionTypeSwitch from "./QuestionTypeSwitch";
 import type { Question, QuestionType } from "./types";
+import QuestionRichText from "@/app/(app)/projects/[slug]/assignment/components/QuestionRichText";
 
 import TestEditor from "./test/TestEditor";
 import FillEditor from "./fill/FillEditor";
@@ -70,6 +71,7 @@ export default function QuestionItem({
 }: Props) {
   const [localText, setLocalText] = useState(value.q ?? "");
   const [isDeleting, setIsDeleting] = useState(false);
+  const questionTextRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setLocalText(value.q ?? "");
@@ -294,9 +296,10 @@ export default function QuestionItem({
               Текст вопроса:
             </label>
             <textarea
+              ref={questionTextRef}
               className="question-textarea"
               value={localText}
-              placeholder="Введите текст вопроса. Используйте Enter для переноса строки..."
+              placeholder="Введите текст вопроса. Enter — новая строка. **жирный текст** — между двойными звёздочками."
               onChange={(e) => setLocalText(e.target.value)}
               onBlur={() => {
                 if (localText !== value.q) {
@@ -305,7 +308,39 @@ export default function QuestionItem({
               }}
               disabled={disabled}
             />
-            <div className="format-hint">💡 Заполните формулировку задания для ученика</div>
+            <div className="format-toolbar">
+              <button
+                type="button"
+                className="btn btn-small ghost"
+                disabled={disabled}
+                onClick={() => {
+                  const textarea = questionTextRef.current;
+                  const start = textarea?.selectionStart ?? localText.length;
+                  const end = textarea?.selectionEnd ?? localText.length;
+                  const selected = localText.slice(start, end);
+                  const wrapped = selected ? `**${selected}**` : "****";
+                  const next = localText.slice(0, start) + wrapped + localText.slice(end);
+                  setLocalText(next);
+                  requestAnimationFrame(() => {
+                    if (!textarea) return;
+                    textarea.focus();
+                    const caret = selected ? start + wrapped.length : start + 2;
+                    textarea.setSelectionRange(caret, caret);
+                  });
+                }}
+              >
+                B Жирный
+              </button>
+            </div>
+            {localText.trim() && (
+              <div className="question-text-preview">
+                <div className="question-text-preview-label">Предпросмотр:</div>
+                <QuestionRichText text={localText} className="question-text-preview-body" />
+              </div>
+            )}
+            <div className="format-hint">
+              💡 Enter — перенос строки. **так** — жирный текст. Работает в JSON и в админке.
+            </div>
           </div>
         )}
 

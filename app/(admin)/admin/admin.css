@@ -710,6 +710,50 @@
   font-weight: 500;
 }
 
+.admin-root .format-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-root .question-text-preview {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.admin-root .question-text-preview-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.admin-root .question-text-preview-body {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+.admin-root .sentence-preview-cloze {
+  padding: 16px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.admin-root .sentence-preview-cloze .sentence-cloze {
+  font-size: 16px;
+}
+
+.admin-root .sentence-preview-cloze .sentence-gap-input {
+  pointer-events: none;
+}
+
 /* ===== СТИЛИ СПИСКА ДОСТУПОВ (UserAccessModal) ===== */
 .admin-root .access-category { 
   margin-top: 12px; 

@@ -139,7 +139,7 @@
 }
 
 /* =========================
-   SENTENCE
+   SENTENCE / CLOZE
    ========================= */
 
 .sentence-container {
@@ -149,6 +149,107 @@
   margin: 20px 0;
 }
 
+.sentence-container--cloze {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  padding: 20px 22px;
+}
+
+.sentence-cloze {
+  font-size: 17px;
+  line-height: 1.75;
+  color: #1e293b;
+}
+
+.sentence-cloze-paragraph {
+  margin: 0 0 0.85em;
+  line-height: 1.85;
+}
+
+.sentence-cloze-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+.sentence-cloze-spacer {
+  height: 0.5em;
+}
+
+.sentence-cloze-text {
+  display: inline;
+}
+
+.sentence-gap {
+  display: inline;
+  white-space: nowrap;
+  vertical-align: baseline;
+  margin: 0 2px;
+}
+
+.sentence-gap-num {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  vertical-align: super;
+  margin-right: 1px;
+  line-height: 1;
+}
+
+.sentence-gap-num::before {
+  content: "[";
+}
+
+.sentence-gap-num::after {
+  content: "]";
+}
+
+.sentence-gap-input {
+  display: inline-block;
+  width: auto;
+  min-width: 3ch;
+  max-width: min(100%, 14em);
+  padding: 2px 4px 3px;
+  margin: 0;
+  border: none;
+  border-bottom: 2px solid #cbd5e1;
+  border-radius: 0;
+  background: rgba(248, 250, 252, 0.9);
+  font-size: inherit;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1.4;
+  vertical-align: baseline;
+  box-sizing: content-box;
+}
+
+.sentence-gap-input:focus {
+  outline: none;
+  border-bottom-color: var(--accent2, #4ecdc4);
+  background: #fff;
+}
+
+.sentence-gap-input.is-correct {
+  border-bottom-color: #22c55e;
+  color: #166534;
+  background: rgba(220, 252, 231, 0.55);
+}
+
+.sentence-gap-input.is-incorrect {
+  border-bottom-color: #ef4444;
+  color: #991b1b;
+  background: rgba(254, 226, 226, 0.55);
+}
+
+.sentence-empty-error {
+  padding: 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  color: #991b1b;
+  font-weight: 600;
+}
+
+/* Legacy sentence layout (fallback) */
 .sentence-text {
   font-size: 18px;
   line-height: 1.6;
@@ -158,12 +259,6 @@
   border-radius: 8px;
   border: 1px solid #e0e0e0;
   white-space: pre-line;
-}
-
-.sentence-gap {
-  display: inline-block;
-  min-width: 120px;
-  margin: 0 5px;
 }
 
 .sentence-input {
@@ -178,6 +273,72 @@
 .sentence-input:focus {
   border-color: var(--accent2);
   outline: none;
+}
+
+/* Rich text in questions */
+.question-rich-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.question-rich-text strong {
+  font-weight: 800;
+}
+
+.question-title .question-rich-text {
+  display: inline;
+}
+
+.complex-question-title {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.complex-subquestion-title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.reading-subquestion-title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.45;
+  flex: 1;
+}
+
+.review-question-title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.review-sentence-cloze {
+  margin-top: 8px;
+}
+
+.review-sentence-chip {
+  display: inline;
+  white-space: nowrap;
+  padding: 1px 8px 2px;
+  margin: 0 2px;
+  border-radius: 8px;
+  font-weight: 700;
+  vertical-align: baseline;
+}
+
+.review-sentence-chip.is-correct {
+  background: #dcfce7;
+  border: 1px solid #22c55e;
+  color: #166534;
+}
+
+.review-sentence-chip.is-incorrect {
+  background: #fee2e2;
+  border: 1px solid #ef4444;
+  color: #991b1b;
 }
 
 /* =========================
@@ -1144,21 +1305,38 @@
 }
 
 .gatehouse-root .fill-input-item input,
-.gatehouse-root .sentence-input {
+.gatehouse-root .sentence-input,
+.gatehouse-root .sentence-gap-input {
   border-color: rgba(165, 180, 252, 0.26);
   background: rgba(7, 8, 22, 0.5);
   color: #f8fafc;
 }
 
 .gatehouse-root .fill-input-item input::placeholder,
-.gatehouse-root .sentence-input::placeholder {
+.gatehouse-root .sentence-input::placeholder,
+.gatehouse-root .sentence-gap-input::placeholder {
   color: rgba(165, 180, 252, 0.6);
 }
 
 .gatehouse-root .fill-input-item input:focus,
-.gatehouse-root .sentence-input:focus {
+.gatehouse-root .sentence-input:focus,
+.gatehouse-root .sentence-gap-input:focus {
   border-color: rgba(34, 211, 238, 0.7);
   box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.12);
+}
+
+.gatehouse-root .sentence-container--cloze {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(165, 180, 252, 0.2);
+}
+
+.gatehouse-root .sentence-cloze,
+.gatehouse-root .sentence-cloze-paragraph {
+  color: #f8fafc;
+}
+
+.gatehouse-root .sentence-gap-num {
+  color: #a5b4fc;
 }
 
 .gatehouse-root .fill-input-number {

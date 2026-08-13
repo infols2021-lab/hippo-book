@@ -3,6 +3,7 @@
 import React from "react";
 import type { QuestionComplex, QuestionAny } from "@/lib/assignments/types";
 import MediaRenderer from "./MediaRenderer";
+import QuestionRichText from "./QuestionRichText";
 import QuestionTest from "./QuestionTest";
 import QuestionFill from "./QuestionFill";
 import QuestionSentence from "./QuestionSentence";
@@ -124,17 +125,7 @@ export default function QuestionComplex({
           }}
         >
           {question.q && (
-            <div
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: "#1e293b",
-                marginBottom: 12,
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {question.q}
-            </div>
+            <QuestionRichText as="div" className="complex-question-title" text={question.q} />
           )}
           {question.media && question.media.length > 0 && (
             <MediaRenderer key={JSON.stringify(question.media)} media={question.media} />
@@ -188,17 +179,7 @@ export default function QuestionComplex({
           {/* Тело подвопроса */}
           <div style={{ flex: 1, minWidth: 0 }}>
             {subQ.q && (
-              <div
-                style={{
-                  fontSize: 16,
-                  fontWeight: 600,
-                  color: "#222",
-                  marginBottom: 12,
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {subQ.q}
-              </div>
+              <QuestionRichText as="div" className="complex-subquestion-title" text={subQ.q} />
             )}
 
             {/* Медиа подвопроса */}

@@ -55,11 +55,11 @@ export default function ReadingEditor({ value, onChange, disabled }: Props) {
           className="question-textarea"
           rows={6}
           value={value.text ?? ""}
-          placeholder="Вставьте сюда текст для чтения, по которому ученики будут отвечать на вопросы..."
+          placeholder="Текст для чтения. Enter — новая строка. **жирный** — между **звёздочками**."
           disabled={disabled}
           onChange={(e) => patch({ text: e.target.value })}
         />
-        <div className="format-hint">💡 Этот текст будет показываться ученику перед вопросами</div>
+        <div className="format-hint">💡 Enter — перенос строки. **так** — жирный текст.</div>
       </div>
 
       {/* Подвопросы */}

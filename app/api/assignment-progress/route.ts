@@ -1,7 +1,7 @@
 // app/api/assignment-progress/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { calcAndBuildReview } from "@/lib/assignments/scoring";
+import { calcAndBuildReview, deriveScoreFromPoints } from "@/lib/assignments/scoring";
 import type { AssignmentData } from "@/lib/assignments/types";
 import { requireUser } from "@/lib/api/auth";
 
@@ -31,8 +31,20 @@ function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null;
 }
 
-function normalizeScore(value: unknown): number {
+function normalizeScore(value: unknown, pointsEarned?: number, pointsTotal?: number): number {
   const score = Number(value);
+  if (Number.isFinite(score) && score > 0) {
+    return Math.max(0, Math.min(100, Math.round(score)));
+  }
+
+  if (
+    typeof pointsEarned === "number" &&
+    typeof pointsTotal === "number" &&
+    pointsTotal > 0
+  ) {
+    return deriveScoreFromPoints(pointsEarned, pointsTotal);
+  }
+
   return Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0;
 }
 
@@ -239,7 +251,7 @@ export async function POST(req: Request) {
       );
     }
     const { stats } = calcAndBuildReview(questions, body.answers);
-    realScore = normalizeScore(stats.score);
+    realScore = normalizeScore(stats.score, stats.pointsEarned, stats.pointsTotal);
   }
 
   const payload = {

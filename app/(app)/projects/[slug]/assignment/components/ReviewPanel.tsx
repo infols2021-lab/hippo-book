@@ -1,7 +1,9 @@
 "use client";
 
 import React from "react";
-import type { ReviewItem, TestOption } from "@/lib/assignments/types";
+import type { ReviewItem, TestOption, ReviewPart } from "@/lib/assignments/types";
+import { isVariantMatch } from "@/lib/assignments/scoring";
+import QuestionRichText from "./QuestionRichText";
 import MediaRenderer from "./MediaRenderer";
 import { ImageMapRenderer } from "./QuestionImageMap";
 import { CrosswordGridReadOnly } from "./QuestionCrossword";
@@ -233,56 +235,88 @@ function FilledSentence({
   template,
   userAnswers,
   correctAnswers,
+  parts,
 }: {
   template: string;
   userAnswers: string[];
   correctAnswers: string[];
+  parts?: ReviewPart[];
 }) {
-  const parts = template.split("___");
+  const isBlankCorrect = (idx: number) => {
+    if (parts?.[idx]) return parts[idx].isCorrect;
+    const userRaw = userAnswers[idx] ?? "";
+    const variants = correctAnswers[idx];
+    if (!variants) return false;
+    return isVariantMatch(userRaw, variants);
+  };
+
+  let gapIndex = 0;
+  const paragraphs = template.split("\n").map((line) => {
+    if (!line.trim()) return { isEmpty: true as const, chunks: [] as Array<{ kind: "text"; text: string } | { kind: "gap"; gapIndex: number }> };
+    const lineParts = line.split("___");
+    const chunks: Array<{ kind: "text"; text: string } | { kind: "gap"; gapIndex: number }> = [];
+    lineParts.forEach((part, partIndex) => {
+      if (part) chunks.push({ kind: "text", text: part });
+      if (partIndex < lineParts.length - 1) {
+        chunks.push({ kind: "gap", gapIndex });
+        gapIndex += 1;
+      }
+    });
+    return { isEmpty: false as const, chunks };
+  });
+
   return (
-    <div style={{ lineHeight: "2.4", fontSize: "16px", color: "#1e293b" }}>
-      {parts.map((part, idx: number) => {
-        const uAns = userAnswers[idx]?.trim().toLowerCase();
-        const cAns = correctAnswers[idx]?.trim().toLowerCase();
-        const isCorrect = uAns === cAns;
+    <div className="review-sentence-cloze sentence-cloze">
+      {paragraphs.map((paragraph, paragraphIndex) => {
+        if (paragraph.isEmpty) {
+          return <div key={paragraphIndex} className="sentence-cloze-spacer" aria-hidden="true" />;
+        }
 
         return (
-          <span key={idx}>
-            {part}
-            {idx < userAnswers.length && (
-              <span
-                style={{
-                  display: "inline-block",
-                  margin: "0 8px",
-                  padding: "4px 12px",
-                  borderRadius: "12px",
-                  background: isCorrect ? "#dcfce7" : "#fee2e2",
-                  border: "2px solid",
-                  borderColor: isCorrect ? "#22c55e" : "#ef4444",
-                  fontWeight: 900,
-                  color: isCorrect ? "#166534" : "#991b1b",
-                }}
-              >
-                {userAnswers[idx] || "—"} {isCorrect ? "✓" : "✗"}
-              </span>
-            )}
-          </span>
+          <p key={paragraphIndex} className="sentence-cloze-paragraph">
+            {paragraph.chunks.map((chunk, chunkIndex) => {
+              if (chunk.kind === "text") {
+                return (
+                  <QuestionRichText
+                    key={`${paragraphIndex}-t-${chunkIndex}`}
+                    as="span"
+                    text={chunk.text}
+                    className="sentence-cloze-text"
+                  />
+                );
+              }
+
+              const isCorrect = isBlankCorrect(chunk.gapIndex);
+              const answer = userAnswers[chunk.gapIndex] || "—";
+
+              return (
+                <span
+                  key={`${paragraphIndex}-g-${chunkIndex}`}
+                  className={`review-sentence-chip ${isCorrect ? "is-correct" : "is-incorrect"}`}
+                >
+                  <span className="sentence-gap-num">{chunk.gapIndex + 1}</span>
+                  {answer} {isCorrect ? "✓" : "✗"}
+                </span>
+              );
+            })}
+          </p>
         );
       })}
+
       {correctAnswers.length > 0 && (
         <div
           style={{
-            marginTop: "20px",
-            padding: "16px",
+            marginTop: "16px",
+            padding: "14px 16px",
             background: "#f0fdf4",
             border: "1px solid #bbf7d0",
             borderRadius: "12px",
-            fontSize: "15px",
+            fontSize: "14px",
           }}
         >
           <span style={{ fontWeight: 800, color: "#166534" }}>Правильные ответы: </span>
           {correctAnswers.map((ans, i: number) => (
-            <span key={i} style={{ marginRight: "16px", fontWeight: 900, color: "#000" }}>
+            <span key={i} style={{ marginRight: "14px", fontWeight: 800, color: "#000" }}>
               {i + 1}. <span style={{ color: "#10b981" }}>{ans}</span>
             </span>
           ))}
@@ -406,18 +440,11 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                 {status.label}
               </span>
             </div>
-            <h4
-              style={{
-                fontSize: "18px",
-                fontWeight: 700,
-                color: "#1e293b",
-                margin: 0,
-                lineHeight: 1.35,
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {r.questionText}
-            </h4>
+            <QuestionRichText
+              as="h4"
+              className="review-question-title"
+              text={r.questionText}
+            />
           </div>
 
           <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -535,6 +562,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               template={r.sentenceTemplate}
               userAnswers={r.userAnswers || []}
               correctAnswers={r.correctAnswers || []}
+              parts={r.parts}
             />
           </div>
         )}

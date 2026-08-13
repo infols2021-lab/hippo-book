@@ -91,16 +91,9 @@ function buildParts(correctAnswers: any[], userArr: string[], totalCount: number
   for (let idx = 0; idx < totalCount; idx++) {
     const variants = correctAnswers[idx];
     const userRaw = String(userArr[idx] ?? "");
-    const userNorm = normalizeText(userRaw);
+    const ok = isVariantMatch(userRaw, variants);
 
     const variantsArray = ensureArray(variants);
-
-    const varsNorm = variantsArray.map((v: any) => {
-      return normalizeText(extractCorrectValue(v));
-    });
-
-    const ok = userNorm.length > 0 && varsNorm.some((v) => v === userNorm);
-
     const correctDisplay = variantsArray
       .map(extractCorrectValue)
       .filter(Boolean)
@@ -110,7 +103,7 @@ function buildParts(correctAnswers: any[], userArr: string[], totalCount: number
       index: idx,
       isCorrect: ok,
       user: userRaw,
-      correct: correctDisplay || "Ответ не задан", 
+      correct: correctDisplay || "Ответ не задан",
     });
   }
   return parts;
@@ -125,6 +118,75 @@ function safeFraction(earned: number, total: number): number {
   if (total <= 0 || !Number.isFinite(earned) || !Number.isFinite(total)) return 0;
   const f = earned / total;
   return Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : 0;
+}
+
+/** Единый расчёт процента из набранных баллов. */
+export function deriveScoreFromPoints(pointsEarned: number, pointsTotal: number): number {
+  return clampScore(safeFraction(pointsEarned, pointsTotal) * 100);
+}
+
+/** Проверка ответа пользователя против одного или нескольких допустимых вариантов. */
+export function isVariantMatch(userRaw: string, variants: any): boolean {
+  const userNorm = normalizeText(userRaw);
+  if (!userNorm) return false;
+
+  const variantsArray = ensureArray(variants);
+  return variantsArray.some((variant: any) => {
+    const extracted = extractCorrectValue(variant);
+    if (!extracted) return false;
+
+    // Поддержка записи вида "am going to prepare или will prepare" в одной строке
+    const splitVariants = String(extracted)
+      .split(/\s+или\s+/i)
+      .map((part) => normalizeText(part))
+      .filter(Boolean);
+
+    const normalizedVariants =
+      splitVariants.length > 1 ? splitVariants : [normalizeText(extracted)];
+
+    return normalizedVariants.some((v) => v === userNorm);
+  });
+}
+
+/** Нормализует ответ fill/sentence: массив, объект с индексами или одиночное значение. */
+export function normalizeUserAnswerArray(a: any, expectedLen: number): string[] {
+  if (Array.isArray(a)) {
+    return Array.from({ length: expectedLen }, (_, i) => String(a[i] ?? "").trim());
+  }
+
+  if (a && typeof a === "object") {
+    return Array.from({ length: expectedLen }, (_, i) =>
+      String(a[i] ?? a[String(i)] ?? "").trim()
+    );
+  }
+
+  if (expectedLen <= 1 && a !== undefined && a !== null && a !== "") {
+    return [String(a).trim()];
+  }
+
+  return Array.from({ length: expectedLen }, () => "");
+}
+
+/** Ответы подвопросов complex/reading: массив или объект по id/индексу. */
+export function normalizeSubAnswers(a: any): Record<string | number, any> {
+  if (Array.isArray(a)) {
+    const mapped: Record<number, any> = {};
+    a.forEach((value, index) => {
+      mapped[index] = value;
+    });
+    return mapped;
+  }
+
+  if (a && typeof a === "object") return a as Record<string | number, any>;
+  return {};
+}
+
+function getSubAnswer(subAns: Record<string | number, any>, sq: any, subI: number): any {
+  if (!sq || typeof sq !== "object") return subAns[subI];
+  if (sq.id !== undefined && sq.id !== null && subAns[sq.id] !== undefined) return subAns[sq.id];
+  if (subAns[subI] !== undefined) return subAns[subI];
+  if (subAns[String(subI)] !== undefined) return subAns[String(subI)];
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,10 +247,10 @@ export function isQuestionAnswered(q: any, a: any): boolean {
   
   if (q.type === "complex" || q.type === "reading") {
     const subQs = ensureArray(q.subQuestions);
-    const subAns = a && typeof a === "object" ? a : {};
+    const subAns = normalizeSubAnswers(a);
     if (subQs.length === 0) return true;
     return subQs.every((sq, idx) => {
-      const subA = subAns[sq.id] !== undefined ? subAns[sq.id] : subAns[idx];
+      const subA = getSubAnswer(subAns, sq, idx);
       return isQuestionAnswered(sq, subA);
     });
   } 
@@ -274,23 +336,32 @@ export function calcAndBuildReview(
     const pointsTotal = getPointsTotal(q);
     const media = ensureArray(q.media).length > 0 ? ensureArray(q.media) : undefined;
 
-    // COMPLEX / READING
+    // COMPLEX / READING — каждый подвопрос считается отдельно через processQ
     if (q.type === "complex" || q.type === "reading") {
       const subQs = ensureArray(q.subQuestions);
-      const subAns = a && typeof a === "object" ? a : {};
+      const subAns = normalizeSubAnswers(a);
 
       const subReviews: ReviewItem[] = [];
       let earned = 0;
       let total = 0;
       let allSkipped = true;
+      let subCorrect = 0;
+      let subIncorrect = 0;
+      let subSkipped = 0;
+      let subTotal = 0;
 
       subQs.forEach((sq: any, subI: number) => {
-        const subA = subAns[sq.id] !== undefined ? subAns[sq.id] : subAns[subI];
+        const subA = getSubAnswer(subAns, sq, subI);
         const sr = processQ(sq, subA, `${idxText}.${subI + 1}`);
         subReviews.push(sr);
         earned += Number.isFinite(sr.pointsEarned) ? sr.pointsEarned : 0;
         total += Number.isFinite(sr.pointsTotal) ? sr.pointsTotal : 0;
         if (!sr.isSkipped) allSkipped = false;
+
+        subTotal++;
+        if (sr.isSkipped) subSkipped++;
+        else if (sr.isCorrect) subCorrect++;
+        else subIncorrect++;
       });
 
       return {
@@ -302,7 +373,12 @@ export function calcAndBuildReview(
         pointsTotal: total,
         subReviews,
         media,
-        readingText: q.type === "reading" ? (q.text || "") : undefined
+        readingText: q.type === "reading" ? (q.text || "") : undefined,
+        // мета для UI: complex = контейнер, статистика живёт в подвопросах
+        correctCount: subCorrect,
+        incorrectCount: subIncorrect,
+        skippedCount: subSkipped,
+        totalCount: subTotal,
       } as ReviewItem;
     }
 
@@ -393,8 +469,8 @@ export function calcAndBuildReview(
         ? (String(q.sentence || "").match(/___/g) || []).length 
         : correctAnswers.length;
 
-      const userArr: string[] = ensureArray(a).slice(0, totalCount).map((x) => String(x ?? ""));
-      const isSkipped = userArr.length === 0 || userArr.every(x => !x.trim());
+      const userArr = normalizeUserAnswerArray(a, totalCount);
+      const isSkipped = userArr.every((x) => !x.trim());
 
       const baseResult = {
         type: q.type, questionText, pointsTotal, media,
@@ -617,12 +693,18 @@ export function calcAndBuildReview(
     review.push(processQ(q, userAns, String(i + 1)));
   });
 
-  const score = clampScore(safeFraction(statsSum.pointsEarned, statsSum.pointsTotal) * 100);
+  const pointsEarnedFinal = Number(statsSum.pointsEarned.toFixed(2));
+  const score = deriveScoreFromPoints(pointsEarnedFinal, statsSum.pointsTotal);
 
   return {
     stats: {
-      score, correct: statsSum.correct, incorrect: statsSum.incorrect, skipped: statsSum.skipped,
-      total: statsSum.total, pointsEarned: Number(statsSum.pointsEarned.toFixed(2)), pointsTotal: statsSum.pointsTotal,
+      score,
+      correct: statsSum.correct,
+      incorrect: statsSum.incorrect,
+      skipped: statsSum.skipped,
+      total: statsSum.total,
+      pointsEarned: pointsEarnedFinal,
+      pointsTotal: statsSum.pointsTotal,
     },
     review,
   };

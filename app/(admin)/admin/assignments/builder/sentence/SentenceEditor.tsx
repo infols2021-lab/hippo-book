@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { SentenceQuestion } from "../types";
+import SentenceCloze from "@/app/(app)/projects/[slug]/assignment/components/SentenceCloze";
 
 type Props = {
   value: SentenceQuestion;
@@ -99,45 +100,36 @@ export default function SentenceEditor({ value, onChange, disabled }: Props) {
         </label>
         <textarea
           className="input"
-          rows={4}
+          rows={6}
           disabled={disabled}
-          placeholder="I ___ to school every ___ ."
+          placeholder={"My name is Mary.\nI am ___ years old and I live ___ a big house.\n\nEnter — новый абзац. ___ — пропуск."}
           value={sentence}
           onChange={(e) => handleSentenceChange(e.target.value)}
         />
 
         <div className="small-muted" style={{ marginTop: 6 }}>
-          Количество пропусков: <b>{blanks}</b>
+          Количество пропусков: <b>{blanks}</b>. Enter — новая строка/абзац. Разбивай длинный текст на строки для читаемости.
         </div>
       </div>
 
       {/* Предпросмотр */}
       <div className="form-group">
         <label style={{ fontWeight: 600, display: "block", marginBottom: 8 }}>
-          Предпросмотр:
+          Предпросмотр (как у ученика):
         </label>
-        <div className="sentence-preview">
-          {sentence.split("___").map((part, idx) => (
-            <span key={idx}>
-              {part}
-              {idx < blanks && (
-                <span
-                  style={{
-                    display: "inline-block",
-                    padding: "2px 8px",
-                    margin: "0 6px",
-                    borderRadius: 8,
-                    background: "rgba(78,205,196,0.14)",
-                    border: "1px solid rgba(78,205,196,0.35)",
-                    fontWeight: 800,
-                  }}
-                >
-                  [{idx + 1}]
-                </span>
-              )}
-            </span>
-          ))}
-        </div>
+        {sentence.trim() ? (
+          <div className="sentence-preview-cloze">
+            <SentenceCloze
+              sentence={sentence}
+              rawAnswers={normalizeAnswers(value.answers, blanks)}
+              value={Array.from({ length: blanks }, () => "")}
+              disabled
+              onChange={() => {}}
+            />
+          </div>
+        ) : (
+          <div className="small-muted">Введите предложение выше</div>
+        )}
       </div>
 
       <div className="form-group">

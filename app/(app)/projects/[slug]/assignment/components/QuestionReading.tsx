@@ -4,6 +4,7 @@ import React from "react";
 import type { QuestionReading as QuestionReadingType, QuestionTest as QuestionTestType } from "@/lib/assignments/types";
 import QuestionTestComponent from "./QuestionTest";
 import MediaRenderer from "./MediaRenderer";
+import QuestionRichText from "./QuestionRichText";
 
 type Props = {
   question: QuestionReadingType;
@@ -50,18 +51,18 @@ export default function QuestionReading({
           }}
         >
           {question.text && (
-            <div
+            <QuestionRichText
+              as="div"
+              className="reading-passage-text"
+              text={question.text}
               style={{
                 fontSize: "16px",
                 lineHeight: 1.6,
-                whiteSpace: "pre-wrap",
                 color: "#1e293b",
                 fontWeight: 500,
                 marginBottom: question.media?.length ? "16px" : 0,
               }}
-            >
-              {question.text}
-            </div>
+            />
           )}
           {question.media && question.media.length > 0 && (
             <MediaRenderer media={question.media} />
@@ -119,17 +120,7 @@ export default function QuestionReading({
                     {idx + 1}
                   </div>
                   {sq.q && (
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: 900,
-                        color: "#000",
-                        lineHeight: 1.4,
-                        flex: 1,
-                      }}
-                    >
-                      {sq.q}
-                    </div>
+                    <QuestionRichText as="div" className="reading-subquestion-title" text={sq.q} />
                   )}
                 </div>
 

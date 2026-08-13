@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import LoadingBlock from "@/components/LoadingBlock";
 import ErrorBox from "@/components/ErrorBox";
+import "@/app/(app)/projects/[slug]/assignment/assignment.css";
 
 import type { EditorMode, AssignmentMode, Question, InfoBlock, FeedbackRange } from "./builder/types";
 import { deepClone, newQuestion, newBlock } from "./builder/types";

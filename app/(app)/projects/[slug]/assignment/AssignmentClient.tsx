@@ -25,7 +25,8 @@ import {
 } from "@/lib/assignments/mediaPreload";
 import type { FinalStats, ReviewItem, QuestionAny, AssignmentData, MaterialData } from "@/lib/assignments/types";
 import type { InfoBlock } from "@/app/(admin)/admin/assignments/builder/types";
-import { validateAllAnswered, calcAndBuildReview, isQuestionAnswered } from "@/lib/assignments/scoring";
+import { validateAllAnswered, calcAndBuildReview, isQuestionAnswered, deriveScoreFromPoints } from "@/lib/assignments/scoring";
+import QuestionRichText from "./components/QuestionRichText";
 
 import {
   recommendGatehouseLevel,
@@ -87,6 +88,19 @@ function getAssignmentMaterialLevels(assignment: AssignmentData | null): string[
   if (direct.length) return direct;
 
   return normalizeStringArray(getAssignmentMaterial(assignment)?.target_levels);
+}
+
+function resolveDisplayScore(stats: FinalStats, serverScore?: number | null): number {
+  const fromPoints = deriveScoreFromPoints(stats.pointsEarned, stats.pointsTotal);
+  const normalizedServer =
+    serverScore !== undefined && serverScore !== null && Number.isFinite(Number(serverScore))
+      ? Math.max(0, Math.min(100, Math.round(Number(serverScore))))
+      : null;
+
+  if (normalizedServer !== null && normalizedServer > 0) return normalizedServer;
+  if (fromPoints > 0) return fromPoints;
+  if (normalizedServer !== null) return normalizedServer;
+  return Number.isFinite(stats.score) ? stats.score : 0;
 }
 
 function getFeedbackMessage(score: number, ranges?: any[]): string {
@@ -500,16 +514,18 @@ export default function AssignmentClient({
       const json = await res.json();
 
       if (res.ok && json?.ok) {
-        const serverScore = json.score !== undefined ? json.score : clientStats.score;
-        const finalStatsToDisplay = { ...clientStats, score: serverScore };
+        const finalStatsToDisplay = {
+          ...clientStats,
+          score: resolveDisplayScore(clientStats, json.score),
+        };
 
         if (isGatehouse && json.recommendation) {
           setGatehouseRecommendation(json.recommendation);
         } else if (isGatehouse) {
           const recommendation = recommendGatehouseLevel({
-            score: serverScore,
+            score: finalStatsToDisplay.score,
             maxScore: 100,
-            percent: serverScore,
+            percent: finalStatsToDisplay.score,
             materialLevels: getAssignmentMaterialLevels(assignment),
           });
           setGatehouseRecommendation(recommendation);
@@ -821,8 +837,8 @@ export default function AssignmentClient({
                     <div key={currentIndex} className="premium-card active-question" style={{ background: theme.cardBg }}>
                       {questions[currentIndex]!.q && (
                         <h2 className="question-title">
-                          {questions.length > 1 ? `${currentIndex + 1}. ` : ""}
-                          {questions[currentIndex]!.q}
+                          {questions.length > 1 ? `${currentIndex + 1}. ` : null}
+                          <QuestionRichText as="span" text={questions[currentIndex]!.q} />
                         </h2>
                       )}
 
