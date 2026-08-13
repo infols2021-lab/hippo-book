@@ -56,6 +56,7 @@ export default function ProductTour() {
   const targetRetryCount = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rewardsModalReadyRef = useRef(false);
+  const rewardsTourBootRef = useRef(false);
   const handledStepAdvanceRef = useRef<string | null>(null);
   const pathnameRef = useRef(pathname);
   const stageRef = useRef(stage);
@@ -196,6 +197,12 @@ export default function ProductTour() {
   );
 
   useEffect(() => {
+    if (stage !== "rewards_tour") {
+      rewardsTourBootRef.current = false;
+    }
+  }, [stage]);
+
+  useEffect(() => {
     clearRetryTimer();
     targetRetryCount.current = 0;
     handledStepAdvanceRef.current = null;
@@ -216,8 +223,13 @@ export default function ProductTour() {
 
     if (activeOnPath) {
       let resumeIndex = getInitialTourStepIndex(stage, pathname, steps as CustomTourStep[]);
-      if (stage === "rewards_tour" && prevStageRef.current !== "rewards_tour") {
-        resumeIndex = 0;
+      if (stage === "rewards_tour") {
+        if (!rewardsTourBootRef.current) {
+          resumeIndex = 0;
+          rewardsTourBootRef.current = true;
+        } else {
+          resumeIndex = stepIndexRef.current;
+        }
       }
       prevStageRef.current = stage;
       setStepIndex(resumeIndex);

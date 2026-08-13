@@ -41,6 +41,7 @@ const DEFAULT_PROXY_PUBLIC_BUCKETS = [
   "streak_icon_assets",
   "streak-roadmap-bg",
   "profile-backgrounds",
+  "media",
 ];
 
 function getAllowedPublicBuckets(): string[] {
@@ -142,7 +143,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
   return NextResponse.redirect(targetUrl, {
     status: 307,
     headers: {
-      "Cache-Control": "public, max-age=86400, s-maxage=86400",
+      "Cache-Control": "public, max-age=31536000, immutable, s-maxage=31536000",
     },
   });
 }

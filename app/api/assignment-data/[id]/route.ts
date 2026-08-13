@@ -11,6 +11,7 @@ import {
   assertOlympiadAssignmentAccess,
   assertGatehouseAssignmentAccess,
 } from "@/lib/assignments/access";
+import { rewriteAssignmentMediaUrls } from "@/lib/assignments/resolveMediaUrls";
 
 // ----------------------------------------------------------------------------
 // Вспомогательные функции
@@ -168,9 +169,9 @@ export async function GET(
       progressRow = data;
     }
 
-    // 8. Ответ
+    // 8. Ответ — медиа сразу на CDN, без лишнего редиректа через Vercel
     return ok({
-      assignment,
+      assignment: rewriteAssignmentMediaUrls(assignment),
       progress: progressRow
         ? {
             is_completed: Boolean(progressRow.is_completed),

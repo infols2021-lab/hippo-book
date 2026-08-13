@@ -13,6 +13,7 @@ const KNOWN_STORAGE_BUCKETS = [
   "streak_icon_assets",
   "streak-roadmap-bg",
   "profile-backgrounds",
+  "media",
 ];
 
 /**

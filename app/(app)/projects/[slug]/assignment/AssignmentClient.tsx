@@ -18,6 +18,11 @@ import ImageModal from "./components/ImageModal";
 import BlockRenderer from "./components/BlockRenderer";
 
 import { getImageUrl } from "@/lib/assignments/image";
+import {
+  ensureMediaPreconnect,
+  getQuestionMediaUrls,
+  warmAssignmentMediaCache,
+} from "@/lib/assignments/mediaPreload";
 import type { FinalStats, ReviewItem, QuestionAny, AssignmentData, MaterialData } from "@/lib/assignments/types";
 import type { InfoBlock } from "@/app/(admin)/admin/assignments/builder/types";
 import { validateAllAnswered, calcAndBuildReview, isQuestionAnswered } from "@/lib/assignments/scoring";
@@ -134,35 +139,33 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
   const saveBusyRef = useRef(false);
 
   useEffect(() => {
+    ensureMediaPreconnect();
+  }, []);
+
+  useEffect(() => {
+    if (loading || err) return;
+
+    if (assignmentMode === "interactive" && questions.length > 0) {
+      const current = questions[currentIndex];
+      const next = questions[currentIndex + 1];
+      warmAssignmentMediaCache(
+        { questions },
+        { priorityUrls: [...getQuestionMediaUrls(current), ...getQuestionMediaUrls(next)] }
+      );
+      return;
+    }
+
+    if (assignmentMode === "informational" && blocks.length > 0) {
+      warmAssignmentMediaCache({ blocks });
+    }
+  }, [assignmentMode, blocks, currentIndex, err, loading, questions]);
+
+  useEffect(() => {
     if (assignmentMode !== "interactive") return;
-    const nextIndex = currentIndex + 1;
-    if (!questions[nextIndex]) return;
-
-    const nextQ = questions[nextIndex];
-    const urls: { type: string; url: string }[] = [];
-
-    if (Array.isArray(nextQ.media)) {
-      for (const m of nextQ.media) {
-        if (m?.url) urls.push({ type: m.type || "unknown", url: getImageUrl(m.url) });
-      }
-    }
-    if ((nextQ as any).image) {
-      urls.push({ type: "image", url: getImageUrl((nextQ as any).image) });
-    }
-
-    const preloads = urls.map(({ type, url }) => {
-      if (type.startsWith("image") || url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i)) {
-        const img = new window.Image();
-        img.src = url;
-        return { cleanup: () => {} };
-      }
-      return { cleanup: () => {} };
-    });
-
-    return () => {
-      preloads.forEach(p => p.cleanup());
-    };
-  }, [currentIndex, questions, assignmentMode]);
+    const upcoming = questions.slice(currentIndex + 1, currentIndex + 3);
+    if (!upcoming.length) return;
+    warmAssignmentMediaCache({ questions: upcoming });
+  }, [assignmentMode, currentIndex, questions]);
 
   const isGatehouse = useMemo(() => {
     const s = String(source ?? "").trim().toLowerCase();
@@ -237,10 +240,14 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
 
       if (isIntro) {
         setAssignmentMode("informational");
-        setBlocks(data?.content?.blocks || []);
+        const nextBlocks = data?.content?.blocks || [];
+        setBlocks(nextBlocks);
+        warmAssignmentMediaCache({ blocks: nextBlocks });
       } else {
         setAssignmentMode("interactive");
-        setQuestions(normalizeQuestions(data?.content?.questions));
+        const nextQuestions = normalizeQuestions(data?.content?.questions);
+        setQuestions(nextQuestions);
+        warmAssignmentMediaCache({ questions: nextQuestions });
       }
 
       if (guestMode) {
@@ -743,7 +750,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
                           <div className="materials-block">
                             <div className="materials-label">МАТЕРИАЛЫ К ВОПРОСУ</div>
                             {(questions[currentIndex]!.media?.length ?? 0) > 0 && (
-                              <MediaRenderer media={questions[currentIndex]!.media} />
+                              <MediaRenderer media={questions[currentIndex]!.media} priority />
                             )}
                             {!(questions[currentIndex]!.media?.length ?? 0) &&
                               questions[currentIndex]!.image &&

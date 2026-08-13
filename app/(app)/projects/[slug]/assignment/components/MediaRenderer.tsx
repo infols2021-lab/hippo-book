@@ -210,7 +210,7 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
         margin: "10px 0",
       }}
     >
-      <audio ref={audioRef} src={finalUrl} preload="metadata" />
+      <audio ref={audioRef} src={finalUrl} preload="auto" />
 
       {/* ── Кнопка Play / Pause ── */}
       <button
@@ -343,10 +343,12 @@ function ZoomableImage({
   url,
   name,
   onZoom,
+  priority = false,
 }: {
   url: string;
   name?: string;
   onZoom?: (imageUrl: string) => void;
+  priority?: boolean;
 }) {
   const isMounted = useRef(true);
 
@@ -481,8 +483,9 @@ function ZoomableImage({
           alt={name || "Task Image"}
           onLoad={handleLoad}
           onError={handleError}
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
           decoding="async"
+          fetchPriority={priority ? "high" : "auto"}
           style={{
             width: "100%",
             maxHeight: "400px",
@@ -594,7 +597,13 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
 // ГЛАВНЫЙ РЕНДЕРЕР
 // ============================================================================
 
-export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) {
+export default function MediaRenderer({
+  media,
+  priority = false,
+}: {
+  media?: MediaAttachment[];
+  priority?: boolean;
+}) {
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [imageModalSrc, setImageModalSrc] = useState("");
 
@@ -619,7 +628,7 @@ export default function MediaRenderer({ media }: { media?: MediaAttachment[] }) 
           if (m.type === "audio")
             return <CustomAudioPlayer key={key} url={m.url} name={m.name} />;
           if (m.type === "image")
-            return <ZoomableImage key={key} url={m.url} name={m.name} onZoom={handleZoom} />;
+            return <ZoomableImage key={key} url={m.url} name={m.name} onZoom={handleZoom} priority={priority} />;
           if (m.type === "pdf")
             return <PdfViewer key={key} url={m.url} name={m.name} />;
           return null;
