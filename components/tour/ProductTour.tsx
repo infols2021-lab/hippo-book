@@ -117,6 +117,16 @@ export default function ProductTour() {
     if (stage !== "requests_info" || stepIndex !== 1) return;
     const timer = setTimeout(() => {
       document
+        .querySelector<HTMLElement>('[data-tour="requests-project-switcher"]')
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [stage, stepIndex]);
+
+  useEffect(() => {
+    if (stage !== "requests_info" || stepIndex !== 2) return;
+    const timer = setTimeout(() => {
+      document
         .querySelector<HTMLElement>('[data-tour="create-request-btn"]')
         ?.scrollIntoView({ block: "center", behavior: "smooth" });
     }, 280);

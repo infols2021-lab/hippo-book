@@ -515,9 +515,9 @@ export default function RewardsModal({
             ) : (
               <>
                 {activeTab === "wardrobe" && (
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 h-full">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 min-h-0">
                     <div
-                      className="md:col-span-5 border rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col items-center justify-center relative shadow-sm"
+                      className="md:col-span-5 border rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col items-center justify-center relative shadow-sm min-h-[220px] md:min-h-[280px] md:max-h-[420px]"
                       style={{
                         backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 2%, transparent)",
                         borderColor: "var(--glass-border, rgba(15,23,42,0.08))",
@@ -529,7 +529,7 @@ export default function RewardsModal({
                       </div>
                     </div>
 
-                    <div className="md:col-span-7 flex flex-col space-y-3 sm:space-y-4">
+                    <div className="md:col-span-7 flex flex-col space-y-3 sm:space-y-4 min-h-0">
                       <div
                         className="flex gap-2 border-b pb-2.5 overflow-x-auto no-scrollbar"
                         style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
@@ -567,12 +567,12 @@ export default function RewardsModal({
                       </div>
 
                       <div
-                        className={`flex-1 overflow-y-auto pr-1 ${
+                        className={`overflow-y-auto overscroll-contain pr-1 min-h-0 max-h-[min(52vh,420px)] sm:max-h-[min(46vh,460px)] ${
                           wardrobeCategory === "title"
                             ? "flex flex-col gap-2.5"
                             : wardrobeCategory === "base"
-                            ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-2.5"
-                            : "grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3"
+                            ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-2.5 items-start content-start auto-rows-max"
+                            : "grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 items-start content-start auto-rows-max"
                         }`}
                       >
                         {filteredInventory.length === 0 ? (
@@ -602,7 +602,7 @@ export default function RewardsModal({
                                   onClick={() =>
                                     handleEquip(wardrobeCategory, equipped ? null : item.reward!.id)
                                   }
-                                  className="border rounded-xl p-2 sm:p-2.5 flex flex-col items-center gap-1.5 cursor-pointer transition-all"
+                                  className="border rounded-xl p-2 sm:p-2.5 flex flex-col items-center gap-1.5 cursor-pointer transition-all w-full"
                                   style={{
                                     backgroundColor: equipped
                                       ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
@@ -711,7 +711,7 @@ export default function RewardsModal({
                                 onClick={() =>
                                   handleEquip(wardrobeCategory, equipped ? null : item.reward!.id)
                                 }
-                                className="border rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-between cursor-pointer transition-all min-h-[110px]"
+                                className="border rounded-2xl p-3 sm:p-3.5 flex flex-col items-center gap-2 cursor-pointer transition-all w-full"
                                 style={{
                                   backgroundColor: equipped
                                     ? "color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent)"
@@ -721,19 +721,23 @@ export default function RewardsModal({
                                     : "var(--glass-border, rgba(15,23,42,0.08))",
                                 }}
                               >
-                                {equipped && (
-                                  <span
-                                    className="self-end text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider"
-                                    style={{
-                                      backgroundColor: "var(--project-primary, #0ea5e9)",
-                                      color: "#ffffff",
-                                    }}
-                                  >
-                                    Надето
-                                  </span>
-                                )}
+                                <div className="w-full flex items-start justify-between gap-1 min-h-[18px]">
+                                  {equipped ? (
+                                    <span
+                                      className="text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ml-auto"
+                                      style={{
+                                        backgroundColor: "var(--project-primary, #0ea5e9)",
+                                        color: "#ffffff",
+                                      }}
+                                    >
+                                      Надето
+                                    </span>
+                                  ) : (
+                                    <span className="w-1" aria-hidden="true" />
+                                  )}
+                                </div>
 
-                                <div className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center my-2">
+                                <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center flex-shrink-0">
                                   {item.reward.asset_url ? (
                                     <img
                                       src={item.reward.asset_url}
@@ -747,8 +751,10 @@ export default function RewardsModal({
                                   )}
                                 </div>
 
-                                <div className="text-center w-full">
-                                  <div className="font-bold text-[11px] sm:text-xs truncate">{item.reward.title}</div>
+                                <div className="text-center w-full min-w-0">
+                                  <div className="font-bold text-[11px] sm:text-xs truncate leading-tight">
+                                    {item.reward.title}
+                                  </div>
                                 </div>
                               </div>
                             );

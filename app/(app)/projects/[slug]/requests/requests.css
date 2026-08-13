@@ -115,6 +115,34 @@
   margin-bottom: 14px;
 }
 
+.project-pill {
+  position: relative;
+}
+
+.project-pill--pending {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #f59e0b 28%, transparent);
+}
+
+.project-pill-alert {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 2px solid var(--project-card-bg, #ffffff);
+  pointer-events: none;
+}
+
 .materials-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(168px, 200px));

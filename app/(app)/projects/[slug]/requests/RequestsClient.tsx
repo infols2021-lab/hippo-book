@@ -232,6 +232,16 @@ export default function RequestsClient({
     return map;
   }, [availableProjects]);
 
+  const pendingByProject = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of requests) {
+      if (!r.is_processed && r.project_id) {
+        map.set(r.project_id, (map.get(r.project_id) || 0) + 1);
+      }
+    }
+    return map;
+  }, [requests]);
+
   const showProjectSwitcher = availableProjects.length > 1;
 
   const [modalStep, setModalStep] = useState<1 | 2>(1);
@@ -616,20 +626,38 @@ export default function RequestsClient({
       <div
         className="level-filter-container"
         style={{ marginBottom: inModal ? 12 : 20 }}
+        data-tour={inModal ? undefined : "requests-project-switcher"}
       >
         <div className="level-filter-title">Направление:</div>
         <div className="level-filter-chips no-scrollbar">
-          {availableProjects.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`btn small ${activeProject.slug === p.slug ? "" : "ghost"}`}
-              onClick={() => void switchProject(p.slug)}
-              disabled={projectSwitching || busy}
-            >
-              {p.name}
-            </button>
-          ))}
+          {availableProjects.map((p) => {
+            const pendingCount = pendingByProject.get(p.id) ?? 0;
+            const hasPending = pendingCount > 0;
+
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className={`btn small project-pill ${activeProject.slug === p.slug ? "" : "ghost"} ${
+                  hasPending ? "project-pill--pending" : ""
+                }`}
+                onClick={() => void switchProject(p.slug)}
+                disabled={projectSwitching || busy}
+                title={
+                  hasPending
+                    ? `${pendingCount} необработанных заявок`
+                    : undefined
+                }
+              >
+                {hasPending && (
+                  <span className="project-pill-alert" aria-hidden="true">
+                    !
+                  </span>
+                )}
+                {p.name}
+              </button>
+            );
+          })}
         </div>
       </div>
     );

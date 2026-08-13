@@ -227,9 +227,21 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       primaryLabel: "Далее",
     },
     {
+      target: visibleTourTarget('[data-tour="requests-project-switcher"]'),
+      title: "Все направления в одном месте",
+      content:
+        "Переключайте направление прямо на этой странице — не нужно возвращаться в портал. Выберите проект, откройте каталог материалов и создайте заявку для него здесь же.",
+      mascotImage: pickMascotImage("requests_info_projects"),
+      skipBeacon: true,
+      primaryLabel: "Далее",
+      placement: "bottom",
+      blockTargetInteraction: true,
+    },
+    {
       target: visibleTourTarget('[data-tour="create-request-btn"]'),
       title: "Создание заявки",
-      content: "Новые заявки создаются здесь. Сейчас нажимать не обязательно - достаточно запомнить расположение кнопки.",
+      content:
+        "Новые заявки создаются здесь. Сейчас нажимать не обязательно — достаточно запомнить расположение кнопки.",
       mascotImage: pickMascotImage("requests_info_btn"),
       skipBeacon: true,
       hideNextButton: false,
@@ -377,6 +389,13 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
       },
       {
         ...base[1],
+        placement: "bottom",
+        skipScroll: true,
+        blockTargetInteraction: true,
+        primaryLabel: "Далее",
+      },
+      {
+        ...base[2],
         placement: "top",
         skipScroll: true,
         blockTargetInteraction: true,

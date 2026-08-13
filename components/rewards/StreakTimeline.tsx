@@ -244,7 +244,7 @@ export default function StreakTimeline({
                 return (
                   <div
                     key={item.day_number}
-                    className="grid grid-cols-2 gap-2 sm:gap-4 items-center relative"
+                    className="grid grid-cols-2 gap-2 sm:gap-4 items-start relative"
                   >
                     {/* МЕТКА ДНЯ */}
                     <div className="absolute left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
