@@ -6,7 +6,7 @@ import ImageUpload from "./ImageUpload";
 import MediaUpload from "./MediaUpload";
 import QuestionTypeSwitch from "./QuestionTypeSwitch";
 import type { Question, QuestionType } from "./types";
-import QuestionRichText from "@/app/(app)/projects/[slug]/assignment/components/QuestionRichText";
+import QuestionTextPreview from "./QuestionTextPreview";
 
 import TestEditor from "./test/TestEditor";
 import FillEditor from "./fill/FillEditor";
@@ -332,14 +332,9 @@ export default function QuestionItem({
                 B Жирный
               </button>
             </div>
-            {localText.trim() && (
-              <div className="question-text-preview">
-                <div className="question-text-preview-label">Предпросмотр:</div>
-                <QuestionRichText text={localText} className="question-text-preview-body" />
-              </div>
-            )}
+            {localText.trim() && <QuestionTextPreview text={localText} />}
             <div className="format-hint">
-              💡 Enter — перенос строки. **так** — жирный текст. Работает в JSON и в админке.
+              💡 В поле выше — разметка (**так**). Ниже в предпросмотре — как увидит ученик.
             </div>
           </div>
         )}

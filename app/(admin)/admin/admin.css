@@ -737,6 +737,16 @@
   font-size: 15px;
   line-height: 1.5;
   color: #0f172a;
+  font-weight: 400;
+}
+
+.admin-root .question-text-preview-body strong,
+.admin-root .question-text-preview-body .rich-text-bold {
+  font-weight: 800;
+}
+
+.admin-root .question-text-preview-body .rich-text-normal {
+  font-weight: 400;
 }
 
 .admin-root .sentence-preview-cloze {

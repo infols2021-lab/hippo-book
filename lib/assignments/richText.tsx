@@ -83,7 +83,7 @@ export function RichTextContent({
             </strong>
           );
         }
-        return <span key={`t-${index}`}>{seg.value}</span>;
+        return <span key={`t-${index}`} className="rich-text-normal">{seg.value}</span>;
       })}
     </Tag>
   );
