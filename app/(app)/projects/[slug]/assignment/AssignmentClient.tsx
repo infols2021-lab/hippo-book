@@ -18,7 +18,7 @@ import ImageModal from "./components/ImageModal";
 import BlockRenderer from "./components/BlockRenderer";
 
 import { getImageUrl } from "@/lib/assignments/image";
-import type { FinalStats, ReviewItem, QuestionAny, AssignmentData } from "@/lib/assignments/types";
+import type { FinalStats, ReviewItem, QuestionAny, AssignmentData, MaterialData } from "@/lib/assignments/types";
 import type { InfoBlock } from "@/app/(admin)/admin/assignments/builder/types";
 import { validateAllAnswered, calcAndBuildReview, isQuestionAnswered } from "@/lib/assignments/scoring";
 
@@ -66,14 +66,20 @@ function normalizeStringArray(value: unknown): string[] {
   return value.map((item) => String(item ?? "").trim()).filter(Boolean);
 }
 
+function getAssignmentMaterial(assignment: AssignmentData | null): MaterialData | null {
+  if (!assignment) return null;
+
+  const materials = assignment.materials || assignment.material;
+  const material = Array.isArray(materials) ? materials[0] : materials;
+  return material ?? null;
+}
+
 function getAssignmentMaterialLevels(assignment: AssignmentData | null): string[] {
   if (!assignment) return [];
   const direct = normalizeStringArray(assignment.target_levels);
   if (direct.length) return direct;
 
-  const materials = assignment.materials || assignment.material;
-  const material = Array.isArray(materials) ? materials[0] : materials;
-  return normalizeStringArray(material?.target_levels);
+  return normalizeStringArray(getAssignmentMaterial(assignment)?.target_levels);
 }
 
 function getFeedbackMessage(score: number, ranges?: any[]): string {
@@ -196,9 +202,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     const basePath = `/projects/${projectSlug}/materials`;
 
     if (!id && assignment) {
-      const mat = Array.isArray(assignment.materials)
-        ? assignment.materials[0]
-        : assignment.material || assignment.materials;
+      const mat = getAssignmentMaterial(assignment);
       id = String(assignment.material_id || mat?.id || "").trim();
       if (!s && mat?.material_kind) {
         s = mat.material_kind === "crossword" ? "crossword" : "textbook";
