@@ -11,8 +11,8 @@ import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal"
 import { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTimeline";
 import { useTour } from "@/components/tour/TourProvider";
 import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
-import { dispatchBurgerClicked, dispatchTourPageReady } from "@/lib/tour/tourMobile";
-import { saveTourProgress } from "@/lib/tour/tourPersistence";
+import { dispatchBurgerClicked, dispatchTourPageReady, dispatchTourRewardsForceTab } from "@/lib/tour/tourMobile";
+import { saveTourProgress, clearTourProgress } from "@/lib/tour/tourPersistence";
 
 import "./profile.css";
 
@@ -221,10 +221,11 @@ export default function ProfileClient({
 
   useEffect(() => {
     if (stage === "rewards_tour") {
+      clearTourProgress();
       saveTourProgress("rewards_tour", 0, window.location.pathname);
       setRewardsInitialTab("wardrobe");
       setRewardsModalOpen(true);
-      window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: "wardrobe" }));
+      dispatchTourRewardsForceTab("wardrobe");
     }
   }, [stage]);
 
@@ -347,6 +348,7 @@ export default function ProfileClient({
     setRewardsInitialTab(stage === "rewards_gate" ? "wardrobe" : tab);
     setRewardsModalOpen(true);
     if (stage === "rewards_gate") {
+      clearTourProgress();
       saveTourProgress("rewards_tour", 0, window.location.pathname);
       advanceTour("rewards_tour");
     }
@@ -520,6 +522,7 @@ export default function ProfileClient({
         <RewardsModal
           isOpen={rewardsModalOpen}
           initialTab={rewardsInitialTab}
+          tourMode={stage === "rewards_tour"}
           onClose={() => {
             setRewardsModalOpen(false);
             void fetchStreakData();

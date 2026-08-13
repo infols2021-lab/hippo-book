@@ -194,6 +194,7 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
 
             {/* Десктоп: сетка карточек (без изменений) */}
             <div
+              data-tour="portal-directions"
               className={`
                 hidden md:grid items-stretch min-h-0 flex-1 gap-5 md:gap-6
                 ${

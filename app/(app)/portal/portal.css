@@ -700,3 +700,15 @@ body.portal-tour-active .react-joyride__overlay {
 body.portal-tour-active .react-joyride__spotlight {
   border-radius: 20px !important;
 }
+
+/* Выбор направления: все карточки кликабельны, оверлей не перехватывает клики */
+body.portal-tour-active [data-tour="direction-card"],
+body.portal-tour-active [data-tour="portal-directions"],
+body.portal-tour-active [data-tour="portal-carousel-track"] {
+  pointer-events: auto !important;
+}
+
+body.portal-tour-active [data-tour="direction-card"] {
+  position: relative;
+  z-index: 10055;
+}

@@ -44,6 +44,10 @@ export function dispatchTourRewardsModalReady() {
   window.dispatchEvent(new Event(TOUR_REWARDS_MODAL_READY));
 }
 
+export function dispatchTourRewardsForceTab(tab: "wardrobe" | "streaks" | "referral" | "promos") {
+  window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: tab }));
+}
+
 export function setTourSheetActive(active: boolean) {
   document.body.classList.toggle(TOUR_SHEET_ACTIVE_CLASS, active);
 }

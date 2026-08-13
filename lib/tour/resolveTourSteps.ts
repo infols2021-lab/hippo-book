@@ -1,6 +1,6 @@
 import type { TourStage } from "@/lib/tour/tourConfig";
 import { pickMascotImage } from "@/lib/tour/mascotImages";
-import { visiblePortalCard, visibleTourTarget, visibleMobileMenuTarget } from "@/lib/tour/tourTargets";
+import { visiblePortalDirections, visibleTourTarget, visibleMobileMenuTarget } from "@/lib/tour/tourTargets";
 import type { CustomTourStep } from "@/components/tour/TourSteps";
 import { isMobileViewport, isMobileMenuGateStage } from "@/lib/tour/tourMobile";
 import { getPortalProjectCount } from "@/lib/tour/tourPortal";
@@ -104,12 +104,13 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
   ],
   direction_gate: [
     {
-      target: visiblePortalCard,
+      target: visiblePortalDirections,
       title: "Выберите направление",
       content: "Чтобы продолжить, выберите любую карточку направления и нажмите на неё.",
       mascotImage: pickMascotImage("direction_gate"),
       skipBeacon: true,
       hideNextButton: true,
+      hideOverlay: true,
       blockTargetInteraction: false,
     },
   ],
@@ -310,13 +311,14 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
 
     const cardStep: CustomTourStep = {
       ...base[0],
-      target: visibleTourTarget('[data-tour="portal-card-cta"]', '[data-tour="direction-card"]'),
+      target: visiblePortalDirections,
       placement: "top",
       skipScroll: true,
       portalTheme: true,
       portalMobileDock: true,
-      scrollPortalCard: true,
-      content: "Нажмите «Перейти» на карточке, чтобы войти в выбранное направление.",
+      hideOverlay: true,
+      blockTargetInteraction: false,
+      content: "Нажмите на любое направление в списке — откроется профиль этой ветки.",
     };
 
     return [swipeStep, cardStep];
@@ -418,10 +420,16 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
   }
 
   if (stage === "rewards_tour" && isMobile) {
+    const rewardTabs = ["wardrobe", "streaks", "referral", "promos"] as const;
     return base.map((step, index) => ({
       ...step,
-      placement: index === 0 ? ("bottom" as const) : ("top" as const),
+      target: "body",
+      placement: "center" as const,
       skipScroll: true,
+      skipBeacon: true,
+      disableScrolling: true,
+      targetWaitTimeout: 8000,
+      rewardTab: rewardTabs[index] ?? "wardrobe",
     }));
   }
 

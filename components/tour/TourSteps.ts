@@ -6,6 +6,7 @@ import { BASE_TOUR_STEPS } from "@/lib/tour/resolveTourSteps";
 export interface CustomTourStep extends Step {
   mascotImage?: string;
   skipBeacon?: boolean;
+  hideOverlay?: boolean;
   blockTargetInteraction?: boolean;
   overlayClickAction?: false | "close" | "next" | "replay";
   hideNextButton?: boolean;
@@ -26,6 +27,8 @@ export interface CustomTourStep extends Step {
   portalTheme?: boolean;
   /** Компактный док внизу экрана (мобильный портал). */
   portalMobileDock?: boolean;
+  /** Вкладка модалки наград для синхронизации на мобилке. */
+  rewardTab?: "wardrobe" | "streaks" | "referral" | "promos";
 }
 
 export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = BASE_TOUR_STEPS;

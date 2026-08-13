@@ -30,6 +30,8 @@ export interface RewardsModalProps {
   onClose: () => void;
   defaultTab?: RewardsTabType;
   initialTab?: RewardsTabType;
+  /** Тур наград активен — вкладки переключает только гайд, стартуем с гардероба. */
+  tourMode?: boolean;
 }
 
 export default function RewardsModal({
@@ -38,6 +40,7 @@ export default function RewardsModal({
   onClose,
   defaultTab = "wardrobe",
   initialTab,
+  tourMode = false,
 }: RewardsModalProps) {
   const showModal = Boolean(isOpen ?? open);
   useBodyScrollLock(showModal);
@@ -90,6 +93,28 @@ export default function RewardsModal({
   }>({ isOpen: false, prize: null });
 
   const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const tourModeRef = useRef(tourMode);
+  tourModeRef.current = tourMode;
+
+  const applyRewardsTab = (mapped: "wardrobe" | "streaks" | "referrals" | "promocode") => {
+    setActiveTab(mapped);
+    requestAnimationFrame(() => scrollRewardTabIntoView(mapped));
+  };
+
+  const selectTab = (tab: "wardrobe" | "streaks" | "promocode" | "referrals") => {
+    if (tourModeRef.current) return;
+    applyRewardsTab(tab);
+  };
+
+  const mapTourTab = (tab: string): "wardrobe" | "streaks" | "referrals" | "promocode" | null => {
+    const tabMap: Record<string, "wardrobe" | "streaks" | "referrals" | "promocode"> = {
+      wardrobe: "wardrobe",
+      streaks: "streaks",
+      referral: "referrals",
+      promos: "promocode",
+    };
+    return tabMap[tab] ?? null;
+  };
 
   const scrollRewardTabIntoView = (mapped: "wardrobe" | "streaks" | "referrals" | "promocode") => {
     const container = tabsContainerRef.current;
@@ -115,18 +140,8 @@ export default function RewardsModal({
   // Перехватываем сигналы от ProductTour для переключения вкладок
   useEffect(() => {
     const handleTourTab = (e: CustomEvent | Event) => {
-      const tab = (e as CustomEvent).detail;
-      const tabMap: Record<string, "wardrobe" | "streaks" | "referrals" | "promocode"> = {
-        wardrobe: "wardrobe",
-        streaks: "streaks",
-        referral: "referrals",
-        promos: "promocode",
-      };
-      const mapped = tabMap[tab as string];
-      if (mapped) {
-        setActiveTab(mapped);
-        requestAnimationFrame(() => scrollRewardTabIntoView(mapped));
-      }
+      const mapped = mapTourTab(String((e as CustomEvent).detail ?? ""));
+      if (mapped) applyRewardsTab(mapped);
     };
 
     window.addEventListener("tour:show-reward-tab", handleTourTab);
@@ -146,12 +161,19 @@ export default function RewardsModal({
   }, [showModal, loading]);
 
   useEffect(() => {
-    if (showModal) {
-      const tab = normalizeTab(initialTab || defaultTab);
-      setActiveTab(tab);
-      requestAnimationFrame(() => scrollRewardTabIntoView(tab));
+    if (!showModal) return;
+    if (tourMode) {
+      applyRewardsTab("wardrobe");
+      return;
     }
-  }, [showModal, initialTab, defaultTab]);
+    const tab = normalizeTab(initialTab || defaultTab);
+    applyRewardsTab(tab);
+  }, [showModal, initialTab, defaultTab, tourMode]);
+
+  useEffect(() => {
+    if (!showModal || !tourMode) return;
+    applyRewardsTab("wardrobe");
+  }, [tourMode, showModal]);
 
   const loadData = async () => {
     setLoading(true);
@@ -415,7 +437,7 @@ export default function RewardsModal({
                 id="tour-wardrobe"
                 data-tour="wardrobe-tab"
                 type="button"
-                onClick={() => setActiveTab("wardrobe")}
+                onClick={() => selectTab("wardrobe")}
                 className="flex-shrink-0 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
                 style={{
                   backgroundColor:
@@ -429,7 +451,7 @@ export default function RewardsModal({
                 id="tour-streaks"
                 data-tour="streaks-tab"
                 type="button"
-                onClick={() => setActiveTab("streaks")}
+                onClick={() => selectTab("streaks")}
                 className="flex-shrink-0 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
                 style={{
                   backgroundColor:
@@ -444,7 +466,7 @@ export default function RewardsModal({
                 id="tour-referral"
                 data-tour="referral-tab"
                 type="button"
-                onClick={() => setActiveTab("referrals")}
+                onClick={() => selectTab("referrals")}
                 className="flex-shrink-0 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
                 style={{
                   backgroundColor:
@@ -459,7 +481,7 @@ export default function RewardsModal({
                 id="tour-promos"
                 data-tour="promos-tab"
                 type="button"
-                onClick={() => setActiveTab("promocode")}
+                onClick={() => selectTab("promocode")}
                 className="flex-shrink-0 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
                 style={{
                   backgroundColor:

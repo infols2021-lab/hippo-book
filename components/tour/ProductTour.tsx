@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { flushSync } from "react-dom";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { ACTIONS, EVENTS, STATUS } from "react-joyride";
@@ -19,6 +20,7 @@ import {
   TOUR_BURGER_CLICKED,
   TOUR_PAGE_READY,
   TOUR_REWARDS_MODAL_READY,
+  dispatchTourRewardsForceTab,
 } from "@/lib/tour/tourMobile";
 import { isPortalTourStage } from "@/lib/tour/tourConfig";
 import { scrollPortalCardIntoView, setPortalTourActive } from "@/lib/tour/tourPortal";
@@ -31,6 +33,13 @@ const Joyride = dynamic(
   { ssr: false }
 );
 
+const REWARDS_TAB_MAP = ["wardrobe", "streaks", "referral", "promos"] as const;
+
+function syncRewardsTab(stepIndex: number, steps: CustomTourStep[]) {
+  const step = steps[stepIndex] as CustomTourStep | undefined;
+  const tab = step?.rewardTab ?? REWARDS_TAB_MAP[stepIndex] ?? "wardrobe";
+  dispatchTourRewardsForceTab(tab);
+}
 const MAX_TARGET_RETRIES = 8;
 const MAX_REWARDS_TARGET_RETRIES = 24;
 const TARGET_RETRY_DELAY_MS = 400;
@@ -56,7 +65,9 @@ export default function ProductTour() {
   const targetRetryCount = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rewardsModalReadyRef = useRef(false);
-  const rewardsTourBootRef = useRef(false);
+  const rewardsTourInitDoneRef = useRef(false);
+  const rewardsTourStartingRef = useRef(false);
+  const rewardsTourSessionRef = useRef(0);
   const handledStepAdvanceRef = useRef<string | null>(null);
   const pathnameRef = useRef(pathname);
   const stageRef = useRef(stage);
@@ -153,15 +164,15 @@ export default function ProductTour() {
           return;
         }
 
-        const tabMap = ["wardrobe", "streaks", "referral", "promos"] as const;
-        const currentTab = tabMap[stepIndexRef.current] ?? "wardrobe";
-        if (stepIndexRef.current === 0) {
-          document.querySelector<HTMLElement>('[data-tour="wardrobe-tab"]')?.scrollIntoView({
-            block: "nearest",
-            inline: "start",
-          });
+        const currentSteps = getResolvedTourSteps(stageRef.current, isMobileViewport()) as CustomTourStep[];
+        let idx = stepIndexRef.current;
+        if (rewardsTourStartingRef.current) {
+          idx = 0;
+          stepIndexRef.current = 0;
+          flushSync(() => setStepIndex(0));
+          rewardsTourStartingRef.current = false;
         }
-        window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: currentTab }));
+        syncRewardsTab(idx, currentSteps);
         abortTourRunRef.current = false;
         setRun(true);
       }, delay);
@@ -198,11 +209,53 @@ export default function ProductTour() {
 
   useEffect(() => {
     if (stage !== "rewards_tour") {
-      rewardsTourBootRef.current = false;
+      rewardsTourInitDoneRef.current = false;
+      rewardsTourStartingRef.current = false;
+      return;
     }
+
+    if (prevStageRef.current !== "rewards_tour") {
+      rewardsTourSessionRef.current += 1;
+      rewardsTourInitDoneRef.current = false;
+      rewardsTourStartingRef.current = true;
+      flushSync(() => {
+        setStepIndex(0);
+        setRun(false);
+      });
+      stepIndexRef.current = 0;
+      dispatchTourRewardsForceTab("wardrobe");
+    }
+    prevStageRef.current = stage;
   }, [stage]);
 
+  // Отдельная одноразовая инициализация тура наград (мобилка ждёт steps после isMobile).
   useEffect(() => {
+    if (stage !== "rewards_tour") return;
+    if (!steps.length) return;
+    if (!isTourStageActiveOnPath("rewards_tour", pathname)) return;
+    if (rewardsTourInitDoneRef.current) return;
+
+    rewardsTourInitDoneRef.current = true;
+    targetRetryCount.current = 0;
+    handledStepAdvanceRef.current = null;
+    rewardsTourStartingRef.current = true;
+    flushSync(() => {
+      setStepIndex(0);
+      setRun(false);
+    });
+    stepIndexRef.current = 0;
+    saveTourProgress("rewards_tour", 0, pathname);
+    rewardsModalReadyRef.current = false;
+    prepareStepEnvironment(0, steps as CustomTourStep[]);
+    syncRewardsTab(0, steps as CustomTourStep[]);
+    scheduleRewardsTourRun();
+  }, [stage, pathname, steps.length, prepareStepEnvironment, scheduleRewardsTourRun]);
+
+  useEffect(() => {
+    if (stage === "rewards_tour") {
+      return;
+    }
+
     clearRetryTimer();
     targetRetryCount.current = 0;
     handledStepAdvanceRef.current = null;
@@ -222,28 +275,14 @@ export default function ProductTour() {
     const activeOnPath = isTourStageActiveOnPath(stage, pathname);
 
     if (activeOnPath) {
-      let resumeIndex = getInitialTourStepIndex(stage, pathname, steps as CustomTourStep[]);
-      if (stage === "rewards_tour") {
-        if (!rewardsTourBootRef.current) {
-          resumeIndex = 0;
-          rewardsTourBootRef.current = true;
-        } else {
-          resumeIndex = stepIndexRef.current;
-        }
-      }
+      const resumeIndex = getInitialTourStepIndex(stage, pathname, steps as CustomTourStep[]);
       prevStageRef.current = stage;
       setStepIndex(resumeIndex);
       stepIndexRef.current = resumeIndex;
       saveTourProgress(stage, resumeIndex, pathname);
       stopTourRun();
       prepareStepEnvironment(resumeIndex, steps as CustomTourStep[]);
-
-      if (stage === "rewards_tour") {
-        rewardsModalReadyRef.current = false;
-        scheduleRewardsTourRun();
-      } else {
-        scheduleRun();
-      }
+      scheduleRun();
     } else {
       stopTourRun();
       releaseTourUi();
@@ -296,7 +335,9 @@ export default function ProductTour() {
       ) {
         targetRetryCount.current = 0;
         if (stageRef.current === "rewards_tour") {
-          scheduleRewardsTourRun(120);
+          if (rewardsTourInitDoneRef.current) {
+            scheduleRewardsTourRun(120);
+          }
         } else {
           scheduleRun(120);
         }
@@ -307,7 +348,8 @@ export default function ProductTour() {
       rewardsModalReadyRef.current = true;
       if (
         stageRef.current === "rewards_tour" &&
-        isTourStageActiveOnPath("rewards_tour", pathnameRef.current)
+        isTourStageActiveOnPath("rewards_tour", pathnameRef.current) &&
+        rewardsTourInitDoneRef.current
       ) {
         targetRetryCount.current = 0;
         scheduleRewardsTourRun(120);
@@ -330,11 +372,8 @@ export default function ProductTour() {
 
   useEffect(() => {
     if (stage !== "rewards_tour" || !run) return;
-
-    const tabMap = ["wardrobe", "streaks", "referral", "promos"] as const;
-    const currentTab = tabMap[stepIndex] ?? "wardrobe";
-    window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: currentTab }));
-  }, [stepIndex, stage, run]);
+    syncRewardsTab(stepIndex, steps as CustomTourStep[]);
+  }, [stepIndex, stage, run, steps]);
 
   const handleJoyrideEvent = (data: EventData, _controls: Controls) => {
     const { status, type, action, index, step } = data;
@@ -344,12 +383,14 @@ export default function ProductTour() {
       const failedIndex = index ?? stepIndexRef.current;
       const failedStep = currentStageSteps[failedIndex] as CustomTourStep | undefined;
 
-      stopTourRun();
-      if (failedStep?.requiresMobileMenu) {
-        setTourSheetActive(true);
-        dispatchCloseMobileMenu();
-      } else {
-        releaseTourUi();
+      if (stageRef.current !== "rewards_tour") {
+        stopTourRun();
+        if (failedStep?.requiresMobileMenu) {
+          setTourSheetActive(true);
+          dispatchCloseMobileMenu();
+        } else {
+          releaseTourUi();
+        }
       }
 
       targetRetryCount.current += 1;
@@ -417,7 +458,11 @@ export default function ProductTour() {
           }
           } else {
             setStepIndex(nextIndex);
+            stepIndexRef.current = nextIndex;
             saveTourProgress(stageRef.current, nextIndex, pathnameRef.current);
+            if (stageRef.current === "rewards_tour") {
+              syncRewardsTab(nextIndex, currentStageSteps as CustomTourStep[]);
+            }
             const nextStep = currentStageSteps[nextIndex] as CustomTourStep | undefined;
             if (nextStep?.requiresMobileMenu) {
               stopTourRun();
@@ -444,8 +489,11 @@ export default function ProductTour() {
       }
 
       // Переход стадии только через STEP_AFTER (клик «Далее»), не при abort/FINISHED
-      if (finishedStage === "rewards_tour") {
-        advanceTour("finished");
+      if (finishedStage !== "rewards_tour") {
+        const config = TOUR_STAGES[finishedStage];
+        if (config?.type === "advanceOnNext" && config.nextStage) {
+          advanceTour(config.nextStage);
+        }
       }
       handledStepAdvanceRef.current = null;
     }
@@ -465,11 +513,13 @@ export default function ProductTour() {
   const menuStepActive = Boolean(steps[stepIndex]?.requiresMobileMenu);
   const portalTourActive = isPortalTourStage(stage);
   const portalMobileTour = portalTourActive && isMobile;
+  const rewardsTourActive = stage === "rewards_tour";
   const currentStep = steps[stepIndex] as CustomTourStep | undefined;
   const portalDock = Boolean(currentStep?.portalMobileDock);
 
   return (
     <Joyride
+      key={rewardsTourActive ? `rewards-tour-${rewardsTourSessionRef.current}` : stage}
       steps={steps}
       run={run}
       stepIndex={stepIndex}
@@ -478,11 +528,11 @@ export default function ProductTour() {
       tooltipComponent={CustomTooltip}
       continuous={true}
       options={{
-        zIndex: menuStepActive ? 10020 : portalTourActive ? 10050 : 10000,
+        zIndex: menuStepActive ? 10020 : portalTourActive ? 10050 : rewardsTourActive ? 10060 : 10000,
         overlayColor: portalMobileTour ? "rgba(3, 7, 18, 0.82)" : portalTourActive ? "rgba(0, 0, 0, 0.78)" : "rgba(0, 0, 0, 0.65)",
         overlayClickAction: false,
         spotlightPadding: portalMobileTour ? 4 : isMobile ? 6 : 10,
-        targetWaitTimeout: menuStepActive ? 5000 : 3000,
+        targetWaitTimeout: rewardsTourActive ? 8000 : menuStepActive ? 5000 : 3000,
         width: joyrideWidth,
         scrollOffset: portalMobileTour ? 0 : isMobile ? 100 : 80,
       }}
