@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import LoadingBlock from "@/components/LoadingBlock";
 import ErrorBox from "@/components/ErrorBox";
 import AssignmentEditor from "./AssignmentEditor";
+import {
+  buildMaterialAssignmentsExportPack,
+  downloadMaterialAssignmentsPack,
+  materialMetaFromSelection,
+  parseMaterialAssignmentsImportPack,
+} from "@/lib/assignments/materialAssignmentsPack";
 
 type AssignmentRow = {
   id: string;
@@ -66,6 +72,9 @@ export default function AssignmentsTab({ onChanged }: Props) {
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<AssignmentRow | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<any | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const isLegacy = selectedProjectId.startsWith("legacy_") || selectedProjectId === "global_demo";
 
@@ -241,6 +250,92 @@ export default function AssignmentsTab({ onChanged }: Props) {
     await onChanged?.();
   }
 
+  function handleExportAssignments() {
+    if (!selectedMaterial) return;
+
+    if (!rows.length) {
+      window.alert("У этого материала пока нет заданий для экспорта.");
+      return;
+    }
+
+    const pack = buildMaterialAssignmentsExportPack({
+      material: materialMetaFromSelection(selectedMaterial),
+      assignments: rows,
+    });
+
+    downloadMaterialAssignmentsPack(pack);
+  }
+
+  function handleImportClick() {
+    if (!selectedMaterial) return;
+    importInputRef.current?.click();
+  }
+
+  async function handleImportFile(file: File | null) {
+    if (!file || !selectedMaterial) return;
+
+    setImportReport(null);
+    setErr(null);
+
+    let parsedPack;
+    try {
+      const text = await file.text();
+      const raw = JSON.parse(text);
+      const parsed = parseMaterialAssignmentsImportPack(raw);
+      if (!parsed.ok) {
+        setErr(parsed.error);
+        return;
+      }
+      parsedPack = parsed.pack;
+    } catch (e: any) {
+      setErr(e?.message || "Не удалось прочитать JSON-файл");
+      return;
+    }
+
+    if (parsedPack.material.id !== selectedMaterial.id) {
+      setErr(
+        `Материал в файле ("${parsedPack.material.title}") не совпадает с выбранным ("${selectedMaterial.title}"). ` +
+          `Выбери тот же материал или экспортируй/импортируй заново.`
+      );
+      return;
+    }
+
+    const proceed = window.confirm(
+      `Импортировать ${parsedPack.assignments.length} заданий в материал "${selectedMaterial.title}"?\n\n` +
+        `Существующие задания будут обновлены по id. Новые не создаются.`
+    );
+    if (!proceed) return;
+
+    setImporting(true);
+
+    try {
+      const res = await fetch("/api/admin/assignments/bulk-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...parsedPack,
+          target_material_id: selectedMaterial.id,
+        }),
+      });
+
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+
+      setImportReport(json);
+      await loadAssignments(selectedMaterial);
+      await onChanged?.();
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) {
+        importInputRef.current.value = "";
+      }
+    }
+  }
+
   return (
     <div className="card space-y-6">
       <div className="admin-section-head mb-4">
@@ -312,15 +407,78 @@ export default function AssignmentsTab({ onChanged }: Props) {
           </select>
         </div>
 
-        <button 
-          className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap" 
-          onClick={openCreate} 
-          disabled={!selectedMaterial} 
-          type="button"
-        >
-          Создать задание
-        </button>
+        <div className="assignments-toolbar-actions">
+          <button
+            className="assignments-toolbar-btn assignments-toolbar-btn--ghost"
+            onClick={handleExportAssignments}
+            disabled={!selectedMaterial || !rows.length || importing}
+            type="button"
+            title="Скачать JSON всех заданий материала"
+          >
+            ⬇️ Экспорт заданий
+          </button>
+
+          <button
+            className="assignments-toolbar-btn assignments-toolbar-btn--ghost"
+            onClick={handleImportClick}
+            disabled={!selectedMaterial || importing}
+            type="button"
+            title="Загрузить JSON и обновить задания материала"
+          >
+            {importing ? "Импорт..." : "⬆️ Импорт заданий"}
+          </button>
+
+          <button
+            className="assignments-toolbar-btn assignments-toolbar-btn--primary"
+            onClick={openCreate}
+            disabled={!selectedMaterial || importing}
+            type="button"
+          >
+            Создать задание
+          </button>
+
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="assignments-import-input"
+            onChange={(e) => void handleImportFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
       </div>
+
+      {importReport && (
+        <div className="assignments-import-report">
+          <div className="assignments-import-report-head">
+            <strong>Импорт завершён</strong>
+            <button
+              type="button"
+              className="btn btn-small ghost"
+              onClick={() => setImportReport(null)}
+            >
+              ✕
+            </button>
+          </div>
+          <div className="assignments-import-report-stats">
+            <span>Обновлено: <b>{importReport.updated ?? 0}</b></span>
+            <span>Пропущено: <b>{importReport.skipped ?? 0}</b></span>
+            <span>Ошибок: <b>{importReport.failed ?? 0}</b></span>
+          </div>
+          {Array.isArray(importReport.results) && importReport.results.length > 0 && (
+            <div className="assignments-import-report-list">
+              {importReport.results.map((item: any) => (
+                <div
+                  key={`${item.id}-${item.title}`}
+                  className={`assignments-import-report-item assignments-import-report-item--${item.status}`}
+                >
+                  <span>{item.title}</span>
+                  <span>{item.status}{item.message ? `: ${item.message}` : ""}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {loading && <LoadingBlock text="Загрузка данных..." />}
       {err && <ErrorBox message={err} />}

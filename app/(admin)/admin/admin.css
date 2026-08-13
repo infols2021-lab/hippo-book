@@ -764,6 +764,108 @@
   pointer-events: none;
 }
 
+/* ===== ЭКСПОРТ / ИМПОРТ ЗАДАНИЙ МАТЕРИАЛА ===== */
+.admin-root .assignments-toolbar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-root .assignments-toolbar-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.admin-root .assignments-toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-root .assignments-toolbar-btn--primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.admin-root .assignments-toolbar-btn--primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.admin-root .assignments-toolbar-btn--ghost {
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+}
+
+.admin-root .assignments-toolbar-btn--ghost:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.admin-root .assignments-import-input {
+  display: none;
+}
+
+.admin-root .assignments-import-report {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+}
+
+.admin-root .assignments-import-report-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.admin-root .assignments-import-report-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: #14532d;
+  margin-bottom: 10px;
+}
+
+.admin-root .assignments-import-report-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.admin-root .assignments-import-report-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+}
+
+.admin-root .assignments-import-report-item--updated {
+  color: #166534;
+}
+
+.admin-root .assignments-import-report-item--skipped {
+  color: #92400e;
+}
+
+.admin-root .assignments-import-report-item--failed {
+  color: #b91c1c;
+}
+
 /* ===== СТИЛИ СПИСКА ДОСТУПОВ (UserAccessModal) ===== */
 .admin-root .access-category { 
   margin-top: 12px; 
