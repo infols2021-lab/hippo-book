@@ -6,7 +6,11 @@ import AppHeader from "@/components/AppHeader";
 import LogoutButton from "@/components/LogoutButton";
 import { useTour } from "@/components/tour/TourProvider";
 import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
-import { dispatchBurgerClicked, dispatchTourPageReady } from "@/lib/tour/tourMobile";
+import {
+  dispatchBurgerClicked,
+  dispatchTourPageReady,
+  markTourMobileMenuPrimed,
+} from "@/lib/tour/tourMobile";
 import { PORTAL_MOBILE_MQ } from "@/lib/tour/tourPortal";
 import { rewriteSupabasePublicStorageUrl } from "@/lib/storage/publicUrl";
 import type { MaterialWithProgress } from "@/lib/materials/types";
@@ -80,6 +84,7 @@ export default function MaterialsClient({
 
   const handleProfileNav = () => {
     if (stage === "materials_profile_gate") {
+      markTourMobileMenuPrimed();
       advanceTour("rewards_gate");
     }
     setMobileMenuOpen(false);

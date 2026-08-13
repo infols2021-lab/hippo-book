@@ -33,6 +33,29 @@ export function resolveResumeStepIndex(
   return index;
 }
 
+function isMobileBottomSheetOpen(): boolean {
+  if (typeof document === "undefined") return false;
+  const sheet = document.querySelector<HTMLElement>(".mobile-bottom-sheet");
+  if (!sheet) return false;
+  const style = window.getComputedStyle(sheet);
+  return style.display !== "none" && style.visibility !== "hidden";
+}
+
+/** Если шаг меню активен, но sheet закрыт — возвращаемся к бургер-шагу. */
+export function resolveMobileMenuResumeIndex(
+  steps: CustomTourStep[],
+  savedIndex: number
+): number {
+  const index = resolveResumeStepIndex(steps, savedIndex);
+  const step = steps[index];
+  if (!step?.requiresMobileMenu || isMobileBottomSheetOpen()) return index;
+
+  for (let i = index - 1; i >= 0; i--) {
+    if (steps[i]?.waitForBurgerClick) return i;
+  }
+  return 0;
+}
+
 export function getInitialTourStepIndex(
   stage: TourStage,
   pathname: string,

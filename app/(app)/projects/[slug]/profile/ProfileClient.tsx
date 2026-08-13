@@ -11,7 +11,11 @@ import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal"
 import { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTimeline";
 import { useTour } from "@/components/tour/TourProvider";
 import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
-import { dispatchBurgerClicked, dispatchTourPageReady, dispatchTourRewardsForceTab } from "@/lib/tour/tourMobile";
+import {
+  dispatchBurgerClicked,
+  dispatchTourPageReady,
+  dispatchTourRewardsForceTab,
+} from "@/lib/tour/tourMobile";
 import { saveTourProgress, clearTourProgress } from "@/lib/tour/tourPersistence";
 
 import "./profile.css";
@@ -207,6 +211,18 @@ export default function ProfileClient({
   useEffect(() => {
     dispatchTourPageReady();
   }, []);
+
+  useEffect(() => {
+    if (stage === "materials_profile_gate") {
+      advanceTour("rewards_gate");
+    }
+  }, [stage, advanceTour]);
+
+  useEffect(() => {
+    if (stage === "rewards_gate" || stage === "rewards_tour" || stage === "profile_requests_gate") {
+      dispatchTourPageReady();
+    }
+  }, [stage]);
 
   // Fallback при «Назад» в браузере
   useEffect(() => {

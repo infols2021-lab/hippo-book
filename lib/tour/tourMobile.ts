@@ -51,3 +51,26 @@ export function dispatchTourRewardsForceTab(tab: "wardrobe" | "streaks" | "refer
 export function setTourSheetActive(active: boolean) {
   document.body.classList.toggle(TOUR_SHEET_ACTIVE_CLASS, active);
 }
+
+const MOBILE_MENU_PRIMED_KEY = "hippo-book:tour-mobile-menu-primed";
+
+/** Пользователь уже открыл меню на предыдущей странице (например, «Профиль» из материалов). */
+export function markTourMobileMenuPrimed() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(MOBILE_MENU_PRIMED_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
+export function consumeTourMobileMenuPrimed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const primed = sessionStorage.getItem(MOBILE_MENU_PRIMED_KEY) === "1";
+    if (primed) sessionStorage.removeItem(MOBILE_MENU_PRIMED_KEY);
+    return primed;
+  } catch {
+    return false;
+  }
+}

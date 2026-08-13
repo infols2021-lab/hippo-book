@@ -15,6 +15,9 @@ import { TOUR_STAGES, isTourStageActiveOnPath, isTourPausedStage } from "@/lib/t
 import { getResolvedTourSteps } from "@/lib/tour/resolveTourSteps";
 import {
   dispatchCloseMobileMenu,
+  dispatchOpenMobileMenu,
+  consumeTourMobileMenuPrimed,
+  isMobileMenuGateStage,
   isMobileViewport,
   setTourSheetActive,
   TOUR_BURGER_CLICKED,
@@ -26,7 +29,7 @@ import { isPortalTourStage } from "@/lib/tour/tourConfig";
 import { scrollPortalCardIntoView, setPortalTourActive } from "@/lib/tour/tourPortal";
 import { visiblePortalCard } from "@/lib/tour/tourTargets";
 import { saveTourProgress } from "@/lib/tour/tourPersistence";
-import { getInitialTourStepIndex, releaseTourUi } from "@/lib/tour/tourRecovery";
+import { getInitialTourStepIndex, releaseTourUi, resolveMobileMenuResumeIndex } from "@/lib/tour/tourRecovery";
 
 const Joyride = dynamic(
   () => import("react-joyride").then((mod) => mod.Joyride),
@@ -42,6 +45,7 @@ function syncRewardsTab(stepIndex: number, steps: CustomTourStep[]) {
 }
 const MAX_TARGET_RETRIES = 8;
 const MAX_REWARDS_TARGET_RETRIES = 24;
+const MAX_REWARDS_MODAL_WAIT_ATTEMPTS = 40;
 const TARGET_RETRY_DELAY_MS = 400;
 const DOM_SETTLE_MS = 350;
 const MOBILE_MENU_SETTLE_MS = 500;
@@ -65,6 +69,7 @@ export default function ProductTour() {
   const targetRetryCount = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rewardsModalReadyRef = useRef(false);
+  const rewardsModalWaitAttemptsRef = useRef(0);
   const rewardsTourInitDoneRef = useRef(false);
   const rewardsTourStartingRef = useRef(false);
   const rewardsTourSessionRef = useRef(0);
@@ -170,9 +175,17 @@ export default function ProductTour() {
         }
 
         if (!rewardsModalReadyRef.current) {
-          scheduleRewardsTourRun(180);
-          return;
+          rewardsModalWaitAttemptsRef.current += 1;
+          if (rewardsModalWaitAttemptsRef.current >= MAX_REWARDS_MODAL_WAIT_ATTEMPTS) {
+            rewardsModalReadyRef.current = true;
+            rewardsModalWaitAttemptsRef.current = 0;
+          } else {
+            scheduleRewardsTourRun(180);
+            return;
+          }
         }
+
+        rewardsModalWaitAttemptsRef.current = 0;
 
         const currentSteps = getResolvedTourSteps(stageRef.current, isMobileViewport()) as CustomTourStep[];
         let idx = stepIndexRef.current;
@@ -206,6 +219,7 @@ export default function ProductTour() {
 
       if (step.requiresMobileMenu) {
         setTourSheetActive(true);
+        dispatchOpenMobileMenu();
       } else if (step.waitForBurgerClick) {
         setTourSheetActive(false);
         dispatchCloseMobileMenu();
@@ -256,6 +270,7 @@ export default function ProductTour() {
     stepIndexRef.current = 0;
     saveTourProgress("rewards_tour", 0, pathname);
     rewardsModalReadyRef.current = false;
+    rewardsModalWaitAttemptsRef.current = 0;
     prepareStepEnvironment(0, steps as CustomTourStep[]);
     syncRewardsTab(0, steps as CustomTourStep[]);
     scheduleRewardsTourRun();
@@ -285,14 +300,28 @@ export default function ProductTour() {
     const activeOnPath = isTourStageActiveOnPath(stage, pathname);
 
     if (activeOnPath) {
-      const resumeIndex = getInitialTourStepIndex(stage, pathname, steps as CustomTourStep[]);
+      let resumeIndex = getInitialTourStepIndex(stage, pathname, steps as CustomTourStep[]);
+
+      if (
+        isMobileViewport() &&
+        isMobileMenuGateStage(stage) &&
+        consumeTourMobileMenuPrimed() &&
+        steps.length > 1
+      ) {
+        resumeIndex = 1;
+      } else {
+        resumeIndex = resolveMobileMenuResumeIndex(steps as CustomTourStep[], resumeIndex);
+      }
+
       prevStageRef.current = stage;
       setStepIndex(resumeIndex);
       stepIndexRef.current = resumeIndex;
       saveTourProgress(stage, resumeIndex, pathname);
       stopTourRun();
       prepareStepEnvironment(resumeIndex, steps as CustomTourStep[]);
-      scheduleRun();
+      scheduleRun(resumeIndex >= 1 && (steps[resumeIndex] as CustomTourStep)?.requiresMobileMenu
+        ? MOBILE_MENU_SETTLE_MS
+        : DOM_SETTLE_MS);
     } else {
       stopTourRun();
       releaseTourUi();
@@ -397,7 +426,18 @@ export default function ProductTour() {
         stopTourRun();
         if (failedStep?.requiresMobileMenu) {
           setTourSheetActive(true);
-          dispatchCloseMobileMenu();
+          dispatchOpenMobileMenu();
+
+          const burgerIndex = currentStageSteps.findIndex((s) => s.waitForBurgerClick);
+          if (burgerIndex >= 0 && failedIndex !== burgerIndex && targetRetryCount.current >= 3) {
+            targetRetryCount.current = 0;
+            setStepIndex(burgerIndex);
+            stepIndexRef.current = burgerIndex;
+            saveTourProgress(stageRef.current, burgerIndex, pathnameRef.current);
+            prepareStepEnvironment(burgerIndex, currentStageSteps as CustomTourStep[]);
+            scheduleRun(MOBILE_MENU_SETTLE_MS);
+            return;
+          }
         } else {
           releaseTourUi();
         }
