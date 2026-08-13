@@ -1,0 +1,386 @@
+/* app/(app)/projects/[slug]/materials/[materialId]/material-detail.css */
+
+.material-detail-page {
+  min-height: 100vh;
+  padding: 0 0 40px;
+  overflow-x: hidden;
+}
+
+.material-detail-container {
+  width: 95%;
+  max-width: 840px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.material-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  color: var(--project-primary);
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.material-detail-hero {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  padding: 32px;
+  border-radius: 28px;
+}
+
+.material-detail-cover {
+  flex-shrink: 0;
+  width: 160px;
+  height: 160px;
+  border-radius: 20px;
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--project-text) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--project-text) 6%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.material-detail-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.material-detail-cover-placeholder {
+  font-size: 3.5rem;
+  opacity: 0.3;
+}
+
+.material-detail-info {
+  flex: 1;
+  min-width: 250px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.material-detail-title {
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--project-text);
+  line-height: 1.2;
+}
+
+.material-detail-description {
+  color: color-mix(in srgb, var(--project-text) 60%, transparent);
+  margin: 0 0 24px;
+  line-height: 1.5;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.material-detail-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.material-detail-progress-bar {
+  flex: 1;
+  height: 8px;
+  background-color: color-mix(in srgb, var(--project-text) 8%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.material-detail-progress-fill {
+  height: 100%;
+  background-color: var(--project-primary);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 999px;
+}
+
+.material-detail-progress-pct {
+  font-weight: 900;
+  font-size: 16px;
+  color: var(--project-primary);
+  min-width: 44px;
+  text-align: right;
+}
+
+.material-detail-progress-meta {
+  font-size: 13px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--project-text) 50%, transparent);
+  margin-top: 10px;
+}
+
+.material-detail-section-label {
+  margin-bottom: 20px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--project-text) 50%, transparent);
+  padding-left: 8px;
+}
+
+.material-detail-assignments {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.material-detail-assignment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  background-color: var(--project-card-bg);
+  border-radius: 20px;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--project-text) 5%, transparent);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.material-detail-assignment:hover {
+  border-color: color-mix(in srgb, var(--project-primary) 40%, transparent);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px -8px color-mix(in srgb, var(--project-text) 12%, transparent);
+}
+
+.material-detail-assignment-main {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+  flex: 1;
+}
+
+.material-detail-assignment-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  background-color: color-mix(in srgb, var(--project-primary) 10%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.material-detail-assignment-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.material-detail-assignment-title {
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--project-text);
+  line-height: 1.3;
+}
+
+.material-detail-assignment-type {
+  font-size: 12px;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--project-text) 50%, transparent);
+  letter-spacing: 0.05em;
+}
+
+.material-detail-assignment-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 20px;
+  border-radius: 99px;
+  font-weight: 800;
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.material-detail-assignment-status.is-done {
+  background: color-mix(in srgb, #10b981 12%, transparent);
+  color: #059669;
+  border: 1px solid color-mix(in srgb, #10b981 25%, transparent);
+}
+
+.material-detail-assignment-status.is-pending {
+  background: color-mix(in srgb, var(--project-text) 4%, transparent);
+  color: var(--project-text);
+  border: 1px solid color-mix(in srgb, var(--project-text) 8%, transparent);
+}
+
+.material-detail-assignment:hover .material-detail-assignment-status.is-pending {
+  background: var(--project-primary);
+  color: #fff;
+  border-color: var(--project-primary);
+}
+
+.material-detail-empty {
+  padding: 60px 20px;
+  text-align: center;
+  background-color: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border-radius: 24px;
+  color: color-mix(in srgb, var(--project-text) 60%, transparent);
+  border: 1px dashed var(--glass-border);
+}
+
+.material-detail-empty-icon {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 16px;
+  opacity: 0.8;
+}
+
+.material-detail-empty-title {
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--project-text);
+}
+
+.material-detail-empty-text {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.material-detail-no-access {
+  text-align: center;
+  padding-top: 100px;
+}
+
+.material-detail-no-access-card {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 40px;
+}
+
+@media (max-width: 768px) {
+  .material-detail-page {
+    padding-bottom: 24px;
+  }
+
+  .material-detail-container {
+    width: 92%;
+    margin: 12px auto 0;
+  }
+
+  .material-detail-container .mobile-header-bar .brand-mark {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    font-weight: 900;
+    font-size: 14px;
+    background: var(--project-primary);
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .material-detail-back {
+    display: none;
+  }
+
+  .material-detail-hero {
+    flex-direction: column;
+    padding: 16px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    gap: 16px;
+  }
+
+  .material-detail-cover {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border-radius: 16px;
+  }
+
+  .material-detail-info {
+    min-width: 0;
+  }
+
+  .material-detail-title {
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+
+  .material-detail-description {
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+
+  .material-detail-progress-pct {
+    font-size: 14px;
+    min-width: 40px;
+  }
+
+  .material-detail-section-label {
+    font-size: 12px;
+    margin-bottom: 14px;
+    padding-left: 4px;
+  }
+
+  .material-detail-assignments {
+    gap: 12px;
+  }
+
+  .material-detail-assignment {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px;
+    border-radius: 18px;
+    gap: 12px;
+  }
+
+  .material-detail-assignment:hover {
+    transform: none;
+  }
+
+  .material-detail-assignment-main {
+    gap: 14px;
+  }
+
+  .material-detail-assignment-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
+    border-radius: 12px;
+  }
+
+  .material-detail-assignment-title {
+    font-size: 15px;
+  }
+
+  .material-detail-assignment-status {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+    border-radius: 14px;
+  }
+
+  .material-detail-empty {
+    padding: 40px 16px;
+    border-radius: 20px;
+  }
+}
+
+@media (min-width: 769px) {
+  .material-detail-container .mobile-header-bar {
+    display: none;
+  }
+}

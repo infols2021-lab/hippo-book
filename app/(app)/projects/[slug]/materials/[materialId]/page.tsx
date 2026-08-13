@@ -90,11 +90,13 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
   const completed = completedIds.length;
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const coverUrl = toStorageProxyUrl(material.cover_image_url);
+  const markText = slug.slice(0, 2).toUpperCase();
 
   return (
     <MaterialClient 
       slug={slug}
-      project={project}
+      projectName={project.name}
+      markText={markText}
       material={material}
       assignments={assignments}
       completedIds={completedIds}

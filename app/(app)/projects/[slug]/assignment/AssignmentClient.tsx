@@ -190,9 +190,20 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
     if (guestMode) {
       return { href: "/login", headerLabel: "На страницу входа", actionLabel: "На страницу входа" };
     }
-    const s = String(source ?? "").trim().toLowerCase();
-    const id = String(sourceId ?? "").trim();
+
+    let s = String(source ?? "").trim().toLowerCase();
+    let id = String(sourceId ?? "").trim();
     const basePath = `/projects/${projectSlug}/materials`;
+
+    if (!id && assignment) {
+      const mat = Array.isArray(assignment.materials)
+        ? assignment.materials[0]
+        : assignment.material || assignment.materials;
+      id = String(assignment.material_id || mat?.id || "").trim();
+      if (!s && mat?.material_kind) {
+        s = mat.material_kind === "crossword" ? "crossword" : "textbook";
+      }
+    }
 
     if (s === "textbook" && id) {
       return { href: `${basePath}/${encodeURIComponent(id)}`, headerLabel: "Назад к материалу", actionLabel: "Вернуться к материалу" };
@@ -201,7 +212,7 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
       return { href: `${basePath}/${encodeURIComponent(id)}`, headerLabel: "Назад к кроссворду", actionLabel: "Вернуться к кроссворду" };
     }
     return { href: basePath, headerLabel: "К материалам", actionLabel: "К материалам" };
-  }, [source, sourceId, projectSlug, guestMode]);
+  }, [source, sourceId, projectSlug, guestMode, assignment]);
 
   async function load() {
     try {

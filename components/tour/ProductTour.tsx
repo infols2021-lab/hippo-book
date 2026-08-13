@@ -60,6 +60,7 @@ export default function ProductTour() {
   const pathnameRef = useRef(pathname);
   const stageRef = useRef(stage);
   const stepIndexRef = useRef(stepIndex);
+  const prevStageRef = useRef(stage);
   pathnameRef.current = pathname;
   stageRef.current = stage;
   stepIndexRef.current = stepIndex;
@@ -153,6 +154,12 @@ export default function ProductTour() {
 
         const tabMap = ["wardrobe", "streaks", "referral", "promos"] as const;
         const currentTab = tabMap[stepIndexRef.current] ?? "wardrobe";
+        if (stepIndexRef.current === 0) {
+          document.querySelector<HTMLElement>('[data-tour="wardrobe-tab"]')?.scrollIntoView({
+            block: "nearest",
+            inline: "start",
+          });
+        }
         window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: currentTab }));
         abortTourRunRef.current = false;
         setRun(true);
@@ -208,7 +215,11 @@ export default function ProductTour() {
     const activeOnPath = isTourStageActiveOnPath(stage, pathname);
 
     if (activeOnPath) {
-      const resumeIndex = getInitialTourStepIndex(stage, pathname, steps as CustomTourStep[]);
+      let resumeIndex = getInitialTourStepIndex(stage, pathname, steps as CustomTourStep[]);
+      if (stage === "rewards_tour" && prevStageRef.current !== "rewards_tour") {
+        resumeIndex = 0;
+      }
+      prevStageRef.current = stage;
       setStepIndex(resumeIndex);
       stepIndexRef.current = resumeIndex;
       saveTourProgress(stage, resumeIndex, pathname);

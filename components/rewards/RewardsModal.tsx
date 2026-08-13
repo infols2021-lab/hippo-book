@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import MascotViewer from "../mascot/MascotViewer";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { dispatchTourRewardsModalReady } from "@/lib/tour/tourMobile";
@@ -89,6 +89,29 @@ export default function RewardsModal({
     prize: CustomPhysicalPrize | null;
   }>({ isOpen: false, prize: null });
 
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollRewardTabIntoView = (mapped: "wardrobe" | "streaks" | "referrals" | "promocode") => {
+    const container = tabsContainerRef.current;
+    if (mapped === "wardrobe" && container) {
+      container.scrollLeft = 0;
+    }
+
+    const selector =
+      mapped === "wardrobe"
+        ? '[data-tour="wardrobe-tab"]'
+        : mapped === "streaks"
+        ? '[data-tour="streaks-tab"]'
+        : mapped === "referrals"
+        ? '[data-tour="referral-tab"]'
+        : '[data-tour="promos-tab"]';
+
+    document.querySelector<HTMLElement>(selector)?.scrollIntoView({
+      block: "nearest",
+      inline: mapped === "wardrobe" ? "start" : "nearest",
+    });
+  };
+
   // Перехватываем сигналы от ProductTour для переключения вкладок
   useEffect(() => {
     const handleTourTab = (e: CustomEvent | Event) => {
@@ -102,20 +125,7 @@ export default function RewardsModal({
       const mapped = tabMap[tab as string];
       if (mapped) {
         setActiveTab(mapped);
-        requestAnimationFrame(() => {
-          const selector =
-            mapped === "wardrobe"
-              ? '[data-tour="wardrobe-tab"]'
-              : mapped === "streaks"
-              ? '[data-tour="streaks-tab"]'
-              : mapped === "referrals"
-              ? '[data-tour="referral-tab"]'
-              : '[data-tour="promos-tab"]';
-          document.querySelector<HTMLElement>(selector)?.scrollIntoView({
-            block: "nearest",
-            inline: mapped === "wardrobe" ? "start" : "nearest",
-          });
-        });
+        requestAnimationFrame(() => scrollRewardTabIntoView(mapped));
       }
     };
 
@@ -137,7 +147,9 @@ export default function RewardsModal({
 
   useEffect(() => {
     if (showModal) {
-      setActiveTab(normalizeTab(initialTab || defaultTab));
+      const tab = normalizeTab(initialTab || defaultTab);
+      setActiveTab(tab);
+      requestAnimationFrame(() => scrollRewardTabIntoView(tab));
     }
   }, [showModal, initialTab, defaultTab]);
 
@@ -392,6 +404,7 @@ export default function RewardsModal({
             </div>
 
             <div
+              ref={tabsContainerRef}
               className="flex gap-1 p-1 rounded-2xl border overflow-x-auto no-scrollbar w-full sm:w-auto min-w-0 max-w-full flex-shrink"
               style={{
                 backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent)",
@@ -403,7 +416,7 @@ export default function RewardsModal({
                 data-tour="wardrobe-tab"
                 type="button"
                 onClick={() => setActiveTab("wardrobe")}
-                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
+                className="flex-shrink-0 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
                 style={{
                   backgroundColor:
                     activeTab === "wardrobe" ? "var(--project-primary, #0ea5e9)" : "transparent",
@@ -417,7 +430,7 @@ export default function RewardsModal({
                 data-tour="streaks-tab"
                 type="button"
                 onClick={() => setActiveTab("streaks")}
-                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
+                className="flex-shrink-0 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
                 style={{
                   backgroundColor:
                     activeTab === "streaks" ? "var(--project-primary, #0ea5e9)" : "transparent",
@@ -432,7 +445,7 @@ export default function RewardsModal({
                 data-tour="referral-tab"
                 type="button"
                 onClick={() => setActiveTab("referrals")}
-                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
+                className="flex-shrink-0 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
                 style={{
                   backgroundColor:
                     activeTab === "referrals" ? "var(--project-primary, #0ea5e9)" : "transparent",
@@ -447,7 +460,7 @@ export default function RewardsModal({
                 data-tour="promos-tab"
                 type="button"
                 onClick={() => setActiveTab("promocode")}
-                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
+                className="flex-shrink-0 sm:flex-none px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black tracking-wide uppercase whitespace-nowrap transition-all"
                 style={{
                   backgroundColor:
                     activeTab === "promocode" ? "var(--project-primary, #0ea5e9)" : "transparent",

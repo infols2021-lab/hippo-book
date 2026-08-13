@@ -221,6 +221,7 @@ export default function ProfileClient({
 
   useEffect(() => {
     if (stage === "rewards_tour") {
+      saveTourProgress("rewards_tour", 0, window.location.pathname);
       setRewardsInitialTab("wardrobe");
       setRewardsModalOpen(true);
       window.dispatchEvent(new CustomEvent("tour:show-reward-tab", { detail: "wardrobe" }));

@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
+import LogoutButton from "@/components/LogoutButton";
+import { PORTAL_MOBILE_MQ } from "@/lib/tour/tourPortal";
+
+import "../../profile/profile.css";
+import "./material-detail.css";
 
 type Props = {
   slug: string;
-  project: any;
+  projectName: string;
+  markText: string;
   material: any;
   assignments: any[];
   completedIds: string[];
@@ -17,221 +23,201 @@ type Props = {
   hasAccess: boolean;
 };
 
+function assignmentSource(material: any): "textbook" | "crossword" {
+  return material?.material_kind === "crossword" ? "crossword" : "textbook";
+}
+
+function assignmentHref(slug: string, assignmentId: string, material: any): string {
+  const source = assignmentSource(material);
+  const params = new URLSearchParams({
+    id: assignmentId,
+    source,
+    sourceId: String(material.id),
+  });
+  return `/projects/${slug}/assignment?${params.toString()}`;
+}
+
 export default function MaterialClient({
-  slug, project, material, assignments, completedIds, progressPct, completedCount, totalCount, coverUrl, hasAccess
+  slug,
+  projectName,
+  markText,
+  material,
+  assignments,
+  completedIds,
+  progressPct,
+  completedCount,
+  totalCount,
+  coverUrl,
+  hasAccess,
 }: Props) {
-  
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia(PORTAL_MOBILE_MQ);
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const sectionLabel =
+    material?.material_kind === "crossword" ? "Задания кроссворда" : "Задания учебника";
 
   if (!hasAccess) {
     return (
-      <div className="container" style={{ textAlign: "center", paddingTop: 100 }}>
-        <div className="card" style={{ maxWidth: "500px", margin: "0 auto", padding: "40px" }}>
-          <h2 style={{ color: "var(--project-text)", margin: "0 0 16px 0", fontWeight: 800 }}>
-            У вас нет доступа к этому материалу 🔒
-          </h2>
-          <Link href={`/projects/${slug}/materials`} className="btn ghost">
-            Вернуться назад
-          </Link>
+      <div className="material-detail-page">
+        <div className="material-detail-container material-detail-no-access">
+          <div className="card material-detail-no-access-card">
+            <h2 style={{ color: "var(--project-text)", margin: "0 0 16px 0", fontWeight: 800 }}>
+              У вас нет доступа к этому материалу 🔒
+            </h2>
+            <Link href={`/projects/${slug}/materials`} className="btn ghost">
+              Вернуться назад
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ paddingBottom: "60px" }}>
-      <AppHeader
-        nav={[
-          { kind: "link", href: `/projects/${slug}/materials`, label: "К материалам", className: "btn ghost" },
-          { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn secondary" },
-        ]}
-      />
+    <div className="material-detail-page">
+      {isMobile ? (
+        <>
+          {mobileMenuOpen && (
+            <>
+              <div
+                className="mobile-bottom-sheet-overlay"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              <div className="mobile-bottom-sheet">
+                <div className="sheet-handle" />
+                <div className="sheet-title">Навигация</div>
+                <div className="sheet-menu-list">
+                  <Link
+                    className="sheet-item"
+                    href={`/projects/${slug}/materials`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    К материалам
+                  </Link>
+                  <Link
+                    className="sheet-item"
+                    href={`/projects/${slug}/profile`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Профиль
+                  </Link>
+                  <Link className="sheet-item" href="/portal" onClick={() => setMobileMenuOpen(false)}>
+                    Главный портал
+                  </Link>
+                  <LogoutButton className="sheet-item sheet-item--danger w-full text-left">
+                    Выйти
+                  </LogoutButton>
+                </div>
+              </div>
+            </>
+          )}
 
-      <div className="container" style={{ maxWidth: "840px" }}>
-        
-        <Link 
-          href={`/projects/${slug}/materials`} 
-          style={{ 
-            display: "inline-flex", 
-            alignItems: "center", 
-            gap: "8px", 
-            marginBottom: "24px", 
-            color: "var(--project-primary)", 
-            textDecoration: "none", 
-            fontWeight: 800,
-            fontSize: "14px",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em"
-          }}
-        >
+          <div className="material-detail-container">
+            <div className="mobile-header-bar">
+              <div className="mobile-header-left">
+                <Link href={`/projects/${slug}/materials`} className="brand-mark" aria-label="К материалам">
+                  ←
+                </Link>
+                <div className="mobile-user-info">
+                  <div className="mobile-user-name">{material.title}</div>
+                  <div className="mobile-streak-pill">{projectName}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="mobile-burger-btn"
+                onClick={() => setMobileMenuOpen((open) => !open)}
+                aria-label="Открыть меню"
+                aria-expanded={mobileMenuOpen}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <AppHeader
+          nav={[
+            { kind: "link", href: `/projects/${slug}/materials`, label: "К материалам", className: "btn ghost" },
+            { kind: "link", href: `/projects/${slug}/profile`, label: "Профиль", className: "btn secondary" },
+          ]}
+        />
+      )}
+
+      <div className="material-detail-container">
+        <Link href={`/projects/${slug}/materials`} className="material-detail-back">
           ← Назад к материалам
         </Link>
 
-        {/* Главная карточка материала */}
-        <div className="card" style={{ 
-          display: "flex", 
-          gap: "24px", 
-          marginBottom: "32px",
-          flexWrap: "wrap",
-          padding: "32px",
-          borderRadius: "28px"
-        }}>
-          <div style={{ 
-            flexShrink: 0, 
-            width: "160px", 
-            height: "160px", 
-            borderRadius: "20px", 
-            overflow: "hidden", 
-            backgroundColor: "color-mix(in srgb, var(--project-text) 4%, transparent)",
-            border: "1px solid color-mix(in srgb, var(--project-text) 6%, transparent)",
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center" 
-          }}>
+        <div className="card material-detail-hero">
+          <div className="material-detail-cover">
             {coverUrl ? (
-              <img src={coverUrl} alt={material.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <img src={coverUrl} alt={material.title} />
             ) : (
-              <span style={{ fontSize: "3.5rem", opacity: 0.3 }}>📄</span>
+              <span className="material-detail-cover-placeholder">📄</span>
             )}
           </div>
 
-          <div style={{ flex: 1, minWidth: "250px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <h1 style={{ margin: "0 0 12px 0", fontSize: "28px", fontWeight: 900, color: "var(--project-text)", lineHeight: 1.2 }}>
-              {material.title}
-            </h1>
-            <p style={{ color: "color-mix(in srgb, var(--project-text) 60%, transparent)", margin: "0 0 24px 0", lineHeight: 1.5, fontSize: "15px", fontWeight: 500 }}>
+          <div className="material-detail-info">
+            <h1 className="material-detail-title">{material.title}</h1>
+            <p className="material-detail-description">
               {material.description || "Учебные материалы и задания для изучения"}
             </p>
-            
-            {/* Прогресс-бар */}
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-              <div style={{ 
-                flex: 1, 
-                height: "8px", 
-                backgroundColor: "color-mix(in srgb, var(--project-text) 8%, transparent)", 
-                borderRadius: "999px", 
-                overflow: "hidden" 
-              }}>
-                <div style={{ 
-                  width: `${progressPct}%`, 
-                  height: "100%", 
-                  backgroundColor: "var(--project-primary)", 
-                  transition: "width 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
-                  borderRadius: "999px"
-                }} />
+
+            <div className="material-detail-progress-row">
+              <div className="material-detail-progress-bar">
+                <div
+                  className="material-detail-progress-fill"
+                  style={{ width: `${progressPct}%` }}
+                />
               </div>
-              <span style={{ 
-                fontWeight: 900, 
-                fontSize: "16px", 
-                color: "var(--project-primary)",
-                minWidth: "44px",
-                textAlign: "right"
-              }}>
-                {progressPct}%
-              </span>
+              <span className="material-detail-progress-pct">{progressPct}%</span>
             </div>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "color-mix(in srgb, var(--project-text) 50%, transparent)", marginTop: "10px" }}>
+            <div className="material-detail-progress-meta">
               Выполнено {completedCount} из {totalCount} заданий
             </div>
           </div>
         </div>
 
-        {/* Заголовок списка заданий */}
-        <div style={{ 
-          marginBottom: "20px", 
-          fontSize: "14px", 
-          textTransform: "uppercase", 
-          letterSpacing: "0.05em", 
-          fontWeight: 800, 
-          color: "color-mix(in srgb, var(--project-text) 50%, transparent)",
-          paddingLeft: "8px"
-        }}>
-          Задания учебника
-        </div>
-        
-        {/* Список заданий */}
+        <div className="material-detail-section-label">{sectionLabel}</div>
+
         {assignments.length > 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div className="material-detail-assignments">
             {assignments.map((a, index) => {
               const isDone = completedIds.includes(a.id);
-              const assignTypeLabel = a.assignment_type === 'intro' ? 'ОЗНАКОМИТЕЛЬНОЕ' : 'ТЕСТ';
-              const isHovered = hoveredId === a.id;
-              
+              const assignTypeLabel = a.assignment_type === "intro" ? "ОЗНАКОМИТЕЛЬНОЕ" : "ТЕСТ";
+
               return (
                 <Link
                   key={a.id}
-                  href={`/projects/${slug}/assignment?id=${a.id}`}
-                  onMouseEnter={() => setHoveredId(a.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "20px 24px",
-                    backgroundColor: "var(--project-card-bg)",
-                    borderRadius: "20px",
-                    textDecoration: "none",
-                    color: "inherit",
-                    border: `1px solid ${isHovered ? "color-mix(in srgb, var(--project-primary) 40%, transparent)" : "var(--glass-border)"}`,
-                    transform: isHovered ? "translateY(-3px)" : "translateY(0)",
-                    boxShadow: isHovered 
-                      ? "0 12px 32px -8px color-mix(in srgb, var(--project-text) 12%, transparent)" 
-                      : "0 4px 12px -4px color-mix(in srgb, var(--project-text) 5%, transparent)",
-                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                  }}
+                  href={assignmentHref(slug, a.id, material)}
+                  className="material-detail-assignment"
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-                    <div style={{
-                      width: "48px", 
-                      height: "48px", 
-                      flexShrink: 0, 
-                      borderRadius: "14px",
-                      backgroundColor: "color-mix(in srgb, var(--project-primary) 10%, transparent)",
-                      display: "flex", 
-                      alignItems: "center", 
-                      justifyContent: "center", 
-                      fontSize: "22px"
-                    }}>
-                      📝
-                    </div>
-                    
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <div style={{ fontWeight: 800, fontSize: "16px", color: "var(--project-text)" }}>
+                  <div className="material-detail-assignment-main">
+                    <div className="material-detail-assignment-icon">📝</div>
+                    <div className="material-detail-assignment-text">
+                      <div className="material-detail-assignment-title">
                         {index + 1}. {a.title || "Задание без названия"}
                       </div>
-                      <div style={{ 
-                        fontSize: "12px", 
-                        fontWeight: 800, 
-                        color: "color-mix(in srgb, var(--project-text) 50%, transparent)", 
-                        letterSpacing: "0.05em" 
-                      }}>
-                        {assignTypeLabel}
-                      </div>
+                      <div className="material-detail-assignment-type">{assignTypeLabel}</div>
                     </div>
                   </div>
-                  
-                  {/* Кнопка-статус */}
-                  <div style={{
-                    display: "inline-flex", 
-                    alignItems: "center", 
-                    justifyContent: "center",
-                    padding: "8px 20px", 
-                    borderRadius: "99px", 
-                    fontWeight: 800, 
-                    fontSize: "13px", 
-                    whiteSpace: "nowrap", 
-                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                    background: isDone 
-                      ? "color-mix(in srgb, #10b981 12%, transparent)" 
-                      : (isHovered ? "var(--project-primary)" : "color-mix(in srgb, var(--project-text) 4%, transparent)"),
-                    color: isDone 
-                      ? "#059669" 
-                      : (isHovered ? "#fff" : "var(--project-text)"),
-                    border: isDone 
-                      ? "1px solid color-mix(in srgb, #10b981 25%, transparent)" 
-                      : `1px solid ${isHovered ? "var(--project-primary)" : "color-mix(in srgb, var(--project-text) 8%, transparent)"}`,
-                    boxShadow: (isHovered && !isDone) ? "inset 0 1px 1px rgba(255,255,255,0.3)" : "none"
-                  }}>
+
+                  <div
+                    className={`material-detail-assignment-status ${isDone ? "is-done" : "is-pending"}`}
+                  >
                     {isDone ? "✅ Выполнено" : "▶ Начать"}
                   </div>
                 </Link>
@@ -239,18 +225,12 @@ export default function MaterialClient({
             })}
           </div>
         ) : (
-          <div style={{ 
-            padding: "60px 20px", 
-            textAlign: "center", 
-            backgroundColor: "var(--glass-bg)",
-            backdropFilter: "var(--glass-blur)",
-            borderRadius: "24px", 
-            color: "color-mix(in srgb, var(--project-text) 60%, transparent)", 
-            border: "1px dashed var(--glass-border)" 
-          }}>
-            <span style={{ fontSize: "2.5rem", display: "block", marginBottom: "16px", opacity: 0.8 }}>📭</span>
-            <div style={{ fontWeight: 800, fontSize: "16px", color: "var(--project-text)" }}>В этом материале пока нет заданий</div>
-            <p style={{ marginTop: "8px", fontSize: "14px" }}>Ожидайте, когда они будут добавлены администратором.</p>
+          <div className="material-detail-empty">
+            <span className="material-detail-empty-icon">📭</span>
+            <div className="material-detail-empty-title">В этом материале пока нет заданий</div>
+            <p className="material-detail-empty-text">
+              Ожидайте, когда они будут добавлены администратором.
+            </p>
           </div>
         )}
       </div>

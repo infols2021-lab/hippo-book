@@ -417,6 +417,14 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
     ];
   }
 
+  if (stage === "rewards_tour" && isMobile) {
+    return base.map((step, index) => ({
+      ...step,
+      placement: index === 0 ? ("bottom" as const) : ("top" as const),
+      skipScroll: true,
+    }));
+  }
+
   return base;
 }
 
