@@ -29,7 +29,12 @@ function asObject(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function normalizeNode(raw: unknown, path: string, issues: RoadmapValidationIssue[]): RoadmapNodeDef | null {
+function normalizeNode(
+  raw: unknown,
+  path: string,
+  issues: RoadmapValidationIssue[],
+  options?: { allowUnlinkedAssignments?: boolean },
+): RoadmapNodeDef | null {
   const obj = asObject(raw);
   if (!obj) {
     issues.push(issue(path, "Узел должен быть объектом"));
@@ -54,7 +59,7 @@ function normalizeNode(raw: unknown, path: string, issues: RoadmapValidationIssu
   const assignment = asObject(obj.assignment);
   const exam = asObject(obj.exam);
 
-  if (type === "lesson" && !assignmentId && !assignment) {
+  if (type === "lesson" && !assignmentId && !assignment && !options?.allowUnlinkedAssignments) {
     issues.push(issue(path, "lesson требует assignment или assignment_id"));
   }
 
@@ -71,7 +76,7 @@ function normalizeNode(raw: unknown, path: string, issues: RoadmapValidationIssu
         issues.push(issue(`${path}.exam.pass_percent`, "pass_percent должен быть 1..100"));
       }
     }
-    if (!assignmentId && !assignment) {
+    if (!assignmentId && !assignment && !options?.allowUnlinkedAssignments) {
       issues.push(issue(path, "exam требует assignment или assignment_id"));
     }
   }
@@ -103,7 +108,12 @@ function normalizeNode(raw: unknown, path: string, issues: RoadmapValidationIssu
   };
 }
 
-function normalizeSegment(raw: unknown, index: number, issues: RoadmapValidationIssue[]): RoadmapSegment | null {
+function normalizeSegment(
+  raw: unknown,
+  index: number,
+  issues: RoadmapValidationIssue[],
+  options?: { allowUnlinkedAssignments?: boolean },
+): RoadmapSegment | null {
   const obj = asObject(raw);
   const path = `segments[${index}]`;
   if (!obj) {
@@ -135,7 +145,7 @@ function normalizeSegment(raw: unknown, index: number, issues: RoadmapValidation
 
     const nodes: RoadmapNodeDef[] = [];
     nodesRaw.forEach((nodeRaw, nodeIndex) => {
-      const node = normalizeNode(nodeRaw, `${path}.nodes[${nodeIndex}]`, issues);
+      const node = normalizeNode(nodeRaw, `${path}.nodes[${nodeIndex}]`, issues, options);
       if (node) nodes.push(node);
     });
 
@@ -149,7 +159,7 @@ function normalizeSegment(raw: unknown, index: number, issues: RoadmapValidation
   }
 
   if (kind === "exam") {
-    const node = normalizeNode(obj.node, `${path}.node`, issues);
+    const node = normalizeNode(obj.node, `${path}.node`, issues, options);
     if (!node) {
       issues.push(issue(`${path}.node`, "exam сегмент требует node"));
       return null;
@@ -181,7 +191,10 @@ function normalizeSegment(raw: unknown, index: number, issues: RoadmapValidation
   return null;
 }
 
-export function parseRoadmapImportPack(raw: unknown): RoadmapValidationResult {
+export function parseRoadmapImportPack(
+  raw: unknown,
+  options?: { allowUnlinkedAssignments?: boolean },
+): RoadmapValidationResult {
   const issues: RoadmapValidationIssue[] = [];
   const obj = asObject(raw);
 
@@ -206,7 +219,7 @@ export function parseRoadmapImportPack(raw: unknown): RoadmapValidationResult {
 
   const segments: RoadmapSegment[] = [];
   segmentsRaw.forEach((segmentRaw, index) => {
-    const segment = normalizeSegment(segmentRaw, index, issues);
+    const segment = normalizeSegment(segmentRaw, index, issues, options);
     if (segment) segments.push(segment);
   });
 

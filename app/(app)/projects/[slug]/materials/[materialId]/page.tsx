@@ -97,11 +97,13 @@ export default async function MaterialDetailsPage({ params }: PageProps) {
     return (
       <RoadmapMaterialView
         slug={slug}
+        projectName={project.name}
         material={{
           id: material.id,
           title: material.title,
           description: material.description,
         }}
+        coverUrl={coverUrl}
         hasAccess={hasAccess}
       />
     );

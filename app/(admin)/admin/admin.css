@@ -1069,6 +1069,39 @@
   font-size: 14px;
 }
 
+.admin-root .roadmap-visual-select {
+  border: 2px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: #ffffff;
+  width: 100%;
+}
+
+.admin-root .roadmap-visual-field-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-root .roadmap-visual-link-btn {
+  border: none;
+  background: transparent;
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0;
+}
+
+.admin-root .roadmap-visual-field-hint {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.5;
+}
+
 .admin-root .roadmap-visual-toolbar {
   display: flex;
   gap: 8px;
@@ -1117,8 +1150,8 @@
 }
 
 .admin-root .roadmap-visual-node {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   padding: 10px;
   border-radius: 12px;

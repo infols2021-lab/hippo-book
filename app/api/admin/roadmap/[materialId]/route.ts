@@ -214,7 +214,7 @@ export async function PUT(
     return fail("Bad JSON", 400, "BAD_JSON", noStoreInit());
   }
 
-  const parsed = parseRoadmapImportPack(body);
+  const parsed = parseRoadmapImportPack(body, { allowUnlinkedAssignments: true });
   if (!parsed.ok) {
     return fail(
       parsed.issues.map((item) => `${item.path}: ${item.message}`).join("; "),

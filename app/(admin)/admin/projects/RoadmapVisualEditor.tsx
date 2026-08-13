@@ -11,6 +11,7 @@ import {
   ROADMAP_PACK_VERSION,
 } from "@/lib/roadmap/types";
 import { buildCourse30Template } from "@/lib/roadmap/templates/course30";
+import RoadmapAssignmentSelect from "./RoadmapAssignmentSelect";
 
 type Props = {
   materialId: string;
@@ -247,7 +248,8 @@ export default function RoadmapVisualEditor({ materialId, materialTitle }: Props
         <div>
           <h4 className="roadmap-import-title">Визуальный редактор дорожки</h4>
           <p className="roadmap-import-subtitle">
-            Редактируйте блоки, экзамены и сертификат. Для создания inline-заданий используйте JSON-импорт ниже.
+            Сначала создайте задания в разделе «Задания» для этого материала, затем привяжите их через селектор.
+            JSON-импорт ниже — для массовой загрузки.
           </p>
         </div>
         <div className="roadmap-visual-head-actions">
@@ -340,21 +342,19 @@ export default function RoadmapVisualEditor({ materialId, materialTitle }: Props
                           }}
                         />
                       </label>
-                      <label className="roadmap-visual-field">
-                        <span>assignment_id</span>
-                        <input
-                          value={node.assignment_id ?? ""}
-                          onChange={(e) => {
-                            const nodes = [...segment.nodes];
-                            nodes[nodeIndex] = {
-                              ...node,
-                              assignment_id: e.target.value.trim() || null,
-                            };
-                            updateSegment(index, { nodes } as Partial<RoadmapSegment>);
-                          }}
-                          placeholder="UUID задания"
-                        />
-                      </label>
+                      <RoadmapAssignmentSelect
+                        materialId={materialId}
+                        value={node.assignment_id ?? null}
+                        label={`Задание для «${node.title || `Урок ${nodeIndex + 1}`}»`}
+                        onChange={(assignmentId) => {
+                          const nodes = [...segment.nodes];
+                          nodes[nodeIndex] = {
+                            ...node,
+                            assignment_id: assignmentId,
+                          };
+                          updateSegment(index, { nodes } as Partial<RoadmapSegment>);
+                        }}
+                      />
                     </div>
                   ))}
                   <button
@@ -381,21 +381,19 @@ export default function RoadmapVisualEditor({ materialId, materialTitle }: Props
 
             {segment.kind === "exam" ? (
               <>
-                <label className="roadmap-visual-field">
-                  <span>assignment_id экзамена</span>
-                  <input
-                    value={segment.node.assignment_id ?? ""}
-                    onChange={(e) =>
-                      updateSegment(index, {
-                        node: {
-                          ...segment.node,
-                          assignment_id: e.target.value.trim() || null,
-                        },
-                      } as Partial<RoadmapSegment>)
-                    }
-                    placeholder="UUID задания"
-                  />
-                </label>
+                <RoadmapAssignmentSelect
+                  materialId={materialId}
+                  value={segment.node.assignment_id ?? null}
+                  label="Задание экзамена"
+                  onChange={(assignmentId) =>
+                    updateSegment(index, {
+                      node: {
+                        ...segment.node,
+                        assignment_id: assignmentId,
+                      },
+                    } as Partial<RoadmapSegment>)
+                  }
+                />
                 <div className="roadmap-visual-exam-grid">
                   <label className="roadmap-visual-field">
                     <span>Лимит (мин)</span>
