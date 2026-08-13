@@ -29,7 +29,7 @@ export default function PortalCard({ project, index, compact = false, pill = fal
         href={`/projects/${project.slug}`}
         onClick={handleClick}
         data-tour="direction-card"
-        className="group relative flex items-center gap-3 w-full px-4 py-3.5 rounded-[20px] border transition-all duration-300 active:scale-[0.98] overflow-hidden"
+        className="group relative flex items-center gap-3.5 w-full px-4 py-4 min-h-[84px] rounded-[22px] border transition-all duration-300 active:scale-[0.98] overflow-hidden"
         style={{
           background: `linear-gradient(135deg, color-mix(in srgb, ${pColor} 18%, #0f172a) 0%, color-mix(in srgb, ${pColor} 8%, #0b0f19) 100%)`,
           borderColor: `color-mix(in srgb, ${pColor} 35%, transparent)`,
@@ -37,21 +37,22 @@ export default function PortalCard({ project, index, compact = false, pill = fal
         }}
       >
         <div
-          className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white/20"
+          className="w-3 h-3 rounded-full shrink-0 ring-2 ring-white/20"
           style={{ backgroundColor: pColor }}
         />
-        <div className="flex-1 min-w-0 text-left">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-white/45 mb-0.5 truncate">
-            {project.slug}
+        <div className="flex-1 min-w-0 text-left py-0.5">
+          <div className="text-[16px] font-black text-white leading-snug line-clamp-2">
+            {project.name}
           </div>
-          <div className="text-[15px] font-black text-white leading-tight truncate">{project.name}</div>
           {project.description ? (
-            <div className="text-[11px] text-white/55 font-medium truncate mt-0.5">{project.description}</div>
+            <div className="text-[12px] text-white/60 font-medium leading-snug line-clamp-2 mt-1">
+              {project.description}
+            </div>
           ) : null}
         </div>
         <div
           data-tour="portal-card-cta"
-          className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold"
+          className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
           style={{
             background: `linear-gradient(135deg, ${pColor}, color-mix(in srgb, ${pColor} 70%, #000))`,
           }}
@@ -67,10 +68,10 @@ export default function PortalCard({ project, index, compact = false, pill = fal
       href={`/projects/${project.slug}`}
       onClick={handleClick}
       data-tour="direction-card"
-      className={`group relative flex flex-col h-full overflow-hidden transition-all duration-500 ${
+      className={`group relative flex flex-col overflow-hidden transition-all duration-500 ${
         compact
           ? "min-h-0 p-5 rounded-[28px] hover:shadow-xl"
-          : "min-h-[400px] md:min-h-[460px] p-8 sm:p-10 rounded-[40px] hover:-translate-y-2 hover:shadow-2xl"
+          : "p-7 sm:p-8 rounded-[32px] hover:-translate-y-2 hover:shadow-2xl"
       } ${
         isLight
           ? "bg-gradient-to-br from-white/95 to-[#e0f2fe]/95 shadow-[0_0_40px_rgba(255,255,255,0.1)] border border-white/60"
@@ -84,8 +85,8 @@ export default function PortalCard({ project, index, compact = false, pill = fal
         style={{ backgroundColor: pColor }}
       />
 
-      <div className="relative z-10 flex flex-col h-full min-h-0">
-        <div className={compact ? "mb-3" : "mb-6"}>
+      <div className="relative z-10 flex flex-col min-h-0">
+        <div className={compact ? "mb-3" : "mb-5"}>
           <span
             className={`inline-block rounded-full font-black uppercase tracking-[0.15em] border ${
               compact ? "px-3 py-1 text-[9px]" : "px-4 py-1.5 text-[10px]"
@@ -97,16 +98,9 @@ export default function PortalCard({ project, index, compact = false, pill = fal
           </span>
         </div>
 
-        <p
-          className={`font-bold uppercase tracking-widest ${
-            compact ? "text-[10px] mb-1" : "text-xs mb-2"
-          } ${isLight ? "text-black/40" : "text-white/40"}`}
-        >
-          Текущая платформа
-        </p>
         <h2
-          className={`font-black tracking-tight leading-none ${
-            compact ? "text-[1.75rem] mb-3" : "text-4xl sm:text-5xl md:text-6xl mb-6"
+          className={`font-black tracking-tight leading-[1.05] ${
+            compact ? "text-[1.75rem] mb-3" : "text-3xl sm:text-4xl lg:text-[2.75rem] mb-4"
           } ${isLight ? "text-[#0c4a6e]" : "text-white"}`}
         >
           {project.name}
@@ -114,13 +108,13 @@ export default function PortalCard({ project, index, compact = false, pill = fal
 
         <p
           className={`font-medium leading-relaxed ${
-            compact ? "text-xs line-clamp-2 max-w-none" : "text-sm md:text-base max-w-xs"
+            compact ? "text-xs line-clamp-2 max-w-none" : "text-sm md:text-[15px] max-w-sm line-clamp-4"
           } ${isLight ? "text-slate-600" : "text-slate-300"}`}
         >
           {project.description || "Учебники, кроссворды, задания, прогресс и аналитика."}
         </p>
 
-        <div className={`mt-auto ${compact ? "pt-4" : "pt-16"}`}>
+        <div className={`mt-6 ${compact ? "pt-2" : "pt-4"}`}>
           <div
             data-tour="portal-card-cta"
             className={`inline-flex items-center gap-2 rounded-full font-bold text-white shadow-lg transition-transform group-hover:scale-105 ${

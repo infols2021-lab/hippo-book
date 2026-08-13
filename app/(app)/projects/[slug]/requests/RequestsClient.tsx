@@ -162,10 +162,10 @@ export default function RequestsClient({
   const router = useRouter();
   const { stage, advanceTour } = useTour();
 
-  const [activeProject, setActiveProject] = useState<Project>(project);
+  const [catalogProject, setCatalogProject] = useState<Project>(project);
   const [tabs, setTabs] = useState<ProjectTab[]>(initialTabs);
   const [levels, setLevels] = useState<ProjectLevel[]>(initialLevels);
-  const [projectSwitching, setProjectSwitching] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   
   const [requests, setRequests] = useState<PurchaseRequest[]>(() =>
     initialRequests.map(normalizeRequestRow)
@@ -201,15 +201,14 @@ export default function RequestsClient({
   }, []);
 
   useEffect(() => {
-    setActiveProject(project);
+    setCatalogProject(project);
     setTabs(initialTabs);
     setLevels(initialLevels);
-    // Сбрасываем контекст только при смене URL-направления
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.slug]);
 
   useEffect(() => {
-    const currProject = availableProjects.find((p) => p.slug === activeProject.slug);
+    const currProject = availableProjects.find((p) => p.slug === project.slug);
     const themeColor = currProject?.theme?.primaryColor || currProject?.theme_color || "#0ea5e9";
     const textColor = currProject?.theme?.textColor || "#0f172a";
 
@@ -222,7 +221,7 @@ export default function RequestsClient({
       document.body.style.removeProperty("--project-text");
       document.body.style.removeProperty("--accent2");
     };
-  }, [activeProject.slug, availableProjects]);
+  }, [project.slug, availableProjects]);
 
   const projectNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -310,7 +309,7 @@ export default function RequestsClient({
       setMaterialsLoading(true);
       try {
         if (!tabs || tabs.length === 0) {
-          const res = await fetch(`/api/projects/${activeProject.slug}/materials?purchasable=true`, {
+          const res = await fetch(`/api/projects/${catalogProject.slug}/materials?purchasable=true`, {
             cache: "no-store",
           });
           const { json } = await safeReadJson(res);
@@ -332,7 +331,7 @@ export default function RequestsClient({
 
         const tabPromises = tabs.map(async (tab) => {
           const res = await fetch(
-            `/api/projects/${activeProject.slug}/materials?tab=${tab.slug}&purchasable=true`,
+            `/api/projects/${catalogProject.slug}/materials?tab=${tab.slug}&purchasable=true`,
             { cache: "no-store" }
           );
           const { json } = await safeReadJson(res);
@@ -380,7 +379,7 @@ export default function RequestsClient({
     return () => {
       alive = false;
     };
-  }, [activeProject.slug, tabs]);
+  }, [catalogProject.slug, tabs]);
 
   useEffect(() => {
     setRequests(initialRequests.map(normalizeRequestRow));
@@ -575,13 +574,13 @@ export default function RequestsClient({
     setQrSeed(Date.now());
   }
 
-  async function switchProject(slug: string) {
-    if (slug === activeProject.slug || projectSwitching) return;
+  async function selectCatalogProject(slug: string) {
+    if (slug === catalogProject.slug || catalogLoading) return;
 
     const meta = availableProjects.find((p) => p.slug === slug);
     if (!meta) return;
 
-    setProjectSwitching(true);
+    setCatalogLoading(true);
     try {
       const res = await fetch(`/api/projects/${slug}`, { cache: "no-store" });
       const { json } = await safeReadJson(res);
@@ -590,7 +589,7 @@ export default function RequestsClient({
       }
 
       const p = json.project;
-      setActiveProject({ id: meta.id, name: meta.name, slug: meta.slug });
+      setCatalogProject({ id: meta.id, name: meta.name, slug: meta.slug });
       setTabs(
         (p.tabs || []).map((t: any) => ({
           id: String(t.id),
@@ -613,13 +612,13 @@ export default function RequestsClient({
         setSelectedMaterialIds([]);
       }
     } catch (e: any) {
-      showNotification("Не удалось переключить направление: " + e.message, "error");
+      showNotification("Не удалось загрузить каталог: " + e.message, "error");
     } finally {
-      setProjectSwitching(false);
+      setCatalogLoading(false);
     }
   }
 
-  function renderProjectPills(inModal = false) {
+  function renderCatalogPills(inModal = false) {
     if (!showProjectSwitcher) return null;
 
     return (
@@ -628,7 +627,7 @@ export default function RequestsClient({
         style={{ marginBottom: inModal ? 12 : 20 }}
         data-tour={inModal ? undefined : "requests-project-switcher"}
       >
-        <div className="level-filter-title">Направление:</div>
+        <div className="level-filter-title">Купить материалы для:</div>
         <div className="level-filter-chips no-scrollbar">
           {availableProjects.map((p) => {
             const pendingCount = pendingByProject.get(p.id) ?? 0;
@@ -638,11 +637,11 @@ export default function RequestsClient({
               <button
                 key={p.id}
                 type="button"
-                className={`btn small project-pill ${activeProject.slug === p.slug ? "" : "ghost"} ${
+                className={`btn small project-pill ${catalogProject.slug === p.slug ? "" : "ghost"} ${
                   hasPending ? "project-pill--pending" : ""
                 }`}
-                onClick={() => void switchProject(p.slug)}
-                disabled={projectSwitching || busy}
+                onClick={() => void selectCatalogProject(p.slug)}
+                disabled={catalogLoading || busy}
                 title={
                   hasPending
                     ? `${pendingCount} необработанных заявок`
@@ -659,6 +658,16 @@ export default function RequestsClient({
             );
           })}
         </div>
+        {!inModal && catalogProject.slug !== project.slug && (
+          <p className="catalog-filter-hint">
+            Вы в профиле «{project.name}». Заявка будет оформлена для «{catalogProject.name}».
+          </p>
+        )}
+        {inModal && catalogProject.slug !== project.slug && (
+          <p className="catalog-filter-hint" style={{ marginTop: 8, marginBottom: 0 }}>
+            Каталог материалов: «{catalogProject.name}»
+          </p>
+        )}
       </div>
     );
   }
@@ -685,8 +694,8 @@ export default function RequestsClient({
 
     if (r.project_id) {
       const target = availableProjects.find((p) => p.id === r.project_id);
-      if (target && target.slug !== activeProject.slug) {
-        await switchProject(target.slug);
+      if (target && target.slug !== catalogProject.slug) {
+        await selectCatalogProject(target.slug);
       }
     }
 
@@ -722,8 +731,8 @@ export default function RequestsClient({
     const payload = {
       request_number: requestNumber,
       created_at: requestDateTime + ":00Z",
-      branch_type: activeProject.slug,
-      project_id: activeProject.id,
+      branch_type: catalogProject.slug,
+      project_id: catalogProject.id,
       material_ids: selectedMaterialIds,
       total_price: totalPrice,
       email: userEmail,
@@ -792,7 +801,7 @@ export default function RequestsClient({
     }
   }
 
-  const brandMark = activeProject.name.substring(0, 2).toUpperCase() || "EK";
+  const brandMark = project.name.substring(0, 2).toUpperCase() || "EK";
 
   const formatPrice = (price: number) => {
     if (price === 0) return "бесплатно";
@@ -885,7 +894,7 @@ export default function RequestsClient({
         >
           {modalStep === 1 ? (
             <div>
-              {!editingId && renderProjectPills(true)}
+              {!editingId && renderCatalogPills(true)}
 
               <div className="form-group">
                 <label>Номер заявки:</label>
@@ -1252,7 +1261,7 @@ export default function RequestsClient({
               <Link
                 className="sheet-item"
                 data-tour="profile-link"
-                href={`/projects/${activeProject.slug}/profile`}
+                href={`/projects/${project.slug}/profile`}
                 onClick={() => {
                   setMobileMenuOpen(false);
                 }}
@@ -1262,7 +1271,7 @@ export default function RequestsClient({
               <Link
                 className="sheet-item"
                 data-tour="materials-link"
-                href={`/projects/${activeProject.slug}/materials`}
+                href={`/projects/${project.slug}/materials`}
                 onClick={() => {
                   setMobileMenuOpen(false);
                 }}
@@ -1287,7 +1296,7 @@ export default function RequestsClient({
           <div className="mobile-header-left">
             <div className="brand-mark">{brandMark}</div>
             <div className="mobile-user-info">
-              <div className="mobile-user-name">{activeProject.name}</div>
+              <div className="mobile-user-name">{project.name}</div>
               <div className="mobile-streak-pill">Заявки на доступы</div>
             </div>
           </div>
@@ -1311,7 +1320,7 @@ export default function RequestsClient({
           <div className="brand">
             <div className="brand-mark">{brandMark}</div>
             <div>
-              <div className="brand-title">{activeProject.name}</div>
+              <div className="brand-title">{project.name}</div>
               <div className="brand-subtitle">Заявки на доступы</div>
             </div>
           </div>
@@ -1319,13 +1328,13 @@ export default function RequestsClient({
             <Link
               data-tour="profile-link"
               className="nav-pill"
-              href={`/projects/${activeProject.slug}/profile`}
+              href={`/projects/${project.slug}/profile`}
               onClick={() => {
               }}
             >
               Профиль
             </Link>
-            <Link className="nav-pill" href={`/projects/${activeProject.slug}/materials`}>
+            <Link className="nav-pill" href={`/projects/${project.slug}/materials`}>
               Материалы
             </Link>
             <Link className="nav-pill nav-pill--logout" href="/portal">
@@ -1339,7 +1348,7 @@ export default function RequestsClient({
             Мои заявки на доступы
           </h2>
 
-          {renderProjectPills()}
+          {renderCatalogPills()}
 
           <div className="payment-info">
             <h4 style={{ margin: "0 0 6px 0", fontSize: 15, fontWeight: 800 }}>Информация об оплате</h4>

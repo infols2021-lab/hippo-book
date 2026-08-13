@@ -183,7 +183,7 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
             <div
               data-tour="portal-carousel-track"
               data-project-count={projects.length}
-              className={`md:hidden flex flex-col gap-2.5 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+              className={`md:hidden flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
                 portalTourMobile ? "pb-1" : "pb-2"
               }`}
             >
@@ -196,7 +196,7 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
             <div
               data-tour="portal-directions"
               className={`
-                hidden md:grid items-stretch min-h-0 flex-1 gap-5 md:gap-6
+                hidden md:grid items-start gap-5 md:gap-6
                 ${
                   projects.length === 1
                     ? "md:grid-cols-1 md:max-w-2xl md:mx-auto"
@@ -207,7 +207,7 @@ export default function PortalClient({ userName, userEmail, isAdmin, projects }:
               `}
             >
               {projects.map((project, index) => (
-                <div key={project.id} data-portal-card-slide className="h-full">
+                <div key={project.id} data-portal-card-slide>
                   <PortalCard project={project} index={index} />
                 </div>
               ))}

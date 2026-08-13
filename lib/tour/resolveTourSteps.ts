@@ -228,9 +228,9 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
     },
     {
       target: visibleTourTarget('[data-tour="requests-project-switcher"]'),
-      title: "Все направления в одном месте",
+      title: "Покупка для другого направления",
       content:
-        "Переключайте направление прямо на этой странице — не нужно возвращаться в портал. Выберите проект, откройте каталог материалов и создайте заявку для него здесь же.",
+        "Профиль и цвета страницы остаются вашими. Здесь вы только выбираете, для какого направления открыть каталог материалов и оформить заявку — без возврата в портал.",
       mascotImage: pickMascotImage("requests_info_projects"),
       skipBeacon: true,
       primaryLabel: "Далее",
