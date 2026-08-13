@@ -56,6 +56,7 @@ type Props = {
   sourceId?: string;
   projectSlug: string;
   guestMode?: boolean;
+  isDemoMaterial?: boolean;
 };
 
 function normalizeQuestions(qs: unknown): QuestionAny[] {
@@ -119,7 +120,14 @@ function scrollAssignmentToTop() {
   document.body.scrollTop = 0;
 }
 
-export default function AssignmentClient({ assignmentId, source, sourceId, projectSlug, guestMode = false }: Props) {
+export default function AssignmentClient({
+  assignmentId,
+  source,
+  sourceId,
+  projectSlug,
+  guestMode = false,
+  isDemoMaterial = false,
+}: Props) {
   const router = useRouter();
   const { stage, advanceTour } = useTour();
 
@@ -156,10 +164,22 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
   }, []);
 
   useEffect(() => {
-    if (stage === "streak_celebration") {
+    if (guestMode || !isDemoMaterial || stage !== "demo_material") return;
+    advanceTour("demo_assignment");
+  }, [guestMode, isDemoMaterial, stage, advanceTour]);
+
+  useEffect(() => {
+    if (stage === "streak_celebration" || stage === "assignment_return_gate") {
       dispatchTourPageReady();
     }
   }, [stage, completedScreen, showChoice]);
+
+  const handleAssignmentBack = () => {
+    if (stage === "assignment_return_gate") {
+      advanceTour("material_return_gate");
+    }
+    router.push(back.href);
+  };
 
   useEffect(() => {
     if (guestMode || stage !== "rewards_gate") return;
@@ -596,7 +616,11 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
       <header className="premium-header">
         <div className="header-content">
           <div style={{ display: "flex", gap: "10px" }}>
-            <button className="back-button" onClick={() => router.push(back.href)}>
+            <button
+              className="back-button"
+              data-tour="assignment-back-btn"
+              onClick={handleAssignmentBack}
+            >
               {back.headerLabel}
             </button>
 
@@ -690,7 +714,8 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
               <button
                 className="btn-premium primary"
                 style={{ flex: 1, background: theme.primary }}
-                onClick={() => router.push(back.href)}
+                data-tour="assignment-back-btn"
+                onClick={handleAssignmentBack}
               >
                 {back.actionLabel}
               </button>
@@ -714,7 +739,8 @@ export default function AssignmentClient({ assignmentId, source, sourceId, proje
               <button
                 className="btn-premium primary"
                 style={{ background: theme.primary, minWidth: "250px" }}
-                onClick={() => router.push(back.href)}
+                data-tour="assignment-back-btn"
+                onClick={handleAssignmentBack}
               >
                 Вернуться к списку
               </button>

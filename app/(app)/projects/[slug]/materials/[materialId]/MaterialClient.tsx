@@ -6,6 +6,7 @@ import { useTour } from "@/components/tour/TourProvider";
 import { dispatchTourPageReady } from "@/lib/tour/tourMobile";
 
 import "../../profile/profile.css";
+import "../../assignment/assignment.css";
 import "./material-detail.css";
 
 type Props = {
@@ -57,10 +58,16 @@ export default function MaterialClient({
   }, []);
 
   useEffect(() => {
-    if (stage === "demo_material") {
+    if (stage === "demo_material" || stage === "material_return_gate") {
       dispatchTourPageReady();
     }
   }, [stage]);
+
+  const handleBackToMaterials = () => {
+    if (stage === "material_return_gate") {
+      advanceTour("materials_profile_gate");
+    }
+  };
 
   const sectionLabel =
     material?.material_kind === "crossword" ? "Задания кроссворда" : "Задания учебника";
@@ -85,17 +92,25 @@ export default function MaterialClient({
   return (
     <div className="material-detail-page">
       <div className="material-detail-container">
-        <Link href={`/projects/${slug}/materials`} className="material-detail-back-btn">
+        <div className="material-detail-header-row">
+          <div className="material-detail-topline">
+            <div className="material-detail-brand-mark">{projectName.slice(0, 2).toUpperCase()}</div>
+            <div className="material-detail-topline-text">
+              <div className="material-detail-topline-kicker">{projectName}</div>
+              <div className="material-detail-topline-title">{material.title}</div>
+            </div>
+          </div>
+          <span className="skills-wordmark material-detail-wordmark">skilLS</span>
+        </div>
+
+        <Link
+          href={`/projects/${slug}/materials`}
+          className="material-detail-back-btn"
+          data-tour="material-back-btn"
+          onClick={handleBackToMaterials}
+        >
           ← Назад к материалам
         </Link>
-
-        <div className="material-detail-topline">
-          <div className="material-detail-brand-mark">{projectName.slice(0, 2).toUpperCase()}</div>
-          <div className="material-detail-topline-text">
-            <div className="material-detail-topline-kicker">{projectName}</div>
-            <div className="material-detail-topline-title">{material.title}</div>
-          </div>
-        </div>
 
         <div className="card material-detail-hero">
           <div className="material-detail-cover">
@@ -130,20 +145,19 @@ export default function MaterialClient({
         <div className="material-detail-section-label">{sectionLabel}</div>
 
         {assignments.length > 0 ? (
-          <div className="material-detail-assignments">
+          <div className="material-detail-assignments" data-tour="demo-assignments-list">
             {assignments.map((a, index) => {
               const isDone = completedIds.includes(a.id);
               const assignTypeLabel = a.assignment_type === "intro" ? "ОЗНАКОМИТЕЛЬНОЕ" : "ТЕСТ";
-              const isTourDemoLink = isDemoMaterial && index === 0;
 
               return (
                 <Link
                   key={a.id}
                   href={assignmentHref(slug, a.id, material)}
                   className="material-detail-assignment"
-                  data-tour={isTourDemoLink ? "demo-assignment-link" : undefined}
+                  data-tour={isDemoMaterial ? "demo-assignment-link" : undefined}
                   onClick={() => {
-                    if (stage === "demo_material" && isTourDemoLink) {
+                    if (isDemoMaterial && stage === "demo_material") {
                       advanceTour("demo_assignment");
                     }
                   }}

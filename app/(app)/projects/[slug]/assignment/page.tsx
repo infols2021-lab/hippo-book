@@ -1,3 +1,4 @@
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import AssignmentClient from "./AssignmentClient";
 
 export const revalidate = 0;
@@ -28,12 +29,24 @@ export default async function AssignmentPage({ params, searchParams }: Props) {
     return <div style={{ padding: 50, textAlign: "center" }}>Ошибка: ID задания не передан</div>;
   }
 
+  let isDemoMaterial = false;
+  if (sourceId) {
+    const supabase = await createSupabaseServerClient();
+    const { data: material } = await supabase
+      .from("materials")
+      .select("is_demo")
+      .eq("id", sourceId)
+      .maybeSingle();
+    isDemoMaterial = Boolean(material?.is_demo);
+  }
+
   return (
     <AssignmentClient
       assignmentId={id}
       projectSlug={slug}
       source={normSource(source)}
       sourceId={normStr(sourceId)}
+      isDemoMaterial={isDemoMaterial}
     />
   );
 }

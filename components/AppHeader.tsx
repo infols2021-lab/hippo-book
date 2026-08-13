@@ -14,6 +14,7 @@ type Props = {
   title?: React.ReactNode;
   subtitle?: React.ReactNode;
   nav?: NavItem[];
+  onProfileNav?: () => void;
 };
 
 export default function AppHeader({
@@ -24,6 +25,7 @@ export default function AppHeader({
     { kind: "link", href: "/portal", label: "🏠 Портал", className: "btn ghost" },
     { kind: "logout", label: "🚪 Выйти", className: "btn secondary" },
   ],
+  onProfileNav,
 }: Props) {
   const [isTeacher, setIsTeacher] = useState(false);
 
@@ -57,7 +59,9 @@ export default function AppHeader({
     checkRole();
   }, []);
 
-  const handleProfileNav = () => {};
+  const handleProfileNav = () => {
+    onProfileNav?.();
+  };
 
   return (
     <header

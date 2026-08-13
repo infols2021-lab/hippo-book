@@ -15,6 +15,7 @@ const burgerTarget = visibleTourTarget('[data-tour="mobile-burger-btn"]');
 const MOBILE_MENU_ITEM_SELECTOR: Partial<Record<TourStage, string>> = {
   profile_requests_gate: '[data-tour="requests-link"]',
   materials_gate: '[data-tour="materials-link"]',
+  materials_profile_gate: '[data-tour="profile-link"]',
   rewards_gate: '[data-tour="rewards-btn"]',
 };
 
@@ -44,6 +45,10 @@ function mobileBurgerIntro(stage: BurgerIntroKey): CustomTourStep {
     materials_gate: {
       title: "Меню профиля",
       content: "Раздел «Материалы» на телефоне находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
+    },
+    materials_profile_gate: {
+      title: "Меню материалов",
+      content: "Пункт «Профиль» на телефоне находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
     },
     rewards_gate: {
       title: "Меню профиля",
@@ -137,10 +142,10 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
   ],
   demo_material: [
     {
-      target: visibleTourTarget('[data-tour="demo-assignment-link"]'),
+      target: visibleTourTarget('[data-tour="demo-assignments-list"]', '[data-tour="demo-assignment-link"]'),
       title: "Начните задание",
       content:
-        "Нажмите на задание и пройдите его до конца. На время выполнения подсказки гайда будут скрыты.",
+        "Выберите любое задание из демо-материала и пройдите его до конца. На время выполнения подсказки гайда будут скрыты.",
       mascotImage: pickMascotImage("demo_material"),
       skipBeacon: true,
       hideNextButton: true,
@@ -154,10 +159,45 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       placement: "center",
       title: "Серия засчитана",
       content:
-        "Задание выполнено. Засчитался первый день серии. Серия начисляется за регулярные занятия - выполняйте задания и получайте награды.",
+        "Задание выполнено. Засчитался первый день серии. Серия начисляется за регулярные занятия — выполняйте задания и получайте награды.",
       mascotImage: pickMascotImage("streak_celebration"),
       skipBeacon: true,
       primaryLabel: "Далее",
+    },
+  ],
+  assignment_return_gate: [
+    {
+      target: visibleTourTarget('[data-tour="assignment-back-btn"]'),
+      title: "Вернитесь к материалу",
+      content: "Нажмите «Назад к материалу», чтобы вернуться на страницу учебника.",
+      mascotImage: pickMascotImage("assignment_return_gate"),
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+      placement: "bottom",
+    },
+  ],
+  material_return_gate: [
+    {
+      target: visibleTourTarget('[data-tour="material-back-btn"]'),
+      title: "К списку материалов",
+      content: "Нажмите «Назад к материалам», чтобы вернуться в общий каталог.",
+      mascotImage: pickMascotImage("material_return_gate"),
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+      placement: "bottom",
+    },
+  ],
+  materials_profile_gate: [
+    {
+      target: visibleTourTarget('[data-tour="profile-link"]'),
+      title: "В профиль",
+      content: "Откройте профиль — там награды, серии и заявки на материалы.",
+      mascotImage: pickMascotImage("materials_profile_gate"),
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
     },
   ],
   rewards_gate: [
@@ -377,6 +417,18 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
       placement: "center" as const,
       skipScroll: true,
     }));
+  }
+
+  if (stage === "assignment_return_gate" || stage === "material_return_gate") {
+    return base.map((step) => ({
+      ...step,
+      placement: "bottom" as const,
+      skipScroll: true,
+    }));
+  }
+
+  if (stage === "materials_profile_gate" && isMobile) {
+    return [mobileBurgerIntro(stage), withMobileMenuTarget(base[0], stage)];
   }
 
   if (stage === "requests_info") {

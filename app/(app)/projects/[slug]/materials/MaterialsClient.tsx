@@ -79,6 +79,9 @@ export default function MaterialsClient({
   }, []);
 
   const handleProfileNav = () => {
+    if (stage === "materials_profile_gate") {
+      advanceTour("rewards_gate");
+    }
     setMobileMenuOpen(false);
   };
 
@@ -87,7 +90,7 @@ export default function MaterialsClient({
   }, []);
 
   useEffect(() => {
-    if (stage === "materials_demo") {
+    if (stage === "materials_demo" || stage === "materials_profile_gate") {
       dispatchTourPageReady();
     }
   }, [stage]);
@@ -156,7 +159,13 @@ export default function MaterialsClient({
             </div>
           </>
         ) : (
-          <AppHeader markText={markText} title={projectName} subtitle="Материалы" nav={materialsNav(slug)} />
+          <AppHeader
+            markText={markText}
+            title={projectName}
+            subtitle="Материалы"
+            nav={materialsNav(slug)}
+            onProfileNav={handleProfileNav}
+          />
         )}
 
         {tabs.length > 0 && (

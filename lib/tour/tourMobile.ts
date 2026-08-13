@@ -16,6 +16,7 @@ export function isMobileViewport(): boolean {
 export const MOBILE_MENU_GATE_STAGES: TourStage[] = [
   "profile_requests_gate",
   "materials_gate",
+  "materials_profile_gate",
   "rewards_gate",
 ];
 

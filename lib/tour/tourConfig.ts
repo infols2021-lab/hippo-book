@@ -9,11 +9,14 @@ export type TourStage =
   | "demo_material"          // 6. Карточка материала: демо-задание
   | "demo_assignment"        // 7. Выполнение задания (гайд на паузе)
   | "streak_celebration"     // 8. Засчитана серия
-  | "rewards_gate"           // 9. Профиль: кнопка «Награды»
-  | "rewards_tour"           // 10. Модалка наград
-  | "profile_requests_gate"  // 11. Профиль: заявки
-  | "requests_info"          // 12. Заявки: как работает
-  | "tour_complete"          // 13. Финал
+  | "assignment_return_gate" // 9. Задание: назад к материалу
+  | "material_return_gate"   // 10. Материал: назад к списку
+  | "materials_profile_gate" // 11. Материалы: переход в профиль
+  | "rewards_gate"           // 12. Профиль: кнопка «Награды»
+  | "rewards_tour"           // 13. Модалка наград
+  | "profile_requests_gate"  // 14. Профиль: заявки
+  | "requests_info"          // 15. Заявки: как работает
+  | "tour_complete"          // 16. Финал
   | "finished";
 
 export type StageConfig = {
@@ -30,7 +33,10 @@ export const TOUR_STAGES: Record<TourStage, StageConfig> = {
   materials_demo: { id: "materials_demo", type: "advanceOnAction" },
   demo_material: { id: "demo_material", type: "advanceOnAction" },
   demo_assignment: { id: "demo_assignment", type: "advanceOnAction" },
-  streak_celebration: { id: "streak_celebration", type: "advanceOnNext", nextStage: "rewards_gate" },
+  streak_celebration: { id: "streak_celebration", type: "advanceOnNext", nextStage: "assignment_return_gate" },
+  assignment_return_gate: { id: "assignment_return_gate", type: "advanceOnAction" },
+  material_return_gate: { id: "material_return_gate", type: "advanceOnAction" },
+  materials_profile_gate: { id: "materials_profile_gate", type: "advanceOnAction" },
   rewards_gate: { id: "rewards_gate", type: "advanceOnAction" },
   rewards_tour: { id: "rewards_tour", type: "advanceOnNext", nextStage: "profile_requests_gate" },
   profile_requests_gate: { id: "profile_requests_gate", type: "advanceOnAction" },
@@ -78,7 +84,12 @@ export function isTourStageActiveOnPath(stage: TourStage, pathname: string): boo
       return MATERIAL_DETAIL_PATH.test(pathname);
     case "demo_assignment":
     case "streak_celebration":
+    case "assignment_return_gate":
       return ASSIGNMENT_PATH.test(pathname);
+    case "material_return_gate":
+      return MATERIAL_DETAIL_PATH.test(pathname);
+    case "materials_profile_gate":
+      return MATERIALS_PATH.test(pathname);
     case "requests_info":
       return REQUESTS_PATH.test(pathname);
     case "tour_complete":
