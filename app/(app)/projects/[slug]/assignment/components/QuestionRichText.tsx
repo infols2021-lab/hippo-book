@@ -1,38 +1,30 @@
 "use client";
 
 import React from "react";
-import { parseRichText } from "@/lib/assignments/richText";
+import { RichTextContent } from "@/lib/assignments/richText";
 
 type Props = {
   text?: string | null;
   className?: string;
   style?: React.CSSProperties;
-  as?: keyof React.JSX.IntrinsicElements;
+  as?: React.ElementType;
 };
 
 export default function QuestionRichText({
   text,
   className = "",
   style,
-  as: Tag = "div",
+  as = "div",
 }: Props) {
-  const lines = parseRichText(text);
-  if (!lines.length) return null;
+  const value = String(text ?? "");
+  if (!value.trim()) return null;
 
   return (
-    <Tag className={`question-rich-text ${className}`.trim()} style={style}>
-      {lines.map((segments, lineIndex) => (
-        <React.Fragment key={lineIndex}>
-          {lineIndex > 0 && <br />}
-          {segments.map((segment, segmentIndex) =>
-            segment.bold ? (
-              <strong key={`${lineIndex}-${segmentIndex}`}>{segment.text}</strong>
-            ) : (
-              <React.Fragment key={`${lineIndex}-${segmentIndex}`}>{segment.text}</React.Fragment>
-            )
-          )}
-        </React.Fragment>
-      ))}
-    </Tag>
+    <RichTextContent
+      text={value}
+      className={`question-rich-text ${className}`.trim()}
+      style={style}
+      as={as}
+    />
   );
 }

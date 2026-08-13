@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 
 export type RichTextSegment =
@@ -6,17 +8,18 @@ export type RichTextSegment =
   | { type: "break" };
 
 /** Парсит строку: переносы строк + **жирный** (markdown-lite). */
-export function parseRichText(input: string): RichTextSegment[] {
-  if (!input) return [];
+export function parseRichText(input: string | null | undefined): RichTextSegment[] {
+  const source = String(input ?? "");
+  if (!source) return [];
 
   const segments: RichTextSegment[] = [];
   const regex = /\*\*(.+?)\*\*|\n/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = regex.exec(input)) !== null) {
+  while ((match = regex.exec(source)) !== null) {
     if (match.index > lastIndex) {
-      segments.push({ type: "text", value: input.slice(lastIndex, match.index) });
+      segments.push({ type: "text", value: source.slice(lastIndex, match.index) });
     }
 
     if (match[0] === "\n") {
@@ -28,15 +31,15 @@ export function parseRichText(input: string): RichTextSegment[] {
     lastIndex = regex.lastIndex;
   }
 
-  if (lastIndex < input.length) {
-    segments.push({ type: "text", value: input.slice(lastIndex) });
+  if (lastIndex < source.length) {
+    segments.push({ type: "text", value: source.slice(lastIndex) });
   }
 
   return segments;
 }
 
 /** Убирает маркеры форматирования — для plain-text fallback. */
-export function stripRichTextMarkers(input: string): string {
+export function stripRichTextMarkers(input: string | null | undefined): string {
   return String(input ?? "")
     .replace(/\*\*(.+?)\*\*/g, "$1")
     .replace(/\n/g, " ")
@@ -44,16 +47,21 @@ export function stripRichTextMarkers(input: string): string {
     .trim();
 }
 
+/** @deprecated alias */
+export const richTextToPlain = stripRichTextMarkers;
+
 type RichTextContentProps = {
   text: string;
   className?: string;
+  style?: React.CSSProperties;
   prefix?: React.ReactNode;
-  as?: "div" | "span" | "h2" | "h4" | "p";
+  as?: React.ElementType;
 };
 
 export function RichTextContent({
   text,
   className,
+  style,
   prefix,
   as: Tag = "div",
 }: RichTextContentProps) {
@@ -62,7 +70,7 @@ export function RichTextContent({
   if (!text.trim()) return null;
 
   return (
-    <Tag className={className}>
+    <Tag className={className} style={style}>
       {prefix}
       {segments.map((seg, index) => {
         if (seg.type === "break") {
