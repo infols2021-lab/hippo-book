@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/api/admin";
 import {
   getFileExtension,
   isAllowedMediaExtension,
+  isSafeStorageObjectPath,
   normalizeStorageObjectPath,
   safeStorageFileName,
   uploadStorageObject,
@@ -156,10 +157,18 @@ export async function POST(req: Request) {
     return fail("Нет корректных файлов для загрузки", 400, "NO_FILES", noStoreInit());
   }
 
+  let resolvedExplicitPath = "";
+  if (explicitPath) {
+    resolvedExplicitPath = normalizeStorageObjectPath(explicitPath);
+    if (!isSafeStorageObjectPath(resolvedExplicitPath)) {
+      return fail("Некорректный путь для загрузки", 400, "INVALID_PATH", noStoreInit());
+    }
+  }
+
   const uploadPromises = validFiles.map(async (f) => {
     const ext = getFileExtension(f.filename);
-    const path = explicitPath
-      ? normalizeStorageObjectPath(explicitPath)
+    const path = resolvedExplicitPath
+      ? resolvedExplicitPath
       : (() => {
           const baseName = safeStorageFileName(f.filename.replace(/\.[^.]+$/, ""));
           const fileName = `${Date.now()}_${randomId()}_${baseName}.${ext}`;

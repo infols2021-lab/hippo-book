@@ -8,6 +8,7 @@ import {
   getUserInventory,
 } from "@/lib/rewards/data";
 import type { RewardType } from "@/lib/rewards/types";
+import { isValidUUID } from "@/lib/api/validate";
 
 const VALID_CATEGORIES: RewardType[] = [
   "base",
@@ -89,11 +90,19 @@ export async function POST(request: Request) {
 
     // Защита: проверяем, присутствует ли предмет в реальном инвентаре пользователя
     if (rewardId) {
+      const normalizedRewardId = String(rewardId).trim();
+      if (!isValidUUID(normalizedRewardId)) {
+        return NextResponse.json(
+          { error: "Некорректный идентификатор награды" },
+          { status: 400 }
+        );
+      }
+
       const { data: invItem } = await adminSupabase
         .from("user_inventory")
         .select("id")
         .eq("user_id", user.id)
-        .eq("reward_id", rewardId)
+        .eq("reward_id", normalizedRewardId)
         .maybeSingle();
 
       if (!invItem) {
@@ -108,7 +117,7 @@ export async function POST(request: Request) {
       adminSupabase,
       user.id,
       category as RewardType,
-      rewardId ? String(rewardId) : null
+      rewardId ? String(rewardId).trim() : null
     );
 
     if (!result.success) {

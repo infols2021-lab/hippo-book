@@ -1,7 +1,7 @@
 // app/api/admin/users/route.ts
 import { ok, fail } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/admin";
-import { sanitizeLikeQuery } from "@/lib/api/validate";
+import { buildIlikeOrFilter, isValidUUID } from "@/lib/api/validate";
 import type { NextRequest } from "next/server";
 
 type ProfileRow = {
@@ -31,11 +31,10 @@ export async function GET(req: NextRequest) {
       .select("id,full_name,email,contact_phone,region,is_admin,created_at")
       .order("created_at", { ascending: false });
 
-    // ✅ Безопасный поиск через ILIKE с экранированием
+    // ✅ Безопасный поиск через ILIKE с экранированием и quoted PostgREST values
     if (q) {
-      const safeQ = sanitizeLikeQuery(q); // возвращает %экранированная_строка%
       query = query.or(
-        `full_name.ilike.${safeQ},email.ilike.${safeQ},contact_phone.ilike.${safeQ}`
+        buildIlikeOrFilter(["full_name", "email", "contact_phone"], q)
       );
     }
 
@@ -100,7 +99,9 @@ export async function PATCH(req: NextRequest) {
   const userId = String(body?.user_id || "").trim();
   const is_admin = Boolean(body?.is_admin);
 
-  if (!userId) return fail("user_id required", 400, "VALIDATION");
+  if (!userId || !isValidUUID(userId)) {
+    return fail("Некорректный user_id", 400, "VALIDATION");
+  }
 
   const { error } = await supabase.from("profiles").update({ is_admin }).eq("id", userId);
 

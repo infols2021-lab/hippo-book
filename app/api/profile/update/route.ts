@@ -111,7 +111,11 @@ export async function PATCH(req: NextRequest) {
   }
   
   if (hasOwn(input, "tour_stage")) {
-    updatePayload.tour_stage = String(input.tour_stage);
+    const tourStage = String(input.tour_stage).trim().slice(0, 64);
+    if (!/^[a-z0-9_-]*$/i.test(tourStage)) {
+      return fail("Некорректное значение tour_stage", 400, "VALIDATION", noStoreInit());
+    }
+    updatePayload.tour_stage = tourStage;
   }
 
   if (Object.keys(updatePayload).length === 0) {

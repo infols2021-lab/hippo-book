@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { ok, fail } from "@/lib/api/response";
 import { directFetch } from "@/lib/net/directFetch";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
+import { isAllowedRedirectUrl } from "@/lib/api/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -117,7 +118,9 @@ export async function POST(req: Request) {
     });
 
     const appUrl = getAppUrl(req);
-    const emailRedirectTo = appUrl ? `${appUrl}/login?message=confirmed` : undefined;
+    const redirectCandidate = appUrl ? `${appUrl}/login?message=confirmed` : undefined;
+    const emailRedirectTo =
+      redirectCandidate && isAllowedRedirectUrl(redirectCandidate) ? redirectCandidate : undefined;
 
     const { error } = await supabaseAnon.auth.resend({
       type: "signup",

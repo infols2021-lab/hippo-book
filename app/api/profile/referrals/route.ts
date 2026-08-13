@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api/response";
+import { isValidUUID } from "@/lib/api/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -122,6 +123,10 @@ export async function POST(req: NextRequest) {
     let refId = body.code.trim();
     if (refId.includes("ref=")) {
       refId = refId.split("ref=")[1].split("&")[0];
+    }
+
+    if (!isValidUUID(refId)) {
+      return fail("Некорректный код приглашения", 400, "VALIDATION");
     }
 
     if (refId === userId) {

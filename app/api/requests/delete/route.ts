@@ -4,6 +4,7 @@ import { ok, fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
 import { deleteRequestRowByNumber } from "@/lib/integrations/googleSheets";
 import { normalizeString } from "@/lib/materials/normalize"; // заменили локальную
+import { isValidUUID } from "@/lib/api/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   const id = normalizeString((body as any).id);
 
-  if (!id) {
+  if (!id || !isValidUUID(id)) {
     return fail("id required", 400, "VALIDATION", noStoreInit());
   }
 

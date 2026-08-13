@@ -4,6 +4,7 @@ import { ok, fail } from "@/lib/api/response";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
 import { isValidEmailFormat, validateEmailDomain } from "@/lib/security/domains";
+import { isAllowedRedirectUrl, isValidUUID } from "@/lib/api/validate";
 
 function getRemoteIp(req: Request): string | null {
   const xff = req.headers.get("x-forwarded-for");
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
     const password = String(body.password ?? "");
     const captchaToken = String(body.captchaToken ?? "");
     const refId = String(body.ref ?? "").trim();
+    const normalizedRefId = isValidUUID(refId) ? refId : "";
 
     const remoteIp = getRemoteIp(req) ?? undefined;
 
@@ -97,7 +99,11 @@ export async function POST(req: Request) {
     });
 
     const origin = getPublicOrigin(req);
-    const redirectTo = origin ? `${origin}/login?message=confirmed` : undefined;
+    const envOrigin =
+      process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || origin;
+    const redirectCandidate = envOrigin ? `${envOrigin.replace(/\/$/, "")}/login?message=confirmed` : undefined;
+    const redirectTo =
+      redirectCandidate && isAllowedRedirectUrl(redirectCandidate) ? redirectCandidate : undefined;
 
     const { data, error } = await supabaseAnon.auth.signUp({
       email,
@@ -161,17 +167,17 @@ export async function POST(req: Request) {
         );
       }
 
-      if (refId && refId !== userId) {
+      if (normalizedRefId && normalizedRefId !== userId) {
         try {
           const { data: refUser } = await admin
             .from("profiles")
             .select("id, referrals_count")
-            .eq("id", refId)
+            .eq("id", normalizedRefId)
             .maybeSingle();
 
           if (refUser) {
             await admin.from("user_referrals").insert({
-              referrer_id: refId,
+              referrer_id: normalizedRefId,
               referred_id: userId,
               is_teacher_student: false,
               status: "active",
@@ -181,7 +187,7 @@ export async function POST(req: Request) {
             await admin
               .from("profiles")
               .update({ referrals_count: (refUser.referrals_count || 0) + 1 })
-              .eq("id", refId);
+              .eq("id", normalizedRefId);
           }
         } catch (refErr) {
           console.error("[register] Ошибка сохранения реферальной связи:", refErr);

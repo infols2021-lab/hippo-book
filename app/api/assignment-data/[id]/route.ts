@@ -2,6 +2,7 @@
 import { ok, fail } from "@/lib/api/response";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
+import { isValidUUID } from "@/lib/api/validate";
 import {
   mockDebugAll,
   mockDebugReview,
@@ -66,6 +67,10 @@ export async function GET(
     if (id === "debug-all") return NextResponse.json(mockDebugAll);
     if (id === "debug-review") return NextResponse.json(mockDebugReview);
     if (id === "debug-single") return NextResponse.json(mockDebugSingle);
+  }
+
+  if (!isValidUUID(id)) {
+    return fail("Invalid assignment id", 400, "VALIDATION");
   }
 
   // 2. Пытаемся получить пользователя, но НЕ блокируем запрос здесь.

@@ -1,5 +1,10 @@
 // lib/storage/publicUrl.ts
 const STORAGE_PROXY_PREFIX = "/api/storage/public";
+const BLOCKED_URL_SCHEMES = /^(javascript|vbscript):/i;
+
+function isBlockedUrlScheme(value: string) {
+  return BLOCKED_URL_SCHEMES.test(value.trim());
+}
 
 type PrimitiveQueryValue = string | number | boolean | null | undefined;
 
@@ -105,6 +110,7 @@ export function rewriteSupabasePublicStorageUrl(
 ): string {
   const raw = String(value || "").trim();
   if (!raw) return "";
+  if (isBlockedUrlScheme(raw)) return "";
 
   // 1. Уже наш прокси – просто докидываем параметры
   if (raw.startsWith(STORAGE_PROXY_PREFIX)) {
