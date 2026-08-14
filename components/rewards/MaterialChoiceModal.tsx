@@ -218,7 +218,6 @@ export default function MaterialChoiceModal({
       const data = await res.json().catch(() => null);
 
       if (res.ok && data && (data.ok || data.success)) {
-        // Убрали "отсебятину" фронтенда. Берем только то, что реально выдал и подтвердил сервер.
         const rewardItems: MaterialChoiceUnboxItem[] = Array.isArray(data.grantedRewards)
           ? data.grantedRewards.map((r: any) => ({
               id: r.id,
@@ -229,6 +228,20 @@ export default function MaterialChoiceModal({
               meta: r.meta,
             }))
           : [];
+
+        if (rewardItems.length === 0 && Array.isArray(data.grantedMaterialIds)) {
+          for (const materialId of data.grantedMaterialIds) {
+            const mat = materials.find((item) => item.id === materialId);
+            if (!mat) continue;
+            rewardItems.push({
+              id: mat.id,
+              title: mat.title,
+              type: mat.kind || "material",
+              description: "Разблокированный материал",
+              asset_url: mat.cover_image_url || null,
+            });
+          }
+        }
 
         onSuccess({
           unboxItems: rewardItems,
@@ -289,7 +302,7 @@ export default function MaterialChoiceModal({
   const cannotFulfillChoice = availableForChoiceByPrice.length > 0 && lockedMaterials.length < requiredChoiceCount;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden overscroll-none animate-in fade-in duration-200 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 overflow-hidden overscroll-none animate-in fade-in duration-200 bg-black/60 backdrop-blur-sm">
       <div
         className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative border border-slate-100 flex flex-col max-h-[90vh]"
       >

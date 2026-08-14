@@ -14,6 +14,11 @@ import type {
   PromocodeRedeemResult,
   PromocodeRewardsBundle,
 } from "./types";
+import {
+  fetchMaterialsAsGrantedItems,
+  mapRewardsToGrantedItems,
+  type GrantedDisplayItem,
+} from "./grantedItems";
 
 // ---------------------------------------------------------------------------
 // 1. МАСКОТ И НАСТРОЙКИ ЭКИПИРОВКИ
@@ -344,7 +349,7 @@ export async function redeemPromocode(
     };
   }
 
-  const grantedRewards: RewardItem[] = [];
+  const grantedRewards: GrantedDisplayItem[] = [];
 
   if (Array.isArray(bundle.reward_ids) && bundle.reward_ids.length > 0) {
     const inventoryRows = bundle.reward_ids.map((rewardId) => ({
@@ -363,7 +368,7 @@ export async function redeemPromocode(
       .in("id", bundle.reward_ids);
 
     if (Array.isArray(rewardsData)) {
-      grantedRewards.push(...(rewardsData as unknown as RewardItem[]));
+      grantedRewards.push(...mapRewardsToGrantedItems(rewardsData, "Награда по промокоду"));
     }
   }
 
@@ -381,6 +386,13 @@ export async function redeemPromocode(
     await adminSupabase
       .from("material_access")
       .upsert(accessRows, { onConflict: "user_id,material_id" });
+
+    const materialItems = await fetchMaterialsAsGrantedItems(
+      adminSupabase,
+      allMaterialIdsToGrant,
+      "Материал по промокоду"
+    );
+    grantedRewards.push(...materialItems);
   }
 
   const { error: rpcError } = await adminSupabase.rpc("increment_promocode_uses", {

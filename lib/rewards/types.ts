@@ -109,12 +109,21 @@ export type PromocodeRedemption = {
   user_full_name?: string;
 };
 
+export type GrantedRewardDisplayItem = {
+  id: string;
+  title: string;
+  type: string;
+  description?: string | null;
+  asset_url?: string | null;
+  meta?: Record<string, unknown>;
+};
+
 export type PromocodeRedeemResult = {
   success: boolean;
   error?: string;
   requiresMaterialChoice?: boolean;
   remainingMaterialChoices?: number;
-  grantedRewards?: RewardItem[];
+  grantedRewards?: GrantedRewardDisplayItem[];
   physicalPrize?: CustomPhysicalPrize | null;
   grantedMaterialIds?: string[];
 };
