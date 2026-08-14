@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import RoadmapImportPanel from "./RoadmapImportPanel";
 import RoadmapVisualEditor from "./RoadmapVisualEditor";
+import RoadmapCertificatePanel from "./RoadmapCertificatePanel";
 
 export default function MaterialsManager() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -401,6 +402,7 @@ export default function MaterialsManager() {
           {editingMaterial.id && (editingMaterial.is_roadmap || editingMaterial.material_kind === "roadmap") ? (
             <>
               <RoadmapVisualEditor materialId={editingMaterial.id} materialTitle={editingMaterial.title || "Материал"} />
+              <RoadmapCertificatePanel materialId={editingMaterial.id} materialTitle={editingMaterial.title || "Материал"} />
               <RoadmapImportPanel materialId={editingMaterial.id} materialTitle={editingMaterial.title || "Материал"} />
             </>
           ) : null}

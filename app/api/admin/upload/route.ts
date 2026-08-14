@@ -31,7 +31,8 @@ const ALLOWED_BUCKETS = [
   "assignments",
   "materials",
   "public",
-  "media"
+  "media",
+  "hippo-book-certificates",
 ];
 
 function noStoreInit(): ResponseInit {

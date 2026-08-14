@@ -2,7 +2,8 @@
 import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { directFetch } from "@/lib/net/directFetch";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 
@@ -20,6 +21,7 @@ const DEFAULT_PUBLIC_BUCKETS = [
   "streak-roadmap-bg",
   "profile-backgrounds",
   "hippo-book-audio",
+  "hippo-book-certificates",
 ];
 
 const DEFAULT_UPLOAD_BUCKETS = [
@@ -30,6 +32,7 @@ const DEFAULT_UPLOAD_BUCKETS = [
   "streak_icon_assets",
   "streak-roadmap-bg",
   "profile-backgrounds",
+  "hippo-book-certificates",
 ];
 
 const DEFAULT_ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "avif"];
@@ -79,9 +82,13 @@ export function getPublicStorageBuckets() {
 
 export function getUploadStorageBuckets() {
   const yandexBucket = process.env.YANDEX_BUCKET_NAME;
+  const certificateBucket = getCertificateStorageBucket();
   const buckets = envList("STORAGE_UPLOAD_BUCKETS", DEFAULT_UPLOAD_BUCKETS);
   if (yandexBucket && !buckets.includes(yandexBucket)) {
     buckets.push(yandexBucket);
+  }
+  if (certificateBucket && !buckets.includes(certificateBucket)) {
+    buckets.push(certificateBucket);
   }
   return buckets;
 }
@@ -215,6 +222,76 @@ export function createSupabaseStorageClient(options?: { admin?: boolean }) {
   });
 }
 
+export function getCertificateStorageBucket() {
+  return String(process.env.CERTIFICATE_BUCKET_NAME || "hippo-book-certificates").trim();
+}
+
+export function isYandexManagedBucket(bucket: string) {
+  const normalized = String(bucket || "").trim();
+  const primary = String(process.env.YANDEX_BUCKET_NAME || "").trim();
+  const certificateBucket = getCertificateStorageBucket();
+  return normalized === primary || normalized === certificateBucket;
+}
+
+function createYandexS3Client() {
+  return new S3Client({
+    region: process.env.YANDEX_REGION || "ru-central1",
+    endpoint: "https://storage.yandexcloud.net",
+    credentials: {
+      accessKeyId: process.env.YANDEX_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY!,
+    },
+  });
+}
+
+export async function downloadStorageObject(bucket: string, path: string | string[]) {
+  const cleanBucket = String(bucket || "").trim();
+  const cleanPath = normalizeStorageObjectPath(path);
+
+  if (!isValidBucketName(cleanBucket)) {
+    throw new Error("Некорректное имя bucket");
+  }
+  if (!isSafeStorageObjectPath(cleanPath)) {
+    throw new Error("Некорректный путь к файлу");
+  }
+
+  if (isYandexManagedBucket(cleanBucket)) {
+    const s3Client = createYandexS3Client();
+    const response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: cleanBucket,
+        Key: cleanPath,
+      }),
+    );
+
+    if (!response.Body) {
+      throw new Error("Файл не найден");
+    }
+
+    const bytes = await response.Body.transformToByteArray();
+    const contentType = response.ContentType || guessContentTypeFromPath(cleanPath);
+    const blob = new Blob([Buffer.from(bytes)], { type: contentType });
+    return {
+      data: blob,
+      contentType,
+      size: bytes.byteLength,
+    } satisfies DownloadStorageObjectResult;
+  }
+
+  assertPublicStorageBucket(cleanBucket);
+  return downloadPublicStorageObject(cleanBucket, cleanPath);
+}
+
+export async function downloadStorageObjectBytes(bucket: string, path: string | string[]) {
+  const result = await downloadStorageObject(bucket, path);
+  const buffer = Buffer.from(await result.data.arrayBuffer());
+  return {
+    bytes: new Uint8Array(buffer),
+    contentType: result.contentType,
+    size: result.size,
+  };
+}
+
 export async function downloadPublicStorageObject(bucket: string, path: string | string[]) {
   const cleanBucket = String(bucket || "").trim();
   const cleanPath = normalizeStorageObjectPath(path);
@@ -259,21 +336,14 @@ export async function uploadStorageObject(input: UploadStorageObjectInput) {
     safeBody = Buffer.from(input.file);
   }
 
-  const isYandexBucket = bucket === process.env.YANDEX_BUCKET_NAME;
+  const isYandexBucket = isYandexManagedBucket(bucket);
   const maxRetries = Math.max(0, Number(input.maxRetries) || 2);
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       if (isYandexBucket) {
-        const s3Client = new S3Client({
-          region: process.env.YANDEX_REGION || "ru-central1",
-          endpoint: "https://storage.yandexcloud.net",
-          credentials: {
-            accessKeyId: process.env.YANDEX_ACCESS_KEY_ID!,
-            secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY!,
-          },
-        });
+        const s3Client = createYandexS3Client();
 
         await s3Client.send(
           new PutObjectCommand({

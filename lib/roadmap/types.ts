@@ -42,11 +42,29 @@ export type RoadmapExamSegment = {
   node: RoadmapNodeDef;
 };
 
+export type CertificateFieldSource =
+  | "profile.full_name"
+  | "profile.email"
+  | "material.title"
+  | "issued_at.ru"
+  | "issued_at.iso"
+  | "certificate.id"
+  | "empty";
+
+export type RoadmapCertificateTemplateConfig = {
+  bucket: string;
+  path: string;
+  field_map: Record<string, string>;
+  fallbacks?: Record<string, string>;
+  updated_at?: string;
+};
+
 export type RoadmapCertificateSegment = {
   kind: "certificate";
   id: string;
   title: string;
   enabled?: boolean;
+  template?: RoadmapCertificateTemplateConfig | null;
 };
 
 export type RoadmapSegment =

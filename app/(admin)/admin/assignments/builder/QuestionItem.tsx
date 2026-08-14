@@ -24,7 +24,6 @@ type Props = {
   disabled?: boolean;
   expanded?: boolean;
   onToggleExpand?: () => void;
-
   onChange: (next: Question) => void;
   onRemove: () => void;
   onMoveUp: () => void;
@@ -138,6 +137,7 @@ export default function QuestionItem({
     dragging.current = false;
     dragStart.current = null;
     pinchStart.current = null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imgUrl, value.type]);
 
   function clientToLocal(eClientX: number, eClientY: number) {

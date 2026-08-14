@@ -6,6 +6,7 @@ import {
   type RoadmapSegment,
   type RoadmapStructure,
 } from "@/lib/roadmap/types";
+import { normalizeFieldMap } from "@/lib/roadmap/certificateConfig";
 
 export type RoadmapValidationIssue = {
   path: string;
@@ -179,11 +180,22 @@ function normalizeSegment(
   }
 
   if (kind === "certificate") {
+    const templateObj = asObject(obj.template);
     return {
       kind: "certificate",
       id,
       title,
       enabled: obj.enabled !== false,
+      template: templateObj
+        ? {
+            bucket: String(templateObj.bucket ?? "").trim(),
+            path: String(templateObj.path ?? "").trim(),
+            field_map: normalizeFieldMap(templateObj.field_map),
+            fallbacks: normalizeFieldMap(templateObj.fallbacks),
+            updated_at:
+              templateObj.updated_at != null ? String(templateObj.updated_at) : undefined,
+          }
+        : undefined,
     };
   }
 

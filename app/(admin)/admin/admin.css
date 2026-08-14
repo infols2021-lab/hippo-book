@@ -1196,8 +1196,105 @@
 
 @media (max-width: 900px) {
   .admin-root .roadmap-visual-meta,
-  .admin-root .roadmap-visual-node,
   .admin-root .roadmap-visual-exam-grid {
     grid-template-columns: 1fr;
   }
+
+  .admin-root .roadmap-certificate-field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-root .roadmap-certificate-panel {
+  margin-top: 8px;
+  margin-bottom: 16px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+}
+
+.admin-root .roadmap-certificate-dropzone {
+  border: 2px dashed #94a3b8;
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.admin-root .roadmap-certificate-dropzone:hover {
+  border-color: #0ea5e9;
+  background: #f0f9ff;
+}
+
+.admin-root .roadmap-certificate-dropzone.is-busy {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.admin-root .roadmap-certificate-dropzone-title {
+  font-size: 16px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.admin-root .roadmap-certificate-dropzone-subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.admin-root .roadmap-certificate-dropzone-meta {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0369a1;
+}
+
+.admin-root .roadmap-certificate-fields {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-root .roadmap-certificate-fields-head {
+  font-size: 13px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.admin-root .roadmap-certificate-field-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) minmax(160px, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.admin-root .roadmap-certificate-field-name {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.admin-root .roadmap-certificate-field-name span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.admin-root .roadmap-certificate-fallback-input {
+  border: 2px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
 }

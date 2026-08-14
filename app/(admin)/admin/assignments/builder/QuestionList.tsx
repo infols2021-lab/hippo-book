@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import QuestionItem from "./QuestionItem";
 import QuestionTypeSwitch from "./QuestionTypeSwitch";
 import { newQuestion, type Question, type QuestionType } from "./types";
@@ -11,23 +11,29 @@ type Props = {
   disabled?: boolean;
 };
 
+// Хелпер для защиты от старых вопросов в базе, у которых может не быть поля id
+function getQId(q: Question, idx: number) {
+  return q.id || `legacy-fallback-${idx}`;
+}
+
 export default function QuestionList({ value, onChange, disabled }: Props) {
   const questions = Array.isArray(value) ? value : [];
   const [newType, setNewType] = useState<QuestionType>("test");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  
+  // Флаг для отслеживания первоначальной загрузки данных
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   const canAdd = !disabled;
 
+  // Инициализируем открытие последнего вопроса только один раз при загрузке данных.
+  // Это заменяет старый багованный useEffect, который перебивал клики пользователя.
   useEffect(() => {
-    if (questions.length === 0) {
-      setExpandedId(null);
-      return;
+    if (!hasInitialized && questions.length > 0) {
+      setExpandedId(getQId(questions[questions.length - 1], questions.length - 1));
+      setHasInitialized(true);
     }
-
-    if (!expandedId || !questions.some((question) => question.id === expandedId)) {
-      setExpandedId(questions[questions.length - 1]?.id ?? null);
-    }
-  }, [questions, expandedId]);
+  }, [questions, hasInitialized]);
 
   function patchAt(index: number, nextQ: Question) {
     const next = [...questions];
@@ -38,15 +44,22 @@ export default function QuestionList({ value, onChange, disabled }: Props) {
   function removeAt(index: number) {
     if (disabled) return;
     const next = [...questions];
+    const removedId = getQId(next[index], index);
+    
     next.splice(index, 1);
 
     if (next.length === 0) {
       const created = newQuestion("test");
       next.push(created);
+      onChange(next);
       setExpandedId(created.id);
+    } else {
+      onChange(next);
+      // Если мы удалили тот вопрос, который сейчас открыт, открываем последний из оставшихся
+      if (expandedId === removedId) {
+        setExpandedId(getQId(next[next.length - 1], next.length - 1));
+      }
     }
-
-    onChange(next);
   }
 
   function move(from: number, to: number) {
@@ -56,6 +69,15 @@ export default function QuestionList({ value, onChange, disabled }: Props) {
     const next = [...questions];
     const [item] = next.splice(from, 1);
     next.splice(to, 0, item);
+
+    // Если мы двигаем легаси-вопрос без ID, его fallback-ID меняется. 
+    // Корректируем стейт, чтобы он оставался открытым после перемещения.
+    if (expandedId === `legacy-fallback-${from}`) {
+      setExpandedId(`legacy-fallback-${to}`);
+    } else if (expandedId === `legacy-fallback-${to}`) {
+      setExpandedId(`legacy-fallback-${from}`);
+    }
+
     onChange(next);
   }
 
@@ -69,31 +91,43 @@ export default function QuestionList({ value, onChange, disabled }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {questions.map((q, idx) => (
-          <QuestionItem
-            key={q.id || `${idx}-${q.type}`}
-            index={idx}
-            total={questions.length}
-            value={q}
-            disabled={disabled}
-            expanded={expandedId === q.id}
-            onToggleExpand={() => setExpandedId((current) => (current === q.id ? null : q.id))}
-            onChange={(next) => patchAt(idx, next)}
-            onRemove={() => removeAt(idx)}
-            onMoveUp={() => move(idx, idx - 1)}
-            onMoveDown={() => move(idx, idx + 1)}
-            onTypeChange={(nextType) => {
-              const base = newQuestion(nextType);
+        {questions.map((q, idx) => {
+          const currentId = getQId(q, idx);
 
-              if (q.q) base.q = q.q;
-              if (q.explanation) base.explanation = q.explanation;
-              if (q.image) base.image = q.image;
-              if (q.media && q.media.length > 0) base.media = q.media;
+          return (
+            <QuestionItem
+              key={currentId}
+              index={idx}
+              total={questions.length}
+              value={q}
+              disabled={disabled}
+              expanded={expandedId === currentId}
+              onToggleExpand={() => setExpandedId((current) => (current === currentId ? null : currentId))}
+              onChange={(next) => patchAt(idx, next)}
+              onRemove={() => removeAt(idx)}
+              onMoveUp={() => move(idx, idx - 1)}
+              onMoveDown={() => move(idx, idx + 1)}
+              onTypeChange={(nextType) => {
+                const base = newQuestion(nextType);
 
-              patchAt(idx, base);
-            }}
-          />
-        ))}
+                if (q.q) base.q = q.q;
+                if (q.explanation) base.explanation = q.explanation;
+                if (q.image) base.image = q.image;
+                if (q.media && q.media.length > 0) base.media = q.media;
+
+                // ВАЖНО: сохраняем старый ID, чтобы при смене типа вопрос мгновенно не схлопывался
+                if (q.id) {
+                  base.id = q.id;
+                } else {
+                  // Если это был легаси-вопрос, у нового типа ID точно есть. Обновляем стейт.
+                  setExpandedId(base.id);
+                }
+
+                patchAt(idx, base);
+              }}
+            />
+          );
+        })}
       </div>
 
       <div style={{ marginTop: 10 }}>

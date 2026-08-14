@@ -1,10 +1,13 @@
 import { fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
 import { isValidUUID } from "@/lib/api/validate";
-import { buildRoadmapCertificatePdf } from "@/lib/roadmap/certificatePdf";
+import { getCertificateTemplateConfig } from "@/lib/roadmap/certificateConfig";
+import { buildCertificatePdf } from "@/lib/roadmap/certificateTemplate";
 import { fetchRoadmapProgress, fetchRoadmapStructure } from "@/lib/roadmap/data";
 import { buildRoadmapUiState } from "@/lib/roadmap/unlock";
+import { downloadStorageObjectBytes } from "@/lib/storage/server";
 import type { NextRequest } from "next/server";
+import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,10 +83,30 @@ export async function GET(
     .sort()
     .pop();
 
-  const pdfBytes = await buildRoadmapCertificatePdf({
-    userName: profile?.full_name?.trim() || user.email?.split("@")[0] || "Участник",
-    courseTitle: material.title,
-    completedAt: completedAt ? new Date(completedAt) : new Date(),
+  const issuedAt = completedAt ? new Date(completedAt) : new Date();
+  const templateConfig = getCertificateTemplateConfig(structure);
+
+  let templateBytes: Uint8Array | null = null;
+  if (templateConfig?.bucket && templateConfig.path) {
+    try {
+      const downloaded = await downloadStorageObjectBytes(templateConfig.bucket, templateConfig.path);
+      templateBytes = downloaded.bytes;
+    } catch (error) {
+      console.error("[certificate] template download failed:", error);
+    }
+  }
+
+  const certificateId = randomUUID();
+  const pdfBytes = await buildCertificatePdf({
+    templateBytes,
+    config: templateConfig,
+    context: {
+      profileFullName: profile?.full_name,
+      profileEmail: profile?.email ?? user.email,
+      materialTitle: material.title,
+      issuedAt,
+      certificateId,
+    },
   });
 
   const filename = `certificate-${materialId.slice(0, 8)}.pdf`;
