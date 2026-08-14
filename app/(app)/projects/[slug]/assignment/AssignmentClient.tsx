@@ -313,7 +313,7 @@ export default function AssignmentClient({
 
   const back = useMemo(() => {
     if (guestMode) {
-      return { href: "/login", headerLabel: "На страницу входа", actionLabel: "На страницу входа" };
+      return { href: "/demo", headerLabel: "К демо-заданиям", actionLabel: "К демо-заданиям" };
     }
 
     let s = String(source ?? "").trim().toLowerCase();
