@@ -106,8 +106,24 @@ export function CrosswordGridReadOnly({
           {title}
         </div>
       )}
-      <div className="cw-grid-wrap" style={{ maxWidth: "100%", overflowX: "auto", paddingBottom: "8px" }}>
-        <div className={`cw-grid ${sizeClass}`}>
+      <div 
+        className="cw-grid-wrap" 
+        style={{ 
+          maxWidth: "100%", 
+          overflowX: "auto", 
+          paddingBottom: "8px",
+          textAlign: "center",
+          WebkitOverflowScrolling: "touch"
+        }}
+      >
+        <div 
+          className={`cw-grid ${sizeClass}`}
+          style={{ 
+            display: "inline-block", 
+            margin: "0 auto", 
+            textAlign: "left" 
+          }}
+        >
           {Array.from({ length: rows }).map((_, r) => (
             <div className="cw-row" key={r}>
               {Array.from({ length: cols }).map((__, c) => {
@@ -366,8 +382,24 @@ export default function QuestionCrossword({
       ) : null}
 
       <div className="cw-card">
-        <div className="cw-grid-wrap" style={{ maxWidth: "100%", overflowX: "auto", paddingBottom: "8px" }}>
-          <div className={`cw-grid ${sizeClass}`}>
+        <div 
+          className="cw-grid-wrap" 
+          style={{ 
+            maxWidth: "100%", 
+            overflowX: "auto", 
+            paddingBottom: "8px",
+            textAlign: "center",
+            WebkitOverflowScrolling: "touch"
+          }}
+        >
+          <div 
+            className={`cw-grid ${sizeClass}`}
+            style={{ 
+              display: "inline-block", 
+              margin: "0 auto", 
+              textAlign: "left" 
+            }}
+          >
             {Array.from({ length: rows }).map((_, r) => (
               <div className="cw-row" key={r}>
                 {Array.from({ length: cols }).map((__, c) => {

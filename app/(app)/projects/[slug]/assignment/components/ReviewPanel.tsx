@@ -28,7 +28,6 @@ function getStatusConfig(item: ReviewItem) {
     Array.isArray(item.userIndices) &&
     item.userIndices.length > 0
   ) {
-    // Явно указали i: number, чтобы TS не ругался
     const hasCorrect = item.userIndices.some((i: number) => item.correctIndices?.includes(i));
     if (hasCorrect) {
       return { key: "penalty", label: "Штраф (лишний вариант)", color: "#f59e0b", bg: "#fffbeb" };
@@ -57,8 +56,8 @@ function FillRow({
   return (
     <div
       style={{
-        display: "grid",
-        gridTemplateColumns: "48px 1fr 1fr",
+        display: "flex",
+        flexWrap: "wrap",
         gap: "12px",
         alignItems: "flex-start",
         padding: "12px 16px",
@@ -68,6 +67,7 @@ function FillRow({
     >
       <div
         style={{
+          flex: "0 0 24px",
           fontWeight: 800,
           color: isCorrect ? "#10b981" : "#cbd5e1",
           fontSize: "14px",
@@ -79,6 +79,7 @@ function FillRow({
       </div>
       <div
         style={{
+          flex: "1 1 120px",
           fontWeight: 900,
           color: isCorrect ? "#10b981" : "#ef4444",
           wordBreak: "break-word",
@@ -86,10 +87,12 @@ function FillRow({
           fontSize: "15px",
         }}
       >
+        <span style={{ fontSize: "12px", display: "block", color: "#64748b", fontWeight: 700, marginBottom: "2px" }}>ВАШ ОТВЕТ:</span>
         {userAnswer || "—"} {userAnswer ? (isCorrect ? "✓" : "✗") : ""}
       </div>
       <div
         style={{
+          flex: "1 1 120px",
           fontWeight: 900,
           color: "#10b981",
           wordBreak: "break-word",
@@ -97,6 +100,7 @@ function FillRow({
           fontSize: "15px",
         }}
       >
+        <span style={{ fontSize: "12px", display: "block", color: "#64748b", fontWeight: 700, marginBottom: "2px" }}>ВЕРНЫЙ ОТВЕТ:</span>
         {correctAnswer}
       </div>
     </div>
@@ -117,7 +121,7 @@ function TestOptionsReview({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
         gap: "16px",
         marginTop: "12px",
       }}
@@ -217,7 +221,7 @@ function TestOptionsReview({
                     }}
                   />
                 ) : (
-                  <div style={{ maxWidth: "200px" }}>
+                  <div style={{ maxWidth: "100%" }}>
                     <MediaRenderer media={opt.media} />
                   </div>
                 )}
@@ -312,14 +316,19 @@ function FilledSentence({
             border: "1px solid #bbf7d0",
             borderRadius: "12px",
             fontSize: "14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "6px"
           }}
         >
           <span style={{ fontWeight: 800, color: "#166534" }}>Правильные ответы: </span>
-          {correctAnswers.map((ans, i: number) => (
-            <span key={i} style={{ marginRight: "14px", fontWeight: 800, color: "#000" }}>
-              {i + 1}. <span style={{ color: "#10b981" }}>{ans}</span>
-            </span>
-          ))}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+            {correctAnswers.map((ans, i: number) => (
+              <span key={i} style={{ fontWeight: 800, color: "#000", background: "rgba(255,255,255,0.6)", padding: "4px 8px", borderRadius: "6px" }}>
+                {i + 1}. <span style={{ color: "#10b981" }}>{ans}</span>
+              </span>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -331,7 +340,6 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
     const status = getStatusConfig(r);
     const scorePercent = r.pointsTotal > 0 ? (r.pointsEarned / r.pointsTotal) * 100 : 0;
       
-    // Все медиа и настройки приезжают к нам уже упакованными в ReviewItem (r) из scoring.ts
     const mediaToRender = r.media;
 
     let imageUrl = "";
@@ -379,11 +387,12 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
         style={{
           background: "#ffffff",
           borderRadius: "24px",
-          padding: "24px",
+          padding: "20px",
           marginBottom: "20px",
           border: "1px solid rgba(0,0,0,0.06)",
           boxShadow: "0 8px 24px rgba(0,0,0,0.02)",
           position: "relative",
+          overflow: "hidden"
         }}
       >
         <div
@@ -394,23 +403,24 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
             bottom: 0,
             width: "5px",
             background: status.color,
-            borderRadius: "24px 0 0 24px",
           }}
         />
 
         <div
           style={{
             display: "flex",
+            flexWrap: "wrap",
             justifyContent: "space-between",
             alignItems: "flex-start",
             gap: "16px",
             marginBottom: "18px",
           }}
         >
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: "1 1 200px" }}>
             <div
               style={{
                 display: "flex",
+                flexWrap: "wrap",
                 alignItems: "center",
                 gap: "8px",
                 marginBottom: "6px",
@@ -467,7 +477,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
             ) : null}
           </div>
 
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ flex: "0 0 auto", minWidth: "100px", textAlign: "right" }}>
             <div style={{ fontSize: "16px", fontWeight: 900, color: "#1e293b" }}>
               <span style={{ color: status.color }}>{fmtPoints(r.pointsEarned)}</span>
               <span style={{ opacity: 0.3, fontWeight: 500 }}> / {r.pointsTotal}</span>
@@ -538,25 +548,6 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               background: "#ffffff",
             }}
           >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "48px 1fr 1fr",
-                gap: "12px",
-                padding: "10px 16px",
-                background: "#f8fafc",
-                borderBottom: "1px solid rgba(0,0,0,0.06)",
-                fontSize: "12px",
-                fontWeight: 800,
-                textTransform: "uppercase",
-                color: "#64748b",
-                letterSpacing: "0.3px",
-              }}
-            >
-              <div>№</div>
-              <div>Ваш ответ</div>
-              <div>Верный ответ</div>
-            </div>
             {(r.parts ?? []).map((p, pI: number) => (
               <FillRow
                 key={pI}
@@ -628,7 +619,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
                 gap: "20px",
               }}
             >
@@ -768,12 +759,13 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                             borderRadius: "10px",
                             display: "flex",
                             alignItems: "center",
+                            flexWrap: "wrap",
                             gap: "12px",
                             fontSize: "14px",
                           }}
                         >
-                          <span style={{ fontWeight: 800, color: "#10b981", minWidth: "28px" }}>✓</span>
-                          <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "80px" }}>
+                          <span style={{ fontWeight: 800, color: "#10b981", minWidth: "20px" }}>✓</span>
+                          <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "70px" }}>
                             №{w.number} {w.direction === "across" ? "→" : "↓"}
                           </span>
                           <span style={{ fontWeight: 900, color: "#000", wordBreak: "break-word" }}>
@@ -812,16 +804,16 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
                             fontSize: "14px",
                           }}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                            <span style={{ fontWeight: 800, color: "#ef4444", minWidth: "28px" }}>✗</span>
-                            <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "80px" }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px" }}>
+                            <span style={{ fontWeight: 800, color: "#ef4444", minWidth: "20px" }}>✗</span>
+                            <span style={{ fontWeight: 700, color: "#1e293b", minWidth: "70px" }}>
                               №{w.number} {w.direction === "across" ? "→" : "↓"}
                             </span>
                             <span style={{ fontWeight: 900, color: "#000", wordBreak: "break-word" }}>
                               Ваш ответ: {w.user}
                             </span>
                           </div>
-                          <div style={{ marginLeft: "40px", color: "#000", fontWeight: 900 }}>
+                          <div style={{ marginLeft: "32px", color: "#000", fontWeight: 900 }}>
                             Правильно: {w.correct}
                           </div>
                         </div>
@@ -913,6 +905,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           alignItems: "center",
           gap: "16px",
           marginBottom: "20px",
@@ -928,6 +921,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
             alignItems: "center",
             justifyContent: "center",
             boxShadow: "0 8px 20px rgba(99,102,241,0.25)",
+            flexShrink: 0
           }}
         >
           <svg
@@ -1003,6 +997,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               color: "#fff",
               fontSize: "14px",
               boxShadow: "0 2px 4px rgba(16,185,129,0.3)",
+              flexShrink: 0
             }}
           >
             ✓
@@ -1031,6 +1026,7 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
               color: "#fff",
               fontSize: "14px",
               boxShadow: "0 2px 4px rgba(239,68,68,0.3)",
+              flexShrink: 0
             }}
           >
             ✗
