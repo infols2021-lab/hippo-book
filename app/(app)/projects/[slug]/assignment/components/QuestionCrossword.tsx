@@ -109,19 +109,17 @@ export function CrosswordGridReadOnly({
       <div 
         className="cw-grid-wrap" 
         style={{ 
-          maxWidth: "100%", 
+          width: "100%", 
           overflowX: "auto", 
-          paddingBottom: "8px",
-          textAlign: "center",
+          paddingBottom: "16px",
           WebkitOverflowScrolling: "touch"
         }}
       >
         <div 
           className={`cw-grid ${sizeClass}`}
           style={{ 
-            display: "inline-block", 
-            margin: "0 auto", 
-            textAlign: "left" 
+            width: "max-content", 
+            margin: "0 auto" 
           }}
         >
           {Array.from({ length: rows }).map((_, r) => (
@@ -385,19 +383,17 @@ export default function QuestionCrossword({
         <div 
           className="cw-grid-wrap" 
           style={{ 
-            maxWidth: "100%", 
+            width: "100%", 
             overflowX: "auto", 
-            paddingBottom: "8px",
-            textAlign: "center",
+            paddingBottom: "16px",
             WebkitOverflowScrolling: "touch"
           }}
         >
           <div 
             className={`cw-grid ${sizeClass}`}
             style={{ 
-              display: "inline-block", 
-              margin: "0 auto", 
-              textAlign: "left" 
+              width: "max-content", 
+              margin: "0 auto" 
             }}
           >
             {Array.from({ length: rows }).map((_, r) => (
