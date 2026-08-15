@@ -38,6 +38,13 @@ export type CrosswordGridReadOnlyProps = {
   sizeClass?: string;
 };
 
+export function getCrosswordSizeClass(rows: number, cols: number): string {
+  if (rows > 15 || cols > 15) return "size-large";
+  if (rows > 12 || cols > 12) return "size-medium";
+  if (rows > 8 || cols > 8) return "size-normal";
+  return "size-small";
+}
+
 export function CrosswordGridReadOnly({
   title,
   grid,
@@ -106,22 +113,8 @@ export function CrosswordGridReadOnly({
           {title}
         </div>
       )}
-      <div 
-        className="cw-grid-wrap" 
-        style={{ 
-          width: "100%", 
-          overflowX: "auto", 
-          paddingBottom: "16px",
-          WebkitOverflowScrolling: "touch"
-        }}
-      >
-        <div 
-          className={`cw-grid ${sizeClass}`}
-          style={{ 
-            width: "max-content", 
-            margin: "0 auto" 
-          }}
-        >
+      <div className="cw-grid-wrap">
+        <div className={`cw-grid ${sizeClass}`}>
           {Array.from({ length: rows }).map((_, r) => (
             <div className="cw-row" key={r}>
               {Array.from({ length: cols }).map((__, c) => {
@@ -168,6 +161,9 @@ export function CrosswordGridReadOnly({
           ))}
         </div>
       </div>
+      {(sizeClass === "size-large" || sizeClass === "size-medium") && (
+        <div className="cw-scroll-hint">← Прокрутите сетку влево-вправо →</div>
+      )}
     </div>
   );
 }
@@ -203,12 +199,7 @@ export default function QuestionCrossword({
   const words: Word[] = Array.isArray(question?.words) ? question.words : [];
   const cellNumbers: Record<string, number> = question?.cellNumbers || {};
 
-  const sizeClass = useMemo(() => {
-    if (rows > 15 || cols > 15) return "size-large";
-    if (rows > 12 || cols > 12) return "size-medium";
-    if (rows > 8 || cols > 8) return "size-normal";
-    return "size-small";
-  }, [rows, cols]);
+  const sizeClass = useMemo(() => getCrosswordSizeClass(rows, cols), [rows, cols]);
 
   const activeCells = useMemo(() => {
     const s = new Set<string>();
@@ -380,22 +371,8 @@ export default function QuestionCrossword({
       ) : null}
 
       <div className="cw-card">
-        <div 
-          className="cw-grid-wrap" 
-          style={{ 
-            width: "100%", 
-            overflowX: "auto", 
-            paddingBottom: "16px",
-            WebkitOverflowScrolling: "touch"
-          }}
-        >
-          <div 
-            className={`cw-grid ${sizeClass}`}
-            style={{ 
-              width: "max-content", 
-              margin: "0 auto" 
-            }}
-          >
+        <div className="cw-grid-wrap">
+          <div className={`cw-grid ${sizeClass}`}>
             {Array.from({ length: rows }).map((_, r) => (
               <div className="cw-row" key={r}>
                 {Array.from({ length: cols }).map((__, c) => {
@@ -418,6 +395,10 @@ export default function QuestionCrossword({
                           disabled={disabled}
                           value={(userGrid?.[r]?.[c] ?? "").toUpperCase()}
                           maxLength={1}
+                          inputMode="text"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
                           style={{ fontWeight: 900, color: "#000" }}
                           onFocus={() => {
                             setFocused({ r, c });
@@ -489,6 +470,9 @@ export default function QuestionCrossword({
             ))}
           </div>
         </div>
+        {(sizeClass === "size-large" || sizeClass === "size-medium") && (
+          <div className="cw-scroll-hint">← Прокрутите сетку влево-вправо →</div>
+        )}
 
         <div className="cw-mode">
           Режим ввода: <strong>{dir === "across" ? "→ across" : "↓ down"}</strong>

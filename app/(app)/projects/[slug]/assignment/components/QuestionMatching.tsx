@@ -127,16 +127,7 @@ export function MatchingLinesRenderer({
   };
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        position: "relative",
-        width: "100%",
-        minHeight: "300px",
-        padding: "20px 0",
-        userSelect: "none",
-      }}
-    >
+    <div className="matching-review-wrap" ref={containerRef}>
       {title && (
         <div style={{ fontWeight: 800, marginBottom: 16, textAlign: "center", color: "#1e293b" }}>{title}</div>
       )}
@@ -180,17 +171,9 @@ export function MatchingLinesRenderer({
         })}
       </svg>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "50px",
-          position: "relative",
-          zIndex: 10,
-        }}
-      >
+      <div className="matching-review-layout">
         {/* Левая колонка */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px", width: "42%" }}>
+        <div className="matching-review-col">
           {pairs.map((p) => {
             const isConnected = !!matches[p.id];
             const leftText = leftLabels[p.id] || p.left.text || "—";
@@ -240,7 +223,7 @@ export function MatchingLinesRenderer({
         </div>
 
         {/* Правая колонка */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px", width: "42%" }}>
+        <div className="matching-review-col">
           {rightItems.map((p) => {
             const isConnected = Object.values(matches).includes(p.id);
             const rightText = rightLabels[p.id] || p.right.text || "—";

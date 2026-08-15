@@ -1,12 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import type { ReviewItem, TestOption, ReviewPart } from "@/lib/assignments/types";
 import { isVariantMatch } from "@/lib/assignments/scoring";
 import QuestionRichText from "./QuestionRichText";
 import MediaRenderer from "./MediaRenderer";
 import { ImageMapRenderer } from "./QuestionImageMap";
-import { CrosswordGridReadOnly } from "./QuestionCrossword";
+import { CrosswordGridReadOnly, getCrosswordSizeClass } from "./QuestionCrossword";
 import { MatchingLinesRenderer } from "./QuestionMatching";
 
 // Форматирование баллов
@@ -54,53 +54,24 @@ function FillRow({
   isCorrect: boolean;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: "12px",
-        alignItems: "flex-start",
-        padding: "12px 16px",
-        borderBottom: "1px solid rgba(0,0,0,0.04)",
-        background: isCorrect ? "rgba(16, 185, 129, 0.03)" : "rgba(239, 68, 68, 0.03)",
-      }}
-    >
-      <div
-        style={{
-          flex: "0 0 24px",
-          fontWeight: 800,
-          color: isCorrect ? "#10b981" : "#cbd5e1",
-          fontSize: "14px",
-          lineHeight: "1.4",
-          paddingTop: "2px",
-        }}
-      >
+    <div className={`review-fill-row ${isCorrect ? "is-correct" : "is-incorrect"}`}>
+      <div className="review-fill-idx" style={{ color: isCorrect ? "#10b981" : "#cbd5e1" }}>
         {index + 1}
       </div>
-      <div
-        style={{
-          flex: "1 1 120px",
-          fontWeight: 900,
-          color: isCorrect ? "#10b981" : "#ef4444",
-          wordBreak: "break-word",
-          lineHeight: "1.5",
-          fontSize: "15px",
-        }}
-      >
-        <span style={{ fontSize: "12px", display: "block", color: "#64748b", fontWeight: 700, marginBottom: "2px" }}>ВАШ ОТВЕТ:</span>
-        {userAnswer || "—"} {userAnswer ? (isCorrect ? "✓" : "✗") : ""}
+      <div className="review-fill-answers">
+        <div className="review-fill-answer" style={{ color: isCorrect ? "#10b981" : "#ef4444" }}>
+          <span className="review-fill-label">Ваш ответ</span>
+          {userAnswer || "—"} {userAnswer ? (isCorrect ? "✓" : "✗") : ""}
+        </div>
+        {!isCorrect && (
+          <div className="review-fill-answer review-fill-correct-mobile" style={{ color: "#10b981" }}>
+            <span className="review-fill-label">Верный ответ</span>
+            {correctAnswer}
+          </div>
+        )}
       </div>
-      <div
-        style={{
-          flex: "1 1 120px",
-          fontWeight: 900,
-          color: "#10b981",
-          wordBreak: "break-word",
-          lineHeight: "1.5",
-          fontSize: "15px",
-        }}
-      >
-        <span style={{ fontSize: "12px", display: "block", color: "#64748b", fontWeight: 700, marginBottom: "2px" }}>ВЕРНЫЙ ОТВЕТ:</span>
+      <div className="review-fill-answer review-fill-correct-desktop" style={{ color: "#10b981" }}>
+        <span className="review-fill-label">Верный ответ</span>
         {correctAnswer}
       </div>
     </div>
@@ -118,14 +89,7 @@ function TestOptionsReview({
   correctIndices: number[];
 }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-        gap: "16px",
-        marginTop: "12px",
-      }}
-    >
+    <div className="review-test-grid">
       {options.map((opt, idx: number) => {
         const isUserSelected = userSelectedIndices.includes(idx);
         const isCorrect = correctIndices.includes(idx);
@@ -141,17 +105,17 @@ function TestOptionsReview({
             <div
               style={{
                 position: "absolute",
-                top: "-10px",
-                right: "-10px",
-                width: "26px",
-                height: "26px",
-                borderRadius: "13px",
+                top: "-8px",
+                right: "-8px",
+                width: "24px",
+                height: "24px",
+                borderRadius: "12px",
                 background: "#10b981",
                 color: "#fff",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "14px",
+                fontSize: "13px",
                 fontWeight: "bold",
                 zIndex: 2,
                 boxShadow: "0 2px 4px rgba(16,185,129,0.3)",
@@ -167,17 +131,17 @@ function TestOptionsReview({
             <div
               style={{
                 position: "absolute",
-                top: "-10px",
-                right: "-10px",
-                width: "26px",
-                height: "26px",
-                borderRadius: "13px",
+                top: "-8px",
+                right: "-8px",
+                width: "24px",
+                height: "24px",
+                borderRadius: "12px",
                 background: "#ef4444",
                 color: "#fff",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "14px",
+                fontSize: "13px",
                 fontWeight: "bold",
                 zIndex: 2,
                 boxShadow: "0 2px 4px rgba(239,68,68,0.3)",
@@ -191,21 +155,15 @@ function TestOptionsReview({
         return (
           <div
             key={opt.id}
+            className="review-test-option"
             style={{
               border: `2px solid ${borderColor}`,
-              borderRadius: "16px",
-              padding: "16px",
               background: bgColor,
-              position: "relative",
               opacity: !isCorrect && !isUserSelected ? 0.6 : 1,
             }}
           >
             {icon}
-            {opt.text && (
-              <div style={{ fontWeight: 900, color: "#000", marginBottom: "8px", fontSize: "15px" }}>
-                {opt.text}
-              </div>
-            )}
+            {opt.text && <div className="review-test-option-text">{opt.text}</div>}
             {opt.media && opt.media.length > 0 && (
               <div style={{ marginTop: "8px", display: "flex", justifyContent: "flex-start" }}>
                 {opt.media[0].url?.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) ||
@@ -214,8 +172,8 @@ function TestOptionsReview({
                     src={opt.media[0].url}
                     alt=""
                     style={{
-                      maxWidth: "120px",
-                      maxHeight: "120px",
+                      maxWidth: "100px",
+                      maxHeight: "100px",
                       objectFit: "contain",
                       borderRadius: "8px",
                     }}
@@ -335,6 +293,75 @@ function FilledSentence({
   );
 }
 
+function CrosswordReviewSection({
+  grid,
+  userGrid,
+  cellNumbers,
+  blocks,
+  words,
+  rows,
+  cols,
+}: {
+  grid: string[][];
+  userGrid: string[][];
+  cellNumbers: Record<string, number>;
+  blocks: { row: number; col: number }[];
+  words: any[];
+  rows: number;
+  cols: number;
+}) {
+  const [activeTab, setActiveTab] = useState<"user" | "correct">("user");
+  const sizeClass = getCrosswordSizeClass(rows, cols);
+
+  return (
+    <>
+      <div className="review-crossword-tabs">
+        <button
+          type="button"
+          className={`review-crossword-tab ${activeTab === "user" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("user")}
+        >
+          Ваше заполнение
+        </button>
+        <button
+          type="button"
+          className={`review-crossword-tab ${activeTab === "correct" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("correct")}
+        >
+          Правильное решение
+        </button>
+      </div>
+      <div className="review-crossword-panels">
+        <div className={`review-crossword-panel ${activeTab !== "user" ? "is-hidden-mobile" : ""}`}>
+          <CrosswordGridReadOnly
+            title="Ваше заполнение"
+            grid={grid}
+            userGrid={userGrid}
+            cellNumbers={cellNumbers}
+            blocks={blocks}
+            words={words}
+            rows={rows}
+            cols={cols}
+            sizeClass={sizeClass}
+          />
+        </div>
+        <div className={`review-crossword-panel ${activeTab !== "correct" ? "is-hidden-mobile" : ""}`}>
+          <CrosswordGridReadOnly
+            title="Правильное решение"
+            grid={grid}
+            cellNumbers={cellNumbers}
+            blocks={blocks}
+            words={words}
+            rows={rows}
+            cols={cols}
+            sizeClass={sizeClass}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
   function renderItem(r: ReviewItem, idx: number, parentType?: string) {
     const status = getStatusConfig(r);
@@ -381,71 +408,18 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
     }
 
     return (
-      <div
-        key={idx}
-        className="review-card"
-        style={{
-          background: "#ffffff",
-          borderRadius: "24px",
-          padding: "20px",
-          marginBottom: "20px",
-          border: "1px solid rgba(0,0,0,0.06)",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.02)",
-          position: "relative",
-          overflow: "hidden"
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: "5px",
-            background: status.color,
-          }}
-        />
+      <div key={idx} className="review-card review-card-inner">
+        <div className="review-card-accent" style={{ background: status.color }} />
 
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: "16px",
-            marginBottom: "18px",
-          }}
-        >
-          <div style={{ flex: "1 1 200px" }}>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: "8px",
-                marginBottom: "6px",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  color: status.color,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                }}
-              >
+        <div className="review-card-top">
+          <div className="review-card-meta">
+            <div className="review-card-badges">
+              <span className="review-card-qnum" style={{ color: status.color }}>
                 {parentType === "reading" ? "Подвопрос" : `Вопрос ${idx + 1}`}
               </span>
               <span
-                style={{
-                  padding: "3px 10px",
-                  borderRadius: "8px",
-                  background: status.bg,
-                  color: status.color,
-                  fontSize: "12px",
-                  fontWeight: 800,
-                }}
+                className="review-card-status"
+                style={{ background: status.bg, color: status.color }}
               >
                 {status.label}
               </span>
@@ -477,30 +451,15 @@ export default function ReviewPanel({ items }: { items: ReviewItem[] }) {
             ) : null}
           </div>
 
-          <div style={{ flex: "0 0 auto", minWidth: "100px", textAlign: "right" }}>
-            <div style={{ fontSize: "16px", fontWeight: 900, color: "#1e293b" }}>
+          <div className="review-score-block">
+            <div className="review-score-value">
               <span style={{ color: status.color }}>{fmtPoints(r.pointsEarned)}</span>
               <span style={{ opacity: 0.3, fontWeight: 500 }}> / {r.pointsTotal}</span>
             </div>
-            <div
-              style={{
-                width: "80px",
-                height: "5px",
-                background: "rgba(0,0,0,0.05)",
-                borderRadius: "10px",
-                marginTop: "8px",
-                overflow: "hidden",
-                marginLeft: "auto",
-              }}
-            >
+            <div className="review-score-bar">
               <div
-                style={{
-                  width: `${scorePercent}%`,
-                  height: "100%",
-                  background: status.color,
-                  borderRadius: "10px",
-                  transition: "width 0.6s ease",
-                }}
+                className="review-score-fill"
+                style={{ width: `${scorePercent}%`, background: status.color }}
               />
             </div>
           </div>

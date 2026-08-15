@@ -691,11 +691,39 @@
 }
 
 .cw-grid-wrap {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
   max-width: 100%;
-  display: flex;
-  justify-content: center;
-  padding: 6px;
+  width: 100%;
+  padding: 6px 4px 12px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 8px;
+  /* text-align center вместо flex — иначе левая часть широкой сетки недоступна */
+  text-align: center;
+}
+
+.cw-grid-wrap .cw-grid {
+  text-align: left;
+  vertical-align: top;
+}
+
+.cw-scroll-hint {
+  display: none;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(78, 205, 196, 0.12);
+  border: 1px solid rgba(78, 205, 196, 0.25);
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.cw-grid-wrap.is-scrollable + .cw-scroll-hint,
+.cw-grid-wrap.is-scrollable .cw-scroll-hint-inline {
+  display: block;
 }
 
 .cw-grid {
@@ -810,6 +838,24 @@
 .cw-cell.focused {
   outline: 4px solid rgba(78, 205, 196, 0.45);
   outline-offset: 2px;
+}
+
+.cw-cell.cw-cell-correct {
+  background: #f0fdf4 !important;
+  border-color: #10b981 !important;
+}
+
+.cw-cell.cw-cell-error {
+  background: #fef2f2 !important;
+  border-color: #ef4444 !important;
+}
+
+.cw-cell.cw-cell-error > div {
+  color: #ef4444 !important;
+}
+
+.cw-cell.cw-cell-correct > div {
+  color: #059669 !important;
 }
 
 .cw-mode {
@@ -978,7 +1024,9 @@
   border: 1px solid rgba(17, 24, 39, 0.10);
   background: #fff;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.06);
-  overflow: hidden;
+  overflow: visible;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .review-card-head {
@@ -1886,4 +1934,448 @@
   .question-title { font-size: 18px; }
   .btn-premium { padding: 14px 18px; font-size: 15px; }
   .nav-btn { padding: 12px 16px; font-size: 15px; }
+}
+
+/* ==========================================================================
+   OVERFLOW & LAYOUT SAFETY (все типы заданий, ПК + мобила)
+   ========================================================================== */
+
+.premium-main,
+.premium-card,
+.answer-block,
+.question-content,
+.crossword-container,
+.review-panel,
+.review-card-body {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.answer-block {
+  overflow-x: visible;
+}
+
+/* ==========================================================================
+   REVIEW PANEL — MOBILE-FIRST
+   ========================================================================== */
+
+.review-panel {
+  margin-top: 32px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.review-panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.review-panel-icon {
+  width: 48px;
+  height: 48px;
+  background: #6366f1;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.25);
+  flex-shrink: 0;
+}
+
+.review-panel-title {
+  font-size: clamp(20px, 5vw, 24px);
+  font-weight: 800;
+  margin: 0;
+  color: #1e293b;
+}
+
+.review-panel-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.review-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 24px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border-radius: 14px;
+  border: 2px solid #e2e8f0;
+}
+
+.review-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #1e293b;
+  min-width: 0;
+}
+
+.review-legend-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.review-card-inner {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.02);
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.review-card-accent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 20px 0 0 20px;
+}
+
+.review-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.review-card-meta {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.review-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.review-card-qnum {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.review-card-status {
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.review-question-title {
+  font-size: clamp(15px, 4vw, 17px);
+  font-weight: 700;
+  line-height: 1.45;
+  color: #1e293b;
+  margin: 0;
+  word-break: break-word;
+}
+
+.review-score-block {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.review-score-value {
+  font-size: 15px;
+  font-weight: 900;
+  color: #1e293b;
+}
+
+.review-score-bar {
+  width: 72px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+  margin-top: 6px;
+  overflow: hidden;
+  margin-left: auto;
+}
+
+.review-score-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.6s ease;
+}
+
+.review-content-block {
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 14px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.review-fill-row {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  align-items: start;
+}
+
+.review-fill-row:last-child {
+  border-bottom: none;
+}
+
+.review-fill-row.is-correct {
+  background: rgba(16, 185, 129, 0.03);
+}
+
+.review-fill-row.is-incorrect {
+  background: rgba(239, 68, 68, 0.03);
+}
+
+.review-fill-idx {
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.4;
+  padding-top: 2px;
+}
+
+.review-fill-answers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.review-fill-answer {
+  font-weight: 800;
+  word-break: break-word;
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.review-fill-label {
+  font-size: 10px;
+  display: block;
+  color: #64748b;
+  font-weight: 700;
+  margin-bottom: 2px;
+  letter-spacing: 0.04em;
+}
+
+.review-fill-correct-desktop {
+  display: none;
+}
+
+.review-fill-correct-mobile {
+  display: block;
+}
+
+.review-test-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.review-test-option {
+  border-radius: 14px;
+  padding: 14px;
+  position: relative;
+}
+
+.review-test-option-text {
+  font-weight: 900;
+  color: #000;
+  margin-bottom: 6px;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.review-imagemap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+}
+
+.review-crossword-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.review-crossword-tab {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.review-crossword-tab.is-active {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  color: #4338ca;
+}
+
+.review-crossword-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.review-crossword-panel.is-hidden-mobile {
+  display: none;
+}
+
+.review-word-row {
+  padding: 10px 12px;
+  border-radius: 10px;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 13px;
+}
+
+.review-word-row.is-correct {
+  background: #f0fdf4;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.review-word-row.is-wrong {
+  background: #fef2f2;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.matching-review-layout {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  position: relative;
+  z-index: 10;
+  min-width: 0;
+}
+
+.matching-review-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 46%;
+}
+
+.matching-review-wrap {
+  position: relative;
+  width: 100%;
+  min-height: 200px;
+  padding: 12px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 641px) {
+  .review-fill-row {
+    grid-template-columns: 28px 1fr 1fr;
+    align-items: center;
+  }
+
+  .review-fill-correct-desktop {
+    display: block;
+  }
+
+  .review-fill-correct-mobile {
+    display: none;
+  }
+
+  .review-crossword-tabs {
+    display: none;
+  }
+
+  .review-crossword-panel.is-hidden-mobile {
+    display: block;
+  }
+}
+
+@media (max-width: 640px) {
+  .review-panel-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+  }
+
+  .review-card-inner {
+    padding: 14px 12px;
+    border-radius: 16px;
+  }
+
+  .review-content-block {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .review-score-block {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left;
+  }
+
+  .review-score-bar {
+    margin-left: 0;
+    flex: 1;
+    max-width: 100px;
+  }
+
+  .review-legend {
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .matching-review-layout {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .matching-review-col {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .cw-scroll-hint {
+    display: block;
+  }
 }
