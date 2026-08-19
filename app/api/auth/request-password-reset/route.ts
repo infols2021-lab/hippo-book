@@ -1,4 +1,3 @@
-// app/api/auth/request-password-reset/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ok, fail } from "@/lib/api/response";
@@ -56,16 +55,16 @@ export async function POST(req: Request) {
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !anon) return fail("Supabase env missing", 500, "ENV_MISSING");
 
-    // Build redirect URL and validate it to prevent open redirect
+    // Формируем корректный URL для редиректа на страницу ввода нового пароля
     let redirectTo: string | undefined;
     const appUrl = getAppUrl(req);
+    
     if (appUrl) {
       const fullRedirect = `${appUrl}/update-password`;
       if (isAllowedRedirectUrl(fullRedirect)) {
         redirectTo = fullRedirect;
       } else {
-        // fallback: use only relative path if domain is not allowed
-        redirectTo = "/update-password";
+        redirectTo = `${appUrl}/update-password`; // Fallback на абсолютный URL
       }
     }
 
@@ -77,8 +76,9 @@ export async function POST(req: Request) {
       ...(redirectTo ? { redirectTo } : {}),
     });
 
-    // Не раскрываем существование email
+    // Не раскрываем существование email в целях безопасности
     if (error) {
+      console.error("Auth reset password error:", error.message);
       return ok({
         message:
           "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\nПроверьте папку Входящие/Спам.",

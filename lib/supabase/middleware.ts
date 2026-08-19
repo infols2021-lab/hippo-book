@@ -23,16 +23,18 @@ export function createSupabaseMiddlewareClient(req: NextRequest, res: NextRespon
   const url = mustPublicEnv("NEXT_PUBLIC_SUPABASE_URL");
   const anon = mustPublicEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
-  return createServerClient<any>(url, anon, {
+  return createServerClient(url, anon, {
     cookies: {
       getAll() {
         return req.cookies.getAll();
       },
-
       setAll(cookiesToSet) {
-        for (const { name, value, options } of cookiesToSet) {
-          res.cookies.set(name, value, options);
-        }
+        // ИСПРАВЛЕНИЕ: При установке новых кук, нужно обновлять как Request (чтобы код ниже видел сессию), 
+        // так и Response (чтобы браузер сохранил изменения).
+        cookiesToSet.forEach(({ name, value, options }) => {
+          req.cookies.set({ name, value, ...options });
+          res.cookies.set({ name, value, ...options });
+        });
       },
     },
   });

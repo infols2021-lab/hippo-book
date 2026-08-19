@@ -188,7 +188,7 @@ export default function UpdatePasswordPage() {
         setReady(true);
 
         if (!sessionExists) {
-          showBanner("warning", "Пожалуйста, откройте эту страницу по ссылке из письма для восстановления.");
+          showBanner("warning", "Пожалуйста, откройте эту страницу по актуальной ссылке из письма для восстановления.");
         }
       } catch (e: any) {
         if (cancelled) return;
@@ -371,7 +371,9 @@ export default function UpdatePasswordPage() {
                   autoComplete="new-password"
                 />
                 {confirm && password !== confirm && (
-                  <div className="field-error">Введенные пароли не совпадают</div>
+                  <div className="field-error" style={{ color: "#ef4444", fontSize: "12px", marginTop: "4px" }}>
+                    Введенные пароли не совпадают
+                  </div>
                 )}
               </div>
 

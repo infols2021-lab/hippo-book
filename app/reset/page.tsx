@@ -264,7 +264,7 @@ export default function ResetPage() {
           ) : null}
 
           <button className="btn btn-primary" disabled={!canSubmit} onClick={() => void onSend()}>
-            {busy ? "Отправка..." : sent ? "Письмо отправлено" : "Получить ссылку"}
+            {busy ? "Отправка..." : sent ? "Письмо отправлено" : "Восстановить пароль"}
           </button>
 
           <div className="link">
