@@ -543,7 +543,8 @@
 .mobile-header-bar,
 .mobile-bottom-sheet-overlay,
 .mobile-bottom-sheet,
-.mobile-stats-row {
+.mobile-stats-row,
+.mobile-project-bar {
   display: none;
 }
 
@@ -590,6 +591,26 @@
   .profile-grid {
     grid-template-columns: 1fr;
     gap: 16px;
+  }
+
+  /* --- 0. Панель быстрого переключения проекта --- */
+  .mobile-project-bar {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: color-mix(in srgb, var(--project-primary) 12%, var(--project-card-bg));
+    border-radius: 16px;
+    margin-bottom: 14px;
+    border: 1px solid var(--glass-border);
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s ease;
+  }
+
+  .mobile-project-bar:active {
+    transform: scale(0.97);
+    background: color-mix(in srgb, var(--project-primary) 18%, var(--project-card-bg));
   }
 
   /* --- 1. Мобильная компактная шапка --- */
@@ -706,6 +727,12 @@
     place-items: center;
     cursor: pointer;
     flex-shrink: 0;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+
+  .mobile-burger-btn:active {
+    transform: scale(0.95);
+    background: color-mix(in srgb, var(--project-text) 12%, transparent);
   }
 
   /* --- 2. Компактная статистика --- */
@@ -780,6 +807,10 @@
     box-sizing: border-box;
   }
 
+  .progress-row:active {
+    transform: scale(0.98);
+  }
+
   .progress-left {
     width: 100%;
   }
@@ -803,6 +834,10 @@
     margin-right: 0 !important;
     padding: 18px 16px !important;
     gap: 12px !important;
+  }
+
+  .referral-promo-banner:active {
+    transform: scale(0.98) !important;
   }
 
   .referral-promo-banner > div:first-child {
@@ -894,11 +929,21 @@
     border: none;
     text-align: left;
     cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+  }
+
+  .sheet-item:active {
+    transform: scale(0.98);
+    background: color-mix(in srgb, var(--project-text) 8%, transparent);
   }
 
   .sheet-item--danger {
     color: #ef4444;
     background: color-mix(in srgb, #ef4444 8%, transparent);
+  }
+
+  .sheet-item--danger:active {
+    background: color-mix(in srgb, #ef4444 14%, transparent);
   }
 
   @keyframes fadeIn {

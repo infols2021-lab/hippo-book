@@ -37,7 +37,7 @@ export default function RewardUnboxModal({
   const handleNext = () => {
     if (isLast) {
       setCurrentIndex(0);
-      onClose();
+      onClose(); // Закрываем и передаем эстафету родительскому компоненту (для обновления стейта или показа физического приза)
     } else {
       setCurrentIndex((prev) => prev + 1);
     }
@@ -52,7 +52,7 @@ export default function RewardUnboxModal({
       case "emotion":
         return "Эмоция маскота";
       case "base":
-        return "База маскота";
+        return "Скин маскота"; // Синхронизировано с новым неймингом гардероба
       case "title":
         return "Титул профиля";
       case "material":

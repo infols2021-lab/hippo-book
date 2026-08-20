@@ -436,7 +436,12 @@ export default function ProfileClient({
 
     materialsProgress.forEach((item) => {
       if (item.tabTitle && item.tabTitle.trim()) {
-        const id = item.tabTitle.toLowerCase().trim();
+        const tabTitleLower = item.tabTitle.toLowerCase().trim();
+        // Фильтруем олимпиадный таб в непрофильных проектах, если кросс-проектное демо-задание подтягивает чужой таб
+        if ((tabTitleLower.includes("олимпиад") || tabTitleLower.includes("olympiad")) && projectSlug !== "olympiad") {
+          return;
+        }
+        const id = tabTitleLower;
         if (!map.has(id)) {
           map.set(id, item.tabTitle.trim());
         }
@@ -448,7 +453,7 @@ export default function ProfileClient({
     });
 
     return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
-  }, [materialsProgress]);
+  }, [materialsProgress, projectSlug]);
 
   const { filteredActive, filteredCompleted } = useMemo(() => {
     if (!materialsProgress) return { filteredActive: [], filteredCompleted: [] };
@@ -636,6 +641,40 @@ export default function ProfileClient({
 
       <div className="profile-container">
         
+        {/* Мобильная панель быстрого переключения проекта (супер удобно для мобилки) */}
+        <div 
+          className="mobile-project-bar md:hidden"
+          onClick={() => setSwitcherOpen(true)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 16px",
+            background: "color-mix(in srgb, var(--project-primary) 12%, var(--project-card-bg))",
+            borderRadius: "16px",
+            marginBottom: "14px",
+            border: "1px solid var(--glass-border)",
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.04)"
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 8, background: "var(--project-primary)", color: "#fff",
+              display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 11, flexShrink: 0
+            }}>
+              {brandMark}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: "10px", opacity: 0.6, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Текущий проект</div>
+              <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--project-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{projectName}</div>
+            </div>
+          </div>
+          <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--project-primary)", display: "flex", alignItems: "center", gap: "4px", flexShrink: 0, marginLeft: 8 }}>
+            Сменить ▾
+          </div>
+        </div>
+
         <div className="mobile-header-bar">
           <div className="mobile-header-left">
             <div className="mobile-avatar" data-tour="profile-avatar" onClick={() => openRewards("wardrobe")}>

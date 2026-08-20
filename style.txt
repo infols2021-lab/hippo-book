@@ -12655,104 +12655,6 @@ export async function POST() {
 // ❌ GET удалён — используйте POST для выхода
 </file>
 
-<file path="app/api/auth/request-password-reset/route.ts">
-// app/api/auth/request-password-reset/route.ts
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { ok, fail } from "@/lib/api/response";
-import { verifyTurnstileToken } from "@/lib/security/turnstile";
-import { isAllowedRedirectUrl } from "@/lib/api/validate";
-
-function isValidEmail(email: string) {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(email);
-}
-
-function getRemoteIp(req: Request): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]?.trim() || null;
-  const xr = req.headers.get("x-real-ip");
-  return xr || null;
-}
-
-function getAppUrl(req: Request): string | null {
-  const envUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
-  if (envUrl) return envUrl.replace(/\/$/, "");
-
-  const proto = req.headers.get("x-forwarded-proto") || "http";
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  if (!host) return null;
-  return `${proto}://${host}`;
-}
-
-export async function POST(req: Request) {
-  try {
-    const body = (await req.json().catch(() => null)) as
-      | { email?: string; captchaToken?: string }
-      | null;
-
-    if (!body) return fail("Bad request", 400, "BAD_REQUEST");
-
-    const email = String(body.email ?? "").trim().toLowerCase();
-    const captchaToken = String(body.captchaToken ?? "");
-
-    const captcha = await verifyTurnstileToken({
-      token: captchaToken,
-      expectedAction: "reset_request",
-      remoteIp: getRemoteIp(req) ?? undefined,
-    });
-
-    if (!captcha.ok) {
-      return fail("Капча не пройдена", 400, captcha.code);
-    }
-
-    if (!email || !isValidEmail(email)) {
-      return fail("Неверный формат email", 400, "VALIDATION");
-    }
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !anon) return fail("Supabase env missing", 500, "ENV_MISSING");
-
-    // Build redirect URL and validate it to prevent open redirect
-    let redirectTo: string | undefined;
-    const appUrl = getAppUrl(req);
-    if (appUrl) {
-      const fullRedirect = `${appUrl}/update-password`;
-      if (isAllowedRedirectUrl(fullRedirect)) {
-        redirectTo = fullRedirect;
-      } else {
-        // fallback: use only relative path if domain is not allowed
-        redirectTo = "/update-password";
-      }
-    }
-
-    const supabaseAnon = createClient(url, anon, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    });
-
-    const { error } = await supabaseAnon.auth.resetPasswordForEmail(email, {
-      ...(redirectTo ? { redirectTo } : {}),
-    });
-
-    // Не раскрываем существование email
-    if (error) {
-      return ok({
-        message:
-          "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\nПроверьте папку Входящие/Спам.",
-      });
-    }
-
-    return ok({
-      message:
-        "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\nПроверьте папку Входящие/Спам.",
-    });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
-  }
-}
-</file>
-
 <file path="app/api/auth/session/route.ts">
 import { NextResponse } from "next/server";
 import { ok, fail } from "@/lib/api/response";
@@ -20357,48 +20259,6 @@ export function getSupabaseBrowserClient(): SupabaseClient<any> {
 }
 </file>
 
-<file path="lib/supabase/middleware.ts">
-/* lib/supabase/middleware.ts */
-import { createServerClient } from "@supabase/ssr";
-import type { NextRequest, NextResponse } from "next/server";
-
-function mustPublicEnv(name: string) {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`${name} is missing`);
-  }
-
-  return value;
-}
-
-/**
- * Supabase client для middleware.
- *
- * ВАЖНО:
- * - Не использовать directFetch/undici тут: middleware может работать в Edge runtime.
- * - Response надо передавать снаружи, чтобы Supabase мог обновлять auth cookies.
- */
-export function createSupabaseMiddlewareClient(req: NextRequest, res: NextResponse) {
-  const url = mustPublicEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const anon = mustPublicEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-
-  return createServerClient<any>(url, anon, {
-    cookies: {
-      getAll() {
-        return req.cookies.getAll();
-      },
-
-      setAll(cookiesToSet) {
-        for (const { name, value, options } of cookiesToSet) {
-          res.cookies.set(name, value, options);
-        }
-      },
-    },
-  });
-}
-</file>
-
 <file path="lib/supabase/server.ts">
 /* lib/supabase/server.ts */
 import "server-only";
@@ -20574,46 +20434,6 @@ export default eslintConfig;
 
 <file path="global.d.ts">
 declare module "*.css";
-</file>
-
-<file path="middleware.ts">
-// middleware.ts
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware";
-
-const PROTECTED_PREFIXES = [
-  "/portal",
-  "/profile",
-  "/assignment",
-  "/textbook",
-  "/materials",
-  "/crossword",
-  "/gatehouse",
-  "/requests",
-  "/admin",
-  "/projects", // ✅ Фаза 0 — защита динамических страниц веток
-];
-
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  const supabase = createSupabaseMiddlewareClient(req, res);
-  const { data: { user } } = await supabase.auth.getUser();
-  const { pathname } = req.nextUrl;
-  const needsAuth = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-
-  if (needsAuth && !user) {
-    const loginUrl = new URL("/login", req.url);
-    return NextResponse.redirect(loginUrl);
-  }
-  return res;
-}
-
-export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|api/|info/|login|register|reset|update-password).*)"
-  ],
-};
 </file>
 
 <file path="postcss.config.mjs">
@@ -27194,6 +27014,104 @@ export async function PATCH(req: NextRequest) {
 }
 </file>
 
+<file path="app/api/auth/request-password-reset/route.ts">
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { ok, fail } from "@/lib/api/response";
+import { verifyTurnstileToken } from "@/lib/security/turnstile";
+import { isAllowedRedirectUrl } from "@/lib/api/validate";
+
+function isValidEmail(email: string) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
+function getRemoteIp(req: Request): string | null {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0]?.trim() || null;
+  const xr = req.headers.get("x-real-ip");
+  return xr || null;
+}
+
+function getAppUrl(req: Request): string | null {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+  if (envUrl) return envUrl.replace(/\/$/, "");
+
+  const proto = req.headers.get("x-forwarded-proto") || "http";
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  if (!host) return null;
+  return `${proto}://${host}`;
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = (await req.json().catch(() => null)) as
+      | { email?: string; captchaToken?: string }
+      | null;
+
+    if (!body) return fail("Bad request", 400, "BAD_REQUEST");
+
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const captchaToken = String(body.captchaToken ?? "");
+
+    const captcha = await verifyTurnstileToken({
+      token: captchaToken,
+      expectedAction: "reset_request",
+      remoteIp: getRemoteIp(req) ?? undefined,
+    });
+
+    if (!captcha.ok) {
+      return fail("Капча не пройдена", 400, captcha.code);
+    }
+
+    if (!email || !isValidEmail(email)) {
+      return fail("Неверный формат email", 400, "VALIDATION");
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !anon) return fail("Supabase env missing", 500, "ENV_MISSING");
+
+    // Формируем корректный URL для редиректа на страницу ввода нового пароля
+    let redirectTo: string | undefined;
+    const appUrl = getAppUrl(req);
+    
+    if (appUrl) {
+      const fullRedirect = `${appUrl}/update-password`;
+      if (isAllowedRedirectUrl(fullRedirect)) {
+        redirectTo = fullRedirect;
+      } else {
+        redirectTo = `${appUrl}/update-password`; // Fallback на абсолютный URL
+      }
+    }
+
+    const supabaseAnon = createClient(url, anon, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+
+    const { error } = await supabaseAnon.auth.resetPasswordForEmail(email, {
+      ...(redirectTo ? { redirectTo } : {}),
+    });
+
+    // Не раскрываем существование email в целях безопасности
+    if (error) {
+      console.error("Auth reset password error:", error.message);
+      return ok({
+        message:
+          "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\nПроверьте папку Входящие/Спам.",
+      });
+    }
+
+    return ok({
+      message:
+        "✅ Если такой email существует, мы отправили письмо со ссылкой для смены пароля.\nПроверьте папку Входящие/Спам.",
+    });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
+  }
+}
+</file>
+
 <file path="app/api/auth/resend-confirmation/route.ts">
 // app/api/auth/resend-confirmation/route.ts
 import { NextResponse } from "next/server";
@@ -30438,6 +30356,588 @@ export default function RegisterPage() {
       </div>
     </div>
   );
+}
+</file>
+
+<file path="app/reset/reset.css">
+/* app/reset/reset.css */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap');
+
+.page-reset {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  font-family: "Montserrat", system-ui, sans-serif;
+  color: #1e293b;
+  background-color: #eaf7ff;
+  background-image:
+    radial-gradient(1200px 700px at 10% 10%, rgba(78, 205, 196, 0.25), transparent 60%),
+    radial-gradient(1100px 700px at 90% 20%, rgba(110, 190, 255, 0.3), transparent 62%),
+    linear-gradient(135deg, #f0f9ff 0%, #d2edf1 50%, #e0f2fe 100%);
+  background-attachment: fixed;
+  overflow: hidden;
+}
+
+.page-reset::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(1000px 600px at 50% 40%, rgba(255, 255, 255, 0.2), transparent 70%);
+  z-index: 0;
+}
+
+.reset-container {
+  width: 100%;
+  max-width: 440px;
+  position: relative;
+  z-index: 1;
+}
+
+.reset-card {
+  border-radius: 32px;
+  padding: 32px 28px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 1);
+  box-shadow:
+    0 24px 60px rgba(15, 65, 95, 0.12),
+    inset 0 1px 2px rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(24px);
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: center;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
+  margin-bottom: 20px;
+}
+
+.brand-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffffff;
+  background: linear-gradient(135deg, #6ebeff 0%, #4ecdc4 100%);
+  box-shadow: 0 8px 24px rgba(78, 205, 196, 0.35);
+}
+
+.brand-title { font-size: 20px; font-weight: 800; line-height: 1.1; color: #1e293b; letter-spacing: -0.5px; }
+.brand-subtitle { font-size: 12px; font-weight: 600; color: #64748b; margin-top: 2px; }
+
+.progress-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.progress-step {
+  flex: 1;
+  height: 6px;
+  border-radius: 4px;
+  background: #4ecdc4;
+}
+
+.step-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 16px 0;
+  text-align: center;
+}
+
+.form-group { margin-bottom: 16px; text-align: left; }
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  padding-left: 4px;
+}
+
+.reset-card input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 2px solid #e2e8f0;
+  background: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a !important;
+  transition: all 0.25s ease;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.reset-card input::placeholder { color: #94a3b8; font-weight: 500; }
+.reset-card input:focus { border-color: #4ecdc4; box-shadow: 0 4px 15px rgba(78, 205, 196, 0.15); }
+
+.btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  padding: 14px 20px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #4ecdc4 0%, #5bbbe2 100%);
+  color: white;
+  box-shadow: 0 8px 20px rgba(78, 205, 196, 0.25);
+  margin-top: 8px;
+}
+
+.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(78, 205, 196, 0.35); }
+.btn-primary:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; color: #ffffff; }
+
+.btn-captcha-reload {
+  background: #ffffff;
+  color: #1e293b;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  margin-bottom: 12px;
+}
+
+.btn-captcha-reload:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; }
+
+.captcha-wrapper { display: flex; justify-content: center; margin: 16px 0; min-height: 65px; }
+
+.info-box {
+  background: color-mix(in srgb, #4ecdc4 8%, #ffffff);
+  border: 1px solid color-mix(in srgb, #4ecdc4 25%, transparent);
+  color: #334155;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.rate-limit {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #92400e;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.link {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+.link a { color: #4ecdc4; text-decoration: none; font-weight: 800; }
+
+.banner {
+  padding: 14px 16px;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.banner.warning { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.banner.error-message { background: #fef2f2; color: #e11d48; border: 1px solid #fecdd3; }
+
+.modal-notice-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 9999;
+}
+
+.modal-notice {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: popIn 0.2s;
+}
+
+.modal-notice-head {
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.modal-notice-x {
+  border: none;
+  background: #f1f5f9;
+  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  font-weight: bold;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.modal-notice-body {
+  padding: 24px;
+  color: #334155;
+  white-space: pre-line;
+  line-height: 1.6;
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.modal-notice-actions {
+  padding: 16px 24px;
+  background: #f8fafc;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn-secondary { background: #f1f5f9; color: #1e293b; width: auto; margin: 0; }
+
+@keyframes popIn {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@media (max-width: 480px) {
+  .page-reset { padding: 16px; overflow: auto; justify-content: flex-start; padding-top: 24px; }
+  .reset-card { padding: 24px 20px; border-radius: 28px; min-height: auto; }
+  .step-title { font-size: 16px; }
+  .brand-title { font-size: 20px; }
+}
+</file>
+
+<file path="app/update-password/update-password.css">
+/* app/update-password/update-password.css */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap');
+
+.page-update-password {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  font-family: "Montserrat", system-ui, sans-serif;
+  color: #1e293b;
+  background-color: #eaf7ff;
+  background-image:
+    radial-gradient(1200px 700px at 10% 10%, rgba(78, 205, 196, 0.25), transparent 60%),
+    radial-gradient(1100px 700px at 90% 20%, rgba(110, 190, 255, 0.3), transparent 62%),
+    linear-gradient(135deg, #f0f9ff 0%, #d2edf1 50%, #e0f2fe 100%);
+  background-attachment: fixed;
+  overflow: hidden;
+}
+
+.page-update-password::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(1000px 600px at 50% 40%, rgba(255, 255, 255, 0.2), transparent 70%);
+  z-index: 0;
+}
+
+.upd-container {
+  width: 100%;
+  max-width: 440px;
+  position: relative;
+  z-index: 1;
+}
+
+.upd-card {
+  border-radius: 32px;
+  padding: 32px 28px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 1);
+  box-shadow:
+    0 24px 60px rgba(15, 65, 95, 0.12),
+    inset 0 1px 2px rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(24px);
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: center;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
+  margin-bottom: 20px;
+}
+
+.brand-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffffff;
+  background: linear-gradient(135deg, #6ebeff 0%, #4ecdc4 100%);
+  box-shadow: 0 8px 24px rgba(78, 205, 196, 0.35);
+}
+
+.brand-title { font-size: 20px; font-weight: 800; line-height: 1.1; color: #1e293b; letter-spacing: -0.5px; }
+.brand-subtitle { font-size: 12px; font-weight: 600; color: #64748b; margin-top: 2px; }
+
+.progress-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.progress-step {
+  flex: 1;
+  height: 6px;
+  border-radius: 4px;
+  background: #e2e8f0;
+  transition: background 0.4s ease;
+}
+
+.progress-step.active { background: #4ecdc4; }
+
+.step-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 16px 0;
+  text-align: center;
+}
+
+.form-group { margin-bottom: 16px; text-align: left; }
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  padding-left: 4px;
+}
+
+.upd-card input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 2px solid #e2e8f0;
+  background: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a !important;
+  transition: all 0.25s ease;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.upd-card input::placeholder { color: #94a3b8; font-weight: 500; }
+.upd-card input:focus { border-color: #4ecdc4; box-shadow: 0 4px 15px rgba(78, 205, 196, 0.15); }
+
+.field-error { color: #ef4444; font-size: 12px; font-weight: 600; margin-top: 6px; padding-left: 4px; }
+
+.btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  padding: 14px 20px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #4ecdc4 0%, #5bbbe2 100%);
+  color: white;
+  box-shadow: 0 8px 20px rgba(78, 205, 196, 0.25);
+  margin-top: 8px;
+}
+
+.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(78, 205, 196, 0.35); }
+.btn-primary:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; color: #ffffff; }
+
+.btn-captcha-reload {
+  background: #ffffff;
+  color: #1e293b;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  margin-bottom: 12px;
+}
+
+.captcha-wrapper { display: flex; justify-content: center; margin: 16px 0; min-height: 65px; }
+
+.info-box {
+  background: color-mix(in srgb, #4ecdc4 8%, #ffffff);
+  border: 1px solid color-mix(in srgb, #4ecdc4 25%, transparent);
+  color: #334155;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.rate-limit {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #92400e;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.link {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+.link a { color: #4ecdc4; text-decoration: none; font-weight: 800; }
+
+.banner {
+  padding: 14px 16px;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.banner.warning { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.banner.error { background: #fef2f2; color: #e11d48; border: 1px solid #fecdd3; }
+.banner.error-message { background: #fef2f2; color: #e11d48; border: 1px solid #fecdd3; }
+
+.modal-notice-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 9999;
+}
+
+.modal-notice {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: popIn 0.2s;
+}
+
+.modal-notice-head {
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.modal-notice-x {
+  border: none;
+  background: #f1f5f9;
+  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  font-weight: bold;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.modal-notice-body {
+  padding: 24px;
+  color: #334155;
+  white-space: pre-line;
+  line-height: 1.6;
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.modal-notice-actions {
+  padding: 16px 24px;
+  background: #f8fafc;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn-secondary { background: #f1f5f9; color: #1e293b; width: auto; margin: 0; }
+
+@keyframes popIn {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@media (max-width: 480px) {
+  .page-update-password { padding: 16px; overflow: auto; justify-content: flex-start; padding-top: 24px; }
+  .upd-card { padding: 24px 20px; border-radius: 28px; min-height: auto; }
+  .step-title { font-size: 16px; }
+  .brand-title { font-size: 20px; }
 }
 </file>
 
@@ -40558,6 +41058,50 @@ export async function uploadStorageObject(input: UploadStorageObjectInput) {
 }
 </file>
 
+<file path="lib/supabase/middleware.ts">
+/* lib/supabase/middleware.ts */
+import { createServerClient } from "@supabase/ssr";
+import type { NextRequest, NextResponse } from "next/server";
+
+function mustPublicEnv(name: string) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`${name} is missing`);
+  }
+
+  return value;
+}
+
+/**
+ * Supabase client для middleware.
+ *
+ * ВАЖНО:
+ * - Не использовать directFetch/undici тут: middleware может работать в Edge runtime.
+ * - Response надо передавать снаружи, чтобы Supabase мог обновлять auth cookies.
+ */
+export function createSupabaseMiddlewareClient(req: NextRequest, res: NextResponse) {
+  const url = mustPublicEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const anon = mustPublicEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+
+  return createServerClient(url, anon, {
+    cookies: {
+      getAll() {
+        return req.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        // ИСПРАВЛЕНИЕ: При установке новых кук, нужно обновлять как Request (чтобы код ниже видел сессию), 
+        // так и Response (чтобы браузер сохранил изменения).
+        cookiesToSet.forEach(({ name, value, options }) => {
+          req.cookies.set({ name, value, ...options });
+          res.cookies.set({ name, value, ...options });
+        });
+      },
+    },
+  });
+}
+</file>
+
 <file path="lib/tour/mascotImages.ts">
 const MASCOT_IMAGES = Array.from({ length: 8 }, (_, i) => `/images/tour/uki${i + 1}.webp`);
 
@@ -40809,6 +41353,60 @@ CREATE POLICY user_roadmap_node_progress_update_own
   WITH CHECK (auth.uid() = user_id);
 
 COMMIT;
+</file>
+
+<file path="middleware.ts">
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware";
+
+const PROTECTED_PREFIXES = [
+  "/portal",
+  "/profile",
+  "/assignment",
+  "/textbook",
+  "/materials",
+  "/crossword",
+  "/gatehouse",
+  "/requests",
+  "/admin",
+  "/projects",
+];
+
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next();
+  const supabase = createSupabaseMiddlewareClient(req, res);
+
+  // ВАЖНО: Вызов getUser() здесь критичен. 
+  // Если пользователь переходит по ссылке из письма с параметром ?code=...
+  // Supabase перехватит его, обменяет на токен и запишет cookie авторизации.
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { pathname } = req.nextUrl;
+  const needsAuth = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
+  // Защита приватных роутов
+  if (needsAuth && !user) {
+    const loginUrl = new URL("/login", req.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Если юзер уже залогинен и пытается зайти на страницы входа/регистрации — кидаем в портал
+  if (user && (pathname === "/login" || pathname === "/register" || pathname === "/reset")) {
+    const portalUrl = new URL("/portal", req.url);
+    return NextResponse.redirect(portalUrl);
+  }
+
+  return res;
+}
+
+export const config = {
+  // ИСПРАВЛЕНИЕ: Убрали исключения для страниц login, register, reset, update-password.
+  // Теперь middleware работает на них, чтобы Supabase успевал обработать токены в URL.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon\\.ico|api/|info/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"
+  ],
+};
 </file>
 
 <file path="next.config.ts">
@@ -44407,7 +45005,7 @@ export default function ResetPage() {
           ) : null}
 
           <button className="btn btn-primary" disabled={!canSubmit} onClick={() => void onSend()}>
-            {busy ? "Отправка..." : sent ? "Письмо отправлено" : "Получить ссылку"}
+            {busy ? "Отправка..." : sent ? "Письмо отправлено" : "Восстановить пароль"}
           </button>
 
           <div className="link">
@@ -44417,295 +45015,6 @@ export default function ResetPage() {
       </div>
     </div>
   );
-}
-</file>
-
-<file path="app/reset/reset.css">
-/* app/reset/reset.css */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap');
-
-.page-reset {
-  min-height: 100vh;
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  font-family: "Montserrat", system-ui, sans-serif;
-  color: #1e293b;
-  background-color: #eaf7ff;
-  background-image:
-    radial-gradient(1200px 700px at 10% 10%, rgba(78, 205, 196, 0.25), transparent 60%),
-    radial-gradient(1100px 700px at 90% 20%, rgba(110, 190, 255, 0.3), transparent 62%),
-    linear-gradient(135deg, #f0f9ff 0%, #d2edf1 50%, #e0f2fe 100%);
-  background-attachment: fixed;
-  overflow: hidden;
-}
-
-.page-reset::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(1000px 600px at 50% 40%, rgba(255, 255, 255, 0.2), transparent 70%);
-  z-index: 0;
-}
-
-.reset-container {
-  width: 100%;
-  max-width: 440px;
-  position: relative;
-  z-index: 1;
-}
-
-.reset-card {
-  border-radius: 32px;
-  padding: 32px 28px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(255, 255, 255, 1);
-  box-shadow:
-    0 24px 60px rgba(15, 65, 95, 0.12),
-    inset 0 1px 2px rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(24px);
-  min-height: 480px;
-  display: flex;
-  flex-direction: column;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  justify-content: center;
-  padding-bottom: 20px;
-  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
-  margin-bottom: 20px;
-}
-
-.brand-mark {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  font-size: 18px;
-  font-weight: 900;
-  color: #ffffff;
-  background: linear-gradient(135deg, #6ebeff 0%, #4ecdc4 100%);
-  box-shadow: 0 8px 24px rgba(78, 205, 196, 0.35);
-}
-
-.brand-title { font-size: 20px; font-weight: 800; line-height: 1.1; color: #1e293b; letter-spacing: -0.5px; }
-.brand-subtitle { font-size: 12px; font-weight: 600; color: #64748b; margin-top: 2px; }
-
-.progress-bar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-}
-
-.progress-step {
-  flex: 1;
-  height: 6px;
-  border-radius: 4px;
-  background: #4ecdc4;
-}
-
-.step-title {
-  font-size: 18px;
-  font-weight: 800;
-  color: #1e293b;
-  margin: 0 0 16px 0;
-  text-align: center;
-}
-
-.form-group { margin-bottom: 16px; text-align: left; }
-.form-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 700;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #64748b;
-  padding-left: 4px;
-}
-
-.reset-card input {
-  width: 100%;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 2px solid #e2e8f0;
-  background: #ffffff;
-  font-size: 15px;
-  font-weight: 700;
-  color: #0f172a !important;
-  transition: all 0.25s ease;
-  outline: none;
-  box-sizing: border-box;
-  font-family: inherit;
-}
-
-.reset-card input::placeholder { color: #94a3b8; font-weight: 500; }
-.reset-card input:focus { border-color: #4ecdc4; box-shadow: 0 4px 15px rgba(78, 205, 196, 0.15); }
-
-.btn {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 0;
-  padding: 14px 20px;
-  border-radius: 16px;
-  font-size: 15px;
-  font-weight: 700;
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #4ecdc4 0%, #5bbbe2 100%);
-  color: white;
-  box-shadow: 0 8px 20px rgba(78, 205, 196, 0.25);
-  margin-top: 8px;
-}
-
-.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(78, 205, 196, 0.35); }
-.btn-primary:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; color: #ffffff; }
-
-.btn-captcha-reload {
-  background: #ffffff;
-  color: #1e293b;
-  border: 2px solid #e2e8f0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
-  margin-bottom: 12px;
-}
-
-.btn-captcha-reload:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; }
-
-.captcha-wrapper { display: flex; justify-content: center; margin: 16px 0; min-height: 65px; }
-
-.info-box {
-  background: color-mix(in srgb, #4ecdc4 8%, #ffffff);
-  border: 1px solid color-mix(in srgb, #4ecdc4 25%, transparent);
-  color: #334155;
-  border-radius: 16px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.5;
-  text-align: left;
-}
-
-.rate-limit {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 12px;
-  padding: 12px 14px;
-  margin-bottom: 12px;
-  font-size: 12px;
-  color: #92400e;
-  text-align: left;
-  line-height: 1.4;
-}
-
-.link {
-  text-align: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: #64748b;
-  margin-top: auto;
-  padding-top: 20px;
-}
-
-.link a { color: #4ecdc4; text-decoration: none; font-weight: 800; }
-
-.banner {
-  padding: 14px 16px;
-  border-radius: 16px;
-  margin-bottom: 16px;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.4;
-  text-align: left;
-}
-
-.banner.warning { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-.banner.error-message { background: #fef2f2; color: #e11d48; border: 1px solid #fecdd3; }
-
-.modal-notice-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  z-index: 9999;
-}
-
-.modal-notice {
-  width: 100%;
-  max-width: 440px;
-  background: #ffffff;
-  border-radius: 24px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-  animation: popIn 0.2s;
-}
-
-.modal-notice-head {
-  padding: 20px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.modal-notice-x {
-  border: none;
-  background: #f1f5f9;
-  border-radius: 10px;
-  width: 32px;
-  height: 32px;
-  font-weight: bold;
-  color: #64748b;
-  cursor: pointer;
-}
-
-.modal-notice-body {
-  padding: 24px;
-  color: #334155;
-  white-space: pre-line;
-  line-height: 1.6;
-  font-weight: 500;
-  font-size: 15px;
-}
-
-.modal-notice-actions {
-  padding: 16px 24px;
-  background: #f8fafc;
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-.btn-secondary { background: #f1f5f9; color: #1e293b; width: auto; margin: 0; }
-
-@keyframes popIn {
-  0% { transform: scale(0.95); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-@media (max-width: 480px) {
-  .page-reset { padding: 16px; overflow: auto; justify-content: flex-start; padding-top: 24px; }
-  .reset-card { padding: 24px 20px; border-radius: 28px; min-height: auto; }
-  .step-title { font-size: 16px; }
-  .brand-title { font-size: 20px; }
 }
 </file>
 
@@ -44900,7 +45209,7 @@ export default function UpdatePasswordPage() {
         setReady(true);
 
         if (!sessionExists) {
-          showBanner("warning", "Пожалуйста, откройте эту страницу по ссылке из письма для восстановления.");
+          showBanner("warning", "Пожалуйста, откройте эту страницу по актуальной ссылке из письма для восстановления.");
         }
       } catch (e: any) {
         if (cancelled) return;
@@ -45083,7 +45392,9 @@ export default function UpdatePasswordPage() {
                   autoComplete="new-password"
                 />
                 {confirm && password !== confirm && (
-                  <div className="field-error">Введенные пароли не совпадают</div>
+                  <div className="field-error" style={{ color: "#ef4444", fontSize: "12px", marginTop: "4px" }}>
+                    Введенные пароли не совпадают
+                  </div>
                 )}
               </div>
 
@@ -45123,299 +45434,6 @@ export default function UpdatePasswordPage() {
       </div>
     </div>
   );
-}
-</file>
-
-<file path="app/update-password/update-password.css">
-/* app/update-password/update-password.css */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap');
-
-.page-update-password {
-  min-height: 100vh;
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  font-family: "Montserrat", system-ui, sans-serif;
-  color: #1e293b;
-  background-color: #eaf7ff;
-  background-image:
-    radial-gradient(1200px 700px at 10% 10%, rgba(78, 205, 196, 0.25), transparent 60%),
-    radial-gradient(1100px 700px at 90% 20%, rgba(110, 190, 255, 0.3), transparent 62%),
-    linear-gradient(135deg, #f0f9ff 0%, #d2edf1 50%, #e0f2fe 100%);
-  background-attachment: fixed;
-  overflow: hidden;
-}
-
-.page-update-password::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(1000px 600px at 50% 40%, rgba(255, 255, 255, 0.2), transparent 70%);
-  z-index: 0;
-}
-
-.upd-container {
-  width: 100%;
-  max-width: 440px;
-  position: relative;
-  z-index: 1;
-}
-
-.upd-card {
-  border-radius: 32px;
-  padding: 32px 28px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(255, 255, 255, 1);
-  box-shadow:
-    0 24px 60px rgba(15, 65, 95, 0.12),
-    inset 0 1px 2px rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(24px);
-  min-height: 480px;
-  display: flex;
-  flex-direction: column;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  justify-content: center;
-  padding-bottom: 20px;
-  border-bottom: 1px solid rgba(30, 41, 59, 0.06);
-  margin-bottom: 20px;
-}
-
-.brand-mark {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  font-size: 18px;
-  font-weight: 900;
-  color: #ffffff;
-  background: linear-gradient(135deg, #6ebeff 0%, #4ecdc4 100%);
-  box-shadow: 0 8px 24px rgba(78, 205, 196, 0.35);
-}
-
-.brand-title { font-size: 20px; font-weight: 800; line-height: 1.1; color: #1e293b; letter-spacing: -0.5px; }
-.brand-subtitle { font-size: 12px; font-weight: 600; color: #64748b; margin-top: 2px; }
-
-.progress-bar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-}
-
-.progress-step {
-  flex: 1;
-  height: 6px;
-  border-radius: 4px;
-  background: #e2e8f0;
-  transition: background 0.4s ease;
-}
-
-.progress-step.active { background: #4ecdc4; }
-
-.step-title {
-  font-size: 18px;
-  font-weight: 800;
-  color: #1e293b;
-  margin: 0 0 16px 0;
-  text-align: center;
-}
-
-.form-group { margin-bottom: 16px; text-align: left; }
-.form-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 700;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #64748b;
-  padding-left: 4px;
-}
-
-.upd-card input {
-  width: 100%;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 2px solid #e2e8f0;
-  background: #ffffff;
-  font-size: 15px;
-  font-weight: 700;
-  color: #0f172a !important;
-  transition: all 0.25s ease;
-  outline: none;
-  box-sizing: border-box;
-  font-family: inherit;
-}
-
-.upd-card input::placeholder { color: #94a3b8; font-weight: 500; }
-.upd-card input:focus { border-color: #4ecdc4; box-shadow: 0 4px 15px rgba(78, 205, 196, 0.15); }
-
-.field-error { color: #ef4444; font-size: 12px; font-weight: 600; margin-top: 6px; padding-left: 4px; }
-
-.btn {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 0;
-  padding: 14px 20px;
-  border-radius: 16px;
-  font-size: 15px;
-  font-weight: 700;
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #4ecdc4 0%, #5bbbe2 100%);
-  color: white;
-  box-shadow: 0 8px 20px rgba(78, 205, 196, 0.25);
-  margin-top: 8px;
-}
-
-.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(78, 205, 196, 0.35); }
-.btn-primary:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; color: #ffffff; }
-
-.btn-captcha-reload {
-  background: #ffffff;
-  color: #1e293b;
-  border: 2px solid #e2e8f0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
-  margin-bottom: 12px;
-}
-
-.captcha-wrapper { display: flex; justify-content: center; margin: 16px 0; min-height: 65px; }
-
-.info-box {
-  background: color-mix(in srgb, #4ecdc4 8%, #ffffff);
-  border: 1px solid color-mix(in srgb, #4ecdc4 25%, transparent);
-  color: #334155;
-  border-radius: 16px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.5;
-  text-align: left;
-}
-
-.rate-limit {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 12px;
-  padding: 12px 14px;
-  margin-bottom: 12px;
-  font-size: 12px;
-  color: #92400e;
-  text-align: left;
-  line-height: 1.4;
-}
-
-.link {
-  text-align: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: #64748b;
-  margin-top: auto;
-  padding-top: 20px;
-}
-
-.link a { color: #4ecdc4; text-decoration: none; font-weight: 800; }
-
-.banner {
-  padding: 14px 16px;
-  border-radius: 16px;
-  margin-bottom: 16px;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.4;
-  text-align: left;
-}
-
-.banner.warning { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-.banner.error { background: #fef2f2; color: #e11d48; border: 1px solid #fecdd3; }
-.banner.error-message { background: #fef2f2; color: #e11d48; border: 1px solid #fecdd3; }
-
-.modal-notice-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  z-index: 9999;
-}
-
-.modal-notice {
-  width: 100%;
-  max-width: 440px;
-  background: #ffffff;
-  border-radius: 24px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-  animation: popIn 0.2s;
-}
-
-.modal-notice-head {
-  padding: 20px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.modal-notice-x {
-  border: none;
-  background: #f1f5f9;
-  border-radius: 10px;
-  width: 32px;
-  height: 32px;
-  font-weight: bold;
-  color: #64748b;
-  cursor: pointer;
-}
-
-.modal-notice-body {
-  padding: 24px;
-  color: #334155;
-  white-space: pre-line;
-  line-height: 1.6;
-  font-weight: 500;
-  font-size: 15px;
-}
-
-.modal-notice-actions {
-  padding: 16px 24px;
-  background: #f8fafc;
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-.btn-secondary { background: #f1f5f9; color: #1e293b; width: auto; margin: 0; }
-
-@keyframes popIn {
-  0% { transform: scale(0.95); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-@media (max-width: 480px) {
-  .page-update-password { padding: 16px; overflow: auto; justify-content: flex-start; padding-top: 24px; }
-  .upd-card { padding: 24px 20px; border-radius: 28px; min-height: auto; }
-  .step-title { font-size: 16px; }
-  .brand-title { font-size: 20px; }
 }
 </file>
 

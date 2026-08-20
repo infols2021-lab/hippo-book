@@ -67,7 +67,8 @@ export default function RewardsModal({
   });
   const [streakPath, setStreakPath] = useState<StreakConfigItem[]>([]);
 
-  const [wardrobeCategory, setWardrobeCategory] = useState<RewardType>("hat");
+  // 1. По умолчанию открываем "Скины"
+  const [wardrobeCategory, setWardrobeCategory] = useState<RewardType>("base");
 
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [promoError, setPromoError] = useState<string | null>(null);
@@ -79,7 +80,9 @@ export default function RewardsModal({
 
   const [unboxModalOpen, setUnboxModalOpen] = useState(false);
   const [unboxedItems, setUnboxedItems] = useState<UnboxedRewardItem[]>([]);
-  const [pendingUnboxItems, setPendingUnboxItems] = useState<UnboxedRewardItem[]>([]);
+  
+  // 2. Стейт для отложенного показа физического приза
+  const [pendingPhysicalPrize, setPendingPhysicalPrize] = useState<CustomPhysicalPrize | null>(null);
 
   const [materialChoiceState, setMaterialChoiceState] = useState<{
     isOpen: boolean;
@@ -137,7 +140,6 @@ export default function RewardsModal({
     });
   };
 
-  // Перехватываем сигналы от ProductTour для переключения вкладок
   useEffect(() => {
     const handleTourTab = (e: CustomEvent | Event) => {
       const mapped = mapTourTab(String((e as CustomEvent).detail ?? ""));
@@ -175,12 +177,13 @@ export default function RewardsModal({
     applyRewardsTab("wardrobe");
   }, [tourMode, showModal]);
 
-  const loadData = async () => {
-    setLoading(true);
+  // 3. Параметр silent и жёсткое отключение кэша
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [mascotRes, streaksRes] = await Promise.all([
-        fetch("/api/mascot"),
-        fetch("/api/streaks"),
+        fetch("/api/mascot", { cache: "no-store" }),
+        fetch("/api/streaks", { cache: "no-store" }),
       ]);
 
       if (mascotRes.ok) {
@@ -204,7 +207,7 @@ export default function RewardsModal({
       }
 
       try {
-        const promoHistoryRes = await fetch("/api/promocodes/history");
+        const promoHistoryRes = await fetch("/api/promocodes/history", { cache: "no-store" });
         if (promoHistoryRes.ok) {
           const promoHistoryData = await promoHistoryRes.json();
           setPromoHistory(promoHistoryData.history || []);
@@ -215,7 +218,7 @@ export default function RewardsModal({
     } catch (e) {
       console.error("Error loading rewards data:", e);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -251,7 +254,7 @@ export default function RewardsModal({
             {
               id: data.reward.id || String(dayNumber),
               title: data.reward.title || `Награда за День ${dayNumber}`,
-              type: data.reward.type || "hat",
+              type: data.reward.type || "base",
               description: data.reward.description || `Награда за ${dayNumber} дн. серии`,
               asset_url: data.reward.asset_url,
               meta: data.reward.meta,
@@ -259,7 +262,7 @@ export default function RewardsModal({
           ]);
           setUnboxModalOpen(true);
         }
-        await loadData();
+        await loadData(true); // silent обновление стейта
       } else {
         const err = await res.json();
         alert(err.error || "Ошибка получения награды");
@@ -269,6 +272,7 @@ export default function RewardsModal({
     }
   };
 
+  // 4. Логика очереди: сначала анбокс цифровых -> потом физический
   const processRedeemResult = (data: {
     physicalPrize?: CustomPhysicalPrize | null;
     grantedRewards?: any[];
@@ -284,33 +288,41 @@ export default function RewardsModal({
         }))
       : [];
 
-    if (data.physicalPrize) {
-      setPhysicalPrizeState({ isOpen: true, prize: data.physicalPrize });
-      setPendingUnboxItems(rewardItems);
-    } else if (rewardItems.length > 0) {
+    if (rewardItems.length > 0) {
       setUnboxedItems(rewardItems);
       setUnboxModalOpen(true);
+      // Если есть физический приз - кидаем в ожидание
+      if (data.physicalPrize) {
+        setPendingPhysicalPrize(data.physicalPrize);
+      }
+    } else if (data.physicalPrize) {
+      // Цифровых нет, сразу показываем физику
+      setPhysicalPrizeState({ isOpen: true, prize: data.physicalPrize });
     } else {
       setPromoSuccessMsg("Промокод успешно активирован!");
     }
 
-    void loadData();
+    void loadData(true);
   };
 
   const handleMaterialChoiceSuccess = (result: MaterialChoiceSuccessResult) => {
     setMaterialChoiceState((prev) => ({ ...prev, isOpen: false }));
 
-    if (result.physicalPrize) {
-      setPhysicalPrizeState({ isOpen: true, prize: result.physicalPrize });
-      setPendingUnboxItems(result.unboxItems as UnboxedRewardItem[]);
-    } else if (result.unboxItems.length > 0) {
-      setUnboxedItems(result.unboxItems as UnboxedRewardItem[]);
+    const rewardItems = result.unboxItems as UnboxedRewardItem[];
+
+    if (rewardItems.length > 0) {
+      setUnboxedItems(rewardItems);
       setUnboxModalOpen(true);
+      if (result.physicalPrize) {
+        setPendingPhysicalPrize(result.physicalPrize);
+      }
+    } else if (result.physicalPrize) {
+      setPhysicalPrizeState({ isOpen: true, prize: result.physicalPrize });
     } else {
       setPromoSuccessMsg("Материалы успешно разблокированы!");
     }
 
-    void loadData();
+    void loadData(true);
   };
 
   const handleRedeemPromo = async (e: React.FormEvent) => {
@@ -352,14 +364,7 @@ export default function RewardsModal({
 
   const closePhysicalPrizeModal = () => {
     setPhysicalPrizeState({ isOpen: false, prize: null });
-
-    if (pendingUnboxItems.length > 0) {
-      setUnboxedItems(pendingUnboxItems);
-      setPendingUnboxItems([]);
-      setUnboxModalOpen(true);
-    }
-
-    void loadData();
+    void loadData(true);
   };
 
   if (!showModal) return null;
@@ -535,10 +540,8 @@ export default function RewardsModal({
                         style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
                       >
                         {[
-                          { type: "hat", label: "Шляпы" },
+                          { type: "base", label: "Скины" },
                           { type: "aura", label: "Ауры" },
-                          { type: "emotion", label: "Эмоции" },
-                          { type: "base", label: "Базы" },
                           { type: "title", label: "Титулы" },
                         ].map((cat) => (
                           <button
@@ -1052,6 +1055,7 @@ export default function RewardsModal({
         </div>
       )}
 
+      {/* 5. Флоу открытия модалок: сначала Unbox (цифровые), после него - PhysicalPrize */}
       {unboxModalOpen && (
         <RewardUnboxModal
           isOpen={unboxModalOpen}
@@ -1059,6 +1063,13 @@ export default function RewardsModal({
           onClose={() => {
             setUnboxModalOpen(false);
             setUnboxedItems([]);
+            // Если есть отложенный физический приз - показываем его сразу после закрытия анбокса
+            if (pendingPhysicalPrize) {
+              setTimeout(() => {
+                setPhysicalPrizeState({ isOpen: true, prize: pendingPhysicalPrize });
+                setPendingPhysicalPrize(null);
+              }, 300);
+            }
           }}
         />
       )}
