@@ -430,6 +430,7 @@ export default function ProfileClient({
     }
   }
 
+  // Честно берём материалы, которые нам отдал бэкенд с правильными `tabTitle`
   const dynamicCategories = useMemo(() => {
     if (!materialsProgress) return [];
     const map = new Map<string, string>(); 
@@ -437,13 +438,8 @@ export default function ProfileClient({
     materialsProgress.forEach((item) => {
       if (item.tabTitle && item.tabTitle.trim()) {
         const tabTitleLower = item.tabTitle.toLowerCase().trim();
-        // Фильтруем олимпиадный таб в непрофильных проектах, если кросс-проектное демо-задание подтягивает чужой таб
-        if ((tabTitleLower.includes("олимпиад") || tabTitleLower.includes("olympiad")) && projectSlug !== "olympiad") {
-          return;
-        }
-        const id = tabTitleLower;
-        if (!map.has(id)) {
-          map.set(id, item.tabTitle.trim());
+        if (!map.has(tabTitleLower)) {
+          map.set(tabTitleLower, item.tabTitle.trim());
         }
       } else if (item.kind === "textbook") {
         if (!map.has("textbook")) map.set("textbook", "Учебники");
@@ -453,7 +449,7 @@ export default function ProfileClient({
     });
 
     return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
-  }, [materialsProgress, projectSlug]);
+  }, [materialsProgress]);
 
   const { filteredActive, filteredCompleted } = useMemo(() => {
     if (!materialsProgress) return { filteredActive: [], filteredCompleted: [] };
@@ -462,7 +458,7 @@ export default function ProfileClient({
       if (selectedCategory === "all") return true;
       if (selectedCategory === "textbook") return m.kind === "textbook";
       if (selectedCategory === "crossword") return m.kind === "crossword";
-      return m.tabTitle?.toLowerCase().trim() === selectedCategory.toLowerCase().trim();
+      return m.tabTitle?.toLowerCase().trim() === selectedCategory;
     });
 
     return {
@@ -474,6 +470,66 @@ export default function ProfileClient({
   const overlayCss = backgroundProxyUrl && (bgReady || !bgLoading) ? `url('${backgroundProxyUrl}')` : "none";
   const brandMark = projectName.substring(0, 2).toUpperCase() || "EK";
   const titleText = streakData?.equippedTitle?.trim() || "Без титула";
+
+  // Универсальный компонент выбора ветки для ПК и Мобилки
+  const ProjectSwitcherUI = (
+    <div className="brand-switcher-wrapper" style={{ flex: 1, minWidth: 0 }}>
+      <button 
+        type="button" 
+        className={`brand brand-interactive ${switcherOpen ? "open" : ""}`}
+        onClick={() => setSwitcherOpen(!switcherOpen)}
+        style={{ width: "100%", justifyContent: "space-between", padding: "8px 12px 8px 8px", boxSizing: "border-box" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+          <div className="brand-mark" style={{ flexShrink: 0 }}>{brandMark}</div>
+          <div className="brand-text-wrapper" style={{ alignItems: "flex-start", minWidth: 0, overflow: "hidden" }}>
+            <div className="brand-title" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>{projectName}</div>
+            <div className="brand-subtitle">Профиль ученика</div>
+          </div>
+        </div>
+        <div className="switcher-chevron" style={{ flexShrink: 0 }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+      </button>
+
+      {switcherOpen && (
+        <>
+          <div className="switcher-overlay" onClick={() => setSwitcherOpen(false)} />
+          <div className="project-switcher-menu" style={{ width: "100%" }}>
+            <div className="switcher-header">Сменить направление</div>
+            <div className="switcher-list">
+              {availableProjects.map((p) => {
+                const isActive = p.slug === projectSlug;
+                const dotColor = p.theme?.primaryColor || p.theme_color || "#6366f1";
+                
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/projects/${p.slug}/profile`}
+                    className={`project-switcher-item ${isActive ? "active" : ""}`}
+                    onClick={() => setSwitcherOpen(false)}
+                  >
+                    <div className="switcher-dot" style={{ backgroundColor: dotColor }} />
+                    <div className="switcher-item-name">{p.name}</div>
+                    {isActive && <div className="switcher-item-check">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </div>}
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="switcher-footer">
+              <Link href="/portal" className="switcher-portal-link">
+                ← На главный портал
+              </Link>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div id="profileBody" className="profile-page" style={{ ["--profile-overlay" as any]: overlayCss }}>
@@ -641,38 +697,17 @@ export default function ProfileClient({
 
       <div className="profile-container">
         
-        {/* Мобильная панель быстрого переключения проекта (супер удобно для мобилки) */}
-        <div 
-          className="mobile-project-bar md:hidden"
-          onClick={() => setSwitcherOpen(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "10px 16px",
-            background: "color-mix(in srgb, var(--project-primary) 12%, var(--project-card-bg))",
-            borderRadius: "16px",
-            marginBottom: "14px",
-            border: "1px solid var(--glass-border)",
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.04)"
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: 8, background: "var(--project-primary)", color: "#fff",
-              display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 11, flexShrink: 0
-            }}>
-              {brandMark}
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: "10px", opacity: 0.6, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Текущий проект</div>
-              <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--project-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{projectName}</div>
-            </div>
-          </div>
-          <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--project-primary)", display: "flex", alignItems: "center", gap: "4px", flexShrink: 0, marginLeft: 8 }}>
-            Сменить ▾
-          </div>
+        {/* CSS для показа свитчера проектов только на мобилке (скрыт на десктопе) */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          .mobile-only-switcher { display: none; margin-bottom: 16px; position: relative; z-index: 40; }
+          @media (max-width: 768px) {
+            .mobile-only-switcher { display: block; }
+          }
+        `}} />
+
+        {/* Гармоничный селектор проектов для мобилки (показывается только на маленьких экранах) */}
+        <div className="mobile-only-switcher">
+          {ProjectSwitcherUI}
         </div>
 
         <div className="mobile-header-bar">
@@ -730,61 +765,9 @@ export default function ProfileClient({
         </div>
 
         <div className="profile-topbar">
-          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-            <span className="skills-wordmark">skilLS</span>
-            <div className="brand-switcher-wrapper">
-              <button 
-                type="button" 
-                className={`brand brand-interactive ${switcherOpen ? "open" : ""}`}
-                onClick={() => setSwitcherOpen(!switcherOpen)}
-              >
-                <div className="brand-mark">{brandMark}</div>
-                <div className="brand-text-wrapper">
-                  <div className="brand-title">{projectName}</div>
-                  <div className="brand-subtitle">Профиль ученика</div>
-                </div>
-                <div className="switcher-chevron">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                </div>
-              </button>
-
-              {switcherOpen && (
-                <>
-                  <div className="switcher-overlay" onClick={() => setSwitcherOpen(false)} />
-                  <div className="project-switcher-menu">
-                    <div className="switcher-header">Сменить направление</div>
-                    <div className="switcher-list">
-                      {availableProjects.map((p) => {
-                        const isActive = p.slug === projectSlug;
-                        const dotColor = p.theme?.primaryColor || p.theme_color || "#6366f1";
-                        
-                        return (
-                          <Link
-                            key={p.id}
-                            href={`/projects/${p.slug}/profile`}
-                            className={`project-switcher-item ${isActive ? "active" : ""}`}
-                            onClick={() => setSwitcherOpen(false)}
-                          >
-                            <div className="switcher-dot" style={{ backgroundColor: dotColor }} />
-                            <div className="switcher-item-name">{p.name}</div>
-                            {isActive && <div className="switcher-item-check">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                            </div>}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                    <div className="switcher-footer">
-                      <Link href="/portal" className="switcher-portal-link">
-                        ← На главный портал
-                      </Link>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "20px", flex: 1, minWidth: 0 }}>
+            <span className="skills-wordmark hidden md:inline-block">skilLS</span>
+            {ProjectSwitcherUI}
           </div>
 
           <div className="top-actions">

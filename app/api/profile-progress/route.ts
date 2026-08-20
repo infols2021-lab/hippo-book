@@ -13,8 +13,12 @@ export async function GET(req: NextRequest) {
   const projectSlug = url.searchParams.get("slug");
 
   try {
-    // 1. Найдём ID проекта по slug (если передан)
     let projectId: string | null = null;
+    let tabs: any[] = [];
+    // Карта для быстрого поиска названий табов: id таба -> title таба
+    const tabTitleMap = new Map<string, string>();
+
+    // 1. Найдём ID проекта по slug (если передан)
     if (projectSlug) {
       const { data: project, error: projectError } = await supabase
         .from("projects")
@@ -23,7 +27,6 @@ export async function GET(req: NextRequest) {
         .single();
 
       if (projectError) {
-        // Если проект не найден, возвращаем пустой результат, а не ошибку
         return ok({
           stats: {
             totalMaterials: 0,
@@ -38,9 +41,6 @@ export async function GET(req: NextRequest) {
       projectId = project?.id ?? null;
     }
 
-    // Карта для быстрого поиска названий табов: id таба -> title таба
-    const tabTitleMap = new Map<string, string>();
-
     // 2. Получаем материалы, привязанные к проекту (через табы)
     let materialsQuery = supabase
       .from("materials")
@@ -48,27 +48,21 @@ export async function GET(req: NextRequest) {
       .eq("is_active", true);
 
     if (projectId) {
-      // 🚀 ИСПРАВЛЕНИЕ: Вытягиваем id вместе с title таба
-      const { data: tabs, error: tabsError } = await supabase
+      const { data: t, error: tabsError } = await supabase
         .from("project_tabs")
         .select("id, title")
         .eq("project_id", projectId)
         .eq("is_active", true);
 
-      if (tabsError) {
-        throw new Error(tabsError.message);
-      }
-
-      const tabIds = tabs?.map((t: { id: string }) => t.id) || [];
-
+      if (tabsError) throw new Error(tabsError.message);
+      
+      tabs = t || [];
+      const tabIds = tabs.map((x: { id: string }) => x.id);
+      
       // Заполняем карту соответствия названий
-      if (tabs) {
-        tabs.forEach((t: { id: string; title: string }) => {
-          if (t.id && t.title) {
-            tabTitleMap.set(t.id, t.title);
-          }
-        });
-      }
+      tabs.forEach((x: { id: string; title: string }) => {
+        if (x.id && x.title) tabTitleMap.set(x.id, x.title);
+      });
 
       if (tabIds.length === 0) {
         return ok({
@@ -83,8 +77,6 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      // Демо-материалы — сквозные, поэтому в фильтр по табам конкретного проекта
-      // их не включаем условием "или": добираем отдельным запросом ниже.
       materialsQuery = materialsQuery.in("project_tab_id", tabIds);
     }
 
@@ -138,11 +130,9 @@ export async function GET(req: NextRequest) {
         .map((p) => p.assignment_id)
     );
 
-    // 4. Для каждого ДОСТУПНОГО материала получаем список заданий и считаем прогресс
-    const materialsProgress = await Promise.all(
+    // 4. Сначала собираем УНИКАЛЬНЫЙ прогресс для правильной математики
+    const uniqueProgress = await Promise.all(
       accessibleMaterials.map(async (m) => {
-
-        // Считаем задания с учетом старой и новой архитектуры
         const { data: assignments } = await supabase
           .from("assignments")
           .select("id")
@@ -155,50 +145,28 @@ export async function GET(req: NextRequest) {
 
         const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-        // Определяем тип материала
-        const kind = m.material_kind === "crossword" ? "crossword" : "textbook";
-
-        // Строим корректную ссылку на страницу материала
-        const href = projectSlug
-          ? `/projects/${projectSlug}/materials/${m.id}`
-          : `/materials/${m.id}`;
-
-        // 🚀 НАХОДИМ НАЗВАНИЕ ТАБА ИЗ НАШЕЙ КАРТЫ
-        const tabTitle = m.project_tab_id ? tabTitleMap.get(m.project_tab_id) : undefined;
-
-        return {
-          kind,
-          id: m.id,
-          title: m.title,
-          total,
-          completed,
-          progressPercent,
-          href,
-          tabTitle, // Отправляем название таба (например: "что то") на фронтенд
-        };
+        return { m, total, completed, progressPercent };
       })
     );
 
-    // 5. Общая статистика (строим только по доступным материалам)
-    const totalMaterials = accessibleMaterials.length;
-    const completedMaterials = materialsProgress.filter(
-      (m) => m.total > 0 && m.completed === m.total
+    // 5. Считаем статистику ДО клонирования демо-материалов, чтобы избежать накрутки счетчиков
+    const totalMaterials = uniqueProgress.length;
+    const completedMaterials = uniqueProgress.filter(
+      (p) => p.total > 0 && p.completed === p.total
     ).length;
 
-    const totalAvailableAssignments = materialsProgress.reduce(
-      (acc, m) => acc + m.total,
+    const totalAvailableAssignments = uniqueProgress.reduce(
+      (acc, p) => acc + p.total,
       0
     );
-    const completedAvailableAssignments = materialsProgress.reduce(
-      (acc, m) => acc + m.completed,
+    const completedAvailableAssignments = uniqueProgress.reduce(
+      (acc, p) => acc + p.completed,
       0
     );
 
     const successRate =
       totalAvailableAssignments > 0
-        ? Math.round(
-            (completedAvailableAssignments / totalAvailableAssignments) * 100
-          )
+        ? Math.round((completedAvailableAssignments / totalAvailableAssignments) * 100)
         : 0;
 
     const stats = {
@@ -208,6 +176,45 @@ export async function GET(req: NextRequest) {
       completedAvailableAssignments,
       successRate,
     };
+
+    // 6. Формируем финальный массив для фронтенда с клонированием демок во все табы проекта
+    const materialsProgress: any[] = [];
+    
+    for (const { m, total, completed, progressPercent } of uniqueProgress) {
+      const kind = m.material_kind === "crossword" ? "crossword" : "textbook";
+      const href = projectSlug
+        ? `/projects/${projectSlug}/materials/${m.id}`
+        : `/materials/${m.id}`;
+
+      if (m.is_demo && tabs.length > 0) {
+        // Если это демо, раскидываем его по всем табам ТЕКУЩЕГО проекта
+        for (const t of tabs) {
+          materialsProgress.push({
+            kind,
+            id: `${m.id}-${t.id}`, // Уникальный ключ для React
+            title: m.title,
+            total,
+            completed,
+            progressPercent,
+            href,
+            tabTitle: t.title, // Принудительно присваиваем имя таба из текущего проекта
+          });
+        }
+      } else {
+        // Обычные материалы кладутся в свой родной таб
+        const tabTitle = m.project_tab_id ? tabTitleMap.get(m.project_tab_id) : undefined;
+        materialsProgress.push({
+          kind,
+          id: m.id,
+          title: m.title,
+          total,
+          completed,
+          progressPercent,
+          href,
+          tabTitle,
+        });
+      }
+    }
 
     return ok({ stats, materialsProgress });
   } catch (error: any) {

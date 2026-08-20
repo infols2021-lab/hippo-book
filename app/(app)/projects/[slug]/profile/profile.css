@@ -94,6 +94,8 @@
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left;
+  display: flex;
+  align-items: center;
 }
 
 .brand-interactive:hover, .brand-interactive.open {
@@ -543,14 +545,30 @@
 .mobile-header-bar,
 .mobile-bottom-sheet-overlay,
 .mobile-bottom-sheet,
-.mobile-stats-row,
-.mobile-project-bar {
+.mobile-stats-row {
   display: none;
 }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+
+/* ==========================================================================
+   🛠 Управление Свитчером Проектов (ПК / Мобилка)
+   ========================================================================== */
+.mobile-only-switcher {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  .profile-topbar .brand-switcher-wrapper {
+    flex: 0 1 auto !important;
+  }
+  .profile-topbar .brand-interactive {
+    width: auto !important;
+    padding: 6px 16px 6px 6px !important;
+  }
+}
 
 /* ==========================================================================
    📱 МОБИЛЬНАЯ АДАПТАЦИЯ (<= 768px)
@@ -593,24 +611,50 @@
     gap: 16px;
   }
 
-  /* --- 0. Панель быстрого переключения проекта --- */
-  .mobile-project-bar {
-    display: flex !important;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 16px;
-    background: color-mix(in srgb, var(--project-primary) 12%, var(--project-card-bg));
-    border-radius: 16px;
-    margin-bottom: 14px;
-    border: 1px solid var(--glass-border);
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
-    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s ease;
+  /* --- 0. Панель быстрого переключения проекта (только мобилка) --- */
+  .mobile-only-switcher {
+    display: block;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 40;
   }
 
-  .mobile-project-bar:active {
+  .mobile-only-switcher .brand-interactive {
+    background: color-mix(in srgb, var(--project-primary) 12%, var(--project-card-bg));
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    padding: 10px 16px 10px 10px !important;
+    border-radius: 18px;
+  }
+
+  .mobile-only-switcher .brand-interactive:active {
     transform: scale(0.97);
     background: color-mix(in srgb, var(--project-primary) 18%, var(--project-card-bg));
+  }
+
+  .mobile-only-switcher .project-switcher-menu {
+    width: 100%;
+    top: calc(100% + 8px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  }
+
+  .mobile-only-switcher .brand-mark {
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
+    border-radius: 12px;
+  }
+
+  .mobile-only-switcher .brand-title {
+    font-size: 16px;
+  }
+
+  .mobile-only-switcher .brand-subtitle {
+    font-size: 11px;
+  }
+
+  .mobile-only-switcher .switcher-chevron {
+    color: var(--project-primary);
   }
 
   /* --- 1. Мобильная компактная шапка --- */
