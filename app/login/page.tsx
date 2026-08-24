@@ -107,10 +107,11 @@ function LoginPageContent() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [featureModal, setFeatureModal] = useState<FeatureModalContent | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"registration" | "rules">("registration");
 
   // Безопасная обработка скролла DOM при открытии модалок
-  const isAnyModalOpen = helpOpen || supportOpen || Boolean(featureModal);
+  const isAnyModalOpen = helpOpen || supportOpen || Boolean(featureModal) || previewOpen;
 
   useEffect(() => {
     if (isAnyModalOpen) {
@@ -295,6 +296,7 @@ function LoginPageContent() {
         setHelpOpen(false);
         setSupportOpen(false);
         setFeatureModal(null);
+        setPreviewOpen(false);
       }
     }
 
@@ -350,6 +352,85 @@ function LoginPageContent() {
 
   return (
     <div className="page-login">
+      {/* МОДАЛЬНОЕ ОКНО: ПОЛНОЭКРАННЫЙ ПРОСМОТР СКРИНШОТА ПРОФИЛЯ */}
+      {previewOpen && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPreviewOpen(false);
+          }}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 99999,
+            backgroundColor: "rgba(10, 15, 30, 0.92)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "flex-start",
+            overflowY: "auto",
+            padding: "24px 12px",
+            boxSizing: "border-box",
+          }}
+        >
+          <button
+            type="button"
+            aria-label="Закрыть"
+            onClick={() => setPreviewOpen(false)}
+            style={{
+              position: "fixed",
+              top: "16px",
+              right: "16px",
+              zIndex: 100000,
+              width: "44px",
+              height: "44px",
+              borderRadius: "50%",
+              backgroundColor: "rgba(255, 255, 255, 0.22)",
+              color: "#ffffff",
+              border: "1px solid rgba(255, 255, 255, 0.3)",
+              fontSize: "22px",
+              fontWeight: "bold",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+              transition: "transform 0.15s ease, background-color 0.15s ease",
+            }}
+          >
+            ✕
+          </button>
+
+          <div
+            style={{
+              margin: "auto",
+              width: "100%",
+              maxWidth: "1200px",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <img
+              src="/certificate.png"
+              alt="Скриншот интерфейса"
+              style={{
+                width: "100%",
+                height: "auto",
+                display: "block",
+                borderRadius: "14px",
+                boxShadow: "0 20px 60px rgba(0, 0, 0, 0.6)",
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* МОДАЛЬНОЕ ОКНО: ПРИМЕРЫ ЗАДАНИЙ */}
       <div
         className={`modal-overlay ${featureModal ? "active" : ""}`}
@@ -617,24 +698,29 @@ function LoginPageContent() {
             </p>
 
             <div className="promo-cta-wrap">
-              <a href="https://hipposha-book.ru" target="_blank" rel="noreferrer" className="promo-cta">
+              <a href="https://taplink.cc/hippo_ga" target="_blank" rel="noreferrer" className="promo-cta">
                 Подробнее об экзаменах и участии &nbsp;→
               </a>
             </div>
           </div>
 
-          {/* SIGNATURE VISUAL: Изображение сертификата */}
-          <div className="cert-container">
-            <div className="cert-wrapper">
+          {/* ИЗОБРАЖЕНИЕ ПРЕВЬЮ ПРОФИЛЯ */}
+          <div
+            className="preview-container"
+            onClick={() => setPreviewOpen(true)}
+            style={{ cursor: "pointer" }}
+          >
+            <div className="preview-wrapper">
               <img
                 src="/certificate.png"
-                alt="Пример международной подготовки skilLS"
+                alt="Предпросмотр профиля"
                 style={{
                   width: "100%",
                   height: "auto",
                   display: "block",
                   borderRadius: "16px",
                   boxShadow: "0 8px 30px rgba(0, 0, 0, 0.08)",
+                  transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 }}
               />
             </div>
