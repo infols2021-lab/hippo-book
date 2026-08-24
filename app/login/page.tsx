@@ -2,7 +2,8 @@
 
 import "./login.css";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 
 type BannerType = "error" | "success" | "warning" | null;
 
@@ -64,8 +65,7 @@ function looksLikeNetworkError(err: unknown) {
     msg.includes("networkerror") ||
     msg.includes("network error") ||
     msg.includes("load failed") ||
-    msg.includes("request failed") ||
-    msg.includes("typeerror: failed to fetch")
+    msg.includes("request failed")
   );
 }
 
@@ -85,15 +85,22 @@ function unwrapApiData(json: ApiPayload | null) {
   return json;
 }
 
-export default function LoginPage() {
+function extractErrorMessage(payload: ApiPayload | null, json: ApiPayload | null, fallback: string) {
+  return String(payload?.error || payload?.message || json?.error || fallback);
+}
+
+function LoginPageContent() {
+  const searchParams = useSearchParams();
+  const msgParam = searchParams.get("message");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const [bannerType, setBannerType] = useState<BannerType>(null);
   const [bannerText, setBannerText] = useState("");
+  const [showResendBtn, setShowResendBtn] = useState(false);
   const [busy, setBusy] = useState(false);
-
   const [networkIssue, setNetworkIssue] = useState(false);
 
   // Модальные окна
@@ -102,11 +109,19 @@ export default function LoginPage() {
   const [featureModal, setFeatureModal] = useState<FeatureModalContent | null>(null);
   const [activeTab, setActiveTab] = useState<"registration" | "rules">("registration");
 
-  const msgParam = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get("message");
-  }, []);
+  // Безопасная обработка скролла DOM при открытии модалок
+  const isAnyModalOpen = helpOpen || supportOpen || Boolean(featureModal);
+
+  useEffect(() => {
+    if (isAnyModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isAnyModalOpen]);
 
   function showBanner(type: BannerType, text: string) {
     setBannerType(type);
@@ -143,7 +158,7 @@ export default function LoginPage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function run() {
+    async function checkSession() {
       try {
         const res = await fetch("/api/auth/session", {
           method: "GET",
@@ -165,7 +180,7 @@ export default function LoginPage() {
       }
     }
 
-    run();
+    checkSession();
 
     return () => {
       cancelled = true;
@@ -174,6 +189,7 @@ export default function LoginPage() {
 
   async function resendConfirmation(emailValue: string) {
     try {
+      setBusy(true);
       const res = await fetch("/api/auth/resend-confirmation", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -184,13 +200,11 @@ export default function LoginPage() {
       const payload = unwrapApiData(json);
 
       if (!res.ok || !json?.ok) {
-        showBanner(
-          "error",
-          payload?.error || payload?.message || json?.error || "Не удалось отправить письмо подтверждения."
-        );
+        showBanner("error", extractErrorMessage(payload, json, "Не удалось отправить письмо подтверждения."));
         return;
       }
 
+      setShowResendBtn(false);
       showBanner(
         "success",
         payload?.message || json?.message || "Письмо с подтверждением отправлено повторно. Проверьте почту."
@@ -198,6 +212,8 @@ export default function LoginPage() {
     } catch (e: any) {
       if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
       else showBanner("error", "Не удалось отправить письмо: " + (e?.message || String(e)));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -217,6 +233,7 @@ export default function LoginPage() {
     }
 
     setNetworkIssue(false);
+    setShowResendBtn(false);
 
     try {
       setBusy(true);
@@ -237,7 +254,7 @@ export default function LoginPage() {
       const payload = unwrapApiData(json);
 
       if (!res.ok || !json?.ok) {
-        const msg = String(payload?.error || payload?.message || json?.error || "Ошибка входа");
+        const msg = extractErrorMessage(payload, json, "Ошибка входа");
         const code = String(payload?.code || json?.code || "").toUpperCase();
 
         if (looksLikeNetworkError(msg)) {
@@ -248,10 +265,7 @@ export default function LoginPage() {
 
         if (code === "EMAIL_NOT_CONFIRMED" || msg.toLowerCase().includes("email не подтверж")) {
           showBanner("error", "Email не подтвержден. Проверьте вашу почту и подтвердите регистрацию.");
-          const resend = window.confirm("Отправить письмо с подтверждением повторно?");
-          if (resend) {
-            await resendConfirmation(e);
-          }
+          setShowResendBtn(true);
         } else if (code === "INVALID_CREDENTIALS") {
           showBanner("error", "Неверный email или пароль. Если вы забыли пароль, воспользуйтесь восстановлением.");
         } else if (code === "RATE_LIMIT") {
@@ -278,35 +292,15 @@ export default function LoginPage() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        if (helpOpen) closeHelp();
-        if (supportOpen) closeSupport();
-        if (featureModal) closeFeatureModal();
+        setHelpOpen(false);
+        setSupportOpen(false);
+        setFeatureModal(null);
       }
     }
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [helpOpen, supportOpen, featureModal]);
-
-  function openHelp() {
-    setHelpOpen(true);
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeHelp() {
-    setHelpOpen(false);
-    document.body.style.overflow = "";
-  }
-
-  function openSupport() {
-    setSupportOpen(true);
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeSupport() {
-    setSupportOpen(false);
-    document.body.style.overflow = "";
-  }
+  }, []);
 
   function openFeatureModal(tagName: string) {
     const data = FEATURE_DATA[tagName] || {
@@ -314,12 +308,6 @@ export default function LoginPage() {
       description: "Интерактивное упражнение на платформе skilLS.",
     };
     setFeatureModal(data);
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeFeatureModal() {
-    setFeatureModal(null);
-    document.body.style.overflow = "";
   }
 
   function renderBanner() {
@@ -329,6 +317,18 @@ export default function LoginPage() {
     return (
       <div className={cls} style={{ display: "block", whiteSpace: "pre-line", marginBottom: "1rem" }}>
         {bannerText}
+        {showResendBtn && (
+          <div style={{ marginTop: "8px" }}>
+            <button
+              type="button"
+              className="btn-secondary-action"
+              onClick={() => void resendConfirmation(email.trim().toLowerCase())}
+              disabled={busy}
+            >
+              Отправить письмо повторно
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -354,11 +354,11 @@ export default function LoginPage() {
       <div
         className={`modal-overlay ${featureModal ? "active" : ""}`}
         onClick={(e) => {
-          if (e.target === e.currentTarget) closeFeatureModal();
+          if (e.target === e.currentTarget) setFeatureModal(null);
         }}
       >
         <div className="modal-content">
-          <button className="modal-close" aria-label="Закрыть" onClick={closeFeatureModal} type="button">
+          <button className="modal-close" aria-label="Закрыть" onClick={() => setFeatureModal(null)} type="button">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -398,13 +398,13 @@ export default function LoginPage() {
         className="help-modal"
         style={{ display: helpOpen ? "flex" : "none" }}
         onClick={(e) => {
-          if (e.target === e.currentTarget) closeHelp();
+          if (e.target === e.currentTarget) setHelpOpen(false);
         }}
       >
         <div className="help-modal-content">
           <div className="help-modal-header">
             <h3>Помощь</h3>
-            <button className="help-close" onClick={closeHelp} type="button">
+            <button className="help-close" onClick={() => setHelpOpen(false)} type="button">
               ✕
             </button>
           </div>
@@ -435,7 +435,7 @@ export default function LoginPage() {
                   <div className="step-body">
                     <h5>Заполните анкету</h5>
                     <p>
-                      Нажмите кнопку <Link href="/register" onClick={closeHelp}>«Зарегистрироваться»</Link>. 
+                      Нажмите кнопку <Link href="/register" onClick={() => setHelpOpen(false)}>«Зарегистрироваться»</Link>. 
                       Внимательно введите ваш рабочий Email и придумайте пароль.
                     </p>
                   </div>
@@ -509,13 +509,13 @@ export default function LoginPage() {
         className="help-modal"
         style={{ display: supportOpen ? "flex" : "none" }}
         onClick={(e) => {
-          if (e.target === e.currentTarget) closeSupport();
+          if (e.target === e.currentTarget) setSupportOpen(false);
         }}
       >
         <div className="help-modal-content" style={{ maxWidth: "400px" }}>
           <div className="help-modal-header">
             <h3>Техническая поддержка</h3>
-            <button className="help-close" onClick={closeSupport} type="button">
+            <button className="help-close" onClick={() => setSupportOpen(false)} type="button">
               ✕
             </button>
           </div>
@@ -573,10 +573,13 @@ export default function LoginPage() {
         <div className="promo-side">
           <div className="promo-content">
             <div className="logo">
-              <img src="/image_0bd68b.png" alt="skilLS Logo" onError={(e) => {
-                // Fallback, если логотип еще не положен в public
-                (e.currentTarget as HTMLElement).style.display = "none";
-              }} />
+              <img
+                src="/image_0bd68b.png"
+                alt="skilLS Logo"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = "none";
+                }}
+              />
             </div>
 
             <h1 className="promo-title">skilLS - образовательная онлайн-платформа</h1>
@@ -620,99 +623,20 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* SIGNATURE VISUAL: Векторный сертификат */}
+          {/* SIGNATURE VISUAL: Изображение сертификата */}
           <div className="cert-container">
             <div className="cert-wrapper">
-              <svg viewBox="0 0 720 452" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Пример международного сертификата skilLS">
-                <defs>
-                  <linearGradient id="paperGrad" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="#ffffff" />
-                    <stop offset="100%" stopColor="#f8fafc" />
-                  </linearGradient>
-                  <linearGradient id="sealGrad" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" />
-                    <stop offset="100%" stopColor="#1e40af" />
-                  </linearGradient>
-                  <linearGradient id="barFill" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#93c5fd" />
-                    <stop offset="100%" stopColor="#3b82f6" />
-                  </linearGradient>
-                </defs>
-
-                <rect x="6" y="6" width="708" height="440" rx="16" fill="url(#paperGrad)" stroke="#e2e8f0" strokeWidth="2" />
-                <rect x="16" y="16" width="688" height="420" rx="10" fill="none" stroke="#bfdbfe" strokeWidth="1" strokeOpacity="0.6" />
-
-                <g opacity="0.4" stroke="#93c5fd" strokeWidth="1.5" fill="none">
-                  <circle cx="50" cy="50" r="10" />
-                  <circle cx="50" cy="50" r="18" />
-                  <circle cx="670" cy="50" r="10" />
-                  <circle cx="670" cy="50" r="18" />
-                </g>
-
-                <text x="46" y="62" className="cert-svg-mono" fontSize="10.5" letterSpacing="2.5" fill="#64748b" fontWeight="600">
-                  SKILLS · DIGITAL ACHIEVEMENT
-                </text>
-                <text x="46" y="102" className="cert-svg-serif" fontSize="27" fill="#0f172a" fontWeight="600">
-                  Сертификат достижений
-                </text>
-                <text x="46" y="126" className="cert-svg-text" fontSize="12.5" fill="#64748b">
-                  Интерактивная подготовка &amp; Экзамены
-                </text>
-
-                <g transform="translate(636,64)">
-                  <circle r="34" fill="url(#sealGrad)" />
-                  <circle r="34" fill="none" stroke="#dbeafe" strokeWidth="1.5" strokeOpacity=".3" />
-                  <path d="M0,-16 L4.5,-5 L16,-5 L6.5,2 L10,13 L0,6 L-10,13 L-6.5,2 L-16,-5 L-4.5,-5 Z" fill="#ffffff" />
-                </g>
-
-                <text x="46" y="188" className="cert-svg-mono" fontSize="9.5" letterSpacing="1.8" fill="#64748b" fontWeight="600">
-                  СТУДЕНТ
-                </text>
-                <text x="46" y="214" className="cert-svg-serif" fontSize="21" fill="#0f172a" fontWeight="500">
-                  Анна Иванова
-                </text>
-                <line x1="46" y1="224" x2="330" y2="224" stroke="#bfdbfe" strokeWidth="1" strokeOpacity="0.7" />
-
-                <text x="46" y="256" className="cert-svg-mono" fontSize="9.5" letterSpacing="1.8" fill="#64748b" fontWeight="600">
-                  ПРОГРЕСС НАВЫКОВ · CEFR
-                </text>
-                <g fontFamily="'IBM Plex Mono', monospace" fontSize="11.5" fontWeight="600">
-                  <rect x="46" y="266" width="52" height="26" rx="6" fill="#f1f5f9" stroke="#e2e8f0" strokeWidth="1.3" />
-                  <text x="72" y="283" textAnchor="middle" fill="#94a3b8">A1</text>
-                  <rect x="104" y="266" width="52" height="26" rx="6" fill="#f1f5f9" stroke="#e2e8f0" strokeWidth="1.3" />
-                  <text x="130" y="283" textAnchor="middle" fill="#94a3b8">A2</text>
-                  <rect x="162" y="266" width="52" height="26" rx="6" fill="#f1f5f9" stroke="#e2e8f0" strokeWidth="1.3" />
-                  <text x="188" y="283" textAnchor="middle" fill="#94a3b8">B1</text>
-                  <rect x="220" y="263" width="58" height="32" rx="8" fill="url(#barFill)" />
-                  <text x="249" y="284" textAnchor="middle" fill="#ffffff">B2</text>
-                  <rect x="284" y="266" width="52" height="26" rx="6" fill="none" stroke="#e2e8f0" strokeWidth="1.3" />
-                  <text x="310" y="283" textAnchor="middle" fill="#94a3b8">C1</text>
-                  <rect x="342" y="266" width="52" height="26" rx="6" fill="none" stroke="#e2e8f0" strokeWidth="1.3" />
-                  <text x="368" y="283" textAnchor="middle" fill="#94a3b8">C2</text>
-                </g>
-
-                <text x="46" y="332" className="cert-svg-mono" fontSize="9.5" letterSpacing="1.8" fill="#64748b" fontWeight="600">
-                  МАРШРУТ НА СУПЕРФИНАЛ
-                </text>
-                <g>
-                  <circle cx="52" cy="358" r="4.5" fill="#3b82f6" />
-                  <text x="52" y="378" textAnchor="middle" className="cert-svg-text" fontSize="9.5" fill="#64748b">
-                    Старт
-                  </text>
-                  <line x1="60" y1="358" x2="590" y2="358" stroke="#93c5fd" strokeWidth="2" strokeDasharray="4 6" />
-                  <g transform="translate(600,358)">
-                    <path d="M0,-13 L3.8,-4 L13,-4 L5.5,1.6 L8.4,10.6 L0,5 L-8.4,10.6 L-5.5,1.6 L-13,-4 L-3.8,-4 Z" fill="#2563eb" />
-                  </g>
-                  <text x="600" y="378" textAnchor="middle" className="cert-svg-mono" fontSize="9.5" fill="#2563eb" fontWeight="600">
-                    ИТАЛИЯ
-                  </text>
-                </g>
-
-                <line x1="46" y1="404" x2="674" y2="404" stroke="#e2e8f0" strokeWidth="1" />
-                <text x="46" y="424" className="cert-svg-text" fontSize="10" fill="#94a3b8">
-                  Современная платформа для изучения английского языка
-                </text>
-              </svg>
+              <img
+                src="/certificate.png"
+                alt="Пример международной подготовки skilLS"
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                  borderRadius: "16px",
+                  boxShadow: "0 8px 30px rgba(0, 0, 0, 0.08)",
+                }}
+              />
             </div>
           </div>
         </div>
@@ -798,7 +722,7 @@ export default function LoginPage() {
               </button>
 
               <Link href="/demo" className="btn-demo">
-                ⚡ Пройти демо-задание
+                Пройти демо-задание
               </Link>
             </form>
 
@@ -811,10 +735,10 @@ export default function LoginPage() {
                 <Link className="aux-btn" href="/info">
                   Информация
                 </Link>
-                <button className="aux-btn" onClick={openHelp} type="button">
+                <button className="aux-btn" onClick={() => setHelpOpen(true)} type="button">
                   Помощь
                 </button>
-                <button className="aux-btn" onClick={openSupport} type="button">
+                <button className="aux-btn" onClick={() => setSupportOpen(true)} type="button">
                   Поддержка
                 </button>
               </div>
@@ -823,5 +747,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="page-login" />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
