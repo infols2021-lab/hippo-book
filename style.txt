@@ -27723,226 +27723,6 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
-<file path="app/api/profile-progress/route.ts">
-// app/api/profile-progress/route.ts
-import { ok, fail } from "@/lib/api/response";
-import { requireUser } from "@/lib/api/auth";
-import { type NextRequest } from "next/server";
-
-export async function GET(req: NextRequest) {
-  const auth = await requireUser();
-  if ("response" in auth) return auth.response;
-  const { supabase, user } = auth;
-
-  // Получаем slug из URL, если нужно фильтровать по проекту
-  const url = new URL(req.url);
-  const projectSlug = url.searchParams.get("slug");
-
-  try {
-    // 1. Найдём ID проекта по slug (если передан)
-    let projectId: string | null = null;
-    if (projectSlug) {
-      const { data: project, error: projectError } = await supabase
-        .from("projects")
-        .select("id")
-        .eq("slug", projectSlug)
-        .single();
-
-      if (projectError) {
-        // Если проект не найден, возвращаем пустой результат, а не ошибку
-        return ok({
-          stats: {
-            totalMaterials: 0,
-            completedMaterials: 0,
-            totalAvailableAssignments: 0,
-            completedAvailableAssignments: 0,
-            successRate: 0,
-          },
-          materialsProgress: [],
-        });
-      }
-      projectId = project?.id ?? null;
-    }
-
-    // Карта для быстрого поиска названий табов: id таба -> title таба
-    const tabTitleMap = new Map<string, string>();
-
-    // 2. Получаем материалы, привязанные к проекту (через табы)
-    let materialsQuery = supabase
-      .from("materials")
-      .select("id, title, material_kind, is_available, is_demo, project_tab_id")
-      .eq("is_active", true);
-
-    if (projectId) {
-      // 🚀 ИСПРАВЛЕНИЕ: Вытягиваем id вместе с title таба
-      const { data: tabs, error: tabsError } = await supabase
-        .from("project_tabs")
-        .select("id, title")
-        .eq("project_id", projectId)
-        .eq("is_active", true);
-
-      if (tabsError) {
-        throw new Error(tabsError.message);
-      }
-
-      const tabIds = tabs?.map((t: { id: string }) => t.id) || [];
-
-      // Заполняем карту соответствия названий
-      if (tabs) {
-        tabs.forEach((t: { id: string; title: string }) => {
-          if (t.id && t.title) {
-            tabTitleMap.set(t.id, t.title);
-          }
-        });
-      }
-
-      if (tabIds.length === 0) {
-        return ok({
-          stats: {
-            totalMaterials: 0,
-            completedMaterials: 0,
-            totalAvailableAssignments: 0,
-            completedAvailableAssignments: 0,
-            successRate: 0,
-          },
-          materialsProgress: [],
-        });
-      }
-
-      // Демо-материалы — сквозные, поэтому в фильтр по табам конкретного проекта
-      // их не включаем условием "или": добираем отдельным запросом ниже.
-      materialsQuery = materialsQuery.in("project_tab_id", tabIds);
-    }
-
-    const [{ data: materials, error: matErr }, { data: demoMaterials, error: demoMatErr }] =
-      await Promise.all([
-        materialsQuery,
-        // Демо-материалы должны попадать в прогресс независимо от того, в каком проекте/табе они созданы.
-        supabase
-          .from("materials")
-          .select("id, title, material_kind, is_available, is_demo, project_tab_id")
-          .eq("is_active", true)
-          .eq("is_demo", true),
-      ]);
-
-    if (matErr) throw matErr;
-    if (demoMatErr) throw demoMatErr;
-
-    // Получаем реальные доступы пользователя к материалам
-    const { data: accessData, error: accessErr } = await supabase
-      .from("material_access")
-      .select("material_id")
-      .eq("user_id", user.id);
-
-    if (accessErr) throw accessErr;
-
-    const grantedMaterialIds = new Set(accessData?.map((a) => a.material_id) || []);
-
-    // Объединяем обычные материалы проекта и сквозные демо-материалы, без дублей
-    const materialsById = new Map<string, any>();
-    for (const m of materials || []) materialsById.set(m.id, m);
-    for (const m of demoMaterials || []) {
-      if (!materialsById.has(m.id)) materialsById.set(m.id, m);
-    }
-
-    // Оставляем ТОЛЬКО те материалы, которые публичны (is_available), демо (is_demo)
-    // или выданы пользователю
-    const accessibleMaterials = Array.from(materialsById.values()).filter(
-      (m) => m.is_available || m.is_demo || grantedMaterialIds.has(m.id)
-    );
-
-    // 3. Получаем прогресс пользователя по всем заданиям
-    const { data: userProgress, error: progErr } = await supabase
-      .from("user_progress")
-      .select("assignment_id, is_completed")
-      .eq("user_id", user.id);
-    if (progErr) throw progErr;
-
-    const completedSet = new Set(
-      (userProgress || [])
-        .filter((p) => p.is_completed)
-        .map((p) => p.assignment_id)
-    );
-
-    // 4. Для каждого ДОСТУПНОГО материала получаем список заданий и считаем прогресс
-    const materialsProgress = await Promise.all(
-      accessibleMaterials.map(async (m) => {
-
-        // Считаем задания с учетом старой и новой архитектуры
-        const { data: assignments } = await supabase
-          .from("assignments")
-          .select("id")
-          .or(`material_id.eq.${m.id},textbook_id.eq.${m.id},crossword_id.eq.${m.id}`);
-
-        const total = assignments?.length ?? 0;
-        const completed = (assignments || [])
-          .filter((a) => completedSet.has(a.id))
-          .length;
-
-        const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-        // Определяем тип материала
-        const kind = m.material_kind === "crossword" ? "crossword" : "textbook";
-
-        // Строим корректную ссылку на страницу материала
-        const href = projectSlug
-          ? `/projects/${projectSlug}/materials/${m.id}`
-          : `/materials/${m.id}`;
-
-        // 🚀 НАХОДИМ НАЗВАНИЕ ТАБА ИЗ НАШЕЙ КАРТЫ
-        const tabTitle = m.project_tab_id ? tabTitleMap.get(m.project_tab_id) : undefined;
-
-        return {
-          kind,
-          id: m.id,
-          title: m.title,
-          total,
-          completed,
-          progressPercent,
-          href,
-          tabTitle, // Отправляем название таба (например: "что то") на фронтенд
-        };
-      })
-    );
-
-    // 5. Общая статистика (строим только по доступным материалам)
-    const totalMaterials = accessibleMaterials.length;
-    const completedMaterials = materialsProgress.filter(
-      (m) => m.total > 0 && m.completed === m.total
-    ).length;
-
-    const totalAvailableAssignments = materialsProgress.reduce(
-      (acc, m) => acc + m.total,
-      0
-    );
-    const completedAvailableAssignments = materialsProgress.reduce(
-      (acc, m) => acc + m.completed,
-      0
-    );
-
-    const successRate =
-      totalAvailableAssignments > 0
-        ? Math.round(
-            (completedAvailableAssignments / totalAvailableAssignments) * 100
-          )
-        : 0;
-
-    const stats = {
-      totalMaterials,
-      completedMaterials,
-      totalAvailableAssignments,
-      completedAvailableAssignments,
-      successRate,
-    };
-
-    return ok({ stats, materialsProgress });
-  } catch (error: any) {
-    console.error("🔴 [API PROFILE PROGRESS] Ошибка:", error);
-    return fail(error?.message || "Server error", 500, "DB_ERROR");
-  }
-}
-</file>
-
 <file path="app/api/projects/[slug]/materials/route.ts">
 // app/api/projects/[slug]/materials/route.ts
 import { NextRequest } from "next/server";
@@ -44614,6 +44394,233 @@ export async function GET() {
 }
 </file>
 
+<file path="app/api/profile-progress/route.ts">
+// app/api/profile-progress/route.ts
+import { ok, fail } from "@/lib/api/response";
+import { requireUser } from "@/lib/api/auth";
+import { type NextRequest } from "next/server";
+
+export async function GET(req: NextRequest) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+  const { supabase, user } = auth;
+
+  // Получаем slug из URL, если нужно фильтровать по проекту
+  const url = new URL(req.url);
+  const projectSlug = url.searchParams.get("slug");
+
+  try {
+    let projectId: string | null = null;
+    let tabs: any[] = [];
+    // Карта для быстрого поиска названий табов: id таба -> title таба
+    const tabTitleMap = new Map<string, string>();
+
+    // 1. Найдём ID проекта по slug (если передан)
+    if (projectSlug) {
+      const { data: project, error: projectError } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("slug", projectSlug)
+        .single();
+
+      if (projectError) {
+        return ok({
+          stats: {
+            totalMaterials: 0,
+            completedMaterials: 0,
+            totalAvailableAssignments: 0,
+            completedAvailableAssignments: 0,
+            successRate: 0,
+          },
+          materialsProgress: [],
+        });
+      }
+      projectId = project?.id ?? null;
+    }
+
+    // 2. Получаем материалы, привязанные к проекту (через табы)
+    let materialsQuery = supabase
+      .from("materials")
+      .select("id, title, material_kind, is_available, is_demo, project_tab_id")
+      .eq("is_active", true);
+
+    if (projectId) {
+      const { data: t, error: tabsError } = await supabase
+        .from("project_tabs")
+        .select("id, title")
+        .eq("project_id", projectId)
+        .eq("is_active", true);
+
+      if (tabsError) throw new Error(tabsError.message);
+      
+      tabs = t || [];
+      const tabIds = tabs.map((x: { id: string }) => x.id);
+      
+      // Заполняем карту соответствия названий
+      tabs.forEach((x: { id: string; title: string }) => {
+        if (x.id && x.title) tabTitleMap.set(x.id, x.title);
+      });
+
+      if (tabIds.length === 0) {
+        return ok({
+          stats: {
+            totalMaterials: 0,
+            completedMaterials: 0,
+            totalAvailableAssignments: 0,
+            completedAvailableAssignments: 0,
+            successRate: 0,
+          },
+          materialsProgress: [],
+        });
+      }
+
+      materialsQuery = materialsQuery.in("project_tab_id", tabIds);
+    }
+
+    const [{ data: materials, error: matErr }, { data: demoMaterials, error: demoMatErr }] =
+      await Promise.all([
+        materialsQuery,
+        // Демо-материалы должны попадать в прогресс независимо от того, в каком проекте/табе они созданы.
+        supabase
+          .from("materials")
+          .select("id, title, material_kind, is_available, is_demo, project_tab_id")
+          .eq("is_active", true)
+          .eq("is_demo", true),
+      ]);
+
+    if (matErr) throw matErr;
+    if (demoMatErr) throw demoMatErr;
+
+    // Получаем реальные доступы пользователя к материалам
+    const { data: accessData, error: accessErr } = await supabase
+      .from("material_access")
+      .select("material_id")
+      .eq("user_id", user.id);
+
+    if (accessErr) throw accessErr;
+
+    const grantedMaterialIds = new Set(accessData?.map((a) => a.material_id) || []);
+
+    // Объединяем обычные материалы проекта и сквозные демо-материалы, без дублей
+    const materialsById = new Map<string, any>();
+    for (const m of materials || []) materialsById.set(m.id, m);
+    for (const m of demoMaterials || []) {
+      if (!materialsById.has(m.id)) materialsById.set(m.id, m);
+    }
+
+    // Оставляем ТОЛЬКО те материалы, которые публичны (is_available), демо (is_demo)
+    // или выданы пользователю
+    const accessibleMaterials = Array.from(materialsById.values()).filter(
+      (m) => m.is_available || m.is_demo || grantedMaterialIds.has(m.id)
+    );
+
+    // 3. Получаем прогресс пользователя по всем заданиям
+    const { data: userProgress, error: progErr } = await supabase
+      .from("user_progress")
+      .select("assignment_id, is_completed")
+      .eq("user_id", user.id);
+    if (progErr) throw progErr;
+
+    const completedSet = new Set(
+      (userProgress || [])
+        .filter((p) => p.is_completed)
+        .map((p) => p.assignment_id)
+    );
+
+    // 4. Сначала собираем УНИКАЛЬНЫЙ прогресс для правильной математики
+    const uniqueProgress = await Promise.all(
+      accessibleMaterials.map(async (m) => {
+        const { data: assignments } = await supabase
+          .from("assignments")
+          .select("id")
+          .or(`material_id.eq.${m.id},textbook_id.eq.${m.id},crossword_id.eq.${m.id}`);
+
+        const total = assignments?.length ?? 0;
+        const completed = (assignments || [])
+          .filter((a) => completedSet.has(a.id))
+          .length;
+
+        const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        return { m, total, completed, progressPercent };
+      })
+    );
+
+    // 5. Считаем статистику ДО клонирования демо-материалов, чтобы избежать накрутки счетчиков
+    const totalMaterials = uniqueProgress.length;
+    const completedMaterials = uniqueProgress.filter(
+      (p) => p.total > 0 && p.completed === p.total
+    ).length;
+
+    const totalAvailableAssignments = uniqueProgress.reduce(
+      (acc, p) => acc + p.total,
+      0
+    );
+    const completedAvailableAssignments = uniqueProgress.reduce(
+      (acc, p) => acc + p.completed,
+      0
+    );
+
+    const successRate =
+      totalAvailableAssignments > 0
+        ? Math.round((completedAvailableAssignments / totalAvailableAssignments) * 100)
+        : 0;
+
+    const stats = {
+      totalMaterials,
+      completedMaterials,
+      totalAvailableAssignments,
+      completedAvailableAssignments,
+      successRate,
+    };
+
+    // 6. Формируем финальный массив для фронтенда с клонированием демок во все табы проекта
+    const materialsProgress: any[] = [];
+    
+    for (const { m, total, completed, progressPercent } of uniqueProgress) {
+      const kind = m.material_kind === "crossword" ? "crossword" : "textbook";
+      const href = projectSlug
+        ? `/projects/${projectSlug}/materials/${m.id}`
+        : `/materials/${m.id}`;
+
+      if (m.is_demo && tabs.length > 0) {
+        // Если это демо, раскидываем его по всем табам ТЕКУЩЕГО проекта
+        for (const t of tabs) {
+          materialsProgress.push({
+            kind,
+            id: `${m.id}-${t.id}`, // Уникальный ключ для React
+            title: m.title,
+            total,
+            completed,
+            progressPercent,
+            href,
+            tabTitle: t.title, // Принудительно присваиваем имя таба из текущего проекта
+          });
+        }
+      } else {
+        // Обычные материалы кладутся в свой родной таб
+        const tabTitle = m.project_tab_id ? tabTitleMap.get(m.project_tab_id) : undefined;
+        materialsProgress.push({
+          kind,
+          id: m.id,
+          title: m.title,
+          total,
+          completed,
+          progressPercent,
+          href,
+          tabTitle,
+        });
+      }
+    }
+
+    return ok({ stats, materialsProgress });
+  } catch (error: any) {
+    console.error("🔴 [API PROFILE PROGRESS] Ошибка:", error);
+    return fail(error?.message || "Server error", 500, "DB_ERROR");
+  }
+}
+</file>
+
 <file path="app/api/roadmap/[materialId]/certificate/route.ts">
 import { fail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/auth";
@@ -49414,6 +49421,925 @@ export default async function DocumentsPage({
       </div>
     </div>
   );
+}
+</file>
+
+<file path="app/info/pricing/page.tsx">
+import { createClient } from "@supabase/supabase-js";
+import PricingClient from "./PricingClient";
+
+type SP = { source?: string; sourceId?: string };
+
+function lastDayOfCurrentMonthUTC(): Date {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  return new Date(Date.UTC(y, m + 1, 0, 12, 0, 0));
+}
+
+function formatRuDate(d: Date) {
+  return new Intl.DateTimeFormat("ru-RU", { year: "numeric", month: "long", day: "2-digit" }).format(d);
+}
+
+export const metadata = {
+  title: "Каталог материалов и прайс",
+  description: "Доступные учебники, кроссворды и тестирования по направлениям.",
+};
+
+export const revalidate = 0;
+
+export default async function PricingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<SP>;
+}) {
+  const sp = (await searchParams) ?? {};
+
+  // Админский клиент Supabase для безошибочного получения публичного каталога на сервере
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // 1. Активные проекты
+  const { data: projectsData } = await supabaseAdmin
+    .from("projects")
+    .select("id, name, slug, theme_color, theme")
+    .eq("is_active", true)
+    .order("order_index", { ascending: true });
+
+  const projects = projectsData || [];
+  const projectIds = projects.map((p) => p.id);
+
+  let tabs: any[] = [];
+  let materials: any[] = [];
+
+  if (projectIds.length > 0) {
+    // 2. Активные табы
+    const { data: tabsData } = await supabaseAdmin
+      .from("project_tabs")
+      .select("id, project_id, title, icon")
+      .in("project_id", projectIds)
+      .eq("is_active", true)
+      .order("order_index", { ascending: true });
+
+    tabs = tabsData || [];
+    const tabIds = tabs.map((t) => t.id);
+
+    if (tabIds.length > 0) {
+      // 3. Активные материалы по project_tab_id
+      const { data: matsData } = await supabaseAdmin
+        .from("materials")
+        .select("id, project_tab_id, title, description, cover_image_url, price, is_active, is_secret")
+        .eq("is_active", true)
+        .in("project_tab_id", tabIds);
+
+      const tabToProjectMap = new Map<string, string>();
+      tabs.forEach((t) => tabToProjectMap.set(t.id, t.project_id));
+
+      materials = (matsData || [])
+        .filter((m: any) => !m.is_secret)
+        .map((m: any) => ({
+          ...m,
+          project_id: tabToProjectMap.get(m.project_tab_id) || null,
+          tab_id: m.project_tab_id,
+        }));
+    }
+  }
+
+  const stamp = formatRuDate(lastDayOfCurrentMonthUTC());
+
+  return (
+    <PricingClient
+      projects={projects}
+      tabs={tabs}
+      materials={materials}
+      lastUpdateDate={stamp}
+      source={sp.source}
+      sourceId={sp.sourceId}
+    />
+  );
+}
+</file>
+
+<file path="app/info/pricing/PricingClient.tsx">
+"use client";
+
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
+import "../info.css";
+
+type Project = { id: string; name: string; slug: string; theme_color?: string; theme?: any };
+type Tab = { id: string; project_id: string; title: string; icon?: string };
+type Material = {
+  id: string;
+  project_id?: string;
+  project_tab_id?: string;
+  tab_id?: string;
+  title: string;
+  cover_image_url?: string;
+  price?: number;
+  description?: string;
+};
+
+type Props = {
+  projects: Project[];
+  tabs: Tab[];
+  materials: Material[];
+  lastUpdateDate: string;
+  source?: string;
+  sourceId?: string;
+};
+
+function toStorageProxyUrl(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  const value = raw.trim();
+  if (!value) return "";
+  if (value.startsWith("/api/storage/public/") || value.startsWith("data:") || value.startsWith("http")) return value;
+
+  const marker = "/storage/v1/object/public/";
+  const idx = value.indexOf(marker);
+  if (idx === -1) return value;
+  const rest = value.slice(idx + marker.length).split("?")[0].split("#")[0];
+  const parts = rest.split("/").filter(Boolean);
+  const bucket = parts.shift();
+  const path = parts.join("/");
+  if (!bucket || !path) return value;
+  return getStoragePublicUrl(bucket, path);
+}
+
+export default function PricingClient({ projects, tabs, materials, lastUpdateDate, source, sourceId }: Props) {
+  const [activeProjectId, setActiveProjectId] = useState<string>(projects[0]?.id || "");
+  const [activeTabId, setActiveTabId] = useState<string>("all");
+
+  const qs = useMemo(() => {
+    const q = new URLSearchParams();
+    if (source) q.set("source", source);
+    if (sourceId) q.set("sourceId", sourceId);
+    const s = q.toString();
+    return s ? `?${s}` : "";
+  }, [source, sourceId]);
+
+  // Табы текущего проекта
+  const currentProjectTabs = useMemo(() => {
+    return tabs.filter((t) => t.project_id === activeProjectId);
+  }, [tabs, activeProjectId]);
+
+  const handleProjectChange = (pid: string) => {
+    setActiveProjectId(pid);
+    setActiveTabId("all");
+  };
+
+  // Фильтрация материалов
+  const filteredMaterials = useMemo(() => {
+    const projectTabIds = new Set(currentProjectTabs.map((t) => t.id));
+
+    return materials.filter((m) => {
+      const tabId = m.project_tab_id || m.tab_id;
+      
+      // 1. Проверяем связь с проектом (по m.project_id или по принадлежности m.project_tab_id к табам проекта)
+      const belongsToProject = m.project_id ? m.project_id === activeProjectId : (tabId ? projectTabIds.has(tabId) : false);
+      if (!belongsToProject) return false;
+
+      // 2. Проверяем выбор конкретного таба
+      if (activeTabId !== "all" && tabId !== activeTabId) return false;
+
+      return true;
+    });
+  }, [materials, activeProjectId, activeTabId, currentProjectTabs]);
+
+  const activeProject = projects.find((p) => p.id === activeProjectId);
+  const projectColor = activeProject?.theme?.primaryColor || activeProject?.theme_color || "#0ea5e9";
+
+  return (
+    <div className="info-wrap">
+      <div className="info-shell">
+        <div className="info-main-card">
+          
+          <div className="info-topbar">
+            <div className="info-topbar-left">
+              <Link className="info-back-btn" href={`/info${qs}`}>
+                ← Назад
+              </Link>
+              <div className="info-badge">
+                <span className="info-badge-dot" style={{ background: projectColor, boxShadow: `0 0 0 4px ${projectColor}30` }} />
+                <div className="info-badge-text">
+                  <span>Обновлено:</span> <strong>{lastUpdateDate}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h1 className="info-title">Каталог материалов</h1>
+          <p className="info-subtitle">
+            Выберите направление и раздел, чтобы посмотреть доступные учебники, кроссворды и тестирования. 
+            Оплата происходит безопасно через QR-код.
+          </p>
+
+          {/* Выбор проекта */}
+          {projects.length > 0 && (
+            <div className="filter-section">
+              <div className="filter-label">Направление:</div>
+              <div className="filter-chips">
+                {projects.map((p) => {
+                  const isActive = p.id === activeProjectId;
+                  const color = p.theme?.primaryColor || p.theme_color || "#0ea5e9";
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => handleProjectChange(p.id)}
+                      className={`chip-main ${isActive ? "active" : ""}`}
+                      style={isActive ? { background: color, borderColor: color } : {}}
+                      type="button"
+                    >
+                      {p.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Выбор таба */}
+          {currentProjectTabs.length > 0 && (
+            <div className="filter-section" style={{ marginTop: 12 }}>
+              <div className="filter-label">Раздел:</div>
+              <div className="filter-chips">
+                <button
+                  onClick={() => setActiveTabId("all")}
+                  className={`chip-sub ${activeTabId === "all" ? "active" : ""}`}
+                  style={activeTabId === "all" ? { background: `${projectColor}15`, color: projectColor, borderColor: projectColor } : {}}
+                  type="button"
+                >
+                  Все разделы
+                </button>
+                {currentProjectTabs.map((t) => {
+                  const isActive = t.id === activeTabId;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setActiveTabId(t.id)}
+                      className={`chip-sub ${isActive ? "active" : ""}`}
+                      style={isActive ? { background: `${projectColor}15`, color: projectColor, borderColor: projectColor } : {}}
+                      type="button"
+                    >
+                      {t.icon ? `${t.icon} ` : ""}{t.title}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Сетка материалов */}
+          <div className="materials-container">
+            {filteredMaterials.length === 0 ? (
+              <div className="empty-state">
+                <span className="empty-state-icon">📭</span>
+                <h3>Материалов пока нет</h3>
+                <p>В этом разделе еще не добавлены материалы. Выберите другой раздел или направление.</p>
+              </div>
+            ) : (
+              <div className="materials-grid">
+                {filteredMaterials.map((m) => {
+                  const price = m.price || 1000;
+                  const cover = toStorageProxyUrl(m.cover_image_url);
+                  return (
+                    <div key={m.id} className="mat-card">
+                      <div className="mat-cover">
+                        {cover ? (
+                          <img src={cover} alt={m.title} loading="lazy" />
+                        ) : (
+                          <div className="mat-cover-placeholder">📚</div>
+                        )}
+                        <div className="mat-price">{price} ₽</div>
+                      </div>
+                      <div className="mat-body">
+                        <div className="mat-title" title={m.title}>{m.title}</div>
+                        <div className="mat-desc">
+                          {m.description || "Доступ выдается администратором после оплаты"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Инфоблоки */}
+          <div className="info-split">
+            <div className="info-box">
+              <div className="info-box-head">
+                <h2>Как оформить доступ</h2>
+                <div className="info-box-pill" style={{ color: projectColor, background: `${projectColor}15` }}>Оплата</div>
+              </div>
+              <div className="steps">
+                <div className="step">
+                  <div className="step-num" style={{ background: projectColor }}>1</div>
+                  <div className="step-text">Сформируйте заявку в личном кабинете. Вы получите <strong>QR-код</strong> для оплаты через СБП.</div>
+                </div>
+                <div className="step">
+                  <div className="step-num" style={{ background: projectColor }}>2</div>
+                  <div className="step-text">Оплатите по QR-коду в приложении любого удобного банка.</div>
+                </div>
+                <div className="step">
+                  <div className="step-num" style={{ background: projectColor }}>3</div>
+                  <div className="step-text">Доступ откроется автоматически или в течение <strong>24 часов</strong> после проверки.</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="info-box">
+              <div className="info-box-head">
+                <h2>Соответствие уровням</h2>
+                <div className="info-box-pill">Автовыдача</div>
+              </div>
+              <p className="info-box-desc">Система автоматически подберет нужный уровень материалов при указании вашего класса.</p>
+              
+              <div className="class-table">
+                <div className="class-row">
+                  <div className="c-age">1–2 класс</div>
+                  <div className="c-val">Baby Hippo • Below Scale</div>
+                </div>
+                <div className="class-row">
+                  <div className="c-age">3–4 класс</div>
+                  <div className="c-val">Little Hippo • CEFR A1</div>
+                </div>
+                <div className="class-row">
+                  <div className="c-age">5–6 класс</div>
+                  <div className="c-val">Hippo 1 • CEFR A2</div>
+                </div>
+                <div className="class-row">
+                  <div className="c-age">7–9 класс</div>
+                  <div className="c-val">Hippo 2-3 • CEFR B1-B2</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="app/info/info.css">
+/* app/info/info.css */
+
+.info-wrap {
+  min-height: calc(100vh - 80px);
+  padding: 40px 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #0f172a;
+}
+
+.info-shell {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+/* Главная плавающая карточка */
+.info-main-card {
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(20px);
+  border-radius: 32px;
+  padding: 40px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.06);
+  border: 1px solid #ffffff;
+}
+
+/* Верхняя панель */
+.info-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.info-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.info-back-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  background: #f1f5f9;
+  color: #1e293b;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.info-back-btn:hover {
+  background: #e2e8f0;
+  transform: translateY(-1px);
+}
+
+.info-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.info-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.info-badge-text {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 600;
+  display: flex;
+  gap: 6px;
+}
+
+.info-badge-text strong {
+  color: #0f172a;
+}
+
+/* Уведомление */
+.info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin-bottom: 28px;
+  font-size: 14px;
+  color: #1e40af;
+  line-height: 1.5;
+}
+
+.info-banner-icon {
+  font-size: 18px;
+}
+
+/* Заголовки */
+.info-title {
+  font-size: 38px;
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0 0 12px 0;
+  letter-spacing: -0.8px;
+}
+
+.info-subtitle {
+  font-size: 16px;
+  color: #475569;
+  line-height: 1.6;
+  max-width: 800px;
+  margin: 0 0 36px 0;
+}
+
+/* Сетка инфо-карточек */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 36px;
+}
+
+.info-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+}
+
+.info-card-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.info-card h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 10px 0;
+}
+
+.info-card p {
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Сетка ссылок-действий */
+.info-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.info-action-btn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 20px 24px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.25s ease;
+}
+
+.info-action-btn:hover {
+  background: #ffffff;
+  border-color: #0ea5e9;
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(14, 165, 233, 0.1);
+}
+
+.info-action-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.info-action-sub {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.info-action-arrow {
+  font-size: 20px;
+  color: #0ea5e9;
+  font-weight: 700;
+  transition: transform 0.2s ease;
+}
+
+.info-action-btn:hover .info-action-arrow {
+  transform: translateX(4px);
+}
+
+/* Фильтры (Чипы) */
+.filter-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  min-width: 90px;
+}
+
+.filter-chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chip-main {
+  padding: 10px 20px;
+  border-radius: 14px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chip-main:hover {
+  background: #e2e8f0;
+}
+
+.chip-main.active {
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.chip-sub {
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chip-sub:hover {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.chip-sub.active {
+  font-weight: 800;
+}
+
+/* Сетка материалов */
+.materials-container {
+  margin-top: 32px;
+  padding-top: 32px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.materials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.mat-card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  transition: all 0.25s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.mat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
+  border-color: #cbd5e1;
+}
+
+.mat-cover {
+  width: 100%;
+  height: 180px;
+  background: #f8fafc;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.mat-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mat-cover-placeholder {
+  font-size: 48px;
+  opacity: 0.3;
+}
+
+.mat-price {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.mat-body {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.mat-title {
+  font-weight: 800;
+  font-size: 15px;
+  color: #0f172a;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.mat-desc {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  margin-top: auto;
+  line-height: 1.4;
+}
+
+/* Пустое состояние */
+.empty-state {
+  text-align: center;
+  padding: 50px 20px;
+  background: #f8fafc;
+  border-radius: 24px;
+  border: 2px dashed #cbd5e1;
+}
+
+.empty-state-icon {
+  font-size: 44px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.empty-state h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+}
+
+.empty-state p {
+  color: #64748b;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Двухколоночный блок снизу */
+.info-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 40px;
+}
+
+.info-box {
+  background: #f8fafc;
+  border-radius: 24px;
+  padding: 28px;
+  border: 1px solid #e2e8f0;
+}
+
+.info-box-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.info-box-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.info-box-pill {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.info-box-desc {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+}
+
+/* Шаги */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.step-text {
+  font-size: 14px;
+  color: #334155;
+  line-height: 1.45;
+}
+
+/* Таблица уровней */
+.class-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.class-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
+}
+
+.c-age {
+  font-weight: 800;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.c-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+/* ==================== Документы (ссылки-карточки) ==================== */
+
+/* Делаем карточки-ссылки в разделе документов */
+a.info-card {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+a.info-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
+  border-color: #0ea5e9;
+}
+
+/* Сетка документов: 4 колонки */
+.info-grid.docs-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* ==================== Адаптивная верстка ==================== */
+
+@media (max-width: 900px) {
+  .info-grid,
+  .info-actions,
+  .info-split,
+  .info-grid.docs-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .info-wrap {
+    padding: 16px;
+  }
+
+  .info-main-card {
+    padding: 24px 20px;
+    border-radius: 24px;
+  }
+
+  .info-title {
+    font-size: 28px;
+  }
+
+  .info-subtitle {
+    font-size: 14px;
+  }
+
+  .class-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
 }
 </file>
 
@@ -54458,827 +55384,6 @@ export async function POST(req: Request) {
 }
 </file>
 
-<file path="app/info/pricing/PricingClient.tsx">
-"use client";
-
-import Link from "next/link";
-import { useMemo, useState } from "react";
-import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
-import "../info.css";
-
-type Project = { id: string; name: string; slug: string; theme_color?: string; theme?: any };
-type Tab = { id: string; project_id: string; title: string; icon?: string };
-type Material = {
-  id: string;
-  project_id?: string;
-  project_tab_id?: string;
-  tab_id?: string;
-  title: string;
-  cover_image_url?: string;
-  price?: number;
-  description?: string;
-};
-
-type Props = {
-  projects: Project[];
-  tabs: Tab[];
-  materials: Material[];
-  lastUpdateDate: string;
-  source?: string;
-  sourceId?: string;
-};
-
-function toStorageProxyUrl(raw: unknown): string {
-  if (typeof raw !== "string") return "";
-  const value = raw.trim();
-  if (!value) return "";
-  if (value.startsWith("/api/storage/public/") || value.startsWith("data:") || value.startsWith("http")) return value;
-
-  const marker = "/storage/v1/object/public/";
-  const idx = value.indexOf(marker);
-  if (idx === -1) return value;
-  const rest = value.slice(idx + marker.length).split("?")[0].split("#")[0];
-  const parts = rest.split("/").filter(Boolean);
-  const bucket = parts.shift();
-  const path = parts.join("/");
-  if (!bucket || !path) return value;
-  return getStoragePublicUrl(bucket, path);
-}
-
-export default function PricingClient({ projects, tabs, materials, lastUpdateDate, source, sourceId }: Props) {
-  const [activeProjectId, setActiveProjectId] = useState<string>(projects[0]?.id || "");
-  const [activeTabId, setActiveTabId] = useState<string>("all");
-
-  const qs = useMemo(() => {
-    const q = new URLSearchParams();
-    if (source) q.set("source", source);
-    if (sourceId) q.set("sourceId", sourceId);
-    const s = q.toString();
-    return s ? `?${s}` : "";
-  }, [source, sourceId]);
-
-  // Табы текущего проекта
-  const currentProjectTabs = useMemo(() => {
-    return tabs.filter((t) => t.project_id === activeProjectId);
-  }, [tabs, activeProjectId]);
-
-  const handleProjectChange = (pid: string) => {
-    setActiveProjectId(pid);
-    setActiveTabId("all");
-  };
-
-  // Фильтрация материалов
-  const filteredMaterials = useMemo(() => {
-    const projectTabIds = new Set(currentProjectTabs.map((t) => t.id));
-
-    return materials.filter((m) => {
-      const tabId = m.project_tab_id || m.tab_id;
-      
-      // 1. Проверяем связь с проектом (по m.project_id или по принадлежности m.project_tab_id к табам проекта)
-      const belongsToProject = m.project_id ? m.project_id === activeProjectId : (tabId ? projectTabIds.has(tabId) : false);
-      if (!belongsToProject) return false;
-
-      // 2. Проверяем выбор конкретного таба
-      if (activeTabId !== "all" && tabId !== activeTabId) return false;
-
-      return true;
-    });
-  }, [materials, activeProjectId, activeTabId, currentProjectTabs]);
-
-  const activeProject = projects.find((p) => p.id === activeProjectId);
-  const projectColor = activeProject?.theme?.primaryColor || activeProject?.theme_color || "#0ea5e9";
-
-  return (
-    <div className="info-wrap">
-      <div className="info-shell">
-        <div className="info-main-card">
-          
-          <div className="info-topbar">
-            <div className="info-topbar-left">
-              <Link className="info-back-btn" href={`/info${qs}`}>
-                ← Назад
-              </Link>
-              <div className="info-badge">
-                <span className="info-badge-dot" style={{ background: projectColor, boxShadow: `0 0 0 4px ${projectColor}30` }} />
-                <div className="info-badge-text">
-                  <span>Обновлено:</span> <strong>{lastUpdateDate}</strong>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <h1 className="info-title">Каталог материалов</h1>
-          <p className="info-subtitle">
-            Выберите направление и раздел, чтобы посмотреть доступные учебники, кроссворды и тестирования. 
-            Оплата происходит безопасно через QR-код.
-          </p>
-
-          {/* Выбор проекта */}
-          {projects.length > 0 && (
-            <div className="filter-section">
-              <div className="filter-label">Направление:</div>
-              <div className="filter-chips">
-                {projects.map((p) => {
-                  const isActive = p.id === activeProjectId;
-                  const color = p.theme?.primaryColor || p.theme_color || "#0ea5e9";
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => handleProjectChange(p.id)}
-                      className={`chip-main ${isActive ? "active" : ""}`}
-                      style={isActive ? { background: color, borderColor: color } : {}}
-                      type="button"
-                    >
-                      {p.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Выбор таба */}
-          {currentProjectTabs.length > 0 && (
-            <div className="filter-section" style={{ marginTop: 12 }}>
-              <div className="filter-label">Раздел:</div>
-              <div className="filter-chips">
-                <button
-                  onClick={() => setActiveTabId("all")}
-                  className={`chip-sub ${activeTabId === "all" ? "active" : ""}`}
-                  style={activeTabId === "all" ? { background: `${projectColor}15`, color: projectColor, borderColor: projectColor } : {}}
-                  type="button"
-                >
-                  Все разделы
-                </button>
-                {currentProjectTabs.map((t) => {
-                  const isActive = t.id === activeTabId;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => setActiveTabId(t.id)}
-                      className={`chip-sub ${isActive ? "active" : ""}`}
-                      style={isActive ? { background: `${projectColor}15`, color: projectColor, borderColor: projectColor } : {}}
-                      type="button"
-                    >
-                      {t.icon ? `${t.icon} ` : ""}{t.title}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Сетка материалов */}
-          <div className="materials-container">
-            {filteredMaterials.length === 0 ? (
-              <div className="empty-state">
-                <span className="empty-state-icon">📭</span>
-                <h3>Материалов пока нет</h3>
-                <p>В этом разделе еще не добавлены материалы. Выберите другой раздел или направление.</p>
-              </div>
-            ) : (
-              <div className="materials-grid">
-                {filteredMaterials.map((m) => {
-                  const price = m.price || 1000;
-                  const cover = toStorageProxyUrl(m.cover_image_url);
-                  return (
-                    <div key={m.id} className="mat-card">
-                      <div className="mat-cover">
-                        {cover ? (
-                          <img src={cover} alt={m.title} loading="lazy" />
-                        ) : (
-                          <div className="mat-cover-placeholder">📚</div>
-                        )}
-                        <div className="mat-price">{price} ₽</div>
-                      </div>
-                      <div className="mat-body">
-                        <div className="mat-title" title={m.title}>{m.title}</div>
-                        <div className="mat-desc">
-                          {m.description || "Доступ выдается администратором после оплаты"}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Инфоблоки */}
-          <div className="info-split">
-            <div className="info-box">
-              <div className="info-box-head">
-                <h2>Как оформить доступ</h2>
-                <div className="info-box-pill" style={{ color: projectColor, background: `${projectColor}15` }}>Оплата</div>
-              </div>
-              <div className="steps">
-                <div className="step">
-                  <div className="step-num" style={{ background: projectColor }}>1</div>
-                  <div className="step-text">Сформируйте заявку в личном кабинете. Вы получите <strong>QR-код</strong> для оплаты через СБП.</div>
-                </div>
-                <div className="step">
-                  <div className="step-num" style={{ background: projectColor }}>2</div>
-                  <div className="step-text">Оплатите по QR-коду в приложении любого удобного банка.</div>
-                </div>
-                <div className="step">
-                  <div className="step-num" style={{ background: projectColor }}>3</div>
-                  <div className="step-text">Доступ откроется автоматически или в течение <strong>24 часов</strong> после проверки.</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="info-box">
-              <div className="info-box-head">
-                <h2>Соответствие уровням</h2>
-                <div className="info-box-pill">Автовыдача</div>
-              </div>
-              <p className="info-box-desc">Система автоматически подберет нужный уровень материалов при указании вашего класса.</p>
-              
-              <div className="class-table">
-                <div className="class-row">
-                  <div className="c-age">1–2 класс</div>
-                  <div className="c-val">Baby Hippo • Below Scale</div>
-                </div>
-                <div className="class-row">
-                  <div className="c-age">3–4 класс</div>
-                  <div className="c-val">Little Hippo • CEFR A1</div>
-                </div>
-                <div className="class-row">
-                  <div className="c-age">5–6 класс</div>
-                  <div className="c-val">Hippo 1 • CEFR A2</div>
-                </div>
-                <div className="class-row">
-                  <div className="c-age">7–9 класс</div>
-                  <div className="c-val">Hippo 2-3 • CEFR B1-B2</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="app/info/info.css">
-/* app/info/info.css */
-
-.info-wrap {
-  min-height: calc(100vh - 80px);
-  padding: 40px 20px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: #0f172a;
-}
-
-.info-shell {
-  max-width: 1040px;
-  margin: 0 auto;
-}
-
-/* Главная плавающая карточка */
-.info-main-card {
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(20px);
-  border-radius: 32px;
-  padding: 40px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.06);
-  border: 1px solid #ffffff;
-}
-
-/* Верхняя панель */
-.info-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24px;
-}
-
-.info-topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.info-back-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 10px 18px;
-  background: #f1f5f9;
-  color: #1e293b;
-  border-radius: 14px;
-  font-weight: 700;
-  font-size: 14px;
-  text-decoration: none;
-  transition: all 0.2s ease;
-}
-
-.info-back-btn:hover {
-  background: #e2e8f0;
-  transform: translateY(-1px);
-}
-
-.info-badge {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 16px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-}
-
-.info-badge-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #10b981;
-}
-
-.info-badge-text {
-  font-size: 13px;
-  color: #64748b;
-  font-weight: 600;
-  display: flex;
-  gap: 6px;
-}
-
-.info-badge-text strong {
-  color: #0f172a;
-}
-
-/* Уведомление */
-.info-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 16px;
-  padding: 14px 18px;
-  margin-bottom: 28px;
-  font-size: 14px;
-  color: #1e40af;
-  line-height: 1.5;
-}
-
-.info-banner-icon {
-  font-size: 18px;
-}
-
-/* Заголовки */
-.info-title {
-  font-size: 38px;
-  font-weight: 900;
-  color: #0f172a;
-  margin: 0 0 12px 0;
-  letter-spacing: -0.8px;
-}
-
-.info-subtitle {
-  font-size: 16px;
-  color: #475569;
-  line-height: 1.6;
-  max-width: 800px;
-  margin: 0 0 36px 0;
-}
-
-/* Сетка инфо-карточек */
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  margin-bottom: 36px;
-}
-
-.info-card {
-  background: #ffffff;
-  border-radius: 20px;
-  padding: 24px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
-}
-
-.info-card-icon {
-  font-size: 32px;
-  margin-bottom: 12px;
-}
-
-.info-card h3 {
-  font-size: 18px;
-  font-weight: 800;
-  color: #0f172a;
-  margin: 0 0 10px 0;
-}
-
-.info-card p {
-  font-size: 14px;
-  color: #475569;
-  line-height: 1.5;
-  margin: 0;
-}
-
-/* Сетка ссылок-действий */
-.info-actions {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-}
-
-.info-action-btn {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 20px 24px;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: all 0.25s ease;
-}
-
-.info-action-btn:hover {
-  background: #ffffff;
-  border-color: #0ea5e9;
-  transform: translateY(-3px);
-  box-shadow: 0 12px 24px rgba(14, 165, 233, 0.1);
-}
-
-.info-action-title {
-  font-size: 16px;
-  font-weight: 800;
-  color: #0f172a;
-  margin-bottom: 4px;
-}
-
-.info-action-sub {
-  font-size: 12px;
-  color: #64748b;
-  font-weight: 600;
-}
-
-.info-action-arrow {
-  font-size: 20px;
-  color: #0ea5e9;
-  font-weight: 700;
-  transition: transform 0.2s ease;
-}
-
-.info-action-btn:hover .info-action-arrow {
-  transform: translateX(4px);
-}
-
-/* Фильтры (Чипы) */
-.filter-section {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.filter-label {
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #94a3b8;
-  min-width: 90px;
-}
-
-.filter-chips {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.chip-main {
-  padding: 10px 20px;
-  border-radius: 14px;
-  background: #f1f5f9;
-  color: #334155;
-  font-size: 14px;
-  font-weight: 700;
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.chip-main:hover {
-  background: #e2e8f0;
-}
-
-.chip-main.active {
-  color: #ffffff;
-  border-color: transparent;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-}
-
-.chip-sub {
-  padding: 8px 16px;
-  border-radius: 12px;
-  background: transparent;
-  color: #64748b;
-  font-size: 13px;
-  font-weight: 600;
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.chip-sub:hover {
-  background: #f8fafc;
-  color: #1e293b;
-}
-
-.chip-sub.active {
-  font-weight: 800;
-}
-
-/* Сетка материалов */
-.materials-container {
-  margin-top: 32px;
-  padding-top: 32px;
-  border-top: 1px solid #f1f5f9;
-}
-
-.materials-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 20px;
-}
-
-.mat-card {
-  background: #ffffff;
-  border-radius: 20px;
-  border: 1px solid #e2e8f0;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
-  transition: all 0.25s ease;
-  display: flex;
-  flex-direction: column;
-}
-
-.mat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
-  border-color: #cbd5e1;
-}
-
-.mat-cover {
-  width: 100%;
-  height: 180px;
-  background: #f8fafc;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.mat-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.mat-cover-placeholder {
-  font-size: 48px;
-  opacity: 0.3;
-}
-
-.mat-price {
-  position: absolute;
-  bottom: 12px;
-  right: 12px;
-  background: #0f172a;
-  color: #ffffff;
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-weight: 800;
-  font-size: 13px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.mat-body {
-  padding: 16px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.mat-title {
-  font-weight: 800;
-  font-size: 15px;
-  color: #0f172a;
-  margin-bottom: 6px;
-  line-height: 1.3;
-}
-
-.mat-desc {
-  font-size: 12px;
-  font-weight: 500;
-  color: #64748b;
-  margin-top: auto;
-  line-height: 1.4;
-}
-
-/* Пустое состояние */
-.empty-state {
-  text-align: center;
-  padding: 50px 20px;
-  background: #f8fafc;
-  border-radius: 24px;
-  border: 2px dashed #cbd5e1;
-}
-
-.empty-state-icon {
-  font-size: 44px;
-  display: block;
-  margin-bottom: 12px;
-}
-
-.empty-state h3 {
-  font-size: 18px;
-  font-weight: 800;
-  color: #0f172a;
-  margin: 0 0 6px 0;
-}
-
-.empty-state p {
-  color: #64748b;
-  font-size: 14px;
-  margin: 0;
-}
-
-/* Двухколоночный блок снизу */
-.info-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  margin-top: 40px;
-}
-
-.info-box {
-  background: #f8fafc;
-  border-radius: 24px;
-  padding: 28px;
-  border: 1px solid #e2e8f0;
-}
-
-.info-box-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.info-box-head h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.info-box-pill {
-  font-size: 11px;
-  font-weight: 800;
-  padding: 4px 10px;
-  border-radius: 8px;
-  text-transform: uppercase;
-  background: #e2e8f0;
-  color: #475569;
-}
-
-.info-box-desc {
-  font-size: 13px;
-  color: #475569;
-  line-height: 1.5;
-  margin: 0 0 16px 0;
-}
-
-/* Шаги */
-.steps {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.step {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.step-num {
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 13px;
-  flex-shrink: 0;
-}
-
-.step-text {
-  font-size: 14px;
-  color: #334155;
-  line-height: 1.45;
-}
-
-/* Таблица уровней */
-.class-table {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.class-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid #f1f5f9;
-}
-
-.c-age {
-  font-weight: 800;
-  font-size: 13px;
-  color: #0f172a;
-}
-
-.c-val {
-  font-size: 13px;
-  font-weight: 600;
-  color: #64748b;
-}
-
-/* ==================== Документы (ссылки-карточки) ==================== */
-
-/* Делаем карточки-ссылки в разделе документов */
-a.info-card {
-  text-decoration: none;
-  color: inherit;
-  display: block;
-  transition: all 0.25s ease;
-  cursor: pointer;
-}
-
-a.info-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
-  border-color: #0ea5e9;
-}
-
-/* Сетка документов: 4 колонки */
-.info-grid.docs-grid {
-  grid-template-columns: repeat(4, 1fr);
-}
-
-/* ==================== Адаптивная верстка ==================== */
-
-@media (max-width: 900px) {
-  .info-grid,
-  .info-actions,
-  .info-split,
-  .info-grid.docs-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 600px) {
-  .info-wrap {
-    padding: 16px;
-  }
-
-  .info-main-card {
-    padding: 24px 20px;
-    border-radius: 24px;
-  }
-
-  .info-title {
-    font-size: 28px;
-  }
-
-  .info-subtitle {
-    font-size: 14px;
-  }
-
-  .class-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-}
-</file>
-
 <file path="app/info/page.tsx">
 import Link from "next/link";
 import "./info.css";
@@ -56959,104 +57064,6 @@ body.portal-tour-active [data-tour="direction-card"] {
 }
 </file>
 
-<file path="app/info/pricing/page.tsx">
-import { createClient } from "@supabase/supabase-js";
-import PricingClient from "./PricingClient";
-
-type SP = { source?: string; sourceId?: string };
-
-function lastDayOfCurrentMonthUTC(): Date {
-  const now = new Date();
-  const y = now.getUTCFullYear();
-  const m = now.getUTCMonth();
-  return new Date(Date.UTC(y, m + 1, 0, 12, 0, 0));
-}
-
-function formatRuDate(d: Date) {
-  return new Intl.DateTimeFormat("ru-RU", { year: "numeric", month: "long", day: "2-digit" }).format(d);
-}
-
-export const metadata = {
-  title: "Каталог материалов и прайс",
-  description: "Доступные учебники, кроссворды и тестирования по направлениям.",
-};
-
-export const revalidate = 0;
-
-export default async function PricingPage({
-  searchParams,
-}: {
-  searchParams?: Promise<SP>;
-}) {
-  const sp = (await searchParams) ?? {};
-
-  // Админский клиент Supabase для безошибочного получения публичного каталога на сервере
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  // 1. Активные проекты
-  const { data: projectsData } = await supabaseAdmin
-    .from("projects")
-    .select("id, name, slug, theme_color, theme")
-    .eq("is_active", true)
-    .order("order_index", { ascending: true });
-
-  const projects = projectsData || [];
-  const projectIds = projects.map((p) => p.id);
-
-  let tabs: any[] = [];
-  let materials: any[] = [];
-
-  if (projectIds.length > 0) {
-    // 2. Активные табы
-    const { data: tabsData } = await supabaseAdmin
-      .from("project_tabs")
-      .select("id, project_id, title, icon")
-      .in("project_id", projectIds)
-      .eq("is_active", true)
-      .order("order_index", { ascending: true });
-
-    tabs = tabsData || [];
-    const tabIds = tabs.map((t) => t.id);
-
-    if (tabIds.length > 0) {
-      // 3. Активные материалы по project_tab_id
-      const { data: matsData } = await supabaseAdmin
-        .from("materials")
-        .select("id, project_tab_id, title, description, cover_image_url, price, is_active, is_secret")
-        .eq("is_active", true)
-        .in("project_tab_id", tabIds);
-
-      const tabToProjectMap = new Map<string, string>();
-      tabs.forEach((t) => tabToProjectMap.set(t.id, t.project_id));
-
-      materials = (matsData || [])
-        .filter((m: any) => !m.is_secret)
-        .map((m: any) => ({
-          ...m,
-          project_id: tabToProjectMap.get(m.project_tab_id) || null,
-          tab_id: m.project_tab_id,
-        }));
-    }
-  }
-
-  const stamp = formatRuDate(lastDayOfCurrentMonthUTC());
-
-  return (
-    <PricingClient
-      projects={projects}
-      tabs={tabs}
-      materials={materials}
-      lastUpdateDate={stamp}
-      source={sp.source}
-      sourceId={sp.sourceId}
-    />
-  );
-}
-</file>
-
 <file path="components/rewards/MaterialChoiceModal.tsx">
 "use client";
 
@@ -57846,231 +57853,6 @@ export default function ReferralTimeline({ link, stats, track, onClaimMilestone 
             </div>
           );
         })}
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="components/rewards/RewardUnboxModal.tsx">
-"use client";
-
-import React from "react";
-import type { RewardType, RewardMeta } from "@/lib/rewards/types";
-import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
-
-export interface UnboxedRewardItem {
-  id: string;
-  title: string;
-  type: RewardType | string;
-  description?: string | null;
-  asset_url?: string | null;
-  link_url?: string | null; // Поддержка скрытых ссылок
-  meta?: RewardMeta;
-}
-
-interface RewardUnboxModalProps {
-  isOpen: boolean;
-  items: UnboxedRewardItem[];
-  onClose: () => void;
-}
-
-export default function RewardUnboxModal({
-  isOpen,
-  items,
-  onClose,
-}: RewardUnboxModalProps) {
-  const [currentIndex, setCurrentIndex] = React.useState(0);
-  const visible = isOpen && items && items.length > 0;
-  useBodyScrollLock(visible);
-
-  if (!visible) return null;
-
-  const currentItem = items[currentIndex] || items[0];
-  const isLast = currentIndex >= items.length - 1;
-
-  const handleNext = () => {
-    if (isLast) {
-      setCurrentIndex(0);
-      onClose();
-    } else {
-      setCurrentIndex((prev) => prev + 1);
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case "hat":
-        return "Головной убор";
-      case "aura":
-        return "Аура маскота";
-      case "emotion":
-        return "Эмоция маскота";
-      case "base":
-        return "База маскота";
-      case "title":
-        return "Титул профиля";
-      case "material":
-      case "textbook":
-        return "Учебный материал";
-      case "crossword":
-        return "Кроссворд";
-      default:
-        return "Награда";
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden overscroll-none animate-in fade-in duration-200"
-      style={{ backgroundColor: "rgba(0, 0, 0, 0.82)" }}
-    >
-      <div
-        className="rounded-t-[32px] sm:rounded-[32px] max-w-md w-full p-6 sm:p-8 text-center space-y-6 shadow-2xl relative overflow-hidden border transition-all"
-        style={{
-          backgroundColor: "var(--project-card-bg, #ffffff)",
-          color: "var(--project-text, #0f172a)",
-          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
-          boxShadow: "var(--glass-shadow, 0 20px 50px rgba(0,0,0,0.3))",
-        }}
-      >
-        {/* Мобильный индикатор перетаскивания */}
-        <div 
-          className="w-10 h-1 rounded-full mx-auto sm:hidden -mt-2 mb-2" 
-          style={{ backgroundColor: "color-mix(in srgb, var(--project-text) 20%, transparent)" }}
-        />
-
-        {/* Фоновый размытый блик темы */}
-        <div
-          className="absolute -top-16 -left-16 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-25"
-          style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
-        />
-        <div
-          className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-25"
-          style={{ backgroundColor: "var(--project-secondary, #38bdf8)" }}
-        />
-
-        {/* Шапка шагов */}
-        <div 
-          className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-60"
-          style={{ color: "var(--project-text)" }}
-        >
-          <span>Новая награда</span>
-          {items.length > 1 && (
-            <span>
-              {currentIndex + 1} из {items.length}
-            </span>
-          )}
-        </div>
-
-        {/* Карточка самой награды */}
-        <div
-          className="p-6 rounded-2xl border flex flex-col items-center justify-center space-y-4"
-          style={{
-            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
-            borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
-          }}
-        >
-          <span
-            className="text-[11px] font-black px-3.5 py-1 rounded-full border uppercase tracking-wider"
-            style={{
-              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
-              color: "var(--project-primary, #0ea5e9)",
-              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
-            }}
-          >
-            {getTypeLabel(currentItem.type)}
-          </span>
-
-          {/* Титул или Изображение */}
-          {currentItem.type === "title" ? (
-            <div className="py-4">
-              <span
-                className="font-black text-base sm:text-lg px-5 py-2 rounded-2xl border inline-block shadow-sm uppercase tracking-wider"
-                style={{
-                  borderColor: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
-                  color: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
-                  backgroundColor: `${currentItem.meta?.color || "var(--project-primary, #0ea5e9)"}18`,
-                }}
-              >
-                «{currentItem.title}»
-              </span>
-            </div>
-          ) : currentItem.asset_url ? (
-            <div className="w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center py-2">
-              <img
-                src={currentItem.asset_url}
-                alt={currentItem.title}
-                className="max-h-full max-w-full object-contain filter drop-shadow-md"
-              />
-            </div>
-          ) : (
-            <div 
-              className="py-4 font-black text-xs uppercase tracking-widest opacity-40"
-              style={{ color: "var(--project-text)" }}
-            >
-              Разблокировано
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <h3 className="text-lg sm:text-xl font-black" style={{ color: "var(--project-text)" }}>
-              {currentItem.title}
-            </h3>
-            {currentItem.description && (
-              <p 
-                className="text-xs font-medium opacity-70 leading-relaxed"
-                style={{ color: "var(--project-text)" }}
-              >
-                {currentItem.description}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Кнопки действия */}
-        <div className="space-y-3 w-full">
-          {currentItem.link_url && (
-            <a
-              href={currentItem.link_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center w-full py-4 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105 active:scale-[0.99]"
-              style={{
-                backgroundColor: "var(--project-primary, #0ea5e9)",
-                boxShadow: "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
-              }}
-            >
-              Перейти по ссылке
-            </a>
-          )}
-          <button
-            type="button"
-            onClick={handleNext}
-            className={`w-full py-4 font-black text-xs uppercase tracking-wider rounded-2xl transition-all ${
-              currentItem.link_url
-                ? "shadow-sm hover:brightness-95"
-                : "text-white shadow-lg hover:brightness-105 active:scale-[0.99]"
-            }`}
-            style={{
-              backgroundColor: currentItem.link_url
-                ? "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)"
-                : "var(--project-primary, #0ea5e9)",
-              boxShadow: currentItem.link_url
-                ? "none"
-                : "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
-              color: currentItem.link_url ? "inherit" : "#ffffff",
-            }}
-          >
-            {currentItem.link_url && !isLast
-              ? "Далее"
-              : currentItem.link_url && isLast
-              ? "Закрыть"
-              : isLast
-              ? "Забрать награду"
-              : "Далее"}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -62996,6 +62778,231 @@ export default function ReferralTab() {
 }
 </file>
 
+<file path="components/rewards/RewardUnboxModal.tsx">
+"use client";
+
+import React from "react";
+import type { RewardType, RewardMeta } from "@/lib/rewards/types";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+
+export interface UnboxedRewardItem {
+  id: string;
+  title: string;
+  type: RewardType | string;
+  description?: string | null;
+  asset_url?: string | null;
+  link_url?: string | null; // Поддержка скрытых ссылок
+  meta?: RewardMeta;
+}
+
+interface RewardUnboxModalProps {
+  isOpen: boolean;
+  items: UnboxedRewardItem[];
+  onClose: () => void;
+}
+
+export default function RewardUnboxModal({
+  isOpen,
+  items,
+  onClose,
+}: RewardUnboxModalProps) {
+  const [currentIndex, setCurrentIndex] = React.useState(0);
+  const visible = isOpen && items && items.length > 0;
+  useBodyScrollLock(visible);
+
+  if (!visible) return null;
+
+  const currentItem = items[currentIndex] || items[0];
+  const isLast = currentIndex >= items.length - 1;
+
+  const handleNext = () => {
+    if (isLast) {
+      setCurrentIndex(0);
+      onClose(); // Закрываем и передаем эстафету родительскому компоненту (для обновления стейта или показа физического приза)
+    } else {
+      setCurrentIndex((prev) => prev + 1);
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case "hat":
+        return "Головной убор";
+      case "aura":
+        return "Аура маскота";
+      case "emotion":
+        return "Эмоция маскота";
+      case "base":
+        return "Скин маскота"; // Синхронизировано с новым неймингом гардероба
+      case "title":
+        return "Титул профиля";
+      case "material":
+      case "textbook":
+        return "Учебный материал";
+      case "crossword":
+        return "Кроссворд";
+      default:
+        return "Награда";
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden overscroll-none animate-in fade-in duration-200"
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.82)" }}
+    >
+      <div
+        className="rounded-t-[32px] sm:rounded-[32px] max-w-md w-full p-6 sm:p-8 text-center space-y-6 shadow-2xl relative overflow-hidden border transition-all"
+        style={{
+          backgroundColor: "var(--project-card-bg, #ffffff)",
+          color: "var(--project-text, #0f172a)",
+          borderColor: "var(--glass-border, rgba(15, 23, 42, 0.12))",
+          boxShadow: "var(--glass-shadow, 0 20px 50px rgba(0,0,0,0.3))",
+        }}
+      >
+        {/* Мобильный индикатор перетаскивания */}
+        <div 
+          className="w-10 h-1 rounded-full mx-auto sm:hidden -mt-2 mb-2" 
+          style={{ backgroundColor: "color-mix(in srgb, var(--project-text) 20%, transparent)" }}
+        />
+
+        {/* Фоновый размытый блик темы */}
+        <div
+          className="absolute -top-16 -left-16 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-25"
+          style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
+        />
+        <div
+          className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-25"
+          style={{ backgroundColor: "var(--project-secondary, #38bdf8)" }}
+        />
+
+        {/* Шапка шагов */}
+        <div 
+          className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-60"
+          style={{ color: "var(--project-text)" }}
+        >
+          <span>Новая награда</span>
+          {items.length > 1 && (
+            <span>
+              {currentIndex + 1} из {items.length}
+            </span>
+          )}
+        </div>
+
+        {/* Карточка самой награды */}
+        <div
+          className="p-6 rounded-2xl border flex flex-col items-center justify-center space-y-4"
+          style={{
+            backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent)",
+            borderColor: "var(--glass-border, rgba(15, 23, 42, 0.1))",
+          }}
+        >
+          <span
+            className="text-[11px] font-black px-3.5 py-1 rounded-full border uppercase tracking-wider"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 12%, transparent)",
+              color: "var(--project-primary, #0ea5e9)",
+              borderColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 25%, transparent)",
+            }}
+          >
+            {getTypeLabel(currentItem.type)}
+          </span>
+
+          {/* Титул или Изображение */}
+          {currentItem.type === "title" ? (
+            <div className="py-4">
+              <span
+                className="font-black text-base sm:text-lg px-5 py-2 rounded-2xl border inline-block shadow-sm uppercase tracking-wider"
+                style={{
+                  borderColor: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
+                  color: currentItem.meta?.color || "var(--project-primary, #0ea5e9)",
+                  backgroundColor: `${currentItem.meta?.color || "var(--project-primary, #0ea5e9)"}18`,
+                }}
+              >
+                «{currentItem.title}»
+              </span>
+            </div>
+          ) : currentItem.asset_url ? (
+            <div className="w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center py-2">
+              <img
+                src={currentItem.asset_url}
+                alt={currentItem.title}
+                className="max-h-full max-w-full object-contain filter drop-shadow-md"
+              />
+            </div>
+          ) : (
+            <div 
+              className="py-4 font-black text-xs uppercase tracking-widest opacity-40"
+              style={{ color: "var(--project-text)" }}
+            >
+              Разблокировано
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <h3 className="text-lg sm:text-xl font-black" style={{ color: "var(--project-text)" }}>
+              {currentItem.title}
+            </h3>
+            {currentItem.description && (
+              <p 
+                className="text-xs font-medium opacity-70 leading-relaxed"
+                style={{ color: "var(--project-text)" }}
+              >
+                {currentItem.description}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Кнопки действия */}
+        <div className="space-y-3 w-full">
+          {currentItem.link_url && (
+            <a
+              href={currentItem.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-full py-4 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:brightness-105 active:scale-[0.99]"
+              style={{
+                backgroundColor: "var(--project-primary, #0ea5e9)",
+                boxShadow: "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
+              }}
+            >
+              Перейти по ссылке
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={handleNext}
+            className={`w-full py-4 font-black text-xs uppercase tracking-wider rounded-2xl transition-all ${
+              currentItem.link_url
+                ? "shadow-sm hover:brightness-95"
+                : "text-white shadow-lg hover:brightness-105 active:scale-[0.99]"
+            }`}
+            style={{
+              backgroundColor: currentItem.link_url
+                ? "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)"
+                : "var(--project-primary, #0ea5e9)",
+              boxShadow: currentItem.link_url
+                ? "none"
+                : "0 10px 25px -4px color-mix(in srgb, var(--project-primary, #0ea5e9) 40%, transparent)",
+              color: currentItem.link_url ? "inherit" : "#ffffff",
+            }}
+          >
+            {currentItem.link_url && !isLast
+              ? "Далее"
+              : currentItem.link_url && isLast
+              ? "Закрыть"
+              : isLast
+              ? "Забрать награду"
+              : "Далее"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="components/AppHeader.tsx">
 "use client";
 
@@ -64112,6 +64119,150 @@ export function consumeTourMobileMenuPrimed(): boolean {
 }
 </file>
 
+<file path="components/portal/PortalCard.tsx">
+"use client";
+
+import Link from "next/link";
+import type { ProjectConfig } from "@/app/(app)/portal/PortalClient";
+import { useTour } from "@/components/tour/TourProvider";
+
+type PortalCardProps = {
+  project: ProjectConfig;
+  index: number;
+  compact?: boolean;
+  /** Мобильная «пилюля» — горизонтальная карточка в вертикальном списке */
+  pill?: boolean;
+};
+
+export default function PortalCard({ project, index, compact = false, pill = false }: PortalCardProps) {
+  const { stage, advanceTour } = useTour();
+  const pColor = project.theme?.primaryColor || "#3b82f6";
+  const isLight = index % 2 === 0;
+
+  const handleClick = () => {
+    if (stage === "direction_gate") {
+      advanceTour("profile_stats");
+    }
+  };
+
+  if (pill) {
+    return (
+      <Link
+        href={`/projects/${project.slug}`}
+        onClick={handleClick}
+        data-tour="direction-card"
+        className="group relative flex items-center gap-3.5 w-full px-4 py-4 min-h-[84px] rounded-[22px] border transition-all duration-300 active:scale-[0.98] overflow-hidden"
+        style={{
+          background: `linear-gradient(135deg, color-mix(in srgb, ${pColor} 18%, #0f172a) 0%, color-mix(in srgb, ${pColor} 8%, #0b0f19) 100%)`,
+          borderColor: `color-mix(in srgb, ${pColor} 35%, transparent)`,
+          boxShadow: `0 8px 24px -8px color-mix(in srgb, ${pColor} 45%, transparent)`,
+        }}
+      >
+        <div
+          className="w-3 h-3 rounded-full shrink-0 ring-2 ring-white/20"
+          style={{ backgroundColor: pColor }}
+        />
+        <div className="flex-1 min-w-0 text-left py-0.5">
+          <div className="text-[16px] font-black text-white leading-snug line-clamp-2">
+            {project.name}
+          </div>
+          {project.description ? (
+            <div className="text-[12px] text-white/60 font-medium leading-snug line-clamp-2 mt-1">
+              {project.description}
+            </div>
+          ) : null}
+        </div>
+        <div
+          data-tour="portal-card-cta"
+          className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
+          style={{
+            background: `linear-gradient(135deg, ${pColor}, color-mix(in srgb, ${pColor} 70%, #000))`,
+          }}
+        >
+          →
+        </div>
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      href={`/projects/${project.slug}`}
+      onClick={handleClick}
+      data-tour="direction-card"
+      className={`group relative flex flex-col overflow-hidden transition-all duration-500 ${
+        compact
+          ? "min-h-0 p-5 rounded-[28px] hover:shadow-xl"
+          : "p-7 sm:p-8 rounded-[32px] hover:-translate-y-2 hover:shadow-2xl"
+      } ${
+        isLight
+          ? "bg-gradient-to-br from-white/95 to-[#e0f2fe]/95 shadow-[0_0_40px_rgba(255,255,255,0.1)] border border-white/60"
+          : "bg-gradient-to-br from-[#1e1b4b]/95 to-[#0f172a]/95 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/10"
+      } backdrop-blur-xl`}
+    >
+      <div
+        className={`absolute rounded-full blur-[80px] opacity-40 group-hover:opacity-70 transition-opacity duration-700 pointer-events-none ${
+          compact ? "-top-20 -right-20 w-40 h-40" : "-top-32 -right-32 w-64 h-64"
+        }`}
+        style={{ backgroundColor: pColor }}
+      />
+
+      <div className="relative z-10 flex flex-col min-h-0">
+        <div className={compact ? "mb-3" : "mb-5"}>
+          <span
+            className={`inline-block rounded-full font-black uppercase tracking-[0.15em] border ${
+              compact ? "px-3 py-1 text-[9px]" : "px-4 py-1.5 text-[10px]"
+            } ${
+              isLight ? "bg-white/50 border-black/10 text-black/60" : "bg-black/40 border-white/10 text-white/60"
+            }`}
+          >
+            {project.slug}
+          </span>
+        </div>
+
+        <h2
+          className={`font-black tracking-tight leading-[1.05] ${
+            compact ? "text-[1.75rem] mb-3" : "text-3xl sm:text-4xl lg:text-[2.75rem] mb-4"
+          } ${isLight ? "text-[#0c4a6e]" : "text-white"}`}
+        >
+          {project.name}
+        </h2>
+
+        <p
+          className={`font-medium leading-relaxed ${
+            compact ? "text-xs line-clamp-2 max-w-none" : "text-sm md:text-[15px] max-w-sm line-clamp-4"
+          } ${isLight ? "text-slate-600" : "text-slate-300"}`}
+        >
+          {project.description || "Учебники, кроссворды, задания, прогресс и аналитика."}
+        </p>
+
+        <div className={`mt-6 ${compact ? "pt-2" : "pt-4"}`}>
+          <div
+            data-tour="portal-card-cta"
+            className={`inline-flex items-center gap-2 rounded-full font-bold text-white shadow-lg transition-transform group-hover:scale-105 ${
+              compact ? "px-4 py-2.5 text-sm" : "px-6 py-3 gap-3"
+            }`}
+            style={{
+              background: `linear-gradient(135deg, ${pColor}, ${pColor}dd)`,
+              boxShadow: `0 10px 30px ${pColor}40`,
+            }}
+          >
+            Перейти
+            <span
+              className={`bg-white/20 rounded-full flex items-center justify-center text-xs ${
+                compact ? "w-5 h-5" : "w-6 h-6"
+              }`}
+            >
+              →
+            </span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+</file>
+
 <file path="app/(app)/projects/[slug]/profile/profile.css">
 /* app/(app)/projects/[slug]/profile/profile.css */
 
@@ -64209,6 +64360,8 @@ export function consumeTourMobileMenuPrimed(): boolean {
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left;
+  display: flex;
+  align-items: center;
 }
 
 .brand-interactive:hover, .brand-interactive.open {
@@ -64667,6 +64820,23 @@ export function consumeTourMobileMenuPrimed(): boolean {
 
 
 /* ==========================================================================
+   🛠 Управление Свитчером Проектов (ПК / Мобилка)
+   ========================================================================== */
+.mobile-only-switcher {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  .profile-topbar .brand-switcher-wrapper {
+    flex: 0 1 auto !important;
+  }
+  .profile-topbar .brand-interactive {
+    width: auto !important;
+    padding: 6px 16px 6px 6px !important;
+  }
+}
+
+/* ==========================================================================
    📱 МОБИЛЬНАЯ АДАПТАЦИЯ (<= 768px)
    ========================================================================== */
 @media (max-width: 768px) {
@@ -64705,6 +64875,52 @@ export function consumeTourMobileMenuPrimed(): boolean {
   .profile-grid {
     grid-template-columns: 1fr;
     gap: 16px;
+  }
+
+  /* --- 0. Панель быстрого переключения проекта (только мобилка) --- */
+  .mobile-only-switcher {
+    display: block;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 40;
+  }
+
+  .mobile-only-switcher .brand-interactive {
+    background: color-mix(in srgb, var(--project-primary) 12%, var(--project-card-bg));
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    padding: 10px 16px 10px 10px !important;
+    border-radius: 18px;
+  }
+
+  .mobile-only-switcher .brand-interactive:active {
+    transform: scale(0.97);
+    background: color-mix(in srgb, var(--project-primary) 18%, var(--project-card-bg));
+  }
+
+  .mobile-only-switcher .project-switcher-menu {
+    width: 100%;
+    top: calc(100% + 8px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  }
+
+  .mobile-only-switcher .brand-mark {
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
+    border-radius: 12px;
+  }
+
+  .mobile-only-switcher .brand-title {
+    font-size: 16px;
+  }
+
+  .mobile-only-switcher .brand-subtitle {
+    font-size: 11px;
+  }
+
+  .mobile-only-switcher .switcher-chevron {
+    color: var(--project-primary);
   }
 
   /* --- 1. Мобильная компактная шапка --- */
@@ -64821,6 +65037,12 @@ export function consumeTourMobileMenuPrimed(): boolean {
     place-items: center;
     cursor: pointer;
     flex-shrink: 0;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+
+  .mobile-burger-btn:active {
+    transform: scale(0.95);
+    background: color-mix(in srgb, var(--project-text) 12%, transparent);
   }
 
   /* --- 2. Компактная статистика --- */
@@ -64895,6 +65117,10 @@ export function consumeTourMobileMenuPrimed(): boolean {
     box-sizing: border-box;
   }
 
+  .progress-row:active {
+    transform: scale(0.98);
+  }
+
   .progress-left {
     width: 100%;
   }
@@ -64918,6 +65144,10 @@ export function consumeTourMobileMenuPrimed(): boolean {
     margin-right: 0 !important;
     padding: 18px 16px !important;
     gap: 12px !important;
+  }
+
+  .referral-promo-banner:active {
+    transform: scale(0.98) !important;
   }
 
   .referral-promo-banner > div:first-child {
@@ -65009,11 +65239,21 @@ export function consumeTourMobileMenuPrimed(): boolean {
     border: none;
     text-align: left;
     cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+  }
+
+  .sheet-item:active {
+    transform: scale(0.98);
+    background: color-mix(in srgb, var(--project-text) 8%, transparent);
   }
 
   .sheet-item--danger {
     color: #ef4444;
     background: color-mix(in srgb, #ef4444 8%, transparent);
+  }
+
+  .sheet-item--danger:active {
+    background: color-mix(in srgb, #ef4444 14%, transparent);
   }
 
   @keyframes fadeIn {
@@ -65034,150 +65274,6 @@ body.tour-sheet-active .mobile-bottom-sheet-overlay {
 
 body.tour-sheet-active .mobile-bottom-sheet {
   z-index: 10005 !important;
-}
-</file>
-
-<file path="components/portal/PortalCard.tsx">
-"use client";
-
-import Link from "next/link";
-import type { ProjectConfig } from "@/app/(app)/portal/PortalClient";
-import { useTour } from "@/components/tour/TourProvider";
-
-type PortalCardProps = {
-  project: ProjectConfig;
-  index: number;
-  compact?: boolean;
-  /** Мобильная «пилюля» — горизонтальная карточка в вертикальном списке */
-  pill?: boolean;
-};
-
-export default function PortalCard({ project, index, compact = false, pill = false }: PortalCardProps) {
-  const { stage, advanceTour } = useTour();
-  const pColor = project.theme?.primaryColor || "#3b82f6";
-  const isLight = index % 2 === 0;
-
-  const handleClick = () => {
-    if (stage === "direction_gate") {
-      advanceTour("profile_stats");
-    }
-  };
-
-  if (pill) {
-    return (
-      <Link
-        href={`/projects/${project.slug}`}
-        onClick={handleClick}
-        data-tour="direction-card"
-        className="group relative flex items-center gap-3.5 w-full px-4 py-4 min-h-[84px] rounded-[22px] border transition-all duration-300 active:scale-[0.98] overflow-hidden"
-        style={{
-          background: `linear-gradient(135deg, color-mix(in srgb, ${pColor} 18%, #0f172a) 0%, color-mix(in srgb, ${pColor} 8%, #0b0f19) 100%)`,
-          borderColor: `color-mix(in srgb, ${pColor} 35%, transparent)`,
-          boxShadow: `0 8px 24px -8px color-mix(in srgb, ${pColor} 45%, transparent)`,
-        }}
-      >
-        <div
-          className="w-3 h-3 rounded-full shrink-0 ring-2 ring-white/20"
-          style={{ backgroundColor: pColor }}
-        />
-        <div className="flex-1 min-w-0 text-left py-0.5">
-          <div className="text-[16px] font-black text-white leading-snug line-clamp-2">
-            {project.name}
-          </div>
-          {project.description ? (
-            <div className="text-[12px] text-white/60 font-medium leading-snug line-clamp-2 mt-1">
-              {project.description}
-            </div>
-          ) : null}
-        </div>
-        <div
-          data-tour="portal-card-cta"
-          className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
-          style={{
-            background: `linear-gradient(135deg, ${pColor}, color-mix(in srgb, ${pColor} 70%, #000))`,
-          }}
-        >
-          →
-        </div>
-      </Link>
-    );
-  }
-
-  return (
-    <Link
-      href={`/projects/${project.slug}`}
-      onClick={handleClick}
-      data-tour="direction-card"
-      className={`group relative flex flex-col overflow-hidden transition-all duration-500 ${
-        compact
-          ? "min-h-0 p-5 rounded-[28px] hover:shadow-xl"
-          : "p-7 sm:p-8 rounded-[32px] hover:-translate-y-2 hover:shadow-2xl"
-      } ${
-        isLight
-          ? "bg-gradient-to-br from-white/95 to-[#e0f2fe]/95 shadow-[0_0_40px_rgba(255,255,255,0.1)] border border-white/60"
-          : "bg-gradient-to-br from-[#1e1b4b]/95 to-[#0f172a]/95 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/10"
-      } backdrop-blur-xl`}
-    >
-      <div
-        className={`absolute rounded-full blur-[80px] opacity-40 group-hover:opacity-70 transition-opacity duration-700 pointer-events-none ${
-          compact ? "-top-20 -right-20 w-40 h-40" : "-top-32 -right-32 w-64 h-64"
-        }`}
-        style={{ backgroundColor: pColor }}
-      />
-
-      <div className="relative z-10 flex flex-col min-h-0">
-        <div className={compact ? "mb-3" : "mb-5"}>
-          <span
-            className={`inline-block rounded-full font-black uppercase tracking-[0.15em] border ${
-              compact ? "px-3 py-1 text-[9px]" : "px-4 py-1.5 text-[10px]"
-            } ${
-              isLight ? "bg-white/50 border-black/10 text-black/60" : "bg-black/40 border-white/10 text-white/60"
-            }`}
-          >
-            {project.slug}
-          </span>
-        </div>
-
-        <h2
-          className={`font-black tracking-tight leading-[1.05] ${
-            compact ? "text-[1.75rem] mb-3" : "text-3xl sm:text-4xl lg:text-[2.75rem] mb-4"
-          } ${isLight ? "text-[#0c4a6e]" : "text-white"}`}
-        >
-          {project.name}
-        </h2>
-
-        <p
-          className={`font-medium leading-relaxed ${
-            compact ? "text-xs line-clamp-2 max-w-none" : "text-sm md:text-[15px] max-w-sm line-clamp-4"
-          } ${isLight ? "text-slate-600" : "text-slate-300"}`}
-        >
-          {project.description || "Учебники, кроссворды, задания, прогресс и аналитика."}
-        </p>
-
-        <div className={`mt-6 ${compact ? "pt-2" : "pt-4"}`}>
-          <div
-            data-tour="portal-card-cta"
-            className={`inline-flex items-center gap-2 rounded-full font-bold text-white shadow-lg transition-transform group-hover:scale-105 ${
-              compact ? "px-4 py-2.5 text-sm" : "px-6 py-3 gap-3"
-            }`}
-            style={{
-              background: `linear-gradient(135deg, ${pColor}, ${pColor}dd)`,
-              boxShadow: `0 10px 30px ${pColor}40`,
-            }}
-          >
-            Перейти
-            <span
-              className={`bg-white/20 rounded-full flex items-center justify-center text-xs ${
-                compact ? "w-5 h-5" : "w-6 h-6"
-              }`}
-            >
-              →
-            </span>
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
 }
 </file>
 
@@ -66588,6 +66684,496 @@ export interface CustomTourStep extends Step {
 export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = BASE_TOUR_STEPS;
 </file>
 
+<file path="lib/tour/resolveTourSteps.ts">
+import type { TourStage } from "@/lib/tour/tourConfig";
+import { pickMascotImage } from "@/lib/tour/mascotImages";
+import {
+  visibleDemoMaterialCard,
+  visiblePortalDirections,
+  visibleTourTarget,
+  visibleMobileMenuTarget,
+} from "@/lib/tour/tourTargets";
+import type { CustomTourStep } from "@/components/tour/TourSteps";
+import { isMobileViewport, isMobileMenuGateStage } from "@/lib/tour/tourMobile";
+import { getPortalProjectCount } from "@/lib/tour/tourPortal";
+
+const burgerTarget = visibleTourTarget('[data-tour="mobile-burger-btn"]');
+
+const MOBILE_MENU_ITEM_SELECTOR: Partial<Record<TourStage, string>> = {
+  profile_requests_gate: '[data-tour="requests-link"]',
+  materials_gate: '[data-tour="materials-link"]',
+  materials_profile_gate: '[data-tour="profile-link"]',
+  rewards_gate: '[data-tour="rewards-btn"]',
+};
+
+function mobileMenuItemTarget(stage: TourStage) {
+  const selector = MOBILE_MENU_ITEM_SELECTOR[stage];
+  if (!selector) return visibleTourTarget('[data-tour="profile-link"]');
+  return visibleMobileMenuTarget(selector);
+}
+
+function withMobileMenuTarget(step: CustomTourStep, stage: TourStage): CustomTourStep {
+  return {
+    ...step,
+    target: mobileMenuItemTarget(stage),
+    requiresMobileMenu: true,
+    placement: "top",
+  };
+}
+
+type BurgerIntroKey = TourStage;
+
+function mobileBurgerIntro(stage: BurgerIntroKey): CustomTourStep {
+  const copy: Partial<Record<BurgerIntroKey, { title: string; content: string }>> = {
+    profile_requests_gate: {
+      title: "Меню профиля",
+      content: "Пункт «Заявки на покупку» находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
+    },
+    materials_gate: {
+      title: "Меню профиля",
+      content: "Раздел «Материалы» на телефоне находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
+    },
+    materials_profile_gate: {
+      title: "Меню материалов",
+      content: "Пункт «Профиль» на телефоне находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
+    },
+    rewards_gate: {
+      title: "Меню профиля",
+      content: "Раздел «Награды» на телефоне находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
+    },
+  };
+
+  const text = copy[stage] ?? {
+    title: "Меню",
+    content: "Нажмите ☰ в правом верхнем углу, чтобы открыть меню.",
+  };
+
+  return {
+    target: burgerTarget,
+    title: text.title,
+    content: text.content,
+    mascotImage: pickMascotImage(stage),
+    skipBeacon: true,
+    hideNextButton: true,
+    waitForBurgerClick: true,
+    blockTargetInteraction: false,
+    placement: "bottom",
+  };
+}
+
+/** Базовые шаги (desktop + fallback). */
+export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
+  portal_intro: [
+    {
+      target: "body",
+      placement: "center",
+      title: "Добро пожаловать",
+      content:
+        "На платформе несколько направлений обучения. У каждого свой контент, а профиль и награды общие.",
+      mascotImage: pickMascotImage("portal_intro"),
+      skipBeacon: true,
+      primaryLabel: "Далее",
+    },
+  ],
+  direction_gate: [
+    {
+      target: visiblePortalDirections,
+      title: "Выберите направление",
+      content: "Нажмите на любую карточку направления, чтобы продолжить.",
+      mascotImage: pickMascotImage("direction_gate"),
+      skipBeacon: true,
+      hideNextButton: true,
+      hideOverlay: true,
+      blockTargetInteraction: false,
+    },
+  ],
+  profile_stats: [
+    {
+      target: visibleTourTarget('[data-tour="profile-stats"]'),
+      title: "Профиль",
+      content:
+        "Здесь отображаются прогресс и награды по направлению. Далее откроем материалы и пройдем короткое демо-задание.",
+      mascotImage: pickMascotImage("profile_stats"),
+      skipBeacon: true,
+      primaryLabel: "Далее",
+    },
+  ],
+  materials_gate: [
+    {
+      target: visibleTourTarget('[data-tour="materials-link"]'),
+      title: "Раздел «Материалы»",
+      content: "Здесь учебники, задания и прогресс по направлению. Нажмите «Материалы», чтобы открыть раздел.",
+      mascotImage: pickMascotImage("materials_gate"),
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+    },
+  ],
+  materials_demo: [
+    {
+      target: visibleDemoMaterialCard,
+      title: "Демо-задание",
+      content:
+        "Откройте материал с пометкой «Демо». Остальные карточки сейчас недоступны - начните обучение именно с него.",
+      mascotImage: pickMascotImage("materials_demo"),
+      skipBeacon: true,
+      hideNextButton: true,
+      hideOverlay: true,
+      blockTargetInteraction: false,
+      fallbackTarget: "body" as const,
+      fallbackPlacement: "center" as const,
+      fallbackTitle: "Демо-задание",
+      fallbackContent:
+        "Найдите материал с пометкой «Демо» в списке и откройте его. Это короткое задание для знакомства с платформой.",
+    },
+  ],
+  demo_material: [
+    {
+      target: visibleTourTarget('[data-tour="demo-assignments-list"]', '[data-tour="demo-assignment-link"]'),
+      title: "Начните задание",
+      content:
+        "Выберите любое задание из демо-материала и пройдите его до конца. На время выполнения подсказки гайда будут скрыты.",
+      mascotImage: pickMascotImage("demo_material"),
+      skipBeacon: true,
+      hideNextButton: true,
+      hideOverlay: true,
+      blockTargetInteraction: false,
+    },
+  ],
+  streak_celebration: [
+    {
+      target: "body",
+      placement: "center",
+      title: "Серия засчитана",
+      content:
+        "Задание выполнено. Засчитался первый день серии. Серия начисляется за регулярные занятия — выполняйте задания и получайте награды.",
+      mascotImage: pickMascotImage("streak_celebration"),
+      skipBeacon: true,
+      primaryLabel: "Далее",
+    },
+  ],
+  assignment_return_gate: [
+    {
+      target: visibleTourTarget('[data-tour="assignment-back-btn"]'),
+      title: "Вернитесь к материалу",
+      content: "Нажмите «Назад к материалу», чтобы вернуться на страницу учебника.",
+      mascotImage: pickMascotImage("assignment_return_gate"),
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+      placement: "bottom",
+    },
+  ],
+  material_return_gate: [
+    {
+      target: visibleTourTarget('[data-tour="material-back-btn"]'),
+      title: "К списку материалов",
+      content: "Нажмите «Назад к материалам», чтобы вернуться в общий каталог.",
+      mascotImage: pickMascotImage("material_return_gate"),
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+      placement: "bottom",
+    },
+  ],
+  materials_profile_gate: [
+    {
+      target: visibleTourTarget('[data-tour="profile-link"]'),
+      title: "В профиль",
+      content: "Откройте профиль — там награды, серии и заявки на материалы.",
+      mascotImage: pickMascotImage("materials_profile_gate"),
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+    },
+  ],
+  rewards_gate: [
+    {
+      target: visibleTourTarget('[data-tour="rewards-btn"]'),
+      title: "Центр наград",
+      content:
+        "Здесь гардероб маскота, серии, реферальная программа и промокоды. Нажмите «Награды», чтобы открыть раздел.",
+      mascotImage: pickMascotImage("rewards_gate"),
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+    },
+  ],
+  rewards_tour: [
+    {
+      target: visibleTourTarget('[data-tour="wardrobe-tab"]'),
+      title: "Гардероб",
+      content: "Здесь меняется внешний вид маскота: фоны, ауры, титулы и предметы из инвентаря.",
+      mascotImage: pickMascotImage("rewards_wardrobe"),
+      skipBeacon: true,
+    },
+    {
+      target: visibleTourTarget('[data-tour="streaks-tab"]'),
+      title: "Серии",
+      content:
+        "Первый день серии уже засчитан. Продолжайте занятия, чтобы получать награды за серию.",
+      mascotImage: pickMascotImage("rewards_streaks"),
+      skipBeacon: true,
+    },
+    {
+      target: visibleTourTarget('[data-tour="referral-tab"]'),
+      title: "Реферальная программа",
+      content: "По персональной ссылке можно приглашать учеников и получать бонусы за каждого нового участника.",
+      mascotImage: pickMascotImage("rewards_referral"),
+      skipBeacon: true,
+    },
+    {
+      target: visibleTourTarget('[data-tour="promos-tab"]'),
+      title: "Промокоды",
+      content: "Здесь активируются промокоды на подарки и бонусные предметы.",
+      mascotImage: pickMascotImage("rewards_promos"),
+      skipBeacon: true,
+    },
+  ],
+  profile_requests_gate: [
+    {
+      target: visibleTourTarget('[data-tour="requests-link"]'),
+      title: "Заявки на покупку",
+      content:
+        "Если нужен доступ к новым материалам, оформите заявку. Нажмите «Заявки на покупку», чтобы посмотреть, как это работает.",
+      mascotImage: pickMascotImage("profile_requests_gate"),
+      skipBeacon: true,
+      hideNextButton: true,
+      blockTargetInteraction: false,
+    },
+  ],
+  requests_info: [
+    {
+      target: "body",
+      placement: "center",
+      title: "Как работают заявки",
+      content:
+        "Вы выбираете материалы, создаете заявку и получаете QR для оплаты. После проверки администратором доступ открывается автоматически.",
+      mascotImage: pickMascotImage("requests_info_text"),
+      skipBeacon: true,
+      primaryLabel: "Далее",
+    },
+    {
+      target: visibleTourTarget('[data-tour="requests-project-switcher"]'),
+      title: "Покупка для другого направления",
+      content:
+        "Профиль и цвета страницы остаются вашими. Здесь вы только выбираете, для какого направления открыть каталог материалов и оформить заявку — без возврата в портал.",
+      mascotImage: pickMascotImage("requests_info_projects"),
+      skipBeacon: true,
+      primaryLabel: "Далее",
+      placement: "bottom",
+      blockTargetInteraction: true,
+    },
+    {
+      target: visibleTourTarget('[data-tour="create-request-btn"]'),
+      title: "Создание заявки",
+      content:
+        "Новые заявки создаются здесь. Сейчас нажимать не обязательно — достаточно запомнить расположение кнопки.",
+      mascotImage: pickMascotImage("requests_info_btn"),
+      skipBeacon: true,
+      hideNextButton: false,
+      blockTargetInteraction: true,
+      primaryLabel: "Понятно",
+      placement: "top",
+    },
+  ],
+  tour_complete: [
+    {
+      target: "body",
+      placement: "center",
+      title: "Обучение завершено",
+      content:
+        "Краткий гайд по платформе пройден. Все разделы доступны в меню навигации. Повторить подсказки можно через пункт «Помощь по платформе».",
+      mascotImage: pickMascotImage("tour_complete"),
+      skipBeacon: true,
+      primaryLabel: "Готово",
+    },
+  ],
+};
+
+function withDemoMaterialFallback(steps: CustomTourStep[]): CustomTourStep[] {
+  return steps.map((step) => {
+    if (!step.fallbackTarget) return step;
+    const demoCard = visibleDemoMaterialCard();
+    if (demoCard) return step;
+
+    const { fallbackTarget, fallbackPlacement, fallbackTitle, fallbackContent, ...rest } = step;
+    return {
+      ...rest,
+      target: fallbackTarget,
+      placement: fallbackPlacement ?? "center",
+      title: fallbackTitle ?? step.title,
+      content: fallbackContent ?? step.content,
+      hideOverlay: true,
+    };
+  });
+}
+
+export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()): CustomTourStep[] {
+  const base = BASE_TOUR_STEPS[stage];
+  if (!base?.length) return [];
+
+  if (!isMobile) {
+    if (stage === "materials_demo") return withDemoMaterialFallback(base);
+    return base;
+  }
+
+  if (stage === "portal_intro") {
+    return [
+      {
+        ...base[0],
+        target: "body",
+        placement: "center",
+        skipScroll: true,
+        portalTheme: true,
+        portalMobileDock: true,
+        content:
+          "На платформе несколько направлений. Профиль и награды общие. Ниже выберите ветку, с которой начнете.",
+        primaryLabel: "Далее",
+      },
+    ];
+  }
+
+  if (stage === "direction_gate") {
+    const swipeStep: CustomTourStep = {
+      target: "body",
+      placement: "center",
+      title: "Список направлений",
+      content: "Прокрутите список и нажмите на нужное направление, чтобы открыть профиль ветки.",
+      mascotImage: pickMascotImage("direction_gate_swipe"),
+      skipBeacon: true,
+      skipScroll: true,
+      portalTheme: true,
+      portalMobileDock: true,
+      primaryLabel: "Понятно",
+      isPortalSwipeStep: true,
+    };
+
+    const cardStep: CustomTourStep = {
+      ...base[0],
+      target: visiblePortalDirections,
+      placement: "top",
+      skipScroll: true,
+      portalTheme: true,
+      portalMobileDock: true,
+      hideOverlay: true,
+      blockTargetInteraction: false,
+      content: "Нажмите на любое направление в списке.",
+    };
+
+    return [swipeStep, cardStep];
+  }
+
+  if (stage === "profile_stats") {
+    return [
+      {
+        ...base[0],
+        placement: "bottom",
+        content:
+          "Здесь прогресс и награды по направлению. Далее откроем материалы и пройдем короткое демо-задание.",
+        primaryLabel: "Далее",
+      },
+    ];
+  }
+
+  if (stage === "materials_demo") {
+    return withDemoMaterialFallback([
+      {
+        ...base[0],
+        placement: "top",
+        skipScroll: true,
+        hideOverlay: true,
+      },
+    ]);
+  }
+
+  if (stage === "demo_material") {
+    return [
+      {
+        ...base[0],
+        placement: "top",
+        skipScroll: true,
+        hideOverlay: true,
+      },
+    ];
+  }
+
+  if (stage === "streak_celebration" || stage === "tour_complete") {
+    return base.map((step) => ({
+      ...step,
+      placement: "center" as const,
+      skipScroll: true,
+    }));
+  }
+
+  if (stage === "assignment_return_gate" || stage === "material_return_gate") {
+    return base.map((step) => ({
+      ...step,
+      placement: "bottom" as const,
+      skipScroll: true,
+    }));
+  }
+
+  if (stage === "materials_profile_gate" && isMobile) {
+    return [mobileBurgerIntro(stage), withMobileMenuTarget(base[0], stage)];
+  }
+
+  if (stage === "requests_info") {
+    return [
+      {
+        ...base[0],
+        placement: "center",
+        skipScroll: true,
+        primaryLabel: "Далее",
+      },
+      {
+        ...base[1],
+        placement: "bottom",
+        skipScroll: true,
+        blockTargetInteraction: true,
+        primaryLabel: "Далее",
+      },
+      {
+        ...base[2],
+        placement: "top",
+        skipScroll: true,
+        blockTargetInteraction: true,
+        primaryLabel: "Понятно",
+      },
+    ];
+  }
+
+  if (isMobileMenuGateStage(stage) && base.length === 1) {
+    return [mobileBurgerIntro(stage), withMobileMenuTarget(base[0], stage)];
+  }
+
+  if (stage === "rewards_tour" && isMobile) {
+    const rewardTabs = ["wardrobe", "streaks", "referral", "promos"] as const;
+    return base.map((step, index) => ({
+      ...step,
+      target: "body",
+      placement: "center" as const,
+      skipScroll: true,
+      skipBeacon: true,
+      disableScrolling: true,
+      targetWaitTimeout: 8000,
+      rewardTab: rewardTabs[index] ?? "wardrobe",
+    }));
+  }
+
+  return base;
+}
+
+/** Финальные шаги с учётом DOM (кол-во направлений на портале). */
+export function getResolvedTourSteps(stage: TourStage, isMobile = isMobileViewport()): CustomTourStep[] {
+  let steps = resolveTourSteps(stage, isMobile);
+  if (stage === "direction_gate" && isMobile && getPortalProjectCount() <= 1) {
+    steps = steps.filter((s) => !s.isPortalSwipeStep);
+  }
+  return steps;
+}
+</file>
+
 <file path="components/rewards/RewardsModal.tsx">
 "use client";
 
@@ -66658,7 +67244,8 @@ export default function RewardsModal({
   });
   const [streakPath, setStreakPath] = useState<StreakConfigItem[]>([]);
 
-  const [wardrobeCategory, setWardrobeCategory] = useState<RewardType>("hat");
+  // 1. По умолчанию открываем "Скины"
+  const [wardrobeCategory, setWardrobeCategory] = useState<RewardType>("base");
 
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [promoError, setPromoError] = useState<string | null>(null);
@@ -66670,7 +67257,9 @@ export default function RewardsModal({
 
   const [unboxModalOpen, setUnboxModalOpen] = useState(false);
   const [unboxedItems, setUnboxedItems] = useState<UnboxedRewardItem[]>([]);
-  const [pendingUnboxItems, setPendingUnboxItems] = useState<UnboxedRewardItem[]>([]);
+  
+  // 2. Стейт для отложенного показа физического приза
+  const [pendingPhysicalPrize, setPendingPhysicalPrize] = useState<CustomPhysicalPrize | null>(null);
 
   const [materialChoiceState, setMaterialChoiceState] = useState<{
     isOpen: boolean;
@@ -66728,7 +67317,6 @@ export default function RewardsModal({
     });
   };
 
-  // Перехватываем сигналы от ProductTour для переключения вкладок
   useEffect(() => {
     const handleTourTab = (e: CustomEvent | Event) => {
       const mapped = mapTourTab(String((e as CustomEvent).detail ?? ""));
@@ -66766,12 +67354,13 @@ export default function RewardsModal({
     applyRewardsTab("wardrobe");
   }, [tourMode, showModal]);
 
-  const loadData = async () => {
-    setLoading(true);
+  // 3. Параметр silent и жёсткое отключение кэша
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [mascotRes, streaksRes] = await Promise.all([
-        fetch("/api/mascot"),
-        fetch("/api/streaks"),
+        fetch("/api/mascot", { cache: "no-store" }),
+        fetch("/api/streaks", { cache: "no-store" }),
       ]);
 
       if (mascotRes.ok) {
@@ -66795,7 +67384,7 @@ export default function RewardsModal({
       }
 
       try {
-        const promoHistoryRes = await fetch("/api/promocodes/history");
+        const promoHistoryRes = await fetch("/api/promocodes/history", { cache: "no-store" });
         if (promoHistoryRes.ok) {
           const promoHistoryData = await promoHistoryRes.json();
           setPromoHistory(promoHistoryData.history || []);
@@ -66806,7 +67395,7 @@ export default function RewardsModal({
     } catch (e) {
       console.error("Error loading rewards data:", e);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -66842,7 +67431,7 @@ export default function RewardsModal({
             {
               id: data.reward.id || String(dayNumber),
               title: data.reward.title || `Награда за День ${dayNumber}`,
-              type: data.reward.type || "hat",
+              type: data.reward.type || "base",
               description: data.reward.description || `Награда за ${dayNumber} дн. серии`,
               asset_url: data.reward.asset_url,
               meta: data.reward.meta,
@@ -66850,7 +67439,7 @@ export default function RewardsModal({
           ]);
           setUnboxModalOpen(true);
         }
-        await loadData();
+        await loadData(true); // silent обновление стейта
       } else {
         const err = await res.json();
         alert(err.error || "Ошибка получения награды");
@@ -66860,6 +67449,7 @@ export default function RewardsModal({
     }
   };
 
+  // 4. Логика очереди: сначала анбокс цифровых -> потом физический
   const processRedeemResult = (data: {
     physicalPrize?: CustomPhysicalPrize | null;
     grantedRewards?: any[];
@@ -66875,33 +67465,41 @@ export default function RewardsModal({
         }))
       : [];
 
-    if (data.physicalPrize) {
-      setPhysicalPrizeState({ isOpen: true, prize: data.physicalPrize });
-      setPendingUnboxItems(rewardItems);
-    } else if (rewardItems.length > 0) {
+    if (rewardItems.length > 0) {
       setUnboxedItems(rewardItems);
       setUnboxModalOpen(true);
+      // Если есть физический приз - кидаем в ожидание
+      if (data.physicalPrize) {
+        setPendingPhysicalPrize(data.physicalPrize);
+      }
+    } else if (data.physicalPrize) {
+      // Цифровых нет, сразу показываем физику
+      setPhysicalPrizeState({ isOpen: true, prize: data.physicalPrize });
     } else {
       setPromoSuccessMsg("Промокод успешно активирован!");
     }
 
-    void loadData();
+    void loadData(true);
   };
 
   const handleMaterialChoiceSuccess = (result: MaterialChoiceSuccessResult) => {
     setMaterialChoiceState((prev) => ({ ...prev, isOpen: false }));
 
-    if (result.physicalPrize) {
-      setPhysicalPrizeState({ isOpen: true, prize: result.physicalPrize });
-      setPendingUnboxItems(result.unboxItems as UnboxedRewardItem[]);
-    } else if (result.unboxItems.length > 0) {
-      setUnboxedItems(result.unboxItems as UnboxedRewardItem[]);
+    const rewardItems = result.unboxItems as UnboxedRewardItem[];
+
+    if (rewardItems.length > 0) {
+      setUnboxedItems(rewardItems);
       setUnboxModalOpen(true);
+      if (result.physicalPrize) {
+        setPendingPhysicalPrize(result.physicalPrize);
+      }
+    } else if (result.physicalPrize) {
+      setPhysicalPrizeState({ isOpen: true, prize: result.physicalPrize });
     } else {
       setPromoSuccessMsg("Материалы успешно разблокированы!");
     }
 
-    void loadData();
+    void loadData(true);
   };
 
   const handleRedeemPromo = async (e: React.FormEvent) => {
@@ -66943,14 +67541,7 @@ export default function RewardsModal({
 
   const closePhysicalPrizeModal = () => {
     setPhysicalPrizeState({ isOpen: false, prize: null });
-
-    if (pendingUnboxItems.length > 0) {
-      setUnboxedItems(pendingUnboxItems);
-      setPendingUnboxItems([]);
-      setUnboxModalOpen(true);
-    }
-
-    void loadData();
+    void loadData(true);
   };
 
   if (!showModal) return null;
@@ -67126,10 +67717,8 @@ export default function RewardsModal({
                         style={{ borderColor: "var(--glass-border, rgba(15,23,42,0.08))" }}
                       >
                         {[
-                          { type: "hat", label: "Шляпы" },
+                          { type: "base", label: "Скины" },
                           { type: "aura", label: "Ауры" },
-                          { type: "emotion", label: "Эмоции" },
-                          { type: "base", label: "Базы" },
                           { type: "title", label: "Титулы" },
                         ].map((cat) => (
                           <button
@@ -67643,6 +68232,7 @@ export default function RewardsModal({
         </div>
       )}
 
+      {/* 5. Флоу открытия модалок: сначала Unbox (цифровые), после него - PhysicalPrize */}
       {unboxModalOpen && (
         <RewardUnboxModal
           isOpen={unboxModalOpen}
@@ -67650,6 +68240,13 @@ export default function RewardsModal({
           onClose={() => {
             setUnboxModalOpen(false);
             setUnboxedItems([]);
+            // Если есть отложенный физический приз - показываем его сразу после закрытия анбокса
+            if (pendingPhysicalPrize) {
+              setTimeout(() => {
+                setPhysicalPrizeState({ isOpen: true, prize: pendingPhysicalPrize });
+                setPendingPhysicalPrize(null);
+              }, 300);
+            }
           }}
         />
       )}
@@ -67675,496 +68272,6 @@ export default function RewardsModal({
       )}
     </>
   );
-}
-</file>
-
-<file path="lib/tour/resolveTourSteps.ts">
-import type { TourStage } from "@/lib/tour/tourConfig";
-import { pickMascotImage } from "@/lib/tour/mascotImages";
-import {
-  visibleDemoMaterialCard,
-  visiblePortalDirections,
-  visibleTourTarget,
-  visibleMobileMenuTarget,
-} from "@/lib/tour/tourTargets";
-import type { CustomTourStep } from "@/components/tour/TourSteps";
-import { isMobileViewport, isMobileMenuGateStage } from "@/lib/tour/tourMobile";
-import { getPortalProjectCount } from "@/lib/tour/tourPortal";
-
-const burgerTarget = visibleTourTarget('[data-tour="mobile-burger-btn"]');
-
-const MOBILE_MENU_ITEM_SELECTOR: Partial<Record<TourStage, string>> = {
-  profile_requests_gate: '[data-tour="requests-link"]',
-  materials_gate: '[data-tour="materials-link"]',
-  materials_profile_gate: '[data-tour="profile-link"]',
-  rewards_gate: '[data-tour="rewards-btn"]',
-};
-
-function mobileMenuItemTarget(stage: TourStage) {
-  const selector = MOBILE_MENU_ITEM_SELECTOR[stage];
-  if (!selector) return visibleTourTarget('[data-tour="profile-link"]');
-  return visibleMobileMenuTarget(selector);
-}
-
-function withMobileMenuTarget(step: CustomTourStep, stage: TourStage): CustomTourStep {
-  return {
-    ...step,
-    target: mobileMenuItemTarget(stage),
-    requiresMobileMenu: true,
-    placement: "top",
-  };
-}
-
-type BurgerIntroKey = TourStage;
-
-function mobileBurgerIntro(stage: BurgerIntroKey): CustomTourStep {
-  const copy: Partial<Record<BurgerIntroKey, { title: string; content: string }>> = {
-    profile_requests_gate: {
-      title: "Меню профиля",
-      content: "Пункт «Заявки на покупку» находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
-    },
-    materials_gate: {
-      title: "Меню профиля",
-      content: "Раздел «Материалы» на телефоне находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
-    },
-    materials_profile_gate: {
-      title: "Меню материалов",
-      content: "Пункт «Профиль» на телефоне находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
-    },
-    rewards_gate: {
-      title: "Меню профиля",
-      content: "Раздел «Награды» на телефоне находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
-    },
-  };
-
-  const text = copy[stage] ?? {
-    title: "Меню",
-    content: "Нажмите ☰ в правом верхнем углу, чтобы открыть меню.",
-  };
-
-  return {
-    target: burgerTarget,
-    title: text.title,
-    content: text.content,
-    mascotImage: pickMascotImage(stage),
-    skipBeacon: true,
-    hideNextButton: true,
-    waitForBurgerClick: true,
-    blockTargetInteraction: false,
-    placement: "bottom",
-  };
-}
-
-/** Базовые шаги (desktop + fallback). */
-export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
-  portal_intro: [
-    {
-      target: "body",
-      placement: "center",
-      title: "Добро пожаловать",
-      content:
-        "На платформе несколько направлений обучения. У каждого свой контент, а профиль и награды общие.",
-      mascotImage: pickMascotImage("portal_intro"),
-      skipBeacon: true,
-      primaryLabel: "Далее",
-    },
-  ],
-  direction_gate: [
-    {
-      target: visiblePortalDirections,
-      title: "Выберите направление",
-      content: "Нажмите на любую карточку направления, чтобы продолжить.",
-      mascotImage: pickMascotImage("direction_gate"),
-      skipBeacon: true,
-      hideNextButton: true,
-      hideOverlay: true,
-      blockTargetInteraction: false,
-    },
-  ],
-  profile_stats: [
-    {
-      target: visibleTourTarget('[data-tour="profile-stats"]'),
-      title: "Профиль",
-      content:
-        "Здесь отображаются прогресс и награды по направлению. Далее откроем материалы и пройдем короткое демо-задание.",
-      mascotImage: pickMascotImage("profile_stats"),
-      skipBeacon: true,
-      primaryLabel: "Далее",
-    },
-  ],
-  materials_gate: [
-    {
-      target: visibleTourTarget('[data-tour="materials-link"]'),
-      title: "Раздел «Материалы»",
-      content: "Здесь учебники, задания и прогресс по направлению. Нажмите «Материалы», чтобы открыть раздел.",
-      mascotImage: pickMascotImage("materials_gate"),
-      skipBeacon: true,
-      hideNextButton: true,
-      blockTargetInteraction: false,
-    },
-  ],
-  materials_demo: [
-    {
-      target: visibleDemoMaterialCard,
-      title: "Демо-задание",
-      content:
-        "Откройте материал с пометкой «Демо». Остальные карточки сейчас недоступны - начните обучение именно с него.",
-      mascotImage: pickMascotImage("materials_demo"),
-      skipBeacon: true,
-      hideNextButton: true,
-      hideOverlay: true,
-      blockTargetInteraction: false,
-      fallbackTarget: "body" as const,
-      fallbackPlacement: "center" as const,
-      fallbackTitle: "Демо-задание",
-      fallbackContent:
-        "Найдите материал с пометкой «Демо» в списке и откройте его. Это короткое задание для знакомства с платформой.",
-    },
-  ],
-  demo_material: [
-    {
-      target: visibleTourTarget('[data-tour="demo-assignments-list"]', '[data-tour="demo-assignment-link"]'),
-      title: "Начните задание",
-      content:
-        "Выберите любое задание из демо-материала и пройдите его до конца. На время выполнения подсказки гайда будут скрыты.",
-      mascotImage: pickMascotImage("demo_material"),
-      skipBeacon: true,
-      hideNextButton: true,
-      hideOverlay: true,
-      blockTargetInteraction: false,
-    },
-  ],
-  streak_celebration: [
-    {
-      target: "body",
-      placement: "center",
-      title: "Серия засчитана",
-      content:
-        "Задание выполнено. Засчитался первый день серии. Серия начисляется за регулярные занятия — выполняйте задания и получайте награды.",
-      mascotImage: pickMascotImage("streak_celebration"),
-      skipBeacon: true,
-      primaryLabel: "Далее",
-    },
-  ],
-  assignment_return_gate: [
-    {
-      target: visibleTourTarget('[data-tour="assignment-back-btn"]'),
-      title: "Вернитесь к материалу",
-      content: "Нажмите «Назад к материалу», чтобы вернуться на страницу учебника.",
-      mascotImage: pickMascotImage("assignment_return_gate"),
-      skipBeacon: true,
-      hideNextButton: true,
-      blockTargetInteraction: false,
-      placement: "bottom",
-    },
-  ],
-  material_return_gate: [
-    {
-      target: visibleTourTarget('[data-tour="material-back-btn"]'),
-      title: "К списку материалов",
-      content: "Нажмите «Назад к материалам», чтобы вернуться в общий каталог.",
-      mascotImage: pickMascotImage("material_return_gate"),
-      skipBeacon: true,
-      hideNextButton: true,
-      blockTargetInteraction: false,
-      placement: "bottom",
-    },
-  ],
-  materials_profile_gate: [
-    {
-      target: visibleTourTarget('[data-tour="profile-link"]'),
-      title: "В профиль",
-      content: "Откройте профиль — там награды, серии и заявки на материалы.",
-      mascotImage: pickMascotImage("materials_profile_gate"),
-      skipBeacon: true,
-      hideNextButton: true,
-      blockTargetInteraction: false,
-    },
-  ],
-  rewards_gate: [
-    {
-      target: visibleTourTarget('[data-tour="rewards-btn"]'),
-      title: "Центр наград",
-      content:
-        "Здесь гардероб маскота, серии, реферальная программа и промокоды. Нажмите «Награды», чтобы открыть раздел.",
-      mascotImage: pickMascotImage("rewards_gate"),
-      skipBeacon: true,
-      hideNextButton: true,
-      blockTargetInteraction: false,
-    },
-  ],
-  rewards_tour: [
-    {
-      target: visibleTourTarget('[data-tour="wardrobe-tab"]'),
-      title: "Гардероб",
-      content: "Здесь меняется внешний вид маскота: фоны, ауры, титулы и предметы из инвентаря.",
-      mascotImage: pickMascotImage("rewards_wardrobe"),
-      skipBeacon: true,
-    },
-    {
-      target: visibleTourTarget('[data-tour="streaks-tab"]'),
-      title: "Серии",
-      content:
-        "Первый день серии уже засчитан. Продолжайте занятия, чтобы получать награды за серию.",
-      mascotImage: pickMascotImage("rewards_streaks"),
-      skipBeacon: true,
-    },
-    {
-      target: visibleTourTarget('[data-tour="referral-tab"]'),
-      title: "Реферальная программа",
-      content: "По персональной ссылке можно приглашать учеников и получать бонусы за каждого нового участника.",
-      mascotImage: pickMascotImage("rewards_referral"),
-      skipBeacon: true,
-    },
-    {
-      target: visibleTourTarget('[data-tour="promos-tab"]'),
-      title: "Промокоды",
-      content: "Здесь активируются промокоды на подарки и бонусные предметы.",
-      mascotImage: pickMascotImage("rewards_promos"),
-      skipBeacon: true,
-    },
-  ],
-  profile_requests_gate: [
-    {
-      target: visibleTourTarget('[data-tour="requests-link"]'),
-      title: "Заявки на покупку",
-      content:
-        "Если нужен доступ к новым материалам, оформите заявку. Нажмите «Заявки на покупку», чтобы посмотреть, как это работает.",
-      mascotImage: pickMascotImage("profile_requests_gate"),
-      skipBeacon: true,
-      hideNextButton: true,
-      blockTargetInteraction: false,
-    },
-  ],
-  requests_info: [
-    {
-      target: "body",
-      placement: "center",
-      title: "Как работают заявки",
-      content:
-        "Вы выбираете материалы, создаете заявку и получаете QR для оплаты. После проверки администратором доступ открывается автоматически.",
-      mascotImage: pickMascotImage("requests_info_text"),
-      skipBeacon: true,
-      primaryLabel: "Далее",
-    },
-    {
-      target: visibleTourTarget('[data-tour="requests-project-switcher"]'),
-      title: "Покупка для другого направления",
-      content:
-        "Профиль и цвета страницы остаются вашими. Здесь вы только выбираете, для какого направления открыть каталог материалов и оформить заявку — без возврата в портал.",
-      mascotImage: pickMascotImage("requests_info_projects"),
-      skipBeacon: true,
-      primaryLabel: "Далее",
-      placement: "bottom",
-      blockTargetInteraction: true,
-    },
-    {
-      target: visibleTourTarget('[data-tour="create-request-btn"]'),
-      title: "Создание заявки",
-      content:
-        "Новые заявки создаются здесь. Сейчас нажимать не обязательно — достаточно запомнить расположение кнопки.",
-      mascotImage: pickMascotImage("requests_info_btn"),
-      skipBeacon: true,
-      hideNextButton: false,
-      blockTargetInteraction: true,
-      primaryLabel: "Понятно",
-      placement: "top",
-    },
-  ],
-  tour_complete: [
-    {
-      target: "body",
-      placement: "center",
-      title: "Обучение завершено",
-      content:
-        "Краткий гайд по платформе пройден. Все разделы доступны в меню навигации. Повторить подсказки можно через пункт «Помощь по платформе».",
-      mascotImage: pickMascotImage("tour_complete"),
-      skipBeacon: true,
-      primaryLabel: "Готово",
-    },
-  ],
-};
-
-function withDemoMaterialFallback(steps: CustomTourStep[]): CustomTourStep[] {
-  return steps.map((step) => {
-    if (!step.fallbackTarget) return step;
-    const demoCard = visibleDemoMaterialCard();
-    if (demoCard) return step;
-
-    const { fallbackTarget, fallbackPlacement, fallbackTitle, fallbackContent, ...rest } = step;
-    return {
-      ...rest,
-      target: fallbackTarget,
-      placement: fallbackPlacement ?? "center",
-      title: fallbackTitle ?? step.title,
-      content: fallbackContent ?? step.content,
-      hideOverlay: true,
-    };
-  });
-}
-
-export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()): CustomTourStep[] {
-  const base = BASE_TOUR_STEPS[stage];
-  if (!base?.length) return [];
-
-  if (!isMobile) {
-    if (stage === "materials_demo") return withDemoMaterialFallback(base);
-    return base;
-  }
-
-  if (stage === "portal_intro") {
-    return [
-      {
-        ...base[0],
-        target: "body",
-        placement: "center",
-        skipScroll: true,
-        portalTheme: true,
-        portalMobileDock: true,
-        content:
-          "На платформе несколько направлений. Профиль и награды общие. Ниже выберите ветку, с которой начнете.",
-        primaryLabel: "Далее",
-      },
-    ];
-  }
-
-  if (stage === "direction_gate") {
-    const swipeStep: CustomTourStep = {
-      target: "body",
-      placement: "center",
-      title: "Список направлений",
-      content: "Прокрутите список и нажмите на нужное направление, чтобы открыть профиль ветки.",
-      mascotImage: pickMascotImage("direction_gate_swipe"),
-      skipBeacon: true,
-      skipScroll: true,
-      portalTheme: true,
-      portalMobileDock: true,
-      primaryLabel: "Понятно",
-      isPortalSwipeStep: true,
-    };
-
-    const cardStep: CustomTourStep = {
-      ...base[0],
-      target: visiblePortalDirections,
-      placement: "top",
-      skipScroll: true,
-      portalTheme: true,
-      portalMobileDock: true,
-      hideOverlay: true,
-      blockTargetInteraction: false,
-      content: "Нажмите на любое направление в списке.",
-    };
-
-    return [swipeStep, cardStep];
-  }
-
-  if (stage === "profile_stats") {
-    return [
-      {
-        ...base[0],
-        placement: "bottom",
-        content:
-          "Здесь прогресс и награды по направлению. Далее откроем материалы и пройдем короткое демо-задание.",
-        primaryLabel: "Далее",
-      },
-    ];
-  }
-
-  if (stage === "materials_demo") {
-    return withDemoMaterialFallback([
-      {
-        ...base[0],
-        placement: "top",
-        skipScroll: true,
-        hideOverlay: true,
-      },
-    ]);
-  }
-
-  if (stage === "demo_material") {
-    return [
-      {
-        ...base[0],
-        placement: "top",
-        skipScroll: true,
-        hideOverlay: true,
-      },
-    ];
-  }
-
-  if (stage === "streak_celebration" || stage === "tour_complete") {
-    return base.map((step) => ({
-      ...step,
-      placement: "center" as const,
-      skipScroll: true,
-    }));
-  }
-
-  if (stage === "assignment_return_gate" || stage === "material_return_gate") {
-    return base.map((step) => ({
-      ...step,
-      placement: "bottom" as const,
-      skipScroll: true,
-    }));
-  }
-
-  if (stage === "materials_profile_gate" && isMobile) {
-    return [mobileBurgerIntro(stage), withMobileMenuTarget(base[0], stage)];
-  }
-
-  if (stage === "requests_info") {
-    return [
-      {
-        ...base[0],
-        placement: "center",
-        skipScroll: true,
-        primaryLabel: "Далее",
-      },
-      {
-        ...base[1],
-        placement: "bottom",
-        skipScroll: true,
-        blockTargetInteraction: true,
-        primaryLabel: "Далее",
-      },
-      {
-        ...base[2],
-        placement: "top",
-        skipScroll: true,
-        blockTargetInteraction: true,
-        primaryLabel: "Понятно",
-      },
-    ];
-  }
-
-  if (isMobileMenuGateStage(stage) && base.length === 1) {
-    return [mobileBurgerIntro(stage), withMobileMenuTarget(base[0], stage)];
-  }
-
-  if (stage === "rewards_tour" && isMobile) {
-    const rewardTabs = ["wardrobe", "streaks", "referral", "promos"] as const;
-    return base.map((step, index) => ({
-      ...step,
-      target: "body",
-      placement: "center" as const,
-      skipScroll: true,
-      skipBeacon: true,
-      disableScrolling: true,
-      targetWaitTimeout: 8000,
-      rewardTab: rewardTabs[index] ?? "wardrobe",
-    }));
-  }
-
-  return base;
-}
-
-/** Финальные шаги с учётом DOM (кол-во направлений на портале). */
-export function getResolvedTourSteps(stage: TourStage, isMobile = isMobileViewport()): CustomTourStep[] {
-  let steps = resolveTourSteps(stage, isMobile);
-  if (stage === "direction_gate" && isMobile && getPortalProjectCount() <= 1) {
-    steps = steps.filter((s) => !s.isPortalSwipeStep);
-  }
-  return steps;
 }
 </file>
 
@@ -70774,15 +70881,16 @@ export default function ProfileClient({
     }
   }
 
+  // Честно берём материалы, которые нам отдал бэкенд с правильными `tabTitle`
   const dynamicCategories = useMemo(() => {
     if (!materialsProgress) return [];
     const map = new Map<string, string>(); 
 
     materialsProgress.forEach((item) => {
       if (item.tabTitle && item.tabTitle.trim()) {
-        const id = item.tabTitle.toLowerCase().trim();
-        if (!map.has(id)) {
-          map.set(id, item.tabTitle.trim());
+        const tabTitleLower = item.tabTitle.toLowerCase().trim();
+        if (!map.has(tabTitleLower)) {
+          map.set(tabTitleLower, item.tabTitle.trim());
         }
       } else if (item.kind === "textbook") {
         if (!map.has("textbook")) map.set("textbook", "Учебники");
@@ -70801,7 +70909,7 @@ export default function ProfileClient({
       if (selectedCategory === "all") return true;
       if (selectedCategory === "textbook") return m.kind === "textbook";
       if (selectedCategory === "crossword") return m.kind === "crossword";
-      return m.tabTitle?.toLowerCase().trim() === selectedCategory.toLowerCase().trim();
+      return m.tabTitle?.toLowerCase().trim() === selectedCategory;
     });
 
     return {
@@ -70813,6 +70921,66 @@ export default function ProfileClient({
   const overlayCss = backgroundProxyUrl && (bgReady || !bgLoading) ? `url('${backgroundProxyUrl}')` : "none";
   const brandMark = projectName.substring(0, 2).toUpperCase() || "EK";
   const titleText = streakData?.equippedTitle?.trim() || "Без титула";
+
+  // Универсальный компонент выбора ветки для ПК и Мобилки
+  const ProjectSwitcherUI = (
+    <div className="brand-switcher-wrapper" style={{ flex: 1, minWidth: 0 }}>
+      <button 
+        type="button" 
+        className={`brand brand-interactive ${switcherOpen ? "open" : ""}`}
+        onClick={() => setSwitcherOpen(!switcherOpen)}
+        style={{ width: "100%", justifyContent: "space-between", padding: "8px 12px 8px 8px", boxSizing: "border-box" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+          <div className="brand-mark" style={{ flexShrink: 0 }}>{brandMark}</div>
+          <div className="brand-text-wrapper" style={{ alignItems: "flex-start", minWidth: 0, overflow: "hidden" }}>
+            <div className="brand-title" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>{projectName}</div>
+            <div className="brand-subtitle">Профиль ученика</div>
+          </div>
+        </div>
+        <div className="switcher-chevron" style={{ flexShrink: 0 }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+      </button>
+
+      {switcherOpen && (
+        <>
+          <div className="switcher-overlay" onClick={() => setSwitcherOpen(false)} />
+          <div className="project-switcher-menu" style={{ width: "100%" }}>
+            <div className="switcher-header">Сменить направление</div>
+            <div className="switcher-list">
+              {availableProjects.map((p) => {
+                const isActive = p.slug === projectSlug;
+                const dotColor = p.theme?.primaryColor || p.theme_color || "#6366f1";
+                
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/projects/${p.slug}/profile`}
+                    className={`project-switcher-item ${isActive ? "active" : ""}`}
+                    onClick={() => setSwitcherOpen(false)}
+                  >
+                    <div className="switcher-dot" style={{ backgroundColor: dotColor }} />
+                    <div className="switcher-item-name">{p.name}</div>
+                    {isActive && <div className="switcher-item-check">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </div>}
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="switcher-footer">
+              <Link href="/portal" className="switcher-portal-link">
+                ← На главный портал
+              </Link>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div id="profileBody" className="profile-page" style={{ ["--profile-overlay" as any]: overlayCss }}>
@@ -70980,6 +71148,19 @@ export default function ProfileClient({
 
       <div className="profile-container">
         
+        {/* CSS для показа свитчера проектов только на мобилке (скрыт на десктопе) */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          .mobile-only-switcher { display: none; margin-bottom: 16px; position: relative; z-index: 40; }
+          @media (max-width: 768px) {
+            .mobile-only-switcher { display: block; }
+          }
+        `}} />
+
+        {/* Гармоничный селектор проектов для мобилки (показывается только на маленьких экранах) */}
+        <div className="mobile-only-switcher">
+          {ProjectSwitcherUI}
+        </div>
+
         <div className="mobile-header-bar">
           <div className="mobile-header-left">
             <div className="mobile-avatar" data-tour="profile-avatar" onClick={() => openRewards("wardrobe")}>
@@ -71035,61 +71216,9 @@ export default function ProfileClient({
         </div>
 
         <div className="profile-topbar">
-          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-            <span className="skills-wordmark">skilLS</span>
-            <div className="brand-switcher-wrapper">
-              <button 
-                type="button" 
-                className={`brand brand-interactive ${switcherOpen ? "open" : ""}`}
-                onClick={() => setSwitcherOpen(!switcherOpen)}
-              >
-                <div className="brand-mark">{brandMark}</div>
-                <div className="brand-text-wrapper">
-                  <div className="brand-title">{projectName}</div>
-                  <div className="brand-subtitle">Профиль ученика</div>
-                </div>
-                <div className="switcher-chevron">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                </div>
-              </button>
-
-              {switcherOpen && (
-                <>
-                  <div className="switcher-overlay" onClick={() => setSwitcherOpen(false)} />
-                  <div className="project-switcher-menu">
-                    <div className="switcher-header">Сменить направление</div>
-                    <div className="switcher-list">
-                      {availableProjects.map((p) => {
-                        const isActive = p.slug === projectSlug;
-                        const dotColor = p.theme?.primaryColor || p.theme_color || "#6366f1";
-                        
-                        return (
-                          <Link
-                            key={p.id}
-                            href={`/projects/${p.slug}/profile`}
-                            className={`project-switcher-item ${isActive ? "active" : ""}`}
-                            onClick={() => setSwitcherOpen(false)}
-                          >
-                            <div className="switcher-dot" style={{ backgroundColor: dotColor }} />
-                            <div className="switcher-item-name">{p.name}</div>
-                            {isActive && <div className="switcher-item-check">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                            </div>}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                    <div className="switcher-footer">
-                      <Link href="/portal" className="switcher-portal-link">
-                        ← На главный портал
-                      </Link>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "20px", flex: 1, minWidth: 0 }}>
+            <span className="skills-wordmark hidden md:inline-block">skilLS</span>
+            {ProjectSwitcherUI}
           </div>
 
           <div className="top-actions">

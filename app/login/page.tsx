@@ -17,6 +17,40 @@ type ApiPayload = {
   redirectTo?: string;
 };
 
+type FeatureModalContent = {
+  title: string;
+  image?: string;
+  description?: string;
+};
+
+const FEATURE_DATA: Record<string, FeatureModalContent> = {
+  "Тесты": {
+    title: "Формат задания: Тесты",
+    image: "/features/test.png",
+    description: "Вопросы с одиночным или множественным выбором ответа, аудио-вставками и пояснениями.",
+  },
+  "Вписать слово": {
+    title: "Формат задания: Вписать слово",
+    image: "/features/fill.png",
+    description: "Задания на ввод пропущенных слов и выражений с гибкой системой проверки вариантов.",
+  },
+  "Кроссворды": {
+    title: "Формат задания: Кроссворды",
+    image: "/features/crossword.png",
+    description: "Интерактивная сетка кроссворда для тренировки словарного запаса и спеллинга.",
+  },
+  "Аудирование": {
+    title: "Формат задания: Аудирование",
+    image: "/features/audio.png",
+    description: "Упражнения на восприятие речи на слух с нативным британским и американским произношением.",
+  },
+  "Пары": {
+    title: "Формат задания: Пары",
+    image: "/features/matching.png",
+    description: "Сопоставление слов с картинками, определениями или аудио-дорожками.",
+  },
+};
+
 function isValidEmail(email: string) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
@@ -37,16 +71,11 @@ function looksLikeNetworkError(err: unknown) {
 
 async function readApiPayload(res: Response): Promise<ApiPayload | null> {
   const text = await res.text();
-
   if (!text) return null;
-
   try {
     return JSON.parse(text) as ApiPayload;
   } catch {
-    return {
-      ok: false,
-      error: text,
-    };
+    return { ok: false, error: text };
   }
 }
 
@@ -67,8 +96,10 @@ export default function LoginPage() {
 
   const [networkIssue, setNetworkIssue] = useState(false);
 
+  // Модальные окна
   const [helpOpen, setHelpOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [featureModal, setFeatureModal] = useState<FeatureModalContent | null>(null);
   const [activeTab, setActiveTab] = useState<"registration" | "rules">("registration");
 
   const msgParam = useMemo(() => {
@@ -104,7 +135,7 @@ export default function LoginPage() {
       setNetworkIssue(false);
       showBanner(
         "error",
-        "Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email.",
+        "Пользователь с таким email уже зарегистрирован. Войдите в существующий аккаунт или используйте другой email."
       );
     }
   }, [msgParam]);
@@ -145,12 +176,8 @@ export default function LoginPage() {
     try {
       const res = await fetch("/api/auth/resend-confirmation", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          email: emailValue,
-        }),
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: emailValue }),
       });
 
       const json = await readApiPayload(res);
@@ -159,14 +186,14 @@ export default function LoginPage() {
       if (!res.ok || !json?.ok) {
         showBanner(
           "error",
-          payload?.error || payload?.message || json?.error || "Не удалось отправить письмо подтверждения.",
+          payload?.error || payload?.message || json?.error || "Не удалось отправить письмо подтверждения."
         );
         return;
       }
 
       showBanner(
         "success",
-        payload?.message || json?.message || "Письмо с подтверждением отправлено повторно. Проверьте почту.",
+        payload?.message || json?.message || "Письмо с подтверждением отправлено повторно. Проверьте почту."
       );
     } catch (e: any) {
       if (looksLikeNetworkError(e)) showNetworkBanner(String(e?.message || e));
@@ -197,9 +224,7 @@ export default function LoginPage() {
 
       const res = await fetch("/api/auth/login", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           email: e,
           password,
@@ -223,7 +248,6 @@ export default function LoginPage() {
 
         if (code === "EMAIL_NOT_CONFIRMED" || msg.toLowerCase().includes("email не подтверж")) {
           showBanner("error", "Email не подтвержден. Проверьте вашу почту и подтвердите регистрацию.");
-
           const resend = window.confirm("Отправить письмо с подтверждением повторно?");
           if (resend) {
             await resendConfirmation(e);
@@ -254,20 +278,15 @@ export default function LoginPage() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        if (helpOpen) {
-          setHelpOpen(false);
-          document.body.style.overflow = "";
-        }
-        if (supportOpen) {
-          setSupportOpen(false);
-          document.body.style.overflow = "";
-        }
+        if (helpOpen) closeHelp();
+        if (supportOpen) closeSupport();
+        if (featureModal) closeFeatureModal();
       }
     }
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [helpOpen, supportOpen]);
+  }, [helpOpen, supportOpen, featureModal]);
 
   function openHelp() {
     setHelpOpen(true);
@@ -289,12 +308,26 @@ export default function LoginPage() {
     document.body.style.overflow = "";
   }
 
+  function openFeatureModal(tagName: string) {
+    const data = FEATURE_DATA[tagName] || {
+      title: `Формат задания: ${tagName}`,
+      description: "Интерактивное упражнение на платформе skilLS.",
+    };
+    setFeatureModal(data);
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeFeatureModal() {
+    setFeatureModal(null);
+    document.body.style.overflow = "";
+  }
+
   function renderBanner() {
     if (!bannerType) return null;
     const cls = bannerType === "error" ? "error" : bannerType === "success" ? "success" : "warning";
 
     return (
-      <div className={cls} style={{ display: "block", whiteSpace: "pre-line" }}>
+      <div className={cls} style={{ display: "block", whiteSpace: "pre-line", marginBottom: "1rem" }}>
         {bannerText}
       </div>
     );
@@ -304,31 +337,63 @@ export default function LoginPage() {
     if (!networkIssue) return null;
 
     return (
-      <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button className="btn student" type="button" onClick={() => window.location.reload()}>
+      <div style={{ marginBottom: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button className="btn-secondary-action" type="button" onClick={() => window.location.reload()}>
           Обновить страницу
         </button>
-        <Link className="btn info" href="/info">
+        <Link className="btn-secondary-action" href="/info">
           Информация
         </Link>
       </div>
     );
   }
 
-  function renderExistingAccountHelp() {
-    if (msgParam !== "confirmed") return null;
-
-    return (
-      <div className="existing-account-help">
-        <strong>Отлично! Ваш аккаунт активирован.</strong>
-        <br />
-        Теперь вы можете войти в систему используя ваш email и пароль.
-      </div>
-    );
-  }
-
   return (
     <div className="page-login">
+      {/* МОДАЛЬНОЕ ОКНО: ПРИМЕРЫ ЗАДАНИЙ */}
+      <div
+        className={`modal-overlay ${featureModal ? "active" : ""}`}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeFeatureModal();
+        }}
+      >
+        <div className="modal-content">
+          <button className="modal-close" aria-label="Закрыть" onClick={closeFeatureModal} type="button">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <div className="modal-title">{featureModal?.title}</div>
+          <div className="modal-image-placeholder">
+            {featureModal?.image ? (
+              <img
+                src={featureModal.image}
+                alt={featureModal.title}
+                style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10px" }}
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = "none";
+                }}
+              />
+            ) : null}
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.5"
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+            <span>Здесь будет скриншот упражнения</span>
+          </div>
+          {featureModal?.description && (
+            <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "var(--text-mut-navy)", lineHeight: 1.5 }}>
+              {featureModal.description}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* МОДАЛЬНОЕ ОКНО: ПОМОЩЬ */}
       <div
         className="help-modal"
         style={{ display: helpOpen ? "flex" : "none" }}
@@ -364,15 +429,14 @@ export default function LoginPage() {
           <div className={"help-tab-content " + (activeTab === "registration" ? "active" : "")}>
             <div className="help-html-inner">
               <h4 className="help-section-title">Как создать профиль и войти</h4>
-              
               <div className="registration-guide">
                 <div className="guide-step">
                   <div className="step-badge">1</div>
                   <div className="step-body">
                     <h5>Заполните анкету</h5>
                     <p>
-                      Нажмите кнопку <Link href="/register" onClick={closeHelp}>«Зарегистрироваться»</Link> в самом низу. 
-                      Внимательно введите ваш настоящий рабочий Email и придумайте безопасный пароль.
+                      Нажмите кнопку <Link href="/register" onClick={closeHelp}>«Зарегистрироваться»</Link>. 
+                      Внимательно введите ваш рабочий Email и придумайте пароль.
                     </p>
                   </div>
                 </div>
@@ -382,8 +446,7 @@ export default function LoginPage() {
                   <div className="step-body">
                     <h5>Отправка ссылки на почту</h5>
                     <p>
-                      Сразу после регистрации наша система отправит вам автоматическое письмо. 
-                      Обычно оно долетает быстро — в течение пары минут.
+                      Сразу после регистрации система отправит вам автоматическое письмо с подтверждением.
                     </p>
                   </div>
                 </div>
@@ -393,7 +456,7 @@ export default function LoginPage() {
                   <div className="step-body">
                     <h5>Проверьте все папки</h5>
                     <p>
-                      Откройте ваш почтовый ящик. Если во «Входящих» пусто, не пугайтесь — обязательно загляните в папки <strong>«Спам»</strong> и <strong>«Промоакции»</strong>. Фильтры почты иногда путают автоматические письма.
+                      Если во «Входящих» пусто — загляните в папки <strong>«Спам»</strong> и <strong>«Промоакции»</strong>.
                     </p>
                   </div>
                 </div>
@@ -403,7 +466,7 @@ export default function LoginPage() {
                   <div className="step-body">
                     <h5>Подтвердите и учитесь</h5>
                     <p>
-                      Кликните по ссылке в письме. Ваш аккаунт мгновенно активируется, вас вернет сюда, и вы сможете спокойно зайти под своим логином и паролем.
+                      Кликните по ссылке в письме. Аккаунт активируется, и вы сможете войти.
                     </p>
                   </div>
                 </div>
@@ -413,33 +476,26 @@ export default function LoginPage() {
 
           <div className={"help-tab-content " + (activeTab === "rules" ? "active" : "")}>
             <div className="help-html-inner rules-tab-bg">
-              <h4 className="rules-main-title">Правила</h4>
-              
+              <h4 className="rules-main-title">Правила платформы</h4>
               <div className="help-rules-grid">
                 <div className="rule-card">
                   <p>
-                    Количество попыток не ограничено. Мы верим, что вы сможете! 
-                    Система будет хранить ваш лучший (последний) результат.
+                    Количество попыток не ограничено. Система сохраняет ваш лучший (последний) результат.
                   </p>
                 </div>
-
                 <div className="rule-card">
                   <p>
-                    Полный доступ к учебным модулям откроется после покупки.
+                    Полный доступ к учебным модулям открывается после подключения тарифа или выдачи преподавателем.
                   </p>
                 </div>
-
                 <div className="rule-card">
                   <p>
-                    Ваша цель — не просто пройти, а понять. Подходите к каждому уроку осознанно, 
-                    чтобы извлечь максимальную пользу.
+                    Подходите к каждому уроку осознанно, чтобы извлечь максимальную пользу из разбора ошибок.
                   </p>
                 </div>
-
                 <div className="rule-card trophy-card">
                   <p>
-                    Помните, главное — это ваше развитие. Этот учебник — ваш инструмент. 
-                    Используйте его по максимуму!
+                    Главное — это ваше развитие. Учебные материалы skilLS — ваш инструмент для подготовки к вершинам.
                   </p>
                 </div>
               </div>
@@ -448,6 +504,7 @@ export default function LoginPage() {
         </div>
       </div>
 
+      {/* МОДАЛЬНОЕ ОКНО: ТЕХПОДДЕРЖКА */}
       <div
         className="help-modal"
         style={{ display: supportOpen ? "flex" : "none" }}
@@ -462,9 +519,9 @@ export default function LoginPage() {
               ✕
             </button>
           </div>
-          <div style={{ padding: "20px 0", color: "rgba(15,23,42,0.9)" }}>
+          <div style={{ padding: "20px 0", color: "var(--text-navy)" }}>
             <p style={{ marginBottom: "20px", fontSize: "14px", lineHeight: "1.5", fontWeight: 600 }}>
-              Обычно администратор отвечает в течение 2 часов. Выберите любой удобный способ для быстрой связи:
+              Обычно администратор отвечает в течение 2 часов. Выберите удобный способ связи:
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <a
@@ -477,11 +534,11 @@ export default function LoginPage() {
                   borderRadius: "12px",
                   background: "linear-gradient(135deg, #24a1de, #208ec4)",
                   color: "#fff",
-                  fontWeight: 900,
+                  fontWeight: 800,
                   fontSize: "14px",
                   textDecoration: "none",
                   textAlign: "center",
-                  boxShadow: "0 4px 12px rgba(36, 161, 222, 0.2)"
+                  boxShadow: "0 4px 12px rgba(36, 161, 222, 0.2)",
                 }}
               >
                 Написать в Telegram
@@ -496,11 +553,11 @@ export default function LoginPage() {
                   borderRadius: "12px",
                   background: "linear-gradient(135deg, #0077ff, #0066da)",
                   color: "#fff",
-                  fontWeight: 900,
+                  fontWeight: 800,
                   fontSize: "14px",
                   textDecoration: "none",
                   textAlign: "center",
-                  boxShadow: "0 4px 12px rgba(0, 119, 255, 0.2)"
+                  boxShadow: "0 4px 12px rgba(0, 119, 255, 0.2)",
                 }}
               >
                 Написать во ВКонтакте
@@ -510,132 +567,258 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="login-container">
-        <div className="login-card">
-          <div className="brand">
-            <div className="brand-mark">EK</div>
-            <div>
-              <div className="brand-title">skilLS</div>
-              <div className="brand-subtitle">Образовательная платформа</div>
+      {/* ОСНОВНАЯ РАЗМЕТКА SPLIT SCREEN */}
+      <div className="split-layout">
+        {/* PROMO SIDE */}
+        <div className="promo-side">
+          <div className="promo-content">
+            <div className="logo">
+              <img src="/image_0bd68b.png" alt="skilLS Logo" onError={(e) => {
+                // Fallback, если логотип еще не положен в public
+                (e.currentTarget as HTMLElement).style.display = "none";
+              }} />
+            </div>
+
+            <h1 className="promo-title">skilLS - образовательная онлайн-платформа</h1>
+
+            <p className="promo-text">
+              Прокачивайте английский в современных форматах. В личном кабинете доступны десятки типов интерактивных заданий. Каждое упражнение помогает закрепить знания и уверенно решать реальные тесты, а подробная аналитика показывает ваш прогресс по всем темам.
+            </p>
+
+            <div className="interactive-hint">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+              </svg>
+              Нажми на формат, чтобы увидеть пример задания
+            </div>
+
+            <div className="feature-tags">
+              {["Тесты", "Вписать слово", "Кроссворды", "Аудирование", "Пары"].map((tag, idx) => (
+                <div
+                  key={tag}
+                  className="feature-tag"
+                  style={{ animationDelay: `${idx * 0.2}s` }}
+                  onClick={() => openFeatureModal(tag)}
+                >
+                  {tag}
+                </div>
+              ))}
+            </div>
+
+            <p className="promo-text">
+              Сейчас мы фокусируемся на подготовке к международной олимпиаде <strong>HIPPO</strong> и международным экзаменам <strong>Gatehouse Awards</strong>, и список направлений будет расширяться. Подтвержденный уровень CEFR официально признается за рубежом, а лучшие участники получают шанс поехать на суперфинал в Италию.
+            </p>
+
+            <p className="promo-text">
+              Для старта тренировок <strong>используйте панель авторизации справа.</strong>
+            </p>
+
+            <div className="promo-cta-wrap">
+              <a href="https://hipposha-book.ru" target="_blank" rel="noreferrer" className="promo-cta">
+                Подробнее об экзаменах и участии &nbsp;→
+              </a>
             </div>
           </div>
 
-          <h2 className="step-title">Вход в аккаунт</h2>
+          {/* SIGNATURE VISUAL: Векторный сертификат */}
+          <div className="cert-container">
+            <div className="cert-wrapper">
+              <svg viewBox="0 0 720 452" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Пример международного сертификата skilLS">
+                <defs>
+                  <linearGradient id="paperGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#ffffff" />
+                    <stop offset="100%" stopColor="#f8fafc" />
+                  </linearGradient>
+                  <linearGradient id="sealGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" />
+                    <stop offset="100%" stopColor="#1e40af" />
+                  </linearGradient>
+                  <linearGradient id="barFill" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#93c5fd" />
+                    <stop offset="100%" stopColor="#3b82f6" />
+                  </linearGradient>
+                </defs>
 
-          <div className="loading" style={{ display: busy ? "block" : "none" }}>
-            <div className="spinner" />
-            Проверяем данные...
-          </div>
+                <rect x="6" y="6" width="708" height="440" rx="16" fill="url(#paperGrad)" stroke="#e2e8f0" strokeWidth="2" />
+                <rect x="16" y="16" width="688" height="420" rx="10" fill="none" stroke="#bfdbfe" strokeWidth="1" strokeOpacity="0.6" />
 
-          {renderBanner()}
-          {renderNetworkActions()}
-          {renderExistingAccountHelp()}
+                <g opacity="0.4" stroke="#93c5fd" strokeWidth="1.5" fill="none">
+                  <circle cx="50" cy="50" r="10" />
+                  <circle cx="50" cy="50" r="18" />
+                  <circle cx="670" cy="50" r="10" />
+                  <circle cx="670" cy="50" r="18" />
+                </g>
 
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              placeholder="example@gmail.com"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  (document.getElementById("password") as HTMLInputElement | null)?.focus();
-                }
-              }}
-            />
-          </div>
+                <text x="46" y="62" className="cert-svg-mono" fontSize="10.5" letterSpacing="2.5" fill="#64748b" fontWeight="600">
+                  SKILLS · DIGITAL ACHIEVEMENT
+                </text>
+                <text x="46" y="102" className="cert-svg-serif" fontSize="27" fill="#0f172a" fontWeight="600">
+                  Сертификат достижений
+                </text>
+                <text x="46" y="126" className="cert-svg-text" fontSize="12.5" fill="#64748b">
+                  Интерактивная подготовка &amp; Экзамены
+                </text>
 
-          <div className="form-group">
-            <label htmlFor="password">Пароль</label>
-            <div className="input-wrapper">
-              <input
-                type={showPassword ? "text" : "password"}
-                id="password"
-                placeholder="Введите ваш пароль"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void doLogin(false);
-                }}
-              />
-              <button
-                type="button"
-                className="toggle-password"
-                onClick={() => setShowPassword(!showPassword)}
-                tabIndex={-1}
-                title={showPassword ? "Скрыть пароль" : "Показать пароль"}
-              >
-                {showPassword ? "Скрыть" : "Показать"}
-              </button>
+                <g transform="translate(636,64)">
+                  <circle r="34" fill="url(#sealGrad)" />
+                  <circle r="34" fill="none" stroke="#dbeafe" strokeWidth="1.5" strokeOpacity=".3" />
+                  <path d="M0,-16 L4.5,-5 L16,-5 L6.5,2 L10,13 L0,6 L-10,13 L-6.5,2 L-16,-5 L-4.5,-5 Z" fill="#ffffff" />
+                </g>
+
+                <text x="46" y="188" className="cert-svg-mono" fontSize="9.5" letterSpacing="1.8" fill="#64748b" fontWeight="600">
+                  СТУДЕНТ
+                </text>
+                <text x="46" y="214" className="cert-svg-serif" fontSize="21" fill="#0f172a" fontWeight="500">
+                  Анна Иванова
+                </text>
+                <line x1="46" y1="224" x2="330" y2="224" stroke="#bfdbfe" strokeWidth="1" strokeOpacity="0.7" />
+
+                <text x="46" y="256" className="cert-svg-mono" fontSize="9.5" letterSpacing="1.8" fill="#64748b" fontWeight="600">
+                  ПРОГРЕСС НАВЫКОВ · CEFR
+                </text>
+                <g fontFamily="'IBM Plex Mono', monospace" fontSize="11.5" fontWeight="600">
+                  <rect x="46" y="266" width="52" height="26" rx="6" fill="#f1f5f9" stroke="#e2e8f0" strokeWidth="1.3" />
+                  <text x="72" y="283" textAnchor="middle" fill="#94a3b8">A1</text>
+                  <rect x="104" y="266" width="52" height="26" rx="6" fill="#f1f5f9" stroke="#e2e8f0" strokeWidth="1.3" />
+                  <text x="130" y="283" textAnchor="middle" fill="#94a3b8">A2</text>
+                  <rect x="162" y="266" width="52" height="26" rx="6" fill="#f1f5f9" stroke="#e2e8f0" strokeWidth="1.3" />
+                  <text x="188" y="283" textAnchor="middle" fill="#94a3b8">B1</text>
+                  <rect x="220" y="263" width="58" height="32" rx="8" fill="url(#barFill)" />
+                  <text x="249" y="284" textAnchor="middle" fill="#ffffff">B2</text>
+                  <rect x="284" y="266" width="52" height="26" rx="6" fill="none" stroke="#e2e8f0" strokeWidth="1.3" />
+                  <text x="310" y="283" textAnchor="middle" fill="#94a3b8">C1</text>
+                  <rect x="342" y="266" width="52" height="26" rx="6" fill="none" stroke="#e2e8f0" strokeWidth="1.3" />
+                  <text x="368" y="283" textAnchor="middle" fill="#94a3b8">C2</text>
+                </g>
+
+                <text x="46" y="332" className="cert-svg-mono" fontSize="9.5" letterSpacing="1.8" fill="#64748b" fontWeight="600">
+                  МАРШРУТ НА СУПЕРФИНАЛ
+                </text>
+                <g>
+                  <circle cx="52" cy="358" r="4.5" fill="#3b82f6" />
+                  <text x="52" y="378" textAnchor="middle" className="cert-svg-text" fontSize="9.5" fill="#64748b">
+                    Старт
+                  </text>
+                  <line x1="60" y1="358" x2="590" y2="358" stroke="#93c5fd" strokeWidth="2" strokeDasharray="4 6" />
+                  <g transform="translate(600,358)">
+                    <path d="M0,-13 L3.8,-4 L13,-4 L5.5,1.6 L8.4,10.6 L0,5 L-8.4,10.6 L-5.5,1.6 L-13,-4 L-3.8,-4 Z" fill="#2563eb" />
+                  </g>
+                  <text x="600" y="378" textAnchor="middle" className="cert-svg-mono" fontSize="9.5" fill="#2563eb" fontWeight="600">
+                    ИТАЛИЯ
+                  </text>
+                </g>
+
+                <line x1="46" y1="404" x2="674" y2="404" stroke="#e2e8f0" strokeWidth="1" />
+                <text x="46" y="424" className="cert-svg-text" fontSize="10" fill="#94a3b8">
+                  Современная платформа для изучения английского языка
+                </text>
+              </svg>
             </div>
           </div>
+        </div>
 
-          <button className="btn student" onClick={() => void doLogin(false)} disabled={busy}>
-            Войти как ученик
-          </button>
-
-          <Link 
-            href="/demo" 
-            style={{
-              marginTop: "12px",
-              display: "block",
-              width: "100%",
-              padding: "12px",
-              borderRadius: "12px",
-              background: "linear-gradient(135deg, #10b981, #059669)",
-              color: "#ffffff",
-              fontWeight: 900,
-              fontSize: "14px",
-              textDecoration: "none",
-              textAlign: "center",
-              boxShadow: "0 4px 14px rgba(16, 185, 129, 0.25)",
-              transition: "transform 0.15s ease"
-            }}
-          >
-            Пройти демо-задание
-          </Link>
-
-          <div className="link">
-            <p>
-              Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
-            </p>
-            <p>
-              <Link href="/reset">Забыли пароль?</Link>
-            </p>
-
-            <div className="bottom-actions">
-              <Link className="btn info" href="/info">
-                Информация
+        {/* AUTH SIDE */}
+        <div className="auth-side">
+          <div className="auth-container">
+            <div className="auth-tabs">
+              <div className="auth-tab active">Вход</div>
+              <Link href="/register" className="auth-tab" style={{ textDecoration: "none" }}>
+                Регистрация
               </Link>
-
-              <button className="btn help" onClick={openHelp} type="button">
-                Помощь
-              </button>
             </div>
 
-            <button
-              className="btn support"
-              onClick={openSupport}
-              type="button"
-              style={{
-                marginTop: "12px",
-                width: "100%",
-                padding: "11px",
-                borderRadius: "12px",
-                background: "rgba(15, 23, 42, 0.05)",
-                border: "1px solid rgba(15, 23, 42, 0.08)",
-                color: "rgba(15, 23, 42, 0.8)",
-                fontWeight: 700,
-                fontSize: "14px",
-                cursor: "pointer"
+            {renderBanner()}
+            {renderNetworkActions()}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void doLogin(false);
               }}
             >
-              Техническая поддержка
-            </button>
+              <div className="form-group">
+                <label className="form-label" htmlFor="email">Электронная почта</label>
+                <input
+                  type="email"
+                  id="email"
+                  className="form-input"
+                  placeholder="student@mail.ru"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      (document.getElementById("password") as HTMLInputElement | null)?.focus();
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="password">Пароль</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    id="password"
+                    className="form-input"
+                    placeholder="Введите пароль"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{ paddingRight: "75px" }}
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                      color: "var(--blue-600)",
+                      cursor: "pointer",
+                      padding: "4px",
+                    }}
+                  >
+                    {showPassword ? "Скрыть" : "Показать"}
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" className="btn-submit" disabled={busy}>
+                {busy ? "Проверяем данные..." : "Войти на платформу"}
+              </button>
+
+              <Link href="/demo" className="btn-demo">
+                ⚡ Пройти демо-задание
+              </Link>
+            </form>
+
+            <div className="auth-footer">
+              <Link href="/reset" className="auth-link">
+                Забыли пароль?
+              </Link>
+
+              <div className="aux-actions">
+                <Link className="aux-btn" href="/info">
+                  Информация
+                </Link>
+                <button className="aux-btn" onClick={openHelp} type="button">
+                  Помощь
+                </button>
+                <button className="aux-btn" onClick={openSupport} type="button">
+                  Поддержка
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
