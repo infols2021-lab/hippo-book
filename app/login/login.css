@@ -12,7 +12,7 @@
   --blue-400: #38bdf8;
   --blue-100: #e0f2fe;
   --blue-50: #f0f9ff;
-  
+
   --emerald-400: #34d399; /* Для градиентных маркеров текста */
 
   /* Фоны и интерфейс */
@@ -30,7 +30,7 @@
   min-height: 100vh;
   width: 100vw;
   /* Глобальный фон под всем, чтобы стекло авторизации просвечивало */
-  background: #f1f5f9; 
+  background: #f1f5f9;
   overflow: hidden;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: var(--text-navy);
@@ -81,7 +81,7 @@
   width: 100vw;
   position: relative;
   z-index: 1;
-  background-image: 
+  background-image:
     linear-gradient(rgba(15, 23, 42, 0.02) 1px, transparent 1px),
     linear-gradient(90deg, rgba(15, 23, 42, 0.02) 1px, transparent 1px);
   background-size: 32px 32px;
@@ -349,13 +349,13 @@
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  
+
   /* Эффект дорогого матового стекла */
   background: var(--auth-bg);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   border-left: 1px solid rgba(255, 255, 255, 0.6);
-  
+
   position: relative;
   z-index: 10;
   box-shadow: -20px 0 40px rgba(0, 0, 0, 0.03);
@@ -621,7 +621,7 @@
 }
 
 /* ============================================================
-   MODALS (С Улучшенным фоном)
+   MODALS (С Улучшенным фоном) — модалка "Пример задания"
    ============================================================ */
 .modal-overlay {
   position: fixed;
@@ -700,10 +700,261 @@
 }
 
 /* ============================================================
+   HELP / SUPPORT MODALS ("Помощь" и "Техподдержка")
+   Компонент переключает эти окна через inline
+   style={{ display: helpOpen ? "flex" : "none" }},
+   поэтому оверлей должен быть fixed + flex-центрирование,
+   а не завязан на класс .active, как у .modal-overlay выше.
+   ============================================================ */
+.help-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  /* display управляется инлайн-стилем из React (flex/none) */
+  animation: help-modal-fade 0.25s ease;
+}
+
+@keyframes help-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.help-modal-content {
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+  border-radius: 24px;
+  padding: 2rem 2.25rem 2.25rem;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-sizing: border-box;
+  position: relative;
+  animation: help-modal-pop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes help-modal-pop {
+  from { transform: translateY(16px) scale(0.96); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.help-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.help-modal-header h3 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-navy);
+  letter-spacing: -0.02em;
+}
+
+.help-close {
+  cursor: pointer;
+  background: var(--blue-50);
+  border: none;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--blue-600);
+  font-size: 1.1rem;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.help-close:hover {
+  background: #e2e8f0;
+  color: var(--blue-900);
+  transform: rotate(90deg);
+}
+
+/* --- Табы (Регистрация / Правила) --- */
+.help-modal-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--auth-line);
+}
+
+.help-tab {
+  appearance: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-mut-auth);
+  padding: 0 0.25rem 0.85rem;
+  margin-right: 1.5rem;
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.help-tab:hover {
+  color: var(--text-navy);
+}
+
+.help-tab.active {
+  color: var(--text-navy);
+}
+
+.help-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--blue-600);
+  border-radius: 3px 3px 0 0;
+}
+
+.help-tab-content {
+  display: none;
+}
+
+.help-tab-content.active {
+  display: block;
+  animation: help-tab-fade 0.25s ease;
+}
+
+@keyframes help-tab-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.help-html-inner {
+  color: var(--text-mut-navy);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.help-section-title,
+.rules-main-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-navy);
+  margin: 0 0 1.1rem;
+  letter-spacing: -0.01em;
+}
+
+/* --- Шаги регистрации --- */
+.registration-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+.step-badge {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue-500), var(--blue-600));
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(14, 165, 233, 0.3);
+}
+
+.step-body h5 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-navy);
+}
+
+.step-body p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text-mut-navy);
+}
+
+.step-body a {
+  color: var(--blue-600);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.step-body a:hover {
+  text-decoration: underline;
+}
+
+/* --- Правила платформы --- */
+.rules-tab-bg {
+  background: linear-gradient(180deg, var(--blue-50) 0%, rgba(240, 249, 255, 0) 100%);
+  border-radius: 16px;
+  padding: 1.25rem;
+  margin: -0.25rem -0.25rem 0;
+}
+
+.help-rules-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.rule-card {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+
+.rule-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-mut-navy);
+  font-weight: 600;
+}
+
+.rule-card.trophy-card {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, var(--blue-600), var(--blue-500));
+  border-color: transparent;
+}
+
+.rule-card.trophy-card p {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* ============================================================
    REDUCED MOTION & MOBILE ADAPTATION
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  .preview-wrapper, .cert-wrapper, .promo-cta, .btn-submit, .btn-demo, .feature-tag, .modal-content, .modal-overlay, .interactive-hint svg, .page-login::before, .page-login::after {
+  .preview-wrapper, .cert-wrapper, .promo-cta, .btn-submit, .btn-demo, .feature-tag, .modal-content, .modal-overlay, .interactive-hint svg, .page-login::before, .page-login::after, .help-modal, .help-modal-content, .help-tab-content {
     transition: none !important;
     animation: none !important;
   }
@@ -794,8 +1045,13 @@
   .help-rules-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .modal-content {
     padding: 1.5rem;
+  }
+
+  .help-modal-content {
+    padding: 1.5rem;
+    max-height: 90vh;
   }
 }
