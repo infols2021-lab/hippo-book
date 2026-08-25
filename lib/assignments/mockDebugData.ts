@@ -37,25 +37,23 @@ export const SANDBOX_MOCKS = {
     points: 1,
   },
 
-  crossword: {
+ crossword: {
     id: "sandbox-crossword",
     type: "crossword",
-    q: "Разгадайте мини-кроссворд на тему животных и цветов:",
+    // Добавили переносы строк \n и сами вопросы прямо в текст задания
+    q: "Разгадайте мини-кроссворд (слова вписываются на английском):\n\nПо горизонтали (→):\n1. Домашний питомец, который ловит мышей (3 буквы)\n2. Цвет пожарной машины и спелых яблок (3 буквы)\n\nПо вертикали (↓):\n1. Легковое транспортное средство (3 буквы)",
     media: [],
     metadata: { rows: 3, cols: 3 },
-    // Сетка 3x3:
-    // C A T
-    // A . .
-    // R E D
     grid: [
       ["C", "A", "T"],
       ["A", "",  ""],
       ["R", "E", "D"],
     ],
     words: [
-      { id: "w1", number: 1, word: "CAT", direction: "across", start: { row: 0, col: 0 }, length: 3 },
-      { id: "w2", number: 1, word: "CAR", direction: "down",   start: { row: 0, col: 0 }, length: 3 },
-      { id: "w3", number: 2, word: "RED", direction: "across", start: { row: 2, col: 0 }, length: 3 },
+      // Заодно поправил 'word' на 'text', чтобы строгий TypeScript из types.ts был счастлив
+      { id: "w1", number: 1, text: "CAT", direction: "across", start: { row: 0, col: 0 }, length: 3 },
+      { id: "w2", number: 1, text: "CAR", direction: "down",   start: { row: 0, col: 0 }, length: 3 },
+      { id: "w3", number: 2, text: "RED", direction: "across", start: { row: 2, col: 0 }, length: 3 },
     ],
     blocks: [],
     cellNumbers: { "0,0": 1, "2,0": 2 },
