@@ -244,6 +244,29 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
 }
 
 // ==========================================
+// ХУК: ДИНАМИЧЕСКАЯ ПОЗИЦИЯ ПАНЕЛИ АВТОРИЗАЦИИ
+// ==========================================
+// На десктопе .auth-side стоит справа (split-layout: row).
+// На мобилке (<=768px) split-layout уходит в column-reverse,
+// и .auth-side физически оказывается сверху экрана.
+// Брейкпоинт синхронизирован с login.css (@media max-width: 768px).
+function useAuthPanelPosition() {
+  const [position, setPosition] = useState<"справа" | "сверху">("справа");
+
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 768px)");
+
+    const update = () => setPosition(mql.matches ? "сверху" : "справа");
+    update();
+
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
+
+  return position;
+}
+
+// ==========================================
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ==========================================
 function isValidEmail(email: string) {
@@ -289,6 +312,8 @@ function extractErrorMessage(payload: ApiPayload | null, json: ApiPayload | null
 function LoginPageContent() {
   const searchParams = useSearchParams();
   const msgParam = searchParams.get("message");
+
+  const authPanelPosition = useAuthPanelPosition();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -886,7 +911,7 @@ function LoginPageContent() {
             </p>
 
             <p className="promo-text">
-              Для старта тренировок <strong>используйте панель авторизации справа.</strong>
+              Для старта тренировок <strong>используйте панель авторизации {authPanelPosition}.</strong>
             </p>
 
             <div className="promo-cta-wrap">
