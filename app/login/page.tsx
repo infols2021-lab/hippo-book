@@ -5,11 +5,14 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 
-// Импортируем твои боевые компоненты заданий для песочницы
+// Импортируем боевые компоненты заданий для песочницы
 import QuestionTest from "@/app/(app)/projects/[slug]/assignment/components/QuestionTest";
 import QuestionFill from "@/app/(app)/projects/[slug]/assignment/components/QuestionFill";
-// Если Кроссворд/Пары полностью готовы на клиенте, их можно раскомментировать и добавить в Sandbox
-// import QuestionCrossword from "@/app/(app)/projects/[slug]/assignment/components/QuestionCrossword";
+import QuestionCrossword from "@/app/(app)/projects/[slug]/assignment/components/QuestionCrossword";
+import QuestionMatching from "@/app/(app)/projects/[slug]/assignment/components/QuestionMatching";
+
+// Импортируем моки[cite: 1]
+import { SANDBOX_MOCKS } from "@/lib/assignments/mockDebugData";
 
 type BannerType = "error" | "success" | "warning" | null;
 
@@ -47,60 +50,37 @@ const FEATURE_DATA: Record<string, FeatureModalContent> = {
   "Кроссворды": {
     id: "crossword",
     title: "Формат задания: Кроссворды",
-    image: "/features/crossword.png", // Фолбэк на картинку, если компонент слишком сложный для песочницы
     description: "Интерактивная сетка кроссворда для тренировки словарного запаса и спеллинга.",
   },
   "Аудирование": {
     id: "audio",
     title: "Формат задания: Аудирование",
-    image: "/features/audio.png",
     description: "Упражнения на восприятие речи на слух с нативным британским и американским произношением.",
   },
   "Пары": {
     id: "matching",
     title: "Формат задания: Пары",
-    image: "/features/matching.png",
     description: "Сопоставление слов с картинками, определениями или аудио-дорожками.",
   },
-};
-
-// ==========================================
-// 🏗️ MOCK DATA ДЛЯ ПЕСОЧНИЦЫ
-// ==========================================
-const MOCK_TEST: any = {
-  id: "demo-test-1",
-  type: "test",
-  q: "Choose the correct option to complete the sentence:\n\nShe ___ to the gym every morning.",
-  multiple: false,
-  layout: "vertical",
-  options: [
-    { id: "o1", text: "go", media: [] },
-    { id: "o2", text: "goes", media: [] },
-    { id: "o3", text: "is going", media: [] },
-  ],
-  correct: [1], // правильный индекс: "goes"
-  media: [],
-};
-
-const MOCK_FILL: any = {
-  id: "demo-fill-1",
-  type: "fill",
-  q: "Впишите правильную форму глагола 'to be':\n\nThey ___ good friends.",
-  answers: [["are", "'re"]], // поддерживаем альтернативные ответы
-  media: [],
 };
 
 // ==========================================
 // 🛠️ КОМПОНЕНТ ИНТЕРАКТИВНОЙ ПЕСОЧНИЦЫ
 // ==========================================
 function InteractiveSandbox({ type }: { type: FeatureType }) {
-  const [value, setValue] = useState<any>(type === "fill" ? [""] : []);
+  const [value, setValue] = useState<any>(null);
   const [isChecked, setIsChecked] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
 
+  const mockData: any = SANDBOX_MOCKS[type];
+
   // Сбрасываем стейт при смене типа
   useEffect(() => {
-    setValue(type === "fill" ? [""] : []);
+    if (type === "fill") setValue([""]);
+    else if (type === "matching") setValue({});
+    else if (type === "crossword") setValue(undefined);
+    else setValue([]); // test & audio
+    
     setIsChecked(false);
     setIsCorrect(false);
   }, [type]);
@@ -108,18 +88,39 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
   const handleCheck = () => {
     let correct = false;
 
-    if (type === "test") {
+    if (type === "test" || type === "audio") {
       const userAns = Array.isArray(value) ? [...value].sort() : [];
-      const rightAns = [...MOCK_TEST.correct].sort();
+      const rightAns = [...mockData.correct].sort();
       correct = JSON.stringify(userAns) === JSON.stringify(rightAns);
-    } else if (type === "fill") {
+    } 
+    else if (type === "fill") {
       const userAns = Array.isArray(value) ? value : [""];
-      const rightAns = MOCK_FILL.answers as string[][];
-      
+      const rightAns = mockData.answers as string[][];
       correct = rightAns.every((acceptedVariants, idx) => {
         const userWord = (userAns[idx] || "").trim().toLowerCase();
         return acceptedVariants.some((v) => v.trim().toLowerCase() === userWord);
       });
+    } 
+    else if (type === "matching") {
+      const pairs = mockData.pairs as any[];
+      // Для песочницы правильный ответ - когда id левой карточки равен id правой карточки
+      correct = pairs.every(p => value && value[p.id] === p.id);
+    } 
+    else if (type === "crossword") {
+      const rows = mockData.metadata.rows;
+      const cols = mockData.metadata.cols;
+      const correctGrid = mockData.grid;
+      correct = true;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const expected = String(correctGrid[r][c] || "").trim().toUpperCase();
+          const userVal = String(value?.[r]?.[c] || "").trim().toUpperCase();
+          if (expected && expected !== userVal) {
+            correct = false;
+            break;
+          }
+        }
+      }
     }
 
     setIsCorrect(correct);
@@ -127,24 +128,13 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
   };
 
   const handleReset = () => {
-    setValue(type === "fill" ? [""] : []);
+    if (type === "fill") setValue([""]);
+    else if (type === "matching") setValue({});
+    else if (type === "crossword") setValue(undefined);
+    else setValue([]);
+    
     setIsChecked(false);
   };
-
-  const isTest = type === "test";
-  const isFill = type === "fill";
-
-  // Если для типа еще нет песочницы (например, кроссворд), показываем фолбэк-картинку
-  if (!isTest && !isFill) {
-    return (
-      <div className="modal-image-placeholder">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-        <span>Здесь будет скриншот упражнения</span>
-      </div>
-    );
-  }
 
   return (
     <div 
@@ -163,21 +153,37 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
       } as any}
     >
       <div style={{ marginBottom: "20px", fontSize: "15px", fontWeight: 600, color: "#334155", whiteSpace: "pre-wrap" }}>
-        {isTest ? MOCK_TEST.q : MOCK_FILL.q}
+        {mockData.q}
       </div>
 
-      <div style={{ marginBottom: "24px" }}>
-        {isTest && (
+      <div style={{ marginBottom: "24px", overflowX: type === "crossword" ? "auto" : "visible" }}>
+        {(type === "test" || type === "audio") && (
           <QuestionTest 
-            question={MOCK_TEST} 
+            question={mockData as any} 
             value={value} 
             onChange={(val) => { setValue(val); setIsChecked(false); }} 
             disabled={isChecked} 
           />
         )}
-        {isFill && (
+        {type === "fill" && (
           <QuestionFill 
-            question={MOCK_FILL} 
+            question={mockData as any} 
+            value={value} 
+            onChange={(val) => { setValue(val); setIsChecked(false); }} 
+            disabled={isChecked} 
+          />
+        )}
+        {type === "matching" && (
+          <QuestionMatching 
+            question={mockData as any} 
+            value={value || {}} 
+            onChange={(val) => { setValue(val); setIsChecked(false); }} 
+            disabled={isChecked} 
+          />
+        )}
+        {type === "crossword" && (
+          <QuestionCrossword 
+            question={mockData as any} 
             value={value} 
             onChange={(val) => { setValue(val); setIsChecked(false); }} 
             disabled={isChecked} 
@@ -190,7 +196,7 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
         <div>
           {isChecked && (
             <span style={{ fontWeight: 800, fontSize: "14px", color: isCorrect ? "#10b981" : "#ef4444" }}>
-              {isCorrect ? "✅ Правильно!" : "❌ Ошибка, попробуйте еще раз."}
+              {isCorrect ? "✅ Идеально!" : "❌ Ошибка, попробуйте еще раз."}
             </span>
           )}
         </div>
@@ -611,7 +617,7 @@ function LoginPageContent() {
           if (e.target === e.currentTarget) setFeatureModal(null);
         }}
       >
-        <div className="modal-content" style={{ maxWidth: "600px", width: "100%" }}>
+        <div className="modal-content" style={{ maxWidth: "660px", width: "100%" }}>
           <button className="modal-close" aria-label="Закрыть" onClick={() => setFeatureModal(null)} type="button">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -621,22 +627,7 @@ function LoginPageContent() {
           <div className="modal-title">{featureModal?.title}</div>
           
           {featureModal && (
-            // Если у модалки есть картинка И она не поддерживается в песочнице, покажем картинку.
-            // Иначе рендерим интерактивную песочницу.
-            featureModal.image && (featureModal.id !== "test" && featureModal.id !== "fill") ? (
-              <div className="modal-image-placeholder">
-                <img
-                  src={featureModal.image}
-                  alt={featureModal.title}
-                  style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10px" }}
-                  onError={(e) => {
-                    (e.currentTarget as HTMLElement).style.display = "none";
-                  }}
-                />
-              </div>
-            ) : (
-              <InteractiveSandbox type={featureModal.id} />
-            )
+            <InteractiveSandbox type={featureModal.id} />
           )}
 
           {featureModal?.description && (
