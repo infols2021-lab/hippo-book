@@ -1,6 +1,9 @@
 "use client";
 
 import "./login.css";
+// 🔥 Фикс для кроссвордов: импортируем боевые стили сетки заданий
+import "@/app/(app)/projects/[slug]/assignment/assignment.css";
+
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
@@ -11,7 +14,10 @@ import QuestionFill from "@/app/(app)/projects/[slug]/assignment/components/Ques
 import QuestionCrossword from "@/app/(app)/projects/[slug]/assignment/components/QuestionCrossword";
 import QuestionMatching from "@/app/(app)/projects/[slug]/assignment/components/QuestionMatching";
 
-// Импортируем моки[cite: 1]
+// 🔥 Фикс для аудио: импортируем рендерер медиа
+import MediaRenderer from "@/app/(app)/projects/[slug]/assignment/components/MediaRenderer";
+
+// Импортируем моки
 import { SANDBOX_MOCKS } from "@/lib/assignments/mockDebugData";
 
 type BannerType = "error" | "success" | "warning" | null;
@@ -96,7 +102,7 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
     else if (type === "fill") {
       const userAns = Array.isArray(value) ? value : [""];
       const rightAns = mockData.answers as string[][];
-      correct = rightAns.every((acceptedVariants, idx) => {
+      correct = rightAns.every((acceptedVariants: string[], idx: number) => {
         const userWord = (userAns[idx] || "").trim().toLowerCase();
         return acceptedVariants.some((v) => v.trim().toLowerCase() === userWord);
       });
@@ -154,6 +160,12 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
     >
       <div style={{ marginBottom: "20px", fontSize: "15px", fontWeight: 600, color: "#334155", whiteSpace: "pre-wrap" }}>
         {mockData.q}
+        {/* 🔥 Фикс для аудио: рендерим медиа-блок, если он есть */}
+        {mockData.media && mockData.media.length > 0 && (
+          <div style={{ marginTop: "16px", borderRadius: "12px", overflow: "hidden" }}>
+            <MediaRenderer media={mockData.media} />
+          </div>
+        )}
       </div>
 
       <div style={{ marginBottom: "24px", overflowX: type === "crossword" ? "auto" : "visible" }}>
