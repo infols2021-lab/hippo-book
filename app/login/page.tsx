@@ -152,7 +152,7 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
         "--project-input-bg": "#f8fafc",
         "--project-input-border": "#cbd5e1",
         background: "#f8fafc",
-        padding: "24px",
+        padding: "clamp(16px, 4vw, 24px)", // Адаптивный паддинг для мобилок
         borderRadius: "16px",
         border: "1px solid #e2e8f0",
         textAlign: "left"
@@ -168,7 +168,14 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
         )}
       </div>
 
-      <div style={{ marginBottom: "24px", overflowX: type === "crossword" ? "auto" : "visible" }}>
+      {/* Обертка с горизонтальным скроллом для мобилок (спасает кроссворды и широкие таблицы) */}
+      <div style={{ 
+        marginBottom: "24px", 
+        width: "100%", 
+        overflowX: "auto", 
+        WebkitOverflowScrolling: "touch",
+        paddingBottom: "4px" // Место под скроллбар
+      }}>
         {(type === "test" || type === "audio") && (
           <QuestionTest 
             question={mockData as any} 
@@ -629,7 +636,16 @@ function LoginPageContent() {
           if (e.target === e.currentTarget) setFeatureModal(null);
         }}
       >
-        <div className="modal-content" style={{ maxWidth: "660px", width: "100%" }}>
+        <div 
+          className="modal-content" 
+          style={{ 
+            maxWidth: "660px", 
+            width: "calc(100% - 32px)", 
+            maxHeight: "90vh", // Ограничиваем высоту экрана для мобилок
+            overflowY: "auto", // Внутренний скролл
+            boxSizing: "border-box" 
+          }}
+        >
           <button className="modal-close" aria-label="Закрыть" onClick={() => setFeatureModal(null)} type="button">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
