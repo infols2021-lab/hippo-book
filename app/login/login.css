@@ -13,7 +13,7 @@
   --blue-100: #e0f2fe;
   --blue-50: #f0f9ff;
   
-  --emerald-400: #34d399; /* Для градиентных маркеров */
+  --emerald-400: #34d399; /* Для градиентных маркеров текста */
 
   /* Фоны и интерфейс */
   --auth-bg: rgba(255, 255, 255, 0.85); /* Полупрозрачный фон для стекла */
@@ -88,7 +88,7 @@
 }
 
 /* ============================================================
-   PROMO SIDE
+   PROMO SIDE (No-Scroll: всегда вписывается в 100vh)
    ============================================================ */
 .promo-side {
   flex: 1.25;
@@ -97,46 +97,39 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(14, 165, 233, 0.2) transparent;
-}
-
-.promo-side::-webkit-scrollbar {
-  width: 6px;
-}
-
-.promo-side::-webkit-scrollbar-thumb {
-  background-color: rgba(14, 165, 233, 0.3);
-  border-radius: 4px;
+  height: 100vh;
+  /* Жёсткая блокировка скролла — контент всегда вписывается в экран */
+  overflow: hidden;
 }
 
 .promo-content {
-  padding: clamp(1.5rem, 3vh, 2.5rem) clamp(2rem, 4vw, 4rem) 0.5rem;
+  padding: clamp(1.5rem, 3vh, 2.5rem) clamp(2rem, 4vw, 4rem) 0;
   max-width: 900px;
   position: relative;
   z-index: 2;
+  /* Блок текста не растягивается — забирает только нужное место */
+  flex-shrink: 0;
 }
 
 .logo {
   display: inline-flex;
   align-items: center;
-  margin-bottom: clamp(1rem, 2vh, 1.5rem);
+  margin-bottom: clamp(0.75rem, 2vh, 1.5rem);
 }
 
 .logo img {
-  height: clamp(40px, 5vh, 54px);
+  height: clamp(36px, 4.5vh, 54px);
   object-fit: contain;
 }
 
 /* Градиентный переливающийся заголовок */
 .promo-title {
   font-family: 'Inter', sans-serif;
-  font-size: clamp(1.8rem, 3.8vh, 2.8rem);
+  font-size: clamp(1.6rem, 3.4vh, 2.8rem);
   font-weight: 900;
   line-height: 1.15;
   letter-spacing: -0.03em;
-  margin-bottom: 1rem;
+  margin-bottom: clamp(0.5rem, 1.4vh, 1rem);
   background: linear-gradient(135deg, var(--blue-900) 0%, var(--blue-600) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -144,10 +137,10 @@
 }
 
 .promo-text {
-  font-size: clamp(0.95rem, 1.8vh, 1.1rem);
-  line-height: 1.6;
+  font-size: clamp(0.9rem, 1.6vh, 1.1rem);
+  line-height: 1.55;
   color: var(--text-mut-navy);
-  margin-bottom: 0.8rem;
+  margin-bottom: clamp(0.4rem, 1vh, 0.8rem);
   font-weight: 500;
 }
 
@@ -188,7 +181,7 @@
   font-size: 0.88rem;
   font-weight: 700;
   color: var(--blue-600);
-  margin: 1rem 0 0.6rem 0;
+  margin: clamp(0.6rem, 1.6vh, 1rem) 0 clamp(0.4rem, 1vh, 0.6rem) 0;
 }
 
 .interactive-hint svg {
@@ -205,12 +198,12 @@
 .feature-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.8rem;
-  margin-bottom: 1.2rem;
+  gap: 0.7rem;
+  margin-bottom: clamp(0.6rem, 1.6vh, 1.2rem);
 }
 
 .feature-tag {
-  padding: 0.6rem 1.4rem;
+  padding: 0.55rem 1.3rem;
   border-radius: 99px;
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(12px);
@@ -257,13 +250,13 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
-  margin-top: 1rem;
+  margin-top: clamp(0.5rem, 1.4vh, 1rem);
 }
 
 .promo-cta {
   display: inline-flex;
   align-items: center;
-  padding: 0.8rem 1.4rem;
+  padding: 0.75rem 1.3rem;
   border-radius: 12px;
   color: var(--blue-800);
   background: rgba(255, 255, 255, 0.7);
@@ -283,14 +276,18 @@
   box-shadow: 0 8px 24px rgba(14, 165, 233, 0.15);
 }
 
-/* ============ ЛЕВИТИРУЮЩЕЕ ПРЕВЬЮ (ДЫХАНИЕ) ============ */
+/* ============ ПРЕВЬЮ: МАСШТАБИРУЕМАЯ КАРТИНКА (СЕКРЕТ ФОКУСА) ============ */
 .preview-container {
-  padding: 1rem clamp(2rem, 4vw, 4rem) 3rem;
+  padding: clamp(0.5rem, 1.5vh, 1rem) clamp(2rem, 4vw, 4rem) clamp(1.5rem, 3vh, 3rem);
   position: relative;
   z-index: 2;
   display: flex;
   justify-content: flex-start;
   align-items: center;
+  /* Занимает всё оставшееся место до низа экрана, но не больше */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 @keyframes levitate {
@@ -300,10 +297,14 @@
 
 .preview-wrapper {
   width: 100%;
+  height: 100%;
   max-width: 660px;
   border-radius: 20px;
   position: relative;
-  /* Добавляем мягкое левитирование */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Мягкое левитирование */
   animation: levitate 7s ease-in-out infinite;
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -323,8 +324,12 @@
 }
 
 .preview-wrapper img {
-  width: 100%;
-  height: auto;
+  /* Пропорционально уменьшается, чтобы влезть в доступную высоту, и никогда не ломает верстку */
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
   display: block;
   border-radius: 20px;
   box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.25);
@@ -440,7 +445,11 @@
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.01), 0 0 0 4px rgba(14, 165, 233, 0.15);
 }
 
-/* Кнопка Сабмита (Premium Inner Glow) */
+/* ============================================================
+   ИЕРАРХИЯ КНОПОК (Apple Style: одно главное действие)
+   ============================================================ */
+
+/* PRIMARY — «Войти на платформу»: акцентная, дорогая, тёмный градиент */
 .btn-submit {
   width: 100%;
   padding: 1.15rem;
@@ -453,20 +462,21 @@
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   margin-top: 0.5rem;
-  /* Эффект объема в стиле Apple */
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 8px 20px rgba(15, 23, 42, 0.2);
+  /* Фирменный "яблочный" блик сверху + объёмная тень снизу */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 8px 20px rgba(15, 23, 42, 0.25);
   user-select: none;
 }
 
 .btn-submit:hover {
   background: linear-gradient(180deg, var(--blue-700) 0%, var(--blue-800) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 12px 28px rgba(15, 23, 42, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 12px 28px rgba(15, 23, 42, 0.32);
   transform: translateY(-2px);
 }
 
 .btn-submit:active {
+  /* Кнопка "продавливается" при нажатии */
   transform: translateY(1px);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
 .btn-submit:disabled {
@@ -475,28 +485,38 @@
   transform: none;
 }
 
-/* Кнопка Демо-задания */
+/* SECONDARY — «Пройти демо-задание»: стеклянная / призрачная, без заливки */
 .btn-demo {
   display: block;
   width: 100%;
   margin-top: 12px;
   padding: 1rem;
   border-radius: 12px;
-  background: linear-gradient(180deg, var(--emerald-400) 0%, #10b981 100%);
-  color: #ffffff;
-  font-weight: 800;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--blue-900);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  font-weight: 700;
   font-size: 0.95rem;
   text-decoration: none;
   text-align: center;
+  cursor: pointer;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 8px 20px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
   user-select: none;
 }
 
 .btn-demo:hover {
-  transform: translateY(-2px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 12px 28px rgba(16, 185, 129, 0.35);
-  filter: brightness(1.05);
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.btn-demo:active {
+  transform: translateY(0);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 /* Подвал авторизации и ссылки */
@@ -683,7 +703,7 @@
    REDUCED MOTION & MOBILE ADAPTATION
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  .preview-wrapper, .cert-wrapper, .promo-cta, .btn-submit, .feature-tag, .modal-content, .modal-overlay, .interactive-hint svg, .page-login::before, .page-login::after {
+  .preview-wrapper, .cert-wrapper, .promo-cta, .btn-submit, .btn-demo, .feature-tag, .modal-content, .modal-overlay, .interactive-hint svg, .page-login::before, .page-login::after {
     transition: none !important;
     animation: none !important;
   }
@@ -691,7 +711,7 @@
 
 @media (max-width: 1024px) {
   .promo-content {
-    padding: 1.5rem 2rem 0.5rem;
+    padding: 1.5rem 2rem 0;
   }
   .preview-container {
     padding: 1rem 2rem 2rem;
@@ -702,6 +722,12 @@
   body, html, .page-login {
     height: auto !important;
     overflow-y: auto !important;
+  }
+
+  /* На мобилках включаем обычный скролл — трюк с No-Scroll актуален только для десктопного сплит-лейаута */
+  .promo-side {
+    height: auto;
+    overflow: visible;
   }
 
   /* На мобилках отключаем левитацию, чтобы не тратить батарею */
@@ -757,6 +783,12 @@
   .preview-wrapper {
     transform: none;
     max-width: 480px;
+    height: auto;
+  }
+
+  .preview-wrapper img {
+    width: 100%;
+    height: auto;
   }
 
   .help-rules-grid {
