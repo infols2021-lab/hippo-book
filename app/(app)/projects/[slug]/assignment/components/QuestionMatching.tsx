@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback, useId, useMemo } from "react";
+import React, { useEffect, useRef, useState, useCallback, useId } from "react";
 import type { QuestionMatching, MatchingPair } from "@/lib/assignments/types";
 import MediaRenderer from "./MediaRenderer";
 
@@ -26,7 +26,7 @@ function SmallMedia({ media }: { media?: any[] }) {
       {isImg ? (
         <img
           src={m.url}
-          alt=""
+          alt="Медиавариант"
           style={{
             maxWidth: "120px",
             maxHeight: "120px",
@@ -53,7 +53,7 @@ export type MatchingLinesRendererProps = {
   matches: Record<string, string>;      // leftId -> rightId
   leftLabels: Record<string, string>;
   rightLabels: Record<string, string>;
-  correctMatches?: Record<string, string>; // для определения правильности (опционально)
+  correctMatches?: Record<string, string>; // для определения правильности
 };
 
 export function MatchingLinesRenderer({
@@ -69,7 +69,6 @@ export function MatchingLinesRenderer({
   const [dots, setDots] = useState<Record<string, DotNode>>({});
   const [rightItems, setRightItems] = useState<MatchingPair[]>([]);
 
-  // Перемешиваем правую колонку для визуализации (как в оригинале)
   useEffect(() => {
     setRightItems([...pairs].sort(() => Math.random() - 0.5));
   }, [pairs]);
@@ -121,9 +120,8 @@ export function MatchingLinesRenderer({
   }, []);
 
   const getStrokeColor = (leftId: string, rightId: string) => {
-    if (!correctMatches) return "#6366f1"; // нейтральный
-    const isCorrect = correctMatches[leftId] === rightId;
-    return isCorrect ? "#22c55e" : "#ef4444";
+    if (!correctMatches) return "#6366f1"; 
+    return correctMatches[leftId] === rightId ? "#22c55e" : "#ef4444";
   };
 
   return (
@@ -172,7 +170,6 @@ export function MatchingLinesRenderer({
       </svg>
 
       <div className="matching-review-layout">
-        {/* Левая колонка */}
         <div className="matching-review-col">
           {pairs.map((p) => {
             const isConnected = !!matches[p.id];
@@ -222,7 +219,6 @@ export function MatchingLinesRenderer({
           })}
         </div>
 
-        {/* Правая колонка */}
         <div className="matching-review-col">
           {rightItems.map((p) => {
             const isConnected = Object.values(matches).includes(p.id);
@@ -277,7 +273,7 @@ export function MatchingLinesRenderer({
 }
 
 // ============================================================================
-// Оригинальный интерактивный компонент
+// Интерактивный компонент с умной проверкой
 // ============================================================================
 
 export default function QuestionMatching({ question, value = {}, onChange, disabled }: Props) {
@@ -447,16 +443,23 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
           </filter>
         </defs>
 
+        {/* 1. Отрисовка связей, установленных пользователем */}
         {Object.entries(value).map(([lId, rId]) => {
           const start = dots[`left-${lId}`];
           const end = dots[`right-${rId}`];
           if (!start || !end) return null;
+          
+          let strokeColor = "#6366f1";
+          if (disabled) {
+            strokeColor = lId === rId ? "#10b981" : "#ef4444"; // Если ID совпадают - правильно
+          }
+
           return (
             <path
-              key={`${lId}-${rId}`}
+              key={`user-${lId}-${rId}`}
               d={generatePath(start.x, start.y, end.x, end.y)}
               fill="none"
-              stroke="#6366f1"
+              stroke={strokeColor}
               strokeWidth="6"
               strokeLinecap="round"
               style={{ filter: `url(#${filterId})`, opacity: 0.9 }}
@@ -464,6 +467,31 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
           );
         })}
 
+        {/* 2. Подсказки правильных связей (пунктиром), если пользователь ошибся/пропустил */}
+        {disabled && pairs.map((p) => {
+          // Если юзер НЕ провел правильную линию для этой пары
+          if (value[p.id] !== p.id) {
+            const start = dots[`left-${p.id}`];
+            const end = dots[`right-${p.id}`];
+            if (!start || !end) return null;
+
+            return (
+              <path
+                key={`correct-hint-${p.id}`}
+                d={generatePath(start.x, start.y, end.x, end.y)}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="4"
+                strokeDasharray="8 8"
+                strokeLinecap="round"
+                opacity="0.5"
+              />
+            );
+          }
+          return null;
+        })}
+
+        {/* 3. Линия в процессе рисования */}
         {drawingLine && dots[`${drawingLine.side}-${drawingLine.startId}`] && (
           <path
             d={generatePath(
@@ -491,74 +519,110 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
           zIndex: 10,
         }}
       >
+        {/* ЛЕВАЯ КОЛОНКА */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px", width: "42%" }}>
-          {pairs.map((p) => (
-            <div
-              key={p.id}
-              className="matching-card"
-              style={{
-                position: "relative",
-                background: "#fff",
-                border: `2px solid ${value[p.id] ? "#6366f1" : "#e2e8f0"}`,
-                borderRadius: "20px",
-                padding: "16px",
-                display: "flex",
-                alignItems: "center",
-                minHeight: "80px",
-                boxShadow: value[p.id]
-                  ? "0 8px 20px rgba(99,102,241,0.12)"
-                  : "0 2px 10px rgba(0,0,0,0.02)",
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                {p.left.text && (
-                  <div style={{ fontWeight: 900, fontSize: "15px", marginBottom: "8px", color: "#000" }}>
-                    {p.left.text}
-                  </div>
-                )}
-                <SmallMedia media={p.left?.media} />
-              </div>
-              <div
-                className="matching-dot"
-                data-id={p.id}
-                data-side="left"
-                onPointerDown={(e) => handlePointerDown(e, p.id, "left")}
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "50%",
-                  background: value[p.id] ? "#6366f1" : "#fff",
-                  border: "6px solid #fff",
-                  boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-                  position: "absolute",
-                  right: "-16px",
-                  cursor: "crosshair",
-                  zIndex: 50,
-                }}
-              />
-            </div>
-          ))}
-        </div>
+          {pairs.map((p) => {
+            const connectedRightId = value[p.id];
+            
+            // Цвета по умолчанию
+            let borderColor = connectedRightId ? "#6366f1" : "#e2e8f0";
+            let bgColor = "#fff";
+            let icon = null;
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px", width: "42%" }}>
-          {rightItems.map((p) => {
-            const isConnected = Object.values(value).includes(p.id);
+            // Логика проверки
+            if (disabled && connectedRightId) {
+              const isCorrect = connectedRightId === p.id;
+              borderColor = isCorrect ? "#10b981" : "#ef4444";
+              bgColor = isCorrect ? "#f0fdf4" : "#fef2f2";
+              icon = isCorrect ? "✓" : "✗";
+            }
+
             return (
               <div
                 key={p.id}
                 className="matching-card"
                 style={{
                   position: "relative",
-                  background: "#fff",
-                  border: `2px solid ${isConnected ? "#6366f1" : "#e2e8f0"}`,
+                  background: bgColor,
+                  border: `2px solid ${borderColor}`,
                   borderRadius: "20px",
                   padding: "16px",
                   display: "flex",
                   alignItems: "center",
                   minHeight: "80px",
-                  boxShadow: isConnected
-                    ? "0 8px 20px rgba(99,102,241,0.12)"
-                    : "0 2px 10px rgba(0,0,0,0.02)",
+                  boxShadow: connectedRightId && !disabled ? "0 8px 20px rgba(99,102,241,0.12)" : "0 2px 10px rgba(0,0,0,0.02)",
+                }}
+              >
+                <div style={{ flex: 1, position: "relative" }}>
+                  {p.left.text && (
+                    <div style={{ fontWeight: 900, fontSize: "15px", marginBottom: "8px", color: disabled ? (borderColor) : "#000" }}>
+                      {p.left.text}
+                    </div>
+                  )}
+                  <SmallMedia media={p.left?.media} />
+                </div>
+
+                {disabled && icon && (
+                  <div style={{ position: "absolute", right: "24px", fontWeight: "900", color: borderColor, fontSize: "20px" }}>
+                    {icon}
+                  </div>
+                )}
+
+                <div
+                  className="matching-dot"
+                  data-id={p.id}
+                  data-side="left"
+                  onPointerDown={(e) => handlePointerDown(e, p.id, "left")}
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    background: disabled && connectedRightId ? borderColor : (connectedRightId ? "#6366f1" : "#fff"),
+                    border: "6px solid #fff",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+                    position: "absolute",
+                    right: "-16px",
+                    cursor: disabled ? "default" : "crosshair",
+                    zIndex: 50,
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ПРАВАЯ КОЛОНКА */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px", width: "42%" }}>
+          {rightItems.map((p) => {
+            const connectedLeftId = Object.keys(value).find((k) => value[k] === p.id);
+            
+            // Цвета по умолчанию
+            let borderColor = connectedLeftId ? "#6366f1" : "#e2e8f0";
+            let bgColor = "#fff";
+            let icon = null;
+
+            // Логика проверки
+            if (disabled && connectedLeftId) {
+              const isCorrect = connectedLeftId === p.id;
+              borderColor = isCorrect ? "#10b981" : "#ef4444";
+              bgColor = isCorrect ? "#f0fdf4" : "#fef2f2";
+              icon = isCorrect ? "✓" : "✗";
+            }
+
+            return (
+              <div
+                key={p.id}
+                className="matching-card"
+                style={{
+                  position: "relative",
+                  background: bgColor,
+                  border: `2px solid ${borderColor}`,
+                  borderRadius: "20px",
+                  padding: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  minHeight: "80px",
+                  boxShadow: connectedLeftId && !disabled ? "0 8px 20px rgba(99,102,241,0.12)" : "0 2px 10px rgba(0,0,0,0.02)",
                 }}
               >
                 <div
@@ -570,23 +634,29 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
                     width: "32px",
                     height: "32px",
                     borderRadius: "50%",
-                    background: isConnected ? "#6366f1" : "#fff",
+                    background: disabled && connectedLeftId ? borderColor : (connectedLeftId ? "#6366f1" : "#fff"),
                     border: "6px solid #fff",
                     boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
                     position: "absolute",
                     left: "-16px",
-                    cursor: "crosshair",
+                    cursor: disabled ? "default" : "crosshair",
                     zIndex: 50,
                   }}
                 />
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, paddingLeft: "12px", position: "relative" }}>
                   {p.right.text && (
-                    <div style={{ fontWeight: 900, fontSize: "15px", marginBottom: "8px", color: "#000" }}>
+                    <div style={{ fontWeight: 900, fontSize: "15px", marginBottom: "8px", color: disabled ? (borderColor) : "#000" }}>
                       {p.right.text}
                     </div>
                   )}
                   <SmallMedia media={p.right?.media} />
                 </div>
+                
+                {disabled && icon && (
+                  <div style={{ position: "absolute", right: "12px", fontWeight: "900", color: borderColor, fontSize: "20px" }}>
+                    {icon}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -600,7 +670,7 @@ export default function QuestionMatching({ question, value = {}, onChange, disab
         .matching-dot {
           transition: transform 0.2s ease, background 0.2s ease;
         }
-        .matching-dot:hover {
+        .matching-dot:not([style*="cursor: default"]):hover {
           transform: scale(1.15);
         }
       `}</style>

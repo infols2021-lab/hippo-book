@@ -23,13 +23,13 @@ type Props = {
 };
 
 // ============================================================================
-// Read-only компонент для отображения сетки кроссворда (без ввода)
+// Read-only компонент для отображения сетки кроссворда (разбор)
 // ============================================================================
 
 export type CrosswordGridReadOnlyProps = {
   title?: string;
   grid: string[][];           // эталонная сетка (правильные буквы)
-  userGrid?: string[][];      // сетка пользователя (если передана, будет подсветка ошибок)
+  userGrid?: string[][];      // сетка пользователя
   cellNumbers: Record<string, number>;
   blocks: { row: number; col: number }[];
   words: Word[];
@@ -169,7 +169,7 @@ export function CrosswordGridReadOnly({
 }
 
 // ============================================================================
-// Основной интерактивный компонент
+// Основной интерактивный компонент (с умным UI-фидбеком)
 // ============================================================================
 
 function ensureGrid(rows: number, cols: number, prev?: string[][]) {
@@ -353,10 +353,6 @@ export default function QuestionCrossword({
 
   return (
     <div className="crossword-container">
-      {/* Текст вопроса и медиа НЕ рендерятся здесь —
-          родительский компонент задания делает это для всех типов вопросов одинаково.
-          Оставляем только legacy-поле image для обратной совместимости,
-          поскольку оно специфично для кроссворда и родитель о нём не знает. */}
       {question?.image && !(question?.media?.length) ? (
         <div className="cw-card cw-image-card">
           <img
@@ -379,12 +375,33 @@ export default function QuestionCrossword({
                   const kind = cellKind(r, c);
                   const isFocused = focused?.r === r && focused?.c === c;
                   const n = getCellNumber(r, c);
+                  
+                  // Логика проверки:
+                  const userChar = (userGrid?.[r]?.[c] ?? "").toUpperCase();
+                  const correctChar = (correctGrid?.[r]?.[c] ?? "").toUpperCase();
+                  
+                  let displayChar = userChar;
+                  let textColor = "#000";
+                  let cellBg = "";
+
+                  if (disabled && kind === "active") {
+                    if (userChar) {
+                      const isCorrect = userChar === correctChar;
+                      textColor = isCorrect ? "#166534" : "#991b1b"; // Ярко зеленый или красный
+                      cellBg = isCorrect ? "#f0fdf4" : "#fef2f2";
+                    } else if (correctChar) {
+                      // Юзер пропустил букву — показываем правильную полупрозрачно
+                      textColor = "rgba(16, 185, 129, 0.6)"; 
+                      displayChar = correctChar;
+                    }
+                  }
 
                   return (
                     <div
                       key={c}
                       className={`cw-cell ${kind} ${isFocused ? "focused" : ""}`}
                       onPointerDown={() => handleCellPointerDown(r, c)}
+                      style={cellBg ? { background: cellBg } : undefined}
                     >
                       {kind === "active" ? (
                         <input
@@ -393,13 +410,17 @@ export default function QuestionCrossword({
                             inputRefs.current[r][c] = el;
                           }}
                           disabled={disabled}
-                          value={(userGrid?.[r]?.[c] ?? "").toUpperCase()}
+                          value={displayChar.slice(0, 1)}
                           maxLength={1}
                           inputMode="text"
                           autoComplete="off"
                           autoCorrect="off"
                           spellCheck={false}
-                          style={{ fontWeight: 900, color: "#000" }}
+                          style={{ 
+                            fontWeight: 900, 
+                            color: textColor,
+                            background: "transparent" // Чтобы просвечивал cellBg
+                          }}
                           onFocus={() => {
                             setFocused({ r, c });
                             setDir((d) => {
@@ -474,9 +495,11 @@ export default function QuestionCrossword({
           <div className="cw-scroll-hint">← Прокрутите сетку влево-вправо →</div>
         )}
 
-        <div className="cw-mode">
-          Режим ввода: <strong>{dir === "across" ? "→ across" : "↓ down"}</strong>
-        </div>
+        {!disabled && (
+          <div className="cw-mode">
+            Режим ввода: <strong>{dir === "across" ? "→ across" : "↓ down"}</strong>
+          </div>
+        )}
       </div>
     </div>
   );

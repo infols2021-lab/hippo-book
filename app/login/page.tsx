@@ -5,6 +5,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 
+// Импортируем твои боевые компоненты заданий для песочницы
+import QuestionTest from "@/app/(app)/projects/[slug]/assignment/components/QuestionTest";
+import QuestionFill from "@/app/(app)/projects/[slug]/assignment/components/QuestionFill";
+// Если Кроссворд/Пары полностью готовы на клиенте, их можно раскомментировать и добавить в Sandbox
+// import QuestionCrossword from "@/app/(app)/projects/[slug]/assignment/components/QuestionCrossword";
+
 type BannerType = "error" | "success" | "warning" | null;
 
 type ApiPayload = {
@@ -18,7 +24,10 @@ type ApiPayload = {
   redirectTo?: string;
 };
 
+type FeatureType = "test" | "fill" | "crossword" | "audio" | "matching";
+
 type FeatureModalContent = {
+  id: FeatureType;
   title: string;
   image?: string;
   description?: string;
@@ -26,32 +35,192 @@ type FeatureModalContent = {
 
 const FEATURE_DATA: Record<string, FeatureModalContent> = {
   "Тесты": {
+    id: "test",
     title: "Формат задания: Тесты",
-    image: "/features/test.png",
     description: "Вопросы с одиночным или множественным выбором ответа, аудио-вставками и пояснениями.",
   },
   "Вписать слово": {
+    id: "fill",
     title: "Формат задания: Вписать слово",
-    image: "/features/fill.png",
     description: "Задания на ввод пропущенных слов и выражений с гибкой системой проверки вариантов.",
   },
   "Кроссворды": {
+    id: "crossword",
     title: "Формат задания: Кроссворды",
-    image: "/features/crossword.png",
+    image: "/features/crossword.png", // Фолбэк на картинку, если компонент слишком сложный для песочницы
     description: "Интерактивная сетка кроссворда для тренировки словарного запаса и спеллинга.",
   },
   "Аудирование": {
+    id: "audio",
     title: "Формат задания: Аудирование",
     image: "/features/audio.png",
     description: "Упражнения на восприятие речи на слух с нативным британским и американским произношением.",
   },
   "Пары": {
+    id: "matching",
     title: "Формат задания: Пары",
     image: "/features/matching.png",
     description: "Сопоставление слов с картинками, определениями или аудио-дорожками.",
   },
 };
 
+// ==========================================
+// 🏗️ MOCK DATA ДЛЯ ПЕСОЧНИЦЫ
+// ==========================================
+const MOCK_TEST: any = {
+  id: "demo-test-1",
+  type: "test",
+  q: "Choose the correct option to complete the sentence:\n\nShe ___ to the gym every morning.",
+  multiple: false,
+  layout: "vertical",
+  options: [
+    { id: "o1", text: "go", media: [] },
+    { id: "o2", text: "goes", media: [] },
+    { id: "o3", text: "is going", media: [] },
+  ],
+  correct: [1], // правильный индекс: "goes"
+  media: [],
+};
+
+const MOCK_FILL: any = {
+  id: "demo-fill-1",
+  type: "fill",
+  q: "Впишите правильную форму глагола 'to be':\n\nThey ___ good friends.",
+  answers: [["are", "'re"]], // поддерживаем альтернативные ответы
+  media: [],
+};
+
+// ==========================================
+// 🛠️ КОМПОНЕНТ ИНТЕРАКТИВНОЙ ПЕСОЧНИЦЫ
+// ==========================================
+function InteractiveSandbox({ type }: { type: FeatureType }) {
+  const [value, setValue] = useState<any>(type === "fill" ? [""] : []);
+  const [isChecked, setIsChecked] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
+
+  // Сбрасываем стейт при смене типа
+  useEffect(() => {
+    setValue(type === "fill" ? [""] : []);
+    setIsChecked(false);
+    setIsCorrect(false);
+  }, [type]);
+
+  const handleCheck = () => {
+    let correct = false;
+
+    if (type === "test") {
+      const userAns = Array.isArray(value) ? [...value].sort() : [];
+      const rightAns = [...MOCK_TEST.correct].sort();
+      correct = JSON.stringify(userAns) === JSON.stringify(rightAns);
+    } else if (type === "fill") {
+      const userAns = Array.isArray(value) ? value : [""];
+      const rightAns = MOCK_FILL.answers as string[][];
+      
+      correct = rightAns.every((acceptedVariants, idx) => {
+        const userWord = (userAns[idx] || "").trim().toLowerCase();
+        return acceptedVariants.some((v) => v.trim().toLowerCase() === userWord);
+      });
+    }
+
+    setIsCorrect(correct);
+    setIsChecked(true);
+  };
+
+  const handleReset = () => {
+    setValue(type === "fill" ? [""] : []);
+    setIsChecked(false);
+  };
+
+  const isTest = type === "test";
+  const isFill = type === "fill";
+
+  // Если для типа еще нет песочницы (например, кроссворд), показываем фолбэк-картинку
+  if (!isTest && !isFill) {
+    return (
+      <div className="modal-image-placeholder">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        <span>Здесь будет скриншот упражнения</span>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className="sandbox-container" 
+      style={{
+        // Инжектируем CSS переменные, чтобы компоненты выглядели как в оригинале
+        "--project-primary": "#0ea5e9",
+        "--project-card-bg": "#ffffff",
+        "--project-input-bg": "#f8fafc",
+        "--project-input-border": "#cbd5e1",
+        background: "#f8fafc",
+        padding: "24px",
+        borderRadius: "16px",
+        border: "1px solid #e2e8f0",
+        textAlign: "left"
+      } as any}
+    >
+      <div style={{ marginBottom: "20px", fontSize: "15px", fontWeight: 600, color: "#334155", whiteSpace: "pre-wrap" }}>
+        {isTest ? MOCK_TEST.q : MOCK_FILL.q}
+      </div>
+
+      <div style={{ marginBottom: "24px" }}>
+        {isTest && (
+          <QuestionTest 
+            question={MOCK_TEST} 
+            value={value} 
+            onChange={(val) => { setValue(val); setIsChecked(false); }} 
+            disabled={isChecked} 
+          />
+        )}
+        {isFill && (
+          <QuestionFill 
+            question={MOCK_FILL} 
+            value={value} 
+            onChange={(val) => { setValue(val); setIsChecked(false); }} 
+            disabled={isChecked} 
+          />
+        )}
+      </div>
+
+      {/* Панель микро-проверки */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
+        <div>
+          {isChecked && (
+            <span style={{ fontWeight: 800, fontSize: "14px", color: isCorrect ? "#10b981" : "#ef4444" }}>
+              {isCorrect ? "✅ Правильно!" : "❌ Ошибка, попробуйте еще раз."}
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: "10px" }}>
+          {isChecked ? (
+            <button 
+              type="button" 
+              onClick={handleReset}
+              style={{ background: "#f1f5f9", color: "#475569", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}
+            >
+              Сбросить
+            </button>
+          ) : (
+            <button 
+              type="button" 
+              onClick={handleCheck}
+              style={{ background: "#0ea5e9", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(14,165,233,0.3)" }}
+            >
+              Проверить ответ
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ==========================================
 function isValidEmail(email: string) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
@@ -89,6 +258,9 @@ function extractErrorMessage(payload: ApiPayload | null, json: ApiPayload | null
   return String(payload?.error || payload?.message || json?.error || fallback);
 }
 
+// ==========================================
+// ГЛАВНЫЙ КОМПОНЕНТ СТРАНИЦЫ ВХОДА
+// ==========================================
 function LoginPageContent() {
   const searchParams = useSearchParams();
   const msgParam = searchParams.get("message");
@@ -306,6 +478,7 @@ function LoginPageContent() {
 
   function openFeatureModal(tagName: string) {
     const data = FEATURE_DATA[tagName] || {
+      id: "unknown",
       title: `Формат задания: ${tagName}`,
       description: "Интерактивное упражнение на платформе skilLS.",
     };
@@ -431,41 +604,41 @@ function LoginPageContent() {
         </div>
       )}
 
-      {/* МОДАЛЬНОЕ ОКНО: ПРИМЕРЫ ЗАДАНИЙ */}
+      {/* МОДАЛЬНОЕ ОКНО: ПРИМЕРЫ ЗАДАНИЙ (ИНТЕРАКТИВНАЯ ПЕСОЧНИЦА) */}
       <div
         className={`modal-overlay ${featureModal ? "active" : ""}`}
         onClick={(e) => {
           if (e.target === e.currentTarget) setFeatureModal(null);
         }}
       >
-        <div className="modal-content">
+        <div className="modal-content" style={{ maxWidth: "600px", width: "100%" }}>
           <button className="modal-close" aria-label="Закрыть" onClick={() => setFeatureModal(null)} type="button">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+          
           <div className="modal-title">{featureModal?.title}</div>
-          <div className="modal-image-placeholder">
-            {featureModal?.image ? (
-              <img
-                src={featureModal.image}
-                alt={featureModal.title}
-                style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10px" }}
-                onError={(e) => {
-                  (e.currentTarget as HTMLElement).style.display = "none";
-                }}
-              />
-            ) : null}
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.5"
-                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            <span>Здесь будет скриншот упражнения</span>
-          </div>
+          
+          {featureModal && (
+            // Если у модалки есть картинка И она не поддерживается в песочнице, покажем картинку.
+            // Иначе рендерим интерактивную песочницу.
+            featureModal.image && (featureModal.id !== "test" && featureModal.id !== "fill") ? (
+              <div className="modal-image-placeholder">
+                <img
+                  src={featureModal.image}
+                  alt={featureModal.title}
+                  style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10px" }}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = "none";
+                  }}
+                />
+              </div>
+            ) : (
+              <InteractiveSandbox type={featureModal.id} />
+            )
+          )}
+
           {featureModal?.description && (
             <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "var(--text-mut-navy)", lineHeight: 1.5 }}>
               {featureModal.description}

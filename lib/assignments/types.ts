@@ -112,6 +112,7 @@ export type InfoBlock =
   | AccordionBlock
   | DownloadsBlock;
 
+
 // ==========================================
 // ВОПРОСЫ: ИНТЕРАКТИВНЫЙ РЕЖИМ (Тесты)
 // ==========================================
@@ -126,7 +127,7 @@ export type QuestionType =
   | "imagemap"
   | "reading";
 
-// БАЗОВЫЙ ИНТЕРФЕЙС (ТУТ БОЛЬШЕ НЕТ type?: string)
+// БАЗОВЫЙ ИНТЕРФЕЙС
 export type QuestionBase = {
   id: string;
   q?: string;
@@ -250,7 +251,7 @@ export type QuestionAny =
   | QuestionImageMap
   | QuestionReading;
 
-// АЛИАСЫ ДЛЯ АДМИНКИ
+// АЛИАСЫ ДЛЯ АДМИНКИ И КОМПОНЕНТОВ
 export type Question = QuestionAny;
 export type TestQuestion = QuestionTest;
 export type FillQuestion = QuestionFill;
@@ -261,8 +262,9 @@ export type MatchingQuestion = QuestionMatching;
 export type ImageMapQuestion = QuestionImageMap;
 export type ReadingQuestion = QuestionReading;
 
+
 // ==========================================
-// ДАННЫЕ ЗАДАНИЯ И РЕВЬЮ
+// ДАННЫЕ ЗАДАНИЯ И РЕВЬЮ (ПРОГРЕСС И СТАТИСТИКА)
 // ==========================================
 
 export type Progress = {

@@ -31,6 +31,13 @@ export default function QuestionTest({ question, value, onChange, disabled }: Pr
     ? [Number(value)]
     : [];
 
+  // Безопасное извлечение правильных ответов (для режима разбора/песочницы)
+  const correctIndices: number[] = Array.isArray(question.correct)
+    ? question.correct
+    : typeof question.correct === "number"
+    ? [question.correct]
+    : [];
+
   function handleToggle(index: number) {
     if (disabled) return;
 
@@ -49,23 +56,17 @@ export default function QuestionTest({ question, value, onChange, disabled }: Pr
 
   if (options.length === 0) {
     return (
-      <div style={{ color: "rgba(0,0,0,0.5)", fontStyle: "italic" }}>
-        Нет вариантов ответа
+      <div style={{ color: "#64748b", fontWeight: 600, padding: "16px", background: "#f8fafc", borderRadius: "12px", border: "1px dashed #cbd5e1" }}>
+        ⚠️ Нет вариантов ответа
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "12px",
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       {isMultiple && (
-        <div style={{ fontSize: "13px", color: "rgba(0,0,0,0.5)", marginBottom: "4px" }}>
-          Выберите все подходящие варианты (множественный выбор)
+        <div style={{ fontSize: "14px", fontWeight: 700, color: "#64748b", display: "flex", alignItems: "center", gap: "6px" }}>
+          <span style={{ fontSize: "16px" }}>☑️</span> Выберите все подходящие варианты
         </div>
       )}
 
@@ -74,14 +75,48 @@ export default function QuestionTest({ question, value, onChange, disabled }: Pr
           layout === "horizontal"
             ? {
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                gap: "16px",
+              }
+            : {
+                display: "flex",
+                flexDirection: "column",
                 gap: "12px",
               }
-            : undefined
         }
       >
         {options.map((opt, index) => {
           const isSelected = selectedIndices.includes(index);
+          const isCorrect = correctIndices.includes(index);
+
+          // Логика визуального фидбека для режима проверки (disabled = true)
+          let borderColor = isSelected ? "#0ea5e9" : "#e2e8f0";
+          let bgColor = isSelected ? "#f0f9ff" : "#ffffff";
+          let textColor = "#0f172a";
+          let icon = null;
+
+          if (disabled) {
+            if (isSelected && isCorrect) {
+              borderColor = "#10b981"; // Зеленый (выбрал правильно)
+              bgColor = "#f0fdf4";
+              textColor = "#166534";
+              icon = <span style={{ color: "#10b981", fontWeight: 900, fontSize: "18px" }}>✓</span>;
+            } else if (isSelected && !isCorrect) {
+              borderColor = "#ef4444"; // Красный (выбрал ошибку)
+              bgColor = "#fef2f2";
+              textColor = "#991b1b";
+              icon = <span style={{ color: "#ef4444", fontWeight: 900, fontSize: "18px" }}>✗</span>;
+            } else if (!isSelected && isCorrect) {
+              borderColor = "#10b981"; // Пропустил правильный
+              bgColor = "#ffffff";
+              textColor = "#166534";
+              icon = <span style={{ color: "#10b981", fontWeight: 900, fontSize: "18px", opacity: 0.5 }}>✓</span>;
+            } else {
+              borderColor = "#e2e8f0"; // Серый (не выбрал и он не правильный)
+              bgColor = "#f8fafc";
+              textColor = "#64748b";
+            }
+          }
 
           return (
             <label
@@ -90,73 +125,68 @@ export default function QuestionTest({ question, value, onChange, disabled }: Pr
                 display: "flex",
                 alignItems: "flex-start",
                 gap: "16px",
-                padding: "16px",
+                padding: "16px 20px",
                 borderRadius: "16px",
-                background: isSelected ? "rgba(0, 123, 255, 0.04)" : "#fff",
-                border: `2px solid ${
-                  isSelected ? "#007bff" : "rgba(0,0,0,0.08)"
-                }`,
+                background: bgColor,
+                border: `2px solid ${borderColor}`,
                 cursor: disabled ? "default" : "pointer",
                 transition: "all 0.2s ease",
-                boxShadow: isSelected
-                  ? "0 4px 12px rgba(0, 123, 255, 0.1)"
-                  : "0 2px 4px rgba(0,0,0,0.02)",
-                opacity: disabled && !isSelected ? 0.7 : 1,
+                boxShadow: isSelected && !disabled ? "0 4px 12px rgba(14, 165, 233, 0.15)" : "0 2px 4px rgba(0,0,0,0.02)",
+                opacity: disabled && !isSelected && !isCorrect ? 0.6 : 1,
                 height: layout === "horizontal" ? "100%" : undefined,
               }}
             >
-              <div style={{ paddingTop: "2px" }}>
-                <input
-                  type={isMultiple ? "checkbox" : "radio"}
-                  checked={isSelected}
-                  onChange={() => handleToggle(index)}
-                  disabled={disabled}
-                  style={{
-                    width: "20px",
-                    height: "20px",
-                    cursor: disabled ? "default" : "pointer",
-                    accentColor: "#007bff",
-                  }}
-                />
+              <div style={{ paddingTop: "2px", display: "flex", alignItems: "center", justifyContent: "center", width: "24px", height: "24px" }}>
+                {disabled && icon ? (
+                  icon
+                ) : (
+                  <input
+                    type={isMultiple ? "checkbox" : "radio"}
+                    checked={isSelected}
+                    onChange={() => handleToggle(index)}
+                    disabled={disabled}
+                    style={{
+                      width: "22px",
+                      height: "22px",
+                      cursor: disabled ? "default" : "pointer",
+                      accentColor: "#0ea5e9",
+                    }}
+                  />
+                )}
               </div>
 
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                }}
-              >
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
                 {opt.text && (
                   <div
                     style={{
                       fontSize: "16px",
-                      color: "#000",
-                      lineHeight: 1.4,
-                      fontWeight: isSelected ? 800 : 600,
+                      color: textColor,
+                      lineHeight: 1.45,
+                      fontWeight: isSelected || (disabled && isCorrect) ? 800 : 600,
                     }}
                   >
                     {opt.text}
                   </div>
                 )}
 
-                {/* Ограничиваем размер картинок до 120px, как в ReviewPanel */}
+                {/* Ограничиваем размер картинок до 120px для UI-стабильности */}
                 {opt.media && opt.media.length > 0 && (
                   <div style={{ marginTop: opt.text ? "4px" : "0", display: "flex", justifyContent: "flex-start" }}>
                     {opt.media[0].url?.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) || opt.media[0].type?.startsWith("image") ? (
                       <img
                         src={opt.media[0].url}
-                        alt=""
+                        alt="Медиавариант"
                         style={{
-                          maxWidth: "120px",
-                          maxHeight: "120px",
+                          maxWidth: "140px",
+                          maxHeight: "140px",
                           objectFit: "contain",
-                          borderRadius: "8px",
+                          borderRadius: "10px",
+                          border: "1px solid rgba(0,0,0,0.05)",
+                          backgroundColor: "#fff"
                         }}
                       />
                     ) : (
-                      <div style={{ maxWidth: "300px" }}>
+                      <div style={{ maxWidth: "300px", width: "100%" }}>
                         <MediaRenderer media={opt.media} />
                       </div>
                     )}
