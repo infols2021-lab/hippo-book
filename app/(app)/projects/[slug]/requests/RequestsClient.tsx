@@ -6,8 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import { useRouter } from "next/navigation";
 import { useTour } from "@/components/tour/TourProvider";
-import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
-import { dispatchBurgerClicked, dispatchTourPageReady } from "@/lib/tour/tourMobile";
+import { dispatchTourPageReady } from "@/lib/tour/tourMobile";
 
 import "./requests.css";
 import "../profile/profile.css";
@@ -166,7 +165,7 @@ export default function RequestsClient({
   const [tabs, setTabs] = useState<ProjectTab[]>(initialTabs);
   const [levels, setLevels] = useState<ProjectLevel[]>(initialLevels);
   const [catalogLoading, setCatalogLoading] = useState(false);
-  
+
   const [requests, setRequests] = useState<PurchaseRequest[]>(() =>
     initialRequests.map(normalizeRequestRow)
   );
@@ -177,12 +176,6 @@ export default function RequestsClient({
 
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const { handleOverlayClick: handleTourOverlayClick } = useTourMobileMenu(
-    mobileMenuOpen,
-    setMobileMenuOpen
-  );
 
   useEffect(() => {
     if (stage === "profile_requests_gate") {
@@ -808,6 +801,14 @@ export default function RequestsClient({
     return `${price} ₽`;
   };
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
+    } finally {
+      window.location.href = "/login";
+    }
+  };
+
   return (
     <div className="page-requests">
       <style>{`
@@ -1251,95 +1252,88 @@ export default function RequestsClient({
         </div>
       </Modal>
 
-      {mobileMenuOpen && (
-        <>
-          <div className="mobile-bottom-sheet-overlay" onClick={handleTourOverlayClick} />
-          <div className="mobile-bottom-sheet">
-            <div className="sheet-handle" />
-            <div className="sheet-title">Навигация</div>
-            <div className="sheet-menu-list">
-              <Link
-                className="sheet-item"
-                data-tour="profile-link"
-                href={`/projects/${project.slug}/profile`}
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                }}
-              >
-                Профиль
-              </Link>
-              <Link
-                className="sheet-item"
-                data-tour="materials-link"
-                href={`/projects/${project.slug}/materials`}
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                }}
-              >
-                Материалы
-              </Link>
-              <Link
-                className="sheet-item"
-                href="/portal"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Главный портал
-              </Link>
-            </div>
-          </div>
-        </>
-      )}
-
       <div className="container">
-        
-        <div className="mobile-header-bar">
-          <div className="mobile-header-left">
-            <div className="brand-mark">{brandMark}</div>
-            <div className="mobile-user-info">
-              <div className="mobile-user-name">{project.name}</div>
-              <div className="mobile-streak-pill">Заявки на доступы</div>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="mobile-burger-btn"
-            data-tour="mobile-burger-btn"
-            onClick={() => {
-              const opening = !mobileMenuOpen;
-              setMobileMenuOpen(opening);
-              if (opening) dispatchBurgerClicked();
-            }}
-            aria-label="Открыть меню"
-            aria-expanded={mobileMenuOpen}
-          >
-            ☰
-          </button>
-        </div>
 
-        <div className="profile-topbar">
-          <div className="brand">
-            <div className="brand-mark">{brandMark}</div>
-            <div>
-              <div className="brand-title">{project.name}</div>
-              <div className="brand-subtitle">Заявки на доступы</div>
+        {/* ========================================================= */}
+        {/* DESKTOP HEADER (Замена старому AppHeader)                   */}
+        {/* ========================================================= */}
+        <div
+          className="hidden md:flex items-center justify-between mb-8"
+          style={{
+            background: "var(--glass-bg)",
+            backdropFilter: "var(--glass-blur)",
+            WebkitBackdropFilter: "var(--glass-blur)",
+            border: "1px solid var(--glass-border)",
+            boxShadow: "var(--glass-shadow)",
+            borderRadius: "28px",
+            padding: "16px 24px"
+          }}
+        >
+          <div className="flex items-center gap-4 min-w-0">
+            <div
+              className="flex items-center justify-center rounded-[14px] font-black text-lg flex-shrink-0"
+              style={{
+                width: "46px", height: "46px",
+                background: "var(--project-primary)",
+                color: "#ffffff",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3), 0 8px 16px -4px color-mix(in srgb, var(--project-primary) 50%, transparent)",
+              }}
+            >
+              {brandMark}
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-[19px] font-extrabold leading-tight truncate" style={{ color: "var(--project-text)" }}>
+                {project.name}
+              </h3>
+              <div className="text-[13px] font-medium truncate mt-0.5" style={{ color: "color-mix(in srgb, var(--project-text) 60%, transparent)" }}>
+                Заявки на доступы
+              </div>
             </div>
           </div>
-          <div className="top-actions">
+
+          <div className="flex items-center gap-3">
             <Link
-              data-tour="profile-link"
-              className="nav-pill"
               href={`/projects/${project.slug}/profile`}
-              onClick={() => {
-              }}
+              className="nav-pill"
+              data-tour="profile-link"
             >
               Профиль
             </Link>
             <Link className="nav-pill" href={`/projects/${project.slug}/materials`}>
               Материалы
             </Link>
-            <Link className="nav-pill nav-pill--logout" href="/portal">
-              Портал
-            </Link>
+            <button
+              className="nav-pill nav-pill--logout"
+              type="button"
+              onClick={handleLogout}
+            >
+              Выйти
+            </button>
+          </div>
+        </div>
+
+        {/* ========================================================= */}
+        {/* MOBILE HEADER (Компактный заголовок без бургера)            */}
+        {/* ========================================================= */}
+        <div className="md:hidden flex items-center gap-3 mb-5 mt-2 px-1">
+          <div
+            className="flex items-center justify-center rounded-[12px] font-black text-sm flex-shrink-0"
+            style={{
+              width: "40px", height: "40px",
+              background: "var(--project-primary)",
+              color: "#ffffff",
+              boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3), 0 4px 10px -2px color-mix(in srgb, var(--project-primary) 50%, transparent)",
+            }}
+          >
+            {brandMark}
+          </div>
+          <div className="min-w-0 flex flex-col">
+            <h3 className="text-[16px] font-black leading-tight truncate" style={{ color: "var(--project-text)" }}>
+              {project.name}
+            </h3>
+            <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "color-mix(in srgb, var(--project-text) 50%, transparent)", marginTop: "2px" }}>
+              Заявки на доступы
+            </div>
           </div>
         </div>
 
@@ -1362,9 +1356,9 @@ export default function RequestsClient({
           <div className="requests-actions" style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
             <button
               data-tour="create-request-btn"
-              className="btn" 
-              onClick={openCreate} 
-              type="button" 
+              className="btn"
+              onClick={openCreate}
+              type="button"
               disabled={busy}
             >
               + Создать новую заявку
@@ -1392,10 +1386,10 @@ export default function RequestsClient({
             <div className="empty-state" style={{ textAlign: "center", padding: "40px 0" }}>
               <h3>Заявок пока нет</h3>
               <p style={{ opacity: 0.7, marginBottom: 16 }}>Создайте свою первую заявку на покупку доступа к учебным материалам</p>
-              <button 
-                className="btn" 
-                onClick={openCreate} 
-                type="button" 
+              <button
+                className="btn"
+                onClick={openCreate}
+                type="button"
                 disabled={busy}
               >
                 + Создать заявку

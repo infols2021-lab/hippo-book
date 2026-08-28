@@ -1,17 +1,10 @@
+// app/(app)/projects/[slug]/materials/MaterialsClient.tsx
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import AppHeader from "@/components/AppHeader";
-import LogoutButton from "@/components/LogoutButton";
+import { useEffect } from "react";
 import { useTour } from "@/components/tour/TourProvider";
-import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
-import {
-  dispatchBurgerClicked,
-  dispatchTourPageReady,
-  markTourMobileMenuPrimed,
-} from "@/lib/tour/tourMobile";
-import { PORTAL_MOBILE_MQ } from "@/lib/tour/tourPortal";
+import { dispatchTourPageReady } from "@/lib/tour/tourMobile";
 import { rewriteSupabasePublicStorageUrl } from "@/lib/storage/publicUrl";
 import type { MaterialWithProgress } from "@/lib/materials/types";
 
@@ -43,19 +36,6 @@ function toCoverUrl(raw: unknown): string {
   return rewriteSupabasePublicStorageUrl(value);
 }
 
-function materialsNav(slug: string) {
-  return [
-    {
-      kind: "link" as const,
-      href: `/projects/${slug}/profile`,
-      label: "Профиль",
-      className: "btn ghost",
-      tourId: "profile-link",
-    },
-    { kind: "logout" as const, label: "Выйти", className: "btn secondary" },
-  ];
-}
-
 export default function MaterialsClient({
   slug,
   projectName,
@@ -66,29 +46,6 @@ export default function MaterialsClient({
   lockedMats,
 }: Props) {
   const { stage, advanceTour } = useTour();
-  const [isMobile, setIsMobile] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const { handleOverlayClick: handleTourOverlayClick } = useTourMobileMenu(
-    mobileMenuOpen,
-    setMobileMenuOpen
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia(PORTAL_MOBILE_MQ);
-    const sync = () => setIsMobile(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
-
-  const handleProfileNav = () => {
-    if (stage === "materials_profile_gate") {
-      markTourMobileMenuPrimed();
-      advanceTour("rewards_gate");
-    }
-    setMobileMenuOpen(false);
-  };
 
   useEffect(() => {
     dispatchTourPageReady();
@@ -100,79 +57,108 @@ export default function MaterialsClient({
     }
   }, [stage]);
 
-  const toggleMobileMenu = () => {
-    const opening = !mobileMenuOpen;
-    setMobileMenuOpen(opening);
-    if (opening) dispatchBurgerClicked();
-  };
-
   const materials = [...availableMats, ...lockedMats];
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
+    } finally {
+      window.location.href = "/login";
+    }
+  };
 
   return (
     <div className={`materials-page ${stage === "materials_demo" ? "materials-tour-demo-active" : ""}`}>
       <div className="materials-container">
-        {isMobile ? (
-          <>
-            {mobileMenuOpen && (
-              <>
-                <div className="mobile-bottom-sheet-overlay" onClick={handleTourOverlayClick} />
-                <div className="mobile-bottom-sheet">
-                  <div className="sheet-handle" />
-                  <div className="sheet-title">Навигация</div>
-                  <div className="sheet-menu-list">
-                    <Link
-                      className="sheet-item"
-                      data-tour="profile-link"
-                      href={`/projects/${slug}/profile`}
-                      onClick={handleProfileNav}
-                    >
-                      Профиль
-                    </Link>
-                    <Link className="sheet-item" href="/portal" onClick={() => setMobileMenuOpen(false)}>
-                      Главный портал
-                    </Link>
-                    <LogoutButton className="sheet-item sheet-item--danger w-full text-left">
-                      Выйти
-                    </LogoutButton>
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div className="mobile-header-bar">
-              <div className="mobile-header-left">
-                <div className="brand-mark">{markText}</div>
-                <div className="mobile-user-info">
-                  <div className="mobile-user-name">{projectName}</div>
-                  <div className="mobile-streak-pill">Материалы</div>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="mobile-burger-btn"
-                data-tour="mobile-burger-btn"
-                onClick={toggleMobileMenu}
-                aria-label="Открыть меню"
-                aria-expanded={mobileMenuOpen}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="3" y1="12" x2="21" y2="12" />
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <line x1="3" y1="18" x2="21" y2="18" />
-                </svg>
-              </button>
+        
+        {/* ========================================================= */}
+        {/* DESKTOP HEADER (Замена старому AppHeader)                   */}
+        {/* ========================================================= */}
+        <div 
+          className="hidden md:flex items-center justify-between mb-8" 
+          style={{
+            background: "var(--glass-bg)",
+            backdropFilter: "var(--glass-blur)",
+            WebkitBackdropFilter: "var(--glass-blur)",
+            border: "1px solid var(--glass-border)",
+            boxShadow: "var(--glass-shadow)",
+            borderRadius: "28px",
+            padding: "16px 24px"
+          }}
+        >
+          <div className="flex items-center gap-4 min-w-0">
+            <div
+              className="flex items-center justify-center rounded-[14px] font-black text-lg flex-shrink-0"
+              style={{
+                width: "46px", height: "46px",
+                background: "var(--project-primary)",
+                color: "#ffffff",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3), 0 8px 16px -4px color-mix(in srgb, var(--project-primary) 50%, transparent)",
+              }}
+            >
+              {markText}
             </div>
-          </>
-        ) : (
-          <AppHeader
-            markText={markText}
-            title={projectName}
-            subtitle="Материалы"
-            nav={materialsNav(slug)}
-            onProfileNav={handleProfileNav}
-          />
-        )}
+            <div className="min-w-0">
+              <h3 className="text-[19px] font-extrabold leading-tight truncate" style={{ color: "var(--project-text)" }}>
+                {projectName}
+              </h3>
+              <div className="text-[13px] font-medium truncate mt-0.5" style={{ color: "color-mix(in srgb, var(--project-text) 60%, transparent)" }}>
+                Материалы
+              </div>
+            </div>
+          </div>
 
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/projects/${slug}/profile`}
+              className="nav-pill"
+              data-tour="profile-link"
+              onClick={() => {
+                if (stage === "materials_profile_gate") {
+                  advanceTour("rewards_gate");
+                }
+              }}
+            >
+              Профиль
+            </Link>
+            <button
+              className="nav-pill nav-pill--logout"
+              type="button"
+              onClick={handleLogout}
+            >
+              Выйти
+            </button>
+          </div>
+        </div>
+
+        {/* ========================================================= */}
+        {/* MOBILE HEADER (Компактный заголовок без бургера)            */}
+        {/* ========================================================= */}
+        <div className="md:hidden flex items-center gap-3 mb-5 mt-2 px-1">
+          <div
+            className="flex items-center justify-center rounded-[12px] font-black text-sm flex-shrink-0"
+            style={{
+              width: "40px", height: "40px",
+              background: "var(--project-primary)",
+              color: "#ffffff",
+              boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3), 0 4px 10px -2px color-mix(in srgb, var(--project-primary) 50%, transparent)",
+            }}
+          >
+            {markText}
+          </div>
+          <div className="min-w-0 flex flex-col">
+            <h3 className="text-[16px] font-black leading-tight truncate" style={{ color: "var(--project-text)" }}>
+              {projectName}
+            </h3>
+            <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "color-mix(in srgb, var(--project-text) 50%, transparent)", marginTop: "2px" }}>
+              Материалы
+            </div>
+          </div>
+        </div>
+
+        {/* ========================================================= */}
+        {/* TABS & CONTENT                                              */}
+        {/* ========================================================= */}
         {tabs.length > 0 && (
           <div className="materials-tabs" role="tablist" aria-label="Материалы">
             {tabs.map((tab) => {
