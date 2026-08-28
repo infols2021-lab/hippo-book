@@ -1,17 +1,23 @@
 "use client";
 
 import "./login.css";
+// 🔥 Фикс для кроссвордов: импортируем боевые стили сетки заданий
 import "@/app/(app)/projects/[slug]/assignment/assignment.css";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 
+// Импортируем боевые компоненты заданий для песочницы
 import QuestionTest from "@/app/(app)/projects/[slug]/assignment/components/QuestionTest";
 import QuestionFill from "@/app/(app)/projects/[slug]/assignment/components/QuestionFill";
 import QuestionCrossword from "@/app/(app)/projects/[slug]/assignment/components/QuestionCrossword";
 import QuestionMatching from "@/app/(app)/projects/[slug]/assignment/components/QuestionMatching";
+
+// 🔥 Фикс для аудио: импортируем рендерер медиа
 import MediaRenderer from "@/app/(app)/projects/[slug]/assignment/components/MediaRenderer";
+
+// Импортируем моки
 import { SANDBOX_MOCKS } from "@/lib/assignments/mockDebugData";
 
 type BannerType = "error" | "success" | "warning" | null;
@@ -74,12 +80,13 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
 
   const mockData: any = SANDBOX_MOCKS[type];
 
+  // Сбрасываем стейт при смене типа
   useEffect(() => {
     if (type === "fill") setValue([""]);
     else if (type === "matching") setValue({});
     else if (type === "crossword") setValue(undefined);
-    else setValue([]);
-
+    else setValue([]); // test & audio
+    
     setIsChecked(false);
     setIsCorrect(false);
   }, [type]);
@@ -91,17 +98,21 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
       const userAns = Array.isArray(value) ? [...value].sort() : [];
       const rightAns = [...mockData.correct].sort();
       correct = JSON.stringify(userAns) === JSON.stringify(rightAns);
-    } else if (type === "fill") {
+    } 
+    else if (type === "fill") {
       const userAns = Array.isArray(value) ? value : [""];
       const rightAns = mockData.answers as string[][];
       correct = rightAns.every((acceptedVariants: string[], idx: number) => {
         const userWord = (userAns[idx] || "").trim().toLowerCase();
         return acceptedVariants.some((v) => v.trim().toLowerCase() === userWord);
       });
-    } else if (type === "matching") {
+    } 
+    else if (type === "matching") {
       const pairs = mockData.pairs as any[];
-      correct = pairs.every((p) => value && value[p.id] === p.id);
-    } else if (type === "crossword") {
+      // Для песочницы правильный ответ - когда id левой карточки равен id правой карточки
+      correct = pairs.every(p => value && value[p.id] === p.id);
+    } 
+    else if (type === "crossword") {
       const rows = mockData.metadata.rows;
       const cols = mockData.metadata.cols;
       const correctGrid = mockData.grid;
@@ -127,27 +138,29 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
     else if (type === "matching") setValue({});
     else if (type === "crossword") setValue(undefined);
     else setValue([]);
-
+    
     setIsChecked(false);
   };
 
   return (
-    <div
-      className="sandbox-container"
+    <div 
+      className="sandbox-container" 
       style={{
+        // Инжектируем CSS переменные, чтобы компоненты выглядели как в оригинале
         "--project-primary": "#0ea5e9",
         "--project-card-bg": "#ffffff",
         "--project-input-bg": "#f8fafc",
         "--project-input-border": "#cbd5e1",
         background: "#f8fafc",
-        padding: "clamp(16px, 3vw, 24px)",
+        padding: "clamp(16px, 4vw, 24px)", // Адаптивный паддинг для мобилок
         borderRadius: "16px",
         border: "1px solid #e2e8f0",
-        textAlign: "left",
+        textAlign: "left"
       } as any}
     >
       <div style={{ marginBottom: "20px", fontSize: "15px", fontWeight: 600, color: "#334155", whiteSpace: "pre-wrap" }}>
         {mockData.q}
+        {/* 🔥 Фикс для аудио: рендерим медиа-блок, если он есть */}
         {mockData.media && mockData.media.length > 0 && (
           <div style={{ marginTop: "16px", borderRadius: "12px", overflow: "hidden" }}>
             <MediaRenderer media={mockData.media} />
@@ -155,61 +168,49 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
         )}
       </div>
 
-      <div
-        style={{
-          marginBottom: "24px",
-          width: "100%",
-          overflowX: "auto",
-          WebkitOverflowScrolling: "touch",
-          paddingBottom: "4px",
-        }}
-      >
+      {/* Обертка с горизонтальным скроллом для мобилок (спасает кроссворды и широкие таблицы) */}
+      <div style={{ 
+        marginBottom: "24px", 
+        width: "100%", 
+        overflowX: "auto", 
+        WebkitOverflowScrolling: "touch",
+        paddingBottom: "4px" // Место под скроллбар
+      }}>
         {(type === "test" || type === "audio") && (
-          <QuestionTest
-            question={mockData as any}
-            value={value}
-            onChange={(val) => {
-              setValue(val);
-              setIsChecked(false);
-            }}
-            disabled={isChecked}
+          <QuestionTest 
+            question={mockData as any} 
+            value={value} 
+            onChange={(val) => { setValue(val); setIsChecked(false); }} 
+            disabled={isChecked} 
           />
         )}
         {type === "fill" && (
-          <QuestionFill
-            question={mockData as any}
-            value={value}
-            onChange={(val) => {
-              setValue(val);
-              setIsChecked(false);
-            }}
-            disabled={isChecked}
+          <QuestionFill 
+            question={mockData as any} 
+            value={value} 
+            onChange={(val) => { setValue(val); setIsChecked(false); }} 
+            disabled={isChecked} 
           />
         )}
         {type === "matching" && (
-          <QuestionMatching
-            question={mockData as any}
-            value={value || {}}
-            onChange={(val) => {
-              setValue(val);
-              setIsChecked(false);
-            }}
-            disabled={isChecked}
+          <QuestionMatching 
+            question={mockData as any} 
+            value={value || {}} 
+            onChange={(val) => { setValue(val); setIsChecked(false); }} 
+            disabled={isChecked} 
           />
         )}
         {type === "crossword" && (
-          <QuestionCrossword
-            question={mockData as any}
-            value={value}
-            onChange={(val) => {
-              setValue(val);
-              setIsChecked(false);
-            }}
-            disabled={isChecked}
+          <QuestionCrossword 
+            question={mockData as any} 
+            value={value} 
+            onChange={(val) => { setValue(val); setIsChecked(false); }} 
+            disabled={isChecked} 
           />
         )}
       </div>
 
+      {/* Панель микро-проверки */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
         <div>
           {isChecked && (
@@ -220,16 +221,16 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
         </div>
         <div style={{ display: "flex", gap: "10px" }}>
           {isChecked ? (
-            <button
-              type="button"
+            <button 
+              type="button" 
               onClick={handleReset}
               style={{ background: "#f1f5f9", color: "#475569", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}
             >
               Сбросить
             </button>
           ) : (
-            <button
-              type="button"
+            <button 
+              type="button" 
               onClick={handleCheck}
               style={{ background: "#0ea5e9", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(14,165,233,0.3)" }}
             >
@@ -245,11 +246,15 @@ function InteractiveSandbox({ type }: { type: FeatureType }) {
 // ==========================================
 // ХУК: ДИНАМИЧЕСКАЯ ПОЗИЦИЯ ПАНЕЛИ АВТОРИЗАЦИИ
 // ==========================================
+// На десктопе .auth-side стоит справа (split-layout: row).
+// На мобилке (<=768px) split-layout уходит в column-reverse,
+// и .auth-side физически оказывается сверху экрана.
+// Брейкпоинт синхронизирован с login.css (@media max-width: 768px).
 function useAuthPanelPosition() {
   const [position, setPosition] = useState<"справа" | "сверху">("справа");
 
   useEffect(() => {
-    const mql = window.matchMedia("(max-width: 992px)");
+    const mql = window.matchMedia("(max-width: 768px)");
 
     const update = () => setPosition(mql.matches ? "сверху" : "справа");
     update();
@@ -327,6 +332,7 @@ function LoginPageContent() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"registration" | "rules">("registration");
 
+  // Безопасная обработка скролла DOM при открытии модалок
   const isAnyModalOpen = helpOpen || supportOpen || Boolean(featureModal) || previewOpen;
 
   useEffect(() => {
@@ -568,18 +574,7 @@ function LoginPageContent() {
   }
 
   return (
-    <div
-      className="page-login"
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "radial-gradient(circle at 10% 20%, rgba(224, 242, 254, 0.6) 0%, rgba(248, 250, 252, 0.95) 90%)",
-        padding: "clamp(16px, 3vw, 40px)",
-        boxSizing: "border-box",
-      }}
-    >
+    <div className="page-login">
       {/* МОДАЛЬНОЕ ОКНО: ПОЛНОЭКРАННЫЙ ПРОСМОТР СКРИНШОТА ПРОФИЛЯ */}
       {previewOpen && (
         <div
@@ -594,8 +589,8 @@ function LoginPageContent() {
             bottom: 0,
             zIndex: 99999,
             backgroundColor: "rgba(10, 15, 30, 0.92)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
             display: "flex",
             justifyContent: "center",
             alignItems: "flex-start",
@@ -659,21 +654,21 @@ function LoginPageContent() {
         </div>
       )}
 
-      {/* МОДАЛЬНОЕ ОКНО: ПРИМЕРЫ ЗАДАНИЙ */}
+      {/* МОДАЛЬНОЕ ОКНО: ПРИМЕРЫ ЗАДАНИЙ (ИНТЕРАКТИВНАЯ ПЕСОЧНИЦА) */}
       <div
         className={`modal-overlay ${featureModal ? "active" : ""}`}
         onClick={(e) => {
           if (e.target === e.currentTarget) setFeatureModal(null);
         }}
       >
-        <div
-          className="modal-content"
-          style={{
-            maxWidth: "660px",
-            width: "calc(100% - 32px)",
-            maxHeight: "90vh",
-            overflowY: "auto",
-            boxSizing: "border-box",
+        <div 
+          className="modal-content" 
+          style={{ 
+            maxWidth: "660px", 
+            width: "calc(100% - 32px)", 
+            maxHeight: "90vh", // Ограничиваем высоту экрана для мобилок
+            overflowY: "auto", // Внутренний скролл
+            boxSizing: "border-box" 
           }}
         >
           <button className="modal-close" aria-label="Закрыть" onClick={() => setFeatureModal(null)} type="button">
@@ -681,10 +676,12 @@ function LoginPageContent() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-
+          
           <div className="modal-title">{featureModal?.title}</div>
-
-          {featureModal && <InteractiveSandbox type={featureModal.id} />}
+          
+          {featureModal && (
+            <InteractiveSandbox type={featureModal.id} />
+          )}
 
           {featureModal?.description && (
             <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "var(--text-mut-navy)", lineHeight: 1.5 }}>
@@ -868,154 +865,57 @@ function LoginPageContent() {
         </div>
       </div>
 
-      {/* ОСНОВНАЯ РАЗМЕТКА SPLIT SCREEN С ЦЕНТРИРОВАНИЕМ И ОГРАНИЧЕНИЕМ ШИРИНЫ ДЛЯ 4K/2K ЭКРАНОВ */}
-      <div
-        className="split-layout"
-        style={{
-          width: "100%",
-          maxWidth: "1320px",
-          margin: "0 auto",
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "clamp(24px, 4vw, 64px)",
-        }}
-      >
+      {/* ОСНОВНАЯ РАЗМЕТКА SPLIT SCREEN */}
+      <div className="split-layout">
         {/* PROMO SIDE */}
-        <div
-          className="promo-side"
-          style={{
-            flex: "1 1 55%",
-            maxWidth: "680px",
-            minWidth: 0,
-          }}
-        >
+        <div className="promo-side">
           <div className="promo-content">
-            <div className="logo" style={{ marginBottom: "20px" }}>
+            <div className="logo">
               <img
                 src="/image_0bd68b.png"
                 alt="skilLS Logo"
-                style={{ maxHeight: "48px", width: "auto", display: "block" }}
                 onError={(e) => {
                   (e.currentTarget as HTMLElement).style.display = "none";
                 }}
               />
             </div>
 
-            <h1
-              className="promo-title"
-              style={{
-                fontSize: "clamp(1.75rem, 2.5vw, 2.4rem)",
-                fontWeight: 900,
-                lineHeight: 1.18,
-                letterSpacing: "-0.03em",
-                marginBottom: "16px",
-                color: "#0f172a",
-              }}
-            >
-              skilLS — образовательная онлайн-платформа
-            </h1>
+            <h1 className="promo-title">skilLS - образовательная онлайн-платформа</h1>
 
-            <p
-              className="promo-text"
-              style={{
-                fontSize: "clamp(0.95rem, 1.1vw, 1.05rem)",
-                lineHeight: 1.6,
-                color: "#475569",
-                marginBottom: "20px",
-              }}
-            >
+            <p className="promo-text">
               Прокачивайте английский в современных форматах. В личном кабинете доступны десятки типов интерактивных заданий. Каждое упражнение помогает закрепить знания и уверенно решать реальные тесты, а подробная аналитика показывает ваш прогресс по всем темам.
             </p>
 
-            <div
-              className="interactive-hint"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                fontSize: "0.85rem",
-                fontWeight: 700,
-                color: "#0284c7",
-                marginBottom: "14px",
-              }}
-            >
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 18, height: 18, flexShrink: 0 }}>
+            <div className="interactive-hint">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
               </svg>
               Нажми на формат, чтобы увидеть пример задания
             </div>
 
-            <div className="feature-tags" style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "22px" }}>
+            <div className="feature-tags">
               {["Тесты", "Вписать слово", "Кроссворды", "Аудирование", "Пары"].map((tag, idx) => (
                 <div
                   key={tag}
                   className="feature-tag"
-                  style={{
-                    animationDelay: `${idx * 0.2}s`,
-                    padding: "8px 16px",
-                    borderRadius: "20px",
-                    fontSize: "0.88rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    background: "rgba(14, 165, 233, 0.08)",
-                    color: "#0369a1",
-                    border: "1px solid rgba(14, 165, 233, 0.2)",
-                    transition: "all 0.2s ease",
-                  }}
+                  style={{ animationDelay: `${idx * 0.2}s` }}
                   onClick={() => openFeatureModal(tag)}
                 >
-                  ● {tag}
+                  {tag}
                 </div>
               ))}
             </div>
 
-            <p
-              className="promo-text"
-              style={{
-                fontSize: "clamp(0.9rem, 1vw, 0.98rem)",
-                lineHeight: 1.55,
-                color: "#475569",
-                marginBottom: "14px",
-              }}
-            >
+            <p className="promo-text">
               Сейчас мы фокусируемся на подготовке к международной олимпиаде <strong>HIPPO</strong> и международным экзаменам <strong>Gatehouse Awards</strong>, и список направлений будет расширяться. Подтвержденный уровень CEFR официально признается за рубежом, а лучшие участники получают шанс поехать на суперфинал в Италию.
             </p>
 
-            <p
-              className="promo-text"
-              style={{
-                fontSize: "clamp(0.9rem, 1vw, 0.98rem)",
-                lineHeight: 1.55,
-                color: "#475569",
-                marginBottom: "20px",
-              }}
-            >
+            <p className="promo-text">
               Для старта тренировок <strong>используйте панель авторизации {authPanelPosition}.</strong>
             </p>
 
-            <div className="promo-cta-wrap" style={{ marginBottom: "28px" }}>
-              <a
-                href="https://taplink.cc/hippo_ga"
-                target="_blank"
-                rel="noreferrer"
-                className="promo-cta"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  padding: "10px 20px",
-                  borderRadius: "12px",
-                  background: "#ffffff",
-                  color: "#0ea5e9",
-                  fontWeight: 800,
-                  fontSize: "0.9rem",
-                  textDecoration: "none",
-                  border: "1px solid #bae6fd",
-                  boxShadow: "0 2px 8px rgba(14, 165, 233, 0.08)",
-                  transition: "all 0.2s ease",
-                }}
-              >
+            <div className="promo-cta-wrap">
+              <a href="https://taplink.cc/hippo_ga" target="_blank" rel="noreferrer" className="promo-cta">
                 Подробнее об экзаменах и участии &nbsp;→
               </a>
             </div>
@@ -1025,7 +925,7 @@ function LoginPageContent() {
           <div
             className="preview-container"
             onClick={() => setPreviewOpen(true)}
-            style={{ cursor: "pointer", width: "100%", maxWidth: "560px" }}
+            style={{ cursor: "pointer" }}
           >
             <div className="preview-wrapper">
               <img
@@ -1036,9 +936,8 @@ function LoginPageContent() {
                   height: "auto",
                   display: "block",
                   borderRadius: "16px",
-                  boxShadow: "0 12px 36px rgba(15, 23, 42, 0.1)",
-                  border: "1px solid rgba(226, 232, 240, 0.8)",
-                  transition: "transform 0.25s ease, box-shadow 0.25s ease",
+                  boxShadow: "0 8px 30px rgba(0, 0, 0, 0.08)",
+                  transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 }}
               />
             </div>
@@ -1046,54 +945,11 @@ function LoginPageContent() {
         </div>
 
         {/* AUTH SIDE */}
-        <div
-          className="auth-side"
-          style={{
-            flex: "1 1 45%",
-            maxWidth: "460px",
-            minWidth: "320px",
-            display: "flex",
-            justifyContent: "center",
-            width: "100%",
-          }}
-        >
-          <div
-            className="auth-container"
-            style={{
-              width: "100%",
-              background: "#ffffff",
-              borderRadius: "28px",
-              padding: "clamp(24px, 3.5vw, 40px)",
-              boxShadow: "0 20px 50px -12px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.8)",
-              boxSizing: "border-box",
-            }}
-          >
-            <div className="auth-tabs" style={{ display: "flex", gap: "8px", marginBottom: "28px", borderBottom: "2px solid #f1f5f9", paddingBottom: "12px" }}>
-              <div
-                className="auth-tab active"
-                style={{
-                  fontSize: "1.15rem",
-                  fontWeight: 900,
-                  color: "#0f172a",
-                  cursor: "default",
-                  position: "relative",
-                  paddingRight: "12px",
-                }}
-              >
-                Вход
-              </div>
-              <Link
-                href="/register"
-                className="auth-tab"
-                style={{
-                  fontSize: "1.15rem",
-                  fontWeight: 700,
-                  color: "#94a3b8",
-                  textDecoration: "none",
-                  paddingLeft: "8px",
-                  transition: "color 0.2s ease",
-                }}
-              >
+        <div className="auth-side">
+          <div className="auth-container">
+            <div className="auth-tabs">
+              <div className="auth-tab active">Вход</div>
+              <Link href="/register" className="auth-tab" style={{ textDecoration: "none" }}>
                 Регистрация
               </Link>
             </div>
@@ -1107,22 +963,8 @@ function LoginPageContent() {
                 void doLogin(false);
               }}
             >
-              <div className="form-group" style={{ marginBottom: "18px" }}>
-                <label
-                  className="form-label"
-                  htmlFor="email"
-                  style={{
-                    display: "block",
-                    fontSize: "0.78rem",
-                    fontWeight: 800,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "#64748b",
-                    marginBottom: "8px",
-                  }}
-                >
-                  Электронная почта
-                </label>
+              <div className="form-group">
+                <label className="form-label" htmlFor="email">Электронная почта</label>
                 <input
                   type="email"
                   id="email"
@@ -1137,37 +979,11 @@ function LoginPageContent() {
                       (document.getElementById("password") as HTMLInputElement | null)?.focus();
                     }
                   }}
-                  style={{
-                    width: "100%",
-                    padding: "14px 16px",
-                    borderRadius: "14px",
-                    border: "1.5px solid #e2e8f0",
-                    background: "#f8fafc",
-                    fontSize: "0.95rem",
-                    color: "#0f172a",
-                    outline: "none",
-                    boxSizing: "border-box",
-                    transition: "all 0.2s ease",
-                  }}
                 />
               </div>
 
-              <div className="form-group" style={{ marginBottom: "24px" }}>
-                <label
-                  className="form-label"
-                  htmlFor="password"
-                  style={{
-                    display: "block",
-                    fontSize: "0.78rem",
-                    fontWeight: 800,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "#64748b",
-                    marginBottom: "8px",
-                  }}
-                >
-                  Пароль
-                </label>
+              <div className="form-group">
+                <label className="form-label" htmlFor="password">Пароль</label>
                 <div style={{ position: "relative" }}>
                   <input
                     type={showPassword ? "text" : "password"}
@@ -1178,19 +994,7 @@ function LoginPageContent() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "14px 16px",
-                      paddingRight: "80px",
-                      borderRadius: "14px",
-                      border: "1.5px solid #e2e8f0",
-                      background: "#f8fafc",
-                      fontSize: "0.95rem",
-                      color: "#0f172a",
-                      outline: "none",
-                      boxSizing: "border-box",
-                      transition: "all 0.2s ease",
-                    }}
+                    style={{ paddingRight: "75px" }}
                   />
                   <button
                     type="button"
@@ -1204,11 +1008,11 @@ function LoginPageContent() {
                       transform: "translateY(-50%)",
                       background: "none",
                       border: "none",
-                      fontSize: "0.8rem",
-                      fontWeight: 700,
-                      color: "#0284c7",
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                      color: "var(--blue-600)",
                       cursor: "pointer",
-                      padding: "6px",
+                      padding: "4px",
                     }}
                   >
                     {showPassword ? "Скрыть" : "Показать"}
@@ -1216,117 +1020,28 @@ function LoginPageContent() {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                className="btn-submit"
-                disabled={busy}
-                style={{
-                  width: "100%",
-                  padding: "14px 20px",
-                  borderRadius: "14px",
-                  background: "#0f172a",
-                  color: "#ffffff",
-                  fontSize: "1rem",
-                  fontWeight: 800,
-                  border: "none",
-                  cursor: busy ? "not-allowed" : "pointer",
-                  opacity: busy ? 0.7 : 1,
-                  boxShadow: "0 6px 20px rgba(15, 23, 42, 0.25)",
-                  transition: "all 0.2s ease",
-                  marginBottom: "12px",
-                }}
-              >
+              <button type="submit" className="btn-submit" disabled={busy}>
                 {busy ? "Проверяем данные..." : "Войти на платформу"}
               </button>
 
-              <Link
-                href="/demo"
-                className="btn-demo"
-                style={{
-                  display: "block",
-                  width: "100%",
-                  padding: "13px 20px",
-                  borderRadius: "14px",
-                  background: "#f8fafc",
-                  color: "#334155",
-                  fontSize: "0.92rem",
-                  fontWeight: 700,
-                  textAlign: "center",
-                  textDecoration: "none",
-                  border: "1px solid #e2e8f0",
-                  boxSizing: "border-box",
-                  transition: "all 0.2s ease",
-                }}
-              >
+              <Link href="/demo" className="btn-demo">
                 Пройти демо-задание
               </Link>
             </form>
 
-            <div className="auth-footer" style={{ marginTop: "24px", textAlign: "center" }}>
-              <Link
-                href="/reset"
-                className="auth-link"
-                style={{
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                  color: "#0284c7",
-                  textDecoration: "none",
-                  display: "inline-block",
-                  marginBottom: "20px",
-                }}
-              >
+            <div className="auth-footer">
+              <Link href="/reset" className="auth-link">
                 Забыли пароль?
               </Link>
 
-              <div className="aux-actions" style={{ display: "flex", justifyContent: "center", gap: "8px" }}>
-                <Link
-                  className="aux-btn"
-                  href="/info"
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: "10px",
-                    background: "#f8fafc",
-                    color: "#64748b",
-                    fontSize: "0.8rem",
-                    fontWeight: 700,
-                    textDecoration: "none",
-                    border: "1px solid #e2e8f0",
-                  }}
-                >
+              <div className="aux-actions">
+                <Link className="aux-btn" href="/info">
                   Информация
                 </Link>
-                <button
-                  className="aux-btn"
-                  onClick={() => setHelpOpen(true)}
-                  type="button"
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: "10px",
-                    background: "#f8fafc",
-                    color: "#64748b",
-                    fontSize: "0.8rem",
-                    fontWeight: 700,
-                    border: "1px solid #e2e8f0",
-                    cursor: "pointer",
-                  }}
-                >
+                <button className="aux-btn" onClick={() => setHelpOpen(true)} type="button">
                   Помощь
                 </button>
-                <button
-                  className="aux-btn"
-                  onClick={() => setSupportOpen(true)}
-                  type="button"
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: "10px",
-                    background: "#f8fafc",
-                    color: "#64748b",
-                    fontSize: "0.8rem",
-                    fontWeight: 700,
-                    border: "1px solid #e2e8f0",
-                    cursor: "pointer",
-                  }}
-                >
+                <button className="aux-btn" onClick={() => setSupportOpen(true)} type="button">
                   Поддержка
                 </button>
               </div>
