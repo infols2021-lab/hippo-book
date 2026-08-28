@@ -5,7 +5,6 @@
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  padding-bottom: 60px;
   letter-spacing: 0.01em;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
@@ -15,7 +14,7 @@
 .profile-container {
   width: 95%;
   max-width: 1100px;
-  margin: 24px auto 40px;
+  margin: 0 auto 40px;
   position: relative;
   z-index: 1;
   box-sizing: border-box;
@@ -23,13 +22,12 @@
 }
 
 /* Typography helpers */
-.brand-subtitle, .streak-chip-sub, .profile-email, .mini-cap, 
-.mini-stat-label, .progress-sub, .info-li, .section-title, .streak-summary-key {
+.brand-subtitle, .streak-chip-sub, .profile-email, .progress-sub, .info-li, .section-title {
   line-height: 1.35;
   letter-spacing: 0.02em;
 }
 
-.progress-title, .mini-val, .brand-title, .profile-name {
+.progress-title, .brand-title, .profile-name {
   letter-spacing: 0.005em;
 }
 
@@ -41,7 +39,6 @@
   color: var(--project-text);
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   user-select: none;
-  display: inline-block;
   background: linear-gradient(135deg, var(--project-primary), var(--project-text));
   -webkit-background-clip: text;
   background-clip: text;
@@ -49,7 +46,7 @@
 }
 
 /* ===== Стеклянные Контейнеры (Panels) ===== */
-.profile-topbar, .profile-panel, .panel, .profile-card, .section {
+.profile-topbar, .profile-panel {
   border-radius: 28px;
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
@@ -59,25 +56,10 @@
   padding: 24px;
 }
 
-.profile-layout {
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 24px;
-  margin-top: 24px;
-}
-.section + .section { margin-top: 24px; }
-
-/* ===== Topbar (Desktop) ===== */
 .profile-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
   padding: 16px 24px;
   margin-bottom: 24px;
 }
-
-.brand { display: flex; align-items: center; gap: 16px; }
 
 /* ===== Project Switcher ===== */
 .brand-switcher-wrapper {
@@ -129,7 +111,7 @@
   top: calc(100% + 12px);
   left: 0;
   width: 300px;
-  background: var(--p-card-bg, var(--project-card-bg));
+  background: var(--project-card-bg);
   border: 1px solid var(--glass-border);
   border-radius: 24px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
@@ -227,31 +209,32 @@
 
 /* ===== Бренд ===== */
 .brand-mark {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
   display: grid;
   place-items: center;
   font-weight: 900;
   color: #fff;
-  font-size: 20px;
+  font-size: 16px;
   background: var(--project-primary);
   box-shadow: inset 0 1px 1px rgba(255,255,255,0.3), 0 8px 24px -6px color-mix(in srgb, var(--project-primary) 50%, transparent);
 }
 
 .brand-title {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 900;
   color: var(--project-text);
   line-height: 1.2;
 }
 
 .brand-subtitle {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: color-mix(in srgb, var(--project-text) 60%, transparent);
 }
 
+/* ===== Desktop Навигация ===== */
 .top-actions {
   display: flex;
   align-items: center;
@@ -299,7 +282,7 @@
   text-align: center; 
 }
 
-/* ===== Аватар ===== */
+/* ===== Desktop Аватар ===== */
 .profile-avatar-wrapper {
   width: 220px;
   height: 220px;
@@ -320,15 +303,6 @@
   border-radius: 50%;
 }
 
-.avatar-icon-bg {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--project-text) 5%, transparent), transparent 70%);
-  border-radius: 50%;
-  z-index: 1;
-}
-
-/* ===== Инфо Сайдбара ===== */
 .profile-name { font-size: 24px; font-weight: 900; color: var(--project-text); margin-bottom: 4px; line-height: 1.2;}
 .profile-email { font-size: 14px; font-weight: 700; color: color-mix(in srgb, var(--project-text) 60%, transparent); margin-bottom: 20px; }
 
@@ -348,19 +322,19 @@
 
 /* ===== Стрики / Фишки ===== */
 .streak-chip {
-  height: 48px; border-radius: 14px; padding: 6px 14px;
-  display: inline-grid; grid-template-columns: 32px auto; grid-template-rows: 1fr 1fr; column-gap: 10px;
+  height: 44px; border-radius: 14px; padding: 6px 14px;
+  display: inline-grid; grid-template-columns: 28px auto; grid-template-rows: 1fr 1fr; column-gap: 10px;
   align-items: center; background: color-mix(in srgb, var(--project-text) 5%, transparent);
   border: 1px solid var(--glass-border); transition: all 0.2s ease; cursor: pointer; text-align: left;
 }
 .streak-chip:hover { background: color-mix(in srgb, var(--project-text) 10%, transparent); transform: translateY(-2px); }
 .streak-chip-icon {
-  grid-row: 1 / span 2; width: 32px; height: 32px; border-radius: 10px;
+  grid-row: 1 / span 2; width: 28px; height: 28px; border-radius: 8px;
   display: grid; place-items: center; background: var(--project-card-bg);
-  box-shadow: 0 4px 12px -4px rgba(0,0,0,0.1); font-size: 16px; overflow: hidden;
+  box-shadow: 0 4px 12px -4px rgba(0,0,0,0.1); font-size: 14px; overflow: hidden;
 }
-.streak-chip-value { font-size: 16px; font-weight: 900; color: var(--project-text); line-height: 1; }
-.streak-chip-sub { font-size: 11px; font-weight: 700; color: color-mix(in srgb, var(--project-text) 60%, transparent); }
+.streak-chip-value { font-size: 15px; font-weight: 900; color: var(--project-text); line-height: 1; }
+.streak-chip-sub { font-size: 10px; font-weight: 700; color: color-mix(in srgb, var(--project-text) 60%, transparent); }
 
 /* ===== Правая Панель ===== */
 .section-title { font-size: 16px; font-weight: 900; color: var(--project-text); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;}
@@ -374,6 +348,14 @@
 }
 .stat-value { font-size: 28px; font-weight: 900; color: var(--project-primary); margin-bottom: 4px; }
 .stat-label { font-size: 11px; font-weight: 800; color: color-mix(in srgb, var(--project-text) 60%, transparent); text-transform: uppercase; }
+
+/* Компактный Referral Banner */
+.referral-promo-banner {
+  width: 100%;
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
+}
 
 /* ===== Фильтрация Категорий ===== */
 .category-filter-bar {
@@ -409,7 +391,7 @@
 
 .cat-pill.active {
   background: var(--project-text);
-  color: var(--project-bg, #ffffff);
+  color: var(--project-card-bg);
   border-color: var(--project-text);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
@@ -497,11 +479,11 @@
 
 /* Loader */
 .background-loading {
-  position: fixed; top: 18px; right: 18px; background: var(--project-text); color: var(--project-bg);
+  position: fixed; top: 18px; right: 18px; background: var(--project-text); color: var(--project-card-bg);
   padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 900; z-index: 1000;
 }
 .spinner {
-  border: 3px solid color-mix(in srgb, var(--project-bg) 30%, transparent);
+  border: 3px solid color-mix(in srgb, var(--project-card-bg) 30%, transparent);
   border-top: 3px solid var(--project-primary); border-radius: 50%; width: 18px; height: 18px;
   animation: spin 1.2s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px;
 }
@@ -520,13 +502,13 @@
 }
 
 .tour-help-btn {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 999px;
   border: 1px solid var(--glass-border);
   background: color-mix(in srgb, var(--project-text) 6%, transparent);
   color: var(--project-text);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
   line-height: 1;
   cursor: pointer;
@@ -541,69 +523,17 @@
   background: color-mix(in srgb, var(--project-primary) 12%, transparent);
 }
 
-/* Элементы, которые нужны ТОЛЬКО для мобилки по умолчанию скрыты */
-.mobile-header-bar,
-.mobile-bottom-sheet-overlay,
-.mobile-bottom-sheet,
-.mobile-stats-row {
-  display: none;
-}
-
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-
-/* ==========================================================================
-   🛠 Управление Свитчером Проектов (ПК / Мобилка)
-   ========================================================================== */
-.mobile-only-switcher {
-  display: none;
-}
-
-@media (min-width: 769px) {
-  .profile-topbar .brand-switcher-wrapper {
-    flex: 0 1 auto !important;
-  }
-  .profile-topbar .brand-interactive {
-    width: auto !important;
-    padding: 6px 16px 6px 6px !important;
-  }
-}
 
 /* ==========================================================================
    📱 МОБИЛЬНАЯ АДАПТАЦИЯ (<= 768px)
    ========================================================================== */
 @media (max-width: 768px) {
   .profile-container {
-    width: 92%;
-    margin: 12px auto 30px;
-    max-width: 100%;
-  }
-
-  .mobile-header-bar {
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  .mobile-header-left {
-    min-width: 0;
-    flex: 1;
-  }
-
-  .mobile-user-info {
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  .skills-wordmark {
-    font-size: 18px;
-    flex-shrink: 0;
-  }
-
-  /* Скрываем громоздкую десктопную шапку и левый сайдбар */
-  .profile-topbar,
-  .profile-sidebar {
-    display: none !important;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 12px;
   }
 
   .profile-grid {
@@ -611,237 +541,15 @@
     gap: 16px;
   }
 
-  /* --- 0. Панель быстрого переключения проекта (только мобилка) --- */
-  .mobile-only-switcher {
-    display: block;
-    margin-bottom: 16px;
-    position: relative;
-    z-index: 40;
-  }
-
-  .mobile-only-switcher .brand-interactive {
-    background: color-mix(in srgb, var(--project-primary) 12%, var(--project-card-bg));
-    border: 1px solid var(--glass-border);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
-    padding: 10px 16px 10px 10px !important;
-    border-radius: 18px;
-  }
-
-  .mobile-only-switcher .brand-interactive:active {
-    transform: scale(0.97);
-    background: color-mix(in srgb, var(--project-primary) 18%, var(--project-card-bg));
-  }
-
-  .mobile-only-switcher .project-switcher-menu {
-    width: 100%;
-    top: calc(100% + 8px);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
-  }
-
-  .mobile-only-switcher .brand-mark {
-    width: 38px;
-    height: 38px;
-    font-size: 15px;
-    border-radius: 12px;
-  }
-
-  .mobile-only-switcher .brand-title {
-    font-size: 16px;
-  }
-
-  .mobile-only-switcher .brand-subtitle {
-    font-size: 11px;
-  }
-
-  .mobile-only-switcher .switcher-chevron {
-    color: var(--project-primary);
-  }
-
-  /* --- 1. Мобильная компактная шапка --- */
-  .mobile-header-bar {
-    display: flex !important;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background: var(--glass-bg);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    border-radius: 22px;
-    margin-bottom: 16px;
-  }
-
-  .mobile-header-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .mobile-avatar {
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--project-primary) 15%, transparent);
-    border: 2px solid var(--project-primary);
-    display: grid;
-    place-items: center;
-    font-size: 22px;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-
-  .mobile-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .mobile-user-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .mobile-user-name {
-    font-size: 16px;
-    font-weight: 900;
-    color: var(--project-text);
-    line-height: 1.1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .mobile-title-pill {
-    display: inline-block;
-    margin-top: 4px;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    border: 1px solid color-mix(in srgb, var(--project-primary) 35%, transparent);
-    background: color-mix(in srgb, var(--project-primary) 10%, transparent);
-    color: var(--project-primary);
-    cursor: pointer;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .mobile-profile-meta {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    color: color-mix(in srgb, var(--project-text) 55%, transparent);
-    flex-wrap: wrap;
-  }
-
-  .mobile-meta-dot {
-    opacity: 0.35;
-  }
-
-  .mobile-streak-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    font-weight: 800;
-    color: color-mix(in srgb, var(--project-text) 70%, transparent);
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-  }
-
-  .mobile-burger-btn {
-    width: 42px;
-    height: 42px;
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--project-text) 6%, transparent);
-    border: 1px solid var(--glass-border);
-    color: var(--project-text);
-    font-size: 20px;
-    display: grid;
-    place-items: center;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: transform 0.15s ease, background 0.15s ease;
-  }
-
-  .mobile-burger-btn:active {
-    transform: scale(0.95);
-    background: color-mix(in srgb, var(--project-text) 12%, transparent);
-  }
-
-  /* --- 2. Компактная статистика --- */
+  /* Скрываем десктопные элементы (бекап для Tailwind) */
+  .profile-topbar,
+  .profile-sidebar,
   .desktop-stats-title,
   .stats-grid {
     display: none !important;
   }
 
-  .mobile-stats-row {
-    display: grid !important;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-
-  @media (max-width: 380px) {
-    .mobile-stat-val {
-      font-size: 16px;
-    }
-    .mobile-stat-lbl {
-      font-size: 9px;
-    }
-  }
-
-  .mobile-stat-card {
-    background: var(--project-card-bg);
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
-    padding: 10px 4px;
-    text-align: center;
-    box-shadow: 0 4px 12px -6px rgba(0,0,0,0.05);
-    min-width: 0;
-  }
-
-  .mobile-stat-val {
-    font-size: 18px;
-    font-weight: 900;
-    color: var(--project-text);
-    line-height: 1.1;
-  }
-
-  .mobile-stat-lbl {
-    font-size: 10px;
-    font-weight: 700;
-    color: color-mix(in srgb, var(--project-text) 60%, transparent);
-    margin-top: 2px;
-  }
-
-  .profile-panel {
-    max-width: 100%;
-    overflow-x: hidden;
-    box-sizing: border-box;
-    padding: 16px;
-  }
-
-  .profile-panel .section-title {
-    flex-wrap: wrap;
-  }
-
-  .progress-list-scrollable {
-    max-width: 100%;
-    padding-right: 0;
-  }
-
-  /* --- 3. Карточки материалов --- */
+  /* Карточки материалов на мобильных */
   .progress-row {
     flex-direction: column;
     align-items: stretch;
@@ -871,12 +579,13 @@
     min-width: 0;
   }
 
+  .progress-title {
+    font-size: 15px;
+  }
+
+  /* Реферальный баннер адаптация */
   .referral-promo-banner {
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    padding: 18px 16px !important;
+    padding: 16px !important;
     gap: 12px !important;
   }
 
@@ -890,12 +599,7 @@
   }
 
   .referral-promo-banner h3 {
-    font-size: clamp(16px, 4.5vw, 20px) !important;
-    flex-wrap: wrap;
-  }
-
-  .referral-promo-banner p {
-    max-width: 100% !important;
+    font-size: 17px !important;
   }
 
   .referral-promo-banner > div:last-child {
@@ -905,107 +609,42 @@
     flex: 1 1 auto;
   }
 
-  .progress-title {
-    font-size: 15px;
+  /* Свитчер мобильный */
+  .brand-interactive {
+    background: color-mix(in srgb, var(--project-primary) 12%, var(--project-card-bg));
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    padding: 10px 16px 10px 10px !important;
+    border-radius: 18px;
   }
 
-  /* --- 4. Выезжающее снизу мобильное меню (Bottom Sheet) --- */
-  .mobile-bottom-sheet-overlay {
-    display: block !important;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    z-index: 9998;
-    animation: fadeIn 0.2s ease forwards;
+  .brand-interactive:active {
+    transform: scale(0.97);
+    background: color-mix(in srgb, var(--project-primary) 18%, var(--project-card-bg));
   }
 
-  .mobile-bottom-sheet {
-    display: flex !important;
-    flex-direction: column;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: var(--p-card-bg, var(--project-card-bg));
-    border-top-left-radius: 28px;
-    border-top-right-radius: 28px;
-    padding: 20px 20px 36px;
-    z-index: 9999;
-    box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
-    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    max-height: 85vh;
-    overflow-y: auto;
+  .project-switcher-menu {
+    width: 100%;
+    top: calc(100% + 8px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
   }
 
-  .sheet-handle {
-    width: 40px;
-    height: 4px;
-    background: color-mix(in srgb, var(--project-text) 20%, transparent);
-    border-radius: 99px;
-    margin: 0 auto 16px;
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    font-size: 14px;
+    border-radius: 12px;
   }
 
-  .sheet-title {
-    font-size: 18px;
-    font-weight: 900;
-    color: var(--project-text);
-    margin-bottom: 16px;
+  .brand-title {
+    font-size: 16px;
   }
 
-  .sheet-menu-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  .brand-subtitle {
+    font-size: 11px;
   }
 
-  .sheet-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
-    border-radius: 16px;
-    background: color-mix(in srgb, var(--project-text) 4%, transparent);
-    color: var(--project-text);
-    font-size: 15px;
-    font-weight: 800;
-    text-decoration: none;
-    border: none;
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.2s ease, transform 0.1s ease;
+  .switcher-chevron {
+    color: var(--project-primary);
   }
-
-  .sheet-item:active {
-    transform: scale(0.98);
-    background: color-mix(in srgb, var(--project-text) 8%, transparent);
-  }
-
-  .sheet-item--danger {
-    color: #ef4444;
-    background: color-mix(in srgb, #ef4444 8%, transparent);
-  }
-
-  .sheet-item--danger:active {
-    background: color-mix(in srgb, #ef4444 14%, transparent);
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  @keyframes slideUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-  }
-}
-
-/* Bottom sheet и тур: меню видно, подсветка и тултип — поверх */
-body.tour-sheet-active .mobile-bottom-sheet-overlay {
-  z-index: 10004 !important;
-}
-
-body.tour-sheet-active .mobile-bottom-sheet {
-  z-index: 10005 !important;
 }

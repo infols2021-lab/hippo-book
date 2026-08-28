@@ -10,9 +10,7 @@ import RewardsModal from "@/components/rewards/RewardsModal";
 import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal";
 import { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTimeline";
 import { useTour } from "@/components/tour/TourProvider";
-import { useTourMobileMenu } from "@/hooks/useTourMobileMenu";
 import {
-  dispatchBurgerClicked,
   dispatchTourPageReady,
   dispatchTourRewardsForceTab,
 } from "@/lib/tour/tourMobile";
@@ -171,12 +169,14 @@ export default function ProfileClient({
 
   const [profile, setProfile] = useState<ProfileData>(initialProfile);
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
   const [bgLoading, setBgLoading] = useState<boolean>(Boolean(backgroundProxyUrl));
   const [bgReady, setBgReady] = useState<boolean>(false);
   const [notif, setNotif] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [editOpen, setEditOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false); // Модалка поддержки для мобилок
+  
   const [editFullName, setEditFullName] = useState(profile.full_name ?? "");
   const [editPhone, setEditPhone] = useState(profile.contact_phone ?? "");
   const [editRegion, setEditRegion] = useState(profile.region ?? "");
@@ -250,11 +250,6 @@ export default function ProfileClient({
       setRewardsModalOpen(false);
     }
   }, [stage]);
-
-  const { handleOverlayClick: handleTourOverlayClick } = useTourMobileMenu(
-    mobileMenuOpen,
-    setMobileMenuOpen
-  );
 
   function showNotification(text: string, type: "success" | "error" = "success") {
     setNotif({ type, text });
@@ -430,7 +425,6 @@ export default function ProfileClient({
     }
   }
 
-  // Честно берём материалы, которые нам отдал бэкенд с правильными `tabTitle`
   const dynamicCategories = useMemo(() => {
     if (!materialsProgress) return [];
     const map = new Map<string, string>(); 
@@ -471,7 +465,7 @@ export default function ProfileClient({
   const brandMark = projectName.substring(0, 2).toUpperCase() || "EK";
   const titleText = streakData?.equippedTitle?.trim() || "Без титула";
 
-  // Универсальный компонент выбора ветки для ПК и Мобилки
+  // Универсальный компонент выбора ветки
   const ProjectSwitcherUI = (
     <div className="brand-switcher-wrapper" style={{ flex: 1, minWidth: 0 }}>
       <button 
@@ -601,6 +595,53 @@ export default function ProfileClient({
         </form>
       </Modal>
 
+      {/* Модалка Службы поддержки для мобилок */}
+      <Modal open={supportOpen} onClose={() => setSupportOpen(false)} title="Служба поддержки" maxWidth={400}>
+        <div style={{ color: "var(--project-text)", fontSize: "15px", lineHeight: "1.5" }}>
+          <p style={{ marginBottom: "24px", fontWeight: 500 }}>
+            Обычно администратор отвечает в течение 2 часов. Выберите удобный способ связи:
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <a
+              href="https://t.me/skebobingg"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "block",
+                padding: "14px",
+                borderRadius: "14px",
+                background: "linear-gradient(135deg, #24a1de, #208ec4)",
+                color: "#fff",
+                fontWeight: 800,
+                textAlign: "center",
+                textDecoration: "none",
+                boxShadow: "0 4px 12px rgba(36, 161, 222, 0.2)",
+              }}
+            >
+              Написать в Telegram
+            </a>
+            <a
+              href="https://vk.com/bluntokyr"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "block",
+                padding: "14px",
+                borderRadius: "14px",
+                background: "linear-gradient(135deg, #0077ff, #0066da)",
+                color: "#fff",
+                fontWeight: 800,
+                textAlign: "center",
+                textDecoration: "none",
+                boxShadow: "0 4px 12px rgba(0, 119, 255, 0.2)",
+              }}
+            >
+              Написать во ВКонтакте
+            </a>
+          </div>
+        </div>
+      </Modal>
+
       {rewardsModalOpen && (
         <RewardsModal
           isOpen={rewardsModalOpen}
@@ -620,153 +661,98 @@ export default function ProfileClient({
         />
       )}
 
-      {mobileMenuOpen && (
-        <>
-          <div className="mobile-bottom-sheet-overlay" onClick={handleTourOverlayClick} />
-          <div className="mobile-bottom-sheet">
-            <div className="sheet-handle" />
-            <div className="sheet-title">Меню профиля</div>
-            <div className="sheet-menu-list">
-              <button
-                className="sheet-item"
-                data-tour="rewards-btn"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  openRewards("wardrobe");
-                }}
-              >
-                Награды и гардероб
-              </button>
-              <Link
-                className="sheet-item"
-                data-tour="materials-link"
-                href={`/projects/${projectSlug}/materials`}
-                onClick={() => {
-                  if (stage === "materials_gate") advanceTour("materials_demo");
-                  setMobileMenuOpen(false);
-                }}
-              >
-                Все материалы
-              </Link>
-              <button className="sheet-item" onClick={() => { setMobileMenuOpen(false); openEdit(); }}>
-                Редактировать профиль
-              </button>
-              <button
-                className="sheet-item"
-                data-tour="requests-link"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  if (stage === "profile_requests_gate") {
-                    advanceTour("requests_info");
-                  }
-                  router.push(`/projects/${projectSlug}/requests`);
-                }}
-              >
-                Заявки на покупку
-              </button>
-              {profile.is_admin && (
-                <Link className="sheet-item" href="/admin" onClick={() => setMobileMenuOpen(false)}>
-                  Панель управления
-                </Link>
-              )}
-              <Link
-                className="sheet-item"
-                href="/portal"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Главный портал
-              </Link>
-              <button
-                type="button"
-                className="sheet-item"
-                data-tour="tour-help-btn"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  window.dispatchEvent(new Event("start-product-tour"));
-                }}
-              >
-                ? Помощь по платформе
-              </button>
-              <button className="sheet-item sheet-item--danger" onClick={() => void logout()}>
-                Выйти
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
       <div className="profile-container">
         
-        {/* CSS для показа свитчера проектов только на мобилке (скрыт на десктопе) */}
-        <style dangerouslySetInnerHTML={{ __html: `
-          .mobile-only-switcher { display: none; margin-bottom: 16px; position: relative; z-index: 40; }
-          @media (max-width: 768px) {
-            .mobile-only-switcher { display: block; }
-          }
-        `}} />
+        {/* ========================================================= */}
+        {/* MOBILIE PROFILE HEADER (TELEGRAM STYLE) - HIDDEN ON DESKTOP */}
+        {/* ========================================================= */}
+        <div className="md:hidden flex flex-col items-center w-full pt-4 pb-2">
+          
+          <div className="w-full mb-6 relative z-40">
+            {ProjectSwitcherUI}
+          </div>
 
-        {/* Гармоничный селектор проектов для мобилки (показывается только на маленьких экранах) */}
-        <div className="mobile-only-switcher">
-          {ProjectSwitcherUI}
-        </div>
+          <div
+            className="w-28 h-28 rounded-full flex items-center justify-center overflow-hidden border-[3px] shadow-lg mb-4"
+            onClick={() => openRewards("wardrobe")}
+            data-tour="profile-avatar"
+            style={{ 
+              borderColor: "var(--project-card-bg)", 
+              backgroundColor: "color-mix(in srgb, var(--project-text) 5%, transparent)",
+            }}
+          >
+            {streakData?.equippedAvatarUrl ? (
+              <img src={streakData.equippedAvatarUrl} alt="Аватар" className="w-full h-full object-cover" />
+            ) : (
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            )}
+          </div>
 
-        <div className="mobile-header-bar">
-          <div className="mobile-header-left">
-            <div className="mobile-avatar" data-tour="profile-avatar" onClick={() => openRewards("wardrobe")}>
-              {streakData?.equippedAvatarUrl ? (
-                <img src={streakData.equippedAvatarUrl} alt="Аватар" />
-              ) : (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              )}
+          <h1 className="text-[22px] font-black leading-tight text-center px-4" style={{ color: "var(--project-text)" }}>
+            {nameLabel(profile.full_name)}
+          </h1>
+
+          <div className="mt-1.5 flex items-center justify-center flex-wrap gap-2 text-[14px] font-bold" style={{ color: "var(--project-primary)" }}>
+            <span onClick={() => openRewards("wardrobe")} data-tour="profile-title">
+              «{titleText}»
+            </span>
+            {features?.streaks && (
+              <>
+                <span style={{ opacity: 0.4 }}>•</span>
+                <span onClick={() => openRewards("streaks")}>
+                  {streakLoading ? "…" : `${streakData?.currentStreak ?? 0} дн.`} в сети
+                </span>
+              </>
+            )}
+          </div>
+
+          <div className="flex w-full gap-3 mt-6">
+            <button 
+              className="flex-1 py-3 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-2 transition-transform active:scale-95" 
+              onClick={openEdit}
+              style={{ backgroundColor: "var(--project-card-bg)", border: "1px solid var(--glass-border)", color: "var(--project-text)" }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              Изменить
+            </button>
+            <button 
+              className="flex-1 py-3 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-2 transition-transform active:scale-95" 
+              onClick={() => setSupportOpen(true)}
+              style={{ backgroundColor: "var(--project-card-bg)", border: "1px solid var(--glass-border)", color: "var(--project-text)" }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+              Поддержка
+            </button>
+          </div>
+
+          <div 
+            className="w-full mt-5 rounded-[20px] p-5 flex flex-col gap-4 shadow-sm"
+            style={{ backgroundColor: "var(--project-card-bg)", border: "1px solid var(--glass-border)" }}
+          >
+            <div className="flex flex-col">
+              <span className="text-[11px] font-black uppercase tracking-wider mb-1" style={{ color: "color-mix(in srgb, var(--project-text) 50%, transparent)" }}>Телефон</span>
+              <span className="text-[16px] font-bold" style={{ color: "var(--project-text)" }}>{phoneLabel(profile.contact_phone)}</span>
             </div>
-            <div className="mobile-user-info" data-tour="profile-details">
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span className="skills-wordmark">skilLS</span>
-                <span style={{ fontSize: "12px", opacity: 0.4 }}>•</span>
-                <span className="mobile-user-name">{nameLabel(profile.full_name)}</span>
-              </div>
-              {features?.titles && (
-                <button
-                  type="button"
-                  className="mobile-title-pill"
-                  data-tour="profile-title"
-                  onClick={() => openRewards("wardrobe")}
-                >
-                  «{titleText}»
-                </button>
-              )}
-              <div className="mobile-profile-meta">
-                <span>{phoneLabel(profile.contact_phone)}</span>
-                <span className="mobile-meta-dot">•</span>
-                <span>{regionLabel(profile.region)}</span>
-              </div>
-              {features?.streaks && (
-                <button type="button" className="mobile-streak-pill" onClick={() => openRewards("streaks")}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', marginRight: '4px' }}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg> 
-                  {streakData?.currentStreak ?? 0} дн. серия
-                </button>
-              )}
+            <div className="h-px w-full" style={{ backgroundColor: "var(--glass-border)" }} />
+            <div className="flex flex-col">
+              <span className="text-[11px] font-black uppercase tracking-wider mb-1" style={{ color: "color-mix(in srgb, var(--project-text) 50%, transparent)" }}>Email</span>
+              <span className="text-[16px] font-bold" style={{ color: "var(--project-text)" }}>{userEmail || "—"}</span>
+            </div>
+            <div className="h-px w-full" style={{ backgroundColor: "var(--glass-border)" }} />
+            <div className="flex flex-col">
+              <span className="text-[11px] font-black uppercase tracking-wider mb-1" style={{ color: "color-mix(in srgb, var(--project-text) 50%, transparent)" }}>Регион</span>
+              <span className="text-[16px] font-bold" style={{ color: "var(--project-text)" }}>{regionLabel(profile.region)}</span>
             </div>
           </div>
-          <button
-            type="button"
-            className="mobile-burger-btn"
-            data-tour="mobile-burger-btn"
-            onClick={() => {
-              const opening = !mobileMenuOpen;
-              setMobileMenuOpen(opening);
-              if (opening) dispatchBurgerClicked();
-            }}
-            aria-label="Открыть меню"
-            aria-expanded={mobileMenuOpen}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-          </button>
         </div>
+        {/* ========================================================= */}
 
-        <div className="profile-topbar">
+        {/* DESKTOP TOPBAR */}
+        <div className="profile-topbar hidden md:flex">
           <div style={{ display: "flex", alignItems: "center", gap: "20px", flex: 1, minWidth: 0 }}>
-            <span className="skills-wordmark hidden md:inline-block">skilLS</span>
+            <span className="skills-wordmark">skilLS</span>
             {ProjectSwitcherUI}
           </div>
 
@@ -826,7 +812,8 @@ export default function ProfileClient({
 
         <div className="profile-grid">
           
-          <aside className="profile-panel profile-sidebar">
+          {/* DESKTOP SIDEBAR */}
+          <aside className="profile-panel profile-sidebar hidden md:flex">
             <div
               className="profile-avatar-wrapper"
               data-tour="profile-avatar"
@@ -909,12 +896,14 @@ export default function ProfileClient({
             </div>
           </aside>
 
-          <main className="profile-panel">
+          {/* MAIN CONTENT AREA */}
+          <main className="profile-panel" style={{ paddingTop: 0 }}>
             
-            <div className="section-title desktop-stats-title">
+            {/* Статистика скрыта на смартфонах */}
+            <div className="section-title desktop-stats-title hidden md:block mt-6">
               Статистика <b>материалов</b>
             </div>
-            <div className="stats-grid" data-tour="profile-stats">
+            <div className="stats-grid hidden md:grid" data-tour="profile-stats">
               <div className="stat-card">
                 <div className="stat-value">{stats?.totalMaterials ?? "—"}</div>
                 <div className="stat-label">Доступно материалов</div>
@@ -937,32 +926,13 @@ export default function ProfileClient({
               </div>
             </div>
 
-            <div className="mobile-stats-row" data-tour="profile-stats">
-              <div className="mobile-stat-card">
-                <div className="mobile-stat-val">{stats ? `${stats.successRate}%` : "0%"}</div>
-                <div className="mobile-stat-lbl">прогресс</div>
-              </div>
-              <div className="mobile-stat-card">
-                <div className="mobile-stat-val">{stats?.totalMaterials ?? 0}</div>
-                <div className="mobile-stat-lbl">материалов</div>
-              </div>
-              <div className="mobile-stat-card">
-                <div className="mobile-stat-val">{stats?.completedAvailableAssignments ?? 0}</div>
-                <div className="mobile-stat-lbl">решено</div>
-              </div>
-              <div className="mobile-stat-card">
-                <div className="mobile-stat-val">{stats?.totalAvailableAssignments ?? 0}</div>
-                <div className="mobile-stat-lbl">заданий</div>
-              </div>
-            </div>
-
             <div 
               className="referral-promo-banner" 
               onClick={() => openRewards("referrals")}
               style={{
                 background: "linear-gradient(135deg, var(--project-primary) 0%, #818cf8 100%)",
-                borderRadius: "24px",
-                padding: "24px",
+                borderRadius: "20px",
+                padding: "16px 20px",
                 color: "#fff",
                 cursor: "pointer",
                 display: "flex",
@@ -970,8 +940,8 @@ export default function ProfileClient({
                 gap: "16px",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginTop: "32px",
-                marginBottom: "32px",
+                marginTop: "16px",
+                marginBottom: "24px",
                 boxShadow: "0 10px 25px color-mix(in srgb, var(--project-primary) 30%, transparent)",
                 transition: "transform 0.2s, box-shadow 0.2s"
               }}
@@ -979,20 +949,20 @@ export default function ProfileClient({
               onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
             >
               <div>
-                <h3 style={{ margin: "0 0 8px 0", fontSize: "20px", fontWeight: 900, display: "flex", alignItems: "center", gap: "8px" }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5c-1.2 0-2.12.8-2.5 1.9"></path><path d="M8.5 7.5A3.5 3.5 0 1 1 12 11a3.5 3.5 0 0 1-3.5-3.5z"></path><path d="M20 8v6"></path><path d="M23 11h-6"></path></svg>
+                <h3 style={{ margin: "0 0 6px 0", fontSize: "18px", fontWeight: 900, display: "flex", alignItems: "center", gap: "8px" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5c-1.2 0-2.12.8-2.5 1.9"></path><path d="M8.5 7.5A3.5 3.5 0 1 1 12 11a3.5 3.5 0 0 1-3.5-3.5z"></path><path d="M20 8v6"></path><path d="M23 11h-6"></path></svg>
                   Пригласи друга
                 </h3>
-                <p style={{ margin: 0, fontSize: "14px", opacity: 0.9, fontWeight: 500, maxWidth: "420px", lineHeight: 1.5 }}>
+                <p style={{ margin: 0, fontSize: "13px", opacity: 0.95, fontWeight: 500, maxWidth: "400px", lineHeight: 1.4 }}>
                   Делись ссылкой, зови друзей на платформу и получай эксклюзивные титулы, вещи для маскота и бесплатные материалы.
                 </p>
               </div>
               <div style={{
                 background: "rgba(255,255,255,0.2)",
-                padding: "10px 20px",
-                borderRadius: "14px",
+                padding: "10px 16px",
+                borderRadius: "12px",
                 fontWeight: 800,
-                fontSize: "14px",
+                fontSize: "13px",
                 backdropFilter: "blur(10px)",
                 whiteSpace: "nowrap"
               }}>
@@ -1124,10 +1094,10 @@ export default function ProfileClient({
               </>
             )}
 
-            <div className="section-title" style={{ marginTop: "32px" }}>
+            <div className="section-title hidden md:block" style={{ marginTop: "32px" }}>
               Служба <b>поддержки</b>
             </div>
-            <ul className="info-list">
+            <ul className="info-list hidden md:block">
               <li className="info-li">
                 <span className="info-bullet" />
                 <span>

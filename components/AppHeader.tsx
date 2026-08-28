@@ -75,8 +75,9 @@ export default function AppHeader({
         marginBottom: "24px",
       }}
     >
-      <div className="max-w-[1100px] w-[95%] mx-auto py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      {/* Убрали flex-col, так как на мобильных устройствах навигация скрыта и перенос строк не нужен */}
+      <div className="max-w-[1100px] w-[95%] mx-auto py-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 min-w-0">
           <div
             className="w-[46px] h-[46px] flex items-center justify-center rounded-[14px] font-black text-lg flex-shrink-0 transition-all duration-500"
             style={{
@@ -105,8 +106,9 @@ export default function AppHeader({
           </div>
         </div>
 
+        {/* Скрываем ссылки на мобильных (hidden md:flex), так как для них будет отдельная нижняя панель (BottomNav) */}
         <div
-          className="flex items-center gap-2 sm:gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar"
+          className="hidden md:flex items-center gap-2 sm:gap-3 w-auto overflow-x-auto hide-scrollbar"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
           {isTeacher && (

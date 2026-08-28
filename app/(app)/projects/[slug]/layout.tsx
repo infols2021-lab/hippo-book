@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import BottomNav from "@/components/BottomNav";
 
 export const revalidate = 0;
 
@@ -63,7 +64,7 @@ export default async function ProjectLayout({
     "--project-secondary": secondaryColor,
     "--project-bg": bgColor,
     "--project-text": textColor,
-    "--project-card-bg": cardBgColor, /* Модалки и карточки будут ПЛОТНЫЕ */
+    "--project-card-bg": cardBgColor,
     "--project-input-bg": inputBgColor, 
     "--project-input-text": inputTextColor,
     "--project-input-border": inputBorderColor,
@@ -78,8 +79,15 @@ export default async function ProjectLayout({
   return (
     <>
       <style id="project-theme-vars" dangerouslySetInnerHTML={{ __html: `:root { ${rootCssText} }` }} />
-      <div style={themeVars as React.CSSProperties} className="min-h-screen w-full transition-colors duration-500 project-layout-wrapper">
+      <div 
+        style={themeVars as React.CSSProperties} 
+        // Добавлено pb-[100px] на мобилках, чтобы контент не перекрывался плавающим меню
+        className="min-h-screen w-full transition-colors duration-500 project-layout-wrapper pb-[100px] md:pb-0 relative flex flex-col"
+      >
         {children}
+        
+        {/* Интегрирована плавающая нижняя панель навигации */}
+        <BottomNav slug={slug} />
       </div>
     </>
   );
