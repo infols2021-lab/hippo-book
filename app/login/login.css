@@ -3,44 +3,52 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
 :root {
-  /* Premium Apple-style palette */
+  /* Премиальная палитра в стиле Apple */
   --blue-900: #0f172a;
   --blue-800: #1e293b;
   --blue-700: #334155;
-  --blue-600: #0066cc;
+  --blue-600: #0066cc; /* Более сочный синий (Apple blue) */
   --blue-500: #0ea5e9;
   --blue-400: #38bdf8;
   --blue-100: #e0f2fe;
   --blue-50: #f0f9ff;
 
-  --emerald-400: #34d399;
+  --emerald-400: #34d399; /* Для градиентных маркеров текста */
 
-  /* UI & Backgrounds */
-  --auth-bg: rgba(255, 255, 255, 0.85);
+  /* Фоны и интерфейс */
+  --auth-bg: rgba(255, 255, 255, 0.85); /* Полупрозрачный фон для стекла */
   --auth-line: rgba(0, 0, 0, 0.08);
   --promo-bg: #f8fafc;
 
-  /* Text */
+  /* Текст */
   --text-navy: #0f172a;
   --text-mut-navy: #475569;
   --text-mut-auth: #94a3b8;
 }
 
+/* ============================================================
+   🖥️ FLUID SCALING ДЛЯ ДЕСКТОПА / БОЛЬШИХ ЭКРАНОВ (> 768px)
+   ------------------------------------------------------------
+   На мобилке (<= 768px) это правило вообще не применяется —
+   там всё уже идеально, шрифт остаётся стандартным браузерным.
+   На десктопе базовый размер шрифта (влияет на все rem-размеры:
+   кнопки, лейблы, инпуты, модалки и т.д.) плавно растёт вместе
+   с шириной окна — от 16px на небольших ноутбучных экранах
+   до 19px на больших мониторах, — и дальше не увеличивается.
+   Поэтому на широком экране текст не выглядит мелким/потерянным,
+   но при этом ничего не ломается и не переполняется.
+   ============================================================ */
+@media (min-width: 769px) {
+  html {
+    font-size: clamp(16px, calc(14px + 0.28vw), 19px);
+  }
+}
+
 .page-login {
   min-height: 100vh;
-  width: 100%;
-  /* Display flex to center the split-layout on ultra-wide screens */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  background-color: #f1f5f9;
-  /* Grid pattern moved to root to cover the whole screen */
-  background-image:
-    linear-gradient(rgba(15, 23, 42, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 23, 42, 0.02) 1px, transparent 1px);
-  background-size: 32px 32px;
-  
+  width: 100vw;
+  /* Глобальный фон под всем, чтобы стекло авторизации просвечивало */
+  background: #f1f5f9;
   overflow: hidden;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: var(--text-navy);
@@ -48,102 +56,109 @@
 }
 
 /* ============================================================
-   AMBIENT GLOW BLOBS
+   AMBIENT GLOW BLOBS (Фоновые светящиеся сферы)
    ============================================================ */
 .page-login::before,
 .page-login::after {
   content: "";
   position: fixed;
   border-radius: 50%;
-  filter: blur(120px);
+  filter: blur(100px);
   z-index: 0;
-  opacity: 0.6;
+  opacity: 0.7;
   animation: blob-float 12s infinite alternate ease-in-out;
   pointer-events: none;
 }
 
 .page-login::before {
   width: 50vw;
-  max-width: 800px;
   height: 50vw;
-  max-height: 800px;
-  background: #bae6fd;
-  top: -10%;
-  left: -10%;
+  background: #bae6fd; /* Светло-голубая сфера слева сверху */
+  top: -15vw;
+  left: -15vw;
 }
 
 .page-login::after {
   width: 40vw;
-  max-width: 600px;
   height: 40vw;
-  max-height: 600px;
-  background: #e0e7ff;
-  bottom: -10%;
-  right: -5%;
+  background: #e0e7ff; /* Светло-фиолетовая сфера справа снизу */
+  bottom: -10vw;
+  right: -5vw;
   animation-delay: -6s;
 }
 
 @keyframes blob-float {
   0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(5%, 8%) scale(1.1); }
+  100% { transform: translate(8%, 12%) scale(1.15); }
 }
 
-/* ============================================================
-   LAYOUT
-   ============================================================ */
+/* Дополнительный паттерн-сетка поверх блюра */
 .split-layout {
   display: flex;
-  width: 100%;
-  max-width: 1320px; /* Constraint for 2K/4K screens */
   height: 100vh;
-  max-height: 960px; /* Prevent infinite stretching on tall screens */
+  width: 100vw;
+  /* 🖥️ ФИКС ДЛЯ БОЛЬШИХ/ШИРОКИХ ЭКРАНОВ:
+     ограничиваем максимальную ширину самого сплит-лейаута и
+     центрируем его. Без этого на широких мониторах промо-блок
+     (слева) и форма входа (справа) разъезжались к противоположным
+     краям окна с огромным пустым провалом посередине — из-за
+     этого всё выглядело "прилипшим" к левому/правому краю и
+     текст казался мелким и потерянным. Теперь макет останавливается
+     на разумной ширине и красиво центрируется, а лишнее место
+     по бокам просто докрашивается тем же ambient-фоном. */
+  max-width: 1600px;
   margin: 0 auto;
   position: relative;
   z-index: 1;
-  padding: 0 40px; /* Buffer from edges */
-  gap: 60px;
-  align-items: center;
-  justify-content: space-between;
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.02) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
 /* ============================================================
-   PROMO SIDE
+   PROMO SIDE (No-Scroll: всегда вписывается в 100vh)
    ============================================================ */
 .promo-side {
-  flex: 1 1 55%;
-  max-width: 640px;
+  flex: 1.25;
+  background: transparent;
+  color: var(--text-navy);
   display: flex;
   flex-direction: column;
-  justify-content: center;
   position: relative;
-  height: 100%;
+  height: 100vh;
+  /* Жёсткая блокировка скролла — контент всегда вписывается в экран */
+  overflow: hidden;
 }
 
 .promo-content {
+  padding: clamp(1.5rem, 3vh, 2.5rem) clamp(2rem, 4vw, 4rem) 0;
+  max-width: 900px;
   position: relative;
   z-index: 2;
+  /* Блок текста не растягивается — забирает только нужное место */
   flex-shrink: 0;
 }
 
 .logo {
   display: inline-flex;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: clamp(0.75rem, 2vh, 1.5rem);
 }
 
 .logo img {
-  height: 44px;
+  height: clamp(36px, 4.5vh, 54px);
   object-fit: contain;
 }
 
-/* Typography without infinite VW scaling */
+/* Градиентный переливающийся заголовок */
 .promo-title {
   font-family: 'Inter', sans-serif;
-  font-size: 2.6rem;
+  font-size: clamp(1.6rem, 3.4vh, 2.8rem);
   font-weight: 900;
   line-height: 1.15;
   letter-spacing: -0.03em;
-  margin-bottom: 1.25rem;
+  margin-bottom: clamp(0.5rem, 1.4vh, 1rem);
   background: linear-gradient(135deg, var(--blue-900) 0%, var(--blue-600) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -151,14 +166,14 @@
 }
 
 .promo-text {
-  font-size: 1.05rem;
-  line-height: 1.6;
+  font-size: clamp(0.9rem, 1.6vh, 1.1rem);
+  line-height: 1.55;
   color: var(--text-mut-navy);
-  margin-bottom: 1rem;
+  margin-bottom: clamp(0.4rem, 1vh, 0.8rem);
   font-weight: 500;
 }
 
-/* Marker Effect */
+/* 🔥 ЭФФЕКТ МАРКЕРА НА ЖИРНОМ ТЕКСТЕ 🔥 */
 .promo-text strong {
   color: var(--blue-900);
   font-weight: 800;
@@ -187,15 +202,15 @@
   opacity: 0.5;
 }
 
-/* Interactive Tags */
+/* ============ ИНТЕРАКТИВНЫЕ ТЕГИ ============ */
 .interactive-hint {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 700;
   color: var(--blue-600);
-  margin: 1rem 0 0.75rem 0;
+  margin: clamp(0.6rem, 1.6vh, 1rem) 0 clamp(0.4rem, 1vh, 0.6rem) 0;
 }
 
 .interactive-hint svg {
@@ -212,21 +227,22 @@
 .feature-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  gap: 0.7rem;
+  margin-bottom: clamp(0.6rem, 1.6vh, 1.2rem);
 }
 
 .feature-tag {
-  padding: 0.6rem 1.25rem;
+  padding: 0.55rem 1.3rem;
   border-radius: 99px;
-  background: rgba(14, 165, 233, 0.08);
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  color: #0369a1;
+  color: var(--blue-600);
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
-  border: 1px solid rgba(14, 165, 233, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -257,46 +273,50 @@
   box-shadow: 0 0 10px rgba(255,255,255,0.8);
 }
 
-/* CTA Button */
+/* ============ КНОПКА ПОДРОБНЕЕ ============ */
 .promo-cta-wrap {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
-  margin-top: 1.5rem;
+  margin-top: clamp(0.5rem, 1.4vh, 1rem);
 }
 
 .promo-cta {
   display: inline-flex;
   align-items: center;
-  padding: 0.85rem 1.5rem;
-  border-radius: 14px;
-  color: var(--blue-600);
-  background: #ffffff;
-  border: 1px solid #bae6fd;
-  font-weight: 800;
-  font-size: 0.95rem;
+  padding: 0.75rem 1.3rem;
+  border-radius: 12px;
+  color: var(--blue-800);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  font-weight: 700;
+  font-size: 0.9rem;
   text-decoration: none;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.08);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
 }
 
 .promo-cta:hover {
-  color: var(--blue-700);
+  background: #ffffff;
+  color: var(--blue-600);
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(14, 165, 233, 0.15);
-  border-color: var(--blue-400);
 }
 
-/* Preview Image */
+/* ============ ПРЕВЬЮ: МАСШТАБИРУЕМАЯ КАРТИНКА (СЕКРЕТ ФОКУСА) ============ */
 .preview-container {
-  padding: 1.5rem 0 0 0;
+  padding: clamp(0.5rem, 1.5vh, 1rem) clamp(2rem, 4vw, 4rem) clamp(1.5rem, 3vh, 3rem);
   position: relative;
   z-index: 2;
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  width: 100%;
+  /* Занимает всё оставшееся место до низа экрана, но не больше */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 @keyframes levitate {
@@ -306,71 +326,88 @@
 
 .preview-wrapper {
   width: 100%;
-  max-width: 560px;
+  height: 100%;
+  max-width: 660px;
   border-radius: 20px;
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
+  /* Мягкое левитирование */
   animation: levitate 7s ease-in-out infinite;
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: pointer;
 }
 
-.preview-wrapper img {
-  width: 100%;
-  height: auto;
-  object-fit: contain;
-  display: block;
-  border-radius: 16px;
-  box-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.15);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  transition: box-shadow 0.4s ease, transform 0.4s ease;
+.preview-wrapper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8);
+  pointer-events: none;
 }
 
 .preview-wrapper:hover {
   animation-play-state: paused;
+  transform: scale(1.03) translateY(-5px);
+}
+
+.preview-wrapper img {
+  /* Пропорционально уменьшается, чтобы влезть в доступную высоту, и никогда не ломает верстку */
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 20px;
+  box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.25);
+  transition: box-shadow 0.4s ease;
 }
 
 .preview-wrapper:hover img {
-  box-shadow: 0 30px 60px -12px rgba(15, 23, 42, 0.25);
-  transform: scale(1.02) translateY(-5px);
+  box-shadow: 0 32px 64px -12px rgba(15, 23, 42, 0.35);
 }
 
 /* ============================================================
-   AUTH SIDE
+   AUTH SIDE (GLASSMORPHISM)
    ============================================================ */
 .auth-side {
-  flex: 1 1 45%;
-  max-width: 480px;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 2rem;
+
+  /* Эффект дорогого матового стекла */
+  background: var(--auth-bg);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border-left: 1px solid rgba(255, 255, 255, 0.6);
+
   position: relative;
   z-index: 10;
+  box-shadow: -20px 0 40px rgba(0, 0, 0, 0.03);
+  overflow-y: auto;
 }
 
 .auth-container {
   width: 100%;
-  background: #ffffff;
-  border-radius: 32px;
-  padding: 3rem 2.5rem;
-  box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.8);
-  box-sizing: border-box;
+  max-width: 380px;
 }
 
 .auth-tabs {
   display: flex;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-  border-bottom: 2px solid #f1f5f9;
-  padding-bottom: 1rem;
+  gap: 2.5rem;
+  margin-bottom: 2.5rem;
+  border-bottom: 1px solid var(--auth-line);
 }
 
 .auth-tab {
   font-size: 1.25rem;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-mut-auth);
+  padding-bottom: 1rem;
   cursor: pointer;
   position: relative;
   transition: color 0.3s;
@@ -383,39 +420,50 @@
 
 .auth-tab.active {
   color: var(--text-navy);
-  font-weight: 900;
+}
+
+.auth-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--blue-600);
+  border-radius: 3px 3px 0 0;
 }
 
 .form-group {
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
 }
 
 .form-label {
   display: block;
-  font-size: 0.8rem;
-  font-weight: 800;
+  font-size: 0.75rem;
+  font-weight: 700;
   color: var(--text-mut-navy);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.6rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 .form-input {
   width: 100%;
-  padding: 1.1rem 1.25rem;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 14px;
+  padding: 1rem 1.2rem;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 12px;
   font-size: 1rem;
   font-weight: 500;
   font-family: inherit;
   color: var(--text-navy);
-  background: #f8fafc;
+  background: rgba(255, 255, 255, 0.9);
   transition: all 0.3s ease;
   box-sizing: border-box;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
 }
 
 .form-input::placeholder {
-  color: #94a3b8;
+  color: #cbd5e1;
   font-weight: 400;
 }
 
@@ -423,35 +471,41 @@
   outline: none;
   border-color: var(--blue-500);
   background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.01), 0 0 0 4px rgba(14, 165, 233, 0.15);
 }
 
-/* Buttons */
+/* ============================================================
+   ИЕРАРХИЯ КНОПОК (Apple Style: одно главное действие)
+   ============================================================ */
+
+/* PRIMARY — «Войти на платформу»: акцентная, дорогая, тёмный градиент */
 .btn-submit {
   width: 100%;
   padding: 1.15rem;
-  background: var(--blue-900);
+  background: linear-gradient(180deg, var(--blue-800) 0%, var(--blue-900) 100%);
   color: #ffffff;
   border: none;
-  border-radius: 14px;
-  font-size: 1.05rem;
-  font-weight: 800;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   margin-top: 0.5rem;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+  /* Фирменный "яблочный" блик сверху + объёмная тень снизу */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 8px 20px rgba(15, 23, 42, 0.25);
   user-select: none;
 }
 
 .btn-submit:hover {
-  background: #000000;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.3);
+  background: linear-gradient(180deg, var(--blue-700) 0%, var(--blue-800) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 12px 28px rgba(15, 23, 42, 0.32);
   transform: translateY(-2px);
 }
 
 .btn-submit:active {
+  /* Кнопка "продавливается" при нажатии */
   transform: translateY(1px);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
 .btn-submit:disabled {
@@ -460,33 +514,41 @@
   transform: none;
 }
 
+/* SECONDARY — «Пройти демо-задание»: стеклянная / призрачная, без заливки */
 .btn-demo {
   display: block;
   width: 100%;
-  margin-top: 1rem;
-  padding: 1.1rem;
-  border-radius: 14px;
-  background: #f8fafc;
-  color: var(--blue-800);
-  border: 1px solid #e2e8f0;
+  margin-top: 12px;
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--blue-900);
+  border: 1px solid rgba(0, 0, 0, 0.05);
   font-weight: 700;
   font-size: 0.95rem;
   text-decoration: none;
   text-align: center;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
   user-select: none;
 }
 
 .btn-demo:hover {
-  background: #ffffff;
-  border-color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
   transform: translateY(-1px);
 }
 
-/* Footer */
+.btn-demo:active {
+  transform: translateY(0);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* Подвал авторизации и ссылки */
 .auth-footer {
   margin-top: 2rem;
   text-align: center;
@@ -496,7 +558,7 @@
   color: var(--blue-600);
   font-size: 0.9rem;
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .auth-link:hover {
@@ -507,15 +569,15 @@
 .aux-actions {
   display: flex;
   gap: 10px;
-  margin-top: 1.5rem;
+  margin-top: 24px;
   justify-content: center;
 }
 
 .aux-btn {
   flex: 1;
-  padding: 0.6rem 0.5rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  padding: 0.7rem 0.5rem;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0,0,0,0.05);
   border-radius: 10px;
   color: var(--text-mut-navy);
   font-size: 0.8rem;
@@ -525,12 +587,13 @@
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: inherit;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
 
 .aux-btn:hover {
   background: #ffffff;
   color: var(--blue-700);
-  border-color: #cbd5e1;
+  border-color: rgba(0,0,0,0.1);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
@@ -556,7 +619,7 @@
 }
 
 /* ============================================================
-   BANNERS
+   BANNERS & NOTICES
    ============================================================ */
 .error, .success, .warning {
   padding: 14px 16px;
@@ -565,7 +628,7 @@
   font-weight: 600;
   line-height: 1.5;
   border: 1px solid transparent;
-  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
 .error {
@@ -587,12 +650,12 @@
 }
 
 /* ============================================================
-   MODALS
+   MODALS (С Улучшенным фоном) — модалка "Пример задания"
    ============================================================ */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.5);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   display: flex;
@@ -611,15 +674,17 @@
 }
 
 .modal-content {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
   width: 100%;
-  max-width: 660px;
-  border-radius: 28px;
+  max-width: 620px;
+  border-radius: 24px;
   padding: 2.5rem;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
   transform: translateY(20px) scale(0.95);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
+  border: 1px solid rgba(255,255,255,0.8);
 }
 
 .modal-overlay.active .modal-content {
@@ -650,8 +715,8 @@
 }
 
 .modal-close svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
 .modal-title {
@@ -659,21 +724,29 @@
   font-weight: 800;
   color: var(--text-navy);
   margin-bottom: 1.5rem;
-  padding-right: 3rem;
+  padding-right: 2.5rem;
+  letter-spacing: -0.02em;
 }
 
-/* HELP MODAL */
+/* ============================================================
+   HELP / SUPPORT MODALS ("Помощь" и "Техподдержка")
+   Компонент переключает эти окна через inline
+   style={{ display: helpOpen ? "flex" : "none" }},
+   поэтому оверлей должен быть fixed + flex-центрирование,
+   а не завязан на класс .active, как у .modal-overlay выше.
+   ============================================================ */
 .help-modal {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.5);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
   box-sizing: border-box;
+  /* display управляется инлайн-стилем из React (flex/none) */
   animation: help-modal-fade 0.25s ease;
 }
 
@@ -683,14 +756,17 @@
 }
 
 .help-modal-content {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   width: 100%;
   max-width: 560px;
   max-height: 85vh;
   overflow-y: auto;
-  border-radius: 28px;
-  padding: 2.5rem;
+  border-radius: 24px;
+  padding: 2rem 2.25rem 2.25rem;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   box-sizing: border-box;
   position: relative;
   animation: help-modal-pop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -705,28 +781,31 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
 .help-modal-header h3 {
   margin: 0;
-  font-size: 1.4rem;
-  font-weight: 900;
+  font-size: 1.35rem;
+  font-weight: 800;
   color: var(--text-navy);
+  letter-spacing: -0.02em;
 }
 
 .help-close {
   cursor: pointer;
   background: var(--blue-50);
   border: none;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--blue-600);
-  font-size: 1.2rem;
+  font-size: 1.1rem;
+  line-height: 1;
   transition: all 0.2s ease;
 }
 
@@ -736,36 +815,41 @@
   transform: rotate(90deg);
 }
 
-/* Tabs inside Modal */
+/* --- Табы (Регистрация / Правила) --- */
 .help-modal-tabs {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
-  border-bottom: 2px solid var(--auth-line);
+  border-bottom: 1px solid var(--auth-line);
 }
 
 .help-tab {
+  appearance: none;
   background: none;
   border: none;
   cursor: pointer;
   font-family: inherit;
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 0.95rem;
+  font-weight: 700;
   color: var(--text-mut-auth);
-  padding: 0 0.5rem 0.75rem;
+  padding: 0 0.25rem 0.85rem;
   margin-right: 1.5rem;
   position: relative;
   transition: color 0.2s ease;
 }
 
-.help-tab:hover, .help-tab.active {
+.help-tab:hover {
+  color: var(--text-navy);
+}
+
+.help-tab.active {
   color: var(--text-navy);
 }
 
 .help-tab.active::after {
   content: "";
   position: absolute;
-  bottom: -2px;
+  bottom: -1px;
   left: 0;
   width: 100%;
   height: 3px;
@@ -789,34 +873,36 @@
 
 .help-html-inner {
   color: var(--text-mut-navy);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   line-height: 1.6;
 }
 
-.help-section-title, .rules-main-title {
-  font-size: 1.1rem;
+.help-section-title,
+.rules-main-title {
+  font-size: 1.05rem;
   font-weight: 800;
   color: var(--text-navy);
-  margin: 0 0 1.2rem;
+  margin: 0 0 1.1rem;
+  letter-spacing: -0.01em;
 }
 
-/* Guides */
+/* --- Шаги регистрации --- */
 .registration-guide {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.1rem;
 }
 
 .guide-step {
   display: flex;
   align-items: flex-start;
-  gap: 1rem;
+  gap: 0.9rem;
 }
 
 .step-badge {
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--blue-500), var(--blue-600));
   color: #ffffff;
@@ -829,16 +915,16 @@
 }
 
 .step-body h5 {
-  margin: 0 0 0.3rem;
-  font-size: 1rem;
-  font-weight: 800;
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 700;
   color: var(--text-navy);
 }
 
 .step-body p {
   margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
+  font-size: 0.88rem;
+  line-height: 1.55;
   color: var(--text-mut-navy);
 }
 
@@ -852,31 +938,31 @@
   text-decoration: underline;
 }
 
-/* Rules Grid */
+/* --- Правила платформы --- */
 .rules-tab-bg {
   background: linear-gradient(180deg, var(--blue-50) 0%, rgba(240, 249, 255, 0) 100%);
-  border-radius: 20px;
-  padding: 1.5rem;
-  margin: -0.5rem -0.5rem 0;
+  border-radius: 16px;
+  padding: 1.25rem;
+  margin: -0.25rem -0.25rem 0;
 }
 
 .help-rules-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .rule-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 1.25rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 14px;
+  padding: 1rem;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
 .rule-card p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   line-height: 1.5;
   color: var(--text-mut-navy);
   font-weight: 600;
@@ -894,85 +980,107 @@
 }
 
 /* ============================================================
-   RESPONSIVE ADAPTATIONS
+   REDUCED MOTION & MOBILE ADAPTATION
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  .preview-wrapper, .promo-cta, .btn-submit, .btn-demo, .feature-tag, .modal-content, .modal-overlay, .interactive-hint svg, .page-login::before, .page-login::after, .help-modal, .help-modal-content, .help-tab-content {
+  .preview-wrapper, .cert-wrapper, .promo-cta, .btn-submit, .btn-demo, .feature-tag, .modal-content, .modal-overlay, .interactive-hint svg, .page-login::before, .page-login::after, .help-modal, .help-modal-content, .help-tab-content {
     transition: none !important;
     animation: none !important;
   }
 }
 
-@media (max-width: 1200px) {
-  .promo-title { font-size: 2.2rem; }
-  .split-layout { gap: 40px; padding: 0 30px; }
+@media (max-width: 1024px) {
+  .promo-content {
+    padding: 1.5rem 2rem 0;
+  }
+  .preview-container {
+    padding: 1rem 2rem 2rem;
+  }
 }
 
-/* 992px: Switch to column-reverse (Auth on top) */
-@media (max-width: 992px) {
-  .page-login {
+@media (max-width: 768px) {
+  body, html, .page-login {
+    height: auto !important;
+    overflow-y: auto !important;
+  }
+
+  /* На мобилках включаем обычный скролл — трюк с No-Scroll актуален только для десктопного сплит-лейаута */
+  .promo-side {
     height: auto;
-    display: block; /* Remove absolute centering */
-    overflow-y: auto;
+    overflow: visible;
+  }
+
+  /* На мобилках отключаем левитацию, чтобы не тратить батарею */
+  .preview-wrapper {
+    animation: none;
   }
 
   .split-layout {
     flex-direction: column-reverse;
     height: auto;
-    max-height: none;
-    padding: 40px 20px;
-    gap: 40px;
+    min-height: 100vh;
   }
 
   .auth-side {
     flex: none;
-    max-width: 520px;
-    width: 100%;
-    margin: 0 auto;
+    padding: 3rem 1.5rem 3.5rem;
+    border-radius: 0 0 32px 32px;
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+    z-index: 20;
+    overflow-y: visible;
+    border-left: none;
+    border-bottom: 1px solid rgba(255,255,255,0.6);
   }
 
   .promo-side {
     flex: none;
-    max-width: 600px;
-    width: 100%;
+    padding-top: 2rem;
+    overflow-y: visible;
+  }
+
+  .promo-content {
+    padding: 1.5rem 1.5rem 0.5rem;
+    max-width: 100%;
     margin: 0 auto;
     text-align: center;
   }
 
-  .interactive-hint, .feature-tags, .promo-cta-wrap {
+  .logo, .interactive-hint, .feature-tags {
     justify-content: center;
   }
 
+  .promo-cta-wrap {
+    justify-content: center;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
   .preview-container {
-    margin: 0 auto;
-    padding: 2rem 0;
+    padding: 1rem 1.5rem 3rem;
+    justify-content: center;
   }
 
   .preview-wrapper {
-    animation: none; /* Disable levitation on mobile to save battery */
-  }
-}
-
-@media (max-width: 768px) {
-  .split-layout {
-    padding: 24px 16px;
+    transform: none;
+    max-width: 480px;
+    height: auto;
   }
 
-  .promo-title {
-    font-size: 1.8rem;
-  }
-
-  .auth-container {
-    padding: 2rem 1.5rem;
-    border-radius: 24px;
+  .preview-wrapper img {
+    width: 100%;
+    height: auto;
   }
 
   .help-rules-grid {
     grid-template-columns: 1fr;
   }
 
-  .modal-content, .help-modal-content {
+  .modal-content {
     padding: 1.5rem;
-    border-radius: 20px;
+  }
+
+  .help-modal-content {
+    padding: 1.5rem;
+    max-height: 90vh;
   }
 }
