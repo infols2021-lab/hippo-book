@@ -1002,6 +1002,7 @@ export default function AssignmentClient({
                                     width={800}
                                     height={600}
                                     priority={true}
+                                    sizes="(max-width: 768px) 92vw, 800px"
                                     unoptimized={true}
                                     style={{
                                       width: "100%",

@@ -60,7 +60,10 @@ export default function BottomNav({ slug }: { slug: string }) {
   ], [slug]);
 
   return (
-    <nav className="md:hidden fixed bottom-4 left-4 right-4 z-[100] transition-all duration-300">
+    <nav
+      className="md:hidden fixed left-4 right-4 z-[100] transition-all duration-300"
+      style={{ bottom: "calc(16px + env(safe-area-inset-bottom))" }}
+    >
       <div 
         className="flex items-center justify-between px-2 py-3 rounded-3xl"
         style={{
@@ -74,22 +77,37 @@ export default function BottomNav({ slug }: { slug: string }) {
         {tabs.map((tab) => {
           // Определяем активность таба. Если мы в профиле, горит профиль и т.д.
           const isActive = pathname?.startsWith(tab.href);
-          
+
+          const tourAttr =
+            tab.id === "profile"
+              ? "profile-link"
+              : tab.id === "materials"
+              ? "materials-link"
+              : tab.id === "rewards"
+              ? "rewards-btn"
+              : tab.id === "requests"
+              ? "requests-link"
+              : undefined;
+
+          const handleTour = () => {
+            if (tab.id === "rewards" && stage === "rewards_gate") {
+              clearTourProgress();
+              saveTourProgress("rewards_tour", 0, window.location.pathname + `/rewards`);
+              advanceTour("rewards_tour");
+            } else if (tab.id === "materials" && stage === "materials_gate") {
+              advanceTour("materials_demo");
+            } else if (tab.id === "requests" && stage === "profile_requests_gate") {
+              advanceTour("requests_info");
+            }
+          };
+
           return (
             <Link
               key={tab.id}
               href={tab.href}
               prefetch={true}
-              data-tour={tab.id === "rewards" ? "rewards-btn" : undefined}
-              onClick={
-                tab.id === "rewards" && stage === "rewards_gate"
-                  ? () => {
-                      clearTourProgress();
-                      saveTourProgress("rewards_tour", 0, window.location.pathname + `/rewards`);
-                      advanceTour("rewards_tour");
-                    }
-                  : undefined
-              }
+              data-tour={tourAttr}
+              onClick={handleTour}
               className="flex flex-col items-center justify-center w-full gap-1 transition-colors duration-200 select-none"
               style={{
                 color: isActive ? "var(--project-primary)" : "color-mix(in srgb, var(--project-text) 45%, transparent)",

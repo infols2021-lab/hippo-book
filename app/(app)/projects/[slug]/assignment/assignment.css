@@ -1779,7 +1779,7 @@
 
 .recommendation-box { background: rgba(99, 102, 241, 0.05); padding: 30px; border-radius: 30px; border: 2px solid rgba(99, 102, 241, 0.1); margin-bottom: 40px; text-align: center; }
 
-.loader-container { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.loader-container { height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .premium-spinner { width: 60px; height: 60px; border: 6px solid; border-radius: 50%; animation: spin 1s linear infinite; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -1792,13 +1792,20 @@
   .header-content { flex-direction: column; align-items: flex-start; gap: 12px; }
   .assignment-badge { align-self: flex-end; }
 
-  .premium-main { max-width: 100%; padding: 0 10px 40px; }
+  .premium-main { max-width: 100%; padding: 0 10px calc(110px + env(safe-area-inset-bottom)); }
   .premium-card { border-radius: 28px; padding: 24px 16px; }
+
   .card-title { font-size: 26px; }
   .card-subtitle { font-size: 14px; margin-bottom: 24px; }
 
   .progress-container { margin-bottom: 20px; }
-  .progress-dots { gap: 4px; }
+  .progress-dots { gap: 6px; }
+  /* Увеличиваем тап-зону точек прогресса на мобилке */
+  .progress-dots button {
+    padding: 4px;
+    margin: -4px;
+    background-clip: content-box;
+  }
   .progress-bar-bg { height: 5px; }
   .progress-info { font-size: 14px; }
 

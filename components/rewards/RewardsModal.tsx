@@ -400,7 +400,7 @@ export default function RewardsModal({
       <div
         className={
           isPage
-            ? "w-full h-dvh flex justify-center overflow-hidden"
+            ? "w-full h-full flex justify-center overflow-hidden"
             : "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 overflow-hidden overscroll-none"
         }
         style={isPage ? undefined : { backgroundColor: "rgba(0,0,0,0.8)" }}

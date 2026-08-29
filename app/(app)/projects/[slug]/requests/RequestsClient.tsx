@@ -1,12 +1,12 @@
 // app/(app)/projects/[slug]/requests/RequestsClient.tsx
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import { useRouter } from "next/navigation";
 import { useTour } from "@/components/tour/TourProvider";
 import { dispatchTourPageReady } from "@/lib/tour/tourMobile";
+import ProjectHeader from "@/components/projects/ProjectHeader";
 
 import "./requests.css";
 import "../profile/profile.css";
@@ -801,14 +801,6 @@ export default function RequestsClient({
     return `${price} ₽`;
   };
 
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
-    } finally {
-      window.location.href = "/login";
-    }
-  };
-
   return (
     <div className="page-requests">
       <style>{`
@@ -1255,62 +1247,14 @@ export default function RequestsClient({
       <div className="container">
 
         {/* ========================================================= */}
-        {/* DESKTOP HEADER (Замена старому AppHeader)                   */}
+        {/* DESKTOP HEADER (единая шапка со всеми страницами)          */}
         {/* ========================================================= */}
-        <div
-          className="hidden md:flex items-center justify-between mb-8"
-          style={{
-            background: "var(--glass-bg)",
-            backdropFilter: "var(--glass-blur)",
-            WebkitBackdropFilter: "var(--glass-blur)",
-            border: "1px solid var(--glass-border)",
-            boxShadow: "var(--glass-shadow)",
-            borderRadius: "28px",
-            padding: "16px 24px"
-          }}
-        >
-          <div className="flex items-center gap-4 min-w-0">
-            <div
-              className="flex items-center justify-center rounded-[14px] font-black text-lg flex-shrink-0"
-              style={{
-                width: "46px", height: "46px",
-                background: "var(--project-primary)",
-                color: "#ffffff",
-                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3), 0 8px 16px -4px color-mix(in srgb, var(--project-primary) 50%, transparent)",
-              }}
-            >
-              {brandMark}
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-[19px] font-extrabold leading-tight truncate" style={{ color: "var(--project-text)" }}>
-                {project.name}
-              </h3>
-              <div className="text-[13px] font-medium truncate mt-0.5" style={{ color: "color-mix(in srgb, var(--project-text) 60%, transparent)" }}>
-                Заявки на доступы
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/projects/${project.slug}/profile`}
-              className="nav-pill"
-              data-tour="profile-link"
-            >
-              Профиль
-            </Link>
-            <Link className="nav-pill" href={`/projects/${project.slug}/materials`}>
-              Материалы
-            </Link>
-            <button
-              className="nav-pill nav-pill--logout"
-              type="button"
-              onClick={handleLogout}
-            >
-              Выйти
-            </button>
-          </div>
-        </div>
+        <ProjectHeader
+          slug={project.slug}
+          projectName={project.name}
+          markText={brandMark}
+          subtitle="Заявки на доступы"
+        />
 
         {/* ========================================================= */}
         {/* MOBILE HEADER (Компактный заголовок без бургера)            */}

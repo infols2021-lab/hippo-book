@@ -37,5 +37,8 @@ export default async function ProjectRewardsPage({
     notFound();
   }
 
-  return <RewardsPage projectSlug={slug} initialTab={tab} />;
+  const projectName = project.name || "Направление";
+  const markText = project.slug.slice(0, 2).toUpperCase();
+
+  return <RewardsPage projectSlug={slug} projectName={projectName} markText={markText} initialTab={tab} />;
 }

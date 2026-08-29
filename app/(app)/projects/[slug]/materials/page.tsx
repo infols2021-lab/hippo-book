@@ -6,8 +6,6 @@ import { loadProjectMaterialsData } from "@/lib/data/materials";
 import type { MaterialWithProgress } from "@/lib/materials/types";
 import MaterialsClient from "./MaterialsClient";
 
-import "./materials.css";
-
 export const revalidate = 0;
 
 type PageProps = {

@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import Modal from "@/components/Modal";
@@ -14,6 +14,7 @@ import {
   dispatchTourRewardsForceTab,
 } from "@/lib/tour/tourMobile";
 import { saveTourProgress, clearTourProgress } from "@/lib/tour/tourPersistence";
+import ProjectHeader from "@/components/projects/ProjectHeader";
 
 import "./profile.css";
 
@@ -162,7 +163,6 @@ export default function ProfileClient({
   equippedTitleLabel = null,
 }: Props) {
   const router = useRouter();
-  const pathname = usePathname();
   const { stage, advanceTour } = useTour();
   const backgroundProxyUrl = useMemo(() => toStorageProxyUrl(backgroundUrl), [backgroundUrl]);
 
@@ -844,73 +844,19 @@ export default function ProfileClient({
         </div>
         {/* ========================================================= */}
 
-        {/* DESKTOP TOPBAR */}
-        <div className="profile-topbar hidden md:flex">
-          <div style={{ display: "flex", alignItems: "center", gap: "20px", flex: 1, minWidth: 0 }}>
-            <span className="skills-wordmark">skilLS</span>
-            {ProjectSwitcherUI}
-          </div>
-
-          <div className="top-actions">
-            {features?.streaks && (
-              <button
-                type="button"
-                className="streak-chip"
-                onClick={() => openRewards("streaks")}
-                title="Открыть Центр Наград"
-              >
-                <span className="streak-chip-icon" aria-hidden="true">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>
-                </span>
-                <span className="streak-chip-main">
-                  <span className="streak-chip-value">{streakLoading ? "…" : streakData?.currentStreak ?? 0}</span>
-                  <span className="streak-chip-unit">дн.</span>
-                </span>
-                <span className="streak-chip-sub">{streakData?.doneToday ? "сделано" : "серия"}</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              className="tour-help-btn"
-              title="Помощь по платформе"
-              aria-label="Помощь по платформе"
-              onClick={() => window.dispatchEvent(new Event("start-product-tour"))}
-            >
-              ?
-            </button>
-
-            <button
-              data-tour="rewards-btn"
-              type="button"
-              className="nav-pill"
-              onClick={() => openRewards("wardrobe")}
-            >
-              Награды
-            </button>
-
-            <Link
-              data-tour="materials-link"
-              className="nav-pill"
-              href={`/projects/${projectSlug}/materials`}
-              onClick={() => {
-                if (stage === "materials_gate") advanceTour("materials_demo");
-              }}
-            >
-              Материалы
-            </Link>
-            <button
-              className="nav-pill nav-pill--logout"
-              type="button"
-              onClick={() => setLogoutConfirmOpen(true)}
-              title="Выйти из аккаунта"
-              aria-label="Выйти из аккаунта"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-              Выйти
-            </button>
-          </div>
-        </div>
+        {/* DESKTOP TOPBAR (единая шапка со всеми страницами) */}
+        <ProjectHeader
+          slug={projectSlug}
+          projectName={projectName}
+          markText={brandMark}
+          subtitle="Профиль ученика"
+          left={
+            <div style={{ display: "flex", alignItems: "center", gap: "20px", flex: 1, minWidth: 0 }}>
+              <span className="skills-wordmark">skilLS</span>
+              {ProjectSwitcherUI}
+            </div>
+          }
+        />
 
         <div className="profile-grid">
           
@@ -978,17 +924,6 @@ export default function ProfileClient({
             <div className="profile-actions">
               <button className="btn ghost" onClick={openEdit} type="button">
                 Редактировать профиль
-              </button>
-              <button
-                data-tour="requests-link"
-                className="btn secondary"
-                onClick={() => {
-                  if (stage === "profile_requests_gate") advanceTour("requests_info");
-                  router.push(`/projects/${projectSlug}/requests`);
-                }}
-                type="button"
-              >
-                Заявки на покупку
               </button>
               {profile.is_admin && (
                 <Link className="btn info" href="/admin">

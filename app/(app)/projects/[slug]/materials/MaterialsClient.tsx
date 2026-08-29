@@ -7,6 +7,7 @@ import { useTour } from "@/components/tour/TourProvider";
 import { dispatchTourPageReady } from "@/lib/tour/tourMobile";
 import { rewriteSupabasePublicStorageUrl } from "@/lib/storage/publicUrl";
 import type { MaterialWithProgress } from "@/lib/materials/types";
+import ProjectHeader from "@/components/projects/ProjectHeader";
 
 import "../profile/profile.css";
 import "./materials.css";
@@ -59,77 +60,19 @@ export default function MaterialsClient({
 
   const materials = [...availableMats, ...lockedMats];
 
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
-    } finally {
-      window.location.href = "/login";
-    }
-  };
-
   return (
     <div className={`materials-page ${stage === "materials_demo" ? "materials-tour-demo-active" : ""}`}>
       <div className="materials-container">
         
         {/* ========================================================= */}
-        {/* DESKTOP HEADER (Замена старому AppHeader)                   */}
+        {/* DESKTOP HEADER (единая шапка со всеми страницами)          */}
         {/* ========================================================= */}
-        <div 
-          className="hidden md:flex items-center justify-between mb-8" 
-          style={{
-            background: "var(--glass-bg)",
-            backdropFilter: "var(--glass-blur)",
-            WebkitBackdropFilter: "var(--glass-blur)",
-            border: "1px solid var(--glass-border)",
-            boxShadow: "var(--glass-shadow)",
-            borderRadius: "28px",
-            padding: "16px 24px"
-          }}
-        >
-          <div className="flex items-center gap-4 min-w-0">
-            <div
-              className="flex items-center justify-center rounded-[14px] font-black text-lg flex-shrink-0"
-              style={{
-                width: "46px", height: "46px",
-                background: "var(--project-primary)",
-                color: "#ffffff",
-                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3), 0 8px 16px -4px color-mix(in srgb, var(--project-primary) 50%, transparent)",
-              }}
-            >
-              {markText}
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-[19px] font-extrabold leading-tight truncate" style={{ color: "var(--project-text)" }}>
-                {projectName}
-              </h3>
-              <div className="text-[13px] font-medium truncate mt-0.5" style={{ color: "color-mix(in srgb, var(--project-text) 60%, transparent)" }}>
-                Материалы
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/projects/${slug}/profile`}
-              className="nav-pill"
-              data-tour="profile-link"
-              onClick={() => {
-                if (stage === "materials_profile_gate") {
-                  advanceTour("rewards_gate");
-                }
-              }}
-            >
-              Профиль
-            </Link>
-            <button
-              className="nav-pill nav-pill--logout"
-              type="button"
-              onClick={handleLogout}
-            >
-              Выйти
-            </button>
-          </div>
-        </div>
+        <ProjectHeader
+          slug={slug}
+          projectName={projectName}
+          markText={markText}
+          subtitle="Материалы"
+        />
 
         {/* ========================================================= */}
         {/* MOBILE HEADER (Компактный заголовок без бургера)            */}
