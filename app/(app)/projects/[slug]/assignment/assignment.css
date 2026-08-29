@@ -1769,6 +1769,33 @@
 
 .button-group { display: flex; gap: 15px; justify-content: center; }
 
+/* Инлайн-подсказка для демо-задания (тур приостановлен) */
+.demo-assignment-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--project-primary, #0ea5e9) 35%, transparent);
+  background: color-mix(in srgb, var(--project-primary, #0ea5e9) 8%, #ffffff);
+  color: var(--project-text, #111827);
+  margin-bottom: 20px;
+  box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--project-primary, #0ea5e9) 30%, transparent);
+}
+.demo-assignment-hint svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--project-primary, #0ea5e9);
+}
+.demo-assignment-hint div { display: flex; flex-direction: column; gap: 2px; }
+.demo-assignment-hint b { font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; }
+.demo-assignment-hint span { font-size: 12px; font-weight: 600; line-height: 1.45; opacity: 0.85; }
+
+@media (max-width: 640px) {
+  .demo-assignment-hint { padding: 10px 12px; border-radius: 14px; }
+  .demo-assignment-hint span { font-size: 11px; }
+}
+
 .score-circle { width: 180px; height: 180px; border: 10px solid; border-radius: 50%; margin: 0 auto 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; animation: scaleIn 0.5s ease-out; }
 .score-value { font-size: 56px; font-weight: 900; }
 .score-label { font-size: 14px; font-weight: 800; color: var(--project-text, #111827); opacity: 1; text-transform: uppercase; margin-top: -5px; }

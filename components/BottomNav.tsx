@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { useTour } from "@/components/tour/TourProvider";
 import { saveTourProgress, clearTourProgress } from "@/lib/tour/tourPersistence";
@@ -9,6 +9,7 @@ import { saveTourProgress, clearTourProgress } from "@/lib/tour/tourPersistence"
 export default function BottomNav({ slug }: { slug: string }) {
   const pathname = usePathname();
   const { stage, advanceTour } = useTour();
+  const router = useRouter();
 
   const tabs = useMemo(() => [
     {
@@ -57,6 +58,18 @@ export default function BottomNav({ slug }: { slug: string }) {
         </svg>
       )
     },
+    {
+      id: "guide",
+      label: "Гайд",
+      href: `/projects/${slug}/profile`,
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="9"></circle>
+          <line x1="12" y1="8" x2="12" y2="13"></line>
+          <line x1="12" y1="16.4" x2="12.01" y2="16.4"></line>
+        </svg>
+      )
+    },
   ], [slug]);
 
   return (
@@ -76,7 +89,7 @@ export default function BottomNav({ slug }: { slug: string }) {
       >
         {tabs.map((tab) => {
           // Определяем активность таба. Если мы в профиле, горит профиль и т.д.
-          const isActive = pathname?.startsWith(tab.href);
+          const isActive = tab.id === "guide" ? false : pathname?.startsWith(tab.href);
 
           const tourAttr =
             tab.id === "profile"
@@ -98,6 +111,11 @@ export default function BottomNav({ slug }: { slug: string }) {
               advanceTour("materials_demo");
             } else if (tab.id === "requests" && stage === "profile_requests_gate") {
               advanceTour("requests_info");
+            } else if (tab.id === "profile" && stage === "materials_profile_gate") {
+              advanceTour("rewards_gate");
+            } else if (tab.id === "guide") {
+              clearTourProgress();
+              window.dispatchEvent(new Event("start-product-tour"));
             }
           };
 

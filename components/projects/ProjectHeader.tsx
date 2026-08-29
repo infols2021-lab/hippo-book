@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import Modal from "@/components/Modal";
 import { useTour } from "@/components/tour/TourProvider";
@@ -29,6 +29,7 @@ export default function ProjectHeader({
   subtitle = "Ученик",
 }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
   const { stage, advanceTour } = useTour();
 
   const [streak, setStreak] = useState<number | null>(null);
@@ -91,6 +92,12 @@ export default function ProjectHeader({
     }
   }
 
+  function startGuide() {
+    clearTourProgress();
+    router.push(`/projects/${slug}/profile`);
+    window.dispatchEvent(new Event("start-product-tour"));
+  }
+
   const pill = (active: boolean): CSSProperties => ({
     display: "inline-flex",
     alignItems: "center",
@@ -113,6 +120,7 @@ export default function ProjectHeader({
   return (
     <header
       className="hidden md:flex items-center justify-between gap-6 mb-8"
+      data-tour="project-header"
       style={{
         background:
           "var(--glass-bg, color-mix(in srgb, var(--project-card-bg) 92%, transparent))",
@@ -163,6 +171,7 @@ export default function ProjectHeader({
       <div className="flex items-center gap-3 flex-wrap" style={{ justifyContent: "flex-end" }}>
         {/* Огонёк серии (как на ПК) */}
         <div
+          data-tour="header-streak"
           style={{
             height: 44,
             borderRadius: 14,
@@ -201,12 +210,11 @@ export default function ProjectHeader({
             {doneToday ? "сделано" : "серия"}
           </span>
         </div>
-
-        <Link href={`${base}/profile`} style={pill(isProfile)} data-tour="profile-link" onClick={() => onProfile()}>
+        <Link href={`/projects/${slug}/profile`} style={pill(isProfile)} data-tour="profile-link" onClick={() => onProfile()}>
           Профиль
         </Link>
         <Link
-          href={`${base}/materials`}
+          href={`/projects/${slug}/materials`}
           style={pill(isMaterials)}
           data-tour="materials-link"
           onClick={() => {
@@ -216,7 +224,7 @@ export default function ProjectHeader({
           Материалы
         </Link>
         <Link
-          href={`${base}/rewards`}
+          href={`/projects/${slug}/rewards`}
           style={pill(isRewards)}
           data-tour="rewards-btn"
           onClick={() => onRewards()}
@@ -224,7 +232,7 @@ export default function ProjectHeader({
           Награды
         </Link>
         <Link
-          href={`${base}/requests`}
+          href={`/projects/${slug}/requests`}
           style={pill(isRequests)}
           data-tour="requests-link"
           onClick={() => {
@@ -238,12 +246,12 @@ export default function ProjectHeader({
           type="button"
           aria-label="Помощь по платформе"
           title="Помощь по платформе"
-          onClick={() => window.dispatchEvent(new Event("start-product-tour"))}
+          onClick={startGuide}
           style={{
             width: 38,
             height: 38,
             borderRadius: 999,
-            border: "1px solid var(--glass-border)",
+            border: "1px solid var(--glass-border, rgba(15,23,42,0.08))",
             background: "color-mix(in srgb, var(--project-text) 6%, transparent)",
             color: "var(--project-text)",
             fontSize: 16,
@@ -255,7 +263,7 @@ export default function ProjectHeader({
             flexShrink: 0,
           }}
         >
-          ?
+          !
         </button>
 
         <button
@@ -313,7 +321,7 @@ export default function ProjectHeader({
             <button
               type="button"
               onClick={() => setLogoutOpen(false)}
-              style={{ width: "100%", padding: 14, borderRadius: 14, background: "color-mix(in srgb, var(--project-text) 6%, transparent)", color: "var(--project-text)", fontWeight: 800, fontSize: 14, border: "1px solid var(--glass-border)", cursor: "pointer" }}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: "color-mix(in srgb, var(--project-text) 6%, transparent)", color: "var(--project-text)", fontWeight: 800, fontSize: 14, border: "1px solid var(--glass-border, rgba(15,23,42,0.08))", cursor: "pointer" }}
             >
               Нет, остаться
             </button>

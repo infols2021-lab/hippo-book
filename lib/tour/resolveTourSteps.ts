@@ -4,75 +4,10 @@ import {
   visibleDemoMaterialCard,
   visiblePortalDirections,
   visibleTourTarget,
-  visibleMobileMenuTarget,
 } from "@/lib/tour/tourTargets";
 import type { CustomTourStep } from "@/components/tour/TourSteps";
 import { isMobileViewport, isMobileMenuGateStage } from "@/lib/tour/tourMobile";
 import { getPortalProjectCount } from "@/lib/tour/tourPortal";
-
-const burgerTarget = visibleTourTarget('[data-tour="mobile-burger-btn"]');
-
-const MOBILE_MENU_ITEM_SELECTOR: Partial<Record<TourStage, string>> = {
-  profile_requests_gate: '[data-tour="requests-link"]',
-  materials_gate: '[data-tour="materials-link"]',
-  materials_profile_gate: '[data-tour="profile-link"]',
-  rewards_gate: '[data-tour="rewards-btn"]',
-};
-
-function mobileMenuItemTarget(stage: TourStage) {
-  const selector = MOBILE_MENU_ITEM_SELECTOR[stage];
-  if (!selector) return visibleTourTarget('[data-tour="profile-link"]');
-  return visibleMobileMenuTarget(selector);
-}
-
-function withMobileMenuTarget(step: CustomTourStep, stage: TourStage): CustomTourStep {
-  return {
-    ...step,
-    target: mobileMenuItemTarget(stage),
-    requiresMobileMenu: true,
-    placement: "top",
-  };
-}
-
-type BurgerIntroKey = TourStage;
-
-function mobileBurgerIntro(stage: BurgerIntroKey): CustomTourStep {
-  const copy: Partial<Record<BurgerIntroKey, { title: string; content: string }>> = {
-    profile_requests_gate: {
-      title: "Меню профиля",
-      content: "Пункт «Заявки на покупку» находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
-    },
-    materials_gate: {
-      title: "Меню профиля",
-      content: "Раздел «Материалы» на телефоне находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
-    },
-    materials_profile_gate: {
-      title: "Меню материалов",
-      content: "Пункт «Профиль» на телефоне находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
-    },
-    rewards_gate: {
-      title: "Меню профиля",
-      content: "Раздел «Награды» на телефоне находится в меню ☰. Нажмите на кнопку меню, чтобы открыть его.",
-    },
-  };
-
-  const text = copy[stage] ?? {
-    title: "Меню",
-    content: "Нажмите ☰ в правом верхнем углу, чтобы открыть меню.",
-  };
-
-  return {
-    target: burgerTarget,
-    title: text.title,
-    content: text.content,
-    mascotImage: pickMascotImage(stage),
-    skipBeacon: true,
-    hideNextButton: true,
-    waitForBurgerClick: true,
-    blockTargetInteraction: false,
-    placement: "bottom",
-  };
-}
 
 /** Базовые шаги (desktop + fallback). */
 export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
@@ -103,12 +38,23 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
   profile_stats: [
     {
       target: visibleTourTarget('[data-tour="profile-stats"]'),
-      title: "Профиль",
+      title: "Прогресс и статистика",
       content:
-        "Здесь отображаются прогресс и награды по направлению. Далее откроем материалы и пройдем короткое демо-задание.",
+        "Здесь видно, сколько материалов доступно, сколько пройдено и процент выполнения. Ниже — список материалов для изучения.",
       mascotImage: pickMascotImage("profile_stats"),
       skipBeacon: true,
       primaryLabel: "Далее",
+      placement: "bottom",
+    },
+    {
+      target: visibleTourTarget('[data-tour="project-header"]'),
+      title: "Навигация",
+      content:
+        "Верхняя панель: Профиль, Материалы, Награды, Заявки. Огонёк показывает серию, а кнопка «!» запускает этот гайд заново.",
+      mascotImage: pickMascotImage("profile_stats_nav"),
+      skipBeacon: true,
+      primaryLabel: "Далее",
+      placement: "bottom",
     },
   ],
   materials_gate: [
@@ -127,7 +73,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleDemoMaterialCard,
       title: "Демо-задание",
       content:
-        "Откройте материал с пометкой «Демо». Остальные карточки сейчас недоступны - начните обучение именно с него.",
+        "Откройте карточку с бейджем «Демо» — она подсвечена рамкой. Остальные материалы пока недоступны, начните обучение с демо.",
       mascotImage: pickMascotImage("materials_demo"),
       skipBeacon: true,
       hideNextButton: true,
@@ -142,15 +88,25 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
   ],
   demo_material: [
     {
-      target: visibleTourTarget('[data-tour="demo-assignments-list"]', '[data-tour="demo-assignment-link"]'),
+      target: visibleTourTarget('[data-tour="demo-assignments-list"]'),
+      title: "Страница материала",
+      content: "Здесь список заданий. На время демо доступно одно задание — с пометкой «Демо».",
+      mascotImage: pickMascotImage("demo_material"),
+      skipBeacon: true,
+      primaryLabel: "Далее",
+      placement: "bottom",
+    },
+    {
+      target: visibleTourTarget('[data-tour="demo-assignment-link"]'),
       title: "Начните задание",
       content:
-        "Выберите любое задание из демо-материала и пройдите его до конца. На время выполнения подсказки гайда будут скрыты.",
+        "Нажмите на задание «Демо». Во время выполнения подсказки спрячутся — просто отвечайте и листайте до кнопки «Далее».",
       mascotImage: pickMascotImage("demo_material"),
       skipBeacon: true,
       hideNextButton: true,
       hideOverlay: true,
       blockTargetInteraction: false,
+      placement: "top",
     },
   ],
   streak_celebration: [
@@ -159,7 +115,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       placement: "center",
       title: "Серия засчитана",
       content:
-        "Задание выполнено. Засчитался первый день серии. Серия начисляется за регулярные занятия — выполняйте задания и получайте награды.",
+        "Задание выполнено — засчитан первый день серии! Выполняйте задания регулярно, и серия будет расти вместе с наградами.",
       mascotImage: pickMascotImage("streak_celebration"),
       skipBeacon: true,
       primaryLabel: "Далее",
@@ -216,7 +172,8 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
     {
       target: visibleTourTarget('[data-tour="wardrobe-tab"]'),
       title: "Гардероб",
-      content: "Здесь меняется внешний вид маскота: фоны, ауры, титулы и предметы из инвентаря.",
+      content:
+        "Меняйте внешний вид маскота: скины, ауры и титулы. Нажмите на любой предмет — он сразу наденется, а титул появится в профиле.",
       mascotImage: pickMascotImage("rewards_wardrobe"),
       skipBeacon: true,
     },
@@ -224,21 +181,23 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="streaks-tab"]'),
       title: "Серии",
       content:
-        "Первый день серии уже засчитан. Продолжайте занятия, чтобы получать награды за серию.",
+        "Серия растёт за ежедневные занятия — сейчас у вас уже 1 день. Чем дольше серия, тем ценнее награды в этой вкладке.",
       mascotImage: pickMascotImage("rewards_streaks"),
       skipBeacon: true,
     },
     {
       target: visibleTourTarget('[data-tour="referral-tab"]'),
       title: "Реферальная программа",
-      content: "По персональной ссылке можно приглашать учеников и получать бонусы за каждого нового участника.",
+      content:
+        "Скопируйте личную ссылку и отправьте друзьям. За каждого приглашённого ученика вы получите бонусы: титулы, вещи для маскота и материалы.",
       mascotImage: pickMascotImage("rewards_referral"),
       skipBeacon: true,
     },
     {
       target: visibleTourTarget('[data-tour="promos-tab"]'),
       title: "Промокоды",
-      content: "Здесь активируются промокоды на подарки и бонусные предметы.",
+      content:
+        "Если есть промокод — вставьте его в поле и нажмите «Активировать». Награды появятся в гардеробе. Пока просто посмотрите, как это работает.",
       mascotImage: pickMascotImage("rewards_promos"),
       skipBeacon: true,
     },
@@ -248,7 +207,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="requests-link"]'),
       title: "Заявки на покупку",
       content:
-        "Если нужен доступ к новым материалам, оформите заявку. Нажмите «Заявки на покупку», чтобы посмотреть, как это работает.",
+        "Здесь запрашивают доступ к новым материалам. Нажмите «Заявки» в панели сверху (или внизу на телефоне).",
       mascotImage: pickMascotImage("profile_requests_gate"),
       skipBeacon: true,
       hideNextButton: true,
@@ -261,7 +220,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       placement: "center",
       title: "Как работают заявки",
       content:
-        "Вы выбираете материалы, создаете заявку и получаете QR для оплаты. После проверки администратором доступ открывается автоматически.",
+        "Вы выбираете материалы, создаёте заявку и получаете QR для оплаты. После проверки администратором доступ открывается автоматически.",
       mascotImage: pickMascotImage("requests_info_text"),
       skipBeacon: true,
       primaryLabel: "Далее",
@@ -270,22 +229,22 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="requests-project-switcher"]'),
       title: "Покупка для другого направления",
       content:
-        "Профиль и цвета страницы остаются вашими. Здесь вы только выбираете, для какого направления открыть каталог материалов и оформить заявку — без возврата в портал.",
+        "Здесь выбирают направление для покупки. Попробуйте нажать — это просто выбор, ничего покупать не нужно.",
       mascotImage: pickMascotImage("requests_info_projects"),
       skipBeacon: true,
       primaryLabel: "Далее",
       placement: "bottom",
-      blockTargetInteraction: true,
+      blockTargetInteraction: false,
     },
     {
       target: visibleTourTarget('[data-tour="create-request-btn"]'),
       title: "Создание заявки",
       content:
-        "Новые заявки создаются здесь. Сейчас нажимать не обязательно — достаточно запомнить расположение кнопки.",
+        "Новые заявки создаются здесь. Нажмите кнопку, чтобы посмотреть процесс — форму всегда можно закрыть.",
       mascotImage: pickMascotImage("requests_info_btn"),
       skipBeacon: true,
       hideNextButton: false,
-      blockTargetInteraction: true,
+      blockTargetInteraction: false,
       primaryLabel: "Понятно",
       placement: "top",
     },
@@ -296,7 +255,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       placement: "center",
       title: "Обучение завершено",
       content:
-        "Краткий гайд по платформе пройден. Все разделы доступны в меню навигации. Повторить подсказки можно через пункт «Помощь по платформе».",
+        "Гайд пройден! Все разделы доступны в панели навигации. Кнопка «!» вверху (или «Гайд» внизу на телефоне) запускает подсказки заново.",
       mascotImage: pickMascotImage("tour_complete"),
       skipBeacon: true,
       primaryLabel: "Готово",
@@ -321,7 +280,6 @@ function withDemoMaterialFallback(steps: CustomTourStep[]): CustomTourStep[] {
     };
   });
 }
-
 export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()): CustomTourStep[] {
   const base = BASE_TOUR_STEPS[stage];
   if (!base?.length) return [];
@@ -381,9 +339,19 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
     return [
       {
         ...base[0],
+        target: visibleTourTarget('[data-tour="profile-avatar"]', '[data-tour="profile-title"]'),
         placement: "bottom",
         content:
-          "Здесь прогресс и награды по направлению. Далее откроем материалы и пройдем короткое демо-задание.",
+          "Это ваш профиль: здесь титул, огонёк серии и контакты. Нажмите на титул или огонёк, чтобы открыть награды.",
+      },
+      {
+        target: "body",
+        placement: "center",
+        title: "Навигация",
+        content:
+          "Внизу панель: Материалы, Награды, Заявки, Профиль. Вкладка «Гайд» запускает подсказки заново.",
+        mascotImage: pickMascotImage("profile_stats_nav"),
+        skipBeacon: true,
         primaryLabel: "Далее",
       },
     ];
@@ -403,10 +371,25 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
   if (stage === "demo_material") {
     return [
       {
-        ...base[0],
-        placement: "top",
-        skipScroll: true,
+        target: visibleTourTarget('[data-tour="demo-assignments-list"]'),
+        title: "Страница материала",
+        content: "Здесь список заданий. На время демо доступно одно задание — с пометкой «Демо».",
+        mascotImage: pickMascotImage("demo_material"),
+        skipBeacon: true,
+        primaryLabel: "Далее",
+        placement: "bottom",
+      },
+      {
+        target: visibleTourTarget('[data-tour="demo-assignment-link"]'),
+        title: "Начните задание",
+        content:
+          "Нажмите на задание «Демо». Во время выполнения подсказки спрячутся — просто отвечайте и листайте до кнопки «Далее».",
+        mascotImage: pickMascotImage("demo_material"),
+        skipBeacon: true,
+        hideNextButton: true,
         hideOverlay: true,
+        blockTargetInteraction: false,
+        placement: "top",
       },
     ];
   }
@@ -427,10 +410,6 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
     }));
   }
 
-  if (stage === "materials_profile_gate" && isMobile) {
-    return [mobileBurgerIntro(stage), withMobileMenuTarget(base[0], stage)];
-  }
-
   if (stage === "requests_info") {
     return [
       {
@@ -443,24 +422,25 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
         ...base[1],
         placement: "bottom",
         skipScroll: true,
-        blockTargetInteraction: true,
+        blockTargetInteraction: false,
         primaryLabel: "Далее",
       },
       {
         ...base[2],
         placement: "top",
         skipScroll: true,
-        blockTargetInteraction: true,
+        blockTargetInteraction: false,
         primaryLabel: "Понятно",
       },
     ];
   }
 
-  if (isMobileMenuGateStage(stage) && base.length === 1) {
-    return [mobileBurgerIntro(stage), withMobileMenuTarget(base[0], stage)];
+  // Мобильные «гейт»-шаги: таргеты уже есть в нижней панели (BottomNav)
+  if (isMobileMenuGateStage(stage)) {
+    return [{ ...base[0], placement: "top" as const, skipScroll: true }];
   }
 
-  if (stage === "rewards_tour" && isMobile) {
+  if (stage === "rewards_tour") {
     const rewardTabs = ["wardrobe", "streaks", "referral", "promos"] as const;
     return base.map((step, index) => ({
       ...step,

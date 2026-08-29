@@ -28,6 +28,13 @@ export default function RewardsPage({
     dispatchTourPageReady();
   }, []);
 
+  // После тура наград продолжаем гайд на профиле (кнопка «Заявки»)
+  useEffect(() => {
+    if (stage === "profile_requests_gate" || stage === "tour_complete") {
+      router.push(`/projects/${projectSlug}/profile`);
+    }
+  }, [stage, projectSlug, router]);
+
   const initialTabNormalized: InitialTab = (() => {
     const raw = initialTab;
     if (!raw) return "wardrobe";

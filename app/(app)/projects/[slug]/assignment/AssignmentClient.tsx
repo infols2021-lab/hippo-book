@@ -902,6 +902,19 @@ export default function AssignmentClient({
 
         {!showChoice && !completedScreen && assignment && (
           <div className="assignment-layout animate-in">
+            {stage === "demo_assignment" && !isViewMode && assignmentMode !== "informational" && questions.length > 0 && (
+              <div className="demo-assignment-hint" data-tour="demo-assignment-hint">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                <div>
+                  <b>Демо-задание</b>
+                  <span>Читайте вопрос, выбирайте ответ и жмите «Далее» под заданием. В конце — «Завершить и проверить».</span>
+                </div>
+              </div>
+            )}
             {assignmentMode === "informational" ? (
               <BlockRenderer 
                 blocks={blocks} 
