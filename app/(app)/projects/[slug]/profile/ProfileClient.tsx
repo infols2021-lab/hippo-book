@@ -760,19 +760,48 @@ export default function ProfileClient({
             {nameLabel(profile.full_name)}
           </h1>
 
-          <div className="mt-1.5 flex items-center justify-center flex-wrap gap-2 text-[14px] font-bold" style={{ color: "var(--project-primary)" }}>
-            <span onClick={() => openRewards("wardrobe")} data-tour="profile-title">
-              «{titleText}»
-            </span>
-            {features?.streaks && (
-              <>
-                <span style={{ opacity: 0.4 }}>•</span>
-                <span onClick={() => openRewards("streaks")}>
-                  {streakLoading ? "…" : `${streakData?.currentStreak ?? 0} дн.`} в сети
+          {/* Премиальный мобильный титул (плашка-табличка, без эмодзи) */}
+          <button
+            type="button"
+            onClick={() => openRewards("wardrobe")}
+            data-tour="profile-title"
+            className="mobile-title-plate"
+            style={{ marginTop: "14px" }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="8" r="6"></circle>
+              <path d="M15.5 13 17 22l-5-3-5 3 1.5-9"></path>
+            </svg>
+            <span>{titleText}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+
+          {/* Премиальный мобильный стрик (огонёк серии, как на ПК) */}
+          {features?.streaks && (
+            <button
+              type="button"
+              onClick={() => openRewards("streaks")}
+              className="mobile-streak-chip"
+              style={{ marginTop: "14px" }}
+            >
+              <span className="mobile-streak-chip-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>
+                </svg>
+              </span>
+              <span className="mobile-streak-main">
+                <span className="mobile-streak-value">
+                  {streakLoading ? "…" : streakData?.currentStreak ?? 0}
                 </span>
-              </>
-            )}
-          </div>
+                <span className="mobile-streak-unit">дн.</span>
+              </span>
+              <span className="mobile-streak-sub">
+                {streakLoading ? "загрузка" : streakData?.doneToday ? "сделано" : "серия"}
+              </span>
+            </button>
+          )}
 
           <div className="flex w-full gap-3 mt-6">
             <button 
