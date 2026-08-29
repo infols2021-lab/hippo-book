@@ -10,7 +10,6 @@ import type { MaterialWithProgress } from "@/lib/materials/types";
 import ProjectHeader from "@/components/projects/ProjectHeader";
 
 import "../profile/profile.css";
-import "./materials.css";
 
 type ProjectTab = {
   id: string;

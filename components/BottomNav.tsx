@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useTour } from "@/components/tour/TourProvider";
 import { saveTourProgress, clearTourProgress } from "@/lib/tour/tourPersistence";
 
@@ -10,6 +10,19 @@ export default function BottomNav({ slug }: { slug: string }) {
   const pathname = usePathname();
   const { stage, advanceTour } = useTour();
   const router = useRouter();
+  // Скрываем плашку на странице прохождения задания и конкретного материала
+  const isAssignment = /\/assignment\/?/.test(pathname);
+  const isMaterialDetail = /\/materials\/[^/]+\/?$/.test(pathname) && !/\/materials\/?$/.test(pathname);
+  const hiddenNav = isAssignment || isMaterialDetail;
+
+  useEffect(() => {
+    if (hiddenNav) {
+      document.body.classList.add("bn-hidden");
+    } else {
+      document.body.classList.remove("bn-hidden");
+    }
+    return () => document.body.classList.remove("bn-hidden");
+  }, [hiddenNav]);
 
   const tabs = useMemo(() => [
     {
@@ -71,6 +84,8 @@ export default function BottomNav({ slug }: { slug: string }) {
       )
     },
   ], [slug]);
+
+  if (hiddenNav) return null;
 
   return (
     <nav

@@ -555,7 +555,7 @@ export default function RewardsModal({
             </button>
           </div>
 
-          <div className={`flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 ${isPage ? "pb-28 sm:pb-6" : ""}`}>
+          <div className={`flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 ${isPage ? "pb-36 sm:pb-6" : ""}`}>
             {loading ? (
               <div className="h-full flex items-center justify-center font-bold text-xs sm:text-sm uppercase tracking-wider opacity-60">
                 Загрузка данных...

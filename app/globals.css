@@ -42,6 +42,9 @@ html, body {
 /* ===== Плавающая нижняя панель (BottomNav): не перекрывает контент ===== */
 @media (max-width: 768px) {
   .project-layout-wrapper {
-    padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: calc(130px + env(safe-area-inset-bottom)) !important;
+  }
+  body.bn-hidden .project-layout-wrapper {
+    padding-bottom: 18px !important;
   }
 }

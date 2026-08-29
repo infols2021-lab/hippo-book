@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import BottomNav from "@/components/BottomNav";
+import "../materials/materials.css";
 
 export const revalidate = 0;
 
@@ -83,7 +84,7 @@ export default async function ProjectLayout({
         style={themeVars as React.CSSProperties} 
         // Добавлено отступа снизу на мобилках, чтобы контент не перекрывался плавающим меню
         // (реальная величина с учётом safe-area задана в CSS ниже — .project-layout-wrapper)
-        className="min-h-screen w-full transition-colors duration-500 project-layout-wrapper pb-[100px] md:pb-0 relative flex flex-col"
+        className="min-h-screen w-full transition-colors duration-500 project-layout-wrapper pb-0 md:pb-0 relative flex flex-col"
       >
         {children}
         
