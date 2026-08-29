@@ -302,7 +302,7 @@ export default function MaterialChoiceModal({
   const cannotFulfillChoice = availableForChoiceByPrice.length > 0 && lockedMaterials.length < requiredChoiceCount;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 overflow-hidden overscroll-none animate-in fade-in duration-200 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 overflow-hidden overscroll-none animate-in fade-in duration-200 bg-black/60 backdrop-blur-sm">
       <div
         className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative border border-slate-100 flex flex-col max-h-[90vh]"
       >

@@ -62,6 +62,7 @@ export function isPortalTourStage(stage: TourStage): boolean {
 }
 
 const PROFILE_PATH = /^\/projects\/[^/]+\/profile\/?$/;
+const REWARDS_PATH = /^\/projects\/[^/]+\/rewards\/?$/;
 const MATERIALS_PATH = /^\/projects\/[^/]+\/materials\/?$/;
 const MATERIAL_DETAIL_PATH = /^\/projects\/[^/]+\/materials\/[^/]+\/?$/;
 const ASSIGNMENT_PATH = /^\/projects\/[^/]+\/assignment\/?$/;
@@ -95,7 +96,7 @@ export function isTourStageActiveOnPath(stage: TourStage, pathname: string): boo
     case "tour_complete":
       return PROFILE_PATH.test(pathname) || REQUESTS_PATH.test(pathname);
     case "rewards_tour":
-      return PROFILE_PATH.test(pathname);
+      return PROFILE_PATH.test(pathname) || REWARDS_PATH.test(pathname);
     default:
       return false;
   }

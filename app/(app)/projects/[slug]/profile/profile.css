@@ -647,4 +647,43 @@
   .switcher-chevron {
     color: var(--project-primary);
   }
+
+  /* ===== Мобильная шапка профиля: компактнее ===== */
+  .brand-switcher-wrapper {
+    width: 100%;
+  }
+
+  /* ===== Модалки на телефоне: bottom-sheet (поддержка / редактирование) ===== */
+  .modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .modal-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 22px 22px 0 0 !important;
+    max-height: 92dvh !important;
+    margin: 0 !important;
+    animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  }
+
+  .modal-header {
+    padding: 14px 16px !important;
+  }
+
+  .modal-body {
+    padding: 14px 16px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  @keyframes modalSlideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  /* Скрываем блок "Служба поддержки" внизу профиля — сверху есть кнопка и модалка */
+  .profile-page .info-list {
+    display: none !important;
+  }
 }

@@ -42,13 +42,17 @@ export function visibleTourTarget(...selectors: string[]): () => HTMLElement | n
 export function visibleMobileMenuTarget(selector: string): () => HTMLElement | null {
   return () => {
     const sheet = document.querySelector<HTMLElement>(".mobile-bottom-sheet");
-    if (!sheet || !isTourElementVisible(sheet)) return null;
-
-    const nodes = sheet.querySelectorAll<HTMLElement>(selector);
-    for (const node of nodes) {
-      if (isTourElementVisible(node)) return node;
+    if (sheet && isTourElementVisible(sheet)) {
+      const nodes = sheet.querySelectorAll<HTMLElement>(selector);
+      for (const node of nodes) {
+        if (isTourElementVisible(node)) return node;
+      }
+      return null;
     }
-    return null;
+
+    // Если bottom sheet не используется (страницы с плавающей BottomNav),
+    // ищем цель по всему документу — например, таб «Награды» в нижней панели.
+    return visibleTourTarget(selector)();
   };
 }
 

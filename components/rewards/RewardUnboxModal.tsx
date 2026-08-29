@@ -67,7 +67,7 @@ export default function RewardUnboxModal({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden overscroll-none animate-in fade-in duration-200"
+      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden overscroll-none animate-in fade-in duration-200"
       style={{ backgroundColor: "rgba(0, 0, 0, 0.82)" }}
     >
       <div

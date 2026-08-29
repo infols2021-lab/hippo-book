@@ -6,7 +6,6 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import Modal from "@/components/Modal";
-import RewardsModal from "@/components/rewards/RewardsModal";
 import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal";
 import { ReferralStats, ReferralMilestone } from "@/components/rewards/ReferralTimeline";
 import { useTour } from "@/components/tour/TourProvider";
@@ -176,14 +175,13 @@ export default function ProfileClient({
 
   const [editOpen, setEditOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false); // Модалка поддержки для мобилок
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   
   const [editFullName, setEditFullName] = useState(profile.full_name ?? "");
   const [editPhone, setEditPhone] = useState(profile.contact_phone ?? "");
   const [editRegion, setEditRegion] = useState(profile.region ?? "");
   const [saving, setSaving] = useState(false);
 
-  const [rewardsModalOpen, setRewardsModalOpen] = useState(false);
-  const [rewardsInitialTab, setRewardsInitialTab] = useState<RewardsTabType>("wardrobe");
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
   const [stats, setStats] = useState<Stats | null>(statsProp ?? null);
@@ -238,18 +236,21 @@ export default function ProfileClient({
   useEffect(() => {
     if (stage === "rewards_tour") {
       clearTourProgress();
-      saveTourProgress("rewards_tour", 0, window.location.pathname);
-      setRewardsInitialTab("wardrobe");
-      setRewardsModalOpen(true);
+      saveTourProgress("rewards_tour", 0, window.location.pathname + `/rewards`);
       dispatchTourRewardsForceTab("wardrobe");
+      if (!/\/rewards\/?$/.test(window.location.pathname)) {
+        router.replace(`/projects/${projectSlug}/rewards`);
+      }
     }
     if (stage === "tour_complete") {
       dispatchTourPageReady();
     }
     if (stage === "profile_requests_gate") {
-      setRewardsModalOpen(false);
+      if (window.location.pathname.includes("/rewards")) {
+        router.replace(`/projects/${projectSlug}/profile`);
+      }
     }
-  }, [stage]);
+  }, [stage, router, projectSlug]);
 
   function showNotification(text: string, type: "success" | "error" = "success") {
     setNotif({ type, text });
@@ -362,13 +363,15 @@ export default function ProfileClient({
   }, [statsProp, progressProp, projectSlug]);
 
   function openRewards(tab: RewardsTabType = "wardrobe") {
-    setRewardsInitialTab(stage === "rewards_gate" ? "wardrobe" : tab);
-    setRewardsModalOpen(true);
+    // Награды теперь на отдельной странице. При первом открытии из тура —
+    // сохраняем прогресс тура и переходим в "rewards_tour".
     if (stage === "rewards_gate") {
       clearTourProgress();
-      saveTourProgress("rewards_tour", 0, window.location.pathname);
+      saveTourProgress("rewards_tour", 0, window.location.pathname + `/rewards`);
       advanceTour("rewards_tour");
     }
+    const tabParam = tab === "wardrobe" ? "" : `?tab=${tab}`;
+    router.push(`/projects/${projectSlug}/rewards${tabParam}`);
   }
 
   function openEdit() {
@@ -642,17 +645,66 @@ export default function ProfileClient({
         </div>
       </Modal>
 
-      {rewardsModalOpen && (
-        <RewardsModal
-          isOpen={rewardsModalOpen}
-          initialTab={rewardsInitialTab}
-          tourMode={stage === "rewards_tour"}
-          onClose={() => {
-            setRewardsModalOpen(false);
-            void fetchStreakData();
-          }}
-        />
-      )}
+      {/* Модалка подтверждения выхода из аккаунта */}
+      <Modal open={logoutConfirmOpen} onClose={() => setLogoutConfirmOpen(false)} title="Выход из аккаунта" maxWidth={420}>
+        <div style={{ textAlign: "center" }} data-tour="logout-confirm-modal">
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: "50%",
+              margin: "0 auto 16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "color-mix(in srgb, #ef4444 12%, transparent)",
+              color: "#ef4444",
+            }}
+          >
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </div>
+          <p style={{ margin: "0 0 24px", fontWeight: 700, fontSize: "16px", lineHeight: 1.45, color: "var(--project-text)" }}>
+            Вы уверены, что хотите выйти из аккаунта?
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <button
+              type="button"
+              onClick={() => void logout()}
+              style={{
+                width: "100%",
+                padding: "14px",
+                borderRadius: "14px",
+                background: "#ef4444",
+                color: "#fff",
+                fontWeight: 900,
+                fontSize: "14px",
+                border: "none",
+                cursor: "pointer",
+                boxShadow: "0 8px 20px rgba(239, 68, 68, 0.3)",
+              }}
+            >
+              Да, выйти
+            </button>
+            <button
+              type="button"
+              onClick={() => setLogoutConfirmOpen(false)}
+              style={{
+                width: "100%",
+                padding: "14px",
+                borderRadius: "14px",
+                background: "color-mix(in srgb, var(--project-text) 6%, transparent)",
+                color: "var(--project-text)",
+                fontWeight: 800,
+                fontSize: "14px",
+                border: "1px solid var(--glass-border)",
+                cursor: "pointer",
+              }}
+            >
+              Нет, остаться
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {leaderboardOpen && (
         <StreakLeaderboardModal
@@ -668,8 +720,22 @@ export default function ProfileClient({
         {/* ========================================================= */}
         <div className="md:hidden flex flex-col items-center w-full pt-4 pb-2">
           
-          <div className="w-full mb-6 relative z-40">
-            {ProjectSwitcherUI}
+          <div className="w-full mb-6 relative z-40 flex items-center gap-2">
+            <div className="flex-1 min-w-0">{ProjectSwitcherUI}</div>
+            <button
+              type="button"
+              onClick={() => setLogoutConfirmOpen(true)}
+              aria-label="Выйти из аккаунта"
+              title="Выйти из аккаунта"
+              className="flex-shrink-0 w-[46px] h-[46px] rounded-2xl flex items-center justify-center transition-all active:scale-95"
+              style={{
+                backgroundColor: "color-mix(in srgb, #ef4444 10%, var(--project-card-bg))",
+                border: "1px solid color-mix(in srgb, #ef4444 25%, transparent)",
+                color: "#ef4444",
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </button>
           </div>
 
           <div
@@ -804,7 +870,14 @@ export default function ProfileClient({
             >
               Материалы
             </Link>
-            <button className="nav-pill nav-pill--logout" type="button" onClick={() => void logout()}>
+            <button
+              className="nav-pill nav-pill--logout"
+              type="button"
+              onClick={() => setLogoutConfirmOpen(true)}
+              title="Выйти из аккаунта"
+              aria-label="Выйти из аккаунта"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
               Выйти
             </button>
           </div>

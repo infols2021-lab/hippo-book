@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
+import { useTour } from "@/components/tour/TourProvider";
+import { saveTourProgress, clearTourProgress } from "@/lib/tour/tourPersistence";
 
 export default function BottomNav({ slug }: { slug: string }) {
   const pathname = usePathname();
+  const { stage, advanceTour } = useTour();
 
   const tabs = useMemo(() => [
     {
@@ -77,6 +80,16 @@ export default function BottomNav({ slug }: { slug: string }) {
               key={tab.id}
               href={tab.href}
               prefetch={true}
+              data-tour={tab.id === "rewards" ? "rewards-btn" : undefined}
+              onClick={
+                tab.id === "rewards" && stage === "rewards_gate"
+                  ? () => {
+                      clearTourProgress();
+                      saveTourProgress("rewards_tour", 0, window.location.pathname + `/rewards`);
+                      advanceTour("rewards_tour");
+                    }
+                  : undefined
+              }
               className="flex flex-col items-center justify-center w-full gap-1 transition-colors duration-200 select-none"
               style={{
                 color: isActive ? "var(--project-primary)" : "color-mix(in srgb, var(--project-text) 45%, transparent)",

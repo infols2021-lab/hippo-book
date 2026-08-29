@@ -81,7 +81,8 @@ export default async function ProjectLayout({
       <style id="project-theme-vars" dangerouslySetInnerHTML={{ __html: `:root { ${rootCssText} }` }} />
       <div 
         style={themeVars as React.CSSProperties} 
-        // Добавлено pb-[100px] на мобилках, чтобы контент не перекрывался плавающим меню
+        // Добавлено отступа снизу на мобилках, чтобы контент не перекрывался плавающим меню
+        // (реальная величина с учётом safe-area задана в CSS ниже — .project-layout-wrapper)
         className="min-h-screen w-full transition-colors duration-500 project-layout-wrapper pb-[100px] md:pb-0 relative flex flex-col"
       >
         {children}

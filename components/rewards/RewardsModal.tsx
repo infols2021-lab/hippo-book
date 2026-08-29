@@ -32,6 +32,14 @@ export interface RewardsModalProps {
   initialTab?: RewardsTabType;
   /** Тур наград активен — вкладки переключает только гайд, стартуем с гардероба. */
   tourMode?: boolean;
+  /**
+   * `modal` — классическая модалка поверх страницы (по умолчанию).
+   * `page` — полноэкранная страница "Центр наград" (без оверлея и блокировки скролла),
+   * у которой в шапке вместо кнопки "Закрыть" — кнопка возврата назад.
+   */
+  variant?: "modal" | "page";
+  /** Заголовок страницы (используется только при variant="page"). */
+  title?: string;
 }
 
 export default function RewardsModal({
@@ -41,9 +49,12 @@ export default function RewardsModal({
   defaultTab = "wardrobe",
   initialTab,
   tourMode = false,
+  variant = "modal",
+  title = "Центр наград",
 }: RewardsModalProps) {
   const showModal = Boolean(isOpen ?? open);
-  useBodyScrollLock(showModal);
+  const isPage = variant === "page";
+  useBodyScrollLock(showModal && !isPage);
 
   const normalizeTab = (tab?: RewardsTabType): "wardrobe" | "streaks" | "promocode" | "referrals" => {
     const raw = tab || initialTab || defaultTab;
@@ -387,18 +398,32 @@ export default function RewardsModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 overflow-hidden overscroll-none"
-        style={{ backgroundColor: "rgba(0,0,0,0.8)" }}
+        className={
+          isPage
+            ? "w-full h-dvh flex justify-center overflow-hidden"
+            : "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 overflow-hidden overscroll-none"
+        }
+        style={isPage ? undefined : { backgroundColor: "rgba(0,0,0,0.8)" }}
       >
         <div
-          className="rounded-t-[32px] sm:rounded-[32px] w-full max-w-[min(56rem,100vw)] h-[90vh] sm:h-[88vh] flex flex-col shadow-2xl overflow-hidden relative border transition-all"
-          style={{
-            backgroundColor: "var(--project-card-bg, #ffffff)",
-            color: "var(--project-text, #0f172a)",
-            borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
-          }}
+          className={
+            isPage
+              ? "w-full h-full max-w-[56rem] flex flex-col overflow-hidden"
+              : "rounded-t-[32px] sm:rounded-[32px] w-full max-w-[min(56rem,100vw)] h-[90vh] sm:h-[88vh] flex flex-col shadow-2xl overflow-hidden relative border transition-all"
+          }
+          style={
+            isPage
+              ? { backgroundColor: "var(--project-card-bg, #ffffff)", color: "var(--project-text, #0f172a)" }
+              : {
+                  backgroundColor: "var(--project-card-bg, #ffffff)",
+                  color: "var(--project-text, #0f172a)",
+                  borderColor: "var(--glass-border, rgba(15,23,42,0.12))",
+                }
+          }
         >
-          <div className="w-10 h-1 rounded-full mx-auto sm:hidden mt-2 -mb-2" style={{ backgroundColor: "color-mix(in srgb, var(--project-text) 20%, transparent)" }} />
+          {!isPage && (
+            <div className="w-10 h-1 rounded-full mx-auto sm:hidden mt-2 -mb-2" style={{ backgroundColor: "color-mix(in srgb, var(--project-text) 20%, transparent)" }} />
+          )}
 
           <div
             className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-6 border-b gap-3"
@@ -413,11 +438,28 @@ export default function RewardsModal({
                   className="w-3 h-3 rounded-full flex-shrink-0"
                   style={{ backgroundColor: "var(--project-primary, #0ea5e9)" }}
                 />
-                <h2 className="text-base sm:text-xl font-black tracking-wide uppercase truncate">Центр наград</h2>
+                <h2 className="text-base sm:text-xl font-black tracking-wide uppercase truncate">{title}</h2>
               </div>
 
-              <button
-                type="button"
+              {isPage && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-3 py-1 font-bold text-xs rounded-xl transition-all border flex items-center gap-1.5 flex-shrink-0"
+                  style={{
+                    backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
+                    borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
+                    color: "var(--project-text, #0f172a)",
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
+                  Назад
+                </button>
+              )}
+
+              {!isPage && (
+                <button
+                  type="button"
                 onClick={onClose}
                 className="px-3 py-1 font-bold text-xs rounded-xl transition-all border sm:hidden"
                 style={{
@@ -428,6 +470,7 @@ export default function RewardsModal({
               >
                 Закрыть
               </button>
+              )}
             </div>
 
             <div
@@ -501,7 +544,7 @@ export default function RewardsModal({
             <button
               type="button"
               onClick={onClose}
-              className="hidden sm:block px-3.5 py-1.5 font-bold text-xs rounded-xl transition-all border"
+              className={`hidden sm:block px-3.5 py-1.5 font-bold text-xs rounded-xl transition-all border ${isPage ? "sm:hidden" : ""}`}
               style={{
                 backgroundColor: "color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent)",
                 borderColor: "var(--glass-border, rgba(15,23,42,0.1))",
@@ -512,7 +555,7 @@ export default function RewardsModal({
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+          <div className={`flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 ${isPage ? "pb-28 sm:pb-6" : ""}`}>
             {loading ? (
               <div className="h-full flex items-center justify-center font-bold text-xs sm:text-sm uppercase tracking-wider opacity-60">
                 Загрузка данных...
@@ -963,7 +1006,7 @@ export default function RewardsModal({
 
       {selectedHistoryLog && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-hidden overscroll-none animate-in fade-in duration-200"
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 overflow-hidden overscroll-none animate-in fade-in duration-200"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
           onClick={() => setSelectedHistoryLog(null)}
         >
