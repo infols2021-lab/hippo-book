@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import BottomNav from "@/components/BottomNav";
-import "../materials/materials.css";
+import "./materials/materials.css";
 
 export const revalidate = 0;
 
