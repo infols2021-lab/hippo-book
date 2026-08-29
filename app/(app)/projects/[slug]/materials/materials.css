@@ -89,7 +89,7 @@
 .materials-section.active { display: block; }
 
 /* Grid с высокопроизводительным скроллом (GPU acceleration) */
-.materials-grid {
+.materials-page .materials-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 290px));
   gap: 20px;
@@ -105,26 +105,26 @@
 }
 
 /* Компактный легкий скроллбар */
-.materials-grid::-webkit-scrollbar {
+.materials-page .materials-grid::-webkit-scrollbar {
   width: 6px;
 }
 
-.materials-grid::-webkit-scrollbar-track {
+.materials-page .materials-grid::-webkit-scrollbar-track {
   background: color-mix(in srgb, var(--project-text) 4%, transparent);
   border-radius: 99px;
 }
 
-.materials-grid::-webkit-scrollbar-thumb {
+.materials-page .materials-grid::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--project-text) 20%, transparent);
   border-radius: 99px;
 }
 
-.materials-grid::-webkit-scrollbar-thumb:hover {
+.materials-page .materials-grid::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--project-primary) 50%, transparent);
 }
 
 /* Card */
-.material-card {
+.materials-page .material-card {
   position: relative;
   cursor: pointer;
   border-radius: 20px;
@@ -138,13 +138,13 @@
   transform: translateZ(0); /* Вынос каждой карточки на отдельный GPU-слой */
 }
 
-.material-card:hover {
+.materials-page .material-card:hover {
   transform: translateY(-3px);
   border-color: color-mix(in srgb, var(--project-primary) 40%, transparent);
 }
 
 /* Cover */
-.material-cover {
+.materials-page .material-cover {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -158,7 +158,7 @@
   border: 1px solid color-mix(in srgb, var(--project-text) 6%, transparent);
 }
 
-.material-cover img {
+.materials-page .material-cover img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -180,19 +180,32 @@
   box-shadow: 0 4px 14px color-mix(in srgb, var(--project-primary, #0ea5e9) 45%, transparent);
 }
 
-.material-card--demo {
+.materials-page .material-secret-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #f59e0b;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 4px 10px;
+  border-radius: 8px;
+  letter-spacing: 0.02em;
+}
+
+.materials-page .material-card--demo {
   border-color: color-mix(in srgb, var(--project-primary, #0ea5e9) 45%, transparent);
 }
 
 /* Гайд: только демо-карточка активна */
-.materials-tour-demo-active .material-card:not(.material-card--demo) {
+.materials-page.materials-tour-demo-active .material-card:not(.material-card--demo) {
   opacity: 0.28;
   filter: grayscale(0.35) saturate(0.7);
   pointer-events: none;
   transform: scale(0.985);
 }
 
-.materials-tour-demo-active .material-card--demo {
+.materials-page.materials-tour-demo-active .material-card--demo {
   position: relative;
   z-index: 3;
   border-width: 2px;
@@ -217,12 +230,12 @@
   }
 }
 
-.material-cover-placeholder {
+.materials-page .material-cover-placeholder {
   font-size: 3rem;
   opacity: 0.5;
 }
 
-.material-title {
+.materials-page .material-title {
   font-size: 16px;
   font-weight: 800;
   margin-bottom: 6px;
@@ -230,7 +243,7 @@
   line-height: 1.3;
 }
 
-.material-description {
+.materials-page .material-description {
   color: var(--project-text);
   font-size: 14px;
   font-weight: 600;
@@ -240,7 +253,7 @@
 }
 
 /* Progress */
-.progress-bar {
+.materials-page .progress-bar {
   width: 100%;
   height: 6px;
   background: color-mix(in srgb, var(--project-text) 8%, transparent);
@@ -249,7 +262,7 @@
   margin-bottom: 10px;
 }
 
-.progress-fill {
+.materials-page .progress-fill {
   height: 100%;
   width: 0%;
   background: var(--project-primary);
@@ -257,7 +270,7 @@
   transition: width 0.3s ease;
 }
 
-.material-stats {
+.materials-page .material-stats {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -266,7 +279,7 @@
   color: var(--project-text);
 }
 
-.material-stats .pct {
+.materials-page .material-stats .pct {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -278,20 +291,20 @@
 }
 
 /* Locked (Без тяжелых фильтров блюра) */
-.material-card.locked {
+.materials-page .material-card.locked {
   cursor: not-allowed;
   opacity: 0.8;
 }
 
-.material-card.locked:hover {
+.materials-page .material-card.locked:hover {
   transform: none;
 }
 
-.material-card.locked .material-cover img {
+.materials-page .material-card.locked .material-cover img {
   filter: grayscale(1);
 }
 
-.locked-overlay {
+.materials-page .locked-overlay {
   position: absolute;
   inset: 0;
   border-radius: 20px;
@@ -302,7 +315,7 @@
   z-index: 10;
 }
 
-.locked-badge {
+.materials-page .locked-badge {
   background: var(--project-card-bg, #ffffff);
   color: var(--project-text);
   padding: 8px 16px;
@@ -365,9 +378,9 @@
     pointer-events: none;
   }
 
-  .materials-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+  .materials-page .materials-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
     max-height: none;
     min-height: 0;
     padding-right: 0;
@@ -403,12 +416,12 @@
     margin-top: 0;
   }
 
-  .material-card {
+  .materials-page .material-card {
     border-radius: 16px;
     padding: 10px;
   }
 
-  .material-title {
+  .materials-page .material-title {
     font-size: 13px;
     margin-bottom: 4px;
     line-height: 1.25;
@@ -418,38 +431,38 @@
     overflow: hidden;
   }
 
-  .material-description {
+  .materials-page .material-description {
     display: none;
   }
 
   /* Обложка компактнее на мобилке */
-  .material-cover {
-    aspect-ratio: 4 / 3;
+  .materials-page .material-cover {
+    aspect-ratio: 4 / 3 !important;
     border-radius: 12px;
     margin-bottom: 10px;
   }
 
-  .material-cover-placeholder {
+  .materials-page .material-cover-placeholder {
     font-size: 2rem;
   }
 
-  .progress-bar {
+  .materials-page .progress-bar {
     height: 5px;
     margin-bottom: 8px;
   }
 
-  .material-stats {
+  .materials-page .material-stats {
     font-size: 11px;
     gap: 6px;
     margin-top: auto;
   }
 
-  .material-stats .pct {
+  .materials-page .material-stats .pct {
     padding: 3px 8px;
     font-size: 10px;
   }
 
-  .material-secret-badge {
+  .materials-page .material-secret-badge {
     position: absolute;
     top: 6px;
     right: 6px;
@@ -461,7 +474,7 @@
     border-radius: 6px;
   }
 
-  .material-demo-badge {
+  .materials-page .material-demo-badge {
     top: 6px;
     left: 6px;
     font-size: 10px;
@@ -469,7 +482,7 @@
     border-radius: 6px;
   }
 
-  .locked-badge {
+  .materials-page .locked-badge {
     padding: 6px 10px;
     font-size: 11px;
     border-radius: 99px;

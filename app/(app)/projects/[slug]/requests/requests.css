@@ -6,7 +6,14 @@
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
 }
 
-.container {
+/* Отступ снизу на мобилках, чтобы контент не перекрывался плавающей панелью BottomNav */
+@media (max-width: 768px) {
+  .page-requests {
+    padding-bottom: calc(130px + env(safe-area-inset-bottom));
+  }
+}
+
+.page-requests .container {
   width: 95%;
   max-width: 1200px;
   margin: 20px auto;
@@ -151,7 +158,7 @@
   color: color-mix(in srgb, var(--project-text, #0f172a) 72%, transparent);
 }
 
-.materials-grid {
+.requests-materials-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(168px, 200px));
   justify-content: start;
@@ -160,11 +167,13 @@
   max-height: 380px;
   overflow-y: auto;
   padding: 4px;
+  margin-top: 12px;
+  min-height: 120px;
   margin-bottom: 16px;
   -webkit-overflow-scrolling: touch;
 }
 
-.material-card {
+.requests-material-card {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -177,22 +186,22 @@
   transition: all 0.2s ease;
 }
 
-.material-card:hover {
+.requests-material-card:hover {
   transform: translateY(-2px);
   border-color: var(--project-primary, #0ea5e9);
 }
 
-.material-card.selected {
+.requests-material-card.selected {
   border-color: var(--project-primary, #0ea5e9);
   background: color-mix(in srgb, var(--project-primary, #0ea5e9) 10%, transparent);
 }
 
-.material-card.owned {
+.requests-material-card.owned {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.material-cover-wrapper {
+.requests-material-cover-wrapper {
   width: 100%;
   height: 90px;
   border-radius: 10px;
@@ -204,20 +213,20 @@
   justify-content: center;
 }
 
-.material-cover-img {
+.requests-material-cover-img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
 }
 
-.material-card-body {
+.requests-material-card-body {
   display: flex;
   flex-direction: column;
   flex: 1;
   justify-content: space-between;
 }
 
-.material-card-title {
+.requests-material-card-title {
   font-weight: 800;
   font-size: 13px;
   line-height: 1.3;
@@ -225,7 +234,7 @@
   margin-bottom: 8px;
 }
 
-.material-card-footer {
+.requests-material-card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -234,38 +243,43 @@
   border-top: 1px solid color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent);
 }
 
-.material-card-price {
+.requests-material-card-price {
   font-weight: 900;
   font-size: 14px;
   color: var(--project-primary, #0ea5e9);
 }
 
-.vitrine-card-btn {
+.requests-vitrine-card-btn {
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 11px;
   font-weight: 800;
 }
 
-.vitrine-card-btn.add {
+.requests-vitrine-card-btn.add {
   background: color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent);
   color: var(--project-text, #0f172a);
 }
 
-.vitrine-card-btn.remove {
+.requests-vitrine-card-btn.remove {
   background: var(--project-primary, #0ea5e9);
   color: #ffffff;
 }
 
 /* =========================================================
    ФОРМЫ, ЧЕК И СПИСОК В МОДАЛКАХ
+   Классы заскоплены под .page-requests и .modal-body (модалки
+   рендерятся в портал body), чтобы не переопределять глобальные
+   стили форм на других страницах.
    ========================================================= */
 
-.form-group {
+.page-requests .form-group,
+.modal-body .form-group {
   margin-bottom: 14px;
 }
 
-.form-group label {
+.page-requests .form-group label,
+.modal-body .form-group label {
   display: block;
   margin-bottom: 6px;
   font-weight: 700;
@@ -273,8 +287,10 @@
   font-size: 13px;
 }
 
-.form-group input,
-.form-group select {
+.page-requests .form-group input,
+.page-requests .form-group select,
+.modal-body .form-group input,
+.modal-body .form-group select {
   width: 100%;
   padding: 12px 16px;
   border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.12));
@@ -286,14 +302,17 @@
   color: var(--project-text, #0f172a) !important;
 }
 
-.form-group input:read-only,
-.form-group input:disabled {
+.page-requests .form-group input:read-only,
+.page-requests .form-group input:disabled,
+.modal-body .form-group input:read-only,
+.modal-body .form-group input:disabled {
   opacity: 0.7;
   cursor: not-allowed;
   background: color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent);
 }
 
-.payment-info {
+.page-requests .payment-info,
+.modal-body .payment-info {
   background: color-mix(in srgb, var(--project-primary, #0ea5e9) 8%, transparent);
   border-left: 4px solid var(--project-primary, #0ea5e9);
   padding: 16px 20px;
@@ -302,7 +321,8 @@
   color: var(--project-text, #0f172a);
 }
 
-.receipt-box {
+.page-requests .receipt-box,
+.modal-body .receipt-box {
   background: color-mix(in srgb, var(--project-text, #0f172a) 3%, transparent);
   border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.12));
   border-radius: 14px;
@@ -310,7 +330,8 @@
   margin-bottom: 16px;
 }
 
-.receipt-item {
+.page-requests .receipt-item,
+.modal-body .receipt-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -321,7 +342,8 @@
   font-weight: 600;
 }
 
-.receipt-total {
+.page-requests .receipt-total,
+.modal-body .receipt-total {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -333,14 +355,16 @@
   font-size: 16px;
 }
 
-.summary-items-list {
+.page-requests .summary-items-list,
+.modal-body .summary-items-list {
   background: color-mix(in srgb, var(--project-text, #0f172a) 4%, transparent);
   border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.12));
   border-radius: 12px;
   padding: 10px 14px;
 }
 
-.summary-item {
+.page-requests .summary-item,
+.modal-body .summary-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -351,16 +375,19 @@
   font-weight: 600;
 }
 
-.summary-item:last-child {
+.page-requests .summary-item:last-child,
+.modal-body .summary-item:last-child {
   border-bottom: none;
 }
 
-.summary-item-title {
+.page-requests .summary-item-title,
+.modal-body .summary-item-title {
   font-weight: 700;
   color: var(--project-text, #0f172a);
 }
 
-.summary-item-badge {
+.page-requests .summary-item-badge,
+.modal-body .summary-item-badge {
   display: inline-block;
   font-size: 11px;
   font-weight: 800;
@@ -369,23 +396,27 @@
   width: fit-content;
 }
 
-.summary-item-badge.badge-issued {
+.page-requests .summary-item-badge.badge-issued,
+.modal-body .summary-item-badge.badge-issued {
   background: #fee2e2;
   color: #991b1b;
 }
 
-.summary-item-badge.badge-in-other {
+.page-requests .summary-item-badge.badge-in-other,
+.modal-body .summary-item-badge.badge-in-other {
   background: #fef3c7;
   color: #92400e;
 }
 
-.summary-item-badge-price {
+.page-requests .summary-item-badge-price,
+.modal-body .summary-item-badge-price {
   font-weight: 800;
   color: var(--project-primary, #0ea5e9);
   white-space: nowrap;
 }
 
-.cart-summary-bar {
+.page-requests .cart-summary-bar,
+.modal-body .cart-summary-bar {
   margin-top: 14px;
   padding: 12px 16px;
   border-radius: 14px;
@@ -405,75 +436,11 @@
 }
 
 /* =========================================================
-   МОДАЛЬНОЕ ОКНО (ОБЩИЕ СТИЛИ)
-   ========================================================= */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 99999;
-  padding: 16px;
-  box-sizing: border-box;
-}
-
-.modal-panel {
-  background: var(--project-card-bg, #ffffff);
-  color: var(--project-text, #0f172a);
-  border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.12));
-  border-radius: 24px;
-  width: 100%;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 24px;
-  border-bottom: 1px solid var(--glass-border, rgba(15, 23, 42, 0.08));
-}
-
-.modal-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.modal-close {
-  background: color-mix(in srgb, var(--project-text, #0f172a) 6%, transparent);
-  border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.1));
-  color: var(--project-text, #0f172a);
-  border-radius: 10px;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  font-weight: 800;
-}
-
-.modal-body {
-  padding: 20px 24px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-/* =========================================================
    МОБИЛЬНАЯ АДАПТАЦИЯ (экраны <= 768px)
    ========================================================= */
 
 @media (max-width: 768px) {
-  .container {
+  .page-requests .container {
     width: 100%;
     margin: 0;
     padding: 12px;
@@ -588,7 +555,7 @@
     white-space: normal !important;
   }
 
-  .materials-grid {
+  .requests-materials-grid {
     grid-template-columns: repeat(2, minmax(0, 168px)) !important;
     justify-content: start !important;
     gap: 8px !important;
@@ -597,59 +564,28 @@
     padding: 2px !important;
   }
 
-  .material-card {
+  .requests-material-card {
     padding: 8px !important;
     border-radius: 12px !important;
   }
 
-  .material-cover-wrapper {
+  .requests-material-cover-wrapper {
     height: 65px !important;
     margin-bottom: 6px !important;
   }
 
-  .material-card-title {
+  .requests-material-card-title {
     font-size: 11px !important;
     line-height: 1.2 !important;
     margin-bottom: 4px !important;
   }
 
-  .material-card-price {
+  .requests-material-card-price {
     font-size: 12px !important;
   }
 
-  .vitrine-card-btn {
+  .requests-vitrine-card-btn {
     padding: 3px 6px !important;
     font-size: 10px !important;
-  }
-
-  .modal-overlay {
-    align-items: flex-end !important;
-    padding: 0 !important;
-  }
-
-  .modal-panel {
-    width: 100% !important;
-    max-width: 100% !important;
-    border-radius: 20px 20px 0 0 !important;
-    max-height: 90vh !important;
-    margin: 0 !important;
-    animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
-  }
-
-  .modal-header {
-    padding: 14px 16px !important;
-  }
-
-  .modal-body {
-    padding: 14px 16px !important;
-  }
-
-  @keyframes modalSlideUp {
-    from {
-      transform: translateY(100%);
-    }
-    to {
-      transform: translateY(0);
-    }
   }
 }

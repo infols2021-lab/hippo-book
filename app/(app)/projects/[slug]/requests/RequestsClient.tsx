@@ -808,6 +808,85 @@ export default function RequestsClient({
           from { transform: translate3d(100%, 0, 0); opacity: 0; }
           to { transform: translate3d(0, 0, 0); opacity: 1; }
         }
+
+        /* ===== Модалки, используемые на странице заявок =====
+           Стили живут здесь, а не в requests.css, чтобы НЕ переопределять
+           модалки на других страницах (Modal рендерится в портал body,
+           а CSS заявок при клиентской навигации остаётся в DOM). */
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.65);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 99999;
+          padding: 16px;
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+          overflow: hidden;
+          overscroll-behavior: none;
+        }
+        .modal-panel {
+          width: 100%;
+          max-width: 760px;
+          border-radius: 28px;
+          background: var(--project-card-bg);
+          color: var(--project-text);
+          border: 1px solid var(--glass-border);
+          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+          display: flex;
+          flex-direction: column;
+          max-height: 90vh;
+          overflow: hidden;
+          outline: none;
+        }
+        .modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 20px 24px;
+          border-bottom: 1px solid var(--glass-border);
+          flex-shrink: 0;
+        }
+        .modal-title { margin: 0; font-size: 20px; font-weight: 900; color: inherit; }
+        .modal-close {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          border: none;
+          cursor: pointer;
+          background: color-mix(in srgb, var(--project-text) 6%, transparent);
+          color: inherit;
+          font-size: 16px;
+          font-weight: bold;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+        .modal-close:hover { background: color-mix(in srgb, var(--project-text) 12%, transparent); }
+        .modal-body { padding: 24px; overflow-y: auto; flex: 1; color: var(--project-text); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+
+        @media (max-width: 768px) {
+          .modal-overlay {
+            align-items: flex-end;
+            padding: 0;
+          }
+          .modal-panel {
+            max-width: 100%;
+            border-radius: 20px 20px 0 0;
+            max-height: 90vh;
+            margin: 0;
+            animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+          .modal-header { padding: 14px 16px; }
+          .modal-body { padding: 14px 16px; }
+          @keyframes modalSlideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+          }
+        }
       `}</style>
 
       {notif && (
@@ -960,7 +1039,7 @@ export default function RequestsClient({
                   В этом разделе пока нет материалов
                 </div>
               ) : (
-                <div className="materials-grid no-scrollbar">
+                <div className="requests-materials-grid no-scrollbar">
                   {filteredMaterials.map((item) => {
                     const isOwned = ownedMaterialSet.has(item.id);
                     const isSelected = selectedMaterialIds.includes(item.id);
@@ -968,16 +1047,16 @@ export default function RequestsClient({
                     return (
                       <div
                         key={item.id}
-                        className={`material-card ${isSelected ? "selected" : ""} ${isOwned ? "owned" : ""}`}
+                        className={`requests-material-card ${isSelected ? "selected" : ""} ${isOwned ? "owned" : ""}`}
                         onClick={() => toggleMaterialSelection(item.id)}
                       >
-                        <div className="material-cover-wrapper">
+                        <div className="requests-material-cover-wrapper">
                           {item.cover_image_url ? (
                             <img
                               src={item.cover_image_url}
                               alt={item.title}
                               loading="lazy"
-                              className="material-cover-img"
+                              className="requests-material-cover-img"
                             />
                           ) : (
                             <div style={{ fontSize: "12px", fontWeight: 800, opacity: 0.6, textTransform: "uppercase" }}>
@@ -986,14 +1065,14 @@ export default function RequestsClient({
                           )}
                         </div>
 
-                        <div className="material-card-body">
-                          <div className="material-card-title">{item.title}</div>
-                          <div className="material-card-footer">
-                            <span className="material-card-price">{formatPrice(item.price)}</span>
+                        <div className="requests-material-card-body">
+                          <div className="requests-material-card-title">{item.title}</div>
+                          <div className="requests-material-card-footer">
+                            <span className="requests-material-card-price">{formatPrice(item.price)}</span>
                             {isOwned ? (
                               <span className="owned-badge">Выдан</span>
                             ) : (
-                              <span className={`vitrine-card-btn ${isSelected ? "remove" : "add"}`}>
+                              <span className={`requests-vitrine-card-btn ${isSelected ? "remove" : "add"}`}>
                                 {isSelected ? "Выбрано" : "+ Выбрать"}
                               </span>
                             )}
