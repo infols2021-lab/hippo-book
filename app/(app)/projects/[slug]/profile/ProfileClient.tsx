@@ -78,7 +78,6 @@ type Props = {
   projectName: string;
   projectSlug: string;
   availableProjects: AvailableProject[];
-  grantedProjectSlugs?: string[];
   features: {
     streaks?: boolean;
     titles?: boolean;
@@ -154,7 +153,6 @@ export default function ProfileClient({
   projectName,
   projectSlug,
   availableProjects,
-  grantedProjectSlugs = [],
   features,
   userEmail,
   initialProfile,
@@ -170,6 +168,7 @@ export default function ProfileClient({
 
   const [profile, setProfile] = useState<ProfileData>(initialProfile);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [unreadProfileSlugs, setUnreadProfileSlugs] = useState<Set<string>>(new Set());
   
   const [bgLoading, setBgLoading] = useState<boolean>(Boolean(backgroundProxyUrl));
   const [bgReady, setBgReady] = useState<boolean>(false);
@@ -210,6 +209,20 @@ export default function ProfileClient({
 
   useEffect(() => {
     dispatchTourPageReady();
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/notifications/unread", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        const arr = Array.isArray(j?.notifications) ? j.notifications : [];
+        const s = new Set<string>();
+        for (const n of arr) {
+          if (n?.project_slug) s.add(String(n.project_slug));
+        }
+        setUnreadProfileSlugs(s);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -502,22 +515,21 @@ export default function ProfileClient({
               {availableProjects.map((p) => {
                 const isActive = p.slug === projectSlug;
                 const dotColor = p.theme?.primaryColor || p.theme_color || "#6366f1";
+                const hasNew = unreadProfileSlugs.has(p.slug);
                 
                 return (
                   <Link
                     key={p.id}
                     href={`/projects/${p.slug}/profile`}
-                    className={`project-switcher-item ${isActive ? "active" : ""}`}
+                    className={`project-switcher-item ${isActive ? "active" : ""} ${hasNew ? "has-new" : ""}`}
                     onClick={() => setSwitcherOpen(false)}
                   >
                     <div className="switcher-dot" style={{ backgroundColor: dotColor }} />
                     <div className="switcher-item-name">{p.name}</div>
+                    {hasNew && <div className="switcher-item-new" title="">!</div>}
                     {isActive && <div className="switcher-item-check">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     </div>}
-                    {grantedProjectSlugs.includes(p.slug) && (
-                      <div className="switcher-item-issued" title="Материалы выданы">✓</div>
-                    )}
                   </Link>
                 );
               })}

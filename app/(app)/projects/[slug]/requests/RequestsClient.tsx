@@ -175,6 +175,7 @@ export default function RequestsClient({
   const [tabs, setTabs] = useState<ProjectTab[]>(initialTabs);
   const [levels, setLevels] = useState<ProjectLevel[]>(initialLevels);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [unreadBySlug, setUnreadBySlug] = useState<Map<string, number>>(new Map());
 
   const [requests, setRequests] = useState<PurchaseRequest[]>(() =>
     initialRequests.map(normalizeRequestRow)
@@ -201,6 +202,20 @@ export default function RequestsClient({
 
   useEffect(() => {
     dispatchTourPageReady();
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/notifications/unread", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        const arr = Array.isArray(j?.notifications) ? j.notifications : [];
+        const m = new Map<string, number>();
+        for (const n of arr) {
+          if (n?.project_slug) m.set(String(n.project_slug), (m.get(String(n.project_slug)) || 0) + 1);
+        }
+        setUnreadBySlug(m);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -243,16 +258,6 @@ export default function RequestsClient({
     }
     return map;
   }, [requests]);
-
-  const grantedByProject = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const g of initialGrants) {
-      if (g.projectId) {
-        map.set(g.projectId, (map.get(g.projectId) || 0) + 1);
-      }
-    }
-    return map;
-  }, [initialGrants]);
 
   const currentProjectGrants = useMemo(
     () => initialGrants.filter((g) => g.projectId === project.id),
@@ -650,15 +655,15 @@ export default function RequestsClient({
           {availableProjects.map((p) => {
             const pendingCount = pendingByProject.get(p.id) ?? 0;
             const hasPending = pendingCount > 0;
-            const grantedCount = grantedByProject.get(p.id) ?? 0;
-            const hasGrants = grantedCount > 0;
+            const unreadCount = unreadBySlug.get(p.slug) ?? 0;
+            const hasUnread = unreadCount > 0;
 
             return (
               <button
                 key={p.id}
                 type="button"
                 className={`btn small project-pill ${catalogProject.slug === p.slug ? "" : "ghost"} ${
-                  hasPending ? "project-pill--pending" : ""} ${hasGrants ? "project-pill--issued" : ""
+                  hasPending ? "project-pill--pending" : ""} ${hasUnread ? "project-pill--new" : ""
                 }`}
                 onClick={() => void selectCatalogProject(p.slug)}
                 disabled={catalogLoading || busy}
@@ -673,9 +678,9 @@ export default function RequestsClient({
                     !
                   </span>
                 )}
-                {hasGrants && (
-                  <span className="project-pill-issued" aria-hidden="true">
-                    ✓
+                {hasUnread && (
+                  <span className="project-pill-alert-new" aria-hidden="true">
+                    !
                   </span>
                 )}
                 {p.name}
@@ -1398,9 +1403,9 @@ export default function RequestsClient({
           </h2>
 
           {currentProjectGrants.length > 0 && (
-            <div className="grants-notice">
-              <div className="grants-notice-title">🎉 Вам выдан доступ к материалам</div>
-              <div className="grants-notice-text">
+            <div className="processed-request-notice">
+              <div className="processed-request-title">Вам выдан доступ к материалам</div>
+              <div className="processed-request-text">
                 Откройте раздел <b>«Материалы»</b> и выберите вкладку{" "}
                 {currentProjectGrants[0]?.tabTitle ? (
                   <b>«{currentProjectGrants[0].tabTitle}»</b>

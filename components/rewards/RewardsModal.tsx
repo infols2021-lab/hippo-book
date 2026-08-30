@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import MascotViewer from "../mascot/MascotViewer";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { dispatchTourRewardsModalReady } from "@/lib/tour/tourMobile";
+import { notifyNewGrantForDirection } from "@/components/projects/GrantedAccessModal";
 import StreakTimeline from "./StreakTimeline";
 import MaterialChoiceModal, {
   MaterialChoiceSuccessResult,
@@ -314,6 +315,7 @@ export default function RewardsModal({
     }
 
     void loadData(true);
+    notifyNewGrantForDirection();
   };
 
   const handleMaterialChoiceSuccess = (result: MaterialChoiceSuccessResult) => {
@@ -334,6 +336,7 @@ export default function RewardsModal({
     }
 
     void loadData(true);
+    notifyNewGrantForDirection();
   };
 
   const handleRedeemPromo = async (e: React.FormEvent) => {

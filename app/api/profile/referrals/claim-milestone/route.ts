@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { notifyGrantedMaterials } from "@/lib/notifications/notify";
 import { ok, fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -159,6 +160,8 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+
+    await notifyGrantedMaterials(admin, userId, [...(bundle.materials || []), ...chosenMaterialIds], "referral");
 
     await admin.from("profiles").update({
       claimed_referral_milestones: [...claimedMilestones, milestoneId]

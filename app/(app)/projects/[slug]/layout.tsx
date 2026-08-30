@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import BottomNav from "@/components/BottomNav";
+import GrantedAccessModal from "@/components/projects/GrantedAccessModal";
 import "./materials/materials.css";
 
 export const revalidate = 0;
@@ -90,6 +91,7 @@ export default async function ProjectLayout({
         
         {/* Интегрирована плавающая нижняя панель навигации */}
         <BottomNav slug={slug} />
+        <GrantedAccessModal projectSlug={slug} />
       </div>
     </>
   );

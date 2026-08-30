@@ -158,25 +158,31 @@
   transform: translateX(4px);
 }
 
+.project-switcher-item.has-new {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #ef4444 20%, transparent);
+}
+.switcher-item-new {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-left: auto;
+}
 .project-switcher-item.active {
   border-color: var(--glass-border);
   background: color-mix(in srgb, var(--project-text) 12%, transparent);
 }
 
-.switcher-item-issued {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #10b981;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 900;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-left: auto;
-}
+
 
 .switcher-dot {
   width: 14px;

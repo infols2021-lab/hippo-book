@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { notifyGrantedMaterials } from "@/lib/notifications/notify";
 import { ok, fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     const grantedItems: any[] = [];
+    let welcomeMaterialIds: string[] = [];
     
     if (settings?.welcome_bundle) {
       const bundle = settings.welcome_bundle;
@@ -72,6 +74,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (Array.isArray(bundle.materials) && bundle.materials.length > 0) {
+        welcomeMaterialIds = bundle.materials;
         const [
           { data: fetchedMaterials },
           { data: fetchedTextbooks },
@@ -103,6 +106,10 @@ export async function POST(req: NextRequest) {
           }
         }
       }
+    }
+
+    if (welcomeMaterialIds.length > 0) {
+      await notifyGrantedMaterials(admin, userId, welcomeMaterialIds, "referral");
     }
 
     return ok({

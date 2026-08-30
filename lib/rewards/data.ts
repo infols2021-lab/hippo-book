@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { notifyGrantedMaterials } from "@/lib/notifications/notify";
 import type {
   MascotSettings,
   RewardItem,
@@ -393,6 +394,10 @@ export async function redeemPromocode(
       "Материал по промокоду"
     );
     grantedRewards.push(...materialItems);
+  }
+
+  if (allMaterialIdsToGrant.length > 0) {
+    await notifyGrantedMaterials(adminSupabase, userId, allMaterialIdsToGrant, "promocode");
   }
 
   const { error: rpcError } = await adminSupabase.rpc("increment_promocode_uses", {

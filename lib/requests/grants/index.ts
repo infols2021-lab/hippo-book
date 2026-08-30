@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toStringArray, uniqueStrings } from "@/lib/materials/normalize";
+import { createMaterialNotification } from "@/lib/notifications/notify";
 
 export type GrantKind = "textbook" | "crossword" | "mock_test" | "material";
 
@@ -204,6 +205,49 @@ export async function grantAccessForRequest(
         material_kind: "crossword",
       });
     }
+  }
+
+
+  // Create unread notifications for granted materials
+  try {
+    if (grantsToStore.length > 0) {
+      const matIdSet = Array.from(new Set(grantsToStore.map((g) => g.material_id).filter(Boolean)));
+      if (matIdSet.length) {
+        const { data: mats } = await supabase
+          .from("materials")
+          .select("id, title, cover_image_url, project_tab_id")
+          .in("id", matIdSet);
+        const tabIds = Array.from(new Set((mats||[]).map((m) => m.project_tab_id).filter(Boolean)));
+        const { data: tabs } = tabIds.length
+          ? await supabase.from("project_tabs").select("id, title, slug, project_id").in("id", tabIds)
+          : { data: [] };
+        const tabById = new Map((tabs||[]).map((t) => [t.id, t]));
+        const projIds = Array.from(new Set((tabs||[]).map((t) => t.project_id).filter(Boolean)));
+        const { data: projects } = projIds.length
+          ? await supabase.from("projects").select("id, slug").in("id", projIds)
+          : { data: [] };
+        const slugById = new Map((projects||[]).map((p) => [p.id, p.slug]));
+        const matById = new Map((mats||[]).map((m) => [m.id, m]));
+        for (const g of grantsToStore) {
+          const mat = g.material_id ? matById.get(g.material_id) : undefined;
+          const tab = mat?.project_tab_id ? tabById.get(mat.project_tab_id) : undefined;
+          await createMaterialNotification({
+            userId: g.user_id,
+            kind: "request_processed",
+            requestId: g.request_id,
+            materialId: g.material_id ?? undefined,
+            projectId: tab?.project_id ?? r.project_id ?? undefined,
+            projectSlug: tab ? slugById.get(tab.project_id) : (r.project_id ? null : undefined),
+            materialTitle: mat?.title ?? g.title,
+            tabTitle: tab?.title ?? null,
+            tabSlug: tab?.slug ?? null,
+            coverUrl: mat?.cover_image_url ?? null,
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.error("grantNotices", e);
   }
 
   return { grantedLabels: uniqueStrings(grantedLabels), grantsToStore };

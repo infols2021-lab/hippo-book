@@ -56,32 +56,6 @@ export default async function ProjectProfilePage({
     region: userProfile?.region || "",
     is_admin: Boolean(userProfile?.is_admin),
   };
-
-  // Directions where the user already has granted materials (badge in switcher)
-  const { data: profileAccessRows } = await supabase.from("material_access").select("material_id").eq("user_id", user.id);
-  const { data: profileGrantRows } = await supabase.from("purchase_request_grants").select("material_id").eq("user_id", user.id);
-  const grantedMaterialIds = Array.from(
-    new Set<string>(
-      [
-        ...(profileAccessRows || []).map((a) => a.material_id),
-        ...(profileGrantRows || []).map((g) => g.material_id),
-      ].filter(Boolean)
-    )
-  );
-  let grantedProjectSlugs: string[] = [];
-  if (grantedMaterialIds.length > 0) {
-    const { data: gMats } = await supabase.from("materials").select("project_tab_id").in("id", grantedMaterialIds);
-    const gTabIds = Array.from(new Set<string>((gMats || []).map((m) => m.project_tab_id).filter(Boolean)));
-    const { data: gTabs } = gTabIds.length
-      ? await supabase.from("project_tabs").select("project_id").in("id", gTabIds)
-      : { data: [] }
-    const gProjIds = Array.from(new Set<string>((gTabs || []).map((t) => t.project_id).filter(Boolean)));
-    const { data: gProj } = gProjIds.length
-      ? await supabase.from("projects").select("slug").in("id", gProjIds)
-      : { data: [] }
-    grantedProjectSlugs = (gProj || []).map((p) => p.slug);
-  }
-
   // 5. Флаги геймификации
   const rawFeatures = project.features || {};
   const features = {
@@ -101,9 +75,7 @@ export default async function ProjectProfilePage({
       <ProfileClient
         projectName={project.name}
         projectSlug={project.slug}
-        availableProjects={activeProjects || []}
-        grantedProjectSlugs={grantedProjectSlugs}
-        features={features}
+        availableProjects={activeProjects || []}        features={features}
         userId={user.id}
         userEmail={user.email || ""}
         initialProfile={initialProfile}

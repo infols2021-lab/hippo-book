@@ -212,9 +212,6 @@ export default function ProjectHeader({
             {doneToday ? "сделано" : "серия"}
           </span>
         </div>
-        <Link href={`/projects/${slug}/profile`} style={pill(isProfile)} data-tour="profile-link" onClick={() => onProfile()}>
-          Профиль
-        </Link>
         <Link
           href={`/projects/${slug}/materials`}
           style={pill(isMaterials)}
@@ -242,6 +239,9 @@ export default function ProjectHeader({
           }}
         >
           Заявки
+        </Link>
+        <Link href={`/projects/${slug}/profile`} style={pill(isProfile)} data-tour="profile-link" onClick={() => onProfile()}>
+          Профиль
         </Link>
 
         <button

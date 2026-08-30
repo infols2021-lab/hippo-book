@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import ReferralTimeline, { ReferralStats, ReferralMilestone } from "./ReferralTimeline";
 import RewardUnboxModal, { UnboxedRewardItem } from "./RewardUnboxModal";
 import MaterialChoiceModal, { MaterialChoiceSuccessResult } from "./MaterialChoiceModal";
+import { notifyNewGrantForDirection } from "@/components/projects/GrantedAccessModal";
 
 type ReferralData = {
   referral_link: string;
@@ -90,6 +91,7 @@ export default function ReferralTab() {
           setUnboxModalOpen(true);
         }
         loadData();
+        notifyNewGrantForDirection();
       } else {
         alert(json.error || "Ошибка получения бонуса");
       }
@@ -124,6 +126,7 @@ export default function ReferralTab() {
             setUnboxModalOpen(true);
           }
           loadData();
+          notifyNewGrantForDirection();
         } else {
           alert(json.error || "Ошибка получения награды");
         }
@@ -142,6 +145,7 @@ export default function ReferralTab() {
       setUnboxModalOpen(true);
     }
     loadData();
+    notifyNewGrantForDirection();
   };
 
   if (loading) {
