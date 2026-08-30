@@ -414,6 +414,19 @@ export default function ProductTour() {
     syncRewardsTab(stepIndex, steps as CustomTourStep[]);
   }, [stepIndex, stage, run, steps]);
 
+  // Pulse highlight target on action steps
+  useEffect(() => {
+    document.querySelectorAll(".tour-pulse").forEach((el) => el.classList.remove("tour-pulse"));
+    const currentStep = steps[stepIndex] as CustomTourStep | undefined;
+    if (run && currentStep?.actionStep && currentStep.targetSelector) {
+      const el = document.querySelector<HTMLElement>(currentStep.targetSelector);
+      if (el) {
+        el.classList.add("tour-pulse");
+      }
+    }
+    return () => document.querySelectorAll(".tour-pulse").forEach((el) => el.classList.remove("tour-pulse"));
+  }, [steps, stepIndex, run]);
+
   const handleJoyrideEvent = (data: EventData, _controls: Controls) => {
     const { status, type, action, index, step } = data;
     const currentStageSteps = getResolvedTourSteps(stageRef.current, isMobileViewport());
@@ -496,7 +509,10 @@ export default function ProductTour() {
 
           if (isLastStep && action === ACTIONS.NEXT) {
           const config = TOUR_STAGES[stageRef.current];
-          if (config.type === "advanceOnNext" && config.nextStage) {
+          if (customStep?.primaryAdvanceStage) {
+            handledStepAdvanceRef.current = stageRef.current;
+            advanceTour(customStep.primaryAdvanceStage);
+          } else if (config.type === "advanceOnNext" && config.nextStage) {
             handledStepAdvanceRef.current = stageRef.current;
             advanceTour(config.nextStage);
           } else if (config.nextStage) {

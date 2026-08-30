@@ -688,6 +688,12 @@ export default function RequestsClient({
             );
           })}
         </div>
+        {(!inModal && (pendingByProject.size > 0 || unreadBySlug.size > 0)) && (
+          <div className="switcher-legend">
+            {unreadBySlug.size > 0 ? <span className="legend-red">• Красная метка ! - доступен новый материал</span> : null}
+            {pendingByProject.size > 0 ? <span className="legend-yellow">• Жёлтая метка ! - есть необработанная заявка</span> : null}
+          </div>
+        )}
         {!inModal && catalogProject.slug !== project.slug && (
           <p className="catalog-filter-hint">
             Вы в профиле «{project.name}». Заявка будет оформлена для «{catalogProject.name}».

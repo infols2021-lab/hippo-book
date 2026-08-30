@@ -205,6 +205,21 @@
   opacity: 0.6;
 }
 
+.switcher-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  margin: 8px 4px 4px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--project-text) 4%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--project-text) 80%, transparent);
+}
+.legend-red { color: #ef4444; }
+.legend-yellow { color: #d97706; }
+
 .switcher-footer {
   margin-top: 12px;
   padding-top: 12px;

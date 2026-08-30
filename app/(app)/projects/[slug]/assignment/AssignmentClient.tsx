@@ -901,7 +901,7 @@ export default function AssignmentClient({
         )}
 
         {!showChoice && !completedScreen && assignment && (
-          <div className="assignment-layout animate-in">
+          <div className={`assignment-layout animate-in ${stage === "demo_assignment" && !isViewMode ? "demo-assignment-active" : ""}`}>
             {stage === "demo_assignment" && !isViewMode && assignmentMode !== "informational" && questions.length > 0 && (
               <div className="demo-assignment-hint" data-tour="demo-assignment-hint">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

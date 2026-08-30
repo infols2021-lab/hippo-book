@@ -33,6 +33,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       hideNextButton: true,
       hideOverlay: true,
       blockTargetInteraction: false,
+      actionStep: true,
     },
   ],
   profile_stats: [
@@ -40,7 +41,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="profile-stats"]'),
       title: "Прогресс и статистика",
       content:
-        "Здесь видно, сколько материалов доступно, сколько пройдено и процент выполнения. Ниже — список материалов для изучения.",
+        "Здесь видно, сколько материалов доступно, сколько пройдено и процент выполнения. Ниже - список материалов для изучения.",
       mascotImage: pickMascotImage("profile_stats"),
       skipBeacon: true,
       primaryLabel: "Далее",
@@ -58,9 +59,11 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
     },
     {
       target: visibleTourTarget('[data-tour="project-switcher"]'),
+      actionStep: true,
+      targetSelector: "[data-tour=project-switcher]",
       title: "Смена направления",
       content:
-        "Нажмите на название текущего направления — откроется список всех направлений. Профиль и награды общие, а материалы и заявки у каждого свои.",
+        "Нажмите на название текущего направления - откроется список всех направлений. Профиль и награды общие, а материалы и заявки у каждого свои.",
       mascotImage: pickMascotImage("profile_stats"),
       skipBeacon: true,
       primaryLabel: "Далее",
@@ -76,6 +79,8 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       skipBeacon: true,
       hideNextButton: true,
       blockTargetInteraction: false,
+      actionStep: true,
+      targetSelector: "[data-tour=materials-link]",
     },
   ],
   materials_demo: [
@@ -83,12 +88,15 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleDemoMaterialCard,
       title: "Демо-задание",
       content:
-        "Откройте карточку с бейджем «Демо» — она подсвечена рамкой. Остальные материалы пока недоступны, начните обучение с демо.",
+        "Откройте карточку с бейджем «Демо» - она подсвечена рамкой. Остальные материалы пока недоступны, начните обучение с демо.",
       mascotImage: pickMascotImage("materials_demo"),
       skipBeacon: true,
       hideNextButton: true,
       hideOverlay: true,
       blockTargetInteraction: false,
+      actionStep: true,
+      targetSelector: "[data-tour=demo-material-card]",
+      primaryAdvanceStage: "rewards_gate",
       fallbackTarget: "body" as const,
       fallbackPlacement: "center" as const,
       fallbackTitle: "Демо-задание",
@@ -100,7 +108,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
     {
       target: visibleTourTarget('[data-tour="demo-assignments-list"]'),
       title: "Страница материала",
-      content: "Здесь список заданий. На время демо доступно одно задание — с пометкой «Демо».",
+      content: "Здесь список заданий. На время демо доступно одно задание - с пометкой «Демо».",
       mascotImage: pickMascotImage("demo_material"),
       skipBeacon: true,
       primaryLabel: "Далее",
@@ -110,12 +118,14 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="demo-assignment-link"]'),
       title: "Начните задание",
       content:
-        "Нажмите на задание «Демо». Во время выполнения подсказки спрячутся — просто отвечайте и листайте до кнопки «Далее».",
+        "Нажмите на задание «Демо». Во время выполнения подсказки спрячутся - просто отвечайте и листайте до кнопки «Далее».",
       mascotImage: pickMascotImage("demo_material"),
       skipBeacon: true,
       hideNextButton: true,
       hideOverlay: true,
       blockTargetInteraction: false,
+      actionStep: true,
+      targetSelector: "[data-tour=demo-assignment-link]",
       placement: "top",
     },
   ],
@@ -125,7 +135,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       placement: "center",
       title: "Серия засчитана",
       content:
-        "Задание выполнено — засчитан первый день серии! Выполняйте задания регулярно, и серия будет расти вместе с наградами.",
+        "Задание выполнено - засчитан первый день серии! Выполняйте задания регулярно, и серия будет расти вместе с наградами.",
       mascotImage: pickMascotImage("streak_celebration"),
       skipBeacon: true,
       primaryLabel: "Далее",
@@ -140,6 +150,8 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       skipBeacon: true,
       hideNextButton: true,
       blockTargetInteraction: false,
+      actionStep: true,
+      targetSelector: "[data-tour=assignment-back-btn]",
       placement: "bottom",
     },
   ],
@@ -152,6 +164,8 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       skipBeacon: true,
       hideNextButton: true,
       blockTargetInteraction: false,
+      actionStep: true,
+      targetSelector: "[data-tour=material-back-btn]",
       placement: "bottom",
     },
   ],
@@ -159,16 +173,20 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
     {
       target: visibleTourTarget('[data-tour="profile-link"]'),
       title: "В профиль",
-      content: "Откройте профиль — там награды, серии и заявки на материалы.",
+      content: "Откройте профиль - там награды, серии и заявки на материалы.",
       mascotImage: pickMascotImage("materials_profile_gate"),
       skipBeacon: true,
       hideNextButton: true,
       blockTargetInteraction: false,
+      actionStep: true,
+      targetSelector: "[data-tour=profile-link]",
     },
   ],
   rewards_gate: [
     {
       target: visibleTourTarget('[data-tour="rewards-btn"]'),
+      actionStep: true,
+      targetSelector: "[data-tour=rewards-btn]",
       title: "Центр наград",
       content:
         "Здесь гардероб маскота, серии, реферальная программа и промокоды. Нажмите «Награды», чтобы открыть раздел.",
@@ -183,7 +201,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="wardrobe-tab"]'),
       title: "Гардероб",
       content:
-        "Меняйте внешний вид маскота: скины, ауры и титулы. Нажмите на любой предмет — он сразу наденется, а титул появится в профиле.",
+        "Меняйте внешний вид маскота: скины, ауры и титулы. Нажмите на любой предмет - он сразу наденется, а титул появится в профиле.",
       mascotImage: pickMascotImage("rewards_wardrobe"),
       skipBeacon: true,
     },
@@ -191,7 +209,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="streaks-tab"]'),
       title: "Серии",
       content:
-        "Серия растёт за ежедневные занятия — сейчас у вас уже 1 день. Чем дольше серия, тем ценнее награды в этой вкладке.",
+        "Серия растёт за ежедневные занятия - сейчас у вас уже 1 день. Чем дольше серия, тем ценнее награды в этой вкладке.",
       mascotImage: pickMascotImage("rewards_streaks"),
       skipBeacon: true,
     },
@@ -207,7 +225,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="promos-tab"]'),
       title: "Промокоды",
       content:
-        "Если есть промокод — вставьте его в поле и нажмите «Активировать». Награды появятся в гардеробе. Пока просто посмотрите, как это работает.",
+        "Если есть промокод - вставьте его в поле и нажмите «Активировать». Награды появятся в гардеробе. Пока просто посмотрите, как это работает.",
       mascotImage: pickMascotImage("rewards_promos"),
       skipBeacon: true,
     },
@@ -222,6 +240,8 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       skipBeacon: true,
       hideNextButton: true,
       blockTargetInteraction: false,
+      actionStep: true,
+      targetSelector: "[data-tour=requests-link]",
     },
   ],
   requests_info: [
@@ -239,7 +259,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="requests-project-switcher"]'),
       title: "Покупка для другого направления",
       content:
-        "Здесь выбирают направление для покупки. Попробуйте нажать — это просто выбор, ничего покупать не нужно.",
+        "Здесь выбирают направление для покупки. Попробуйте нажать - это просто выбор, ничего покупать не нужно.",
       mascotImage: pickMascotImage("requests_info_projects"),
       skipBeacon: true,
       primaryLabel: "Далее",
@@ -250,7 +270,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="create-request-btn"]'),
       title: "Создание заявки",
       content:
-        "Новые заявки создаются здесь. Нажмите кнопку, чтобы посмотреть процесс — форму всегда можно закрыть.",
+        "Новые заявки создаются здесь. Нажмите кнопку, чтобы посмотреть процесс - форму всегда можно закрыть.",
       mascotImage: pickMascotImage("requests_info_btn"),
       skipBeacon: true,
       hideNextButton: false,
@@ -287,6 +307,8 @@ function withDemoMaterialFallback(steps: CustomTourStep[]): CustomTourStep[] {
       title: fallbackTitle ?? step.title,
       content: fallbackContent ?? step.content,
       hideOverlay: true,
+      actionStep: false,
+      hideNextButton: false,
     };
   });
 }
@@ -369,7 +391,7 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
         placement: "top",
         title: "Смена направления",
         content:
-          "Нажмите на название текущего направления — откроется список всех направлений. Профиль и награды общие, а материалы и заявки у каждого свои.",
+          "Нажмите на название текущего направления - откроется список всех направлений. Профиль и награды общие, а материалы и заявки у каждого свои.",
         mascotImage: pickMascotImage("profile_stats"),
         skipBeacon: true,
         primaryLabel: "Понятно",
@@ -394,7 +416,7 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
       {
         target: visibleTourTarget('[data-tour="demo-assignments-list"]'),
         title: "Страница материала",
-        content: "Здесь список заданий. На время демо доступно одно задание — с пометкой «Демо».",
+        content: "Здесь список заданий. На время демо доступно одно задание - с пометкой «Демо».",
         mascotImage: pickMascotImage("demo_material"),
         skipBeacon: true,
         primaryLabel: "Далее",
@@ -404,12 +426,14 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
         target: visibleTourTarget('[data-tour="demo-assignment-link"]'),
         title: "Начните задание",
         content:
-          "Нажмите на задание «Демо». Во время выполнения подсказки спрячутся — просто отвечайте и листайте до кнопки «Далее».",
+          "Нажмите на задание «Демо». Во время выполнения подсказки спрячутся - просто отвечайте и листайте до кнопки «Далее».",
         mascotImage: pickMascotImage("demo_material"),
         skipBeacon: true,
         hideNextButton: true,
         hideOverlay: true,
         blockTargetInteraction: false,
+        actionStep: true,
+        targetSelector: "[data-tour=demo-assignment-link]",
         placement: "top",
       },
     ];

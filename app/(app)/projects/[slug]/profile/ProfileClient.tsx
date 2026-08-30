@@ -489,7 +489,10 @@ export default function ProfileClient({
       <button 
         type="button" 
         className={`brand brand-interactive ${switcherOpen ? "open" : ""}`} data-tour="project-switcher"
-        onClick={() => setSwitcherOpen(!switcherOpen)}
+        onClick={() => {
+          if (stage === "profile_stats") advanceTour("materials_gate");
+          setSwitcherOpen(!switcherOpen);
+        }}
         style={{ width: "100%", justifyContent: "space-between", padding: "8px 12px 8px 8px", boxSizing: "border-box" }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
@@ -534,6 +537,11 @@ export default function ProfileClient({
                 );
               })}
             </div>
+            {unreadProfileSlugs.size > 0 && (
+              <div className="switcher-legend">
+                <span className="legend-red">• Красная метка ! - доступен новый материал</span>
+              </div>
+            )}
             <div className="switcher-footer">
               <Link href="/portal" className="switcher-portal-link">
                 ← На главный портал

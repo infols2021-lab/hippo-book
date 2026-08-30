@@ -81,8 +81,8 @@ export default function CustomTooltip({
             className="text-xs sm:text-sm font-medium leading-relaxed mb-4"
             style={{ color: mutedColor }}
           >
-            Вы всегда сможете вернуться к гайду: на компьютере — кнопка «!» в верхней панели, на
-            телефоне — вкладка «Гайд» внизу экрана.
+            Вы всегда сможете вернуться к гайду: на компьютере - кнопка «!» в верхней панели, на
+            телефоне - вкладка «Гайд» внизу экрана.
           </p>
 
           <div
@@ -195,7 +195,7 @@ export default function CustomTooltip({
                   </button>
                 )}
 
-                {!customStep.hideNextButton && (
+                {!customStep.hideNextButton && !customStep.actionStep && (
                   <button
                     {...primaryProps}
                     className="px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all shadow-md hover:brightness-110 active:scale-[0.98]"

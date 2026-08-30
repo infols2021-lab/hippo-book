@@ -48,3 +48,14 @@ html, body {
     padding-bottom: 18px !important;
   }
 }
+
+/* ===== Pulse highlight for guide target (action steps) ===== */
+.tour-pulse {
+  animation: tourPulse 1.4s ease-in-out infinite;
+  border-radius: inherit;
+}
+@keyframes tourPulse {
+  0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.55); }
+  70% { box-shadow: 0 0 0 12px rgba(249, 115, 22, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
+}

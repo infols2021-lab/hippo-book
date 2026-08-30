@@ -34,6 +34,12 @@ export interface CustomTourStep extends Step {
   fallbackPlacement?: "center" | "top" | "bottom";
   fallbackTitle?: string;
   fallbackContent?: string;
+  /** Step where user must click the highlighted element (no Next button). */
+  actionStep?: boolean;
+  /** CSS selector for pulse highlight on action steps. */
+  targetSelector?: string;
+  /** Where to advance if this step is completed via the button (fallback path). */
+  primaryAdvanceStage?: TourStage;
 }
 
 export const TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = BASE_TOUR_STEPS;
