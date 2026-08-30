@@ -1148,7 +1148,7 @@ export default function ProfileClient({
               </>
             )}
 
-            <div className="section-title hidden md:block" style={{ marginTop: "32px" }}>
+            <div className="section-title support-title hidden md:block" style={{ marginTop: "32px" }}>
               Служба <b>поддержки</b>
             </div>
             <ul className="info-list hidden md:block">

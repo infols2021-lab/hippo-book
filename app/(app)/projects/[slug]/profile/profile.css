@@ -800,7 +800,8 @@
   }
 
   /* Скрываем блок "Служба поддержки" внизу профиля — сверху есть кнопка и модалка */
-  .profile-page .info-list {
+  .profile-page .info-list,
+  .profile-page .support-title {
     display: none !important;
   }
 }
