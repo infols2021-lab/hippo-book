@@ -259,7 +259,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="requests-project-switcher"]'),
       title: "Покупка для другого направления",
       content:
-        "Здесь выбирают направление для покупки. Попробуйте нажать - это просто выбор, ничего покупать не нужно.",
+        "Здесь выбирают направление для покупки. Просто выбор направления, ничего покупать сейчас не нужно.",
       mascotImage: pickMascotImage("requests_info_projects"),
       skipBeacon: true,
       primaryLabel: "Далее",
@@ -270,7 +270,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       target: visibleTourTarget('[data-tour="create-request-btn"]'),
       title: "Создание заявки",
       content:
-        "Новые заявки создаются здесь. Нажмите кнопку, чтобы посмотреть процесс - форму всегда можно закрыть.",
+        "Новые заявки создаются здесь. Кнопка «Новая заявка» находится в начале этого раздела, нажмите её, когда захотите оформить покупку.",
       mascotImage: pickMascotImage("requests_info_btn"),
       skipBeacon: true,
       hideNextButton: false,
@@ -394,8 +394,9 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
           "Нажмите на название текущего направления - откроется список всех направлений. Профиль и награды общие, а материалы и заявки у каждого свои.",
         mascotImage: pickMascotImage("profile_stats"),
         skipBeacon: true,
-        primaryLabel: "Понятно",
+        
         skipScroll: true,
+
       },
     ];
   }

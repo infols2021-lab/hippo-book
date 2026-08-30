@@ -135,7 +135,7 @@ function getFeedbackMessage(score: number, ranges?: any[]): string {
   return "Попробуйте пройти задание ещё раз для лучшего результата.";
 }
 
-// Отмечает демо-задание как пройденное в localStorage — читается на странице
+// Отмечает демо-задание как пройденное в localStorage - читается на странице
 // списка демо-материала (app/demo/DemoMaterialClient.tsx) для прогресс-бара.
 function markDemoCompleted(assignmentId: string) {
   try {
@@ -911,7 +911,7 @@ export default function AssignmentClient({
                 </svg>
                 <div>
                   <b>Демо-задание</b>
-                  <span>Читайте вопрос, выбирайте ответ и жмите «Далее» под заданием. В конце — «Завершить и проверить».</span>
+                  <span>Демо-задание. Выберите любой вариант ответа, листайте кнопкой «Далее» и в конце нажмите «Завершить и проверить», чтобы увидеть результат.</span>
                 </div>
               </div>
             )}
