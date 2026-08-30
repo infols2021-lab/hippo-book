@@ -56,6 +56,16 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       primaryLabel: "Далее",
       placement: "bottom",
     },
+    {
+      target: visibleTourTarget('[data-tour="project-switcher"]'),
+      title: "Смена направления",
+      content:
+        "Нажмите на название текущего направления — откроется список всех направлений. Профиль и награды общие, а материалы и заявки у каждого свои.",
+      mascotImage: pickMascotImage("profile_stats"),
+      skipBeacon: true,
+      primaryLabel: "Далее",
+      placement: "bottom",
+    },
   ],
   materials_gate: [
     {
@@ -353,6 +363,17 @@ export function resolveTourSteps(stage: TourStage, isMobile = isMobileViewport()
         mascotImage: pickMascotImage("profile_stats_nav"),
         skipBeacon: true,
         primaryLabel: "Далее",
+      },
+      {
+        target: visibleTourTarget('[data-tour="project-switcher"]'),
+        placement: "top",
+        title: "Смена направления",
+        content:
+          "Нажмите на название текущего направления — откроется список всех направлений. Профиль и награды общие, а материалы и заявки у каждого свои.",
+        mascotImage: pickMascotImage("profile_stats"),
+        skipBeacon: true,
+        primaryLabel: "Понятно",
+        skipScroll: true,
       },
     ];
   }

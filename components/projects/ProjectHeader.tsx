@@ -122,6 +122,8 @@ export default function ProjectHeader({
       className="hidden md:flex items-center justify-between gap-6 mb-8"
       data-tour="project-header"
       style={{
+        position: "relative",
+        zIndex: 60,
         background:
           "var(--glass-bg, color-mix(in srgb, var(--project-card-bg) 92%, transparent))",
         backdropFilter: "var(--glass-blur, blur(16px))",

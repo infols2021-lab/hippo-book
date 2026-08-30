@@ -509,9 +509,9 @@
 
   .request-card-footer {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 10px;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 12px;
     border-top: 1px solid color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent);
   }
 
@@ -519,11 +519,19 @@
     font-size: 16px;
     font-weight: 900;
     color: var(--project-primary, #0ea5e9);
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--project-primary, #0ea5e9) 8%, transparent);
+    width: fit-content;
   }
 
   .request-card-actions {
     display: flex;
     gap: 8px;
+  }
+
+  .request-card-actions button {
+    flex: 1;
   }
 
   .requests-actions {
@@ -588,4 +596,48 @@
     padding: 3px 6px !important;
     font-size: 10px !important;
   }
+}
+
+/* ===== Granted materials notification (processed requests) ===== */
+.grants-notice {
+  background: color-mix(in srgb, #10b981 10%, transparent);
+  border: 1px solid color-mix(in srgb, #10b981 30%, transparent);
+  border-radius: 16px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+.grants-notice-title {
+  font-size: 15px;
+  font-weight: 900;
+  color: #065f46;
+  margin-bottom: 6px;
+}
+.grants-notice-text {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: color-mix(in srgb, #065f46 92%, transparent);
+}
+.grants-notice-text b { font-weight: 900; }
+.project-pill--issued {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #10b981 25%, transparent);
+}
+.project-pill-issued {
+  position: absolute;
+  top: -7px;
+  left: -5px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 2px solid var(--project-card-bg, #ffffff);
+  pointer-events: none;
 }

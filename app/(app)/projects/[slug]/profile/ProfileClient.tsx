@@ -78,6 +78,7 @@ type Props = {
   projectName: string;
   projectSlug: string;
   availableProjects: AvailableProject[];
+  grantedProjectSlugs?: string[];
   features: {
     streaks?: boolean;
     titles?: boolean;
@@ -153,6 +154,7 @@ export default function ProfileClient({
   projectName,
   projectSlug,
   availableProjects,
+  grantedProjectSlugs = [],
   features,
   userEmail,
   initialProfile,
@@ -473,7 +475,7 @@ export default function ProfileClient({
     <div className="brand-switcher-wrapper" style={{ flex: 1, minWidth: 0 }}>
       <button 
         type="button" 
-        className={`brand brand-interactive ${switcherOpen ? "open" : ""}`}
+        className={`brand brand-interactive ${switcherOpen ? "open" : ""}`} data-tour="project-switcher"
         onClick={() => setSwitcherOpen(!switcherOpen)}
         style={{ width: "100%", justifyContent: "space-between", padding: "8px 12px 8px 8px", boxSizing: "border-box" }}
       >
@@ -513,6 +515,9 @@ export default function ProfileClient({
                     {isActive && <div className="switcher-item-check">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     </div>}
+                    {grantedProjectSlugs.includes(p.slug) && (
+                      <div className="switcher-item-issued" title="Материалы выданы">✓</div>
+                    )}
                   </Link>
                 );
               })}

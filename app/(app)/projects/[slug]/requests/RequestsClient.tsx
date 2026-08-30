@@ -57,6 +57,14 @@ type PaymentDisplayItem = {
   isIssued?: boolean;
 };
 
+type GrantedItem = {
+  materialId: string;
+  materialTitle: string;
+  tabTitle: string | null;
+  tabSlug: string | null;
+  projectId: string | null;
+};
+
 type Props = {
   project: Project;
   availableProjects: AvailableProject[];
@@ -67,6 +75,7 @@ type Props = {
   userFullName: string;
   initialRequests: PurchaseRequest[];
   ownedMaterialIds?: string[];
+  initialGrants?: GrantedItem[];
 };
 
 function generateRequestNumber() {
@@ -157,6 +166,7 @@ export default function RequestsClient({
   userFullName,
   initialRequests,
   ownedMaterialIds = [],
+  initialGrants = [],
 }: Props) {
   const router = useRouter();
   const { stage, advanceTour } = useTour();
@@ -233,6 +243,21 @@ export default function RequestsClient({
     }
     return map;
   }, [requests]);
+
+  const grantedByProject = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const g of initialGrants) {
+      if (g.projectId) {
+        map.set(g.projectId, (map.get(g.projectId) || 0) + 1);
+      }
+    }
+    return map;
+  }, [initialGrants]);
+
+  const currentProjectGrants = useMemo(
+    () => initialGrants.filter((g) => g.projectId === project.id),
+    [initialGrants, project.id]
+  );
 
   const showProjectSwitcher = availableProjects.length > 1;
 
@@ -625,13 +650,15 @@ export default function RequestsClient({
           {availableProjects.map((p) => {
             const pendingCount = pendingByProject.get(p.id) ?? 0;
             const hasPending = pendingCount > 0;
+            const grantedCount = grantedByProject.get(p.id) ?? 0;
+            const hasGrants = grantedCount > 0;
 
             return (
               <button
                 key={p.id}
                 type="button"
                 className={`btn small project-pill ${catalogProject.slug === p.slug ? "" : "ghost"} ${
-                  hasPending ? "project-pill--pending" : ""
+                  hasPending ? "project-pill--pending" : ""} ${hasGrants ? "project-pill--issued" : ""
                 }`}
                 onClick={() => void selectCatalogProject(p.slug)}
                 disabled={catalogLoading || busy}
@@ -644,6 +671,11 @@ export default function RequestsClient({
                 {hasPending && (
                   <span className="project-pill-alert" aria-hidden="true">
                     !
+                  </span>
+                )}
+                {hasGrants && (
+                  <span className="project-pill-issued" aria-hidden="true">
+                    ✓
                   </span>
                 )}
                 {p.name}
@@ -1365,6 +1397,18 @@ export default function RequestsClient({
             Мои заявки на доступы
           </h2>
 
+          {currentProjectGrants.length > 0 && (
+            <div className="grants-notice">
+              <div className="grants-notice-title">🎉 Вам выдан доступ к материалам</div>
+              <div className="grants-notice-text">
+                Откройте раздел <b>«Материалы»</b> и выберите вкладку{" "}
+                {currentProjectGrants[0]?.tabTitle ? (
+                  <b>«{currentProjectGrants[0].tabTitle}»</b>
+                ) : null}
+              </div>
+            </div>
+          )}
+
           {renderCatalogPills()}
 
           <div className="payment-info">
@@ -1537,11 +1581,11 @@ export default function RequestsClient({
 
                       <div className="request-card-body">
                         <div className="request-card-materials">{displayMaterials}</div>
+                        <div className="request-card-price">{formatPrice(price)}</div>
                         <div className="request-card-date">{formatDateTime(r.created_at)}</div>
                       </div>
 
                       <div className="request-card-footer">
-                        <span className="request-card-price">{formatPrice(price)}</span>
                         <div className="request-card-actions">
                           {locked ? (
                             <span className="actions-locked">Заявка закрыта</span>

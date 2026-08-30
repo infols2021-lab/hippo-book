@@ -832,6 +832,15 @@ export default function RewardsModal({
                       </p>
                     </div>
 
+                    <div className="rounded-2xl border p-4 text-xs font-medium leading-relaxed" style={{ backgroundColor: "color-mix(in srgb, var(--project-primary, #0ea5e9) 6%, transparent)", borderColor: "var(--glass-border, rgba(15,23,42,0.08))", color: "var(--project-text, #0f172a)" }}>
+                      <div className="font-black uppercase tracking-wider mb-2" style={{ color: "var(--project-primary, #0ea5e9)" }}>Как применить награду</div>
+                      <ul className="space-y-1.5 list-disc pl-4">
+                        <li>Скины и титулы — вкладка «Гардероб», кнопка «Надеть».</li>
+                        <li>Материалы — раздел «Материалы» нужного направления.</li>
+                        <li>Физический приз — напишите администратору.</li>
+                      </ul>
+                    </div>
+
                     <form onSubmit={handleRedeemPromo} className="space-y-4 max-w-md mx-auto">
                       <div>
                         <input

@@ -64,6 +64,52 @@ export default async function ProjectRequestsPage({
     if (g.item_id) ownedSet.add(g.item_id);
   });
 
+  // 3.1. Collect granted materials for notifications (processed requests)
+  const grantedMaterialIds = Array.from(
+    new Set<string>(
+      [
+        ...(grantsRes.data || []).map((g) => g.material_id),
+        ...(accessRes.data || []).map((a) => a.material_id),
+      ].filter(Boolean)
+    )
+  );
+
+  let initialGrants: {
+    materialId: string;
+    materialTitle: string;
+    tabTitle: string | null;
+    tabSlug: string | null;
+    projectId: string | null;
+  }[] = [];
+
+  if (grantedMaterialIds.length > 0) {
+    const { data: grantedMats } = await supabase
+      .from("materials")
+      .select("id, title, project_tab_id")
+      .in("id", grantedMaterialIds);
+
+    const grantedTabIds = Array.from(
+      new Set<string>((grantedMats || []).map((m) => m.project_tab_id).filter(Boolean))
+    );
+
+    const { data: grantedTabs } = grantedTabIds.length
+      ? await supabase.from("project_tabs").select("id, title, slug, project_id").in("id", grantedTabIds)
+      : { data: [] }
+
+    const tabById = new Map((grantedTabs || []).map((t) => [t.id, t]));
+
+    initialGrants = (grantedMats || []).map((m) => {
+      const tab = m.project_tab_id ? tabById.get(m.project_tab_id) : undefined;
+      return {
+        materialId: String(m.id),
+        materialTitle: String(m.title || "Материал"),
+        tabTitle: tab?.title ?? null,
+        tabSlug: tab?.slug ?? null,
+        projectId: tab?.project_id ?? null,
+      };
+    });
+  }
+
   // 4. ДИНАМИЧЕСКИЙ ПОДСЧЕТ ЦЕН ТАБОВ (для справочной информации)
   const { data: materials } = await supabase
     .from("materials")
@@ -128,6 +174,7 @@ export default async function ProjectRequestsPage({
       userFullName={userProfile?.full_name || "Ученик"}
       initialRequests={enrichedRequests}
       ownedMaterialIds={Array.from(ownedSet)}
+      initialGrants={initialGrants}
     />
   );
 }
