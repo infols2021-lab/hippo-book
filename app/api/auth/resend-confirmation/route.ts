@@ -118,7 +118,7 @@ export async function POST(req: Request) {
     });
 
     const appUrl = getAppUrl(req);
-    const redirectCandidate = appUrl ? `${appUrl}/login?message=confirmed` : undefined;
+    const redirectCandidate = appUrl ? `${appUrl}/email-confirmed` : undefined;
     const emailRedirectTo =
       redirectCandidate && isAllowedRedirectUrl(redirectCandidate) ? redirectCandidate : undefined;
 

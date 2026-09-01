@@ -101,7 +101,7 @@ export async function POST(req: Request) {
     const origin = getPublicOrigin(req);
     const envOrigin =
       process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || origin;
-    const redirectCandidate = envOrigin ? `${envOrigin.replace(/\/$/, "")}/login?message=confirmed` : undefined;
+    const redirectCandidate = envOrigin ? `${envOrigin.replace(/\/$/, "")}/email-confirmed` : undefined;
     const redirectTo =
       redirectCandidate && isAllowedRedirectUrl(redirectCandidate) ? redirectCandidate : undefined;
 

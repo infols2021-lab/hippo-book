@@ -1,0 +1,144 @@
+/* app/email-confirmed/email-confirmed.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap');
+
+.page-confirmed {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  font-family: "Montserrat", system-ui, sans-serif;
+  color: #1e293b;
+
+  background-color: #eaf7ff;
+  background-image:
+    radial-gradient(1200px 700px at 10% 10%, rgba(78, 205, 196, 0.25), transparent 60%),
+    radial-gradient(1100px 700px at 90% 20%, rgba(110, 190, 255, 0.3), transparent 62%),
+    linear-gradient(135deg, #f0f9ff 0%, #d2edf1 50%, #e0f2fe 100%);
+  background-attachment: fixed;
+  overflow: hidden;
+}
+
+.page-confirmed::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(1000px 600px at 50% 40%, rgba(255, 255, 255, 0.2), transparent 70%);
+  z-index: 0;
+}
+
+.confirmed-container {
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  z-index: 1;
+}
+
+.confirmed-card {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 28px;
+  padding: 44px 32px 36px;
+  text-align: center;
+  box-shadow: 0 30px 70px -30px rgba(14, 116, 144, 0.45);
+  animation: confirmedCardIn 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes confirmedCardIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Круг с галочкой (без эмодзи) ──────────────────────────── */
+.confirmed-icon {
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 24px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirmed-icon-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, #34d399, #0fb981 80%);
+  animation: confirmedGlow 2.4s ease-in-out infinite;
+}
+
+@keyframes confirmedGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.45); }
+  50% { box-shadow: 0 0 0 16px rgba(52, 211, 153, 0); }
+}
+
+.confirmed-check {
+  position: relative;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  display: block;
+}
+
+.confirmed-check path {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 80;
+  stroke-dashoffset: 80;
+  animation: confirmedDraw 0.7s 0.25s ease-out forwards;
+}
+
+@keyframes confirmedDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+.confirmed-title {
+  margin: 0 0 12px;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.confirmed-subtitle {
+  margin: 0 auto;
+  max-width: 300px;
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 600;
+  color: #475569;
+}
+
+.confirmed-btn {
+  margin-top: 32px;
+  width: 100%;
+  padding: 16px 20px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  font-family: inherit;
+  box-shadow: 0 16px 30px -12px rgba(2, 132, 199, 0.6);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.confirmed-btn:hover {
+  filter: brightness(1.05);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 36px -12px rgba(2, 132, 199, 0.7);
+}
+
+.confirmed-btn:active {
+  transform: translateY(0);
+}
