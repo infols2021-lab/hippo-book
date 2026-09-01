@@ -136,6 +136,40 @@ export async function getUserInventory(
 // 3. ДОРОЖКА СЕРИИ (СТРИКИ) И ЛИДЕРБОРД
 // ---------------------------------------------------------------------------
 
+/**
+ * Возвращает дату (YYYY-MM-DD) «вчера» относительно текущего дня.
+ * День считается по UTC для консистентности с остальной логикой стриков.
+ */
+export function getYesterdayDateString(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().split("T")[0];
+}
+
+/**
+ * Проверяет, «протухла» ли серия: если последний засчитанный день раньше
+ * вчерашнего (т.е. пропущены целые сутки), то текущая серия сбрасывается до 0.
+ * Рекорд (longest_streak) при этом не трогаем.
+ */
+export function isStreakExpired(lastCompletedDate: string | null | undefined): boolean {
+  if (!lastCompletedDate) return false;
+  const lastDate = String(lastCompletedDate).split("T")[0];
+  if (!lastDate) return false;
+  return lastDate < getYesterdayDateString();
+}
+
+/**
+ * Применяет сброс серии к значению current_streak.
+ * Если серия протухла — возвращает 0, иначе исходное значение.
+ */
+export function applyStreakExpiry(
+  currentStreak: number,
+  lastCompletedDate: string | null | undefined
+): number {
+  if (isStreakExpired(lastCompletedDate)) return 0;
+  return currentStreak;
+}
+
 export async function getStreakPath(
   supabase: SupabaseClient,
   userId: string
@@ -163,11 +197,20 @@ export async function getStreakPath(
         .eq("source", "streak"),
     ]);
 
-  const currentStreak = Number(streakRow?.current_streak || 0);
-  const maxStreak = Number(streakRow?.longest_streak ?? currentStreak);
+  const rawCurrentStreak = Number(streakRow?.current_streak || 0);
+  const maxStreak = Number(streakRow?.longest_streak ?? rawCurrentStreak);
   const lastCompletedAt = streakRow?.last_completed_date
     ? String(streakRow.last_completed_date)
     : null;
+
+  // Если серия протухла — сбрасываем её в БД и возвращаем 0.
+  const currentStreak = applyStreakExpiry(rawCurrentStreak, lastCompletedAt);
+  if (currentStreak !== rawCurrentStreak) {
+    await adminSupabase
+      .from("user_streaks")
+      .update({ current_streak: 0 })
+      .eq("user_id", userId);
+  }
 
   let completedToday = false;
   if (lastCompletedAt) {
@@ -211,7 +254,7 @@ export async function getStreakLeaderboard(
 
   const { data, error } = await adminSupabase
     .from("user_streaks")
-    .select("user_id, current_streak, longest_streak")
+    .select("user_id, current_streak, longest_streak, last_completed_date")
     .or("current_streak.gt.0,longest_streak.gt.0")
     .order("longest_streak", { ascending: false })
     .order("current_streak", { ascending: false })
@@ -220,8 +263,10 @@ export async function getStreakLeaderboard(
   if (error || !Array.isArray(data)) return [];
 
   return data.map((row: any, index: number) => {
-    const current = Number(row.current_streak || 0);
-    const max = Number(row.longest_streak ?? current);
+    const rawCurrent = Number(row.current_streak || 0);
+    const max = Number(row.longest_streak ?? rawCurrent);
+    // Протухшие серии не показываем в лидерборде как активные.
+    const current = applyStreakExpiry(rawCurrent, row.last_completed_date);
 
     return {
       rank: index + 1,
@@ -242,7 +287,7 @@ export async function claimStreakReward(
 
   const { data: streakRow } = await adminSupabase
     .from("user_streaks")
-    .select("current_streak, longest_streak")
+    .select("current_streak, longest_streak, last_completed_date")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -250,9 +295,21 @@ export async function claimStreakReward(
     streakRow?.longest_streak ?? streakRow?.current_streak ?? 0
   );
 
+  // Если серия протухла — сбрасываем её в БД, чтобы нельзя было забрать
+  // награду за «висящий» рекорд.
+  const rawCurrent = Number(streakRow?.current_streak || 0);
+  const effectiveCurrent = applyStreakExpiry(rawCurrent, streakRow?.last_completed_date);
+  if (effectiveCurrent !== rawCurrent) {
+    await adminSupabase
+      .from("user_streaks")
+      .update({ current_streak: 0 })
+      .eq("user_id", userId);
+  }
+
   if (maxStreak < dayNumber) {
     return { success: false, error: "Вы ещё не достигли этого рекорда серии." };
   }
+
 
   const { data: streakConfig } = await adminSupabase
     .from("streak_config")

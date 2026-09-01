@@ -1,6 +1,8 @@
 // app/api/assignment-progress/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { applyStreakExpiry } from "@/lib/rewards/data";
 import { calcAndBuildReview, deriveScoreFromPoints } from "@/lib/assignments/scoring";
 import type { AssignmentData } from "@/lib/assignments/types";
 import { requireUser } from "@/lib/api/auth";
@@ -351,6 +353,31 @@ export async function POST(req: Request) {
   }
 
   if (projectConfig.hasStreaks) {
+    // Страховка: если серия протухла (пропущены сутки), сбрасываем её в 0
+    // до вызова RPC, чтобы новая серия стартовала с 1.
+    try {
+      const adminSupabase = getSupabaseAdminClient();
+      const { data: streakRow } = await adminSupabase
+        .from("user_streaks")
+        .select("current_streak, last_completed_date")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const rawCurrent = Number(streakRow?.current_streak || 0);
+      const effectiveCurrent = applyStreakExpiry(
+        rawCurrent,
+        streakRow?.last_completed_date
+      );
+      if (effectiveCurrent !== rawCurrent) {
+        await adminSupabase
+          .from("user_streaks")
+          .update({ current_streak: 0 })
+          .eq("user_id", user.id);
+      }
+    } catch (streakResetError) {
+      console.error("[assignment-progress] streak reset failed:", streakResetError);
+    }
+
     const { data: streakData, error: streakErr } = await supabase.rpc(
       "record_streak_completion",
       { _assignment_id: body.assignmentId },

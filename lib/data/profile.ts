@@ -5,6 +5,7 @@ import type { DataAuthContext, DataAuthProfile } from "@/lib/data/auth";
 import { loadOlympiadProfileProgressData, type OlympiadProfileProgressData } from "@/lib/data/olympiad";
 import { loadGatehouseProfilePageData, type GatehouseProfilePageData } from "@/lib/data/gatehouse";
 import { normalizeScore } from "@/lib/data/normalize";
+import { applyStreakExpiry } from "@/lib/rewards/data";
 
 export type ProfileStreakSnapshot = {
   current_streak?: number;
@@ -62,7 +63,14 @@ export async function loadProfileStreakSnapshot(ctx: DataAuthContext): Promise<P
     const { data: rpcData, error: rpcError } = await supabase.rpc("get_my_streak_snapshot");
 
     if (!rpcError && rpcData && typeof rpcData === "object") {
-      return rpcData as ProfileStreakSnapshot;
+      const snap = rpcData as ProfileStreakSnapshot;
+      return {
+        ...snap,
+        current_streak: applyStreakExpiry(
+          Number(snap.current_streak || 0),
+          snap.last_completed_date
+        ),
+      };
     }
   } catch (e) {
     console.warn("RPC get_my_streak_snapshot не сработал, переходим на прямое чтение user_streaks:", e);
@@ -76,7 +84,10 @@ export async function loadProfileStreakSnapshot(ctx: DataAuthContext): Promise<P
 
   if (streakRow) {
     return {
-      current_streak: streakRow.current_streak || 0,
+      current_streak: applyStreakExpiry(
+        streakRow.current_streak || 0,
+        streakRow.last_completed_date
+      ),
       longest_streak: streakRow.longest_streak || 0,
       last_completed_date: streakRow.last_completed_date || null,
     };

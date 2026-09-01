@@ -2,7 +2,11 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { claimStreakReward, getStreakPath } from "@/lib/rewards/data";
+import {
+  applyStreakExpiry,
+  claimStreakReward,
+  getStreakPath,
+} from "@/lib/rewards/data";
 
 function calculateTierCode(streak: number): string {
   if (streak >= 100) return "legendary";
@@ -70,21 +74,33 @@ export async function GET() {
       console.warn("Фоновое предупреждение при получении дорожки наград:", e);
     }
 
-    const currentStreak = Number(
+    const rawCurrentStreak = Number(
       userStreakRow?.current_streak ?? pathStats?.currentStreak ?? 0
     );
     const longestStreak = Number(
-      userStreakRow?.longest_streak ?? pathStats?.maxStreak ?? currentStreak
+      userStreakRow?.longest_streak ?? pathStats?.maxStreak ?? rawCurrentStreak
     );
     const completedToday = isCompletedToday || Boolean(pathStats?.completedToday);
+
+    // Если серия протухла — сбрасываем её в БД и возвращаем 0.
+    const lastCompletedAt =
+      userStreakRow?.last_completed_date || pathStats?.lastCompletedAt || null;
+    const currentStreak = applyStreakExpiry(rawCurrentStreak, lastCompletedAt);
+    if (currentStreak !== rawCurrentStreak) {
+      await adminSupabase
+        .from("user_streaks")
+        .update({ current_streak: 0 })
+        .eq("user_id", user.id);
+    }
 
     const stats = {
       currentStreak,
       maxStreak: longestStreak,
       longestStreak,
       completedToday,
-      lastCompletedAt: userStreakRow?.last_completed_date || pathStats?.lastCompletedAt || null,
+      lastCompletedAt,
     };
+
 
     // 4. Экипировка маскота / титулы
     let equippedTitleLabel: string | null = null;
