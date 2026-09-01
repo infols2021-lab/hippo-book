@@ -4,7 +4,7 @@ import { ok, fail } from "@/lib/api/response";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
 import { isValidEmailFormat, validateEmailDomain } from "@/lib/security/domains";
-import { isAllowedRedirectUrl, isValidUUID } from "@/lib/api/validate";
+import { isValidUUID } from "@/lib/api/validate";
 
 function getRemoteIp(req: Request): string | null {
   const xff = req.headers.get("x-forwarded-for");
@@ -99,18 +99,19 @@ export async function POST(req: Request) {
     });
 
     const origin = getPublicOrigin(req);
-    const envOrigin =
+    const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || origin;
-    const redirectCandidate = envOrigin ? `${envOrigin.replace(/\/$/, "")}/email-confirmed` : undefined;
-    const redirectTo =
-      redirectCandidate && isAllowedRedirectUrl(redirectCandidate) ? redirectCandidate : undefined;
+    // Всегда передаём emailRedirectTo: Supabase сам сверит его со списком
+    // разрешённых Redirect URLs (Authentication > URL Configuration). Если URL
+    // не разрешён — Supabase сам вернёт fallback на Site URL.
+    const emailRedirectTo = baseUrl ? `${baseUrl.replace(/\/$/, "")}/email-confirmed` : undefined;
 
     const { data, error } = await supabaseAnon.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: fullName, contact_phone: phone, region },
-        ...(redirectTo ? { emailRedirectTo: redirectTo } : {}),
+        ...(emailRedirectTo ? { emailRedirectTo } : {}),
       },
     });
 

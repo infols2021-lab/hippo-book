@@ -1,18 +1,15 @@
-"use client";
+import { redirect } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { useEffect } from "react";
+// Корневой адрес: авторизованного пользователя перекидываем в портал,
+// остальных — на вход. Так корень не «проглатывает» редиректы после
+// подтверждения email (например, /email-confirmed).
+export default async function Home() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-export default function Home() {
-  useEffect(() => {
-    window.location.replace("/login");
-  }, []);
-
-  return (
-    <div className="container">
-      <div className="card">
-        <h1>Edu Keys</h1>
-        <p>Перенаправляем на вход…</p>
-      </div>
-    </div>
-  );
+  redirect(user ? "/portal" : "/login");
 }
+

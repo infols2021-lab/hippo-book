@@ -4,7 +4,6 @@ import { createClient } from "@supabase/supabase-js";
 import { ok, fail } from "@/lib/api/response";
 import { directFetch } from "@/lib/net/directFetch";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
-import { isAllowedRedirectUrl } from "@/lib/api/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -118,9 +117,9 @@ export async function POST(req: Request) {
     });
 
     const appUrl = getAppUrl(req);
-    const redirectCandidate = appUrl ? `${appUrl}/email-confirmed` : undefined;
-    const emailRedirectTo =
-      redirectCandidate && isAllowedRedirectUrl(redirectCandidate) ? redirectCandidate : undefined;
+    // Всегда передаём emailRedirectTo: Supabase сам сверит его со списком
+    // разрешённых Redirect URLs. Если URL не разрешён — fallback на Site URL.
+    const emailRedirectTo = appUrl ? `${appUrl.replace(/\/$/, "")}/email-confirmed` : undefined;
 
     const { error } = await supabaseAnon.auth.resend({
       type: "signup",
