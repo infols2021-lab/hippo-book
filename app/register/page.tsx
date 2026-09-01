@@ -237,9 +237,9 @@ export default function RegisterPage() {
 
           {registered ? (
             <div className="success-screen animate-step">
-              <div className="success-icon">✨</div>
+              <div className="success-icon"></div>
               <h3>Аккаунт создан!</h3>
-              <p>Остался один шаг: проверьте вашу почту <strong>{email}</strong> и перейдите по ссылке для активации.</p>
+              <p>Остался один шаг: проверьте вашу почту. обязательно процерьте папку "Спам" <strong>{email}</strong> и перейдите по ссылке для активации.</p>
               <div className="link"><a href="/login">Перейти ко входу</a></div>
             </div>
           ) : (
