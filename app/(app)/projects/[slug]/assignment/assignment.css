@@ -1824,6 +1824,110 @@
 @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .animate-in { animation: fadeIn 0.7s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
 
+/* ── Празднование серии (StreakCelebrationModal) ─────────────── */
+@keyframes streakGlowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--project-primary, #f97316) 45%, transparent); }
+  50%   { box-shadow: 0 0 42px 8px color-mix(in srgb, var(--project-primary, #f97316) 55%, transparent); }
+}
+@keyframes streakDigitFlash {
+  0% { opacity: 0; transform: translateY(-30px) scale(1.15); filter: brightness(2); }
+  60% { filter: brightness(1.4); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
+}
+@keyframes streakRecordPulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 1; }
+}
+.streak-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(8, 12, 20, 0.62);
+  backdrop-filter: blur(6px);
+}
+.streak-modal-card {
+  width: 100%;
+  max-width: 360px;
+  border-radius: 32px;
+  padding: 40px 28px 28px;
+  text-align: center;
+  color: var(--project-text, #111827);
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--project-primary, #f97316) 16%, #ffffff), #ffffff 65%);
+  border: 1px solid color-mix(in srgb, var(--project-primary, #f97316) 26%, transparent);
+  animation: streakGlowPulse 2.2s ease-in-out infinite;
+  overflow: hidden;
+}
+.streak-flame {
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 58px;
+  filter: drop-shadow(0 6px 16px color-mix(in srgb, var(--project-primary, #f97316) 50%, transparent));
+}
+.streak-celebration-title {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+.streak-counter {
+  min-height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0 2px;
+  font-size: 74px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--project-primary, #f97316);
+}
+.streak-counter-digit {
+  display: inline-block;
+  animation: streakDigitFlash 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--project-primary, #f97316) 35%, transparent);
+}
+.streak-celebration-subtitle {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+.streak-record-note {
+  margin: 6px 0 18px;
+  font-size: 13px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--project-primary, #f97316) 55%, #111827);
+  animation: streakRecordPulse 1.6s ease-in-out infinite;
+}
+.streak-go-review-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 15px 20px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, var(--project-primary, #f97316), color-mix(in srgb, var(--project-primary, #f97316) 70%, #f97316));
+  box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--project-primary, #f97316) 55%, transparent);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.streak-go-review-btn:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px -10px color-mix(in srgb, var(--project-primary, #f97316) 65%, transparent);
+}
+.streak-go-review-btn:active { transform: translateY(0); }
+
 @media (max-width: 768px) {
   .premium-header { padding: 18px 12px; }
   .header-content { flex-direction: column; align-items: flex-start; gap: 12px; }

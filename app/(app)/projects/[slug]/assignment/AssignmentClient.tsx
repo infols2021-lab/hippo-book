@@ -17,6 +17,7 @@ import ReviewPanel from "./components/ReviewPanel";
 import ImageModal from "./components/ImageModal";
 import BlockRenderer from "./components/BlockRenderer";
 import ExamTimer from "./components/ExamTimer";
+import StreakCelebrationModal from "./components/StreakCelebrationModal";
 
 import { getImageUrl } from "@/lib/assignments/image";
 import {
@@ -78,6 +79,12 @@ type RoadmapExamProgress = {
   exam_passed: boolean;
 };
 
+type StreakCelebrationState = {
+  previous: number;
+  current: number;
+  longest: number;
+};
+
 function normalizeQuestions(qs: unknown): QuestionAny[] {
   if (!Array.isArray(qs)) return [];
   return qs.map((q) => {
@@ -135,6 +142,30 @@ function getFeedbackMessage(score: number, ranges?: any[]): string {
   return "Попробуйте пройти задание ещё раз для лучшего результата.";
 }
 
+// Достаёт данные серии из ответа /api/assignment-progress и, если серия
+// реально обновилась (already_counted = false), возвращает состояние
+// празднования. Если сегодня уже засчитано или данных нет — null.
+function parseStreakCelebration(json: any): StreakCelebrationState | null {
+  const streak = json?.streak;
+  if (!streak || typeof streak !== "object") return null;
+
+  const current = Number(streak.current_streak);
+  if (!Number.isFinite(current)) return null;
+
+  // already_counted === true → сегодня уже засчитывали, не показываем повторно
+  if (streak.already_counted === true) return null;
+
+  const longest = Number.isFinite(Number(streak.longest_streak))
+    ? Number(streak.longest_streak)
+    : current;
+
+  // previous = current - 1 даёт красивый «тик» на анимацию. Если серия
+  // сгорела и началась заново (current = 1), покажем 0 -> 1 / стрелку-сброс.
+  const previous = Math.max(0, current - 1);
+
+  return { previous, current, longest };
+}
+
 // Отмечает демо-задание как пройденное в localStorage - читается на странице
 // списка демо-материала (app/demo/DemoMaterialClient.tsx) для прогресс-бара.
 function markDemoCompleted(assignmentId: string) {
@@ -189,6 +220,7 @@ export default function AssignmentClient({
   const [examRemainingSec, setExamRemainingSec] = useState<number | null>(null);
   const [examExpired, setExamExpired] = useState(false);
   const [roadmapExamProgress, setRoadmapExamProgress] = useState<RoadmapExamProgress | null>(null);
+  const [streakCelebration, setStreakCelebration] = useState<StreakCelebrationState | null>(null);
   const saveBusyRef = useRef(false);
   const examTimeoutSubmitRef = useRef(false);
   const stageRef = useRef(stage);
@@ -576,6 +608,13 @@ export default function AssignmentClient({
       if (res.ok) {
         setCompletedScreen(true);
         scrollAssignmentToTop();
+        try {
+          const json = await res.json();
+          const celebration = parseStreakCelebration(json);
+          if (celebration) setStreakCelebration(celebration);
+        } catch {
+          // тело недоступно — пропускаем празднование
+        }
         window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
         notifyDemoAssignmentComplete();
       } else {
@@ -648,6 +687,8 @@ export default function AssignmentClient({
         setReviewItems(review);
         setCompletedScreen(true);
         scrollAssignmentToTop();
+        const celebration = parseStreakCelebration(json);
+        if (celebration) setStreakCelebration(celebration);
         window.dispatchEvent(new Event(isGatehouse ? "gatehouse-profile-progress-refresh" : "profile-streak-refresh"));
         notifyDemoAssignmentComplete();
       } else {
@@ -1125,6 +1166,14 @@ export default function AssignmentClient({
       )}
 
       <ImageModal open={imageModalOpen} src={modalSrc} onClose={closeImage} />
+
+      <StreakCelebrationModal
+        open={streakCelebration !== null}
+        previous={streakCelebration?.previous ?? 0}
+        current={streakCelebration?.current ?? 0}
+        longest={streakCelebration?.longest ?? 0}
+        onClose={() => setStreakCelebration(null)}
+      />
     </div>
   );
 }
