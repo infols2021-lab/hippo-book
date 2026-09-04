@@ -893,9 +893,16 @@ export default function RequestsClient({
   }
 
   function openTariffModal(item: MaterialItem) {
-    if (ownedMaterialSet.has(item.id)) return;
-    if (item.pro && item.pro.is_active && ownedMaterialSet.has(item.pro.id)) return;
-    setTariff("base");
+    const pro = item.pro && item.pro.is_active ? item.pro : null;
+    const hasBase = ownedMaterialSet.has(item.id);
+    const hasPro = Boolean(pro && ownedMaterialSet.has(pro.id));
+
+    // Состояние 5 — «В коллекции»: открывать модалку не нужно.
+    if (hasBase && (hasPro || !pro)) return;
+
+    // Если куплена только База и доступен PRO — сразу предлагаем апгрейд до PRO.
+    // Во всех остальных случаях по умолчанию выбираем Базовый тариф.
+    setTariff(hasBase && pro ? "pro" : "base");
     setTariffMaterial(item);
   }
 
@@ -1246,21 +1253,76 @@ export default function RequestsClient({
                 <div className="requests-materials-grid no-scrollbar">
                   {filteredMaterials.map((item) => {
                     const pro = item.pro && item.pro.is_active ? item.pro : null;
-                    const isOwned =
-                      ownedMaterialSet.has(item.id) || Boolean(pro && ownedMaterialSet.has(pro.id));
+                    const hasProLinked = Boolean(pro);
+                    const hasBase = ownedMaterialSet.has(item.id);
+                    const hasPro = Boolean(pro && ownedMaterialSet.has(pro.id));
+
+                    // Строго 5 состояний карточки:
+                    // 1 — ничего не куплено, доступны База и связанный PRO;
+                    // 2 — ничего не куплено, доступна только База;
+                    // 3 — куплен только PRO (осталась База);
+                    // 4 — куплена только База (остался PRO);
+                    // 5 — куплены оба тарифа (или База без связки с PRO).
+                    let state: 1 | 2 | 3 | 4 | 5;
+                    if (hasBase && (hasPro || !hasProLinked)) {
+                      state = 5;
+                    } else if (hasBase && !hasPro && hasProLinked) {
+                      state = 4;
+                    } else if (!hasBase && hasPro) {
+                      state = 3;
+                    } else if (!hasBase && !hasPro && hasProLinked) {
+                      state = 1;
+                    } else {
+                      state = 2;
+                    }
+
                     const isSelected = pro
                       ? selectedMaterialIds.includes(item.id) || selectedMaterialIds.includes(pro.id)
                       : selectedMaterialIds.includes(item.id);
-                    const pricePrefix = pro ? "от " : "";
+
+                    let badge: { text: string; tone: "info" | "success" | "owned" } | null = null;
+                    let priceText: string;
+                    let buttonText: string;
+                    let disabled = false;
+
+                    if (state === 5) {
+                      badge = { text: "В коллекции", tone: "owned" };
+                      priceText = "—";
+                      buttonText = "Приобретено";
+                      disabled = true;
+                    } else if (state === 4) {
+                      badge = { text: "Куплен Базовый", tone: "success" };
+                      priceText = formatPrice(pro!.price);
+                      buttonText = "Улучшить до PRO";
+                    } else if (state === 3) {
+                      badge = { text: "Куплен PRO", tone: "success" };
+                      priceText = formatPrice(item.price);
+                      buttonText = "Докупить Базовый";
+                    } else if (state === 1) {
+                      badge = { text: "2 тарифа", tone: "info" };
+                      const minPrice = Math.min(item.price, pro!.price);
+                      priceText = minPrice > 0 ? `от ${formatPrice(minPrice)}` : formatPrice(minPrice);
+                      buttonText = "Выбрать тариф";
+                    } else {
+                      // Состояние 2 — только База, без бейджа и приставки «от».
+                      priceText = formatPrice(item.price);
+                      buttonText = "Выбрать";
+                    }
 
                     return (
                       <div
                         key={item.id}
-                        className={`requests-material-card ${isSelected ? "selected" : ""} ${isOwned ? "owned" : ""}`}
-                        onClick={() => openTariffModal(item)}
+                        className={`requests-material-card ${isSelected && !disabled ? "selected" : ""} ${disabled ? "owned" : ""}`}
+                        onClick={() => {
+                          if (!disabled) openTariffModal(item);
+                        }}
                       >
                         <div className="requests-material-cover-wrapper">
-                          {pro && <span className="requests-material-pro-badge">PRO</span>}
+                          {badge && (
+                            <span className={`requests-material-badge requests-material-badge--${badge.tone}`}>
+                              {badge.text}
+                            </span>
+                          )}
                           {item.cover_image_url ? (
                             <img
                               src={item.cover_image_url}
@@ -1278,17 +1340,10 @@ export default function RequestsClient({
                         <div className="requests-material-card-body">
                           <div className="requests-material-card-title">{item.title}</div>
                           <div className="requests-material-card-footer">
-                            <span className="requests-material-card-price">
-                              {pricePrefix}
-                              {formatPrice(item.price)}
+                            <span className="requests-material-card-price">{priceText}</span>
+                            <span className={`requests-vitrine-card-btn ${disabled ? "disabled" : "add"}`}>
+                              {buttonText}
                             </span>
-                            {isOwned ? (
-                              <span className="owned-badge">Выдан</span>
-                            ) : (
-                              <span className={`requests-vitrine-card-btn ${isSelected ? "remove" : "add"}`}>
-                                {isSelected ? "Выбрано" : "Выбрать"}
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -1563,32 +1618,49 @@ export default function RequestsClient({
               )}
             </div>
 
-            {tariffMaterial.pro && tariffMaterial.pro.is_active && (
-              <div className="tariff-switch" role="tablist" aria-label="Тариф курса">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={tariff === "base"}
-                  className={`tariff-switch-item ${tariff === "base" ? "is-active" : ""}`}
-                  onClick={() => setTariff("base")}
-                >
-                  <span className="tariff-switch-label">Базовый</span>
-                  <span className="tariff-switch-price">{formatPrice(tariffMaterial.price)}</span>
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={tariff === "pro"}
-                  className={`tariff-switch-item ${tariff === "pro" ? "is-active" : ""}`}
-                  onClick={() => setTariff("pro")}
-                >
-                  <span className="tariff-switch-label">PRO</span>
-                  <span className="tariff-switch-price">
-                    {formatPrice(tariffMaterial.pro.price)}
-                  </span>
-                </button>
-              </div>
-            )}
+            {(() => {
+              const proTier =
+                tariffMaterial.pro && tariffMaterial.pro.is_active ? tariffMaterial.pro : null;
+              if (!proTier) return null;
+
+              const baseOwned = ownedMaterialSet.has(tariffMaterial.id);
+              const proOwned = ownedMaterialSet.has(proTier.id);
+
+              return (
+                <div className="tariff-switch" role="tablist" aria-label="Тариф курса">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tariff === "base"}
+                    className={`tariff-switch-item ${tariff === "base" ? "is-active" : ""} ${
+                      baseOwned ? "is-owned" : ""
+                    }`}
+                    onClick={() => setTariff("base")}
+                    disabled={baseOwned}
+                  >
+                    <span className="tariff-switch-label">Базовый</span>
+                    <span className="tariff-switch-price">
+                      {baseOwned ? "Приобретено" : formatPrice(tariffMaterial.price)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tariff === "pro"}
+                    className={`tariff-switch-item ${tariff === "pro" ? "is-active" : ""} ${
+                      proOwned ? "is-owned" : ""
+                    }`}
+                    onClick={() => setTariff("pro")}
+                    disabled={proOwned}
+                  >
+                    <span className="tariff-switch-label">PRO</span>
+                    <span className="tariff-switch-price">
+                      {proOwned ? "Приобретено" : formatPrice(proTier.price)}
+                    </span>
+                  </button>
+                </div>
+              );
+            })()}
 
             {activeTariffView.checkout_description && (
               <div className={`tariff-usp tariff-usp--${activeTariffView.tier}`}>

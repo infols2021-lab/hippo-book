@@ -241,8 +241,13 @@
 }
 
 .requests-material-card.owned {
-  opacity: 0.5;
+  opacity: 0.65;
   cursor: not-allowed;
+}
+
+.requests-material-card.owned:hover {
+  transform: none;
+  border-color: var(--glass-border, rgba(15, 23, 42, 0.12));
 }
 
 .requests-material-cover-wrapper {
@@ -261,6 +266,47 @@
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+/* Бейджи состояния на обложке карточки материала */
+.requests-material-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  max-width: calc(100% - 12px);
+  padding: 4px 9px;
+  border-radius: 8px;
+  font-family: var(--font-sans, "Inter", "Geist", system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid transparent;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.14);
+}
+
+.requests-material-badge--info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.requests-material-badge--success {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.requests-material-badge--owned {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
 }
 
 .requests-material-card-body {
@@ -282,6 +328,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   margin-top: auto;
   padding-top: 6px;
   border-top: 1px solid color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent);
@@ -298,6 +346,9 @@
   border-radius: 6px;
   font-size: 11px;
   font-weight: 800;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.25;
 }
 
 .requests-vitrine-card-btn.add {
@@ -305,9 +356,11 @@
   color: var(--project-text, #0f172a);
 }
 
-.requests-vitrine-card-btn.remove {
-  background: var(--project-primary, #0ea5e9);
-  color: #ffffff;
+.requests-vitrine-card-btn.disabled {
+  background: color-mix(in srgb, var(--project-text, #0f172a) 7%, transparent);
+  color: color-mix(in srgb, var(--project-text, #0f172a) 40%, transparent);
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* =========================================================
@@ -640,27 +693,18 @@
     padding: 3px 6px !important;
     font-size: 10px !important;
   }
+
+  .requests-material-badge {
+    top: 4px;
+    left: 4px;
+    padding: 3px 7px;
+    border-radius: 6px;
+  }
 }
 
 /* =========================================================
    Модалка выбора тарифа «База + PRO»
    ========================================================= */
-
-.requests-material-pro-badge {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  z-index: 3;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #0f172a, #334155);
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.28);
-}
 
 .requests-material-cover-wrapper {
   position: relative;
@@ -750,8 +794,23 @@
   transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.tariff-switch-item:hover {
+.tariff-switch-item:hover:not(:disabled):not(.is-owned) {
   color: var(--project-text, #0f172a);
+}
+
+.tariff-switch-item.is-owned,
+.tariff-switch-item:disabled {
+  cursor: not-allowed;
+  color: color-mix(in srgb, var(--project-text, #0f172a) 45%, transparent);
+}
+
+.tariff-switch-item.is-owned {
+  background: color-mix(in srgb, var(--project-text, #0f172a) 5%, transparent);
+}
+
+.tariff-switch-item.is-owned .tariff-switch-label,
+.tariff-switch-item.is-owned .tariff-switch-price {
+  color: inherit;
 }
 
 .tariff-switch-item.is-active {
