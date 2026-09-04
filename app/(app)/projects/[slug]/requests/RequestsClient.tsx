@@ -31,6 +31,57 @@ type MaterialItem = {
   project_tab_id: string | null;
   material_kind: string;
   target_levels?: string[] | null;
+  is_pro?: boolean;
+  pro_material_id?: string | null;
+  checkout_description?: string | null;
+  pro?: LinkedProMaterial | null;
+};
+
+/** Связанный PRO-тариф, приходящий с API витрины. */
+type LinkedProMaterial = {
+  id: string;
+  title: string;
+  price: number;
+  description: string | null;
+  checkout_description: string | null;
+  image: string | null;
+  is_active: boolean;
+};
+
+/** Реактивный объект текущего тарифа в модалке выбора. */
+type TariffView = {
+  id: string;
+  title: string;
+  description: string | null;
+  checkout_description: string | null;
+  image: string | null;
+  price: number;
+  tier: "base" | "pro";
+};
+
+/** «Сырая» запись витрины (контракт /api/projects/[slug]/materials). */
+type VitrineRawMaterial = {
+  id?: unknown;
+  title?: unknown;
+  description?: unknown;
+  cover_image_url?: unknown;
+  price?: unknown;
+  project_tab_id?: unknown;
+  material_kind?: unknown;
+  class_levels?: unknown;
+  target_levels?: unknown;
+  is_pro?: unknown;
+  pro_material_id?: unknown;
+  checkout_description?: unknown;
+  pro?: {
+    id?: unknown;
+    title?: unknown;
+    price?: unknown;
+    description?: unknown;
+    checkout_description?: unknown;
+    image?: unknown;
+    is_active?: unknown;
+  } | null;
 };
 
 type PurchaseRequest = {
@@ -122,6 +173,49 @@ function formatDateTime(dateString: string | null | undefined) {
   });
 }
 
+function normalizeVitrineMaterial(
+  raw: VitrineRawMaterial,
+  fallbackTabId?: string | null
+): MaterialItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const id = raw.id ? String(raw.id) : "";
+  if (!id) return null;
+
+  const proRaw = raw.pro && typeof raw.pro === "object" ? raw.pro : null;
+  const pro: LinkedProMaterial | null = proRaw && proRaw.id
+    ? {
+        id: String(proRaw.id),
+        title: String(proRaw.title ?? raw.title ?? ""),
+        price: typeof proRaw.price === "number" && proRaw.price >= 0 ? proRaw.price : 1000,
+        description: proRaw.description ? String(proRaw.description) : null,
+        checkout_description: proRaw.checkout_description
+          ? String(proRaw.checkout_description)
+          : null,
+        image: proRaw.image ? String(proRaw.image) : null,
+        is_active: Boolean(proRaw.is_active),
+      }
+    : null;
+
+  return {
+    id,
+    title: raw.title ? String(raw.title) : "Материал",
+    description: raw.description ? String(raw.description) : null,
+    cover_image_url: raw.cover_image_url ? String(raw.cover_image_url) : null,
+    price: typeof raw.price === "number" && raw.price >= 0 ? raw.price : 1000,
+    project_tab_id: raw.project_tab_id
+      ? String(raw.project_tab_id)
+      : fallbackTabId ?? null,
+    material_kind: raw.material_kind ? String(raw.material_kind) : "",
+    target_levels: toStringArray(raw.target_levels ?? raw.class_levels),
+    is_pro: Boolean(raw.is_pro),
+    pro_material_id: raw.pro_material_id ? String(raw.pro_material_id) : null,
+    checkout_description: raw.checkout_description
+      ? String(raw.checkout_description)
+      : null,
+    pro,
+  };
+}
+
 function getPaymentQRUrl(seed?: number) {
   const t = encodeURIComponent(String(seed ?? Date.now()));
   return `/api/storage/public/help-images/oplata.png?t=${t}`;
@@ -187,6 +281,10 @@ export default function RequestsClient({
 
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+
+  // Модалка выбора тарифа «База + PRO».
+  const [tariffMaterial, setTariffMaterial] = useState<MaterialItem | null>(null);
+  const [tariff, setTariff] = useState<"base" | "pro">("base");
 
   useEffect(() => {
     if (stage === "profile_requests_gate") {
@@ -337,16 +435,9 @@ export default function RequestsClient({
           });
           const { json } = await safeReadJson(res);
           if (alive && res.ok && json?.ok && Array.isArray(json.materials)) {
-            const list: MaterialItem[] = json.materials.map((m: any) => ({
-              id: String(m.id),
-              title: String(m.title || "Материал"),
-              description: m.description ? String(m.description) : null,
-              cover_image_url: m.cover_image_url ? String(m.cover_image_url) : null,
-              price: typeof m.price === "number" && m.price >= 0 ? m.price : 1000,
-              project_tab_id: m.project_tab_id ? String(m.project_tab_id) : null,
-              material_kind: String(m.material_kind || ""),
-              target_levels: toStringArray(m.target_levels || m.class_levels),
-            }));
+            const list = (json.materials as VitrineRawMaterial[])
+              .map((m) => normalizeVitrineMaterial(m))
+              .filter((item): item is MaterialItem => item !== null);
             setMaterials(list);
           }
           return;
@@ -359,10 +450,9 @@ export default function RequestsClient({
           );
           const { json } = await safeReadJson(res);
           if (res.ok && json?.ok && Array.isArray(json.materials)) {
-            return json.materials.map((m: any) => ({
+            return (json.materials as VitrineRawMaterial[]).map((m) => ({
               ...m,
-              project_tab_id: m.project_tab_id || tab.id,
-              target_levels: toStringArray(m.target_levels || m.class_levels),
+              project_tab_id: m.project_tab_id ? String(m.project_tab_id) : tab.id,
             }));
           }
           return [];
@@ -375,17 +465,8 @@ export default function RequestsClient({
         const map = new Map<string, MaterialItem>();
 
         for (const m of allFetched) {
-          const item: MaterialItem = {
-            id: String(m.id),
-            title: String(m.title || "Материал"),
-            description: m.description ? String(m.description) : null,
-            cover_image_url: m.cover_image_url ? String(m.cover_image_url) : null,
-            price: typeof m.price === "number" && m.price >= 0 ? m.price : 1000,
-            project_tab_id: m.project_tab_id ? String(m.project_tab_id) : null,
-            material_kind: String(m.material_kind || ""),
-            target_levels: toStringArray(m.target_levels || m.class_levels),
-          };
-          if (!map.has(item.id)) {
+          const item = normalizeVitrineMaterial(m as VitrineRawMaterial);
+          if (item && !map.has(item.id)) {
             map.set(item.id, item);
           }
         }
@@ -427,7 +508,7 @@ export default function RequestsClient({
     if (ids.length === 0) return 0;
     let calculated = 0;
     for (const id of ids) {
-      const mat = materials.find((m) => m.id === id);
+      const mat = vitrineCatalog.map.get(id);
       calculated += mat?.price ?? 1000;
     }
     return calculated;
@@ -452,10 +533,71 @@ export default function RequestsClient({
     });
   }, [materials, activeTabId, selectedLevelCode]);
 
+  // Плоский справочник «база + PRO» для чеков, истории и итоговых сумм:
+  // PRO-записи не отдаются витриной отдельно, но их id могут попадать в корзину.
+  const vitrineCatalog = useMemo(() => {
+    const list: MaterialItem[] = [];
+    const map = new Map<string, MaterialItem>();
+    for (const base of materials) {
+      map.set(base.id, base);
+      list.push(base);
+      const pro = base.pro;
+      if (pro && pro.id) {
+        const sameTitle = pro.title && pro.title === base.title;
+        const proItem: MaterialItem = {
+          id: pro.id,
+          title: sameTitle ? `${pro.title} (PRO)` : pro.title || base.title,
+          description: pro.description,
+          cover_image_url: pro.image,
+          price: pro.price,
+          project_tab_id: base.project_tab_id,
+          material_kind: "roadmap",
+          target_levels: base.target_levels,
+          is_pro: true,
+          pro_material_id: base.id,
+          checkout_description: pro.checkout_description,
+          pro: null,
+        };
+        if (!map.has(proItem.id)) {
+          map.set(proItem.id, proItem);
+          list.push(proItem);
+        }
+      }
+    }
+    return { list, map };
+  }, [materials]);
+
   const selectedMaterialsList = useMemo(() => {
     const set = new Set(selectedMaterialIds);
-    return materials.filter((m) => set.has(m.id));
-  }, [materials, selectedMaterialIds]);
+    return vitrineCatalog.list.filter((m) => set.has(m.id));
+  }, [vitrineCatalog, selectedMaterialIds]);
+
+  // Реактивный объект активного тарифа в модалке.
+  const activeTariffView = useMemo<TariffView | null>(() => {
+    if (!tariffMaterial) return null;
+    const pro =
+      tariffMaterial.pro && tariffMaterial.pro.is_active ? tariffMaterial.pro : null;
+    if (tariff === "pro" && pro) {
+      return {
+        id: pro.id,
+        title: pro.title || tariffMaterial.title,
+        description: pro.description,
+        checkout_description: pro.checkout_description,
+        image: pro.image,
+        price: pro.price,
+        tier: "pro" as const,
+      };
+    }
+    return {
+      id: tariffMaterial.id,
+      title: tariffMaterial.title,
+      description: tariffMaterial.description ?? null,
+      checkout_description: tariffMaterial.checkout_description ?? null,
+      image: tariffMaterial.cover_image_url,
+      price: tariffMaterial.price,
+      tier: "base" as const,
+    };
+  }, [tariffMaterial, tariff]);
 
   const pendingRequests = useMemo(() => {
     return requests.filter((r) => !r.is_processed);
@@ -476,7 +618,7 @@ export default function RequestsClient({
     for (const req of pendingRequests) {
       const ids = toStringArray(req.material_ids);
       for (const id of ids) {
-        const mat = materials.find((m) => m.id === id);
+        const mat = vitrineCatalog.map.get(id);
         const title = mat?.title || "Учебный материал";
         const unitPrice = mat?.price ?? 1000;
         const isIssued = ownedMaterialSet.has(id);
@@ -750,11 +892,30 @@ export default function RequestsClient({
     setRequestModalOpen(true);
   }
 
-  function toggleMaterialSelection(id: string) {
-    if (ownedMaterialSet.has(id)) return;
-    setSelectedMaterialIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+  function openTariffModal(item: MaterialItem) {
+    if (ownedMaterialSet.has(item.id)) return;
+    if (item.pro && item.pro.is_active && ownedMaterialSet.has(item.pro.id)) return;
+    setTariff("base");
+    setTariffMaterial(item);
+  }
+
+  function closeTariffModal() {
+    setTariffMaterial(null);
+  }
+
+  /** Добавляет активный тариф в корзину, заменяя альтернативный тариф этого же курса. */
+  function addActiveTariffToCart() {
+    if (!tariffMaterial || !activeTariffView) return;
+    const relatedIds = new Set<string>([tariffMaterial.id]);
+    if (tariffMaterial.pro && tariffMaterial.pro.id) {
+      relatedIds.add(tariffMaterial.pro.id);
+    }
+
+    setSelectedMaterialIds((prev) => {
+      const filtered = prev.filter((id) => !relatedIds.has(id));
+      return [...filtered, activeTariffView.id];
+    });
+    setTariffMaterial(null);
   }
 
   async function saveRequest() {
@@ -1084,16 +1245,22 @@ export default function RequestsClient({
               ) : (
                 <div className="requests-materials-grid no-scrollbar">
                   {filteredMaterials.map((item) => {
-                    const isOwned = ownedMaterialSet.has(item.id);
-                    const isSelected = selectedMaterialIds.includes(item.id);
+                    const pro = item.pro && item.pro.is_active ? item.pro : null;
+                    const isOwned =
+                      ownedMaterialSet.has(item.id) || Boolean(pro && ownedMaterialSet.has(pro.id));
+                    const isSelected = pro
+                      ? selectedMaterialIds.includes(item.id) || selectedMaterialIds.includes(pro.id)
+                      : selectedMaterialIds.includes(item.id);
+                    const pricePrefix = pro ? "от " : "";
 
                     return (
                       <div
                         key={item.id}
                         className={`requests-material-card ${isSelected ? "selected" : ""} ${isOwned ? "owned" : ""}`}
-                        onClick={() => toggleMaterialSelection(item.id)}
+                        onClick={() => openTariffModal(item)}
                       >
                         <div className="requests-material-cover-wrapper">
+                          {pro && <span className="requests-material-pro-badge">PRO</span>}
                           {item.cover_image_url ? (
                             <img
                               src={item.cover_image_url}
@@ -1111,12 +1278,15 @@ export default function RequestsClient({
                         <div className="requests-material-card-body">
                           <div className="requests-material-card-title">{item.title}</div>
                           <div className="requests-material-card-footer">
-                            <span className="requests-material-card-price">{formatPrice(item.price)}</span>
+                            <span className="requests-material-card-price">
+                              {pricePrefix}
+                              {formatPrice(item.price)}
+                            </span>
                             {isOwned ? (
                               <span className="owned-badge">Выдан</span>
                             ) : (
                               <span className={`requests-vitrine-card-btn ${isSelected ? "remove" : "add"}`}>
-                                {isSelected ? "Выбрано" : "+ Выбрать"}
+                                {isSelected ? "Выбрано" : "Выбрать"}
                               </span>
                             )}
                           </div>
@@ -1366,6 +1536,90 @@ export default function RequestsClient({
         </div>
       </Modal>
 
+      <Modal
+        open={Boolean(tariffMaterial)}
+        onClose={closeTariffModal}
+        title=""
+        maxWidth={560}
+        closeOnOverlayClick
+        closeOnEsc
+      >
+        {activeTariffView && tariffMaterial && (
+          <div className="tariff-modal">
+            <div className="tariff-modal-cover">
+              {activeTariffView.image ? (
+                <img src={activeTariffView.image} alt={activeTariffView.title} />
+              ) : (
+                <div className="tariff-modal-cover-placeholder">
+                  {tariffMaterial.material_kind === "crossword" ? "Кроссворд" : "Учебник"}
+                </div>
+              )}
+            </div>
+
+            <div className="tariff-modal-head">
+              <h3 className="tariff-modal-title">{activeTariffView.title}</h3>
+              {activeTariffView.description && (
+                <p className="tariff-modal-desc">{activeTariffView.description}</p>
+              )}
+            </div>
+
+            {tariffMaterial.pro && tariffMaterial.pro.is_active && (
+              <div className="tariff-switch" role="tablist" aria-label="Тариф курса">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tariff === "base"}
+                  className={`tariff-switch-item ${tariff === "base" ? "is-active" : ""}`}
+                  onClick={() => setTariff("base")}
+                >
+                  <span className="tariff-switch-label">Базовый</span>
+                  <span className="tariff-switch-price">{formatPrice(tariffMaterial.price)}</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tariff === "pro"}
+                  className={`tariff-switch-item ${tariff === "pro" ? "is-active" : ""}`}
+                  onClick={() => setTariff("pro")}
+                >
+                  <span className="tariff-switch-label">PRO</span>
+                  <span className="tariff-switch-price">
+                    {formatPrice(tariffMaterial.pro.price)}
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {activeTariffView.checkout_description && (
+              <div className={`tariff-usp tariff-usp--${activeTariffView.tier}`}>
+                <div className="tariff-usp-label">
+                  {activeTariffView.tier === "pro"
+                    ? "Что входит в тариф PRO"
+                    : "Что входит в тариф"}
+                </div>
+                <p className="tariff-usp-text">{activeTariffView.checkout_description}</p>
+              </div>
+            )}
+
+            <div className="tariff-modal-actions">
+              <button type="button" className="btn ghost" onClick={closeTariffModal}>
+                Закрыть
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={addActiveTariffToCart}
+                disabled={ownedMaterialSet.has(activeTariffView.id)}
+              >
+                {ownedMaterialSet.has(activeTariffView.id)
+                  ? "Уже выдан"
+                  : `Добавить в заявку — ${formatPrice(activeTariffView.price)}`}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       <div className="container">
 
         {/* ========================================================= */}
@@ -1492,7 +1746,7 @@ export default function RequestsClient({
                     {requests.map((r) => {
                       const locked = r.is_processed;
 
-                      const matchedMaterials = materials.filter(
+                      const matchedMaterials = vitrineCatalog.list.filter(
                         (m) => r.material_ids && r.material_ids.includes(m.id)
                       );
 
@@ -1560,7 +1814,7 @@ export default function RequestsClient({
                 {requests.map((r) => {
                   const locked = r.is_processed;
 
-                  const matchedMaterials = materials.filter(
+                  const matchedMaterials = vitrineCatalog.list.filter(
                     (m) => r.material_ids && r.material_ids.includes(m.id)
                   );
 

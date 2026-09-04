@@ -62,6 +62,26 @@ function normalizePatchPayload(body: any) {
     payload.order_index = normalizeOrderIndex(body.order_index ?? body.orderIndex);
   }
 
+  if ("is_pro" in body || "isPro" in body) {
+    payload.is_pro = normalizeBool(body.is_pro ?? body.isPro);
+  }
+
+  if ("pro_material_id" in body || "proMaterialId" in body) {
+    payload.pro_material_id = normalizeUUID(body.pro_material_id ?? body.proMaterialId);
+  }
+
+  if ("checkout_description" in body || "checkoutDescription" in body) {
+    payload.checkout_description = normalizeNullableString(
+      body.checkout_description ?? body.checkoutDescription
+    );
+  }
+
+  // Связка «База + PRO»: если материал помечается как PRO-версия,
+  // он не может ссылаться на другой PRO-материал.
+  if (payload.is_pro === true) {
+    payload.pro_material_id = null;
+  }
+
   if ("class_levels" in body || "class_level" in body || "classLevels" in body) {
     payload.class_levels = normalizeClassLevels(body.class_levels ?? body.class_level ?? body.classLevels);
   }

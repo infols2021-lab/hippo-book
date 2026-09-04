@@ -641,3 +641,207 @@
     font-size: 10px !important;
   }
 }
+
+/* =========================================================
+   Модалка выбора тарифа «База + PRO»
+   ========================================================= */
+
+.requests-material-pro-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0f172a, #334155);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.28);
+}
+
+.requests-material-cover-wrapper {
+  position: relative;
+}
+
+.tariff-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tariff-modal-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 18px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--project-text, #0f172a) 5%, transparent);
+  border: 1px solid var(--glass-border, rgba(15, 23, 42, 0.12));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tariff-modal-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tariff-modal-cover-placeholder {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--project-text, #0f172a) 40%, transparent);
+}
+
+.tariff-modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tariff-modal-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.25;
+  color: var(--project-text, #0f172a);
+}
+
+.tariff-modal-desc {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--project-text, #0f172a) 72%, transparent);
+  white-space: pre-line;
+}
+
+/* Segmented Control (iOS-стиль) */
+.tariff-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--project-text, #0f172a) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--project-text, #0f172a) 8%, var(--glass-border, rgba(15, 23, 42, 0.12)));
+}
+
+.tariff-switch-item {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: transparent;
+  color: color-mix(in srgb, var(--project-text, #0f172a) 62%, transparent);
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tariff-switch-item:hover {
+  color: var(--project-text, #0f172a);
+}
+
+.tariff-switch-item.is-active {
+  background: var(--project-card-bg, #ffffff);
+  color: var(--project-text, #0f172a);
+  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--project-text, #0f172a) 40%, transparent);
+}
+
+.tariff-switch-label {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.tariff-switch-item.is-active .tariff-switch-label {
+  color: var(--project-primary, #0ea5e9);
+}
+
+.tariff-switch-price {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+/* УТП-блок тарифа */
+.tariff-usp {
+  border-radius: 18px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--project-primary, #0ea5e9) 26%, var(--glass-border, rgba(15, 23, 42, 0.12)));
+  background: color-mix(in srgb, var(--project-primary, #0ea5e9) 7%, var(--project-card-bg, #ffffff));
+  box-shadow: 0 10px 26px -18px color-mix(in srgb, var(--project-primary, #0ea5e9) 60%, transparent);
+}
+
+.tariff-usp--pro {
+  background: linear-gradient(135deg, color-mix(in srgb, #6366f1 10%, #ffffff), color-mix(in srgb, #8b5cf6 8%, #ffffff));
+  border-color: color-mix(in srgb, #8b5cf6 30%, transparent);
+}
+
+.tariff-usp-label {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--project-primary, #0ea5e9);
+  margin-bottom: 8px;
+}
+
+.tariff-usp--pro .tariff-usp-label {
+  color: #7c3aed;
+}
+
+.tariff-usp-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--project-text, #0f172a);
+  white-space: pre-line;
+}
+
+.tariff-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .tariff-switch {
+    border-radius: 14px;
+  }
+
+  .tariff-switch-item {
+    padding: 8px 10px;
+  }
+
+  .tariff-switch-label {
+    font-size: 13px;
+  }
+
+  .tariff-usp-text {
+    font-size: 13px;
+  }
+
+  .tariff-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .tariff-modal-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

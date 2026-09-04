@@ -2,7 +2,11 @@
 import "server-only";
 
 import type { DataAuthContext } from "@/lib/data/auth";
-import type { MaterialDbRow, MaterialWithProgress } from "@/lib/materials/types";
+import type {
+  MaterialAccessMode,
+  MaterialDbRow,
+  MaterialWithProgress,
+} from "@/lib/materials/types";
 
 export type GatehouseAssignmentLink = {
   id: string;
@@ -128,6 +132,10 @@ export function normalizeGatehouseMaterial(row: any): MaterialDbRow {
     updated_at: typeof row?.updated_at === "string" ? row.updated_at : new Date().toISOString(),
     meta: row?.meta && typeof row.meta === "object" ? row.meta : {},
     project_tab_id: null,
+    // Ветка Gatehouse не участвует в связке «База + PRO».
+    is_pro: false,
+    pro_material_id: null,
+    checkout_description: null,
   };
 }
 
@@ -170,12 +178,18 @@ function buildGatehouseMaterialsWithProgress(params: {
     const progress =
       totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
 
+    const hasAccess = Boolean(material.is_available || params.accessIds.has(material.id));
+
     return {
       ...material,
       totalAssignments,
       completedAssignments,
       progress,
-      hasAccess: Boolean(material.is_available || params.accessIds.has(material.id)),
+      hasAccess,
+      // Ветка Gatehouse не имеет PRO-тарифов — всегда только базовый режим.
+      hasProAccess: false,
+      accessMode: (hasAccess ? "base" : "none") as MaterialAccessMode,
+      pro: null,
     };
   });
 }

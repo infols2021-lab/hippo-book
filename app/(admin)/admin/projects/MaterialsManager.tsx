@@ -16,6 +16,7 @@ export default function MaterialsManager() {
   
   const [levels, setLevels] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
+  const [projectMaterials, setProjectMaterials] = useState<any[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
   const [editingMaterial, setEditingMaterial] = useState<any | null>(null);
@@ -55,6 +56,17 @@ export default function MaterialsManager() {
       setSelectedTabId(""); 
     });
   }, [selectedProjectId, projects]);
+
+  // Все материалы проекта (без фильтра по табу) — для селектора «Привязать PRO-тариф».
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setProjectMaterials([]);
+      return;
+    }
+    fetch(`/api/admin/projects/${selectedProjectId}/materials`)
+      .then((r) => r.json())
+      .then((d) => setProjectMaterials(d.materials || []));
+  }, [selectedProjectId]);
 
   useEffect(() => {
     if (!selectedProjectId || !selectedTabId) {
@@ -96,6 +108,9 @@ export default function MaterialsManager() {
       price: Number(editingMaterial.price) || 1000,
       is_secret: Boolean(editingMaterial.is_secret),
       is_demo: Boolean(editingMaterial.is_demo),
+      is_pro: Boolean(editingMaterial.is_pro),
+      pro_material_id: editingMaterial.is_pro ? null : (editingMaterial.pro_material_id || null),
+      checkout_description: editingMaterial.checkout_description || null,
       material_kind: editingMaterial.is_roadmap ? "roadmap" : (editingMaterial.material_kind || "material"),
       project_tab_id: selectedTabId === "none" || !selectedTabId ? null : selectedTabId,
       class_levels: levelCodes,
@@ -185,9 +200,18 @@ export default function MaterialsManager() {
       target_levels: currentLevels,
       class_levels: currentLevels,
       is_demo: Boolean(material.is_demo),
+      is_pro: Boolean(material.is_pro),
+      pro_material_id: material.pro_material_id ? String(material.pro_material_id) : null,
+      checkout_description: material.checkout_description ? String(material.checkout_description) : "",
       is_roadmap: material.material_kind === "roadmap",
     });
   };
+
+  type ProOptionRow = { id?: string | number; is_pro?: boolean; title?: string };
+  const proOptions = (projectMaterials || []).filter((m: ProOptionRow) => {
+    const id = String(m?.id ?? "");
+    return Boolean(m?.is_pro) && id !== String(editingMaterial?.id || "");
+  });
 
   return (
     <div className="space-y-6">
@@ -230,6 +254,9 @@ export default function MaterialsManager() {
             is_available: false, 
             is_secret: false,
             is_demo: false,
+            is_pro: false,
+            pro_material_id: null,
+            checkout_description: "",
             order_index: 0,
             material_kind: "material",
             is_roadmap: false,
@@ -308,12 +335,82 @@ export default function MaterialsManager() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-bold mb-1">Описание (Description)</label>
+              <label className="block text-sm font-bold mb-1">Описание курса (общее, description)</label>
               <textarea 
                 className="w-full border-2 rounded-xl px-4 py-2" 
                 rows={2} 
                 value={editingMaterial.description || ""} 
                 onChange={e => setEditingMaterial({...editingMaterial, description: e.target.value})} 
+              />
+              <p className="text-xs text-gray-400 font-medium mt-1">
+                Академическое описание: темы курса, уровень языка, для кого предназначен. Используется по всей платформе.
+              </p>
+            </div>
+
+            <div className="md:col-span-2 p-4 bg-gray-50 rounded-xl border flex flex-col gap-4">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-800">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+                  checked={Boolean(editingMaterial.is_pro)}
+                  onChange={(e) =>
+                    setEditingMaterial({
+                      ...editingMaterial,
+                      is_pro: e.target.checked,
+                      pro_material_id: e.target.checked ? null : editingMaterial.pro_material_id,
+                    })
+                  }
+                />
+                PRO-версия (скрыть из каталога витрины)
+              </label>
+
+              {!editingMaterial.is_pro && (
+                <div>
+                  <label className="block text-sm font-bold mb-1 text-gray-700">
+                    Привязать PRO-тариф (pro_material_id)
+                  </label>
+                  <select
+                    className="w-full border-2 rounded-xl px-4 py-2 bg-white outline-none"
+                    value={editingMaterial.pro_material_id || ""}
+                    onChange={(e) =>
+                      setEditingMaterial({
+                        ...editingMaterial,
+                        pro_material_id: e.target.value || null,
+                      })
+                    }
+                  >
+                    <option value="">— Без PRO-версии —</option>
+                    {proOptions.map((p) => (
+                      <option key={String(p.id)} value={String(p.id)}>
+                        {p.title || "Материал"} (PRO)
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400 font-medium mt-1">
+                    В списке — только PRO-материалы этой же ветки. На карточке появится цена «от …», а в заявке — выбор тарифа.
+                  </p>
+                </div>
+              )}
+
+              {Boolean(editingMaterial.is_pro) && (
+                <p className="text-xs text-amber-600 font-semibold">
+                  Материал отмечен как PRO и не показывается отдельной карточкой в витрине и списках ученика.
+                </p>
+              )}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-bold mb-1">
+                Описание тарифа в заявке (checkout_description)
+              </label>
+              <textarea
+                className="w-full border-2 rounded-xl px-4 py-2"
+                rows={4}
+                placeholder="Коммерческое описание формата и тарифа для модалки заявки: УТП, формат доступа, система звёзд, экзамены, сертификаты."
+                value={editingMaterial.checkout_description || ""}
+                onChange={(e) =>
+                  setEditingMaterial({ ...editingMaterial, checkout_description: e.target.value })
+                }
               />
             </div>
           </div>
@@ -474,6 +571,16 @@ export default function MaterialsManager() {
                             {mat.material_kind === "roadmap" && (
                               <span className="bg-sky-100 text-sky-700 px-2 py-0.5 rounded text-[10px] font-bold">
                                 ROADMAP
+                              </span>
+                            )}
+                            {mat.is_pro && (
+                              <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold">
+                                PRO
+                              </span>
+                            )}
+                            {mat.pro_material_id && (
+                              <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                PRO-связь
                               </span>
                             )}
                           </div>

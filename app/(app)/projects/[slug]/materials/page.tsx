@@ -47,7 +47,7 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
       <div className="materials-page">
         <div className="materials-container materials-container--state">
           <div className="materials-empty card">
-            <p>⚠️ Не удалось загрузить профиль</p>
+            <p>Не удалось загрузить профиль</p>
             <p className="materials-subtitle">{profileError.message}</p>
           </div>
         </div>
@@ -64,7 +64,7 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
       <div className="materials-page">
         <div className="materials-container materials-container--state">
           <div className="materials-empty card">
-            <p>📭 В этом проекте пока нет разделов</p>
+            <p>В этом проекте пока нет разделов</p>
             <p className="materials-subtitle">Обратитесь к администратору</p>
           </div>
         </div>
@@ -89,7 +89,7 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
       <div className="materials-page">
         <div className="materials-container materials-container--state">
           <div className="materials-empty card">
-            <p>⚠️ Не удалось загрузить материалы</p>
+            <p>Не удалось загрузить материалы</p>
             <p className="materials-subtitle">{materialsResult.error}</p>
           </div>
         </div>
@@ -103,7 +103,9 @@ export default async function ProjectMaterialsPage({ params, searchParams }: Pag
   const lockedMats: MaterialWithProgress[] = [];
 
   for (const m of materials) {
-    if (m.hasAccess) {
+    // Карточка доступна, если ученик имеет доступ хотя бы к одному из тарифов
+    // связки «База + PRO» (дальше режим открытия определяет бейдж accessMode).
+    if (m.hasAccess || m.hasProAccess) {
       availableMats.push(m);
     } else {
       lockedMats.push(m);

@@ -6,10 +6,18 @@ import { useEffect } from "react";
 import { useTour } from "@/components/tour/TourProvider";
 import { dispatchTourPageReady } from "@/lib/tour/tourMobile";
 import { rewriteSupabasePublicStorageUrl } from "@/lib/storage/publicUrl";
-import type { MaterialWithProgress } from "@/lib/materials/types";
+import type { MaterialAccessMode, MaterialWithProgress } from "@/lib/materials/types";
 import ProjectHeader from "@/components/projects/ProjectHeader";
 
 import "../profile/profile.css";
+
+// Бейдж режима доступа к связке «База + PRO» (без эмодзи — строгий текст).
+const ACCESS_MODE_LABEL: Record<MaterialAccessMode, string | null> = {
+  none: null,
+  base: "Базовый",
+  pro: "PRO",
+  full: "Полный доступ",
+};
 
 type ProjectTab = {
   id: string;
@@ -131,6 +139,7 @@ export default function MaterialsClient({
                   const coverUrl = toCoverUrl(m.cover_image_url);
                   const isSecret = (m as { is_secret?: boolean }).is_secret === true;
                   const isDemo = Boolean((m as { is_demo?: boolean }).is_demo);
+                  const accessLabel = ACCESS_MODE_LABEL[m.accessMode] ?? null;
 
                   return (
                     <Link
@@ -148,11 +157,16 @@ export default function MaterialsClient({
                         {coverUrl ? (
                           <img src={coverUrl} alt={m.title || "Обложка"} loading="lazy" decoding="async" />
                         ) : (
-                          <div className="material-cover-placeholder">{isSecret ? "🎁" : "📄"}</div>
+                          <div className="material-cover-placeholder" aria-hidden="true" />
                         )}
                         {isDemo && <span className="material-demo-badge">Демо</span>}
                         {isSecret && (
-                          <span className="material-secret-badge">★ Секретный</span>
+                          <span className="material-secret-badge">Секретный</span>
+                        )}
+                        {accessLabel && (
+                          <span className={`material-access-badge material-access-badge--${m.accessMode}`}>
+                            {accessLabel}
+                          </span>
                         )}
                       </div>
                       <div className="material-title">{m.title || "Без названия"}</div>
@@ -180,7 +194,7 @@ export default function MaterialsClient({
                         {coverUrl ? (
                           <img src={coverUrl} alt={m.title || "Обложка"} loading="lazy" decoding="async" />
                         ) : (
-                          <div className="material-cover-placeholder">📄</div>
+                          <div className="material-cover-placeholder" aria-hidden="true" />
                         )}
                       </div>
                       <div className="material-title">{m.title || "Без названия"}</div>
@@ -188,7 +202,7 @@ export default function MaterialsClient({
                         {m.description || "Материал временно недоступен"}
                       </div>
                       <div className="locked-overlay">
-                        <span className="locked-badge">🔒 Недоступен</span>
+                        <span className="locked-badge">Недоступен</span>
                       </div>
                     </div>
                   );
@@ -196,7 +210,7 @@ export default function MaterialsClient({
               </div>
             ) : (
               <div className="materials-empty card">
-                <p>📭 В этом разделе пока пусто</p>
+                <p>В этом разделе пока пусто</p>
                 <p className="materials-subtitle" style={{ margin: 0 }}>
                   Ожидайте, когда администратор загрузит сюда материалы.
                 </p>

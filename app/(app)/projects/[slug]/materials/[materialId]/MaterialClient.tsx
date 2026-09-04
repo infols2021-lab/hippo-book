@@ -13,8 +13,8 @@ type Props = {
   slug: string;
   projectName: string;
   markText: string;
-  material: any;
-  assignments: any[];
+  material: MaterialView;
+  assignments: AssignmentPreview[];
   completedIds: string[];
   progressPct: number;
   completedCount: number;
@@ -24,11 +24,26 @@ type Props = {
   isDemoMaterial?: boolean;
 };
 
-function assignmentSource(material: any): "textbook" | "crossword" {
+type MaterialView = {
+  id: string;
+  title: string;
+  description?: string | null;
+  material_kind?: string;
+  is_demo?: boolean;
+};
+
+type AssignmentPreview = {
+  id: string;
+  title: string;
+  order_index: number;
+  assignment_type: string;
+};
+
+function assignmentSource(material: MaterialView): "textbook" | "crossword" {
   return material?.material_kind === "crossword" ? "crossword" : "textbook";
 }
 
-function assignmentHref(slug: string, assignmentId: string, material: any): string {
+function assignmentHref(slug: string, assignmentId: string, material: MaterialView): string {
   const source = assignmentSource(material);
   const params = new URLSearchParams({
     id: assignmentId,
@@ -78,7 +93,7 @@ export default function MaterialClient({
         <div className="material-detail-container material-detail-no-access">
           <div className="card material-detail-no-access-card">
             <h2 style={{ color: "var(--project-text)", margin: "0 0 16px 0", fontWeight: 800 }}>
-              У вас нет доступа к этому материалу 🔒
+              У вас нет доступа к этому материалу
             </h2>
             <Link href={`/projects/${slug}/materials`} className="material-detail-back-btn">
               ← Назад к материалам
@@ -117,7 +132,7 @@ export default function MaterialClient({
             {coverUrl ? (
               <img src={coverUrl} alt={material.title} />
             ) : (
-              <span className="material-detail-cover-placeholder">📄</span>
+              <span className="material-detail-cover-placeholder" aria-hidden="true" />
             )}
           </div>
 
@@ -163,7 +178,7 @@ export default function MaterialClient({
                   }}
                 >
                   <div className="material-detail-assignment-main">
-                    <div className="material-detail-assignment-icon">📝</div>
+                    <div className="material-detail-assignment-icon" aria-hidden="true" />
                     <div className="material-detail-assignment-text">
                       <div className="material-detail-assignment-title">
                         {index + 1}. {a.title || "Задание без названия"}
@@ -175,7 +190,7 @@ export default function MaterialClient({
                   <div
                     className={`material-detail-assignment-status ${isDone ? "is-done" : "is-pending"}`}
                   >
-                    {isDone ? "✅ Выполнено" : "▶ Начать"}
+                    {isDone ? "Выполнено" : "Начать"}
                   </div>
                 </Link>
               );
@@ -183,7 +198,7 @@ export default function MaterialClient({
           </div>
         ) : (
           <div className="material-detail-empty">
-            <span className="material-detail-empty-icon">📭</span>
+            <span className="material-detail-empty-icon" aria-hidden="true" />
             <div className="material-detail-empty-title">В этом материале пока нет заданий</div>
             <p className="material-detail-empty-text">
               Ожидайте, когда они будут добавлены администратором.

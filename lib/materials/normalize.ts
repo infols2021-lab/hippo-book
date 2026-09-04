@@ -190,6 +190,9 @@ export type NormalizedMaterial = {
   is_available: boolean;
   is_active: boolean;
   is_secret: boolean; // ✅ Добавлено
+  is_pro: boolean;
+  pro_material_id: string | null;
+  checkout_description: string | null;
   order_index: number;
   project_tab_id: string | null;
   meta: Record<string, unknown>;
@@ -207,6 +210,8 @@ export function normalizeMaterialInput(
   // Гарантируем, что body это объект
   const safeBody = body && typeof body === "object" ? body : {};
 
+  const isPro = normalizeBool(safeBody.is_pro ?? safeBody.isPro ?? false);
+
   return {
     title: normalizeString(safeBody.title ?? safeBody.name),
     description: normalizeNullableString(safeBody.description),
@@ -222,6 +227,16 @@ export function normalizeMaterialInput(
     is_available: normalizeBool(safeBody.is_available ?? safeBody.isAvailable ?? true),
     is_active: normalizeBool(safeBody.is_active ?? safeBody.isActive ?? true),
     is_secret: normalizeBool(safeBody.is_secret ?? safeBody.isSecret ?? false), // ✅ Критическое добавление
+    
+    // Связка «База + PRO»: если материал сам является PRO-версией,
+    // он не может ссылаться на другой PRO-материал (гарантия на уровне API).
+    is_pro: isPro,
+    pro_material_id: isPro
+      ? null
+      : normalizeUUID(safeBody.pro_material_id ?? safeBody.proMaterialId),
+    checkout_description: normalizeNullableString(
+      safeBody.checkout_description ?? safeBody.checkoutDescription
+    ),
     
     order_index: normalizeOrderIndex(safeBody.order_index ?? safeBody.orderIndex),
     

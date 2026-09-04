@@ -193,6 +193,33 @@
   letter-spacing: 0.02em;
 }
 
+/* Бейдж режима доступа к связке «База + PRO» (строгий текст, без эмодзи) */
+.materials-page .material-access-badge {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: color-mix(in srgb, var(--project-text, #0f172a) 78%, transparent);
+  box-shadow: 0 4px 14px rgba(2, 6, 23, 0.25);
+}
+
+.materials-page .material-access-badge--pro {
+  background: linear-gradient(135deg, #0f172a, #334155);
+}
+
+.materials-page .material-access-badge--full {
+  background: linear-gradient(135deg, #059669, #10b981);
+}
+
 .materials-page .material-card--demo {
   border-color: color-mix(in srgb, var(--project-primary, #0ea5e9) 45%, transparent);
 }

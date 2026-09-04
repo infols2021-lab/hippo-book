@@ -10,6 +10,8 @@ import "server-only";
 import type {
   MaterialDbRow,
   MaterialWithProgress,
+  MaterialProLink,
+  MaterialAccessMode,
 } from "@/lib/materials/types";
 import type { DataAuthContext } from "@/lib/data/auth";
 import type { BranchType } from "@/lib/branches/types";
@@ -133,6 +135,11 @@ function normalizeProjectMaterial(row: any): ExtendedMaterialDbRow {
     updated_at: typeof row?.updated_at === "string" ? row.updated_at : new Date().toISOString(),
     meta: row?.meta && typeof row.meta === "object" ? row.meta : {},
     project_tab_id: row?.project_tab_id ?? null,
+    is_pro: Boolean(row?.is_pro),
+    pro_material_id:
+      typeof row?.pro_material_id === "string" ? row.pro_material_id : null,
+    checkout_description:
+      typeof row?.checkout_description === "string" ? row.checkout_description : null,
   };
 }
 
@@ -160,6 +167,10 @@ function normalizeTextbookToMaterial(row: any): ExtendedMaterialDbRow {
     updated_at: typeof row?.updated_at === "string" ? row.updated_at : new Date().toISOString(),
     meta: row?.meta && typeof row.meta === "object" ? row.meta : {},
     project_tab_id: row?.project_tab_id ?? null,
+    // Легаси-учебники не участвуют в связке «База + PRO».
+    is_pro: false,
+    pro_material_id: null,
+    checkout_description: null,
   };
 }
 
@@ -187,6 +198,10 @@ function normalizeCrosswordToMaterial(row: any): ExtendedMaterialDbRow {
     updated_at: typeof row?.updated_at === "string" ? row.updated_at : new Date().toISOString(),
     meta: row?.meta && typeof row.meta === "object" ? row.meta : {},
     project_tab_id: row?.project_tab_id ?? null,
+    // Легаси-кроссворды не участвуют в связке «База + PRO».
+    is_pro: false,
+    pro_material_id: null,
+    checkout_description: null,
   };
 }
 
@@ -195,6 +210,7 @@ function buildMaterialsWithProgress(params: {
   assignments: ProjectAssignmentLink[];
   userProgress: ProjectProgressRow[];
   accessIds: Set<string>;
+  proById: Map<string, ExtendedMaterialDbRow>;
 }): MaterialWithProgress[] {
   const completedSet = new Set(
     params.userProgress
@@ -226,6 +242,36 @@ function buildMaterialsWithProgress(params: {
       continue;
     }
 
+    // Связка «База + PRO»: достаём привязанный PRO-материал (если он есть).
+    let pro: MaterialProLink | null = null;
+    if (material.pro_material_id) {
+      const proRow = params.proById.get(material.pro_material_id) ?? null;
+      if (proRow) {
+        pro = {
+          id: proRow.id,
+          title: proRow.title,
+          price: proRow.price,
+          description: proRow.description,
+          cover_image_url: proRow.cover_image_url,
+          checkout_description: proRow.checkout_description,
+          material_kind: proRow.material_kind,
+          is_active: proRow.is_active,
+          is_available: proRow.is_available,
+          hasAccess: Boolean(proRow.is_available || params.accessIds.has(proRow.id)),
+        };
+      }
+    }
+
+    const hasProAccess = Boolean(pro?.hasAccess);
+    const accessMode: MaterialAccessMode =
+      pro && hasProAccess
+        ? hasAccess
+          ? "full"
+          : "pro"
+        : hasAccess
+          ? "base"
+          : "none";
+
     const materialAssignments = assignmentsByMaterial.get(material.id) ?? [];
     const totalAssignments = materialAssignments.length;
 
@@ -243,6 +289,9 @@ function buildMaterialsWithProgress(params: {
       completedAssignments,
       progress,
       hasAccess,
+      hasProAccess,
+      accessMode,
+      pro,
     });
   }
 
@@ -274,6 +323,8 @@ export async function loadProjectMaterialsData(
     .from("materials")
     .select("*")
     .eq("is_active", true)
+    // PRO-версии никогда не выводятся отдельными карточками в списках ученика/витрины.
+    .eq("is_pro", false)
     .order("order_index", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -291,7 +342,8 @@ export async function loadProjectMaterialsData(
     .from("materials")
     .select("*")
     .eq("is_active", true)
-    .eq("is_demo", true);
+    .eq("is_demo", true)
+    .eq("is_pro", false);
 
   // Легаси-запросы запрашиваем ТОЛЬКО если у таба нет собственного project_tab_id
   const isOlympiad = projectSlug === "olympiad" || !projectSlug;
@@ -369,6 +421,28 @@ export async function loadProjectMaterialsData(
   }
 
   const materials = Array.from(materialsMap.values());
+
+  // Связка «База + PRO»: отдельным запросом подтягиваем привязанные PRO-материалы
+  // (они не попадают в основной список, но нужны для определения доступа и режима).
+  const proIds = materials
+    .map((m) => m.pro_material_id)
+    .filter((id): id is string => Boolean(id));
+  const proById = new Map<string, ExtendedMaterialDbRow>();
+  if (proIds.length > 0) {
+    const { data: proRows } = await supabase
+      .from("materials")
+      .select("*")
+      .in("id", proIds)
+      .eq("is_pro", true)
+      .eq("is_active", true);
+    if (Array.isArray(proRows)) {
+      for (const r of proRows) {
+        const item = normalizeProjectMaterial(r);
+        proById.set(item.id, item);
+      }
+    }
+  }
+
   const materialIds = materials.map((m) => m.id);
 
   let assignmentRows: any[] = [];
@@ -449,6 +523,7 @@ export async function loadProjectMaterialsData(
       assignments,
       userProgress,
       accessIds,
+      proById,
     }),
     error,
   };

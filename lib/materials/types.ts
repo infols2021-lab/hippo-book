@@ -34,6 +34,49 @@ export type MaterialDbRow = {
   updated_at: string;
   meta: Record<string, unknown>;
   project_tab_id: string | null;
+  is_pro: boolean;
+  pro_material_id: string | null;
+  checkout_description: string | null;
+};
+
+/**
+ * Режим доступа ученика к связке «База + PRO».
+ * - none — нет доступа ни к одному тарифу (карточка закрыта);
+ * - base — доступна только База (классический задачник);
+ * - pro — доступен только PRO (roadmap-тренажёр);
+ * - full — куплены оба тарифа (доступен переключатель режимов).
+ */
+export type MaterialAccessMode = "none" | "base" | "pro" | "full";
+
+/**
+ * Связанный PRO-материал в формате витрины заявок (публичный DTO).
+ * Поле image соответствует cover_image_url в БД.
+ */
+export type LinkedProMaterial = {
+  id: string;
+  title: string;
+  price: number;
+  description: string | null;
+  checkout_description: string | null;
+  image: string | null;
+  is_active: boolean;
+};
+
+/**
+ * Связанный PRO-материал во внутреннем слое загрузчика кабинета ученика
+ * (хранит доступы и поля из materials).
+ */
+export type MaterialProLink = {
+  id: string;
+  title: string;
+  price: number;
+  description: string | null;
+  cover_image_url: string | null;
+  checkout_description: string | null;
+  material_kind: MaterialKind;
+  is_active: boolean;
+  is_available: boolean;
+  hasAccess: boolean;
 };
 
 export type MaterialAccessDbRow = {
@@ -87,7 +130,14 @@ export type MaterialWithProgress = MaterialDbRow & {
   totalAssignments: number;
   completedAssignments: number;
   progress: number;
+  /** Доступ к БАЗОВОМУ материалу (обратная совместимость). */
   hasAccess: boolean;
+  /** Доступ к связанному PRO-материалу. */
+  hasProAccess: boolean;
+  /** Режим доступа к связке «База + PRO». */
+  accessMode: MaterialAccessMode;
+  /** Связанный PRO-материал (если привязан админом), иначе null. */
+  pro: MaterialProLink | null;
 };
 
 export type MaterialCreateInput = {
@@ -103,6 +153,9 @@ export type MaterialCreateInput = {
   class_levels?: string[];
   target_levels?: string[];
   project_tab_id?: string | null;
+  is_pro?: boolean;
+  pro_material_id?: string | null;
+  checkout_description?: string | null;
 };
 
 export type MaterialUpdateInput = Partial<MaterialCreateInput> & {
